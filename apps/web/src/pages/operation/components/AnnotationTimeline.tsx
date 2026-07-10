@@ -8,6 +8,10 @@ import {
   MessageSquare,
   Package,
   FileText,
+  FileInput,
+  Check,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -19,14 +23,14 @@ import {
 } from "@carres/shared";
 import {
   useOrderTimeline,
+  useOperationOrder,
   useAddAnnotation,
   type TimelineEntry,
   type AnnotationTag,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 
-// ─── Category → icon + colour (the mockup's language: milestone blue · money
-//     green · edit amber · exception red · note grey · stock/system neutral) ────
+// ─── Category → icon + colour ─────────────────────────────────────────────────
 
 const CATEGORY_STYLE: Record<
   OrderEventCategory,
@@ -41,7 +45,6 @@ const CATEGORY_STYLE: Record<
   system: { icon: FileText, bg: "#F1EFE8", fg: "#5F5E5A" },
 };
 
-// Friendly chip labels + the order categories appear in the filter row.
 const CATEGORY_LABEL: Record<OrderEventCategory, string> = {
   milestone: "Milestones",
   money: "Money",
@@ -61,14 +64,86 @@ const CATEGORY_ORDER: OrderEventCategory[] = [
   "system",
 ];
 
-// ─── Tag helpers (human note tags keep their semantic colour) ─────────────────
+// ─── Lifecycle tracker — "where is this order?" at a glance ────────────────────
+
+const STEPS = ["Placed", "Confirmed", "Production", "Delivery", "Delivered"] as const;
+
+function stepIndexOf(
+  order: { status?: string | null; operation_stage?: string | null } | undefined,
+): { index: number; cancelled: boolean } {
+  if (!order) return { index: 0, cancelled: false };
+  if (order.status === "cancelled") return { index: 0, cancelled: true };
+  switch (order.operation_stage) {
+    case "placed":
+      return { index: 0, cancelled: false };
+    case "confirmed":
+      return { index: 1, cancelled: false };
+    case "in_production":
+      return { index: 2, cancelled: false };
+    case "ready_to_dispatch":
+    case "dispatched":
+      return { index: 3, cancelled: false };
+    case "delivered":
+      return { index: 4, cancelled: false };
+  }
+  if (order.status === "delivered") return { index: 4, cancelled: false };
+  if (order.status === "proceed_order") return { index: 1, cancelled: false };
+  return { index: 0, cancelled: false };
+}
+
+function LifecycleStepper({ index, cancelled }: { index: number; cancelled: boolean }) {
+  if (cancelled) {
+    return (
+      <div className="flex items-center gap-2 px-1 py-1.5 text-[12px] text-red-700">
+        <AlertTriangle size={14} /> Order cancelled
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start">
+      {STEPS.map((label, i) => {
+        const done = i < index;
+        const current = i === index;
+        const dot = done ? "#3B6D11" : current ? "#185FA5" : "#F1EFE8";
+        const line = i <= index ? "#97C459" : "#E5E1D8";
+        return (
+          <div key={label} className="flex-1 text-center relative">
+            {i > 0 && (
+              <div
+                className="absolute top-[9px] left-[-50%] w-full h-[2px]"
+                style={{ background: line }}
+              />
+            )}
+            <div
+              className="relative w-5 h-5 rounded-full grid place-items-center mx-auto"
+              style={{
+                background: dot,
+                color: done || current ? "#fff" : "#B4B2A9",
+                border: !done && !current ? "1px solid #E5E1D8" : undefined,
+              }}
+            >
+              {done && <Check size={11} strokeWidth={3} />}
+            </div>
+            <div
+              className="text-[10px] mt-1"
+              style={{ color: current ? "#185FA5" : "#8A8378", fontWeight: current ? 500 : 400 }}
+            >
+              {label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Tag helpers ──────────────────────────────────────────────────────────────
 
 const TAG_LABEL: Record<AnnotationTag, string> = {
   follow_up: "Follow up",
   escalate: "Escalate to Jess",
   resolved: "Resolved",
 };
-
 const TAG_CLASS: Record<AnnotationTag, string> = {
   follow_up: "bg-yellow-50 text-yellow-700 border border-yellow-200",
   escalate: "bg-red-50 text-red-700 border border-red-200",
@@ -85,11 +160,8 @@ function TagBadge({ tag }: { tag: AnnotationTag }) {
   );
 }
 
-// ─── Map any timeline entry → a display descriptor ────────────────────────────
-// Human title + category come from the shared taxonomy; unmapped actions fall
-// back to a de-underscored label so nothing ever shows raw jsonb.
+// ─── Describe a timeline entry → category + human title + body ────────────────
 
-// Human labels for the fields the auto-capture triggers record.
 const FIELD_LABEL: Record<string, string> = {
   delivery_date: "Delivery date",
   status: "Status",
@@ -111,6 +183,14 @@ function fmtVal(v: unknown): string {
   return String(v);
 }
 
+function isImport(entry: TimelineEntry): boolean {
+  return (
+    entry.kind === "activity" &&
+    (entry.action === "autocount_import" ||
+      eventTypeForLegacyAction(entry.action) === "order.imported")
+  );
+}
+
 function describe(entry: TimelineEntry): {
   category: OrderEventCategory;
   title: string;
@@ -124,15 +204,12 @@ function describe(entry: TimelineEntry): {
     };
   }
   const action = entry.action ?? "";
-  // New auto-capture rows write action = a taxonomy type directly; legacy rows
-  // map via the action table. Either way we get a category + human label.
   const type: OrderEventType | null = isOrderEventType(action)
     ? action
     : eventTypeForLegacyAction(action);
   if (type) {
     const meta = orderEventMeta(type);
     const d = (entry.detail ?? null) as { field?: string; from?: unknown; to?: unknown } | null;
-    // Field edits read as "Delivery date changed · 5 Jul → 9 Jul".
     if (
       (type === "order.field_changed" || type === "order.date_changed") &&
       d &&
@@ -147,35 +224,36 @@ function describe(entry: TimelineEntry): {
     }
     return { category: meta.category, title: meta.defaultTitle, body: null };
   }
-  return {
-    category: "system",
-    title: action.replace(/_/g, " ") || "Activity",
-    body: null,
-  };
+  return { category: "system", title: action.replace(/_/g, " ") || "Activity", body: null };
 }
 
-// ─── Single timeline entry ────────────────────────────────────────────────────
+// ─── Rows ─────────────────────────────────────────────────────────────────────
 
-function TimelineRow({ entry, first }: { entry: TimelineEntry; first: boolean }) {
-  const time = fmtDate(entry.occurred_at, { time: true });
-  const { category, title, body } = describe(entry);
+function IconChip({ category }: { category: OrderEventCategory }) {
   const style = CATEGORY_STYLE[category];
   const Icon = style.icon;
-  const isNote = entry.kind === "annotation";
-
   return (
     <div
-      className={`flex gap-2.5 py-2 ${first ? "" : "border-t border-dashed border-base-100"} ${
+      className="flex-none w-7 h-7 rounded-full grid place-items-center mt-0.5"
+      style={{ backgroundColor: style.bg, color: style.fg }}
+      aria-hidden
+    >
+      <Icon size={15} strokeWidth={2} />
+    </div>
+  );
+}
+
+function TimelineRow({ entry }: { entry: TimelineEntry }) {
+  const time = fmtDate(entry.occurred_at, { time: true });
+  const { category, title, body } = describe(entry);
+  const isNote = entry.kind === "annotation";
+  return (
+    <div
+      className={`flex gap-2.5 py-2 border-t border-dashed border-base-100 first:border-t-0 ${
         category === "exception" ? "-mx-4 px-4 bg-red-50/60" : ""
       }`}
     >
-      <div
-        className="flex-none w-7 h-7 rounded-full grid place-items-center mt-0.5"
-        style={{ backgroundColor: style.bg, color: style.fg }}
-        aria-hidden
-      >
-        <Icon size={15} strokeWidth={2} />
-      </div>
+      <IconChip category={category} />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <span className="text-[12px] font-medium text-base-800 leading-snug">
@@ -195,11 +273,64 @@ function TimelineRow({ entry, first }: { entry: TimelineEntry; first: boolean })
             {body}
           </p>
         ) : (
-          <div className="text-[11px] text-base-500 mt-0.5">
-            {entry.actor_name ?? "System"}
-          </div>
+          <div className="text-[11px] text-base-500 mt-0.5">{entry.actor_name ?? "System"}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Collapsed run of repeated imports — "Imported from AutoCount · 6 times". */
+function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const latest = run[0];
+  const earliest = run[run.length - 1];
+  const range =
+    run.length > 1
+      ? `${fmtDate(earliest.occurred_at)} – ${fmtDate(latest.occurred_at)}`
+      : fmtDate(latest.occurred_at);
+  return (
+    <div className="border-t border-dashed border-base-100 first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-base-50 rounded"
+      >
+        <div
+          className="flex-none w-7 h-7 rounded-full grid place-items-center"
+          style={{ backgroundColor: "#F1EFE8", color: "#5F5E5A" }}
+          aria-hidden
+        >
+          <FileInput size={15} strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] text-base-600">
+            Imported from AutoCount{" "}
+            <span className="text-base-400">· {run.length} times</span>
+          </div>
+          <div className="text-[11px] text-base-400">{range}</div>
+        </div>
+        {open ? (
+          <ChevronDown size={14} className="text-base-400" />
+        ) : (
+          <ChevronRight size={14} className="text-base-400" />
+        )}
+      </button>
+      {open && (
+        <div className="pl-9 pb-1">
+          {run.map((e) => (
+            <div
+              key={e.id}
+              className="flex items-center justify-between py-1 text-[11px] text-base-500"
+            >
+              <span>{e.actor_name ?? "System"}</span>
+              <span className="font-mono text-[10px] text-base-400">
+                {fmtDate(e.occurred_at, { time: true })}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -234,13 +365,13 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         onChange={(e) => setContent(e.target.value)}
         placeholder="Write a note…"
         rows={2}
-        className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[4px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
+        className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[8px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
       />
       <div className="flex items-center gap-2">
         <select
           value={tag}
           onChange={(e) => setTag(e.target.value as AnnotationTag | "")}
-          className="text-[11px] border border-base-200 rounded-[4px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+          className="text-[11px] border border-base-200 rounded-[8px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">General note · no action</option>
           <option value="follow_up">Follow up</option>
@@ -250,7 +381,7 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         <button
           type="submit"
           disabled={!content.trim() || mutation.isPending}
-          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[4px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
+          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[8px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
         >
           {mutation.isPending ? "Saving…" : "Save note"}
         </button>
@@ -261,17 +392,34 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return (
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate()
+  );
+}
+
+type RenderItem =
+  | { kind: "row"; entry: TimelineEntry; category: OrderEventCategory }
+  | { kind: "group"; run: TimelineEntry[] };
+
+function itemTime(it: RenderItem): string {
+  return it.kind === "row" ? it.entry.occurred_at : it.run[0].occurred_at;
+}
+
 interface Props {
   orderId: string;
 }
 
 export default function AnnotationTimeline({ orderId }: Props) {
   const { data, isLoading } = useOrderTimeline(orderId);
-  const entries = data ?? [];
+  const { data: orderData } = useOperationOrder(orderId);
+  const entries = useMemo(() => data ?? [], [data]);
   const [filter, setFilter] = useState<OrderEventCategory | "all">("all");
 
-  // Tag each entry with its category once, then tally what's present so the
-  // filter row only offers categories that actually appear (with counts).
   const described = useMemo(
     () => entries.map((e) => ({ entry: e, category: describe(e).category })),
     [entries],
@@ -282,20 +430,58 @@ export default function AnnotationTimeline({ orderId }: Props) {
     return m;
   }, [described]);
   const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
-  const shown =
-    filter === "all" ? described : described.filter((d) => d.category === filter);
+
+  // Filter → collapse consecutive imports into one group row.
+  const items = useMemo<RenderItem[]>(() => {
+    const filtered =
+      filter === "all" ? described : described.filter((d) => d.category === filter);
+    const out: RenderItem[] = [];
+    let i = 0;
+    while (i < filtered.length) {
+      if (isImport(filtered[i].entry)) {
+        let j = i;
+        while (j < filtered.length && isImport(filtered[j].entry)) j++;
+        const run = filtered.slice(i, j).map((d) => d.entry);
+        out.push(run.length > 1 ? { kind: "group", run } : { kind: "row", entry: run[0], category: "system" });
+        i = j;
+      } else {
+        out.push({ kind: "row", entry: filtered[i].entry, category: filtered[i].category });
+        i++;
+      }
+    }
+    return out;
+  }, [described, filter]);
+
+  const today = items.filter((it) => isToday(itemTime(it)));
+  const earlier = items.filter((it) => !isToday(itemTime(it)));
+
+  const step = stepIndexOf(orderData?.order);
+
+  function renderItem(it: RenderItem) {
+    return it.kind === "group" ? (
+      <ImportGroupRow key={it.run[0].id} run={it.run} />
+    ) : (
+      <TimelineRow key={it.entry.id} entry={it.entry} />
+    );
+  }
 
   return (
     <div>
+      {/* Lifecycle tracker — where is this order right now. */}
+      {orderData?.order && (
+        <div className="mb-3 px-1">
+          <LifecycleStepper index={step.index} cancelled={step.cancelled} />
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-[12px] text-base-400 py-2">Loading…</div>
       ) : entries.length === 0 ? (
         <div className="text-[12px] text-base-500 py-2">No notes or activity yet.</div>
       ) : (
         <>
-          {/* Filter chips — only worth showing when the order spans 2+ kinds. */}
           {presentCategories.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1 mb-1.5">
+            <div className="flex flex-wrap items-center gap-1 mb-2">
               <FilterChip
                 label="All"
                 count={described.length}
@@ -313,10 +499,31 @@ export default function AnnotationTimeline({ orderId }: Props) {
               ))}
             </div>
           )}
-          <div className="bg-white border border-base-200 rounded-[8px] px-4 py-1 mb-3">
-            {shown.map((d, i) => (
-              <TimelineRow key={d.entry.id} entry={d.entry} first={i === 0} />
-            ))}
+
+          <div className="bg-white border border-base-200 rounded-[8px] px-4 py-2 mb-3">
+            {today.length > 0 && (
+              <>
+                <div className="text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1">
+                  Today
+                </div>
+                {today.map(renderItem)}
+              </>
+            )}
+            {earlier.length > 0 && (
+              <>
+                <div
+                  className={`text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1 ${
+                    today.length > 0 ? "pt-3" : ""
+                  }`}
+                >
+                  Earlier
+                </div>
+                {earlier.map(renderItem)}
+              </>
+            )}
+            {items.length === 0 && (
+              <div className="text-[12px] text-base-400 py-2">Nothing in this filter.</div>
+            )}
           </div>
         </>
       )}
