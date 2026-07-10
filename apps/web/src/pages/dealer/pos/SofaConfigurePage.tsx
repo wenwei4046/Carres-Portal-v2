@@ -240,7 +240,10 @@ function cellsDims(cells: SeedCell[], depth: string): { w: number; d: number } {
 
 export default function SofaConfigurePage({
   model,
-  meta,
+  // meta (fromPrice) is accepted for call-site parity, but the header shows
+  // the LIVE canvas total instead (Loo 2026-07-10) — the price follows what's
+  // actually placed on the canvas, no static from-price anywhere in the POS.
+  meta: _meta,
   skus,
   fabrics,
   masterFabrics,
@@ -306,6 +309,9 @@ export default function SofaConfigurePage({
   const [custSize, setCustSize] = useState<string>(() =>
     sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24",
   );
+  // Customize LIVE total — mirrored up from the canvas engine (onLiveTotal) so
+  // the header price follows every module placed/removed; null = empty canvas.
+  const [custTotal, setCustTotal] = useState<number | null>(null);
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
@@ -520,7 +526,7 @@ export default function SofaConfigurePage({
       data-testid="sofa-configure-page"
     >
       {/* Header — the design's cfg-header with the sofa-flow crumb: back ·
-          eyebrow/model · mode tabs (rail pill pair) · from-price. */}
+          eyebrow/model · mode tabs (rail pill pair) · live total. */}
       <div className="cfg-header cfg-header--icon">
         <button
           className="cfg-header__back"
@@ -691,16 +697,20 @@ export default function SofaConfigurePage({
               <div className="cfg-header__totalNote">component total · combo when matched</div>
             </div>
           ) : (
-            meta && (
-              <div className="cfg-header__total" tabIndex={0}>
-                <div className="cfg-header__totalLabel">From</div>
-                <div className="cfg-header__totalNum">
-                  <sup>RM</sup>
-                  {meta.fromPrice.toLocaleString("en-MY")}
-                </div>
-                <div className="cfg-header__totalNote">priced live on the canvas</div>
+            <div className="cfg-header__total" tabIndex={0}>
+              <div className="cfg-header__totalLabel">Live total</div>
+              <div className="cfg-header__totalNum" data-testid="sofa-cust-total">
+                {custTotal !== null ? (
+                  <>
+                    <sup>RM</sup>
+                    {custTotal.toLocaleString("en-MY")}
+                  </>
+                ) : (
+                  "—"
+                )}
               </div>
-            )
+              <div className="cfg-header__totalNote">component total · combo when matched</div>
+            </div>
           )}
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10, marginLeft: 14 }}>
             <button
@@ -1047,6 +1057,7 @@ export default function SofaConfigurePage({
             heights={sofaSizes}
             heightValue={custSize}
             onHeightChange={setCustSize}
+            onLiveTotal={setCustTotal}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {

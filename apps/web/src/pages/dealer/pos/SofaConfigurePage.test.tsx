@@ -298,6 +298,23 @@ describe("SofaConfigurePage", () => {
     expect(screen.queryByTestId("sofa-build-height")).toBeNull();
   });
 
+  it("Customize header LIVE total prices the seeded build and follows size changes", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
+    fireEvent.click(screen.getByTestId("sofa-qp-customize"));
+    // The seeded 1A+2A layout matches COMBO → its 24″ combo price, live in the header.
+    expect(screen.getByTestId("sofa-cust-total").textContent).toContain("2,990");
+    // Size flip reprices through the canvas engine → the header follows.
+    fireEvent.click(screen.getByTestId("sofa-cust-size-28"));
+    expect(screen.getByTestId("sofa-cust-total").textContent).toContain("3,190");
+  });
+
+  it("Customize header LIVE total shows a placeholder while the canvas is empty", () => {
+    renderPage({ combos: [] }); // straight onto an empty Customize canvas
+    expect(screen.getByTestId("sofa-cust-total").textContent).toContain("—");
+  });
+
   it("Create combo: the button is hidden for a non-principal in Customize", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     roleMock.current = "dealer";
