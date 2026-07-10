@@ -998,9 +998,14 @@ export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
 
 export const productSkuPatchInput = z
   .object({
+    // Loo 2026-07-11 — the CODE is a free field (AutoCount style: ACC-601),
+    // directly renameable. `{MODEL_KEY}-{variant}` is only the MINT default;
+    // editing the variant/SIZE label no longer rewrites the code. Historical
+    // orders/POs keep the old code string. DB unique(sku) → 409 on collision.
+    sku: z.string().trim().min(1).max(60).optional(),
     // '' clears the variant — allowed ONLY for accessory/service (no variant
-    // axis; the route gates by the model's category and re-derives the sku to
-    // the bare MODEL_KEY). Mirrors productSkuCreateInput.
+    // axis; the route gates by the model's category). Mirrors
+    // productSkuCreateInput. Does NOT touch the code (see `sku` above).
     variant: z.string().trim().max(60).optional(),
     variantKind: variantKindSchema.optional(),
     price: z.number().nonnegative().optional(),

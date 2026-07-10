@@ -119,7 +119,7 @@ describe("PosConfigurePage — bed frame", () => {
     // The old model.colors picker is gone (bedModel still carries colours).
     expect(screen.queryByTestId("cfg-colour-Natural oak")).toBeNull();
     // Gap defaults to Confirm later (KIV); switch to '12"'.
-    fireEvent.click(screen.getByTestId('cfg-gap-12"'));
+    fireEvent.change(screen.getByTestId("cfg-gap"), { target: { value: '12"' } });
 
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     const line = onAdd.mock.calls[0][0];
@@ -149,7 +149,7 @@ describe("PosConfigurePage — bed frame", () => {
     expect(onAdd.mock.calls[0][0].attrs).toMatchObject({ gap: "KIV" });
 
     // Explicit None → gap "".
-    fireEvent.click(screen.getByTestId("cfg-gap-none"));
+    fireEvent.change(screen.getByTestId("cfg-gap"), { target: { value: "" } });
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     expect(onAdd.mock.calls[1][0].attrs).toMatchObject({ gap: "" });
     expect(onAdd.mock.calls[1][0].label).toBe("Jager · King");
@@ -241,8 +241,8 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
     const onAdd = vi.fn();
     renderBed(onAdd);
     fireEvent.click(screen.getByTestId("cfg-size-b1"));
-    fireEvent.click(screen.getByTestId('cfg-divan-10"'));
-    fireEvent.click(screen.getByTestId('cfg-leg-4"'));
+    fireEvent.change(screen.getByTestId("cfg-divan"), { target: { value: '10"' } });
+    fireEvent.change(screen.getByTestId("cfg-leg"), { target: { value: '4"' } });
     // 1990 + 125 + 60 = 2175
     expect(screen.getByTestId("cfg-live-total").textContent).toContain("2,175");
     // Total height = divan 10" + leg 4" = 14".
