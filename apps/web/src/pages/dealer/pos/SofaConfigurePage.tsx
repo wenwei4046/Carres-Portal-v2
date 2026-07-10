@@ -32,6 +32,7 @@ import {
   groupSofas,
   mirrorModules,
   moduleFootprint,
+  orderSofaCellsLeftToRight,
   resolveFabricDelta,
   ROOM_H,
   ROOM_W,
@@ -195,6 +196,15 @@ export function centerSeedInRoom(cells: SeedCell[], depth: string): SeedCell[] {
   const dx = Math.max(20, (ROOM_W - bb.w) / 2) - bb.x;
   const dy = Math.max(20, (ROOM_H - bb.h) / 2) - bb.y;
   return cells.map((c) => ({ ...c, x: Math.round(c.x + dx), y: Math.round(c.y + dy) }));
+}
+
+/** A combo's composition read like the customer facing the sofa — leftmost
+ *  arm to rightmost arm along the connected chain (Loo 2026-07-11: the SKU
+ *  reading convention — an arm opens, an arm closes a complete sofa). Seeds
+ *  the layout, then applies the shared explode-order walk; NOT slot order. */
+export function walkCodes(combo: SofaComboDto, depth = "24"): string[] {
+  const seeded = comboSeedCells(combo, depth).map((c, i) => ({ ...c, id: `walk-${i}` }));
+  return orderSofaCellsLeftToRight(seeded, depth).map((c) => c.moduleCode);
 }
 
 export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
@@ -363,9 +373,19 @@ export default function SofaConfigurePage({
         .filter((c) => c.modelId === model.id && c.active && !c.discontinuedAt && c.isQuickPick)
         .map((c) => {
           const codes = c.slots.map((s) => s[0]).filter((code): code is string => !!code);
+          // The SKU reading convention (Loo 2026-07-11): an authored label
+          // that is merely a "+"-join of these same codes (any order) is
+          // re-read in the arm→arm walk order; a real custom name ("Family
+          // corner L") passes through untouched.
+          const walk = walkCodes(c);
+          const label = c.label?.trim() ?? "";
+          const labelCodes = label.split("+").map((s) => s.trim()).filter(Boolean);
+          const isCodeJoin =
+            labelCodes.length === codes.length &&
+            [...labelCodes].sort().join("|") === [...codes].sort().join("|");
           return {
             combo: c,
-            title: c.label?.trim() || codes.join(" + "),
+            title: label && !isCodeJoin ? label : walk.join(" + "),
             codes,
           };
         }),
@@ -402,7 +422,8 @@ export default function SofaConfigurePage({
   function displayFor(pick: QuickPick): { flipped: boolean; slots: string[][]; codes: string[] } {
     const flipped = flip[pick.combo.id] === "R";
     const slots = flipped ? mirrorModules(pick.combo.slots) : pick.combo.slots;
-    const codes = slots.map((s) => s[0]).filter((code): code is string => !!code);
+    // Composition reads arm→arm left→right (the walk order), not slot order.
+    const codes = walkCodes({ ...pick.combo, slots });
     return { flipped, slots, codes };
   }
 

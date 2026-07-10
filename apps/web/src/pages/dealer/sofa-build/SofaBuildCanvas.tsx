@@ -29,6 +29,7 @@ import {
   groupSofas,
   analyzeSofa,
   findSnap,
+  orderSofaCellsLeftToRight,
   hasArmConflict,
   mirrorCode,
   reflowCellsForDepth,
@@ -1102,7 +1103,9 @@ export default function SofaBuildCanvas({
           {onCreateCombo && (
             <button
               type="button"
-              onClick={() => onCreateCombo(cells.map((c) => c.moduleCode))}
+              onClick={() =>
+                onCreateCombo(orderSofaCellsLeftToRight(cells, depth).map((c) => c.moduleCode))
+              }
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-combo"
@@ -1114,7 +1117,9 @@ export default function SofaBuildCanvas({
           {onCreateQuickPick && (
             <button
               type="button"
-              onClick={() => onCreateQuickPick(cells.map((c) => c.moduleCode))}
+              onClick={() =>
+                onCreateQuickPick(orderSofaCellsLeftToRight(cells, depth).map((c) => c.moduleCode))
+              }
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-quickpick"

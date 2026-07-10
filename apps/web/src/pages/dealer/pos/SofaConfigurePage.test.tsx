@@ -465,6 +465,21 @@ describe("SofaConfigurePage", () => {
     expect(screen.getByTestId("sofa-build-total").textContent).toContain("2,990");
   });
 
+  it("composition + title read the sofa arm→arm left-to-right, not slot/label order", () => {
+    const cornerPick: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-00000000c0f1",
+      slots: [["2A(RHF)"], ["CNR"], ["1B(LHF)"]], // authored back-to-front
+      label: "CNR + 1B(LHF) + 2A(RHF)", // authored label = a permutation code-join
+    };
+    renderPage({ combos: [cornerPick] });
+    const grid = screen.getByTestId("sofa-quick-picks");
+    // Title + composition both read the physical walk — the LHF chaise arm
+    // opens, the corner links, the RHF 2-seater arm closes the sofa.
+    expect(within(grid).getAllByText("1B(LHF) + CNR + 2A(RHF)")).toHaveLength(2);
+    expect(within(grid).queryByText("CNR + 1B(LHF) + 2A(RHF)")).toBeNull();
+  });
+
   it("hovering a quick pick does NOT move the hero preview — only clicking selects", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     const solo: SofaComboDto = {
