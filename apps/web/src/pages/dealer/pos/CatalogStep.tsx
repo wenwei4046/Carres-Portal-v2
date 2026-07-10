@@ -336,6 +336,12 @@ export default function CatalogStep({
                 fabrics={catalog.fabrics}
                 fabricTierConfig={catalog.fabricTierConfig}
                 modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                catalog={catalog}
+                cartLines={draft.lines}
+                pwpReservedCodes={pwpReservedCodes}
+                pwpClaimGroup={pwpClaimGroup}
+                customerPhone={customerPhone}
+                onApplyVoucherCode={onApplyVoucherCode}
                 onAdd={addLine}
                 onClose={() => setConfigureModelId(null)}
               />
