@@ -34,7 +34,7 @@ const DELIVERY_ADDON_LABELS: Record<string, string> = {
  *  Returns a short tag to render alongside the line + "FREE" instead of RM0. */
 function freeLineTag(attrs: Record<string, unknown> | null): string | null {
   if (!attrs) return null;
-  if (attrs.free_gift) return "Free gift";
+  if (attrs.free_gift) return "GWP";
   if (attrs.free_item) return "Free item";
   return null;
 }

@@ -102,7 +102,7 @@ export default function OrderSummaryRail({
                     <div className="summary__item-main">
                       <div className="summary__item-name">{g.name}</div>
                       <div className="summary__item-meta">
-                        qty {g.qty} · Free gift{g.campaign ? ` · ${g.campaign}` : ""}
+                        qty {g.qty} · GWP{g.campaign ? ` · ${g.campaign}` : ""}
                       </div>
                     </div>
                     <span className="summary__item-price" style={{ color: "var(--success, #16a34a)" }}>

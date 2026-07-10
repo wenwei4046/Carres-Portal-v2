@@ -315,7 +315,7 @@ export default function CartDrawer({
                           <Gift size={13} strokeWidth={1.75} />
                         </span>
                         <span className="t-small text-base-700 truncate">
-                          Free gift: {g.name}
+                          GWP: {g.name}
                           {g.qty > 1 && <span className="text-base-500"> ×{g.qty}</span>}
                           {g.campaign && (
                             <span className="text-base-400"> · {g.campaign}</span>
