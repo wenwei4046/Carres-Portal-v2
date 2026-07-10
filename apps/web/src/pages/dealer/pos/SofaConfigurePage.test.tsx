@@ -9,13 +9,18 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   CatalogFabricDto,
+  CatalogResponse,
   ModelSofaCompartmentDto,
   ProductModelDto,
   ProductSkuDto,
+  PwpCodeDto,
+  PwpDiscoverDto,
+  PwpRuleDto,
   SofaComboDto,
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
+import type { DraftLine } from "../new-order/draft";
 import {
   analyzeSofa,
   cellsBbox,
@@ -126,6 +131,78 @@ const PRESET_SKU: ProductSkuDto = {
   supplierId: null,
 };
 
+// ── PWP real-apply fixtures ──────────────────────────────────────────────────
+// Rule: buying a MATTRESS unlocks THIS sofa combo at its PWP price (sofa
+// rewards are combo-targeted, 0186 sofa-as-reward). The combo carries a PWP
+// price at 24″ so the swapped engine total is deterministic (1,500).
+const PWP_COMBO: SofaComboDto = { ...COMBO, pwpPricesByHeight: { "24": 1500 } };
+
+const SOFA_RULE: PwpRuleDto = {
+  id: "rule-sofa",
+  type: "pwp",
+  triggerCategory: "mattress",
+  triggerTargets: [],
+  rewardCategory: "sofa",
+  rewardTargets: [{ scope: "combo", modelId: "", comboIds: [PWP_COMBO.id] }],
+  qtyPerTrigger: 1,
+  active: true,
+  carryForward: true,
+  carryForwardDays: null,
+};
+
+const MATT_MODEL_ID = "00000000-0000-0000-0000-0000000000ma";
+
+function pwpCatalog(over?: Partial<CatalogResponse>): CatalogResponse {
+  return {
+    models: [
+      MODEL,
+      { id: MATT_MODEL_ID, category: "mattress", modelKey: "matt-x", name: "Matt X", blurb: null, colors: null, gaps: null, sofaMode: null },
+    ],
+    skus: [
+      { id: "cs-1", modelId: MODEL.id, sku: PRESET_SKU.sku, variant: "3-seater", variantKind: "preset", price: 2990, cost: null, supplierId: null, posActive: true, description: null, pwpPrice: null },
+      { id: "cs-2", modelId: MATT_MODEL_ID, sku: "MATT-A", variant: "Queen", variantKind: "size", price: 1200, cost: null, supplierId: null, posActive: true, description: null, pwpPrice: null },
+    ],
+    sofaFabrics: FABRICS,
+    addons: [],
+    floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    sofaCompartments: POOL,
+    modelSofaCompartments: OFFERED,
+    sofaCombos: [PWP_COMBO],
+    modelDefaultFreeGifts: [],
+    freeItemCampaigns: [],
+    pwpRules: [SOFA_RULE],
+    ...over,
+  } as CatalogResponse;
+}
+
+/** A cart holding the MATTRESS trigger line. */
+const TRIGGER_CART: DraftLine[] = [
+  { localId: "T1", sku: "MATT-A", qty: 1, attrs: null, unitPrice: 1200, label: "Matt X · Queen" },
+];
+
+function reservedCode(over: Partial<PwpCodeDto> & { code: string; ruleId: string }): PwpCodeDto {
+  return {
+    type: "pwp",
+    rewardCategory: "sofa",
+    rewardTargets: SOFA_RULE.rewardTargets,
+    status: "RESERVED",
+    ownerStaffId: "11111111-1111-1111-1111-111111111111",
+    cartLineKey: "T1",
+    triggerItemCode: "MATT-A",
+    claimGroup: null,
+    redeemedOrderId: null,
+    redeemedItemSku: null,
+    sourceOrderId: null,
+    customerId: null,
+    boundCustomerPhone: null,
+    ownerDealerId: null,
+    expiresAt: null,
+    createdAt: "2026-07-11T00:00:00Z",
+    updatedAt: "2026-07-11T00:00:00Z",
+    ...over,
+  };
+}
+
 function renderPage(over?: {
   combos?: SofaComboDto[];
   onClose?: () => void;
@@ -133,6 +210,12 @@ function renderPage(over?: {
   fabrics?: SofaFabricDto[];
   masterFabrics?: CatalogFabricDto[] | null;
   model?: ProductModelDto;
+  catalog?: CatalogResponse | null;
+  cartLines?: DraftLine[];
+  pwpReservedCodes?: PwpCodeDto[];
+  pwpClaimGroup?: string;
+  customerPhone?: string;
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
 }) {
   const onAdd = vi.fn();
   const onClose = vi.fn(over?.onClose);
@@ -148,6 +231,12 @@ function renderPage(over?: {
       sofaCompartments={POOL}
       modelCompartments={OFFERED}
       sofaCombos={over?.combos ?? [COMBO]}
+      catalog={over?.catalog}
+      cartLines={over?.cartLines}
+      pwpReservedCodes={over?.pwpReservedCodes}
+      pwpClaimGroup={over?.pwpClaimGroup}
+      customerPhone={over?.customerPhone}
+      onApplyVoucherCode={over?.onApplyVoucherCode}
       onAdd={onAdd}
       onClose={onClose}
     />,
@@ -466,11 +555,8 @@ describe("SofaConfigurePage", () => {
     expect(screen.getByTestId("sofa-qp-total").textContent).toContain("3,190");
   });
 
-  it("header Add to Cart emits a DraftLine (fabric deferred + remark + PWP hint)", () => {
-    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+  it("header Add to Cart emits a DraftLine (fabric deferred + remark)", () => {
     const { onAdd, onClose } = renderPage({ skus: [PRESET_SKU] });
-    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
-    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
     fireEvent.change(screen.getByTestId("sofa-qp-remark"), { target: { value: "match showroom" } });
     fireEvent.click(screen.getByTestId("sofa-qp-add"));
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -479,7 +565,6 @@ describe("SofaConfigurePage", () => {
     const attrs = line.attrs as Record<string, unknown>;
     expect(attrs.fabric_deferred).toBe(true);
     expect(attrs.remark).toBe("match showroom");
-    expect(attrs.pwp_pending_code).toBe("PWP-1234ABCD");
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -547,36 +632,87 @@ describe("SofaConfigurePage", () => {
     expect(box.querySelector('[data-testid="sofa-plan-svg"]')).toBeTruthy();
   });
 
-  it("shows the INSERT PWP code input by default", () => {
-    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+  it("DORMANT: no catalog → no PWP box at all", () => {
     renderPage();
-    expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
+    expect(screen.queryByTestId("sofa-pwp")).toBeNull();
   });
 
-  it("a valid PWP code shows the applied chip", () => {
-    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
-    renderPage();
+  it("DORMANT: a catalog with only inactive rules → no PWP box", () => {
+    renderPage({
+      catalog: pwpCatalog({ pwpRules: [{ ...SOFA_RULE, active: false }] }),
+    });
+    expect(screen.queryByTestId("sofa-pwp")).toBeNull();
+  });
+});
+
+describe("SofaConfigurePage — PWP voucher real apply", () => {
+  const pwpOver = () => ({
+    skus: [PRESET_SKU],
+    combos: [PWP_COMBO],
+    catalog: pwpCatalog(),
+    cartLines: TRIGGER_CART,
+    pwpReservedCodes: [reservedCode({ code: "PWP-1234ABCD", ruleId: SOFA_RULE.id })],
+    pwpClaimGroup: "cg-1",
+  });
+
+  it("Auto Fill binds the reserved code, previews the PWP total, and emits a claimed line", () => {
+    const { onAdd } = renderPage(pwpOver());
+
+    fireEvent.click(screen.getByTestId("sofa-pwp-autofill"));
+    expect(screen.getByTestId("sofa-pwp-applied").textContent).toContain("PWP-1234ABCD");
+    // Live total swaps to the combo's PWP price at 24″ (1,500), noted as PWP.
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("1,500");
+
+    fireEvent.click(screen.getByTestId("sofa-qp-add"));
+    const line = onAdd.mock.calls[0]![0] as DraftLine;
+    expect(line.unitPrice).toBe(1500);
+    expect(line.origUnitPrice).toBe(2990);
+    expect((line.attrs as Record<string, unknown>).pwp).toEqual({
+      ruleId: SOFA_RULE.id,
+      code: "PWP-1234ABCD",
+      claimGroup: "cg-1",
+    });
+  });
+
+  it("typing the reserved code + Apply binds it like Auto Fill", () => {
+    renderPage(pwpOver());
     fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "pwp-1234abcd" } });
     fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
     expect(screen.getByTestId("sofa-pwp-applied").textContent).toContain("PWP-1234ABCD");
   });
 
   it("an unknown PWP code shows a validation error", () => {
-    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
-    renderPage();
+    renderPage(pwpOver());
     fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "BADCODE" } });
     fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
     expect(screen.getByTestId("sofa-pwp-error")).toBeTruthy();
+    expect(screen.queryByTestId("sofa-pwp-applied")).toBeNull();
   });
 
-  it("clears the applied code via remove", () => {
-    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
-    renderPage();
+  it("no qualifying trigger in the cart → no Auto Fill; the reserved code is refused", () => {
+    renderPage({ ...pwpOver(), cartLines: [] });
+    expect(screen.queryByTestId("sofa-pwp-autofill")).toBeNull();
     fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
     fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-error").textContent).toContain("sofa layout");
+  });
+
+  it("clears the applied code via remove (total back to normal)", () => {
+    renderPage(pwpOver());
+    fireEvent.click(screen.getByTestId("sofa-pwp-autofill"));
     expect(screen.getByTestId("sofa-pwp-applied")).toBeTruthy();
     fireEvent.click(screen.getByTestId("sofa-pwp-remove"));
     expect(screen.queryByTestId("sofa-pwp-applied")).toBeNull();
     expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("2,990");
+  });
+
+  it("cross-order apply without a customer phone is refused with the step-02 hint", () => {
+    const lookup = vi.fn();
+    renderPage({ ...pwpOver(), pwpReservedCodes: [], onApplyVoucherCode: lookup });
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-CROSS111" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(lookup).not.toHaveBeenCalled();
+    expect(screen.getByTestId("sofa-pwp-error").textContent).toContain("step 02");
   });
 });

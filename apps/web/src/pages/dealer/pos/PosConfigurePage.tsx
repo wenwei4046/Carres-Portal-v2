@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, LayoutTemplate, Minus, Plus, X } from "lucide-react";
+import { ArrowLeft, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
+  CatalogResponse,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
   ProductModelDto,
   ProductSkuDto,
+  PwpCodeDto,
+  PwpDiscoverDto,
   SpecialAddonDto,
 } from "@carres/shared";
 import {
@@ -24,6 +27,14 @@ import { SpecialAddonsPicker, useSpecials } from "../new-order/special-addons-pi
 import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
 import type { SellingFabric } from "../sofa-build/selling-fabrics";
 import type { ModelMeta } from "./catalog-index";
+import {
+  coveringPwpForLine,
+  linePwpCode,
+  markLinePwp,
+  markLinePwpWithAvailableCode,
+  markLinePwpWithCode,
+  pwpRewardPrice,
+} from "./pwp-line";
 
 /**
  * Full-page mattress / bed-frame configurator — the design prototype's
@@ -290,6 +301,12 @@ export default function PosConfigurePage({
   fabrics,
   fabricTierConfig,
   modelFabricTierOverrides,
+  catalog,
+  cartLines,
+  pwpReservedCodes,
+  pwpClaimGroup,
+  customerPhone,
+  onApplyVoucherCode,
   onAdd,
   onClose,
 }: {
@@ -303,6 +320,23 @@ export default function PosConfigurePage({
   fabrics?: CatalogFabricDto[] | null;
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
+  /** PWP voucher bar (P8b/c/d) — the full catalog bundle. Optional: absent (or
+   *  0 active pwp_rules) → the voucher section never renders (DORMANT). */
+  catalog?: CatalogResponse | null;
+  /** The current cart lines — PWP eligibility runs the SAME shared
+   *  `coveringPwpForLine` over cart + this candidate, so the bar never offers a
+   *  claim the server would 409. */
+  cartLines?: DraftLine[];
+  /** 0187 — the caller's RESERVED pwp_codes (from /pwp-codes/mine). Auto Fill
+   *  binds the first free one under a covering rule. */
+  pwpReservedCodes?: PwpCodeDto[];
+  /** 0187 — the per-cart claimGroup stamped onto a bound reward line. */
+  pwpClaimGroup?: string;
+  /** 0188 — the cart's customer phone; gates the cross-order manual Apply
+   *  (a carry-forward voucher is phone-bound; the server re-asserts). */
+  customerPhone?: string;
+  /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -413,7 +447,176 @@ export default function PosConfigurePage({
   const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
 
   const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal;
-  const total = unitPrice * qty;
+
+  /** The DraftLine this configuration would emit — byte-identical to the old
+   *  drawer configurators (same attrs, same unitPrice math, same label); used
+   *  by BOTH `add()` and the PWP eligibility candidate below. */
+  function composeLine(localId: string, lineQty: number): DraftLine | null {
+    if (!sku) return null;
+    const optionsPatch =
+      resolvedOptions.lines.length > 0
+        ? { options: resolvedOptions.lines, options_total: optionsTotal }
+        : {};
+    const attrs = isBed
+      ? { gap, ...optionsPatch, ...sp.attrsPatch }
+      : sp.picks.length > 0
+        ? sp.attrsPatch
+        : null;
+    return {
+      localId,
+      sku: sku.sku,
+      qty: lineQty,
+      attrs,
+      unitPrice,
+      label: isBed
+        ? `${model.name} · ${sku.variant}${finishName ? ` · ${finishName}` : ""}${gap ? ` · gap ${gap}` : ""}`
+        : `${model.name} · ${sku.variant}`,
+    };
+  }
+
+  // ── PWP & Promo voucher (2990s configurator rail parity) ──────────────────
+  // A REAL apply, not a hint: the emitted line is PWP-claimed (attrs.pwp with
+  // the bound code + claimGroup) and the live total shows the forced reward
+  // price. Eligibility runs the SAME shared `coveringPwpForLine` the cart +
+  // server use, over cart + a qty-1 candidate of the CURRENT picks — the bar
+  // never offers a claim the server would 409 (honest-pricing). DORMANT (no
+  // catalog / 0 active rules) → the section never renders.
+  const pwpLineId = useRef(newLocalId());
+  const pwpRulesActive = (catalog?.pwpRules ?? []).some((r) => r.active);
+  const pwpCandidate = catalog && pwpRulesActive ? composeLine(pwpLineId.current, 1) : null;
+  const pwpCovering =
+    pwpCandidate && catalog
+      ? coveringPwpForLine(pwpCandidate, [...(cartLines ?? []), pwpCandidate], catalog)
+      : [];
+
+  const [pwpApplied, setPwpApplied] = useState<{
+    ruleId: string;
+    code: string | null;
+    crossOrder: boolean;
+  } | null>(null);
+  const [pwpInput, setPwpInput] = useState("");
+  const [pwpErr, setPwpErr] = useState<string | null>(null);
+  const [pwpBusy, setPwpBusy] = useState(false);
+
+  const appliedRule = pwpApplied
+    ? pwpCovering.find((r) => r.id === pwpApplied.ruleId) ?? null
+    : null;
+  // A pick change (size / specials) that breaks the claim drops it, so the bar
+  // never previews a price the server would reject.
+  useEffect(() => {
+    if (pwpApplied && !appliedRule) {
+      setPwpApplied(null);
+      setPwpErr(null);
+    }
+  }, [pwpApplied, appliedRule]);
+
+  const pwpPrice =
+    appliedRule && pwpCandidate && catalog
+      ? pwpRewardPrice(pwpCandidate, catalog, appliedRule) ?? 0
+      : null;
+  const pwpActive = pwpApplied != null && appliedRule != null && pwpPrice != null;
+
+  // Codes already bound to another reward line in this cart — never re-offer.
+  const consumedCodes = new Set<string>();
+  for (const l of cartLines ?? []) {
+    const c = linePwpCode(l);
+    if (c) consumedCodes.add(c);
+  }
+  const hasVoucherLayer = typeof pwpClaimGroup === "string" && pwpClaimGroup.length > 0;
+  // Auto Fill target: the first covering rule backed by a free RESERVED code
+  // (voucher layer on); without the layer (DORMANT/test) the first covering
+  // rule claims code-less — byte-identical to P8b (mirrors CartDrawer).
+  const autoFill = (() => {
+    for (const rule of pwpCovering) {
+      const code =
+        (pwpReservedCodes ?? []).find(
+          (rc) => rc.ruleId === rule.id && rc.status === "RESERVED" && !consumedCodes.has(rc.code),
+        )?.code ?? null;
+      if (!hasVoucherLayer || code) return { rule, code };
+    }
+    return null;
+  })();
+
+  function applyAutoFill() {
+    if (!autoFill) return;
+    setPwpApplied({ ruleId: autoFill.rule.id, code: autoFill.code, crossOrder: false });
+    setPwpInput(autoFill.code ?? "");
+    setPwpErr(null);
+    setQty(1); // a PWP/promo reward line must be quantity 1 (server-enforced)
+  }
+
+  async function applyManualCode() {
+    const code = pwpInput.trim().toUpperCase();
+    if (!code) return;
+    // A same-cart RESERVED code typed by hand binds exactly like Auto Fill.
+    const reserved = (pwpReservedCodes ?? []).find(
+      (rc) => rc.code.toUpperCase() === code && rc.status === "RESERVED",
+    );
+    if (reserved) {
+      if (consumedCodes.has(reserved.code)) {
+        setPwpErr("This voucher is already applied to a line in this cart.");
+        return;
+      }
+      const rule = pwpCovering.find((r) => r.id === reserved.ruleId);
+      if (!rule) {
+        setPwpErr("This voucher doesn't apply to this product.");
+        return;
+      }
+      setPwpApplied({ ruleId: rule.id, code: reserved.code, crossOrder: false });
+      setPwpErr(null);
+      setQty(1);
+      return;
+    }
+    // Cross-order (carry-forward) voucher — phone-bound; needs the customer
+    // phone (captured at step 02) so the server can answer the binding.
+    if (!onApplyVoucherCode || !hasVoucherLayer) {
+      setPwpErr("Voucher not found, already used, or expired.");
+      return;
+    }
+    if (!(customerPhone ?? "").trim()) {
+      setPwpErr(
+        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+      );
+      return;
+    }
+    setPwpBusy(true);
+    setPwpErr(null);
+    try {
+      const v = await onApplyVoucherCode(code);
+      if (!v) {
+        setPwpErr("Voucher not found, already used, or expired.");
+        return;
+      }
+      if (consumedCodes.has(v.code)) {
+        setPwpErr("This voucher is already applied to a line in this cart.");
+        return;
+      }
+      if (!v.phoneMatches || !v.nameMatches) {
+        setPwpErr("This voucher belongs to a different customer.");
+        return;
+      }
+      const rule = v.ruleId ? pwpCovering.find((r) => r.id === v.ruleId) : undefined;
+      if (!rule) {
+        setPwpErr("This voucher doesn't apply to this product.");
+        return;
+      }
+      setPwpApplied({ ruleId: rule.id, code: v.code, crossOrder: true });
+      setQty(1);
+    } catch {
+      setPwpErr("Couldn't check that voucher — please retry.");
+    } finally {
+      setPwpBusy(false);
+    }
+  }
+
+  function removePwp() {
+    setPwpApplied(null);
+    setPwpInput("");
+    setPwpErr(null);
+  }
+
+  const effUnitPrice = pwpActive ? (pwpPrice as number) : unitPrice;
+  const total = effUnitPrice * qty;
   const canAdd = !!sku && sp.complete;
 
   const title = sku
@@ -432,45 +635,53 @@ export default function PosConfigurePage({
         .join(" · ") || "Ready to add"
     : "Size drives the plan view + price";
 
-  const breakdown: { label: string; price: number; note?: boolean }[] = sku
-    ? [
-        { label: `${sku.variant} ${isBed ? "frame" : "mattress"}`, price: sku.price },
-        ...resolvedOptions.lines.map((o) => ({
-          label:
-            o.kind === "fabric"
-              ? `Fabric · ${o.label ?? o.value}`
-              : `${o.kind === "divan_height" ? "Divan" : "Leg"} ${o.value}`,
-          price: o.surcharge,
-        })),
-        ...(sp.surcharge > 0 ? [{ label: "Special add-ons", price: sp.surcharge }] : []),
-        ...(qty > 1 ? [{ label: `× ${qty} pieces`, price: total - unitPrice }] : []),
-      ]
-    : [{ label: "Pick a size to see the price", price: 0, note: true }];
+  const breakdown: { label: string; price: number; note?: boolean }[] = !sku
+    ? [{ label: "Pick a size to see the price", price: 0, note: true }]
+    : pwpActive
+      ? [
+          {
+            label: `${sku.variant} · PWP voucher${pwpApplied?.code ? ` ${pwpApplied.code}` : ""} (all-in)`,
+            price: pwpPrice as number,
+          },
+        ]
+      : [
+          { label: `${sku.variant} ${isBed ? "frame" : "mattress"}`, price: sku.price },
+          ...resolvedOptions.lines.map((o) => ({
+            label:
+              o.kind === "fabric"
+                ? `Fabric · ${o.label ?? o.value}`
+                : `${o.kind === "divan_height" ? "Divan" : "Leg"} ${o.value}`,
+            price: o.surcharge,
+          })),
+          ...(sp.surcharge > 0 ? [{ label: "Special add-ons", price: sp.surcharge }] : []),
+          ...(qty > 1 ? [{ label: `× ${qty} pieces`, price: total - unitPrice }] : []),
+        ];
 
   // Same DraftLine as the old drawer configurators — contract untouched. The
   // option picks ride attrs.options + options_total; the server re-resolves
   // them on submit (option-picks-recompute) and overwrites with canonical rows.
+  // A PWP-applied line is emitted already claimed (attrs.pwp + forced preview
+  // price via the SAME markLinePwp* helpers the cart uses); the server
+  // re-validates + forces the price regardless.
   function add() {
     if (!sku || !sp.complete) return;
-    const optionsPatch =
-      resolvedOptions.lines.length > 0
-        ? { options: resolvedOptions.lines, options_total: optionsTotal }
-        : {};
-    const attrs = isBed
-      ? { gap, ...optionsPatch, ...sp.attrsPatch }
-      : sp.picks.length > 0
-        ? sp.attrsPatch
-        : null;
-    onAdd({
-      localId: newLocalId(),
-      sku: sku.sku,
-      qty,
-      attrs,
-      unitPrice,
-      label: isBed
-        ? `${model.name} · ${sku.variant}${finishName ? ` · ${finishName}` : ""}${gap ? ` · gap ${gap}` : ""}`
-        : `${model.name} · ${sku.variant}`,
-    });
+    const base = composeLine(newLocalId(), pwpActive ? 1 : qty);
+    if (!base) return;
+    let line = base;
+    if (pwpActive && pwpApplied && appliedRule && pwpPrice != null) {
+      line = pwpApplied.code
+        ? pwpApplied.crossOrder
+          ? markLinePwpWithAvailableCode(
+              base,
+              appliedRule,
+              pwpPrice,
+              pwpApplied.code,
+              pwpClaimGroup ?? "",
+            )
+          : markLinePwpWithCode(base, appliedRule, pwpPrice, pwpApplied.code, pwpClaimGroup ?? "")
+        : markLinePwp(base, appliedRule, pwpPrice);
+    }
+    onAdd(line);
     onClose();
   }
 
@@ -509,7 +720,9 @@ export default function PosConfigurePage({
               {total.toLocaleString("en-MY")}
             </div>
             <div className="cfg-header__totalNote">
-              {sku ? `${qty} × RM ${unitPrice.toLocaleString("en-MY")}` : "Pick a size"}
+              {sku
+                ? `${pwpActive ? "PWP · " : ""}${qty} × RM ${effUnitPrice.toLocaleString("en-MY")}`
+                : "Pick a size"}
             </div>
             {breakdown.length > 0 && (
               <div className="cfg-header__pop" role="tooltip">
@@ -628,14 +841,6 @@ export default function PosConfigurePage({
                       onChange={(e) => chooseFabSeries(e.target.value)}
                       aria-label="Fabric series"
                       className="cfg-select"
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1.5px solid var(--line, #d9d2c7)",
-                        background: "var(--pos-panel, #fff)",
-                        fontSize: 13,
-                      }}
                       data-testid="cfg-fabric-series"
                     >
                       <option value="">KIV · series to confirm</option>
@@ -652,14 +857,6 @@ export default function PosConfigurePage({
                       onChange={(e) => setFabColourKey(e.target.value)}
                       aria-label="Fabric colour"
                       className="cfg-select"
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1.5px solid var(--line, #d9d2c7)",
-                        background: "var(--pos-panel, #fff)",
-                        fontSize: 13,
-                      }}
                       data-testid="cfg-fabric"
                     >
                       <option value={FABRIC_KIV}>KIV · colour to confirm</option>
@@ -689,30 +886,25 @@ export default function PosConfigurePage({
                   <span className="pos-eyebrow">Divan height</span>
                   <span className="cfg-section__detail">{divan || "Confirm later"}</span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${divan === "" ? "is-on" : ""}`}
-                    onClick={() => setDivan("")}
-                    data-testid="cfg-divan-later"
-                  >
-                    <span className="cfg-opt__title">Later</span>
-                  </button>
+                <select
+                  value={divan}
+                  onChange={(e) => setDivan(e.target.value)}
+                  aria-label="Divan height"
+                  className="cfg-select"
+                  data-testid="cfg-divan"
+                >
+                  <option value="" data-testid="cfg-divan-later">
+                    Confirm later
+                  </option>
                   {divanOpts.map((o) => (
-                    <button
-                      key={o.id}
-                      className={`cfg-opt cfg-opt--compact ${divan === o.value ? "is-on" : ""}`}
-                      onClick={() => setDivan(o.value)}
-                      data-testid={`cfg-divan-${o.value}`}
-                    >
-                      <span className="cfg-opt__title">{o.value}</span>
-                      {o.surcharge != null && o.surcharge !== 0 && (
-                        <span className="cfg-opt__sub">
-                          +RM{o.surcharge.toLocaleString("en-MY")}
-                        </span>
-                      )}
-                    </button>
+                    <option key={o.id} value={o.value} data-testid={`cfg-divan-${o.value}`}>
+                      {o.value}
+                      {o.surcharge != null && o.surcharge !== 0
+                        ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                        : ""}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
@@ -724,24 +916,20 @@ export default function PosConfigurePage({
                   <span className="pos-eyebrow">Mattress gap</span>
                   <span className="cfg-section__detail">{gap ? `${gap} thickness` : "None"}</span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${gap === "" ? "is-on" : ""}`}
-                    onClick={() => setGap("")}
-                  >
-                    <span className="cfg-opt__title">None</span>
-                  </button>
+                <select
+                  value={gap}
+                  onChange={(e) => setGap(e.target.value)}
+                  aria-label="Mattress gap"
+                  className="cfg-select"
+                  data-testid="cfg-gap"
+                >
+                  <option value="">None</option>
                   {gapChoices.map((g) => (
-                    <button
-                      key={g}
-                      className={`cfg-opt cfg-opt--compact ${gap === g ? "is-on" : ""}`}
-                      onClick={() => setGap(g)}
-                      data-testid={`cfg-gap-${g}`}
-                    >
-                      <span className="cfg-opt__title">{g}</span>
-                    </button>
+                    <option key={g} value={g} data-testid={`cfg-gap-${g}`}>
+                      {g}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
@@ -755,30 +943,25 @@ export default function PosConfigurePage({
                     {totalHeight ? `Total height ${totalHeight}` : leg || "Confirm later"}
                   </span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${leg === "" ? "is-on" : ""}`}
-                    onClick={() => setLeg("")}
-                    data-testid="cfg-leg-later"
-                  >
-                    <span className="cfg-opt__title">Later</span>
-                  </button>
+                <select
+                  value={leg}
+                  onChange={(e) => setLeg(e.target.value)}
+                  aria-label="Leg height"
+                  className="cfg-select"
+                  data-testid="cfg-leg"
+                >
+                  <option value="" data-testid="cfg-leg-later">
+                    Confirm later
+                  </option>
                   {legOpts.map((o) => (
-                    <button
-                      key={o.id}
-                      className={`cfg-opt cfg-opt--compact ${leg === o.value ? "is-on" : ""}`}
-                      onClick={() => setLeg(o.value)}
-                      data-testid={`cfg-leg-${o.value}`}
-                    >
-                      <span className="cfg-opt__title">{o.value}</span>
-                      {o.surcharge != null && o.surcharge !== 0 && (
-                        <span className="cfg-opt__sub">
-                          +RM{o.surcharge.toLocaleString("en-MY")}
-                        </span>
-                      )}
-                    </button>
+                    <option key={o.id} value={o.value} data-testid={`cfg-leg-${o.value}`}>
+                      {o.value}
+                      {o.surcharge != null && o.surcharge !== 0
+                        ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                        : ""}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
@@ -821,7 +1004,7 @@ export default function PosConfigurePage({
               <div className="cfg-section__head">
                 <span className="pos-eyebrow">Quantity</span>
                 <span className="cfg-section__detail">
-                  {qty} piece{qty === 1 ? "" : "s"}
+                  {pwpActive ? "PWP · 1 piece" : `${qty} piece${qty === 1 ? "" : "s"}`}
                 </span>
               </div>
               <div className="cfg-stepper">
@@ -841,12 +1024,136 @@ export default function PosConfigurePage({
                   type="button"
                   className="cfg-stepperBtn"
                   onClick={() => setQty(qty + 1)}
+                  disabled={pwpActive}
+                  title={pwpActive ? "A PWP/promo reward is limited to 1 piece" : undefined}
                   aria-label="Increase quantity"
                 >
                   <Plus size={16} strokeWidth={1.75} />
                 </button>
               </div>
             </div>
+
+            {/* PWP & Promo voucher — 2990s configurator rail parity. Rendered
+                only when the catalog carries an ACTIVE pwp_rule (DORMANT
+                otherwise). Auto Fill binds the same-cart RESERVED code; typing
+                a code applies a reserved OR cross-order (saved) voucher. */}
+            {catalog && pwpRulesActive && (
+              <div className="cfg-section" data-testid="cfg-pwp-section">
+                <div className="cfg-section__head">
+                  <span className="pos-eyebrow">PWP &amp; Promo voucher</span>
+                  <span className="cfg-section__detail">
+                    {pwpActive
+                      ? "Applied"
+                      : autoFill
+                        ? "Voucher ready"
+                        : sku
+                          ? "Optional"
+                          : "Pick a size first"}
+                  </span>
+                </div>
+                {pwpActive && pwpApplied ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: "1.5px solid var(--c-burnt, #A6471E)",
+                      background: "var(--pos-panel, #fff)",
+                    }}
+                    data-testid="cfg-pwp-applied"
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <Ticket size={16} strokeWidth={1.75} style={{ color: "var(--c-burnt, #A6471E)" }} />
+                      <span>
+                        <span style={{ fontWeight: 700 }}>
+                          {pwpApplied.code ? `PWP ${pwpApplied.code}` : "PWP price"}
+                        </span>
+                        <span style={{ display: "block", color: "var(--fg-muted)", fontSize: 12 }}>
+                          {appliedRule?.type === "promo" && pwpPrice === 0
+                            ? "Applied · FREE"
+                            : `Applied · RM ${(pwpPrice ?? 0).toLocaleString("en-MY")} all-in`}
+                        </span>
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={removePwp}
+                      data-testid="cfg-pwp-remove"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {autoFill && (
+                      <p
+                        style={{ margin: 0, fontSize: 12, color: "var(--c-burnt, #A6471E)" }}
+                        data-testid="cfg-pwp-ready"
+                      >
+                        A PWP code from this cart is ready — tap Auto Fill.
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        value={pwpInput}
+                        onChange={(e) => {
+                          setPwpInput(e.target.value);
+                          if (pwpErr) setPwpErr(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void applyManualCode();
+                        }}
+                        placeholder="Insert PWP code"
+                        aria-label="Insert PWP code"
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "1.5px solid var(--line, #d9d2c7)",
+                          background: "var(--pos-panel, #fff)",
+                          fontSize: 13,
+                          textTransform: "uppercase",
+                        }}
+                        data-testid="cfg-pwp-input"
+                      />
+                      {autoFill && (
+                        <button
+                          type="button"
+                          className="btn btn--primary"
+                          onClick={applyAutoFill}
+                          data-testid="cfg-pwp-autofill"
+                        >
+                          Auto Fill
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => void applyManualCode()}
+                        disabled={pwpBusy || !pwpInput.trim()}
+                        data-testid="cfg-pwp-apply"
+                      >
+                        {pwpBusy ? "Checking…" : "Apply"}
+                      </button>
+                    </div>
+                    {pwpErr && (
+                      <p
+                        style={{ margin: 0, fontSize: 12, color: "var(--c-danger, #B4321A)" }}
+                        data-testid="cfg-pwp-error"
+                      >
+                        {pwpErr}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

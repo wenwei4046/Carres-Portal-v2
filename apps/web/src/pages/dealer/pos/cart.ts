@@ -16,8 +16,12 @@ export function attrsKey(attrs: DraftLine["attrs"]): string {
   return JSON.stringify(sorted);
 }
 
-/** True when two lines are the same product + identical options (mergeable). */
+/** True when two lines are the same product + identical options (mergeable).
+ *  A PWP/promo reward line (attrs.pwp) NEVER merges — the server enforces
+ *  reward qty = 1 (pwp_reward_qty_not_one), so each claim stays its own line
+ *  even when a code-less claim would otherwise be attrs-identical. */
 export function sameLine(a: DraftLine, b: DraftLine): boolean {
+  if (a.attrs?.pwp || b.attrs?.pwp) return false;
   return a.sku === b.sku && attrsKey(a.attrs) === attrsKey(b.attrs);
 }
 
