@@ -28,6 +28,7 @@ import {
   type StorageFeeImportRow,
   type BalanceImportRow,
   type StockEtaImportResult,
+  type OpsStockImportRow,
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
@@ -5046,6 +5047,24 @@ export function useImportStockEta() {
       ).then((r) => r.result),
     onSuccess: (_res, vars) => {
       if (!vars.dryRun) void qc.invalidateQueries({ queryKey: ["operation"] });
+    },
+  });
+}
+
+/** On Hand C+ P3 — bulk book-in from the "Klg Warehouse" ready-stock sheet.
+ *  Add-only: sends the chosen import rows to /api/ops/stock/import (server
+ *  expands qty + inserts). Refreshes every ops-stock list + the dashboard. */
+export function useImportStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rows: OpsStockImportRow[] }) =>
+      apiFetch<{ created: number }>(
+        "/api/ops/stock/import",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+      void qc.invalidateQueries({ queryKey: qk.operation.dashboard() });
     },
   });
 }

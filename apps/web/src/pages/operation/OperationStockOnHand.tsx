@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
+import ImportStockDialog from "./components/ImportStockDialog";
 
 /**
  * OperationStockOnHand — the unified Stock "On Hand" list.
@@ -108,6 +109,8 @@ export default function OperationStockOnHand() {
   const [q, setQ] = useState("");
   // Grouped-by-model rollup (default) vs flat per-unit list. P2 scale view.
   const [view, setView] = useState<"grouped" | "flat">("grouped");
+  // P3 — Excel import from the Klg Warehouse sheet.
+  const [showImport, setShowImport] = useState(false);
 
   const invQ = useQuery<OpsStockListResponse>({
     queryKey: ["operation", "ops-stock", "inventory"],
@@ -194,26 +197,43 @@ export default function OperationStockOnHand() {
             Every physical unit at Carres Klang, tracked by Unit ID.
           </div>
         </div>
-        <div className="relative shrink-0">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="SKU / ref / PO…"
-            className="rounded border border-base-300 pl-3 pr-8 py-2 text-sm w-64 focus:border-primary focus:outline-none"
-            aria-label="Search stock"
-          />
-          {q ? (
-            <button
-              type="button"
-              onClick={() => setQ("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-base-400 hover:text-base-700 text-sm"
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          ) : null}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="SKU / ref / PO…"
+              className="rounded border border-base-300 pl-3 pr-8 py-2 text-sm w-64 focus:border-primary focus:outline-none"
+              aria-label="Search stock"
+            />
+            {q ? (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-base-400 hover:text-base-700 text-sm"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="btn-secondary text-[12px] py-2 whitespace-nowrap"
+            data-testid="onhand-import-open"
+          >
+            Import sheet
+          </button>
         </div>
       </div>
+
+      {showImport ? (
+        <ImportStockDialog
+          existing={items}
+          onClose={() => setShowImport(false)}
+        />
+      ) : null}
 
       {invQ.isLoading ? (
         <p className="text-sm text-base-500">Loading…</p>

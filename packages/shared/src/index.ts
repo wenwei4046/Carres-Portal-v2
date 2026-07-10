@@ -878,6 +878,18 @@ export {
   type StockEtaImportResult,
 } from "./stock-eta-import";
 
+// On Hand C+ P3 — parse the "Klg Warehouse" ready-stock sheet into
+// ops_stock_items import rows (shared by the ImportStockDialog preview + the
+// /api/ops/stock/import endpoint).
+export {
+  normalizeStockCondition,
+  warehouseSheetRecordToImportRow,
+  opsStockImportRowSchema,
+  opsStockImportInputSchema,
+  type OpsStockImportRow,
+  type OpsStockImportInput,
+} from "./ops-stock-import";
+
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
 // explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they

@@ -9,6 +9,7 @@ import {
   opsStockFlagRepairInputSchema,
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
+  opsStockImportInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -256,6 +257,56 @@ opsStockRouter.post("/", requireOperationOrPrincipal, async (c) => {
   const { data, error } = await sb.from("ops_stock_items").insert(rows).select("id");
   if (error) throw mapErr(error);
   return c.json({ created: (data ?? []).length }, 201);
+});
+
+// POST /import — bulk book-in from the "Klg Warehouse" ready-stock sheet
+// (On Hand C+ P3). Add-only: each import row is expanded to `qty` units and
+// inserted (same RLS insert as "+ Add stock", chunked for a large sheet). The
+// client does the New-vs-duplicate preview + only sends the rows to add;
+// snapshot-replace is intentionally NOT here (it would wipe reserved links —
+// deferred to a guarded P3b). Defaults to Carres Klang.
+opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockImportInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let whId = parsed.warehouseId ?? null;
+  if (!whId) {
+    const { data: wh } = await sb
+      .from("warehouses")
+      .select("id")
+      .ilike("name", "%klang%")
+      .limit(1)
+      .maybeSingle();
+    whId = (wh as { id: string } | null)?.id ?? null;
+  }
+  if (!whId) {
+    throw new HTTPException(400, { message: "Carres Klang warehouse not found" });
+  }
+
+  const units = parsed.rows.flatMap((r) =>
+    Array.from({ length: r.qty }, () => ({
+      sku: r.sku,
+      warehouse_id: whId,
+      condition: r.condition,
+      status: r.status,
+      reserved_ref: r.status === "reserved" ? r.reservedRef ?? null : null,
+      supplier: r.supplier ?? null,
+      po_no: r.poNo ?? null,
+      source_ref: r.sourceRef ?? null,
+      date_in: r.dateIn ?? null,
+    })),
+  );
+
+  let created = 0;
+  for (let i = 0; i < units.length; i += 500) {
+    const { data, error } = await sb
+      .from("ops_stock_items")
+      .insert(units.slice(i, i + 500))
+      .select("id");
+    if (error) throw mapErr(error);
+    created += (data ?? []).length;
+  }
+  return c.json({ created }, 201);
 });
 
 // DELETE /:itemId — remove a mis-keyed unit (hard delete). For fixing a wrong
