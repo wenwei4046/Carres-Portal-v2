@@ -118,7 +118,7 @@ describe("PosConfigurePage — bed frame", () => {
     fireEvent.click(screen.getByTestId("cfg-size-b1"));
     // The old model.colors picker is gone (bedModel still carries colours).
     expect(screen.queryByTestId("cfg-colour-Natural oak")).toBeNull();
-    // Gap defaults to the first option ('10"'); switch to '12"'.
+    // Gap defaults to Confirm later (KIV); switch to '12"'.
     fireEvent.click(screen.getByTestId('cfg-gap-12"'));
 
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
@@ -128,6 +128,31 @@ describe("PosConfigurePage — bed frame", () => {
     expect("color" in line.attrs).toBe(false);
     expect(line.unitPrice).toBe(1990);
     expect(line.label).toBe('Jager · King · gap 12"');
+  });
+
+  it("gap is three-state: Confirm later (KIV) is the DEFAULT; None is explicit", () => {
+    const onAdd = vi.fn();
+    render(
+      <PosConfigurePage
+        model={bedModel()}
+        meta={undefined}
+        skus={bedSkus}
+        onAdd={onAdd}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("cfg-size-b1"));
+
+    // Default = Confirm later → attrs.gap carries the KIV sentinel so the
+    // SO PDF / Create-PO show the choice is still pending.
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    expect(onAdd.mock.calls[0][0].attrs).toMatchObject({ gap: "KIV" });
+
+    // Explicit None → gap "".
+    fireEvent.click(screen.getByTestId("cfg-gap-none"));
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    expect(onAdd.mock.calls[1][0].attrs).toMatchObject({ gap: "" });
+    expect(onAdd.mock.calls[1][0].label).toBe("Jager · King");
   });
 
   it("renders the plan-view canvas with the frame footprint once sized", () => {
