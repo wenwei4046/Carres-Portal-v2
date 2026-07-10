@@ -344,6 +344,25 @@ describe("SofaConfigurePage", () => {
     expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
   });
 
+  it("hovering a quick pick does NOT move the hero preview — only clicking selects", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    const solo: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-00000000c003",
+      slots: [["1NA"]],
+      label: "Solo",
+    };
+    renderPage({ combos: [COMBO, solo] });
+    const name = () => screen.getByTestId("sofa-config-name").textContent ?? "";
+    expect(name()).toContain("1A(LHF) + 2A(RHF)"); // hero = first pick
+    const soloCard = screen.getByTestId(`sofa-quick-pick-${solo.id}`);
+    fireEvent.mouseOver(soloCard);
+    fireEvent.mouseEnter(soloCard);
+    expect(name()).toContain("1A(LHF) + 2A(RHF)"); // hover must not steal the hero
+    fireEvent.click(soloCard);
+    expect(name()).toContain("1NA"); // click selects
+  });
+
   it("no combos → lands straight on Customize with the Quick pick tab disabled", () => {
     renderPage({ combos: [] });
     expect(screen.getByTestId("sofa-build-canvas")).toBeTruthy();

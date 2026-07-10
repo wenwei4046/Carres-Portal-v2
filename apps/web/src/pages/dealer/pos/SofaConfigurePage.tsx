@@ -455,12 +455,11 @@ export default function SofaConfigurePage({
     return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "—";
   };
 
-  // Hero pane previews the hovered (else selected, else first) pick. Clicking a
-  // card SELECTS it (prototype behaviour — Customize is the explicit canvas path).
-  const [hoverId, setHoverId] = useState<string | null>(null);
+  // Hero pane previews the SELECTED (else first) pick — CLICK only, no
+  // hover-follow (Loo 2026-07-11: the preview must not chase the mouse).
+  // Customize stays the explicit canvas path.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const heroPick =
-    picks.find((p) => p.combo.id === hoverId) ??
     picks.find((p) => p.combo.id === selectedId) ??
     picks[0] ??
     null;
@@ -782,7 +781,6 @@ export default function SofaConfigurePage({
                       key={p.combo.id}
                       type="button"
                       onClick={() => setSelectedId(p.combo.id)}
-                      onMouseEnter={() => setHoverId(p.combo.id)}
                       className={`sof-qp__card ${isOn ? "is-on" : ""}`}
                       data-testid={`sofa-quick-pick-${p.combo.id}`}
                     >
