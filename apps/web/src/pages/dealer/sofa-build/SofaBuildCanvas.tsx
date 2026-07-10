@@ -1087,8 +1087,7 @@ export default function SofaBuildCanvas({
             <div className="pos-eyebrow" style={{ fontSize: 10 }}>Live total</div>
             <div
               style={{
-                fontFamily: "var(--font-mark, Georgia, serif)",
-                fontStretch: "80%",
+                fontFamily: "var(--font-num, system-ui, sans-serif)",
                 fontWeight: 900,
                 fontSize: 26,
                 lineHeight: 1.1,

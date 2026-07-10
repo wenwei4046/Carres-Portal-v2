@@ -437,20 +437,35 @@ const SkuRowView = memo(function SkuRowView({
   const discontinued = !!sku.discontinuedAt;
   const margin = skuMargin(sku.price, sku.cost);
   const marginLabel = category === "sofa" ? "base margin" : "plan margin";
-  const modelKeyPrefix = model ? `${model.modelKey.toUpperCase()}-` : "";
+  // Accessory / service carry NO size/variant axis (one SKU per model, Loo
+  // 2026-07-11): their code is the bare MODEL_KEY, the suffix is optional and
+  // may be CLEARED (the server re-derives the bare code).
+  const noVariantAxis = category === "accessory" || category === "service";
+  const modelKeyPrefix = model
+    ? noVariantAxis
+      ? model.modelKey.toUpperCase()
+      : `${model.modelKey.toUpperCase()}-`
+    : "";
 
   /** Commit the code's VARIANT segment — the server re-derives the full sku as
-   *  `{MODEL_KEY}-{variant}` (the only sanctioned code-rename path). Historical
-   *  orders/POs keep the OLD code string; a compartment re-offer re-asserts the
-   *  compartment's own code. */
+   *  `{MODEL_KEY}-{variant}` (the only sanctioned code-rename path; accessory/
+   *  service may clear it → bare MODEL_KEY). Historical orders/POs keep the OLD
+   *  code string; a compartment re-offer re-asserts the compartment's own code. */
   function commitVariant(raw: string) {
     const v = raw.trim();
-    if (v === "" || v === sku.variant) return;
+    if (v === sku.variant) return;
+    // Only the no-variant-axis categories may clear the suffix (server 422s
+    // the rest anyway — don't even send it).
+    if (v === "" && !noVariantAxis) return;
     patch.mutate(
       { id: sku.id, patch: { variant: v } },
       {
         onSuccess: () =>
-          toast.success(`${sku.sku} → ${model ? deriveSkuCode(model.modelKey, v) : v}`),
+          toast.success(
+            `${sku.sku} → ${
+              model ? (v ? deriveSkuCode(model.modelKey, v) : model.modelKey.toUpperCase()) : v
+            }`,
+          ),
         onError: (e: unknown) =>
           toast.error(e instanceof ApiError ? e.message : "Update failed"),
       },
@@ -485,11 +500,17 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
-  /** Inline CODE cell: fixed `{MODEL_KEY}-` prefix + an editable variant input. */
+  /** Inline CODE cell: fixed `{MODEL_KEY}-` prefix + an editable variant input.
+   *  The PREFIX ellipsizes (title shows it in full) and the INPUT keeps a
+   *  guaranteed usable width — a long model key must never crush the input to
+   *  a one-character slit (Loo 2026-07-11). */
   const codeCell = inlineEdit ? (
     <div className="flex items-center gap-0.5 min-w-0">
       {modelKeyPrefix && (
-        <span className="t-tiny font-mono text-base-400 shrink-0" title="Model prefix — fixed">
+        <span
+          className="t-tiny font-mono text-base-400 truncate min-w-0"
+          title={`${modelKeyPrefix} — model prefix, fixed`}
+        >
           {modelKeyPrefix}
         </span>
       )}
@@ -499,9 +520,14 @@ const SkuRowView = memo(function SkuRowView({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
+        placeholder={noVariantAxis ? "no size" : undefined}
         aria-label={`${sku.sku} code`}
-        title="Edits the code's variant segment — the full code re-derives as MODELKEY-variant"
-        className={`${INPUT_CLS} t-num text-[12px] min-w-0`}
+        title={
+          noVariantAxis
+            ? "Optional suffix — leave empty for the bare model code"
+            : "Edits the code's variant segment — the full code re-derives as MODELKEY-variant"
+        }
+        className={`${INPUT_CLS} t-num text-[12px] flex-1 min-w-[72px]`}
       />
     </div>
   ) : (
@@ -670,7 +696,7 @@ const SkuRowView = memo(function SkuRowView({
           {category ? CATEGORY_LABEL[category] : "—"}
         </div>
       )}
-      <div className="t-small text-base-700">{sku.variant}</div>
+      <div className="t-small text-base-700">{sku.variant || "—"}</div>
 
       {/* Price */}
       <div className="text-right">
