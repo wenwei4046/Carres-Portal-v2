@@ -5753,6 +5753,32 @@ export function useOrderTimeline(orderId: string | null) {
   });
 }
 
+/** A row in the GLOBAL activity feed — same as TimelineEntry but carries the
+ *  order it belongs to (so + customer) so it can be shown across all orders. */
+export interface GlobalActivityRow {
+  id: string;
+  kind: "annotation" | "activity";
+  order_id: string | null;
+  so: number | null;
+  customer_name: string | null;
+  action?: string | null;
+  detail?: Record<string, unknown> | null;
+  content?: string | null;
+  tag?: AnnotationTag | null;
+  actor_name?: string | null;
+  occurred_at: string;
+}
+
+/** The global cross-order activity feed (monitor view). */
+export function useOperationActivity() {
+  return useQuery({
+    queryKey: ["operation", "activity"] as const,
+    queryFn: () => apiFetch<GlobalActivityRow[]>("/api/operation/activity"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
 export interface EscalationRow {
   id: string;
   content: string;

@@ -1,26 +1,14 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  CircleCheck,
-  Banknote,
-  Pencil,
   AlertTriangle,
-  MessageSquare,
-  Package,
-  FileText,
-  FileInput,
   Check,
   ChevronDown,
   ChevronRight,
-  type LucideIcon,
+  ChevronLeft,
+  FileInput,
 } from "lucide-react";
-import {
-  eventTypeForLegacyAction,
-  isOrderEventType,
-  orderEventMeta,
-  type OrderEventCategory,
-  type OrderEventType,
-} from "@carres/shared";
+import type { OrderEventCategory } from "@carres/shared";
 import {
   useOrderTimeline,
   useOperationOrder,
@@ -28,41 +16,16 @@ import {
   type TimelineEntry,
   type AnnotationTag,
 } from "@/lib/queries";
+import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate } from "@/lib/fmt-date";
-
-// ─── Category → icon + colour ─────────────────────────────────────────────────
-
-const CATEGORY_STYLE: Record<
-  OrderEventCategory,
-  { icon: LucideIcon; bg: string; fg: string }
-> = {
-  milestone: { icon: CircleCheck, bg: "#E6F1FB", fg: "#185FA5" },
-  money: { icon: Banknote, bg: "#E7F3DC", fg: "#3B6D11" },
-  edit: { icon: Pencil, bg: "#FAEEDA", fg: "#854F0B" },
-  exception: { icon: AlertTriangle, bg: "#FCECEA", fg: "#A32D2D" },
-  note: { icon: MessageSquare, bg: "#F1EFE8", fg: "#5F5E5A" },
-  stock: { icon: Package, bg: "#E6F1FB", fg: "#185FA5" },
-  system: { icon: FileText, bg: "#F1EFE8", fg: "#5F5E5A" },
-};
-
-const CATEGORY_LABEL: Record<OrderEventCategory, string> = {
-  milestone: "Milestones",
-  money: "Money",
-  edit: "Changes",
-  exception: "Alerts",
-  note: "Notes",
-  stock: "Stock",
-  system: "System",
-};
-const CATEGORY_ORDER: OrderEventCategory[] = [
-  "exception",
-  "note",
-  "milestone",
-  "money",
-  "edit",
-  "stock",
-  "system",
-];
+import {
+  CATEGORY_LABEL,
+  CATEGORY_ORDER,
+  IconChip,
+  describeActivity,
+  isImport,
+  isToday,
+} from "./activity-display";
 
 // ─── Lifecycle tracker — "where is this order?" at a glance ────────────────────
 
@@ -137,7 +100,7 @@ function LifecycleStepper({ index, cancelled }: { index: number; cancelled: bool
   );
 }
 
-// ─── Tag helpers ──────────────────────────────────────────────────────────────
+// ─── Note tag badge ───────────────────────────────────────────────────────────
 
 const TAG_LABEL: Record<AnnotationTag, string> = {
   follow_up: "Follow up",
@@ -160,92 +123,11 @@ function TagBadge({ tag }: { tag: AnnotationTag }) {
   );
 }
 
-// ─── Describe a timeline entry → category + human title + body ────────────────
-
-const FIELD_LABEL: Record<string, string> = {
-  delivery_date: "Delivery date",
-  status: "Status",
-  balance: "Balance",
-  payment_status: "Payment status",
-  logistic_eta: "Logistic ETA",
-  stock_eta: "Stock ETA",
-  balance_due_date: "Balance due date",
-  called_customer: "Called customer",
-  delivery_time_slot: "Delivery time slot",
-  customer_request: "Customer request",
-  carres_remark: "Carres remark",
-  warehouse_remark: "Warehouse remark",
-  storage_waiver_status: "Storage waiver",
-};
-
-function fmtVal(v: unknown): string {
-  if (v === null || v === undefined || v === "") return "—";
-  return String(v);
-}
-
-function isImport(entry: TimelineEntry): boolean {
-  return (
-    entry.kind === "activity" &&
-    (entry.action === "autocount_import" ||
-      eventTypeForLegacyAction(entry.action) === "order.imported")
-  );
-}
-
-function describe(entry: TimelineEntry): {
-  category: OrderEventCategory;
-  title: string;
-  body: string | null;
-} {
-  if (entry.kind === "annotation") {
-    return {
-      category: entry.tag === "escalate" ? "exception" : "note",
-      title: entry.actor_name ?? "Note",
-      body: entry.content ?? null,
-    };
-  }
-  const action = entry.action ?? "";
-  const type: OrderEventType | null = isOrderEventType(action)
-    ? action
-    : eventTypeForLegacyAction(action);
-  if (type) {
-    const meta = orderEventMeta(type);
-    const d = (entry.detail ?? null) as { field?: string; from?: unknown; to?: unknown } | null;
-    if (
-      (type === "order.field_changed" || type === "order.date_changed") &&
-      d &&
-      (d.from !== undefined || d.to !== undefined)
-    ) {
-      const field = (d.field && FIELD_LABEL[d.field]) || d.field || "Details";
-      return {
-        category: meta.category,
-        title: `${field} changed`,
-        body: `${fmtVal(d.from)} → ${fmtVal(d.to)}`,
-      };
-    }
-    return { category: meta.category, title: meta.defaultTitle, body: null };
-  }
-  return { category: "system", title: action.replace(/_/g, " ") || "Activity", body: null };
-}
-
 // ─── Rows ─────────────────────────────────────────────────────────────────────
-
-function IconChip({ category }: { category: OrderEventCategory }) {
-  const style = CATEGORY_STYLE[category];
-  const Icon = style.icon;
-  return (
-    <div
-      className="flex-none w-7 h-7 rounded-full grid place-items-center mt-0.5"
-      style={{ backgroundColor: style.bg, color: style.fg }}
-      aria-hidden
-    >
-      <Icon size={15} strokeWidth={2} />
-    </div>
-  );
-}
 
 function TimelineRow({ entry }: { entry: TimelineEntry }) {
   const time = fmtDate(entry.occurred_at, { time: true });
-  const { category, title, body } = describe(entry);
+  const { category, title, body } = describeActivity(entry);
   const isNote = entry.kind === "annotation";
   return (
     <div
@@ -253,7 +135,9 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
         category === "exception" ? "-mx-4 px-4 bg-red-50/60" : ""
       }`}
     >
-      <IconChip category={category} />
+      <div className="pt-0.5">
+        <IconChip category={category} />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <span className="text-[12px] font-medium text-base-800 leading-snug">
@@ -280,7 +164,6 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
   );
 }
 
-/** Collapsed run of repeated imports — "Imported from AutoCount · 6 times". */
 function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
   const [open, setOpen] = useState(false);
   const latest = run[0];
@@ -305,8 +188,7 @@ function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[12px] text-base-600">
-            Imported from AutoCount{" "}
-            <span className="text-base-400">· {run.length} times</span>
+            Imported from AutoCount <span className="text-base-400">· {run.length} times</span>
           </div>
           <div className="text-[11px] text-base-400">{range}</div>
         </div>
@@ -392,16 +274,6 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
-function isToday(iso: string): boolean {
-  const d = new Date(iso);
-  const n = new Date();
-  return (
-    d.getFullYear() === n.getFullYear() &&
-    d.getMonth() === n.getMonth() &&
-    d.getDate() === n.getDate()
-  );
-}
-
 type RenderItem =
   | { kind: "row"; entry: TimelineEntry; category: OrderEventCategory }
   | { kind: "group"; run: TimelineEntry[] };
@@ -417,11 +289,12 @@ interface Props {
 export default function AnnotationTimeline({ orderId }: Props) {
   const { data, isLoading } = useOrderTimeline(orderId);
   const { data: orderData } = useOperationOrder(orderId);
+  const setActiveOrder = useActiveOrder((s) => s.set);
   const entries = useMemo(() => data ?? [], [data]);
   const [filter, setFilter] = useState<OrderEventCategory | "all">("all");
 
   const described = useMemo(
-    () => entries.map((e) => ({ entry: e, category: describe(e).category })),
+    () => entries.map((e) => ({ entry: e, category: describeActivity(e).category })),
     [entries],
   );
   const counts = useMemo(() => {
@@ -431,7 +304,6 @@ export default function AnnotationTimeline({ orderId }: Props) {
   }, [described]);
   const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
 
-  // Filter → collapse consecutive imports into one group row.
   const items = useMemo<RenderItem[]>(() => {
     const filtered =
       filter === "all" ? described : described.filter((d) => d.category === filter);
@@ -442,7 +314,11 @@ export default function AnnotationTimeline({ orderId }: Props) {
         let j = i;
         while (j < filtered.length && isImport(filtered[j].entry)) j++;
         const run = filtered.slice(i, j).map((d) => d.entry);
-        out.push(run.length > 1 ? { kind: "group", run } : { kind: "row", entry: run[0], category: "system" });
+        out.push(
+          run.length > 1
+            ? { kind: "group", run }
+            : { kind: "row", entry: run[0], category: "system" },
+        );
         i = j;
       } else {
         out.push({ kind: "row", entry: filtered[i].entry, category: filtered[i].category });
@@ -454,20 +330,26 @@ export default function AnnotationTimeline({ orderId }: Props) {
 
   const today = items.filter((it) => isToday(itemTime(it)));
   const earlier = items.filter((it) => !isToday(itemTime(it)));
-
   const step = stepIndexOf(orderData?.order);
 
-  function renderItem(it: RenderItem) {
-    return it.kind === "group" ? (
+  const renderItem = (it: RenderItem) =>
+    it.kind === "group" ? (
       <ImportGroupRow key={it.run[0].id} run={it.run} />
     ) : (
       <TimelineRow key={it.entry.id} entry={it.entry} />
     );
-  }
 
   return (
     <div>
-      {/* Lifecycle tracker — where is this order right now. */}
+      {/* Back to the global feed — this panel is scoped to one order. */}
+      <button
+        type="button"
+        onClick={() => setActiveOrder(null)}
+        className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-base-900 mb-2"
+      >
+        <ChevronLeft size={13} /> All activity
+      </button>
+
       {orderData?.order && (
         <div className="mb-3 px-1">
           <LifecycleStepper index={step.index} cancelled={step.cancelled} />
