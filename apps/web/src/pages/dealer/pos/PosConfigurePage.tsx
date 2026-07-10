@@ -628,14 +628,6 @@ export default function PosConfigurePage({
                       onChange={(e) => chooseFabSeries(e.target.value)}
                       aria-label="Fabric series"
                       className="cfg-select"
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1.5px solid var(--line, #d9d2c7)",
-                        background: "var(--pos-panel, #fff)",
-                        fontSize: 13,
-                      }}
                       data-testid="cfg-fabric-series"
                     >
                       <option value="">KIV · series to confirm</option>
@@ -652,14 +644,6 @@ export default function PosConfigurePage({
                       onChange={(e) => setFabColourKey(e.target.value)}
                       aria-label="Fabric colour"
                       className="cfg-select"
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1.5px solid var(--line, #d9d2c7)",
-                        background: "var(--pos-panel, #fff)",
-                        fontSize: 13,
-                      }}
                       data-testid="cfg-fabric"
                     >
                       <option value={FABRIC_KIV}>KIV · colour to confirm</option>
@@ -689,30 +673,25 @@ export default function PosConfigurePage({
                   <span className="pos-eyebrow">Divan height</span>
                   <span className="cfg-section__detail">{divan || "Confirm later"}</span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${divan === "" ? "is-on" : ""}`}
-                    onClick={() => setDivan("")}
-                    data-testid="cfg-divan-later"
-                  >
-                    <span className="cfg-opt__title">Later</span>
-                  </button>
+                <select
+                  value={divan}
+                  onChange={(e) => setDivan(e.target.value)}
+                  aria-label="Divan height"
+                  className="cfg-select"
+                  data-testid="cfg-divan"
+                >
+                  <option value="" data-testid="cfg-divan-later">
+                    Confirm later
+                  </option>
                   {divanOpts.map((o) => (
-                    <button
-                      key={o.id}
-                      className={`cfg-opt cfg-opt--compact ${divan === o.value ? "is-on" : ""}`}
-                      onClick={() => setDivan(o.value)}
-                      data-testid={`cfg-divan-${o.value}`}
-                    >
-                      <span className="cfg-opt__title">{o.value}</span>
-                      {o.surcharge != null && o.surcharge !== 0 && (
-                        <span className="cfg-opt__sub">
-                          +RM{o.surcharge.toLocaleString("en-MY")}
-                        </span>
-                      )}
-                    </button>
+                    <option key={o.id} value={o.value} data-testid={`cfg-divan-${o.value}`}>
+                      {o.value}
+                      {o.surcharge != null && o.surcharge !== 0
+                        ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                        : ""}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
@@ -724,24 +703,20 @@ export default function PosConfigurePage({
                   <span className="pos-eyebrow">Mattress gap</span>
                   <span className="cfg-section__detail">{gap ? `${gap} thickness` : "None"}</span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${gap === "" ? "is-on" : ""}`}
-                    onClick={() => setGap("")}
-                  >
-                    <span className="cfg-opt__title">None</span>
-                  </button>
+                <select
+                  value={gap}
+                  onChange={(e) => setGap(e.target.value)}
+                  aria-label="Mattress gap"
+                  className="cfg-select"
+                  data-testid="cfg-gap"
+                >
+                  <option value="">None</option>
                   {gapChoices.map((g) => (
-                    <button
-                      key={g}
-                      className={`cfg-opt cfg-opt--compact ${gap === g ? "is-on" : ""}`}
-                      onClick={() => setGap(g)}
-                      data-testid={`cfg-gap-${g}`}
-                    >
-                      <span className="cfg-opt__title">{g}</span>
-                    </button>
+                    <option key={g} value={g} data-testid={`cfg-gap-${g}`}>
+                      {g}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
@@ -755,30 +730,25 @@ export default function PosConfigurePage({
                     {totalHeight ? `Total height ${totalHeight}` : leg || "Confirm later"}
                   </span>
                 </div>
-                <div className="cfg-optGrid cfg-optGrid--5">
-                  <button
-                    className={`cfg-opt cfg-opt--compact ${leg === "" ? "is-on" : ""}`}
-                    onClick={() => setLeg("")}
-                    data-testid="cfg-leg-later"
-                  >
-                    <span className="cfg-opt__title">Later</span>
-                  </button>
+                <select
+                  value={leg}
+                  onChange={(e) => setLeg(e.target.value)}
+                  aria-label="Leg height"
+                  className="cfg-select"
+                  data-testid="cfg-leg"
+                >
+                  <option value="" data-testid="cfg-leg-later">
+                    Confirm later
+                  </option>
                   {legOpts.map((o) => (
-                    <button
-                      key={o.id}
-                      className={`cfg-opt cfg-opt--compact ${leg === o.value ? "is-on" : ""}`}
-                      onClick={() => setLeg(o.value)}
-                      data-testid={`cfg-leg-${o.value}`}
-                    >
-                      <span className="cfg-opt__title">{o.value}</span>
-                      {o.surcharge != null && o.surcharge !== 0 && (
-                        <span className="cfg-opt__sub">
-                          +RM{o.surcharge.toLocaleString("en-MY")}
-                        </span>
-                      )}
-                    </button>
+                    <option key={o.id} value={o.value} data-testid={`cfg-leg-${o.value}`}>
+                      {o.value}
+                      {o.surcharge != null && o.surcharge !== 0
+                        ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                        : ""}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
