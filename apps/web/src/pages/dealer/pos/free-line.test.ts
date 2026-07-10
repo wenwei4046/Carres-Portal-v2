@@ -60,17 +60,18 @@ describe("previewDefaultGifts", () => {
     expect(previewDefaultGifts([line()], catalog())).toEqual([]);
   });
 
-  it("resolves a model's gift, naming it from the sku description (one row per source model)", () => {
+  it("resolves a model's gift, naming it from the PRODUCT NAME (Loo 2026-07-11; one row per source model)", () => {
     const cat = catalog({ modelDefaultFreeGifts: [{ modelId: MATT, gifts: [{ giftSku: "PILLOW", qty: 1 }] }] });
     const rows = previewDefaultGifts([line()], cat);
-    expect(rows).toEqual([{ giftSku: "PILLOW", qty: 1, name: "Memory Pillow", sourceModelId: MATT }]);
+    // "Acc X" = the accessory MODEL name — beats the sku description.
+    expect(rows).toEqual([{ giftSku: "PILLOW", qty: 1, name: "Acc X", sourceModelId: MATT }]);
   });
 
   it("a campaign-freed item KEEPS its default gift ('Make free' must not strip the GWP)", () => {
     const cat = catalog({ modelDefaultFreeGifts: [{ modelId: MATT, gifts: [{ giftSku: "PILLOW", qty: 1 }] }] });
     const freed = line({ attrs: { free_item: { campaignId: "c1" } } });
     expect(previewDefaultGifts([freed], cat)).toEqual([
-      { giftSku: "PILLOW", qty: 1, name: "Memory Pillow", sourceModelId: MATT },
+      { giftSku: "PILLOW", qty: 1, name: "Acc X", sourceModelId: MATT },
     ]);
   });
 

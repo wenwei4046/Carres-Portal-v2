@@ -151,8 +151,9 @@ export function previewDefaultGifts(
     return !!s && accessoryModelIds.has(s.modelId);
   };
 
-  // Friendly display name: sku description → the accessory's MODEL name (an
-  // accessory is one model = one product, e.g. "Pasir Wool Rug") → bare code.
+  // Friendly display name: the accessory's MODEL name — the PRODUCT NAME (an
+  // accessory is one model = one product, e.g. "Memory Foam Pillow"; Loo
+  // 2026-07-11: product name beats description) → sku description → bare code.
   // Never surface a raw SKU code when a human name exists (Loo 2026-07-06:
   // "Free gift: ACC-601"). The configured label is the CAMPAIGN remark (2990s
   // campaignName) — it rides along muted, it never replaces the product name.
@@ -162,7 +163,7 @@ export function previewDefaultGifts(
   const descBySku = new Map(
     catalog.skus.map((s) => {
       const desc = (s.description ?? "").trim();
-      return [s.sku, desc || modelNameById.get(s.modelId) || ""];
+      return [s.sku, modelNameById.get(s.modelId) || desc || ""];
     }),
   );
   // F7b — one row per (source model, gift sku): do NOT merge the same gift sku
