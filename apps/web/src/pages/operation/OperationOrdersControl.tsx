@@ -1252,6 +1252,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 total={
                   etaCount +
                   (stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) +
+                  (logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0) +
+                  (regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0) +
                   (dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0) +
                   flaggedCount +
                   escalateCount
@@ -1271,6 +1273,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
                   active={stockFilter === "No PO"}
                   onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
+                />
+                {/* Unassigned (no carrier) moved here from LOGISTIC — no carrier
+                    yet ⇒ needs chasing (Jess 2026-07-10). */}
+                <KanbanRow
+                  label="Unassigned"
+                  count={logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0}
+                  active={logisticFilter === NO_CARRIER}
+                  title="No logistic partner assigned yet — assign / chase"
+                  onClick={() => setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))}
+                />
+                {/* "No region" = region couldn't be read from the address (was the
+                    vague "Others" under REGION) — surfaced here to fix (Jess). */}
+                <KanbanRow
+                  label="No region"
+                  count={regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0}
+                  active={regionFilter === OTHERS_LABEL}
+                  title="Delivery region couldn't be read from the address — check it"
+                  onClick={() => setRegionFilter((r) => (r === OTHERS_LABEL ? null : OTHERS_LABEL))}
                 />
                 <KanbanRow
                   label="Urgent"
@@ -1297,55 +1317,70 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
               <KanbanGroup
                 title="STOCK"
-                total={stockEntries.reduce((s, e) => s + e.count, 0)}
+                total={stockEntries
+                  .filter((e) => e.bucket !== "No PO")
+                  .reduce((s, e) => s + e.count, 0)}
                 collapsed={collapsedGroups.has("STOCK")}
                 onToggle={() => toggleGroup("STOCK")}
               >
-                {stockEntries.map((e) => (
-                  <KanbanRow
-                    key={e.bucket}
-                    label={e.bucket}
-                    count={e.count}
-                    active={stockFilter === e.bucket}
-                    onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-                  />
-                ))}
+                {/* "No PO" lives in CHASE NOW — not repeated here (Jess 2026-07-10). */}
+                {stockEntries
+                  .filter((e) => e.bucket !== "No PO")
+                  .map((e) => (
+                    <KanbanRow
+                      key={e.bucket}
+                      label={e.bucket}
+                      count={e.count}
+                      active={stockFilter === e.bucket}
+                      onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+                    />
+                  ))}
               </KanbanGroup>
 
               <KanbanGroup
                 title="LOGISTIC"
                 testid="filter-logistic"
-                total={logisticEntries.reduce((s, e) => s + e.count, 0)}
+                total={logisticEntries
+                  .filter((e) => e.carrier !== NO_CARRIER)
+                  .reduce((s, e) => s + e.count, 0)}
                 collapsed={collapsedGroups.has("LOGISTIC")}
                 onToggle={() => toggleGroup("LOGISTIC")}
               >
-                {logisticEntries.map((e) => (
-                  <KanbanRow
-                    key={e.carrier}
-                    label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
-                    count={e.count}
-                    active={logisticFilter === e.carrier}
-                    title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — assign / chase" : undefined}
-                    onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
-                  />
-                ))}
+                {/* Unassigned moved to CHASE NOW — here only real carriers (Jess). */}
+                {logisticEntries
+                  .filter((e) => e.carrier !== NO_CARRIER)
+                  .map((e) => (
+                    <KanbanRow
+                      key={e.carrier}
+                      label={e.carrier}
+                      count={e.count}
+                      active={logisticFilter === e.carrier}
+                      onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+                    />
+                  ))}
               </KanbanGroup>
 
               <KanbanGroup
                 title="REGION"
-                total={regionEntries.reduce((s, e) => s + e.count, 0)}
+                total={regionEntries
+                  .filter((e) => e.region !== OTHERS_LABEL)
+                  .reduce((s, e) => s + e.count, 0)}
                 collapsed={collapsedGroups.has("REGION")}
                 onToggle={() => toggleGroup("REGION")}
               >
-                {regionEntries.map((e) => (
-                  <KanbanRow
-                    key={e.region}
-                    label={e.region}
-                    count={e.count}
-                    active={regionFilter === e.region}
-                    onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
-                  />
-                ))}
+                {/* "Others" (no region) moved to CHASE NOW as "No region" — here
+                    only real regions (Jess 2026-07-10). */}
+                {regionEntries
+                  .filter((e) => e.region !== OTHERS_LABEL)
+                  .map((e) => (
+                    <KanbanRow
+                      key={e.region}
+                      label={e.region}
+                      count={e.count}
+                      active={regionFilter === e.region}
+                      onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                    />
+                  ))}
               </KanbanGroup>
 
               {/* CATEGORY — its own group at the bottom, collapsed by default.
