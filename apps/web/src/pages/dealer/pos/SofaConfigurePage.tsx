@@ -791,6 +791,30 @@ export default function SofaConfigurePage({
                         <span className="sof-qp__cardLabel">{p.title}</span>
                         <span className="sof-qp__cardSub">{d.codes.join(" + ")}</span>
                         <span className="sof-qp__cardPrice">{cardPriceLabel(p.codes)}</span>
+                        {/* Jump straight onto the drag canvas with THIS layout
+                            loaded (Loo 2026-07-11). span[role=button] — the card
+                            itself is a <button> (same idiom as flip/delete). */}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedId(p.combo.id);
+                            loadPick(p);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setSelectedId(p.combo.id);
+                              loadPick(p);
+                            }
+                          }}
+                          className="sof-qp__cardCustomize"
+                          data-testid={`sofa-quick-pick-customize-${p.combo.id}`}
+                        >
+                          Continue in Customize →
+                        </span>
                       </span>
                       {mirrorable && isOn && (
                         <span
