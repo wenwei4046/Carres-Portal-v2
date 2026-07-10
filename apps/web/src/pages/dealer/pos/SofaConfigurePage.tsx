@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
+  CatalogResponse,
   FabricTierConfigDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
   ModelSofaCompartmentDto,
   ProductModelDto,
   ProductSkuDto,
+  PwpCodeDto,
   PwpDiscoverDto,
   Rot,
   SofaComboDto,
@@ -35,9 +37,17 @@ import {
   type SofaBuild,
   type SofaPricingSnapshot,
 } from "@carres/shared";
-import { useDeleteSofaCombo, usePwpAvailableForPhone } from "@/lib/queries";
+import { useDeleteSofaCombo } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import type { DraftLine } from "../new-order/draft";
+import {
+  coveringPwpForLine,
+  linePwpCode,
+  markLinePwp,
+  markLinePwpWithAvailableCode,
+  markLinePwpWithCode,
+  pwpRewardPrice,
+} from "./pwp-line";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import CreateSofaComboModal from "../sofa-build/CreateSofaComboModal";
@@ -253,6 +263,12 @@ export default function SofaConfigurePage({
   sofaCompartments,
   modelCompartments,
   sofaCombos,
+  catalog,
+  cartLines,
+  pwpReservedCodes,
+  pwpClaimGroup,
+  customerPhone,
+  onApplyVoucherCode,
   onAdd,
   onClose,
 }: {
@@ -270,6 +286,20 @@ export default function SofaConfigurePage({
   /** Already filtered to model.id. */
   modelCompartments: ModelSofaCompartmentDto[];
   sofaCombos: SofaComboDto[];
+  /** PWP voucher bar — the full catalog bundle. Optional: absent (or 0 active
+   *  pwp_rules) → the box never renders (DORMANT byte-identical). */
+  catalog?: CatalogResponse | null;
+  /** The current cart lines — PWP eligibility runs the shared
+   *  `coveringPwpForLine` over cart + the emitted line. */
+  cartLines?: DraftLine[];
+  /** 0187 — the caller's RESERVED pwp_codes; Auto Fill binds one on claim. */
+  pwpReservedCodes?: PwpCodeDto[];
+  /** 0187 — the per-cart claimGroup stamped onto a bound reward line. */
+  pwpClaimGroup?: string;
+  /** 0188 — the cart's customer phone (gates the cross-order manual apply). */
+  customerPhone?: string;
+  /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -363,23 +393,34 @@ export default function SofaConfigurePage({
     return { flipped, slots, codes };
   }
 
-  // ── INSERT PWP CODE (2990s parity) ──────────────────────────────────────
-  // Validate-only: the header box checks a voucher code against the existing
-  // /pwp-codes/available lookup and, on a match, carries the code forward as a
-  // benign hint on the emitted line (attrs.pwp_pending_code). The cart's PWP
-  // machine + the server remain the sole authority for actually consuming a
-  // voucher — this never mutates voucher state.
+  // ── INSERT PWP CODE — real apply (parity with PosConfigurePage) ──────────
+  // The header box APPLIES a voucher, it no longer just validates: the emitted
+  // line is PWP-claimed via the SAME markLinePwp* helpers the cart uses, price
+  // forced to the reward figure. Eligibility runs the shared coveringPwpForLine
+  // over cart + the emitted line — in Quick pick against a live candidate of
+  // the current layout; in Customize (the canvas owns the cells) validation
+  // runs at add-to-cart, falling back to the normal price with a toast when
+  // the code doesn't cover the build. DORMANT (no catalog / 0 active rules) →
+  // the box never renders.
+  const pwpRulesActive = (catalog?.pwpRules ?? []).some((r) => r.active);
+  const [pwpApplied, setPwpApplied] = useState<{
+    ruleId: string;
+    code: string | null;
+    crossOrder: boolean;
+  } | null>(null);
   const [pwpInput, setPwpInput] = useState("");
-  const [pwpCode, setPwpCode] = useState<string | null>(null);
-  const pwpQuery = usePwpAvailableForPhone({ code: pwpCode });
-  const pwpVoucher: PwpDiscoverDto | null =
-    pwpCode !== null
-      ? pwpQuery.data?.vouchers.find(
-          (v) => v.code.toUpperCase() === pwpCode.toUpperCase(),
-        ) ?? null
-      : null;
-  const pwpChecking = pwpCode !== null && pwpQuery.isFetching;
-  const pwpError = pwpCode !== null && !pwpChecking && !pwpVoucher;
+  const [pwpErr, setPwpErr] = useState<string | null>(null);
+  const [pwpBusy, setPwpBusy] = useState(false);
+  // Codes already bound to another reward line in this cart — never re-offer.
+  const consumedCodes = new Set<string>();
+  for (const l of cartLines ?? []) {
+    const c = linePwpCode(l);
+    if (c) consumedCodes.add(c);
+  }
+  const hasVoucherLayer = typeof pwpClaimGroup === "string" && pwpClaimGroup.length > 0;
+  const activeRuleIds = new Set(
+    (catalog?.pwpRules ?? []).filter((r) => r.active).map((r) => r.id),
+  );
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -498,6 +539,162 @@ export default function SofaConfigurePage({
     : null;
   const heroDims = cellsDims(heroCells, effHeight);
 
+  /** The DraftLine the CURRENT quick pick would emit (geometry + options) —
+   *  the PWP eligibility candidate. Null in Customize / no pick / no rep sku. */
+  const quickCandidate: DraftLine | null = (() => {
+    if (!catalog || !pwpRulesActive || mode !== "quick" || !heroPick) return null;
+    const { slots } = displayFor(heroPick);
+    const seeded = comboSeedCells({ ...heroPick.combo, slots }, effHeight);
+    const cells = seeded.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot }));
+    const priced = priceCells(cells, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null);
+    return buildToDraftLine(
+      {
+        cells,
+        height: effHeight,
+        fabricTier: qpFabric?.tier ?? "PRICE_1",
+        fabricId: qpFabric?.id ?? null,
+        fabricCode: qpFabric?.code ?? null,
+        fabricName: qpFabric?.name ?? null,
+        fabricSeries: qpFabricSeries,
+        fabricSurcharge: qpDelta,
+        fabricDeferred: qpDeferred,
+        legHeight: qpLeg || null,
+        legSurcharge: qpLegDelta,
+        total: priced.total,
+        priceBasis: priced.basis,
+      },
+      model,
+      skus,
+    );
+  })();
+  /** The rules that would grant the current quick pick — null = UNKNOWN
+   *  (Customize mode owns its cells; validation then runs at add-to-cart). */
+  const pwpCovering =
+    quickCandidate && catalog
+      ? coveringPwpForLine(quickCandidate, [...(cartLines ?? []), quickCandidate], catalog)
+      : null;
+
+  // Auto Fill target: the first covering rule backed by a free RESERVED code
+  // (voucher layer on); without the layer the first covering rule claims
+  // code-less — byte-identical to P8b (mirrors CartDrawer/PosConfigurePage).
+  const autoFill = (() => {
+    if (!pwpCovering) return null;
+    for (const rule of pwpCovering) {
+      const code =
+        (pwpReservedCodes ?? []).find(
+          (rc) => rc.ruleId === rule.id && rc.status === "RESERVED" && !consumedCodes.has(rc.code),
+        )?.code ?? null;
+      if (!hasVoucherLayer || code) return { rule, code };
+    }
+    return null;
+  })();
+
+  function applyAutoFill() {
+    if (!autoFill) return;
+    setPwpApplied({ ruleId: autoFill.rule.id, code: autoFill.code, crossOrder: false });
+    setPwpInput(autoFill.code ?? "");
+    setPwpErr(null);
+  }
+
+  async function applyManualCode() {
+    const code = pwpInput.trim().toUpperCase();
+    if (!code) return;
+    // A same-cart RESERVED code typed by hand binds exactly like Auto Fill.
+    const reserved = (pwpReservedCodes ?? []).find(
+      (rc) => rc.code.toUpperCase() === code && rc.status === "RESERVED",
+    );
+    if (reserved) {
+      if (consumedCodes.has(reserved.code)) {
+        setPwpErr("This voucher is already applied to a line in this cart.");
+        return;
+      }
+      if (!reserved.ruleId || !activeRuleIds.has(reserved.ruleId)) {
+        setPwpErr("This voucher's offer is no longer active.");
+        return;
+      }
+      if (pwpCovering && !pwpCovering.some((r) => r.id === reserved.ruleId)) {
+        setPwpErr("This voucher doesn't apply to this sofa layout.");
+        return;
+      }
+      setPwpApplied({ ruleId: reserved.ruleId, code: reserved.code, crossOrder: false });
+      setPwpErr(null);
+      return;
+    }
+    // Cross-order (carry-forward) voucher — phone-bound; the server re-asserts.
+    if (!onApplyVoucherCode || !hasVoucherLayer) {
+      setPwpErr("Voucher not found, already used, or expired.");
+      return;
+    }
+    if (!(customerPhone ?? "").trim()) {
+      setPwpErr(
+        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+      );
+      return;
+    }
+    setPwpBusy(true);
+    setPwpErr(null);
+    try {
+      const v = await onApplyVoucherCode(code);
+      if (!v) {
+        setPwpErr("Voucher not found, already used, or expired.");
+        return;
+      }
+      if (consumedCodes.has(v.code)) {
+        setPwpErr("This voucher is already applied to a line in this cart.");
+        return;
+      }
+      if (!v.phoneMatches || !v.nameMatches) {
+        setPwpErr("This voucher belongs to a different customer.");
+        return;
+      }
+      if (!v.ruleId || !activeRuleIds.has(v.ruleId)) {
+        setPwpErr("This voucher's offer is no longer active.");
+        return;
+      }
+      if (pwpCovering && !pwpCovering.some((r) => r.id === v.ruleId)) {
+        setPwpErr("This voucher doesn't apply to this sofa layout.");
+        return;
+      }
+      setPwpApplied({ ruleId: v.ruleId, code: v.code, crossOrder: true });
+    } catch {
+      setPwpErr("Couldn't check that voucher — please retry.");
+    } finally {
+      setPwpBusy(false);
+    }
+  }
+
+  // Quick-mode preview: the applied rule's PWP total for the CURRENT layout.
+  // Null when the applied code doesn't cover it (the chip then warns that the
+  // sofa will add at its normal price).
+  const qpAppliedRule =
+    pwpApplied && pwpCovering
+      ? pwpCovering.find((r) => r.id === pwpApplied.ruleId) ?? null
+      : null;
+  const qpPwpTotal =
+    qpAppliedRule && quickCandidate && catalog
+      ? pwpRewardPrice(quickCandidate, catalog, qpAppliedRule)
+      : null;
+
+  /** Mark the emitted line as the applied PWP reward — validated against the
+   *  REAL line via the same shared resolver the server runs. Not covered →
+   *  toast + the line goes in at its normal price (never a dishonest claim). */
+  function finalizePwpLine(line: DraftLine): DraftLine {
+    if (!pwpApplied || !catalog) return line;
+    const covering = coveringPwpForLine(line, [...(cartLines ?? []), line], catalog);
+    const rule = covering.find((r) => r.id === pwpApplied.ruleId);
+    const price = rule ? pwpRewardPrice(line, catalog, rule) : null;
+    if (!rule || price == null) {
+      toast.error("The PWP code doesn't cover this sofa — added at the normal price.");
+      return line;
+    }
+    if (pwpApplied.code && pwpClaimGroup) {
+      return pwpApplied.crossOrder
+        ? markLinePwpWithAvailableCode(line, rule, price, pwpApplied.code, pwpClaimGroup)
+        : markLinePwpWithCode(line, rule, price, pwpApplied.code, pwpClaimGroup);
+    }
+    return markLinePwp(line, rule, price);
+  }
+
   /** Add the previewed preset straight to the cart (no canvas hop). Priced live
    *  via the shared engine — à-la-carte, or a matched combo. */
   function addQuickPick(pick: QuickPick) {
@@ -532,8 +729,7 @@ export default function SofaConfigurePage({
     if (line) {
       const attrs = line.attrs as Record<string, unknown>;
       if (qpRemark.trim()) attrs.remark = qpRemark.trim();
-      if (pwpVoucher) attrs.pwp_pending_code = pwpVoucher.code;
-      onAdd(line);
+      onAdd(finalizePwpLine(line));
     }
     onClose();
   }
@@ -632,61 +828,86 @@ export default function SofaConfigurePage({
             </button>
           </div>
         </div>
-        {/* INSERT PWP CODE — validate a voucher code (2990s parity). */}
-        <div
-          className="sof-flow__pwp"
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
-          data-testid="sofa-pwp"
-        >
-          {pwpVoucher ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} className="t-small">
-              <span className="pill pill-confirmed" data-testid="sofa-pwp-applied">
-                PWP {pwpVoucher.code} ✓
-              </span>
-              <button
-                type="button"
-                className="t-small text-base-500 underline hover:text-base-800"
-                onClick={() => {
-                  setPwpCode(null);
-                  setPwpInput("");
-                }}
-                data-testid="sofa-pwp-remove"
-              >
-                remove
-              </button>
-            </span>
-          ) : (
-            <>
-              <input
-                type="text"
-                value={pwpInput}
-                onChange={(e) => {
-                  setPwpInput(e.target.value);
-                  if (pwpCode !== null) setPwpCode(null);
-                }}
-                placeholder="Insert PWP code"
-                aria-label="Insert PWP code"
-                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small uppercase"
-                style={{ width: 148 }}
-                data-testid="sofa-pwp-input"
-              />
-              <button
-                type="button"
-                className="btn btn--secondary"
-                disabled={pwpChecking || !pwpInput.trim()}
-                onClick={() => setPwpCode(pwpInput.trim().toUpperCase())}
-                data-testid="sofa-pwp-apply"
-              >
-                {pwpChecking ? "Checking…" : "Apply"}
-              </button>
-              {pwpError && (
-                <span className="t-small text-danger" data-testid="sofa-pwp-error">
-                  No such / not redeemable PWP code.
+        {/* INSERT PWP CODE — real apply (Auto Fill same-cart RESERVED code, or
+            type a reserved / saved voucher). DORMANT-hidden without active
+            rules. Not covered in Quick pick → an inline warning; Customize
+            validates at add-to-cart (toast fallback to the normal price). */}
+        {catalog && pwpRulesActive && (
+          <div
+            className="sof-flow__pwp"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+            data-testid="sofa-pwp"
+          >
+            {pwpApplied ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} className="t-small">
+                <span className="pill pill-confirmed" data-testid="sofa-pwp-applied">
+                  {pwpApplied.code ? `PWP ${pwpApplied.code}` : "PWP price"} ✓
+                  {qpPwpTotal != null ? ` · RM ${qpPwpTotal.toLocaleString("en-MY")}` : ""}
                 </span>
-              )}
-            </>
-          )}
-        </div>
+                {pwpCovering && !qpAppliedRule && (
+                  <span className="t-small text-warning" data-testid="sofa-pwp-uncovered">
+                    doesn't cover this layout — adds at normal price
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="t-small text-base-500 underline hover:text-base-800"
+                  onClick={() => {
+                    setPwpApplied(null);
+                    setPwpInput("");
+                    setPwpErr(null);
+                  }}
+                  data-testid="sofa-pwp-remove"
+                >
+                  remove
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={pwpInput}
+                  onChange={(e) => {
+                    setPwpInput(e.target.value);
+                    if (pwpErr) setPwpErr(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void applyManualCode();
+                  }}
+                  placeholder="Insert PWP code"
+                  aria-label="Insert PWP code"
+                  className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small uppercase"
+                  style={{ width: 148 }}
+                  data-testid="sofa-pwp-input"
+                />
+                {autoFill && (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={applyAutoFill}
+                    data-testid="sofa-pwp-autofill"
+                  >
+                    Auto Fill
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  disabled={pwpBusy || !pwpInput.trim()}
+                  onClick={() => void applyManualCode()}
+                  data-testid="sofa-pwp-apply"
+                >
+                  {pwpBusy ? "Checking…" : "Apply"}
+                </button>
+                {pwpErr && (
+                  <span className="t-small text-danger" data-testid="sofa-pwp-error">
+                    {pwpErr}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
         <div className="cfg-header__live">
           <div className="cfg-header__summary">
             <div className="cfg-header__eyebrow">{model.name} · Sofa</div>
@@ -707,16 +928,20 @@ export default function SofaConfigurePage({
             <div className="cfg-header__total" tabIndex={0}>
               <div className="cfg-header__totalLabel">Live total</div>
               <div className="cfg-header__totalNum" data-testid="sofa-qp-total">
-                {qpTotal !== null ? (
+                {(qpPwpTotal ?? qpTotal) !== null ? (
                   <>
                     <sup>RM</sup>
-                    {qpTotal.toLocaleString("en-MY")}
+                    {(qpPwpTotal ?? qpTotal)!.toLocaleString("en-MY")}
                   </>
                 ) : (
                   "—"
                 )}
               </div>
-              <div className="cfg-header__totalNote">component total · combo when matched</div>
+              <div className="cfg-header__totalNote">
+                {qpPwpTotal != null
+                  ? "PWP voucher price"
+                  : "component total · combo when matched"}
+              </div>
             </div>
           ) : (
             <div className="cfg-header__total" tabIndex={0}>
@@ -1105,15 +1330,10 @@ export default function SofaConfigurePage({
             onLiveTotal={setCustTotal}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
-              if (line) {
-                // Carry a validated PWP code forward as a benign hint — the
-                // cart's PWP control + the server are the sole authority for
-                // actually applying/consuming the voucher.
-                if (pwpVoucher) {
-                  (line.attrs as Record<string, unknown>).pwp_pending_code = pwpVoucher.code;
-                }
-                onAdd(line);
-              }
+              // An applied voucher is validated against the REAL build here
+              // (finalizePwpLine) — covered → the line goes in PWP-claimed at
+              // the forced reward price; not covered → toast + normal price.
+              if (line) onAdd(finalizePwpLine(line));
               onClose();
             }}
             onCreateCombo={
