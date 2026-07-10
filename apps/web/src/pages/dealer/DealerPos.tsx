@@ -125,10 +125,6 @@ export default function DealerPos({
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [showResume, setShowResume] = useState(() => {
-    const d = loadDraft();
-    return !!d && draftHasContent(d);
-  });
 
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
@@ -552,15 +548,6 @@ export default function DealerPos({
     setSubmitError(null);
     setDraft(emptyDraft());
     setStep(1);
-    setShowResume(false);
-    resetPwpReconciler();
-  }
-
-  function discardDraft() {
-    clearDraft();
-    setDraft(emptyDraft());
-    setStep(1);
-    setShowResume(false);
     resetPwpReconciler();
   }
 
@@ -584,7 +571,6 @@ export default function DealerPos({
       },
     }));
     setQuotesOpen(false);
-    setShowResume(false);
     setStep(1);
     toast.success("Quote loaded to cart");
   }
@@ -748,22 +734,8 @@ export default function DealerPos({
         </div>
       </header>
 
-      {/* Resume banner */}
-      {showResume && !submitted && (
-        <div className="shrink-0 bg-signature-50 border-b border-primary/20 px-5 py-2 flex items-center justify-between gap-3">
-          <p className="t-small text-base-700">
-            You have an unsaved order in progress — pick up where you left off?
-          </p>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowResume(false)} className="btn-primary text-[12px]">
-              Resume
-            </button>
-            <button onClick={discardDraft} className="btn-ghost text-[12px]">
-              Start fresh
-            </button>
-          </div>
-        </div>
-      )}
+      {/* No resume banner (Loo 2026-07-11): an unsaved draft silently restores
+          into the cart — "Clear cart" in the drawer covers starting fresh. */}
 
       {/* Body */}
       <main className="flex-1 min-h-0 overflow-hidden">
