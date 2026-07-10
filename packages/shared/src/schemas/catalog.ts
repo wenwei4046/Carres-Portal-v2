@@ -998,7 +998,10 @@ export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
 
 export const productSkuPatchInput = z
   .object({
-    variant: z.string().trim().min(1).max(60).optional(),
+    // '' clears the variant — allowed ONLY for accessory/service (no variant
+    // axis; the route gates by the model's category and re-derives the sku to
+    // the bare MODEL_KEY). Mirrors productSkuCreateInput.
+    variant: z.string().trim().max(60).optional(),
     variantKind: variantKindSchema.optional(),
     price: z.number().nonnegative().optional(),
     cost: z.number().nonnegative().nullable().optional(),
