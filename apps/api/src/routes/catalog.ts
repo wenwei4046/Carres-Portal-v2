@@ -595,6 +595,23 @@ catalogRouter.post("/skus", async (c) => {
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
+  const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
+
+  // Accessory / service carry NO variant axis (one SKU per model, Loo
+  // 2026-07-11) — an empty variant is allowed for them and the SKU code is the
+  // bare MODEL_KEY. Every other category still requires a variant (the size /
+  // preset IS the code suffix).
+  if (parsed.data.variant === "" && !supplierless) {
+    return c.json(
+      {
+        error: "validation",
+        code: "variant_required",
+        message: `A size / variant is required for ${modelRow.category} SKUs.`,
+      },
+      422,
+    );
+  }
+
   // Mattress/bedframe sizes resolve through the canonical table so the SKU code
   // stays SHORT (`-K`) while the stored variant (the SIZE shown) is the FULL
   // name (`King`). Non-size variants (sofa presets, accessories) pass through.
@@ -604,8 +621,9 @@ catalogRouter.post("/skus", async (c) => {
   const resolvedVariant = isBedSize
     ? canonicalSize(parsed.data.variant)
     : { code: parsed.data.variant, name: parsed.data.variant };
-  const skuCode = deriveSkuCode(modelRow.model_key, resolvedVariant.code);
-  const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
+  const skuCode = resolvedVariant.code
+    ? deriveSkuCode(modelRow.model_key, resolvedVariant.code)
+    : modelRow.model_key.toUpperCase();
 
   // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id was NOT NULL on
   // staging/prod. Auto-resolve from suppliers.cat_covered[] when the caller

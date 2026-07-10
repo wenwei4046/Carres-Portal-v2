@@ -318,6 +318,76 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
     expect(screen.queryByTestId("new-sku-sizes")).not.toBeInTheDocument();
-    expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loo 2026-07-11 — accessory/service carry NO size/variant axis (one SKU per
+// model): the Size/variant field is hidden, nothing to fill, and the create
+// sends an EMPTY variant (the server mints the bare MODEL_KEY as the code).
+// ---------------------------------------------------------------------------
+describe("NewSkuModal — accessory/service: no variant axis", () => {
+  it("accessory hides the Size/variant field and previews the bare model-key code", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
+    expect(screen.queryByTestId("new-sku-variant")).not.toBeInTheDocument();
+    // Price / cost / description stay (an accessory still has a price).
+    expect(screen.getByTestId("new-sku-price")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-cost")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-sku-name"), {
+      target: { value: "Memory Foam Pillow" },
+    });
+    expect(screen.getByTestId("new-sku-no-variant-hint")).toHaveTextContent(
+      "MEMORY-FOAM-PILLOW",
+    );
+  });
+
+  it("service hides the Size/variant field too", () => {
+    render(<NewSkuModal models={MODELS} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "service" } });
+    expect(screen.queryByTestId("new-sku-variant")).not.toBeInTheDocument();
+  });
+
+  it("creates the accessory with an EMPTY variant — name + price alone are enough", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
+    fireEvent.change(screen.getByTestId("new-sku-name"), {
+      target: { value: "Memory Foam Pillow" },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "99" } });
+    fireEvent.click(screen.getByText("Create product + SKU"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
+      category: "accessory",
+      modelKey: "memory-foam-pillow",
+      name: "Memory Foam Pillow",
+    });
+    expect(mockCreateSkuMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      variant: "",
+      variantKind: "preset",
+      price: 99,
+      cost: null,
+      description: null,
+    });
+  });
+
+  it("a size typed under another category never leaks into an accessory create", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} onClose={onClose} />);
+    // Sofa (empty compartment pool → classic field) — type a variant…
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "sofa" } });
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "3-seater" } });
+    // …then flip to accessory and create.
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Bolster" } });
+    fireEvent.click(screen.getByText("Create product + SKU"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateSkuMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "" }),
+    );
   });
 });
