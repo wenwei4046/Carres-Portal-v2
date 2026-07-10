@@ -107,12 +107,29 @@ export default function CartDrawer({
     onChange({ ...draft, lines: draft.lines.filter((l) => l.localId !== localId) });
   }
   function bumpLineQty(localId: string, delta: number) {
-    onChange({
-      ...draft,
-      lines: draft.lines.map((l) =>
-        l.localId === localId ? { ...l, qty: Math.max(1, l.qty + delta) } : l,
-      ),
-    });
+    let lines = draft.lines.map((l) =>
+      l.localId === localId ? { ...l, qty: Math.max(1, l.qty + delta) } : l,
+    );
+    // A freed line whose qty grows past its campaign's per-ORDER allowance
+    // would 409 at submit — revert the claim (real price restored) and say why.
+    if (delta > 0 && catalog) {
+      const bumped = lines.find((l) => l.localId === localId);
+      const campaignId = bumped ? lineFreeItemCampaignId(bumped) : null;
+      if (bumped && campaignId) {
+        const camp = (catalog.freeItemCampaigns ?? []).find((c) => c.id === campaignId);
+        const freed = lines.reduce(
+          (sum, l) => sum + (lineFreeItemCampaignId(l) === campaignId ? Number(l.qty ?? 1) : 0),
+          0,
+        );
+        if (camp && freed > camp.maxFreeQty) {
+          lines = lines.map((l) => (l.localId === localId ? unmarkLineFree(l) : l));
+          toast.warning(
+            `"${camp.name}" allows ${camp.maxFreeQty} free per order — the line is back to its real price.`,
+          );
+        }
+      }
+    }
+    onChange({ ...draft, lines });
   }
   function removeAddon(key: string) {
     onChange({ ...draft, addons: draft.addons.filter((a) => a.key !== key) });
@@ -261,7 +278,7 @@ export default function CartDrawer({
 
                       {/* 0185 — free-item "Make free" affordance (eligible lines). */}
                       {catalog && (
-                        <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
+                        <MakeFreeRow line={l} lines={draft.lines} catalog={catalog} onSet={replaceLine} />
                       )}
 
                       {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
@@ -460,16 +477,21 @@ export default function CartDrawer({
  * 0185 — the per-line free-item control. Renders nothing unless the line is
  * covered by ≥1 ACTIVE free-item campaign (or is already claimed free). A freed
  * line shows the campaign + an "Undo"; an eligible paid line shows a "Make free"
- * action per covering campaign whose `maxFreeQty` allows the line's qty (so the
- * client never offers a claim the server would 409). The server re-validates +
- * forces RM0 regardless — this is preview only.
+ * action per covering campaign whose `maxFreeQty` — a per-campaign total across
+ * the WHOLE order (server F3), not a per-line cap — still has room for this
+ * line's qty on top of what the cart already freed (so the client never offers
+ * a claim the server would 409). The server re-validates + forces RM0
+ * regardless — this is preview only.
  */
 function MakeFreeRow({
   line,
+  lines,
   catalog,
   onSet,
 }: {
   line: DraftLine;
+  /** ALL cart lines — needed to count what's already freed under each campaign. */
+  lines: DraftLine[];
   catalog: CatalogResponse;
   onSet: (localId: string, next: DraftLine) => void;
 }) {
@@ -500,9 +522,29 @@ function MakeFreeRow({
     );
   }
 
-  // Only offer campaigns whose per-line max allows this line's qty.
-  const offerable = covering.filter((c) => line.qty <= c.maxFreeQty);
-  if (offerable.length === 0) return null;
+  // qty already claimed free under a campaign across the WHOLE cart — the
+  // server enforces maxFreeQty as a per-order TOTAL, so once the allowance is
+  // used up no further line may offer that campaign.
+  const freedQty = (campaignId: string) =>
+    lines.reduce(
+      (sum, l) => sum + (lineFreeItemCampaignId(l) === campaignId ? Number(l.qty ?? 1) : 0),
+      0,
+    );
+  const offerable = covering.filter((c) => freedQty(c.id) + line.qty <= c.maxFreeQty);
+  if (offerable.length === 0) {
+    // Covered, but the order's free allowance is already spent elsewhere —
+    // say so instead of silently dropping the affordance.
+    return covering.some((c) => freedQty(c.id) > 0) ? (
+      <div className="mt-2">
+        <span
+          className="t-tiny text-base-400"
+          data-testid={`free-limit-reached-${line.localId}`}
+        >
+          Free limit reached for this order
+        </span>
+      </div>
+    ) : null;
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
