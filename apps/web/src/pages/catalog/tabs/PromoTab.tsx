@@ -1420,7 +1420,7 @@ function PwpRuleForm({
         <p className={`t-tiny ${sofaTriggerInvalid ? "text-danger" : "text-base-400"}`}>
           {triggerCategory === "sofa"
             ? "Pick at least one sofa model / combo — “any sofa” has no meaning as a trigger."
-            : `Tick the models that qualify as the trigger. Leave all unticked = any ${triggerCategory}.`}
+            : `Add the models that qualify as the trigger. None added = any ${triggerCategory}.`}
         </p>
       </div>
 
@@ -1453,7 +1453,7 @@ function PwpRuleForm({
             ? "Pick at least one reward combo for a sofa reward."
             : `The reward is sold at each reward SKU's PWP price (set in SKU Master)${
                 type === "promo" ? " — for a Promo, a PWP price of RM 0 redeems the reward free" : ""
-              }. Leave all unticked = any ${rewardCategory}.`}
+              }. None added = any ${rewardCategory}.`}
         </p>
       </div>
 

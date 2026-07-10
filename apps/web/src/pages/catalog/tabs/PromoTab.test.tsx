@@ -280,9 +280,11 @@ describe("PromoTab — free item campaigns", () => {
     fireEvent.change(screen.getByTestId("campaign-maxqty"), { target: { value: "2" } });
     fireEvent.click(screen.getByTestId("campaign-active"));
 
-    // tick the mattress model in the RuleTargetPicker (its checkbox)
-    const modelRow = screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`);
-    fireEvent.click(within(modelRow).getByRole("checkbox"));
+    // add the mattress model via the RuleTargetPicker's dropdown
+    fireEvent.change(screen.getByTestId("rtp-add-model"), {
+      target: { value: MATTRESS_MODEL },
+    });
+    expect(screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("campaign-save"));
 
@@ -363,9 +365,11 @@ describe("PromoTab — PWP / promo rules", () => {
     // trigger=mattress, reward=accessory. Bump qty to 2.
     fireEvent.change(screen.getByTestId("pwp-qty"), { target: { value: "2" } });
 
-    // tick the mattress model in the TRIGGER picker (the first RuleTargetPicker)
-    const triggerRow = screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`);
-    fireEvent.click(within(triggerRow).getByRole("checkbox"));
+    // add the mattress model via the TRIGGER picker's dropdown (the first of
+    // the two pickers — trigger above reward)
+    fireEvent.change(screen.getAllByTestId("rtp-add-model")[0], {
+      target: { value: MATTRESS_MODEL },
+    });
 
     fireEvent.click(screen.getByTestId("pwp-save"));
 
