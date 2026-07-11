@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   warehouseSheetRecordToImportRow,
+  reconcileStockImport,
   type OpsStockImportRow,
   type OpsStockItem,
 } from "@carres/shared";
@@ -10,11 +11,13 @@ import { useImportStock } from "@/lib/queries";
 import { Modal } from "./Modal";
 
 /**
- * Import from the "Klg Warehouse" ready-stock sheet — On Hand C+ P3.
- * Add-only: parse the sheet client-side, bucket each unit into New vs
- * Possible-duplicate (matched on OLD REF against the current pool), then book
- * in the New units at Carres Klang. Snapshot-replace is intentionally NOT here
- * (it would wipe reserved links) — that's a future guarded step.
+ * Import from the "Klg Warehouse" ready-stock sheet.
+ * Add-only + IDEMPOTENT: one sheet line = one stock record (carrying its qty).
+ * The preview here mirrors the server's count-based reconcile — dedup is on a
+ * stable composite key (SKU + PO + OLD REF + supplier + date + condition), NOT
+ * OLD REF alone (usually blank), and counts occurrences so genuinely-identical
+ * units are all kept while a re-import of the same sheet adds nothing. The
+ * server re-reconciles authoritatively; this preview is advisory.
  */
 
 type Stage = "pick" | "preview" | "result";
@@ -68,25 +71,26 @@ export default function ImportStockDialog({
   const [parseError, setParseError] = useState<string | null>(null);
   const [created, setCreated] = useState(0);
 
-  // Units already in the pool that carry an OLD REF — the dedup key.
-  const knownRefs = useMemo(
+  // Count-based reconcile against the current pool — the same pure function the
+  // server runs. `fresh` = the lines to add; `alreadyIn` = lines already
+  // represented (skipped).
+  const reconcile = useMemo(
     () =>
-      new Set(
-        existing
-          .map((e) => e.sourceRef?.trim())
-          .filter((r): r is string => !!r),
+      reconcileStockImport(
+        rows,
+        existing.map((e) => ({
+          sku: e.sku,
+          condition: e.condition,
+          poNo: e.poNo,
+          sourceRef: e.sourceRef,
+          supplier: e.supplier,
+          dateIn: e.dateIn,
+        })),
       ),
-    [existing],
+    [rows, existing],
   );
-
-  const fresh = useMemo(
-    () => rows.filter((r) => !r.sourceRef || !knownRefs.has(r.sourceRef)),
-    [rows, knownRefs],
-  );
-  const dupes = useMemo(
-    () => rows.filter((r) => r.sourceRef && knownRefs.has(r.sourceRef)),
-    [rows, knownRefs],
-  );
+  const fresh = reconcile.toInsert;
+  const alreadyIn = reconcile.alreadyInCount;
 
   async function onFile(file: File) {
     setParseError(null);
@@ -113,10 +117,12 @@ export default function ImportStockDialog({
   async function confirm() {
     if (fresh.length === 0) return;
     try {
-      const res = await importStock.mutateAsync({ rows: fresh });
+      // Send ALL parsed rows — the server reconciles against the live pool and
+      // inserts only the deficit (authoritative + race-safe).
+      const res = await importStock.mutateAsync({ rows });
       setCreated(res.created);
       setStage("result");
-      toast.success(`${res.created} unit(s) booked into Carres Klang`);
+      toast.success(`${res.created} line(s) booked into Carres Klang`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Import failed");
     }
@@ -135,8 +141,9 @@ export default function ImportStockDialog({
             the counts — new vs already-in — before anything saves.
           </p>
           <p className="t-tiny text-base-500">
-            Add-only: units already in the pool (matched by OLD REF) are skipped,
-            so re-importing the same sheet won&rsquo;t double up.
+            Add-only + idempotent: lines already in the pool are matched on a
+            stable key (SKU · PO · ref · supplier · date) and skipped, so
+            re-importing the same sheet won&rsquo;t double up.
           </p>
           <div>
             <button
@@ -172,27 +179,28 @@ export default function ImportStockDialog({
         <div className="flex flex-col gap-3">
           <div className="t-small text-base-700">
             <span className="font-mono t-tiny">{fileName}</span> ·{" "}
-            <span className="font-semibold text-base-900">
-              {unitsOf(rows)}
-            </span>{" "}
+            <span className="font-semibold text-base-900">{rows.length}</span>{" "}
+            lines ·{" "}
+            <span className="font-semibold text-base-900">{unitsOf(rows)}</span>{" "}
             units in sheet
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-green-700">{unitsOf(fresh)}</div>
-              <div className="t-micro text-base-500">new — will add</div>
+              <div className="t-h4 text-green-700">{fresh.length}</div>
+              <div className="t-micro text-base-500">new lines — will add</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-base-900">{unitsOf(dupes)}</div>
+              <div className="t-h4 text-base-900">{alreadyIn}</div>
               <div className="t-micro text-base-500">already in — skipped</div>
             </div>
           </div>
 
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 t-tiny text-base-600">
-            Booking in <span className="font-semibold">{unitsOf(fresh)}</span>{" "}
-            new unit(s) at Carres Klang. Condition, PO, supplier, reserved-ref +
-            date-in come straight from the sheet.
+            Booking in <span className="font-semibold">{fresh.length}</span> new
+            line(s) at Carres Klang. Condition, PO, supplier, reserved-ref, qty +
+            date-in come straight from the sheet. Bulk lines (e.g. accessories)
+            stay as one record carrying their quantity.
           </div>
 
           <div className="flex justify-end gap-2 mt-1">
@@ -211,7 +219,7 @@ export default function ImportStockDialog({
               className="btn-primary text-[12px] disabled:opacity-40"
               data-testid="stock-import-confirm"
             >
-              {busy ? "Booking in…" : `Add ${unitsOf(fresh)} unit(s)`}
+              {busy ? "Booking in…" : `Add ${fresh.length} line(s)`}
             </button>
           </div>
         </div>
@@ -220,7 +228,7 @@ export default function ImportStockDialog({
       {stage === "result" && (
         <div className="flex flex-col gap-3" data-testid="stock-import-result">
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
-            <div className="t-h4 text-green-700">{created} unit(s) booked in</div>
+            <div className="t-h4 text-green-700">{created} line(s) booked in</div>
             <div className="t-small text-base-600 mt-0.5">
               at Carres Klang · the On Hand list has refreshed.
             </div>
