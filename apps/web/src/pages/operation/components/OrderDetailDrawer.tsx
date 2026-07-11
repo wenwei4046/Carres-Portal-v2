@@ -501,17 +501,54 @@ function Panel({
   className?: string;
   children: ReactNode;
 }) {
+  // Per-panel hide / expand (Jess 2026-07-11) — every panel header toggles its
+  // own body (accordion), so a big order can collapse the cards it doesn't need.
+  // State persists across orders via localStorage, keyed by the panel title.
+  const storeKey = `ops-drawer-panel:${title}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(storeKey) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(storeKey, next ? "1" : "0");
+      } catch {
+        /* ignore quota / privacy-mode */
+      }
+      return next;
+    });
+  };
   return (
     <section
-      className={`bg-white rounded-2xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow ? "flex-1" : ""} ${className ?? ""}`}
+      className={`bg-white rounded-2xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow && open ? "flex-1" : ""} ${className ?? ""}`}
     >
-      <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100 shrink-0">
-        <span className="t-h4 text-base-900 truncate">{title}</span>
+      <header
+        className={`flex items-center justify-between gap-3 px-3 py-2 shrink-0 ${open ? "border-b border-base-100" : ""}`}
+      >
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          title={open ? "Hide" : "Expand"}
+          className="flex items-center gap-1.5 min-w-0 text-left hover:text-base-950"
+        >
+          {open ? (
+            <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+          ) : (
+            <ChevronRight size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+          )}
+          <span className="t-h4 text-base-900 truncate">{title}</span>
+        </button>
         {summary != null && (
           <span className="shrink-0 flex items-center gap-1.5">{summary}</span>
         )}
       </header>
-      {children}
+      {open && children}
     </section>
   );
 }
@@ -911,8 +948,10 @@ function DrawerBody({
             deadline) on the left; flag / ⋯ / close on the right. */}
         <div className="flex items-center justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <span className="t-tiny text-base-400 shrink-0">Orders&nbsp;/</span>
-            {/* Stage pill — deriveOrderStage (batch BUG-2). */}
+            {/* Header = status only (Jess 2026-07-11): stage pill · #id · ref ·
+                alert stickers. No breadcrumb, no item-count/region (region → the
+                Delivery card), no deadline (it drives Stock ETA + on-hold, not the
+                header). */}
             <span
               className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
               title={PIPELINE_HINT[pipelineStatus]}
@@ -921,11 +960,6 @@ function DrawerBody({
             </span>
             <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
-            </span>
-            {/* One order, many items → a count + region, NOT one model name (Jess). */}
-            <span className="t-small text-base-500 shrink-0 whitespace-nowrap">
-              {orderedLines.length} item{orderedLines.length === 1 ? "" : "s"}
-              {loc.label ? ` · ${loc.label}` : ""}
             </span>
             {order.source_ref?.[0] && (
               <span className="t-small text-base-400 font-mono shrink-0 uppercase">
@@ -954,14 +988,9 @@ function DrawerBody({
                 <AlertCircle size={10} strokeWidth={2.5} /> Outstanding · hold
               </span>
             )}
-            {/* Deadline countdown — completed NEVER shows red (batch-1 reuses the
-                BUG-1 rule: a delivered order's past deadline reads as settled). */}
-            <DeadlineCountdown
-              deliveryDate={order.delivery_date}
-              tbd={order.delivery_date_tbd}
-              daysLeft={daysToDelivery}
-              completed={pipelineStatus === "completed"}
-            />
+            {/* Deadline removed from the header (Jess 2026-07-11) — it drives the
+                Stock ETA + the on-hold logic, and shows on the Delivery card; not a
+                header field. */}
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1001,28 +1030,22 @@ function DrawerBody({
             header badge (Ready N/N); money → the Balance card; logistic → the
             stage action below. Header stays clean. */}
 
-        {/* Row 3 — converged stage action (batch 1 #1) + the control save bar. */}
-        <div className="flex items-center justify-between gap-3 min-w-0">
-          <ActionBar
-            pipelineStatus={pipelineStatus}
-            allReceived={allReceived}
-            warehouseName={warehouse?.name ?? null}
-            onDispatchClick={onDispatchClick}
-            onDOClick={onDOClick}
-            onIssuePOsClick={onIssuePOsClick}
-            onChaseClick={onFollowUpClick}
-            proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
-          />
-          <OrderControlSaveBar form={form} />
-        </div>
       </header>
 
-      {/* ═══ SCROLL BODY (batch 1 #2) ═══ The single scroll region. Panels flow in
-          at natural height; their internal content is UNTOUCHED (batch 2/3). */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 flex flex-col gap-2.5">
+      {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
+          each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
+          scroll — it clips, and each column owns its own overflow-y. */}
+      <div className="flex-1 min-h-0 px-5 py-3 flex flex-col gap-2.5 overflow-hidden">
+        {/* Save bar only — the stage action moved into the Delivery card (Jess
+            2026-07-11). This slim row holds just the Save control for edited
+            fields (it renders nothing until there are unsaved changes), pinned
+            above the scrolling columns. */}
+        <div className="flex items-center justify-end gap-3 min-w-0 shrink-0 empty:hidden">
+          <OrderControlSaveBar form={form} />
+        </div>
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
-          <div className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
             <AlertCircle
               className="w-4 h-4 shrink-0 mt-0.5 text-warning"
               aria-hidden="true"
@@ -1040,7 +1063,7 @@ function DrawerBody({
             column (gridArea:side) first and the items column (gridArea:main)
             second — no panel code moves. Cards get a fixed ~300px; items fill. */}
         <div
-          className="grid gap-2.5 items-start"
+          className="grid gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden"
           style={{
             gridTemplateColumns: "300px minmax(0, 1fr)",
             gridTemplateAreas: '"side main"',
@@ -1052,7 +1075,7 @@ function DrawerBody({
             grows to fill so the column bottom lines up with the right side). */}
         <div
           style={{ gridArea: "main" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar pr-0.5"
         >
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
@@ -1076,7 +1099,7 @@ function DrawerBody({
                       className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]"
                       title="Has this item's stock been received? Received / Pending (waiting on PO) / No PO"
                     >
-                      Stock
+                      Status
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]">
                       Stock ETA
@@ -1091,16 +1114,16 @@ function DrawerBody({
                       Recv
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
-                      Model
+                      Item
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
                     </th>
                     <th
                       className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32"
-                      title="Where this item's stock is received / consolidated before delivery"
+                      title="Where this item is received / where it routes to (the transfer destination). Per-item legs come with the transfer feature."
                     >
-                      Receive at
+                      Route
                     </th>
                   </tr>
                 </thead>
@@ -1315,12 +1338,12 @@ function DrawerBody({
           )}
         </div>
 
-        {/* RIGHT column — the two locked cards: a combined Customer | Balance
-            split card (+ conditional Storage strip), then a Delivery card that
-            grows to fill so both columns' bottoms line up. */}
+        {/* LEFT column (after the flip) — the support cards: Customer · Balance ·
+            Storage (conditional) · Delivery. Scrolls INDEPENDENTLY of the items
+            column on the right (Jess 2026-07-11). */}
         <div
           style={{ gridArea: "side" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-auto"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar"
         >
           {/* 1. Customer — a quiet identity card (name / phone / address, with an
               inline Edit on a Place order). No region pill (Jess 2026-07-11): the
@@ -1536,6 +1559,21 @@ function DrawerBody({
             }
           >
             <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
+              {/* Stage action lives HERE now (Jess 2026-07-11) — Assign logistic /
+                  Confirm delivery / the next step for this order, moved out of the
+                  header row into its related panel. */}
+              <div className="pb-1 mb-1 border-b border-base-100">
+                <ActionBar
+                  pipelineStatus={pipelineStatus}
+                  allReceived={allReceived}
+                  warehouseName={warehouse?.name ?? null}
+                  onDispatchClick={onDispatchClick}
+                  onDOClick={onDOClick}
+                  onIssuePOsClick={onIssuePOsClick}
+                  onChaseClick={onFollowUpClick}
+                  proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
+                />
+              </div>
               {/* Original (what operation sets) | Logistic update (what the
                   carrier commits back). */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
@@ -2584,50 +2622,6 @@ function ActionsMenu({
         </>
       )}
     </div>
-  );
-}
-
-/** Deadline countdown chip (batch 1 #2 · header). Completed NEVER shows red —
- *  a delivered order's past deadline is settled history (batch-1 BUG-1 rule),
- *  so it renders the date in grey with no "over" heat. */
-function DeadlineCountdown({
-  deliveryDate,
-  tbd,
-  daysLeft,
-  completed,
-}: {
-  deliveryDate: string | null;
-  tbd: boolean | null;
-  daysLeft: number | null;
-  completed: boolean;
-}) {
-  if (tbd) return <span className="t-tiny text-base-400 shrink-0">Deadline TBD</span>;
-  if (!deliveryDate || daysLeft == null) return null;
-  if (completed)
-    return (
-      <span
-        title={`Delivered — deadline was ${fmtDate(deliveryDate)}`}
-        className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 shrink-0 tabular-nums"
-      >
-        {fmtDate(deliveryDate)}
-      </span>
-    );
-  const label =
-    daysLeft < 0 ? `${Math.abs(daysLeft)}d over` : daysLeft === 0 ? "today" : `${daysLeft}d left`;
-  // Heat only on the two hottest tiers; otherwise neutral (lining-box: colour = alert only).
-  const tone =
-    daysLeft <= 1
-      ? "bg-[#FCE4E4] text-[#991B1B]"
-      : daysLeft <= 3
-        ? "bg-[#FDEBD8] text-[#B45309]"
-        : "bg-base-100 text-base-500";
-  return (
-    <span
-      title={`Customer deadline ${fmtDate(deliveryDate)}`}
-      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 tabular-nums ${tone}`}
-    >
-      {label} · {fmtDate(deliveryDate)}
-    </span>
   );
 }
 
