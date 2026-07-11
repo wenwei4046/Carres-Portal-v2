@@ -450,6 +450,8 @@ export {
   opsStockReserveItemInputSchema,
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
+  opsStockRefurbishInputSchema,
+  opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
   opsStockItemSchema,
@@ -462,6 +464,8 @@ export {
   type OpsStockReserveItemInput,
   type OpsStockTakeoutInput,
   type OpsStockFlagRepairInput,
+  type OpsStockRefurbishInput,
+  type OpsStockRefurbishCompleteInput,
   type OpsStockUpdateConditionInput,
   type OpsStockCreateInput,
   type OpsStockItem,
@@ -893,10 +897,14 @@ export {
 export {
   normalizeStockCondition,
   warehouseSheetRecordToImportRow,
+  stockUnitKey,
+  reconcileStockImport,
   opsStockImportRowSchema,
   opsStockImportInputSchema,
   type OpsStockImportRow,
   type OpsStockImportInput,
+  type StockUnitKeyParts,
+  type StockImportReconcileResult,
 } from "./ops-stock-import";
 
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /

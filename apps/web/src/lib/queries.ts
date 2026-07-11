@@ -5058,14 +5058,15 @@ export function useImportStockEta() {
   });
 }
 
-/** On Hand C+ P3 — bulk book-in from the "Klg Warehouse" ready-stock sheet.
- *  Add-only: sends the chosen import rows to /api/ops/stock/import (server
- *  expands qty + inserts). Refreshes every ops-stock list + the dashboard. */
+/** On Hand — bulk book-in from the "Klg Warehouse" ready-stock sheet. Sends ALL
+ *  parsed lines; the server reconciles against the live pool (count-based, per
+ *  stable key) and inserts only the deficit — idempotent. One line = one record
+ *  carrying its qty. Refreshes every ops-stock list + the dashboard. */
 export function useImportStock() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { rows: OpsStockImportRow[] }) =>
-      apiFetch<{ created: number }>(
+      apiFetch<{ created: number; alreadyIn: number; total: number }>(
         "/api/ops/stock/import",
         catalogJson("POST", input),
       ),
