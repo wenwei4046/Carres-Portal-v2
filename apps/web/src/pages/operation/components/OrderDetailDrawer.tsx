@@ -1217,6 +1217,11 @@ function DrawerBody({
               <PanelMenu
                 items={[
                   {
+                    label: "Raise PO for shortages",
+                    icon: <PackagePlus size={14} />,
+                    onClick: () => onIssuePOsClick(),
+                  },
+                  {
                     label: recheckStock.isPending
                       ? "Rechecking…"
                       : "Recheck stock",
@@ -1737,6 +1742,30 @@ function DrawerBody({
           {(hasMsbf || hasSof) && (
             <Panel
               title="Storage"
+              actions={
+                <PanelMenu
+                  items={[
+                    {
+                      label: "Print storage receipt (latest)",
+                      icon: <FileText size={14} />,
+                      disabled: !ledger.some((p) => p.kind === "storage"),
+                      onClick: () => {
+                        const storagePays = ledger.filter(
+                          (p) => p.kind === "storage",
+                        );
+                        if (storagePays.length === 0) return;
+                        const latest = storagePays.reduce((a, b) =>
+                          b.paid_on > a.paid_on ? b : a,
+                        );
+                        void openReceipt(latest, {
+                          orderCode: `SO-${order.so}`,
+                          customerName: order.customer_name ?? "",
+                        });
+                      },
+                    },
+                  ]}
+                />
+              }
               summary={
                 storageOwing ? (
                   <span
@@ -1824,6 +1853,11 @@ function DrawerBody({
             actions={
               <PanelMenu
                 items={[
+                  {
+                    label: "Print DO",
+                    icon: <FileText size={14} />,
+                    onClick: () => void openDoPdf(order.id),
+                  },
                   {
                     label: "Copy address",
                     icon: <Copy size={14} />,
@@ -2464,6 +2498,21 @@ async function openInvoicePdf(orderId: string, so: number) {
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
     toast.error(`No invoice yet (issued at dispatch) — ${msg}`);
+  }
+}
+
+/** Fetch DO data + render the Delivery Order PDF — the Delivery ⋮ "Print DO".
+ *  Mirrors PrintDoButton (same /print-do-data endpoint). */
+async function openDoPdf(orderId: string) {
+  try {
+    const data = await apiFetch<DoTemplateData>(
+      `/api/operation/orders/${orderId}/print-do-data`,
+    );
+    const blob = await renderDoPdf(data);
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`Print delivery order failed — ${msg}`);
   }
 }
 
