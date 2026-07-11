@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Filter, X, Handshake } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -77,6 +77,9 @@ interface Props {
   /** When provided, the loan view's action LOANS the picked sofa (issue a DO +
    *  on-loan tracking) via the parent instead of a plain reserve (migration 0209). */
   onLoan?: (itemId: string, itemSku: string) => void;
+  /** The panel header ⋮ (Jess 2026-07-11 per-panel ⋮) — rendered at the header's
+   *  right edge so the Warehouse-stock panel matches the others. */
+  actions?: ReactNode;
 }
 
 // ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
@@ -102,7 +105,7 @@ const COLS: {
   { key: "cond", label: "Cond", kind: "select", optKey: "cond" },
 ];
 
-export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan }: Props) {
+export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
@@ -293,6 +296,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
               <X size={11} strokeWidth={2.5} /> clear
             </button>
           )}
+          {actions}
         </div>
       </div>
 

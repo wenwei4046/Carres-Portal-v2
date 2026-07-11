@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  ExternalLink,
   FileText,
   Flag,
   MoreVertical,
@@ -755,10 +756,34 @@ function DrawerBody({
   const hasLineTotal = grandTotal > 0;
   const loc = locationForAddress(order.customer_address ?? null);
 
+  const navigate = useNavigate();
   const form = useOrderControlForm(order.id);
   // Re-derive per-line stock readiness on demand — the Items + Warehouse ⋮
   // "Recheck stock" action (Jess 2026-07-11 per-panel ⋮).
   const recheckStock = useRecheckStockMutation(order.id);
+  // The Warehouse-stock panel's header ⋮ (same actions on the grid + the
+  // placeholder). Recheck re-derives readiness; Open jumps to the full stock page.
+  const warehouseMenu = (
+    <PanelMenu
+      items={[
+        {
+          label: recheckStock.isPending ? "Rechecking…" : "Recheck stock",
+          icon: <RotateCcw size={14} />,
+          disabled: recheckStock.isPending,
+          onClick: () =>
+            recheckStock.mutate(undefined, {
+              onSuccess: () => toast.success("Stock rechecked"),
+              onError: (e) => toast.error(e.message),
+            }),
+        },
+        {
+          label: "Open full warehouse",
+          icon: <ExternalLink size={14} />,
+          onClick: () => navigate("/operation?tab=stock-onhand"),
+        },
+      ]}
+    />
+  );
   // Payment ledger (order_payments, migration 0184) — the source of truth for
   // Collected. Fetched at the drawer level so the header sticker + status strip +
   // Money card all read ONE Outstanding.
@@ -1492,10 +1517,16 @@ function DrawerBody({
                 onLoan={(itemId, itemSku) =>
                   setLoanTarget({ itemId, sku: itemSku })
                 }
+                actions={warehouseMenu}
               />
             </div>
           ) : (
-            <Panel title="Warehouse stock" grow summary={<MiniBadge tone="muted">—</MiniBadge>}>
+            <Panel
+              title="Warehouse stock"
+              grow
+              summary={<MiniBadge tone="muted">—</MiniBadge>}
+              actions={warehouseMenu}
+            >
               <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
                 {stage === "delivered"
                   ? "Delivered — stock settled."
@@ -1778,6 +1809,23 @@ function DrawerBody({
               Activity card below carries `grow` to fill the column bottom.) */}
           <Panel
             title="Delivery"
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Copy address",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_address,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_address ?? "",
+                      );
+                      toast.success("Address copied");
+                    },
+                  },
+                ]}
+              />
+            }
             summary={
               assignedLogisticName ? (
                 // Assigned → show the carrier (green = handled).
