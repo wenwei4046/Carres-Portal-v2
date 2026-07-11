@@ -1468,6 +1468,9 @@ function DrawerBody({
                                 )}
                                 <RouteLegEditor
                                   legs={savedLegs}
+                                  partners={(
+                                    partnersData?.partners ?? []
+                                  ).map((p) => p.name)}
                                   onChange={(legs) =>
                                     form.setLineLegs(l.sku, legs)
                                   }

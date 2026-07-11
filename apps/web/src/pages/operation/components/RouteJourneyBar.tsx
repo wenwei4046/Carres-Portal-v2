@@ -9,11 +9,7 @@ import {
   Trash2,
   Warehouse,
 } from "lucide-react";
-import {
-  ROUTE_CARRIERS,
-  STOCK_LOCATIONS,
-  type OrderRouteLeg,
-} from "@carres/shared";
+import { STOCK_LOCATIONS, type OrderRouteLeg } from "@carres/shared";
 
 /**
  * RouteJourneyBar — the per-item transfer "Option D" design (Jess 2026-07-11,
@@ -211,26 +207,37 @@ export function legsToDisplay(legs: OrderRouteLeg[]): RouteLeg[] {
   });
 }
 
-const LEG_PLACES = [...STOCK_LOCATIONS, "Customer"] as const;
+// Route = INBOUND pickup legs only (Jess 2026-07-11) — getting an item INTO the
+// consolidation warehouse. The final delivery to the customer is the Delivery
+// panel's job, so "Customer" is deliberately NOT a leg destination here.
+const LEG_PLACES = [...STOCK_LOCATIONS] as const;
 
 /**
  * The in-place transfer-leg editor (Jess 2026-07-11 Route "Option D" — the real
- * Add-leg). Each row = from → to · carrier · done, with remove; "Add leg" appends
- * a hop starting where the last one ended. Persisted to line_legs via the form.
+ * Add-leg). Each row = from → to · partner · done, with remove; "Add leg" appends
+ * a hop ending at the consolidation warehouse. The carrier of a leg is a real
+ * delivery PARTNER (same list the Delivery panel uses — so AL is pickable), not a
+ * separate invented set. Persisted to line_legs via the form.
  */
 export function RouteLegEditor({
   legs,
   onChange,
+  partners,
 }: {
   legs: OrderRouteLeg[];
   onChange: (legs: OrderRouteLeg[]) => void;
+  /** Delivery-partner names (NETS / AL / HOUZS / …) — the leg's carrier options. */
+  partners: string[];
 }) {
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
   const update = (i: number, patch: Partial<OrderRouteLeg>) =>
     onChange(legs.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const add = () => {
-    const from = legs.length ? legs[legs.length - 1].to : "Carres Klang";
-    onChange([...legs, { from, to: "Customer", carrier: null, done: false }]);
+    const from = legs.length ? legs[legs.length - 1].to : "at-supplier";
+    onChange([
+      ...legs,
+      { from, to: "Carres Klang", carrier: null, done: false },
+    ]);
   };
   const sel =
     "border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[11px] focus:border-primary focus:outline-none";
@@ -284,8 +291,8 @@ export function RouteLegEditor({
             onChange={(e) => update(i, { carrier: e.target.value || null })}
             className={sel}
           >
-            <option value="">carrier…</option>
-            {ROUTE_CARRIERS.map((carr) => (
+            <option value="">partner…</option>
+            {partners.map((carr) => (
               <option key={carr} value={carr}>
                 {carr}
               </option>
