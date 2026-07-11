@@ -34,8 +34,8 @@ import {
   type LineStockStatus,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
-import { renderDoPdf, renderReceiptPdf } from "@/lib/pdf/render";
-import type { DoTemplateData } from "@/lib/pdf/types";
+import { renderDoPdf, renderReceiptPdf, renderInvoicePdf } from "@/lib/pdf/render";
+import type { DoTemplateData, InvoiceTemplateData } from "@/lib/pdf/types";
 import {
   qk,
   useOperationOrder,
@@ -1635,6 +1635,25 @@ function DrawerBody({
               <PanelMenu
                 items={[
                   {
+                    label: "Print invoice",
+                    icon: <FileText size={14} />,
+                    onClick: () => void openInvoicePdf(order.id, order.so),
+                  },
+                  {
+                    label: "Print receipt (latest)",
+                    icon: <FileText size={14} />,
+                    disabled: ledger.length === 0,
+                    onClick: () => {
+                      const latest = ledger.reduce((a, b) =>
+                        b.paid_on > a.paid_on ? b : a,
+                      );
+                      void openReceipt(latest, {
+                        orderCode: `SO-${order.so}`,
+                        customerName: order.customer_name ?? "",
+                      });
+                    },
+                  },
+                  {
                     label: "Copy outstanding",
                     icon: <Copy size={14} />,
                     disabled: !isOwing,
@@ -2427,6 +2446,24 @@ async function openReceipt(
     window.open(URL.createObjectURL(blob), "_blank");
   } catch (e) {
     toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+  }
+}
+
+/** Fetch the order's invoice data + render the Sales Invoice PDF — the Balance ⋮
+ *  "Print invoice". The invoice row is auto-issued at dispatch (migration 0098),
+ *  so before dispatch the endpoint 404s → a clear toast. Mirrors
+ *  DownloadInvoiceButton. */
+async function openInvoicePdf(orderId: string, so: number) {
+  try {
+    const data = await apiFetch<InvoiceTemplateData>(
+      `/api/orders/${orderId}/invoice-pdf-data`,
+    );
+    const blob = await renderInvoicePdf(data);
+    window.open(URL.createObjectURL(blob), "_blank");
+    toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`No invoice yet (issued at dispatch) — ${msg}`);
   }
 }
 
