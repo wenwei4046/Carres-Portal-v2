@@ -1461,9 +1461,11 @@ function DrawerBody({
                                 </div>
                                 {savedLegs.length === 0 && (
                                   <p className="text-[10px] text-base-400 mb-1.5">
-                                    Standard: {locValue || "Carres Klang"} →
-                                    Customer. Add a leg only for a special
-                                    transfer (supplier pickup, cross-warehouse).
+                                    Standard: sits at{" "}
+                                    {locValue || "Carres Klang"}. Add a leg only
+                                    for a special pickup (supplier → warehouse).
+                                    Delivery to the customer is set in the
+                                    Delivery panel.
                                   </p>
                                 )}
                                 <RouteLegEditor
