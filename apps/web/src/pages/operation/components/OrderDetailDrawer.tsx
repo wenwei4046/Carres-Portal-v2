@@ -1,9 +1,18 @@
-import { type ReactNode, type MouseEvent, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  type MouseEvent,
+  type MutableRefObject,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
   Download,
   FileText,
   Flag,
@@ -57,6 +66,13 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import DeliveryChain from "./DeliveryChain";
+import {
+  RouteJourneyBar,
+  RouteLegList,
+  RouteQuietButton,
+  deriveRouteLegs,
+  isSpecialRoute,
+} from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -689,6 +705,12 @@ function DrawerBody({
   // free units grouped by normalized key, so each line resolves its real
   // available units across the order/warehouse naming drift.
   const [pickerSku, setPickerSku] = useState<string | null>(null);
+  // Route "Option D" — which item's journey legs are expanded in-place (one at a
+  // time; the heavy detail stays inside the drawer so the list never gets busy).
+  const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
+  // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
+  // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
+  const customerEditRef = useRef<(() => void) | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
@@ -734,6 +756,9 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // Re-derive per-line stock readiness on demand — the Items + Warehouse ⋮
+  // "Recheck stock" action (Jess 2026-07-11 per-panel ⋮).
+  const recheckStock = useRecheckStockMutation(order.id);
   // Payment ledger (order_payments, migration 0184) — the source of truth for
   // Collected. Fetched at the drawer level so the header sticker + status strip +
   // Money card all read ONE Outstanding.
@@ -1160,6 +1185,18 @@ function DrawerBody({
               <PanelMenu
                 items={[
                   {
+                    label: recheckStock.isPending
+                      ? "Rechecking…"
+                      : "Recheck stock",
+                    icon: <RotateCcw size={14} />,
+                    disabled: recheckStock.isPending,
+                    onClick: () =>
+                      recheckStock.mutate(undefined, {
+                        onSuccess: () => toast.success("Stock rechecked"),
+                        onError: (e) => toast.error(e.message),
+                      }),
+                  },
+                  {
                     label: "Export items (CSV)",
                     icon: <Download size={14} />,
                     onClick: () => downloadOrderCsv(order, lines),
@@ -1235,10 +1272,20 @@ function DrawerBody({
                     // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =
                       form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+                    // Route "Option D" legs — derived from location + carrier +
+                    // readiness (real per-leg authoring lands with the migration).
+                    const routeLegs = isService
+                      ? []
+                      : deriveRouteLegs({
+                          location: locValue,
+                          carrier: assignedLogisticName,
+                          readiness: rd ?? "ready",
+                        });
+                    const routeOpen = routeOpenSku === l.sku;
                     // One row per SKU (duplicate lines combined above) → key on SKU.
                     return (
+                      <Fragment key={l.sku}>
                       <tr
-                        key={l.sku}
                         onClick={() => setPickerSku(l.sku)}
                         className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
                       >
@@ -1325,33 +1372,77 @@ function DrawerBody({
                             <span className="text-base-300">—</span>
                           )}
                         </td>
-                        {/* Route */}
+                        {/* Route — Option D journey bar: icons = places, colour =
+                            progress. Click expands the legs in-place (below). */}
                         {isService ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
                             N/A
                           </td>
                         ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-top">
-                            <select
-                              value={locValue}
-                              onChange={(e) =>
-                                form.setLineLocation(
-                                  l.sku,
-                                  e.target.value ? [e.target.value] : [],
-                                )
-                              }
-                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                            >
-                              <option value="">—</option>
-                              {STOCK_LOCATIONS.map((locOpt) => (
-                                <option key={locOpt} value={locOpt}>
-                                  {locOpt}
-                                </option>
-                              ))}
-                            </select>
+                          <td className="border border-base-200 px-1 py-0.5 align-middle">
+                            {isSpecialRoute(routeLegs) ? (
+                              <RouteJourneyBar
+                                legs={routeLegs}
+                                open={routeOpen}
+                                onClick={() =>
+                                  setRouteOpenSku((cur) =>
+                                    cur === l.sku ? null : l.sku,
+                                  )
+                                }
+                              />
+                            ) : (
+                              <RouteQuietButton
+                                open={routeOpen}
+                                onClick={() =>
+                                  setRouteOpenSku((cur) =>
+                                    cur === l.sku ? null : l.sku,
+                                  )
+                                }
+                              />
+                            )}
                           </td>
                         )}
                       </tr>
+                      {!isService && routeOpen && (
+                        <tr className="bg-base-50">
+                          <td
+                            colSpan={6}
+                            className="border border-base-200 px-3 py-2"
+                          >
+                            <div className="space-y-2">
+                              <RouteLegList legs={routeLegs} />
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
+                                  Current location
+                                </span>
+                                <select
+                                  value={locValue}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    form.setLineLocation(
+                                      l.sku,
+                                      e.target.value ? [e.target.value] : [],
+                                    )
+                                  }
+                                  className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                >
+                                  <option value="">—</option>
+                                  {STOCK_LOCATIONS.map((locOpt) => (
+                                    <option key={locOpt} value={locOpt}>
+                                      {locOpt}
+                                    </option>
+                                  ))}
+                                </select>
+                                <span className="text-[10px] text-base-400 ml-auto">
+                                  Per-leg carrier + Add leg — with the transfer
+                                  update
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1425,9 +1516,57 @@ function DrawerBody({
               inline Edit on a Place order). No region pill (Jess 2026-07-11): the
               region is a DELIVERY attribute (it shows on the Delivery card), not
               customer identity. */}
-          <Panel title="Customer">
+          <Panel
+            title="Customer"
+            actions={
+              <PanelMenu
+                items={[
+                  ...(order.status === "place"
+                    ? [
+                        {
+                          label: "Edit details",
+                          icon: <Pencil size={14} />,
+                          onClick: () => customerEditRef.current?.(),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Copy address",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_address,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_address ?? "",
+                      );
+                      toast.success("Address copied");
+                    },
+                  },
+                  {
+                    label: "Copy phone",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_phone,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_phone ?? "",
+                      );
+                      toast.success("Phone copied");
+                    },
+                  },
+                  {
+                    label: "WhatsApp customer",
+                    icon: <Phone size={14} />,
+                    disabled: !order.customer_phone,
+                    onClick: () => {
+                      const wa = waLink(order.customer_phone);
+                      if (wa) window.open(wa, "_blank", "noopener");
+                    },
+                  },
+                ]}
+              />
+            }
+          >
             <div className="p-3">
-              <OrderCustomerCard order={order} />
+              <OrderCustomerCard order={order} startEditRef={customerEditRef} />
             </div>
           </Panel>
 
@@ -1438,6 +1577,21 @@ function DrawerBody({
               OUTSTANDING owed (no Bill/Total). */}
           <Panel
             title="Balance"
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Copy outstanding",
+                    icon: <Copy size={14} />,
+                    disabled: !isOwing,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(RM(moneyOutstanding));
+                      toast.success("Outstanding copied");
+                    },
+                  },
+                ]}
+              />
+            }
             summary={
               isOwing ? (
                 <span
@@ -2005,6 +2159,7 @@ function LoanSofaModal({
  */
 export function OrderCustomerCard({
   order,
+  startEditRef,
 }: {
   order: {
     id: string;
@@ -2014,9 +2169,10 @@ export function OrderCustomerCard({
     customer_address: string | null;
     placed_at?: string | null;
   };
+  /** Lets an outside control (the panel ⋮) open this card's safe-edit mode. */
+  startEditRef?: MutableRefObject<(() => void) | null>;
 }) {
   const qc = useQueryClient();
-  const editable = order.status === "place";
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(order.customer_name ?? "");
   const [phone, setPhone] = useState(order.customer_phone ?? "");
@@ -2041,6 +2197,11 @@ export function OrderCustomerCard({
     setErr(null);
     setEditing(true);
   }
+
+  // Expose `start` to the panel ⋮ (Edit details) — kept current each render.
+  useEffect(() => {
+    if (startEditRef) startEditRef.current = start;
+  });
 
   function save() {
     setErr(null);
@@ -2130,22 +2291,31 @@ export function OrderCustomerCard({
           {order.customer_address || <span className="text-base-400">—</span>}
         </span>
       </CompactField>
-      {/* Ordered date moved to the drawer header (Jess 2026-07-11). Edit stays —
-          read-only by default (no accidental change), opens the safe edit mode
-          with Save / Cancel below. */}
-      {editable && (
-        <div className="mt-auto pt-2 border-t border-base-100 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={start}
-            className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-primary"
-          >
-            <Pencil className="w-3 h-3" /> Edit details
-          </button>
-        </div>
-      )}
+      {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
+          its header ⋮; the redundant inline button is gone). Read-only by default;
+          the ⋮ "Edit details" opens the safe Save / Cancel mode. */}
     </div>
   );
+}
+
+/**
+ * Build a wa.me link from a MY customer phone (weak-English staff want one tap to
+ * message the customer). Takes the FIRST number if the field lists several
+ * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
+ */
+export function waLink(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const first = phone.split(/[|,/]/)[0] ?? "";
+  let d = first.replace(/\D/g, "");
+  if (!d) return null;
+  if (d.startsWith("60")) {
+    /* already international */
+  } else if (d.startsWith("0")) {
+    d = `60${d.slice(1)}`;
+  } else {
+    d = `60${d}`;
+  }
+  return `https://wa.me/${d}`;
 }
 
 /** Compact label-left / value-right read row (Jess: match the clean mockup). */
