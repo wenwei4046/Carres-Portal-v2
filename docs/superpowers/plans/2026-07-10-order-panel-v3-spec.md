@@ -320,3 +320,34 @@ Ching **2026-07-20** 上班，再一个新人 **2026-08-01**。三个 ops 里两
 - **画图一律全英文**，一个中文都不放（画面是给 ops 团队看的，英文）。聊天可以中文。
 - **不做假动作。** 一个按钮如果点下去 portal 里什么都不变（Chase supplier / Chase logistic），就不放。真正的动作在 portal 外面（打电话）→ portal 只负责把答案填进栏位。
 - **「谁来填」是 UI 之外的问题。** 栏位空（logistic_eta 1/168）多半不是 UI 坏，是还没建「谁来填」的流程。别在空栏位上叠更多 UI —— 先想清楚谁、什么时候、怎么填。
+
+---
+
+## 9. 2026-07-11 设计精修 + 施工状态（session 续）
+
+> 以下是 07-11 跟 Jess 逐条敲定的精修 + 已施工。**代码全在 `apps/web/src/pages/operation/components/OrderDetailDrawer.tsx`,已 commit + push 到 `origin/phase/10-order-detail-layout-redesign`(`0ccf0c5` · `570f4cc` · `211beb4`)。不要 push main —— WIP,走 PR。**
+
+### A 批（不碰 schema)—— ✅ 全做完
+1. **布局翻转**:卡在**左**、items+warehouse 在**右**;左右两栏**各自独立滚**;每个 panel 点标题 chevron **收合/展开**(记 localStorage)。
+2. **Header 一行**:`[状态 pill] · #id · CR ref · Ordered 日期 · ⋮ · ✕`。去掉面包屑、`N items · 地区`、deadline。状态字**推导**:欠钱→红 `On hold delivery`,否则 `Ready to deliver`(为什么 on hold → Balance 卡)。
+3. **每个 panel 的 header 用 pill 报状态/警示,不用句子行**。Delivery 没派物流 → header amber `Assign logistic`;派了 → 显示 carrier。stage 动作(Issue PO / Assign / Confirm delivery)进 **header ⋮**。
+4. **每个 panel header 有 ⋮ 装自己的动作**(机制 = `PanelMenu` + Panel `actions` 插槽,已接 Items 的 Export CSV;其他 panel 加动作很快)。
+5. **Customer 卡**:安全编辑 —— 只读默认(不误改)· ⋮ / Edit → 进编辑 · **Save/Cancel 在 panel 里**。Ordered 挪去 header。
+6. **Items 表**:`Status · Stock ETA · Item · Qty · PO · Route`。**Recv 栏删,GRN 折进 Status**(Status pill 带收货数 `Waiting 0/1`,点它开收货 dialog → `Ready 1/1`)。
+7. **词汇(layman 大白话)**:Status 栏 = **`Waiting` / `Ready` / `No PO`**(`Ready · stock`→`Ready`、`from stock`→删)。**`In stock` 只用在 Warehouse / Loan 面板**(讲实体现货),不进 Status。
+
+### B 批(要 migration —— **Jess 自己批,不经过 Loo**)—— ⏳ 未做
+8. **Route legs(每件货的搬运)**:像送货链一样用 **legs**。每个 leg = `从 → 到 · via 一个 carrier`(carrier 选项:Lalamove / NETS / HOUZS-pickup / 供应商直送 / Keep-at-Klang),各自有状态;`+ Add leg` 加段(>3 destination 就多几段);一段的货 = 1 leg。**每件都可开 Route 选 carrier**(默认走 Carres Klang 显示灰 `Warehouse`,不吵)。系统按规则**建议**一个 carrier(配件@Klang→Lalamove · MS@Klang→NETS · MS@NF→HOUZS-pickup→HOUZS Balakong · BF@供应商→供应商直送),ops 可改。**复用 `orders.delivery_stops`/DeliveryChain 的形状**。要加:carrier 栏 + per-item legs jsonb + `suggestTransfer` 规则函数 + **HOUZS Balakong 仓**(`warehouses` 现在只有 Carres Klang)。Route 栏现在只是旧的 warehouse `<select>` 占位。
+9. **Loan 面板(独立,别跟 Warehouse-stock 混)** —— Jess 明确要**分开成新 panel** 避免混淆:
+   - **Warehouse stock 面板** = 看 match 的现货 + **Reserve**(拿走用,永久)。表头显示「Matching \<model·size\>」+ **Condition 栏**(New/Display/Extra…)。
+   - **Loan 面板(新)** = 货是 `Waiting`(等供应商)但交期快到/逾期 + 仓库有 match 现货 → **Loan**(借一件先出货)→ 记 pending exchange → 那张 PO 的货到了**归还仓库换回**。
+   - 区别一句话:**Reserve = 拿走** · **Loan = 借了还**。
+   - Loan 要动 stock schema(借出/归还的记录)。
+
+### Delivery ↔ Route 关系
+`供应商/仓库 → Route(legs) → 最终物流(如 NETS) → Delivery → 客户`。
+**Delivery 面板 = 最终物流**(送到客户,last-mile)。**Items Route = 内部搬运**,把货弄到那个最终物流手上。**Route 的最后一站 = Delivery 选的物流** —— 一条链。
+
+### 施工尾巴
+- **7 个过时测试**(`OperationOrders.test.tsx` #6/16/17/19/20/23/24):测已删的 ActionBar,要更新成「查 header ⋮」。本来就红(pre-existing),非新 regression。
+- **Deploy**:手动 wrangler,只在 A+B 完成 + review + 合 main 后。别把 WIP branch 推 main。
