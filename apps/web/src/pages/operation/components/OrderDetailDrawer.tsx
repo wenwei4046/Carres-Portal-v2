@@ -1,6 +1,7 @@
 import { type ReactNode, type MouseEvent, useEffect, useState } from "react";
 import {
   AlertCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Download,
@@ -11,6 +12,7 @@ import {
   Pencil,
   Phone,
   RotateCcw,
+  Truck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1013,6 +1015,9 @@ function DrawerBody({
               onConfirmProceedClick={onConfirmProceedClick}
               onTopUpClick={onTopUpClick}
               onAbandonClick={onAbandonClick}
+              onIssuePOsClick={onIssuePOsClick}
+              onDispatchClick={onDispatchClick}
+              onDOClick={onDOClick}
             />
             <button
               type="button"
@@ -1094,27 +1099,24 @@ function DrawerBody({
             <div className="overflow-auto min-h-0" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
+                  {/* Order (Jess 2026-07-11): Status · Stock ETA · Item · Qty · PO ·
+                      Route. GRN (received count + book-in) folds INTO the Status
+                      cell — no separate Recv column. */}
                   <tr className="bg-[#F1EDE6] text-[#8C877D]">
                     <th
-                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]"
-                      title="Has this item's stock been received? Received / Pending (waiting on PO) / No PO"
+                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]"
+                      title="Waiting / Ready / No PO. The count = received / ordered — click to book in received units (GRN)."
                     >
                       Status
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       Stock ETA
-                    </th>
-                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
-                      Qty
-                    </th>
-                    <th
-                      className="text-center text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-[#E5E1D8]"
-                      title="Received / ordered — click to book in received units (GRN)"
-                    >
-                      Recv
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
                       Item
+                    </th>
+                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
+                      Qty
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
@@ -1168,6 +1170,9 @@ function DrawerBody({
                         onClick={() => setPickerSku(l.sku)}
                         className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
                       >
+                        {/* Status (+ GRN folded in) — for a PO item the received
+                            count / book-in button sits next to the status pill, so
+                            there's no separate Recv column (Jess 2026-07-11). */}
                         <td className="border border-base-200 px-1.5 py-1 align-top">
                           {isService || !rd ? (
                             <span className="text-base-300 text-[11px]">—</span>
@@ -1176,21 +1181,46 @@ function DrawerBody({
                               title="Accessory — always in the Klang warehouse; deducted from ready stock"
                               className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] whitespace-nowrap"
                             >
-                              Ready · stock
+                              Ready
                             </span>
                           ) : (
-                            <StockStatusCell
-                              sku={l.sku}
-                              status={rd}
-                              isOverride={isStatusOverride}
-                              onSet={(s) => form.setLineStockStatus(l.sku, s)}
-                              onPick={() => setPickerSku(l.sku)}
-                            />
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <StockStatusCell
+                                sku={l.sku}
+                                status={rd}
+                                isOverride={isStatusOverride}
+                                onSet={(s) => form.setLineStockStatus(l.sku, s)}
+                                onPick={() => setPickerSku(l.sku)}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReceiveLine({
+                                    sku: l.sku,
+                                    qty: l.qty,
+                                    received: lineReceivedOf(l.sku),
+                                  });
+                                }}
+                                title="Book in received units (GRN)"
+                                className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1 py-0.5 rounded ${
+                                  lineReceivedOf(l.sku) >= l.qty
+                                    ? "text-success font-semibold"
+                                    : "text-primary hover:bg-primary/10"
+                                }`}
+                              >
+                                {lineReceivedOf(l.sku)}/{l.qty}
+                                {lineReceivedOf(l.sku) < l.qty && (
+                                  <PackagePlus size={11} strokeWidth={2} />
+                                )}
+                              </button>
+                            </div>
                           )}
                         </td>
+                        {/* Stock ETA */}
                         {isService || isAcc ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            {isAcc ? "from stock" : "N/A"}
+                            {isAcc ? "—" : "N/A"}
                           </td>
                         ) : (
                           <td className="border border-base-200 px-1 py-0.5 align-top">
@@ -1202,39 +1232,7 @@ function DrawerBody({
                             />
                           </td>
                         )}
-                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                          {l.qty}
-                        </td>
-                        {isService || isAcc ? (
-                          <td className="border border-base-200 px-2 py-1 text-[10px] text-base-400 text-center align-middle">
-                            {isAcc ? "from stock" : "—"}
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-1 text-center align-middle">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReceiveLine({
-                                  sku: l.sku,
-                                  qty: l.qty,
-                                  received: lineReceivedOf(l.sku),
-                                });
-                              }}
-                              title="Book in received units (GRN)"
-                              className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
-                                lineReceivedOf(l.sku) >= l.qty
-                                  ? "text-success font-semibold"
-                                  : "text-primary hover:bg-primary/10"
-                              }`}
-                            >
-                              {lineReceivedOf(l.sku)}/{l.qty}
-                              {lineReceivedOf(l.sku) < l.qty && (
-                                <PackagePlus size={11} strokeWidth={2} />
-                              )}
-                            </button>
-                          </td>
-                        )}
+                        {/* Item */}
                         <td className="border border-base-200 px-2 py-1 align-top">
                           <div
                             className="font-mono text-[10px] leading-tight break-words"
@@ -1243,6 +1241,11 @@ function DrawerBody({
                             {l.sku}
                           </div>
                         </td>
+                        {/* Qty */}
+                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                          {l.qty}
+                        </td>
+                        {/* PO */}
                         <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
                           {poNo ? (
                             <span className="text-primary">{poNo}</span>
@@ -1250,6 +1253,7 @@ function DrawerBody({
                             <span className="text-base-300">—</span>
                           )}
                         </td>
+                        {/* Route */}
                         {isService ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
                             N/A
@@ -1549,31 +1553,27 @@ function DrawerBody({
           <Panel
             title="Delivery"
             summary={
-              loc.area === "KV" ? (
-                <MiniBadge tone="kv">Klang Valley</MiniBadge>
+              assignedLogisticName ? (
+                // Assigned → show the carrier (green = handled).
+                <MiniBadge tone="kv">{assignedLogisticName}</MiniBadge>
+              ) : pipelineStatus === "ready" ? (
+                // Ready but no carrier → the ALERT lives on the header (Jess
+                // 2026-07-11): amber, no sentence row. Assign via the picker below.
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
+                  <AlertCircle size={10} strokeWidth={2.5} /> Assign logistic
+                </span>
               ) : loc.area === "Outstation" ? (
                 <MiniBadge tone="outstation">Outstation</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">Area —</MiniBadge>
+                <MiniBadge tone="muted">{loc.label ?? "Area —"}</MiniBadge>
               )
             }
           >
             <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
-              {/* Stage action lives HERE now (Jess 2026-07-11) — Assign logistic /
-                  Confirm delivery / the next step for this order, moved out of the
-                  header row into its related panel. */}
-              <div className="pb-1 mb-1 border-b border-base-100">
-                <ActionBar
-                  pipelineStatus={pipelineStatus}
-                  allReceived={allReceived}
-                  warehouseName={warehouse?.name ?? null}
-                  onDispatchClick={onDispatchClick}
-                  onDOClick={onDOClick}
-                  onIssuePOsClick={onIssuePOsClick}
-                  onChaseClick={onFollowUpClick}
-                  proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
-                />
-              </div>
+              {/* No sentence row (Jess 2026-07-11) — the header pill signals the
+                  state (⚑ Assign logistic / carrier name); the carrier picker below
+                  IS the assign action. Stage actions (Issue PO / Confirm delivery)
+                  live in the header ⋮ menu. */}
               {/* Original (what operation sets) | Logistic update (what the
                   carrier commits back). */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
@@ -2433,6 +2433,9 @@ function ActionsMenu({
   onConfirmProceedClick,
   onTopUpClick,
   onAbandonClick,
+  onIssuePOsClick,
+  onDispatchClick,
+  onDOClick,
 }: {
   order: DrawerBodyProps["data"]["order"];
   lines: operationOrderDetailLine[];
@@ -2444,6 +2447,9 @@ function ActionsMenu({
   onConfirmProceedClick: () => void;
   onTopUpClick: () => void;
   onAbandonClick: () => void;
+  onIssuePOsClick: () => void;
+  onDispatchClick: () => void;
+  onDOClick: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
@@ -2476,9 +2482,41 @@ function ActionsMenu({
         <>
           <div className="fixed inset-0 z-10" onClick={close} />
           <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg">
-            {/* Stage actions moved off the ActionBar (batch 1 #1). */}
+            {/* Stage actions (Jess 2026-07-11) — the per-stage "next step" lives in
+                the ⋮ now (no sentence row). Gated by pipelineStatus so only the
+                relevant one shows. */}
             {active && (
               <>
+                {(pipelineStatus === "needs_setup" || pipelineStatus === "proceed") && (
+                  <MenuItem
+                    icon={<PackagePlus className="w-4 h-4" />}
+                    label="Issue PO"
+                    onClick={() => {
+                      close();
+                      onIssuePOsClick();
+                    }}
+                  />
+                )}
+                {pipelineStatus === "ready" && (
+                  <MenuItem
+                    icon={<Truck className="w-4 h-4" />}
+                    label="Assign logistic"
+                    onClick={() => {
+                      close();
+                      onDispatchClick();
+                    }}
+                  />
+                )}
+                {pipelineStatus === "scheduled" && (
+                  <MenuItem
+                    icon={<CheckCircle2 className="w-4 h-4" />}
+                    label="Confirm delivery"
+                    onClick={() => {
+                      close();
+                      onDOClick();
+                    }}
+                  />
+                )}
                 <MenuItem
                   icon={<RotateCcw className="w-4 h-4" />}
                   label={recheck.isPending ? "Checking…" : "Re-check stock"}
@@ -2623,129 +2661,6 @@ function ActionsMenu({
       )}
     </div>
   );
-}
-
-/** One situational line + at most one primary CTA (batch 1 #1). */
-function ActionRow({
-  line,
-  button,
-}: {
-  line: string;
-  button?: { label: string; onClick: () => void; disabled?: boolean; title?: string };
-}) {
-  return (
-    <div className="flex items-center gap-3 min-w-0">
-      <span className="text-[12px] text-base-600 font-body truncate">{line}</span>
-      {button && (
-        <button
-          type="button"
-          onClick={button.onClick}
-          disabled={button.disabled}
-          title={button.title}
-          className="btn-primary text-[12px] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {button.label}
-        </button>
-      )}
-    </div>
-  );
-}
-
-interface ActionBarProps {
-  pipelineStatus: PipelineStatus;
-  allReceived: boolean;
-  warehouseName: string | null;
-  onDispatchClick: () => void;
-  onDOClick: () => void;
-  onIssuePOsClick: () => void;
-  onChaseClick: () => void;
-  proceedBlocked?: boolean;
-}
-
-/**
- * ActionBar (batch 1 #1) — ONE stage-appropriate primary button, driven by the
- * SAME `pipelineStatus` the header pill shows, so pill + button never disagree.
- * (The old bar keyed on the functional `stage`, which for AutoCount imports is
- * stuck at in_production → it shouted "Waiting on stock" even on a Ready order.)
- * Rare actions — Re-check stock · Transfer to ready · Record top-up · Confirm
- * proceed · Abandon — live in the ⋯ ActionsMenu.
- *
- * ⚠️ NEW/OLD STAGE NOT BRIDGED (batch B marker) — the pill + this button now read
- * `pipelineStatus` (deriveOrderStage), but the underlying functional `stage` and
- * the backend transition RPCs are UNCHANGED. Where pipelineStatus runs ahead of
- * the functional stage (e.g. Master-override readiness on an AutoCount order whose
- * `operation_stage` is still null → functional in_production, pipelineStatus=ready),
- * we surface the pipelineStatus-appropriate CTA ("Assign logistic") and keep the
- * manual bridge (Transfer to ready) in the ⋯ menu so nothing is lost. Teaching the
- * functional stage machine to recognise override-readiness so these CTAs drive
- * real end-to-end transitions is BATCH B — grep "NEW/OLD STAGE NOT BRIDGED".
- */
-function ActionBar({
-  pipelineStatus,
-  allReceived: _allReceived, // gated via pipelineStatus (=ready ⇒ never "waiting")
-  warehouseName,
-  onDispatchClick,
-  onDOClick,
-  onIssuePOsClick,
-  onChaseClick,
-  proceedBlocked,
-}: ActionBarProps) {
-  void _allReceived;
-  switch (pipelineStatus) {
-    case "needs_setup":
-      return (
-        <ActionRow
-          line="No PO raised yet — issue a PO to start procurement."
-          button={{ label: "Issue PO", onClick: onIssuePOsClick }}
-        />
-      );
-    case "proceed":
-      return (
-        <ActionRow
-          line={
-            proceedBlocked
-              ? "Outstation — call the customer to confirm the ETA first, then issue."
-              : "Confirmed — issue the PO to procure the goods."
-          }
-          button={{
-            label: "Issue PO",
-            onClick: onIssuePOsClick,
-            disabled: proceedBlocked,
-            title: proceedBlocked ? "Call the customer first (outstation)" : undefined,
-          }}
-        />
-      );
-    case "pending":
-      return (
-        <ActionRow
-          line="Waiting on stock — chase the PO / update the ETA below."
-          button={{ label: "Chase / update ETA", onClick: onChaseClick }}
-        />
-      );
-    case "in_production":
-      return (
-        <ActionRow
-          line="In production — chase the PO / update the ETA below."
-          button={{ label: "Chase / update ETA", onClick: onChaseClick }}
-        />
-      );
-    case "ready":
-      return (
-        <ActionRow
-          line={`All goods in${warehouseName ? ` at ${warehouseName}` : ""} — assign a delivery partner.`}
-          button={{ label: "Assign logistic", onClick: onDispatchClick }}
-        />
-      );
-    case "scheduled":
-      return (
-        <ActionRow
-          line="Out for delivery — confirm the signed DO to close the loop."
-          button={{ label: "Confirm delivery", onClick: onDOClick }}
-        />
-      );
-    case "completed":
-      return <ActionRow line="Delivered and closed." />;
-  }
 }
 
 function PoRow({
