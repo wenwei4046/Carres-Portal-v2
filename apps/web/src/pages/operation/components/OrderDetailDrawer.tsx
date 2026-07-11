@@ -954,18 +954,38 @@ function DrawerBody({
                 alert stickers. No breadcrumb, no item-count/region (region → the
                 Delivery card), no deadline (it drives Stock ETA + on-hold, not the
                 header). */}
-            <span
-              className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
-              title={PIPELINE_HINT[pipelineStatus]}
-            >
-              {PIPELINE_LABEL[pipelineStatus]}
-            </span>
+            {balanceOwing ? (
+              // Derived "On hold delivery" (Jess 2026-07-11) — an owing balance
+              // holds the delivery; the WHY (amount / due) is on the Balance card.
+              <span
+                className="pill pill-overdue"
+                title="Delivery is on hold until the balance is collected — see the Balance card"
+              >
+                On hold delivery
+              </span>
+            ) : (
+              <span
+                className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
+                title={PIPELINE_HINT[pipelineStatus]}
+              >
+                {pipelineStatus === "ready"
+                  ? "Ready to deliver"
+                  : PIPELINE_LABEL[pipelineStatus]}
+              </span>
+            )}
             <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
             </span>
             {order.source_ref?.[0] && (
               <span className="t-small text-base-400 font-mono shrink-0 uppercase">
                 Ref {order.source_ref[0]}
+              </span>
+            )}
+            {/* Ordered date moved into the header (Jess 2026-07-11) — compact, off
+                the Customer card. */}
+            {order.placed_at && (
+              <span className="t-tiny text-base-400 shrink-0 whitespace-nowrap">
+                · Ordered {fmtDate(order.placed_at)}
               </span>
             )}
             {/* Special sticker — the operator's own "action needed" note as a
@@ -979,17 +999,9 @@ function DrawerBody({
                 <AlertCircle size={10} strokeWidth={2.5} /> Action needed
               </span>
             )}
-            {/* Outstanding · hold sticker (batch 2) — money owed HOLDS delivery
-                until Outstanding = RM0 (hard rule, Jess). Red, always visible when
-                a balance is due. */}
-            {balanceOwing && (
-              <span
-                title="Delivery is held until the balance is fully collected"
-                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] shrink-0"
-              >
-                <AlertCircle size={10} strokeWidth={2.5} /> Outstanding · hold
-              </span>
-            )}
+            {/* (Removed the separate "Outstanding · hold" sticker — the status pill
+                now derives to "On hold delivery" when a balance is owed, so this
+                would just repeat it. The amount lives on the Balance card.) */}
             {/* Deadline removed from the header (Jess 2026-07-11) — it drives the
                 Stock ETA + the on-hold logic, and shows on the Delivery card; not a
                 header field. */}
@@ -2058,23 +2070,20 @@ export function OrderCustomerCard({
           {order.customer_address || <span className="text-base-400">—</span>}
         </span>
       </CompactField>
-      <div className="mt-auto pt-2 border-t border-base-100 flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">Ordered</span>
-          <span className="font-medium text-base-800">
-            {order.placed_at ? fmtDate(order.placed_at) : "—"}
-          </span>
-        </span>
-        {editable && (
+      {/* Ordered date moved to the drawer header (Jess 2026-07-11). Edit stays —
+          read-only by default (no accidental change), opens the safe edit mode
+          with Save / Cancel below. */}
+      {editable && (
+        <div className="mt-auto pt-2 border-t border-base-100 flex items-center justify-end">
           <button
             type="button"
             onClick={start}
             className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-primary"
           >
-            <Pencil className="w-3 h-3" /> Edit
+            <Pencil className="w-3 h-3" /> Edit details
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
