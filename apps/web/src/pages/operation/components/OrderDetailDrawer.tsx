@@ -40,7 +40,6 @@ import {
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
-  type operationOrderDetailStockBalance,
   type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
@@ -187,22 +186,6 @@ const PIPELINE_HINT: Record<PipelineStatus, string> = {
   scheduled: "Delivery partner assigned / out for delivery",
   completed: "Delivered and closed",
 };
-
-function calcShortages(
-  lines: operationOrderDetailLine[],
-  stockBalances: operationOrderDetailStockBalance[],
-): { sku: string; need: number; have: number; short: number }[] {
-  const totalsBySku: Record<string, number> = {};
-  for (const b of stockBalances) {
-    totalsBySku[b.sku] = (totalsBySku[b.sku] ?? 0) + Math.max(0, Number(b.qty) - Number(b.reserved));
-  }
-  const out: { sku: string; need: number; have: number; short: number }[] = [];
-  for (const l of lines) {
-    const have = totalsBySku[l.sku] ?? 0;
-    if (have < l.qty) out.push({ sku: l.sku, need: l.qty, have, short: l.qty - have });
-  }
-  return out;
-}
 
 export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
@@ -608,7 +591,7 @@ function DrawerBody({
   onServiceNoteClick,
   onFollowUpClick,
 }: DrawerBodyProps) {
-  const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
+  const { order, lines, addons, total, warehouse, pos } = data;
   // Defensive default: an API build that predates freeUnits (web can deploy
   // ahead of the Worker) must not crash the drawer — just no picker until then.
   const freeUnits = data.freeUnits ?? [];
@@ -639,15 +622,6 @@ function DrawerBody({
   }
   // reserved_ref written when the operator picks a unit for this order.
   const soRef = `SO-${order.so}`;
-  // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
-  // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
-  // column, per design spec §CQ1 option (b). True when ANY thread has a
-  // customer-leg LP assigned (multi-supplier orders may have N partners; the
-  // ActionBar only needs a boolean cue and the user opens the drill-down for
-  // detail).
-  const anyThreadPartnerAssigned = threads.some(
-    (t) => t.delivery_partner_id !== null,
-  );
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
@@ -662,7 +636,6 @@ function DrawerBody({
     if (order.status === "delivered") return "delivered";
     return "in_production";
   })();
-  const shortages = calcShortages(lines, stockBalances);
   // Line-sum of the order (native/priced orders). AutoCount imports carry no line
   // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
   // Money block below). hasLineTotal drives whether Total is auto (read-only) or
@@ -1022,17 +995,10 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Row 2 — 3-cell status strip (batch 1 #3): Stock · Logistic · Money. */}
-        <StatusStrip
-          readyN={readyN}
-          goodsTotal={goodsLines.length}
-          allReceived={allReceived}
-          logisticEta={form.control?.logistic_eta ?? form.draft.logistic_eta ?? null}
-          logisticName={assignedLogisticName}
-          isOwing={isOwing}
-          owingAmt={owingAmt}
-          balanceGate={balanceGate}
-        />
+        {/* Row 2 removed (Jess 2026-07-11) — the STOCK/LOGISTIC/MONEY strip
+            duplicated status that now lives in its home: stock → the Items table
+            header badge (Ready N/N); money → the Balance card; logistic → the
+            stage action below. Header stays clean. */}
 
         {/* Row 3 — converged stage action (batch 1 #1) + the control save bar. */}
         <div className="flex items-center justify-between gap-3 min-w-0">
@@ -1102,29 +1068,29 @@ function DrawerBody({
             <div className="overflow-auto min-h-0" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-base-700 text-white">
+                  <tr className="bg-[#F1EDE6] text-[#8C877D]">
                     <th
-                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600"
+                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]"
                       title="Has this item's stock been received? Received / Pending (waiting on PO) / No PO"
                     >
                       Stock
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]">
                       Stock ETA
                     </th>
-                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-base-600">
+                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
                       Qty
                     </th>
                     <th
-                      className="text-center text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-base-600"
+                      className="text-center text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-[#E5E1D8]"
                       title="Received / ordered — click to book in received units (GRN)"
                     >
                       Recv
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
                       Model
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
                     </th>
                     <th
@@ -2655,85 +2621,6 @@ function DeadlineCountdown({
     >
       {label} · {fmtDate(deliveryDate)}
     </span>
-  );
-}
-
-/** One cell of the 3-cell status strip — a label + a right-aligned value. */
-function StripCell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 px-3 py-1.5 min-w-0">
-      <span className="t-micro text-base-400 shrink-0">{label}</span>
-      <span className="truncate text-right">{children}</span>
-    </div>
-  );
-}
-
-/** 3-cell status strip (batch 1 #3) — Stock · Logistic · Money, a thin lining-box
- *  row with hairline dividers. Colour only for alerts (green = all in, amber =
- *  waiting/owing, red = HOLD owing); everything else stays neutral grey.
- *  All three values are existing signals (no new data). */
-function StatusStrip({
-  readyN,
-  goodsTotal,
-  allReceived,
-  logisticEta,
-  logisticName,
-  isOwing,
-  owingAmt,
-  balanceGate,
-}: {
-  readyN: number;
-  goodsTotal: number;
-  allReceived: boolean;
-  logisticEta: string | null;
-  logisticName: string | null;
-  isOwing: boolean;
-  owingAmt: number;
-  balanceGate: "hold" | "warn" | null;
-}) {
-  return (
-    <div className="grid grid-cols-3 rounded-[8px] border border-base-200/70 bg-white overflow-hidden divide-x divide-base-200/70 text-[11px]">
-      {/* Stock — goods readiness (readyN / goodsTotal). */}
-      <StripCell label="Stock">
-        {goodsTotal === 0 ? (
-          <span className="text-base-400">no goods</span>
-        ) : allReceived ? (
-          <span className="text-success font-semibold">all in {readyN}/{goodsTotal}</span>
-        ) : (
-          <span className="text-warning font-semibold">{readyN}/{goodsTotal} waiting</span>
-        )}
-      </StripCell>
-      {/* Logistic — scheduled if a logistic ETA is set; greyed until stock is in. */}
-      <StripCell label="Logistic">
-        {logisticEta ? (
-          <span className="text-base-700 font-medium">
-            {logisticName ? `${logisticName} · ` : ""}
-            {fmtDate(logisticEta)}
-          </span>
-        ) : allReceived ? (
-          <span className="text-base-500">to schedule</span>
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </StripCell>
-      {/* Money — owing amount (existing balance signal; real Total/Paid/Owing card
-          is batch 2). Red on a HOLD gate, amber otherwise; grey when clear. */}
-      <StripCell label="Money">
-        {isOwing ? (
-          <span
-            className={
-              balanceGate === "hold"
-                ? "text-[#991B1B] font-semibold"
-                : "text-warning font-semibold"
-            }
-          >
-            Owing {RM(owingAmt)}
-          </span>
-        ) : (
-          <span className="text-base-400">clear</span>
-        )}
-      </StripCell>
-    </div>
   );
 }
 

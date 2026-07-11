@@ -605,6 +605,11 @@ export interface FinancePaymentRow {
 export type operationOrderFilters = Partial<ListOperationOrdersQuery>;
 export type operationPoFilters = Partial<ListPurchaseOrdersQuery>;
 export type MovementsFilters = Partial<ListMovementsQuery>;
+// Re-export the payment-ledger row type so consumers (OrderDetailDrawer) can pull
+// it from the queries boundary alongside the payment hooks, matching the pattern
+// used for the other operation detail types. (It was imported above for internal
+// use but never re-exported — batch-2 build gap.)
+export type { OrderPaymentRow };
 
 function toSearch(f?: OrderFilters): string {
   if (!f) return "";

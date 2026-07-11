@@ -491,7 +491,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · ETA · Deadline · Stock · Manage", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Deadline · Stock · Next", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -500,10 +500,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (11 columns). The follow-up flag is the 2nd column (icon-only
+    // ONE header row (10 columns). The follow-up flag is the 2nd column (icon-only
     // header). Ref is split into Order ID (SO) + Ref No; MS/BF/SOF dropped (the
-    // STOCK core ratio carries the core total). Logistic sits next to Region; a
-    // Logistic ETA column pairs with Deadline; Next action closes the row.
+    // STOCK core ratio carries the core total). Logistic sits next to Region; the
+    // standalone Logistic-ETA column was removed (Jess spec 2026-07-11) and the
+    // "Next" single-action column closes the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -513,10 +514,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Customer",
       "Region",
       "Logistic",
-      "ETA",
       "Deadline",
       "Stock",
-      "Manage",
+      "Next",
     ]);
     // Order ID (SO) + Ref No are now separate columns; the phone tooltip stays on
     // the Order ID cell.
@@ -596,11 +596,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is the 9th cell (index 8: select · flag · Order ID · Ref No ·
-    // Customer · Region · Logistic · Logistic ETA · Deadline). date + weekday.
+    // Deadline is now the 8th cell (index 7: select · flag · Order ID · Ref No ·
+    // Customer · Region · Logistic · Deadline) — the Logistic-ETA column was
+    // removed (Jess spec 2026-07-11). date + weekday.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[8].textContent).not.toBe("—");
-    expect(cells[8].textContent).toMatch(/\d/);
+    expect(cells[7].textContent).not.toBe("—");
+    expect(cells[7].textContent).toMatch(/\d/);
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {

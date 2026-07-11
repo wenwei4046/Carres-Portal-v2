@@ -32,7 +32,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   Filter,
   MoreVertical,
   Truck,
@@ -41,7 +40,6 @@ import {
   CheckCircle2,
   X,
   Flag,
-  Lock,
   Printer,
   type LucideIcon,
 } from "lucide-react";
@@ -317,17 +315,9 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-// Next-action pill colours — restored to Jess's original proposal
-// (carres_full_page_final_dateformat.html) so the five action tones read as
-// five DISTINCT colours, not one washed-out red. Each = soft fill + strong
-// ink + a matching border; carried inline so the shared global `.pill` stays put.
-const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
-  danger: { text: "#991B1B", bg: "#FCE4E4", border: "#F3B4B4" }, // chase / overdue — red
-  warning: { text: "#92400E", bg: "#FBE8C6", border: "#F0D08A" }, // waiting stock — amber
-  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#A9C8F2" }, // call / assign — blue
-  success: { text: "#166534", bg: "#D6EFD9", border: "#A9D8B0" }, // schedule delivery — green
-  neutral: { text: "#4B5563", bg: "#EAE7DF", border: "#D6D2C6" }, // done — grey
-};
+// (NEXT_TONE_STYLE removed with the old multi-tone Next pill — the listing's Next
+//  cell now renders a single accent link; nextActionOf keeps its NextTone return
+//  for its own tests.)
 
 function ovlOf(o: operationOrderListRow) {
   const raw = o.ops_order_control;
@@ -381,6 +371,50 @@ export function nextActionOf(
   if (!logisticEtaOf(o)) return { label: "Logistic · no ETA", tone: "info" };
   if (!ovl?.called_customer) return { label: "Call customer", tone: "info" };
   return { label: "Schedule delivery", tone: "success" };
+}
+
+// ─── NEXT column (Jess spec 2026-07-11) ──────────────────────────────────────
+// The listing's "Next" cell: ONE derived next-action per order as a single
+// clickable link (`Verb ›`). Distinct from nextActionOf above (kept for its own
+// tests) — this is the leaner logistics ladder Jess specified, most-upstream
+// blocker wins (1 = weakest line decides). The verb wording lives in ONE map so
+// it can change without touching the ladder. `actionable: false` states render
+// as muted plain text (not a link). No back-end change — derived from the row.
+const NEXT_VERB = {
+  orderPo: "Order PO",
+  chaseSupplier: "Chase supplier",
+  awaitSupplier: "Await supplier",
+  assignLogistic: "Assign logistic",
+  scheduleDelivery: "Schedule delivery",
+  confirmDelivery: "Confirm delivery",
+  done: "—",
+} as const;
+
+interface NextStep {
+  label: string;
+  /** true → accent link that opens the drawer; false → muted plain text. */
+  actionable: boolean;
+}
+
+export function nextStep(o: operationOrderListRow, stock: StockInfo): NextStep {
+  // 7 — delivered → no action.
+  if (controlTabOf(o) === "completed") return { label: NEXT_VERB.done, actionable: false };
+  const ready = stock.state === "ready" || stock.state === "in_stock";
+  // 1 — any line has no PO (aggregate "unknown" stock = nothing ordered yet).
+  if (stock.state === "unknown") return { label: NEXT_VERB.orderPo, actionable: true };
+  // 2 / 3 — stock still Waiting: deadline passed → chase; not yet due → await (muted).
+  if (!ready) {
+    const dd = daysToDue(o); // null deadline = NOT overdue (Jess resolved).
+    if (dd !== null && dd < 0) return { label: NEXT_VERB.chaseSupplier, actionable: true };
+    return { label: NEXT_VERB.awaitSupplier, actionable: false };
+  }
+  // 4 — all Ready, no logistic yet.
+  const hasLogistic = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
+  if (!hasLogistic) return { label: NEXT_VERB.assignLogistic, actionable: true };
+  // 5 — logistic assigned, no delivery date committed yet.
+  if (!logisticEtaOf(o)) return { label: NEXT_VERB.scheduleDelivery, actionable: true };
+  // 6 — delivery scheduled, not yet delivered.
+  return { label: NEXT_VERB.confirmDelivery, actionable: true };
 }
 
 /** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
@@ -1410,22 +1444,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: "3%" }} />
             <col style={{ width: "3%" }} />
             <col style={{ width: "7%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "15.5%" }} />
             <col style={{ width: "8%" }} />
+            <col style={{ width: "6.5%" }} />
             <col style={{ width: "14%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "6.5%" }} />
-            <col style={{ width: "6.5%" }} />
-            <col style={{ width: "12%" }} />
             <col style={{ width: "9%" }} />
             <col style={{ width: "23%" }} />
           </colgroup>
-          {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
-              stays DROPPED (flame never enters the table), replaced by a faint
-              light hairline. Light micro uppercase labels on the dark band. */}
+          {/* Light lining header band (Jess 2026-07-11 — no more dark header;
+              align to the listing theme). Pale warm band + hairline + dark micro
+              uppercase labels. Flame never enters the table. */}
           <thead>
             <tr
               className="border-b"
-              style={{ backgroundColor: "#221F20", borderBottomColor: "rgba(201,197,187,0.22)" }}
+              style={{ backgroundColor: "#F1EDE6", borderBottomColor: "#DDD8CE" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -1437,24 +1470,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </th>
               <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-[#C9C5BB]" aria-label="Follow-up" />
+                <Flag size={13} strokeWidth={2} className="inline text-[#A8A398]" aria-label="Follow-up" />
               </th>
               <Th>Order ID</Th>
               <Th>Ref No</Th>
               <Th>Customer</Th>
               <Th>Region</Th>
               <Th>Logistic</Th>
-              <Th>ETA</Th>
               <Th>Deadline</Th>
               <Th>Stock</Th>
-              <Th>Manage</Th>
+              <Th>Next</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={10}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1802,15 +1834,15 @@ function StatusTabs({
             style={{
               fontSize: "13px",
               fontWeight: on ? 600 : 500,
-              color: on ? "#FFFFFF" : "#4B5563",
-              background: on ? "#221F20" : "#FFFFFF",
-              border: on ? "1px solid #221F20" : "1px solid #DDD8CE",
+              color: on ? "#221F20" : "#6B6B6B",
+              background: on ? "#E8E4DB" : "#FFFFFF",
+              border: on ? "1px solid #C9C5BB" : "1px solid #DDD8CE",
             }}
           >
             {t.label}
             <span
               className="tabular-nums"
-              style={{ color: on ? "rgba(255,255,255,0.85)" : "#9CA3AF", fontSize: "12px" }}
+              style={{ color: on ? "#6B6B6B" : "#9CA3AF", fontSize: "12px" }}
             >
               {t.count}
             </span>
@@ -1889,27 +1921,19 @@ function OrderRow({
           SO-{o.so}
         </span>
       </td>
-      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. All refs
-          stack vertically; only >3 fold to "+N". Tight to the identity trio. */}
+      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. ONE line
+          (Jess spec 2026-07-11): all refs joined, nowrap + ellipsis, full value on
+          hover — "2012 SO" / long refs must never wrap to two lines. */}
       <td className="px-1 py-1.5">
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
-          <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            {ref.slice(0, 3).map((r, i) => (
-              <div
-                key={i}
-                className="truncate tabular-nums"
-                style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
-              >
-                {r}
-              </div>
-            ))}
-            {ref.length > 3 && (
-              <div style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}>
-                +{ref.length - 3} more
-              </div>
-            )}
+          <div
+            className="font-mono truncate tabular-nums"
+            style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
+            title={ref.join("\n")}
+          >
+            {ref.join(" · ")}
           </div>
         )}
       </td>
@@ -1954,33 +1978,12 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Logistic ETA — the logistic's committed delivery date
-          (ops_order_control.logistic_eta), just before the customer Deadline for
-          a quick compare. "No ETA" (red) when it's overdue for chasing. */}
-      <td className="px-1 py-2 whitespace-nowrap">
-        {(() => {
-          const eta = logisticEtaOf(o);
-          if (eta) {
-            const [d, wd] = fmtDate(eta).split(", ");
-            return (
-              <span className="inline-flex items-baseline gap-1.5">
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
-                >
-                  {d}
-                </span>
-                {wd && <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{wd}</span>}
-              </span>
-            );
-          }
-          return needsEta(o) ? (
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#991B1B" }}>No ETA</span>
-          ) : (
-            <span className="text-base-300">—</span>
-          );
-        })()}
-      </td>
+      {/* Logistic ETA column REMOVED (Jess spec 2026-07-11) — it showed "No ETA"
+          on almost every row (logistic_eta filled on ~1/168), duplicating the
+          "No ETA" filter + the Deadline column. The supplier/stock ETA subline
+          the spec wanted for the Deadline cell is intentionally OMITTED for now:
+          the stock ETA is not on the list row, and fetching it is a back-end
+          change that's explicitly out of scope. */}
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
       <td
@@ -2059,64 +2062,30 @@ function OrderRow({
       <td className="pl-4 pr-2 py-2 whitespace-nowrap">
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
       </td>
-      {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
-          actions (open / flag / assign) that appear on row hover (P2 F). */}
-      <td className="pl-2 pr-2 py-2 whitespace-nowrap relative">
+      {/* Next — ONE derived next-action (Jess spec 2026-07-11). Actionable states
+          render as an accent `Verb ›` link; clicking it just bubbles to the row's
+          onOpen (opens the drawer — no separate handler). Non-actionable states
+          (Await supplier / —) are muted plain text: not a link, not focusable. */}
+      <td className="pl-2 pr-2 py-2 whitespace-nowrap">
         {(() => {
-          const na = nextActionOf(o, stock, lines);
-          const st = NEXT_TONE_STYLE[na.tone];
+          const ns = nextStep(o, stock);
+          if (!ns.actionable) {
+            return (
+              <span style={{ fontSize: "13px", color: "#9CA3AF" }} data-next-action={ns.label}>
+                {ns.label}
+              </span>
+            );
+          }
           return (
             <span
-              className="inline-flex items-center gap-1 rounded-full align-middle max-w-full group-hover:opacity-0 transition-opacity"
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                letterSpacing: "0.01em",
-                padding: "2px 9px",
-                color: st.text,
-                background: st.bg,
-                border: `1px solid ${st.border}`,
-              }}
-              data-next-action={na.label}
+              className="text-primary"
+              style={{ fontSize: "13px", fontWeight: 600 }}
+              data-next-action={ns.label}
             >
-              {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-              <span className="truncate min-w-0">{na.label}</span>
+              {ns.label} ›
             </span>
           );
         })()}
-        {/* Hover actions — hidden until the row is hovered (Gmail pattern). */}
-        <div
-          className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 rounded-md border border-base-200 bg-white shadow-sm px-0.5 py-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Open order"
-            aria-label="Open order"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <ExternalLink size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onFlag(o)}
-            title="Flag for follow-up"
-            aria-label="Flag for follow-up"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-[#9A7B3F]"
-          >
-            <Flag size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Assign logistic (opens the order)"
-            aria-label="Assign logistic"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <Truck size={13} />
-          </button>
-        </div>
       </td>
     </tr>
   );
@@ -2244,7 +2213,7 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "11px", letterSpacing: "0.04em" }}
+      style={{ color: "#8C877D", fontSize: "11px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
