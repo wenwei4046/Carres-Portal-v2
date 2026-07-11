@@ -1417,6 +1417,7 @@ function DrawerBody({
                               />
                             ) : (
                               <RouteQuietButton
+                                label={locValue || "Carres Klang"}
                                 open={routeOpen}
                                 onClick={() =>
                                   setRouteOpenSku((cur) =>

@@ -153,14 +153,17 @@ export function isSpecialRoute(legs: RouteLeg[]): boolean {
 }
 
 /**
- * The quiet default for a standard route — a faint, clickable route icon (no
- * colourful bar). Click opens the same in-place arranger, so ops can still set up
- * a special transfer when they need one.
+ * The quiet default for a standard route — reads the destination in PLAIN WORDS
+ * (the default consolidation warehouse, e.g. "Carres Klang") with a small place
+ * icon, so staff see WHERE it goes at a glance (Jess 2026-07-11: the bare icon
+ * was cryptic). Click opens the arranger to set up a special multi-leg transfer.
  */
 export function RouteQuietButton({
+  label,
   onClick,
   open,
 }: {
+  label: string;
   onClick?: () => void;
   open?: boolean;
 }) {
@@ -171,12 +174,14 @@ export function RouteQuietButton({
         e.stopPropagation();
         onClick?.();
       }}
-      title="Standard route — click to arrange a special transfer"
-      className={`w-full flex items-center justify-center rounded px-1 py-1 hover:bg-base-50 ${
-        open ? "bg-base-50 text-primary" : "text-base-300 hover:text-primary"
+      title="Goes here by default — click to arrange a special transfer"
+      className={`w-full flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] hover:bg-base-50 ${
+        open ? "bg-base-50 text-primary" : "text-base-600 hover:text-primary"
       }`}
     >
-      <RouteIcon className="w-3.5 h-3.5" strokeWidth={2} />
+      <PlaceIcon loc={label} className="w-3.5 h-3.5 shrink-0 text-base-400" />
+      <span className="truncate">{label}</span>
+      <RouteIcon className="w-3 h-3 shrink-0 text-base-300 ml-auto" strokeWidth={2} />
     </button>
   );
 }
