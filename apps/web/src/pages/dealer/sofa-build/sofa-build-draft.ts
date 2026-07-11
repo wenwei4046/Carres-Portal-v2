@@ -1,4 +1,5 @@
 import type { ProductModelDto, ProductSkuDto } from "@carres/shared";
+import { orderSofaCellsLeftToRight } from "@carres/shared";
 import { newLocalId } from "../new-order/configurators";
 import type { DraftLine } from "../new-order/draft";
 import type { SofaBuildAddPayload } from "./SofaBuildCanvas";
@@ -87,10 +88,14 @@ function representativeSofaSku(skus: ProductSkuDto[]): ProductSkuDto | null {
   return skus.find((s) => s.variantKind === "preset") ?? skus[0] ?? null;
 }
 
-/** A compact cells summary like "2A+L+1A" from the build's module codes. */
+/** A compact cells summary like "2A + L + 1A" — read arm→arm left-to-right
+ *  (the shared walk order, Loo 2026-07-11), not canvas insertion order. */
 function cellsSummary(payload: SofaBuildAddPayload): string {
   if (payload.cells.length === 0) return "—";
-  return payload.cells.map((c) => c.moduleCode).join(" + ");
+  const withIds = payload.cells.map((c, i) => ({ ...c, id: `sum-${i}` }));
+  return orderSofaCellsLeftToRight(withIds, payload.height)
+    .map((c) => c.moduleCode)
+    .join(" + ");
 }
 
 /** "Ohana · 2A + L + 1A · 28″ · Velvet Teal · leg 4″" style label. */

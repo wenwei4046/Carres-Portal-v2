@@ -29,6 +29,7 @@ import {
   groupSofas,
   analyzeSofa,
   findSnap,
+  orderSofaCellsLeftToRight,
   hasArmConflict,
   mirrorCode,
   reflowCellsForDepth,
@@ -121,6 +122,7 @@ export default function SofaBuildCanvas({
   heightValue,
   onHeightChange,
   onAddBuild,
+  onLiveTotal,
   onCreateCombo,
   onCreateQuickPick,
   onClose,
@@ -160,6 +162,10 @@ export default function SofaBuildCanvas({
   heightValue?: string;
   onHeightChange?: (h: string) => void;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
+  /** Live engine-total feed (Loo 2026-07-10) — fires whenever the build
+   *  reprices (cells / size / fabric / leg), `null` while the canvas is empty.
+   *  Lets a host page mirror the canvas price in its own chrome. */
+  onLiveTotal?: (total: number | null) => void;
   /** Principal-only: capture the CURRENT arrangement as a sofa combo. When
    *  provided, a "Create combo" button appears beside Add to cart (enabled once
    *  the build is a valid connected sofa). Absent → no button (dealer flow). */
@@ -584,6 +590,12 @@ export default function SofaBuildCanvas({
     };
     return computeSofaPrice(build, snapshot);
   }, [cells, model.id, fabricTier, height, legHeight, snapshot]);
+
+  // Mirror the live total up to the host (POS header) — null while the canvas
+  // is empty so the host shows a placeholder instead of RM 0.
+  useEffect(() => {
+    onLiveTotal?.(cells.length > 0 ? priceResult.total : null);
+  }, [onLiveTotal, cells.length, priceResult.total]);
 
   // Cell indices the winning combo consumed → flame badge on those cells.
   const matchedCellIds = useMemo(() => {
@@ -1076,8 +1088,7 @@ export default function SofaBuildCanvas({
             <div className="pos-eyebrow" style={{ fontSize: 10 }}>Live total</div>
             <div
               style={{
-                fontFamily: "var(--font-mark, Georgia, serif)",
-                fontStretch: "80%",
+                fontFamily: "var(--font-num, system-ui, sans-serif)",
                 fontWeight: 900,
                 fontSize: 26,
                 lineHeight: 1.1,
@@ -1092,7 +1103,9 @@ export default function SofaBuildCanvas({
           {onCreateCombo && (
             <button
               type="button"
-              onClick={() => onCreateCombo(cells.map((c) => c.moduleCode))}
+              onClick={() =>
+                onCreateCombo(orderSofaCellsLeftToRight(cells, depth).map((c) => c.moduleCode))
+              }
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-combo"
@@ -1104,7 +1117,9 @@ export default function SofaBuildCanvas({
           {onCreateQuickPick && (
             <button
               type="button"
-              onClick={() => onCreateQuickPick(cells.map((c) => c.moduleCode))}
+              onClick={() =>
+                onCreateQuickPick(orderSofaCellsLeftToRight(cells, depth).map((c) => c.moduleCode))
+              }
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-quickpick"

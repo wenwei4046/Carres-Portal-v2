@@ -9,6 +9,7 @@ import CalendarPanel from "./rail/CalendarPanel";
 import KeepPanel from "./rail/KeepPanel";
 import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
+import GlobalActivity from "./GlobalActivity";
 
 /**
  * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
@@ -92,9 +93,7 @@ export default function OperationRightRail() {
               (activeOrderId ? (
                 <AnnotationTimeline orderId={activeOrderId} />
               ) : (
-                <p className="t-small text-base-400">
-                  Open an order to see its activity here.
-                </p>
+                <GlobalActivity />
               ))}
           </div>
         </div>

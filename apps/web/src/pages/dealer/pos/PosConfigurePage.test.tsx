@@ -118,8 +118,8 @@ describe("PosConfigurePage — bed frame", () => {
     fireEvent.click(screen.getByTestId("cfg-size-b1"));
     // The old model.colors picker is gone (bedModel still carries colours).
     expect(screen.queryByTestId("cfg-colour-Natural oak")).toBeNull();
-    // Gap defaults to the first option ('10"'); switch to '12"'.
-    fireEvent.click(screen.getByTestId('cfg-gap-12"'));
+    // Gap defaults to Confirm later (KIV); switch to '12"'.
+    fireEvent.change(screen.getByTestId("cfg-gap"), { target: { value: '12"' } });
 
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     const line = onAdd.mock.calls[0][0];
@@ -128,6 +128,31 @@ describe("PosConfigurePage — bed frame", () => {
     expect("color" in line.attrs).toBe(false);
     expect(line.unitPrice).toBe(1990);
     expect(line.label).toBe('Jager · King · gap 12"');
+  });
+
+  it("gap is three-state: Confirm later (KIV) is the DEFAULT; None is explicit", () => {
+    const onAdd = vi.fn();
+    render(
+      <PosConfigurePage
+        model={bedModel()}
+        meta={undefined}
+        skus={bedSkus}
+        onAdd={onAdd}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("cfg-size-b1"));
+
+    // Default = Confirm later → attrs.gap carries the KIV sentinel so the
+    // SO PDF / Create-PO show the choice is still pending.
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    expect(onAdd.mock.calls[0][0].attrs).toMatchObject({ gap: "KIV" });
+
+    // Explicit None → gap "".
+    fireEvent.change(screen.getByTestId("cfg-gap"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    expect(onAdd.mock.calls[1][0].attrs).toMatchObject({ gap: "" });
+    expect(onAdd.mock.calls[1][0].label).toBe("Jager · King");
   });
 
   it("renders the plan-view canvas with the frame footprint once sized", () => {
@@ -216,8 +241,8 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
     const onAdd = vi.fn();
     renderBed(onAdd);
     fireEvent.click(screen.getByTestId("cfg-size-b1"));
-    fireEvent.click(screen.getByTestId('cfg-divan-10"'));
-    fireEvent.click(screen.getByTestId('cfg-leg-4"'));
+    fireEvent.change(screen.getByTestId("cfg-divan"), { target: { value: '10"' } });
+    fireEvent.change(screen.getByTestId("cfg-leg"), { target: { value: '4"' } });
     // 1990 + 125 + 60 = 2175
     expect(screen.getByTestId("cfg-live-total").textContent).toContain("2,175");
     // Total height = divan 10" + leg 4" = 14".

@@ -7,14 +7,16 @@
 // catalog data (models / sofa combos / sofa compartments ride in the catalog
 // bundle — no extra query) + v17 tokens (Tailwind utilities, no inline styles).
 //
-//   MATTRESS / BEDFRAME : tick the Model = any variant; tick sizes to narrow.
-//   SOFA                : tick the Model, then Any build / By combo / By compartment.
-//   ACCESSORY / SERVICE : tick the Model (no variant axis).
+//   MATTRESS / BEDFRAME : add the Model = any variant; tick sizes to narrow.
+//   SOFA                : add the Model, then Any build / By combo / By compartment.
+//   ACCESSORY / SERVICE : add the Model (no variant axis).
+// Models are ADDED via a dropdown (Loo 2026-07-11) — only picked models render.
 //
 // Sizes + compartments come from the model's allowed_options / the per-model
 // offered compartment set; combos from catalog.sofaCombos scoped by model.
 // ----------------------------------------------------------------------------
 
+import { X } from "lucide-react";
 import type {
   CatalogResponse,
   ProductModelDto,
@@ -233,7 +235,12 @@ export function RuleTargetRefinementRow({
 }
 
 // ---------------------------------------------------------------------------
-// Multi-model picker → RuleTarget[].
+// Multi-model picker → RuleTarget[]. DROPDOWN form (Loo 2026-07-11): pick a
+// model from the "Add model…" select to add it; each added model renders as a
+// row with its refinement control + a remove ×. Nothing added = the consumer's
+// "any {category}" semantics (unchanged). A target whose model falls outside
+// the current category filter stays VISIBLE + removable (the old tick-list
+// silently kept it).
 // ---------------------------------------------------------------------------
 export default function RuleTargetPicker({
   catalog,
@@ -247,7 +254,6 @@ export default function RuleTargetPicker({
   /** Optional lowercase category filter; omitted = all categories. */
   categories?: string[];
 }) {
-  const entryFor = (modelId: string): RuleTarget | undefined => value.find((e) => e.modelId === modelId);
   const upsert = (modelId: string, next: RuleTarget | null): void => {
     const rest = value.filter((e) => e.modelId !== modelId);
     onChange(next ? [...rest, next] : rest);
@@ -267,45 +273,82 @@ export default function RuleTargetPicker({
     ...Object.keys(byCategory).filter((c) => !CATEGORY_ORDER.includes(c)),
   ];
 
+  const selectedIds = new Set(value.map((e) => e.modelId));
+  // Display resolves against the FULL catalog so a cross-category leftover
+  // target still shows its name (and can be removed).
+  const anyModelById = new Map(catalog.models.map((m) => [m.id, m]));
+  const addable = (cat: string) => (byCategory[cat] ?? []).filter((m) => !selectedIds.has(m.id));
+  const anyAddable = models.some((m) => !selectedIds.has(m.id));
+
   return (
-    <div className="max-h-[340px] overflow-auto border border-base-200 rounded-[4px] p-2 bg-white">
-      {sorted.map((cat) => (
-        <div key={cat}>
-          <div className="t-micro text-base-400 px-1 pt-2 pb-1">{cat}</div>
-          {(byCategory[cat] ?? []).map((m) => {
-            const entry = entryFor(m.id);
-            return (
-              <div
-                key={m.id}
-                className="flex flex-wrap items-center gap-2 px-1 py-1"
-                data-testid={`rtp-model-${m.id}`}
-              >
-                <label className="flex-1 min-w-[180px] flex items-center gap-2 text-[13px] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(entry)}
-                    onChange={(e) => upsert(m.id, e.target.checked ? { modelId: m.id, scope: "model" } : null)}
-                    className="w-4 h-4"
-                  />
+    <div className="max-h-[340px] overflow-auto border border-base-200 rounded-[4px] p-2 bg-white flex flex-col gap-0.5">
+      <select
+        value=""
+        disabled={!anyAddable}
+        aria-label="Add model"
+        onChange={(e) => {
+          const id = e.target.value;
+          if (id) upsert(id, { modelId: id, scope: "model" });
+        }}
+        className="w-full border border-base-300 rounded-[4px] text-[13px] px-2 py-1.5 bg-white disabled:opacity-50"
+        data-testid="rtp-add-model"
+      >
+        <option value="">
+          {models.length === 0 ? "No models found" : anyAddable ? "Add model…" : "All models added"}
+        </option>
+        {sorted.length > 1
+          ? sorted.map((cat) =>
+              addable(cat).length > 0 ? (
+                <optgroup key={cat} label={cat}>
+                  {addable(cat).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {modelLabel(m)}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null,
+            )
+          : sorted.flatMap((cat) =>
+              addable(cat).map((m) => (
+                <option key={m.id} value={m.id}>
                   {modelLabel(m)}
-                </label>
-                {entry && (
-                  <RuleTargetRefinementRow
-                    category={cat}
-                    model={m}
-                    catalog={catalog}
-                    value={entry}
-                    onChange={(ref) => upsert(m.id, { modelId: m.id, ...ref })}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-      {models.length === 0 && (
-        <div className="t-small text-base-500 px-2 py-3">No models found.</div>
-      )}
+                </option>
+              )),
+            )}
+      </select>
+
+      {value.map((entry) => {
+        const m = anyModelById.get(entry.modelId);
+        return (
+          <div
+            key={entry.modelId}
+            className="flex flex-wrap items-center gap-2 px-1 py-1"
+            data-testid={`rtp-model-${entry.modelId}`}
+          >
+            <span className="flex-1 min-w-[160px] text-[13px] font-medium">
+              {m ? modelLabel(m) : entry.modelId}
+            </span>
+            {m && (
+              <RuleTargetRefinementRow
+                category={m.category}
+                model={m}
+                catalog={catalog}
+                value={entry}
+                onChange={(ref) => upsert(entry.modelId, { modelId: entry.modelId, ...ref })}
+              />
+            )}
+            <button
+              type="button"
+              aria-label={`Remove ${m ? modelLabel(m) : entry.modelId}`}
+              onClick={() => upsert(entry.modelId, null)}
+              className="text-base-400 hover:text-destructive transition-colors"
+              data-testid={`rtp-remove-${entry.modelId}`}
+            >
+              <X size={14} strokeWidth={1.75} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

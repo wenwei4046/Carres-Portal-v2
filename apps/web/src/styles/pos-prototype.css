@@ -24,12 +24,14 @@
   --line: rgba(34, 31, 32, 0.10);
   --line-strong: rgba(34, 31, 32, 0.22);
 
-  /* ---- Type (Outfit everywhere; Bodoni Moda = wordmark + price figures) ---- */
+  /* ---- Type (Outfit everywhere; Bodoni Moda = the WORDMARK only — every
+     numeral renders in standard Outfit via --font-num, Loo 2026-07-11) ---- */
   --font-sans: "Outfit", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --font-title: "Outfit", system-ui, -apple-system, sans-serif;
   --font-button: "Outfit", system-ui, sans-serif;
   --font-script: "Caveat", "Brush Script MT", cursive;
   --font-mark: "Bodoni Moda", "Didot", Georgia, serif;
+  --font-num: "Outfit", system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* ---- Theme: cream (body[data-theme='cream'] in the prototype) ---- */
@@ -326,10 +328,10 @@
 .prod-card__row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; }
 .prod-card__sku { font-family: var(--font-mono); font-size: 10px; color: var(--fg-muted); letter-spacing: 0.04em; }
 .prod-card__price {
-  font-family: var(--font-mark); font-weight: 900;
+  font-family: var(--font-num); font-weight: 900;
   font-size: 22px; letter-spacing: -0.02em; color: var(--c-burnt); line-height: 1;
 }
-.prod-card__price sup { font-size: 9px; font-weight: 700; margin-right: 1px; vertical-align: top; }
+.prod-card__price sup { font-size: 9px; font-weight: 700; margin-right: 1px; vertical-align: baseline; }
 
 .cat-empty { text-align: center; padding: 80px 20px; color: var(--fg-muted); }
 .cat-empty h4 { font-family: var(--font-title); font-size: 22px; margin-bottom: 6px; color: var(--fg); }
@@ -357,20 +359,25 @@
 .cart__empty h5 { font-family: var(--font-title); font-size: 18px; color: var(--fg); }
 .cart__empty p { font-size: 13px; max-width: 22ch; }
 
+/* 2990s CustomerOrderSheet line metrics (Loo 2026-07-11): 64px photo, 15px
+   name over 12px muted detail, roomy 14px rows — hierarchy from type + colour,
+   not boxes. */
 .cart-item {
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 64px 1fr auto;
   gap: 12px;
-  padding: 12px 4px;
+  padding: 14px 4px;
   border-bottom: 1px solid var(--line);
 }
 .cart-item:last-child { border-bottom: none; }
 .cart-item__photo {
-  width: 60px; height: 60px; border-radius: 10px;
+  width: 64px; height: 64px; border-radius: 12px;
   background-color: #d8d2c4; background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-muted); font-size: 20px;
 }
-.cart-item__name { font-family: var(--font-title); font-weight: 700; font-size: 14px; line-height: 1.25; }
-.cart-item__detail { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+.cart-item__name { font-family: var(--font-title); font-weight: 700; font-size: 15px; line-height: 1.25; }
+.cart-item__detail { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 .cart-item__qty {
   display: inline-flex; align-items: center; gap: 4px;
   margin-top: 8px;
@@ -378,17 +385,17 @@
   width: fit-content;
 }
 .cart-item__qty button {
-  width: 22px; height: 22px; border-radius: 99px;
+  width: 26px; height: 26px; border-radius: 99px;
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--fg-muted);
   transition: 100ms ease;
 }
 .cart-item__qty button:hover { background: var(--pos-panel, #fff); color: var(--fg); }
 .cart-item__qty button svg { width: 12px; height: 12px; stroke-width: 2; }
-.cart-item__qty span { min-width: 16px; text-align: center; font-size: 12px; font-weight: 600; }
-.cart-item__right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.cart-item__price { font-family: var(--font-mark); font-weight: 900; font-size: 16px; color: var(--c-burnt); letter-spacing: -0.02em; }
-.cart-item__price sup { font-size: 9px; vertical-align: top; }
+.cart-item__qty span { min-width: 20px; text-align: center; font-size: 13px; font-weight: 600; }
+.cart-item__right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.cart-item__price { font-family: var(--font-num); font-weight: 900; font-size: 20px; color: var(--c-burnt); letter-spacing: -0.02em; }
+.cart-item__price sup { font-size: 9px; vertical-align: baseline; }
 .cart-item__remove {
   color: var(--fg-muted);
   width: 22px; height: 22px; border-radius: 99px;
@@ -406,8 +413,8 @@
 }
 .cart__line { display: flex; justify-content: space-between; font-size: 13px; color: var(--fg-muted); }
 .cart__line--total { color: var(--fg); font-family: var(--font-button); font-weight: 700; font-size: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
-.cart__total-num { font-family: var(--font-mark); font-weight: 900; font-size: 26px; letter-spacing: -0.02em; color: var(--c-burnt); }
-.cart__total-num sup { font-size: 10px; vertical-align: top; }
+.cart__total-num { font-family: var(--font-num); font-weight: 900; font-size: 26px; letter-spacing: -0.02em; color: var(--c-burnt); }
+.cart__total-num sup { font-size: 10px; vertical-align: baseline; }
 .cart__cta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .cart__cta .btn { flex: 1 1 auto; min-width: 0; }
 .cart__cta .btn--primary { flex-basis: 100%; order: 99; }
@@ -465,8 +472,8 @@
 .quote-row__name { font-family: var(--font-title); font-weight: 700; font-size: 15px; }
 .quote-row__meta { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
 .quote-row__right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.quote-row__total { font-family: var(--font-mark); font-weight: 900; font-size: 18px; color: var(--c-burnt); letter-spacing: -0.02em; }
-.quote-row__total sup { font-size: 9px; vertical-align: top; }
+.quote-row__total { font-family: var(--font-num); font-weight: 900; font-size: 18px; color: var(--c-burnt); letter-spacing: -0.02em; }
+.quote-row__total sup { font-size: 9px; vertical-align: baseline; }
 
 /* ========= Animation utility ========= */
 .fade-in { animation: fadeIn 240ms cubic-bezier(0.22, 1, 0.36, 1); }
@@ -512,7 +519,10 @@
 }
 @keyframes cart-pop-fade { from { opacity: 0; } to { opacity: 1; } }
 .cart.cart--pop {
-  width: 460px; max-width: 100%; max-height: calc(100vh - 48px);
+  /* 2990s CustomerOrderSheet proportions (Loo 2026-07-11) — viewport-relative
+     width + a stable height so the sheet reads airy, not a narrow strip. */
+  width: clamp(400px, 42vw, 580px); max-width: 100%;
+  height: clamp(520px, 78vh, 820px); max-height: calc(100vh - 48px);
   border-radius: 20px;
   border: 1px solid var(--line);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.30);
@@ -845,7 +855,7 @@
   letter-spacing: 0.01em;
 }
 .summary__item-price {
-  font-family: var(--font-mark);
+  font-family: var(--font-num);
   font-stretch: 80%;
   font-weight: var(--w-black);
   font-size: var(--fs-18);
@@ -858,7 +868,7 @@
   font-weight: var(--w-bold);
   font-size: 9px;
   letter-spacing: var(--tk-loud);
-  vertical-align: top;
+  vertical-align: baseline;
   margin-right: 2px;
 }
 
@@ -869,8 +879,8 @@
 }
 .summary__total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
 .summary__total-label { font-family: var(--font-button); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-muted); }
-.summary__total-num { font-family: var(--font-mark); font-weight: 900; font-stretch: 80%; font-size: 36px; letter-spacing: -0.03em; color: var(--c-burnt); }
-.summary__total-num sup { font-size: 14px; vertical-align: top; margin-right: 2px; }
+.summary__total-num { font-family: var(--font-num); font-weight: 900; font-stretch: 80%; font-size: 36px; letter-spacing: -0.03em; color: var(--c-burnt); }
+.summary__total-num sup { font-size: 14px; vertical-align: baseline; margin-right: 2px; }
 
 /* ========= CONFIRMATION ========= */
 .confirm {
@@ -1665,7 +1675,7 @@
   flex-shrink: 0;
 }
 .cfg-comp__count {
-  font-family: var(--font-mark); font-stretch: 80%; font-weight: 900;
+  font-family: var(--font-num); font-stretch: 80%; font-weight: 900;
   font-size: 13px; letter-spacing: -0.01em;
 }
 
@@ -1682,7 +1692,7 @@
 }
 .cfg-stepperBtn:hover { border-color: var(--c-burnt); background: var(--pos-panel, #fff); }
 .cfg-stepperVal {
-  font-family: var(--font-mark); font-stretch: 80%; font-weight: 900;
+  font-family: var(--font-num); font-stretch: 80%; font-weight: 900;
   font-size: 36px; color: var(--c-burnt); letter-spacing: -0.02em;
   min-width: 50px; text-align: center;
 }
@@ -1733,7 +1743,7 @@
 .cfg-opt__sub { font-size: 11px; opacity: 0.7; line-height: 1.35; }
 .cfg-opt__price {
   margin-top: 4px;
-  font-family: var(--font-mark); font-stretch: 80%; font-weight: 900;
+  font-family: var(--font-num); font-stretch: 80%; font-weight: 900;
   font-size: 14px; letter-spacing: -0.01em;
 }
 .cfg-opt.is-on .cfg-opt__price { color: var(--c-cream); }
@@ -1758,6 +1768,17 @@
 }
 @media (max-width: 1100px) {
   .cfg-optGrid--5 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Shared option dropdown — the fabric-style <select> that also serves
+   divan / gap / leg heights (Loo 2026-07-11: chips → dropdowns like Fabric). */
+.cfg-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line, #d9d2c7);
+  background: var(--pos-panel, #fff);
+  font-size: 13px;
 }
 
 /* "Others" custom-thickness input — appears below the gap chips when
@@ -1962,11 +1983,11 @@
   color: var(--fg-muted);
 }
 .cfg-header__totalNum {
-  font-family: var(--font-mark); font-stretch: 80%; font-weight: 900;
+  font-family: var(--font-num); font-stretch: 80%; font-weight: 900;
   font-size: 26px; letter-spacing: -0.02em; color: var(--c-burnt);
   line-height: 1;
 }
-.cfg-header__totalNum sup { font-size: 11px; vertical-align: top; margin-right: 2px; }
+.cfg-header__totalNum sup { font-size: 11px; vertical-align: baseline; margin-right: 2px; }
 .cfg-header__totalNote { font-size: 10px; color: var(--fg-muted); }
 
 /* hover-popover with the breakdown */
@@ -2050,11 +2071,11 @@
   color: var(--fg-muted);
 }
 .cfg-footer__totalNum {
-  font-family: var(--font-mark); font-stretch: 80%; font-weight: 900;
+  font-family: var(--font-num); font-stretch: 80%; font-weight: 900;
   font-size: 36px; letter-spacing: -0.02em; color: var(--c-burnt);
   line-height: 1;
 }
-.cfg-footer__totalNum sup { font-size: 14px; vertical-align: top; margin-right: 2px; }
+.cfg-footer__totalNum sup { font-size: 14px; vertical-align: baseline; margin-right: 2px; }
 
 .cfg-footer__cta { display: flex; gap: 10px; }
 
@@ -2163,7 +2184,7 @@
 .sof-depth__rulerTick { width: 16px; height: 1px; background: var(--fg-muted); opacity: 0.5; }
 .sof-depth__cardBody { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .sof-depth__cardLabel {
-  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 28px; letter-spacing: -0.02em;
   color: var(--c-burnt);
 }
@@ -2180,7 +2201,7 @@
   font-size: 12px; color: var(--fg-muted);
   margin-top: 4px;
 }
-.sof-depth__note strong { color: var(--c-burnt); font-family: var(--font-mark); font-weight: 900; font-stretch: 80%; }
+.sof-depth__note strong { color: var(--c-burnt); font-family: var(--font-num); font-weight: 900; font-stretch: 80%; }
 
 /* ── Crumb / mode tabs row (hidden — content portaled into header) ── */
 .sof-flow__crumb { display: none; }
@@ -2309,6 +2330,22 @@
   font-family: var(--font-mono); font-size: 12px; font-weight: 600;
   color: var(--c-burnt); letter-spacing: 0.02em;
   margin-top: 4px;
+}
+/* Per-card "Continue in Customize" (Loo 2026-07-11) — jump straight from a
+   preset card onto the drag canvas with that layout loaded. */
+.sof-qp__cardCustomize {
+  margin-top: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  width: 100%; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: 999px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-qp__cardCustomize:hover {
+  border-color: var(--c-burnt); color: var(--c-burnt);
+  background: rgba(166, 71, 30, 0.05);
 }
 .sof-qp__flip {
   position: absolute; top: 8px; right: 8px;
@@ -3347,11 +3384,11 @@
 }
 .os-sumcard__eyebrow svg { width: 13px; height: 13px; color: var(--c-burnt); }
 .os-sumcard__total {
-  font-family: var(--font-mark); font-weight: 700;
+  font-family: var(--font-num); font-weight: 700;
   font-size: 46px; letter-spacing: -0.02em; line-height: 1; color: var(--c-ink);
   margin-top: 12px;
 }
-.os-sumcard__total sup { font-family: var(--font-button); font-size: 15px; font-weight: 700; vertical-align: top; margin-right: 4px; color: var(--fg-muted); }
+.os-sumcard__total sup { font-family: var(--font-button); font-size: 15px; font-weight: 700; vertical-align: baseline; margin-right: 4px; color: var(--fg-muted); }
 .os-sumcard__orders {
   display: flex; align-items: center; gap: 6px;
   font-size: 12.5px; color: var(--fg-muted); margin-top: 10px;
@@ -3368,7 +3405,7 @@
 }
 .os-sumrow--lead { color: var(--fg); font-weight: 600; }
 .os-sumrow__val { font-family: var(--font-button); font-weight: 600; color: var(--fg); white-space: nowrap; }
-.os-sumrow__val sup { font-size: 9px; font-weight: 700; color: var(--fg-muted); vertical-align: top; margin-right: 1px; }
+.os-sumrow__val sup { font-size: 9px; font-weight: 700; color: var(--fg-muted); vertical-align: baseline; margin-right: 1px; }
 
 /* ----- Controls row ----- */
 .os-controls {
@@ -3482,10 +3519,10 @@
 }
 .os-stat { text-align: right; }
 .os-stat__num {
-  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 22px; letter-spacing: -0.02em; color: var(--c-burnt); line-height: 1;
 }
-.os-stat__num sup { font-size: 9px; font-weight: 700; vertical-align: top; margin-right: 1px; }
+.os-stat__num sup { font-size: 9px; font-weight: 700; vertical-align: baseline; margin-right: 1px; }
 .os-stat__lbl { font-size: 10px; color: var(--fg-muted); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; margin-top: 4px; }
 
 /* Board */
@@ -3512,7 +3549,7 @@
   gap: 14px; padding: 22px 24px 16px;
 }
 .os-lane__num {
-  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 36px; letter-spacing: -0.04em; line-height: 1;
   color: var(--fg-muted); opacity: 0.45;
 }
@@ -3621,10 +3658,10 @@
   margin-bottom: 6px;
 }
 .os-card__total-num {
-  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 19px; letter-spacing: -0.02em; color: var(--fg); line-height: 1;
 }
-.os-card__total-num sup { font-size: 9px; font-weight: 700; vertical-align: top; margin-right: 1px; color: var(--fg-muted); }
+.os-card__total-num sup { font-size: 9px; font-weight: 700; vertical-align: baseline; margin-right: 1px; color: var(--fg-muted); }
 .os-card__total-paid {
   font-family: var(--font-button); font-size: 10.5px; font-weight: 600;
   color: var(--fg-muted);
@@ -3776,17 +3813,17 @@
   color: var(--fg-muted);
 }
 .os-item__price {
-  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 15px; letter-spacing: -0.02em;
 }
-.os-item__price sup { font-size: 8px; font-weight: 700; vertical-align: top; color: var(--fg-muted); margin-right: 1px; }
+.os-item__price sup { font-size: 8px; font-weight: 700; vertical-align: baseline; color: var(--fg-muted); margin-right: 1px; }
 .os-items__total {
   display: flex; justify-content: space-between; align-items: baseline;
   padding-top: 10px;
   border-top: 1px dashed var(--line);
   font-family: var(--font-button); font-size: 13px; font-weight: 600;
 }
-.os-items__total sup { font-size: 9px; vertical-align: top; color: var(--fg-muted); margin-right: 1px; }
+.os-items__total sup { font-size: 9px; vertical-align: baseline; color: var(--fg-muted); margin-right: 1px; }
 
 .os-grid {
   display: grid;
@@ -3836,7 +3873,7 @@
   font-size: 13px; margin-bottom: 8px;
 }
 .os-pay__row em { color: var(--fg-muted); font-style: normal; font-size: 11px; }
-.os-pay__row sup { font-size: 9px; vertical-align: top; color: var(--fg-muted); margin-right: 1px; }
+.os-pay__row sup { font-size: 9px; vertical-align: baseline; color: var(--fg-muted); margin-right: 1px; }
 .os-pay__bar {
   position: relative;
   height: 8px; border-radius: 999px;
@@ -3954,5 +3991,20 @@
 .os-slip__btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .os-slip__btn--cam { background: var(--c-ink); color: var(--c-cream); border-style: solid; border-color: var(--c-ink); }
 .os-slip__btn--cam:hover { background: #000; color: var(--c-cream); border-color: #000; }
+
+/* ========= NUMERALS (Loo 2026-07-11) =========
+   Every figure renders in standard Outfit (--font-num above); Bodoni stays on
+   .pos-wordmark only. The raised Bodoni "RM" used to collide with / wrap away
+   from the figures — the prefix now sits small on the BASELINE (the
+   vertical-align flip above) with an even gap, and a price never line-breaks. */
+.prod-card__price, .cart-item__price, .cart__total-num, .quote-row__total,
+.summary__item-price, .summary__total-num, .cfg-header__totalNum,
+.cfg-footer__totalNum, .os-sumcard__total, .os-sumrow__val, .os-stat__num,
+.os-card__total-num, .os-item__price, .os-items__total { white-space: nowrap; }
+.prod-card__price sup, .cart-item__price sup, .cart__total-num sup,
+.quote-row__total sup, .summary__item-price sup, .summary__total-num sup,
+.cfg-header__totalNum sup, .cfg-footer__totalNum sup, .os-sumcard__total sup,
+.os-sumrow__val sup, .os-stat__num sup, .os-card__total-num sup,
+.os-item__price sup, .os-items__total sup, .os-pay__row sup { margin-right: 3px; }
 
 

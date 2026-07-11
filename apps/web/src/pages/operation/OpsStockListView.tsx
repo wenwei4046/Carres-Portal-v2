@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
@@ -46,6 +46,12 @@ interface Props {
    *  still invalidate the ops-stock cache, which the parent's query listens to,
    *  so the injected rows refresh after any action. */
   rows?: OpsStockItem[];
+  /** On Hand C+ P2 — roll units up by SKU/model into collapsible groups so a
+   *  1000+ unit pool renders as ~150 header rows, not 1000 <select> rows.
+   *  Groups start collapsed; expand on demand. */
+  grouped?: boolean;
+  /** Client-side page size. Paginates GROUPS when grouped, else rows. */
+  pageSize?: number;
 }
 
 export default function OpsStockListView(props: Props) {
@@ -70,7 +76,7 @@ export default function OpsStockListView(props: Props) {
   }
 
   const reserveMut = useMutation({
-    mutationFn: (args: { sku: string; ref: string }) =>
+    mutationFn: (args: { sku: string; ref: string; reason?: string }) =>
       apiFetch<{ itemId: string }>(`/api/ops/stock/reserve`, {
         method: "POST",
         body: JSON.stringify(args),
@@ -138,6 +144,10 @@ export default function OpsStockListView(props: Props) {
   // matching SKU automatically.
   const [reserveSku, setReserveSku] = useState("");
   const [reserveRef, setReserveRef] = useState("");
+  // 0212 — why the ready-pool unit is being pulled (required on reserve).
+  const [reserveReason, setReserveReason] = useState<"" | "urgent" | "exchange">(
+    "",
+  );
 
   // "+ Add stock" form state.
   const EMPTY_ADD = {
@@ -170,6 +180,90 @@ export default function OpsStockListView(props: Props) {
         setShowAdd(false);
       },
     });
+  }
+
+  // On Hand C+ P2 — grouped-by-model rollup + client pagination. A 1000+ unit
+  // pool renders as ~150 collapsed group rows (one per SKU/model), each
+  // expandable to its units; pagination bounds each page to `PAGE` groups.
+  const grouped = props.grouped ?? false;
+  const PAGE = props.pageSize ?? (grouped ? 25 : 50);
+  const [page, setPage] = useState(0);
+  // Groups start collapsed (expanded = the set of open SKUs).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Filters change the injected rows → jump back to page 1.
+  useEffect(() => {
+    setPage(0);
+  }, [props.rows]);
+
+  const groups = useMemo(() => {
+    if (!grouped) return null;
+    const m = new Map<string, OpsStockItem[]>();
+    for (const r of rows) {
+      const g = m.get(r.sku);
+      if (g) g.push(r);
+      else m.set(r.sku, [r]);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows, grouped]);
+
+  const pageCount = grouped ? (groups?.length ?? 0) : rows.length;
+  const totalPages = Math.max(1, Math.ceil(pageCount / PAGE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageGroups = grouped
+    ? (groups ?? []).slice(safePage * PAGE, safePage * PAGE + PAGE)
+    : [];
+  const pageRows = grouped
+    ? []
+    : rows.slice(safePage * PAGE, safePage * PAGE + PAGE);
+
+  function toggleGroup(sku: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  }
+  function renderUnit(r: OpsStockItem) {
+    return (
+      <RowItem
+        key={r.id}
+        row={r}
+        actions={props.actions}
+        onConditionChange={(condition) =>
+          conditionMut.mutate({ itemId: r.id, condition })
+        }
+        onRelease={() => releaseMut.mutate(r.id)}
+        onReassign={(newRef) => reassignMut.mutate({ itemId: r.id, newRef })}
+        onTakeout={() => {
+          if (
+            window.confirm(
+              `Take out unit ${r.sku}? This marks it sold + writes a stock movement.`,
+            )
+          ) {
+            takeoutMut.mutate(r.id);
+          }
+        }}
+        onFlagRepair={(flag) => flagRepairMut.mutate({ itemId: r.id, flag })}
+        onRemove={() => {
+          if (
+            window.confirm(
+              `Remove unit ${r.sku} from stock? This deletes a mis-keyed entry (use Takeout for a sale).`,
+            )
+          ) {
+            deleteMut.mutate(r.id);
+          }
+        }}
+        busy={
+          releaseMut.isPending ||
+          reassignMut.isPending ||
+          takeoutMut.isPending ||
+          flagRepairMut.isPending ||
+          conditionMut.isPending ||
+          deleteMut.isPending
+        }
+      />
+    );
   }
 
   return (
@@ -323,21 +417,43 @@ export default function OpsStockListView(props: Props) {
                 placeholder="SO-1001"
               />
             </label>
+            <label className="text-xs">
+              <span className="block text-base-500 mb-1">Reason</span>
+              <select
+                className="rounded border border-base-300 px-2 py-1.5 text-sm w-44"
+                value={reserveReason}
+                onChange={(e) =>
+                  setReserveReason(
+                    e.target.value as "" | "urgent" | "exchange",
+                  )
+                }
+              >
+                <option value="">Select…</option>
+                <option value="urgent">急单 · Urgent sale</option>
+                <option value="exchange">换货 · Exchange</option>
+              </select>
+            </label>
             <button
               type="button"
               className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
               disabled={
                 !reserveSku.trim() ||
                 !reserveRef.trim() ||
+                !reserveReason ||
                 reserveMut.isPending
               }
               onClick={() =>
                 reserveMut.mutate(
-                  { sku: reserveSku.trim(), ref: reserveRef.trim() },
+                  {
+                    sku: reserveSku.trim(),
+                    ref: reserveRef.trim(),
+                    reason: reserveReason,
+                  },
                   {
                     onSuccess: () => {
                       setReserveSku("");
                       setReserveRef("");
+                      setReserveReason("");
                     },
                   },
                 )
@@ -362,69 +478,122 @@ export default function OpsStockListView(props: Props) {
           <p className="text-base-700 font-medium">Nothing here.</p>
         </div>
       ) : (
-        <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm [&_tbody_tr:nth-child(even)]:bg-base-50/60">
-            <thead className="bg-base-700 border-b-2 border-primary text-[11px] uppercase tracking-[0.02em] text-white">
-              <tr>
-                <th className="text-left px-3 py-2 font-bold">Unit ID</th>
-                <th className="text-left px-3 py-2 font-bold">SKU</th>
-                <th className="text-left px-3 py-2 font-bold">Condition</th>
-                <th className="text-left px-3 py-2 font-bold">Status</th>
-                <th className="text-left px-3 py-2 font-bold">Reserved for</th>
-                <th className="text-left px-3 py-2 font-bold">History</th>
-                <th className="text-left px-3 py-2 font-bold">PO No.</th>
-                <th className="text-left px-3 py-2 font-bold">Source Ref</th>
-                <th className="text-left px-3 py-2 font-bold">Date in</th>
-                <th className="text-right px-3 py-2 font-bold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <RowItem
-                  key={r.id}
-                  row={r}
-                  actions={props.actions}
-                  onConditionChange={(condition) =>
-                    conditionMut.mutate({ itemId: r.id, condition })
+        <>
+          {grouped ? (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-base-500">
+                {groups?.length ?? 0} models · {rows.length} units
+              </span>
+              <div className="flex gap-3 text-[11px]">
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() =>
+                    setExpanded(new Set((groups ?? []).map(([s]) => s)))
                   }
-                  onRelease={() => releaseMut.mutate(r.id)}
-                  onReassign={(newRef) =>
-                    reassignMut.mutate({ itemId: r.id, newRef })
-                  }
-                  onTakeout={() => {
-                    if (
-                      window.confirm(
-                        `Take out unit ${r.sku}? This marks it sold + writes a stock movement.`,
-                      )
-                    ) {
-                      takeoutMut.mutate(r.id);
-                    }
-                  }}
-                  onFlagRepair={(flag) =>
-                    flagRepairMut.mutate({ itemId: r.id, flag })
-                  }
-                  onRemove={() => {
-                    if (
-                      window.confirm(
-                        `Remove unit ${r.sku} from stock? This deletes a mis-keyed entry (use Takeout for a sale).`,
-                      )
-                    ) {
-                      deleteMut.mutate(r.id);
-                    }
-                  }}
-                  busy={
-                    releaseMut.isPending ||
-                    reassignMut.isPending ||
-                    takeoutMut.isPending ||
-                    flagRepairMut.isPending ||
-                    conditionMut.isPending ||
-                    deleteMut.isPending
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+                >
+                  Expand all
+                </button>
+                <button
+                  type="button"
+                  className="text-base-500 hover:underline"
+                  onClick={() => setExpanded(new Set())}
+                >
+                  Collapse all
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="rounded border border-base-200 bg-white overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-base-700 border-b-2 border-primary text-[11px] uppercase tracking-[0.02em] text-white">
+                <tr>
+                  <th className="text-left px-3 py-2 font-bold">Unit ID</th>
+                  <th className="text-left px-3 py-2 font-bold">SKU</th>
+                  <th className="text-left px-3 py-2 font-bold">Condition</th>
+                  <th className="text-left px-3 py-2 font-bold">Status</th>
+                  <th className="text-left px-3 py-2 font-bold">Reserved for</th>
+                  <th className="text-left px-3 py-2 font-bold">History</th>
+                  <th className="text-left px-3 py-2 font-bold">PO No.</th>
+                  <th className="text-left px-3 py-2 font-bold">Source Ref</th>
+                  <th className="text-left px-3 py-2 font-bold">Date in</th>
+                  <th className="text-right px-3 py-2 font-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped
+                  ? pageGroups.map(([sku, rs]) => {
+                      const isOpen = expanded.has(sku);
+                      const reserved = rs.filter(
+                        (x) => x.status === "reserved",
+                      ).length;
+                      const repair = rs.filter((x) => x.needsRepair).length;
+                      const ready = rs.length - reserved - repair;
+                      return (
+                        <Fragment key={"g-" + sku}>
+                          <tr className="bg-base-100 border-t border-base-200">
+                            <td colSpan={10} className="px-3 py-1.5">
+                              <button
+                                type="button"
+                                onClick={() => toggleGroup(sku)}
+                                className="inline-flex items-center gap-2 text-left"
+                              >
+                                <span className="text-base-400 w-3 inline-block">
+                                  {isOpen ? "▾" : "▸"}
+                                </span>
+                                <span className="font-mono text-[12px] font-semibold text-base-900">
+                                  {sku}
+                                </span>
+                                <span className="text-[11px] text-base-500">
+                                  {rs.length} units ·{" "}
+                                  <span className="text-success-700">
+                                    {ready} ready
+                                  </span>
+                                  {reserved ? ` · ${reserved} reserved` : ""}
+                                  {repair ? (
+                                    <span className="text-warning-700">
+                                      {" "}
+                                      · {repair} repair
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </button>
+                            </td>
+                          </tr>
+                          {isOpen ? rs.map(renderUnit) : null}
+                        </Fragment>
+                      );
+                    })
+                  : pageRows.map(renderUnit)}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between mt-3 text-[12px] text-base-600">
+              <span>
+                Page {safePage + 1} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 0}
+                  onClick={() => setPage(safePage - 1)}
+                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-xs hover:bg-base-100 disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages - 1}
+                  onClick={() => setPage(safePage + 1)}
+                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-xs hover:bg-base-100 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -432,8 +601,9 @@ export default function OpsStockListView(props: Props) {
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "New",
-  exhibition: "Exhibition",
-  old: "Old",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
   damaged: "Damaged",
 };
 

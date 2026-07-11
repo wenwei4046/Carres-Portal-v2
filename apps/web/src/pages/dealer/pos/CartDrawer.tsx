@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Plus, Gift, Ticket, UserRound } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
@@ -107,12 +107,29 @@ export default function CartDrawer({
     onChange({ ...draft, lines: draft.lines.filter((l) => l.localId !== localId) });
   }
   function bumpLineQty(localId: string, delta: number) {
-    onChange({
-      ...draft,
-      lines: draft.lines.map((l) =>
-        l.localId === localId ? { ...l, qty: Math.max(1, l.qty + delta) } : l,
-      ),
-    });
+    let lines = draft.lines.map((l) =>
+      l.localId === localId ? { ...l, qty: Math.max(1, l.qty + delta) } : l,
+    );
+    // A freed line whose qty grows past its campaign's per-ORDER allowance
+    // would 409 at submit — revert the claim (real price restored) and say why.
+    if (delta > 0 && catalog) {
+      const bumped = lines.find((l) => l.localId === localId);
+      const campaignId = bumped ? lineFreeItemCampaignId(bumped) : null;
+      if (bumped && campaignId) {
+        const camp = (catalog.freeItemCampaigns ?? []).find((c) => c.id === campaignId);
+        const freed = lines.reduce(
+          (sum, l) => sum + (lineFreeItemCampaignId(l) === campaignId ? Number(l.qty ?? 1) : 0),
+          0,
+        );
+        if (camp && freed > camp.maxFreeQty) {
+          lines = lines.map((l) => (l.localId === localId ? unmarkLineFree(l) : l));
+          toast.warning(
+            `"${camp.name}" allows ${camp.maxFreeQty} free per order — the line is back to its real price.`,
+          );
+        }
+      }
+    }
+    onChange({ ...draft, lines });
   }
   function removeAddon(key: string) {
     onChange({ ...draft, addons: draft.addons.filter((a) => a.key !== key) });
@@ -136,6 +153,30 @@ export default function CartDrawer({
     onChange({ ...draft, lines: draft.lines.map((l) => (l.localId === localId ? next : l)) });
   }
 
+  // Save-Quote capture (Loo 2026-07-11): a quote must carry the customer's
+  // NAME + PHONE before it saves — that's what makes it findable in the
+  // Quotes drawer later. Seeded from draft.customer when opened; written back
+  // on save so the customer step doesn't ask twice.
+  const [quoteFormOpen, setQuoteFormOpen] = useState(false);
+  const [quoteName, setQuoteName] = useState("");
+  const [quotePhone, setQuotePhone] = useState("");
+  const quoteFormValid = quoteName.trim().length > 0 && quotePhone.trim().length > 0;
+  function commitSaveQuote() {
+    if (!quoteFormValid) return;
+    const q = saveQuote({
+      label: quoteName,
+      phone: quotePhone,
+      lines: draft.lines,
+      addons: draft.addons,
+    });
+    onChange({
+      ...draft,
+      customer: { ...draft.customer, name: quoteName.trim(), phone: quotePhone.trim() },
+    });
+    setQuoteFormOpen(false);
+    toast.success(`Quote saved — "${q.label}"`);
+  }
+
   // 0185 — deterministic default-gift preview (display-only; the server appends
   // the real RM0 gift lines). Empty when nothing is configured (DORMANT).
   const giftPreview = catalog ? previewDefaultGifts(draft.lines, catalog) : [];
@@ -148,6 +189,19 @@ export default function CartDrawer({
     const c = linePwpCode(l);
     if (c) boundPwpCodes.add(c);
   }
+
+  // Product photo per sku (via its model) — the cart line shows the real
+  // product shot like the 2990s sheet; ▦ placeholder when there's no photo.
+  const photoBySku = useMemo(() => {
+    const bySku = new Map<string, string>();
+    if (!catalog) return bySku;
+    const models = new Map(catalog.models.map((m) => [m.id, m]));
+    for (const s of catalog.skus) {
+      const url = models.get(s.modelId)?.photoUrl;
+      if (url) bySku.set(s.sku, url);
+    }
+    return bySku;
+  }, [catalog]);
 
   const lineSub = cartLineSubtotal(draft.lines);
   const addonSub = cartAddonSubtotal(draft.addons);
@@ -193,107 +247,112 @@ export default function CartDrawer({
             </div>
           </div>
 
-        {/* Scrollable line list */}
-        <div className="flex-1 overflow-auto px-6 py-4">
+        {/* Scrollable line list — 2990s CustomerOrderSheet rows (Loo 2026-07-11):
+            open rows on hairline dividers, photo · bold name / muted detail ·
+            qty pill, flame price in the right column. No boxes. */}
+        <div className="cart__body">
           {empty ? (
             <p className="t-small text-base-500 text-center py-12">
               Your cart is empty — pick a product to get started.
             </p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {draft.lines.map((l) => (
-                <div key={l.localId} className="pos-card p-3 flex items-start gap-3">
-                  {/* Product photo placeholder */}
-                  <div
-                    className="shrink-0 rounded-xl bg-base-100 flex items-center justify-center text-base-400"
-                    style={{ width: 56, height: 56, fontSize: 22 }}
-                    aria-hidden="true"
-                  >
-                    ▦
-                  </div>
-
-                  {/* Name + SKU + qty stepper */}
-                  <div className="min-w-0 flex-1">
-                    <div className="t-small font-medium text-base-900 truncate">{l.label}</div>
-                    <div className="font-mono text-[11px] text-base-500 mt-0.5">{l.sku}</div>
-                    <SpecialsSummary attrs={l.attrs} />
-
-                    {/* Pill stepper */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => bumpLineQty(l.localId, -1)}
-                        disabled={l.qty <= 1}
-                        aria-label="Decrease quantity"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <Minus size={13} strokeWidth={1.75} />
-                      </button>
-                      <span className="font-mono text-[13px] font-semibold w-6 text-center text-base-900">
-                        {l.qty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => bumpLineQty(l.localId, 1)}
-                        aria-label="Increase quantity"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900"
-                      >
-                        <Plus size={13} strokeWidth={1.75} />
-                      </button>
+            <div className="flex flex-col">
+              {draft.lines.map((l) => {
+                const photo = photoBySku.get(l.sku);
+                // "Booqit · 1A(LHF) + 2A(RHF) · 24″ · Fabric KIV" → bold model
+                // name on top, the configuration as the muted detail line.
+                const [name, ...detailParts] = l.label.split(" · ");
+                const detail = detailParts.join(" · ");
+                return (
+                  <div key={l.localId} className="cart-item">
+                    <div
+                      className="cart-item__photo shrink-0"
+                      style={photo ? { backgroundImage: `url(${photo})` } : undefined}
+                      aria-hidden="true"
+                    >
+                      {!photo && "▦"}
                     </div>
 
-                    {/* 0185 — free-item "Make free" affordance (eligible lines). */}
-                    {catalog && (
-                      <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
-                    )}
+                    {/* Name + detail + SKU + qty stepper */}
+                    <div className="min-w-0">
+                      <div className="cart-item__name">{name}</div>
+                      {detail && <div className="cart-item__detail">{detail}</div>}
+                      <div className="cart-item__detail font-mono">{l.sku}</div>
+                      <SpecialsSummary attrs={l.attrs} />
 
-                    {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
-                        Hidden once the line is claimed free (free-item wins — a
-                        line can't be both free AND PWP-priced). 0187 binds a
-                        RESERVED voucher code on claim (Auto-Fill). */}
-                    {catalog && !isLineFreeItem(l) && (
-                      <PwpRow
-                        line={l}
-                        lines={draft.lines}
-                        catalog={catalog}
-                        onSet={replaceLine}
-                        reservedCodes={pwpReservedCodes ?? []}
-                        consumedCodes={boundPwpCodes}
-                        claimGroup={pwpClaimGroup}
-                        customerPhone={customerPhone}
-                        availableVouchers={pwpAvailableVouchers ?? []}
-                        onApplyVoucherCode={onApplyVoucherCode}
-                      />
-                    )}
-                  </div>
+                      <div className="cart-item__qty">
+                        <button
+                          type="button"
+                          onClick={() => bumpLineQty(l.localId, -1)}
+                          disabled={l.qty <= 1}
+                          aria-label="Decrease quantity"
+                          className="disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Minus />
+                        </button>
+                        <span>{l.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => bumpLineQty(l.localId, 1)}
+                          aria-label="Increase quantity"
+                        >
+                          <Plus />
+                        </button>
+                      </div>
 
-                  {/* Line price + remove (FREE when free / promo-claimed, PWP price
-                      when claimed under a 'pwp' rule) */}
-                  <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
-                    {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
-                      <span
-                        className="pill pill-confirmed"
-                        data-testid={`cart-line-free-${l.localId}`}
+                      {/* 0185 — free-item "Make free" affordance (eligible lines). */}
+                      {catalog && (
+                        <MakeFreeRow line={l} lines={draft.lines} catalog={catalog} onSet={replaceLine} />
+                      )}
+
+                      {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
+                          Hidden once the line is claimed free (free-item wins — a
+                          line can't be both free AND PWP-priced). 0187 binds a
+                          RESERVED voucher code on claim (Auto-Fill). */}
+                      {catalog && !isLineFreeItem(l) && (
+                        <PwpRow
+                          line={l}
+                          lines={draft.lines}
+                          catalog={catalog}
+                          onSet={replaceLine}
+                          reservedCodes={pwpReservedCodes ?? []}
+                          consumedCodes={boundPwpCodes}
+                          claimGroup={pwpClaimGroup}
+                          customerPhone={customerPhone}
+                          availableVouchers={pwpAvailableVouchers ?? []}
+                          onApplyVoucherCode={onApplyVoucherCode}
+                        />
+                      )}
+                    </div>
+
+                    {/* Remove on top, price under (FREE when free / promo-claimed,
+                        PWP price when claimed under a 'pwp' rule) */}
+                    <div className="cart-item__right">
+                      <button
+                        type="button"
+                        onClick={() => removeLine(l.localId)}
+                        aria-label={`Remove ${l.label}`}
+                        className="cart-item__remove"
                       >
-                        FREE
-                      </span>
-                    ) : (
-                      <span className="pos-price text-[16px]">
-                        <span className="pos-price-rm">RM</span>
-                        {(l.unitPrice * l.qty).toLocaleString()}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeLine(l.localId)}
-                      aria-label={`Remove ${l.label}`}
-                      className="text-base-400 hover:text-destructive transition-colors"
-                    >
-                      <Trash2 size={15} strokeWidth={1.75} />
-                    </button>
+                        <Trash2 />
+                      </button>
+                      {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
+                        <span
+                          className="pill pill-confirmed"
+                          data-testid={`cart-line-free-${l.localId}`}
+                        >
+                          FREE
+                        </span>
+                      ) : (
+                        <span className="cart-item__price">
+                          <sup>RM</sup>
+                          {(l.unitPrice * l.qty).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* 0185 — default free-gift preview (display-only). The server
                   appends the real RM0 gift lines authoritatively; the client
@@ -301,7 +360,6 @@ export default function CartDrawer({
               {giftPreview.length > 0 && (
                 <div
                   className="flex flex-col gap-2 pt-3"
-                  style={{ borderTop: "1px solid hsl(var(--base-100))" }}
                   data-testid="cart-gift-preview"
                 >
                   {giftPreview.map((g) => (
@@ -315,7 +373,7 @@ export default function CartDrawer({
                           <Gift size={13} strokeWidth={1.75} />
                         </span>
                         <span className="t-small text-base-700 truncate">
-                          Free gift: {g.name}
+                          GWP: {g.name}
                           {g.qty > 1 && <span className="text-base-500"> ×{g.qty}</span>}
                           {g.campaign && (
                             <span className="text-base-400"> · {g.campaign}</span>
@@ -330,10 +388,7 @@ export default function CartDrawer({
 
               {/* Add-ons */}
               {draft.addons.length > 0 && (
-                <div
-                  className="flex flex-col gap-3 pt-3"
-                  style={{ borderTop: "1px solid hsl(var(--base-100))" }}
-                >
+                <div className="flex flex-col gap-3 pt-3">
                   {draft.addons.map((a) => (
                     <div
                       key={a.key}
@@ -407,19 +462,17 @@ export default function CartDrawer({
               <Trash2 size={16} strokeWidth={1.75} />
               Clear cart
             </button>
-            {/* Save Quote — parks a sanitized snapshot on this device (POS
-                topbar → Quotes lists + loads them back). */}
+            {/* Save Quote — opens the name+phone capture first (Loo 2026-07-11:
+                a quote must carry the customer's name + phone so it can be
+                FOUND later), then parks a sanitized snapshot on this device
+                (POS topbar → Quotes lists + loads them back). */}
             <button
               type="button"
               disabled={draft.lines.length === 0}
               onClick={() => {
-                const q = saveQuote({
-                  label: draft.customer.name,
-                  phone: draft.customer.phone,
-                  lines: draft.lines,
-                  addons: draft.addons,
-                });
-                toast.success(`Quote saved — "${q.label}"`);
+                setQuoteName(draft.customer.name ?? "");
+                setQuotePhone(draft.customer.phone ?? "");
+                setQuoteFormOpen(true);
               }}
               className="btn btn--ghost"
               data-testid="pos-save-quote"
@@ -438,6 +491,88 @@ export default function CartDrawer({
         </div>
         </aside>
       </div>
+
+      {/* Save-Quote capture (Loo 2026-07-11): name + phone are REQUIRED so the
+          quote can be found again in the Quotes drawer (label + phone render
+          on every quote row). Enter saves, Escape/backdrop cancels. */}
+      {quoteFormOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save quote"
+        >
+          <div
+            className="absolute inset-0 bg-black/30"
+            role="presentation"
+            onClick={(e) => {
+              e.stopPropagation();
+              setQuoteFormOpen(false);
+            }}
+          />
+          <div
+            className="relative bg-white rounded-xl shadow-xl p-5 w-[340px] flex flex-col gap-3"
+            data-testid="save-quote-form"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setQuoteFormOpen(false);
+              }
+              if (e.key === "Enter") commitSaveQuote();
+            }}
+          >
+            <div>
+              <div className="t-h4 font-display">Save quote</div>
+              <p className="t-tiny text-base-500 mt-0.5">
+                The customer&apos;s name + phone are how you find this quote again.
+              </p>
+            </div>
+            <label className="block">
+              <span className="t-micro text-base-500 block mb-1">Customer name</span>
+              <input
+                value={quoteName}
+                onChange={(e) => setQuoteName(e.target.value)}
+                placeholder="e.g. Tan Mei Ling"
+                autoFocus
+                aria-label="Quote customer name"
+                data-testid="save-quote-name"
+                className="w-full rounded-[4px] border border-base-200 px-2.5 py-1.5 t-small text-base-900 placeholder:text-base-400 focus:border-base-400 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="t-micro text-base-500 block mb-1">Phone</span>
+              <input
+                value={quotePhone}
+                onChange={(e) => setQuotePhone(e.target.value)}
+                placeholder="e.g. 012-345 6789"
+                inputMode="tel"
+                aria-label="Quote customer phone"
+                data-testid="save-quote-phone"
+                className="w-full rounded-[4px] border border-base-200 px-2.5 py-1.5 t-small font-mono text-base-900 placeholder:text-base-400 focus:border-base-400 focus:outline-none"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-2 mt-1">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setQuoteFormOpen(false)}
+                data-testid="save-quote-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={!quoteFormValid}
+                onClick={commitSaveQuote}
+                data-testid="save-quote-confirm"
+              >
+                Save quote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -446,16 +581,21 @@ export default function CartDrawer({
  * 0185 — the per-line free-item control. Renders nothing unless the line is
  * covered by ≥1 ACTIVE free-item campaign (or is already claimed free). A freed
  * line shows the campaign + an "Undo"; an eligible paid line shows a "Make free"
- * action per covering campaign whose `maxFreeQty` allows the line's qty (so the
- * client never offers a claim the server would 409). The server re-validates +
- * forces RM0 regardless — this is preview only.
+ * action per covering campaign whose `maxFreeQty` — a per-campaign total across
+ * the WHOLE order (server F3), not a per-line cap — still has room for this
+ * line's qty on top of what the cart already freed (so the client never offers
+ * a claim the server would 409). The server re-validates + forces RM0
+ * regardless — this is preview only.
  */
 function MakeFreeRow({
   line,
+  lines,
   catalog,
   onSet,
 }: {
   line: DraftLine;
+  /** ALL cart lines — needed to count what's already freed under each campaign. */
+  lines: DraftLine[];
   catalog: CatalogResponse;
   onSet: (localId: string, next: DraftLine) => void;
 }) {
@@ -486,9 +626,29 @@ function MakeFreeRow({
     );
   }
 
-  // Only offer campaigns whose per-line max allows this line's qty.
-  const offerable = covering.filter((c) => line.qty <= c.maxFreeQty);
-  if (offerable.length === 0) return null;
+  // qty already claimed free under a campaign across the WHOLE cart — the
+  // server enforces maxFreeQty as a per-order TOTAL, so once the allowance is
+  // used up no further line may offer that campaign.
+  const freedQty = (campaignId: string) =>
+    lines.reduce(
+      (sum, l) => sum + (lineFreeItemCampaignId(l) === campaignId ? Number(l.qty ?? 1) : 0),
+      0,
+    );
+  const offerable = covering.filter((c) => freedQty(c.id) + line.qty <= c.maxFreeQty);
+  if (offerable.length === 0) {
+    // Covered, but the order's free allowance is already spent elsewhere —
+    // say so instead of silently dropping the affordance.
+    return covering.some((c) => freedQty(c.id) > 0) ? (
+      <div className="mt-2">
+        <span
+          className="t-tiny text-base-400"
+          data-testid={`free-limit-reached-${line.localId}`}
+        >
+          Free limit reached for this order
+        </span>
+      </div>
+    ) : null;
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">

@@ -6,7 +6,7 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { activeSofaSizes, deriveSkuCode, PRODUCT_CATEGORIES } from "@carres/shared";
+import { activeSofaSizes, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
@@ -437,20 +437,37 @@ const SkuRowView = memo(function SkuRowView({
   const discontinued = !!sku.discontinuedAt;
   const margin = skuMargin(sku.price, sku.cost);
   const marginLabel = category === "sofa" ? "base margin" : "plan margin";
-  const modelKeyPrefix = model ? `${model.modelKey.toUpperCase()}-` : "";
+  // Accessory / service carry NO size/variant axis (one SKU per model, Loo
+  // 2026-07-11): their SIZE may be cleared; other categories keep theirs.
+  const noVariantAxis = category === "accessory" || category === "service";
 
-  /** Commit the code's VARIANT segment — the server re-derives the full sku as
-   *  `{MODEL_KEY}-{variant}` (the only sanctioned code-rename path). Historical
-   *  orders/POs keep the OLD code string; a compartment re-offer re-asserts the
-   *  compartment's own code. */
-  function commitVariant(raw: string) {
+  /** Commit the FULL code — a free, directly-renameable field (Loo 2026-07-11,
+   *  AutoCount style: ACC-601). Historical orders/POs keep the OLD code string;
+   *  a compartment re-offer re-asserts the compartment's own code. A collision
+   *  with an existing code surfaces as the server's 409. */
+  function commitCode(raw: string) {
     const v = raw.trim();
-    if (v === "" || v === sku.variant) return;
+    if (v === "" || v === sku.sku) return;
+    patch.mutate(
+      { id: sku.id, patch: { sku: v } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} → ${v}`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  /** Commit the SIZE (variant) label — never touches the code. Clearing is
+   *  allowed only for accessory/service (no variant axis). */
+  function commitSize(raw: string) {
+    const v = raw.trim();
+    if (v === sku.variant) return;
+    if (v === "" && !noVariantAxis) return;
     patch.mutate(
       { id: sku.id, patch: { variant: v } },
       {
-        onSuccess: () =>
-          toast.success(`${sku.sku} → ${model ? deriveSkuCode(model.modelKey, v) : v}`),
+        onSuccess: () => toast.success(`${sku.sku} · size ${v || "cleared"}`),
         onError: (e: unknown) =>
           toast.error(e instanceof ApiError ? e.message : "Update failed"),
       },
@@ -485,25 +502,19 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
-  /** Inline CODE cell: fixed `{MODEL_KEY}-` prefix + an editable variant input. */
+  /** Inline CODE cell: the WHOLE code is one free-text input (Loo 2026-07-11 —
+   *  not a locked prefix + suffix; codes are AutoCount-style free strings). */
   const codeCell = inlineEdit ? (
-    <div className="flex items-center gap-0.5 min-w-0">
-      {modelKeyPrefix && (
-        <span className="t-tiny font-mono text-base-400 shrink-0" title="Model prefix — fixed">
-          {modelKeyPrefix}
-        </span>
-      )}
-      <input
-        defaultValue={sku.variant}
-        onBlur={(e) => commitVariant(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        aria-label={`${sku.sku} code`}
-        title="Edits the code's variant segment — the full code re-derives as MODELKEY-variant"
-        className={`${INPUT_CLS} t-num text-[12px] min-w-0`}
-      />
-    </div>
+    <input
+      defaultValue={sku.sku}
+      onBlur={(e) => commitCode(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      aria-label={`${sku.sku} code`}
+      title="Edit the full SKU code — new orders/POs use the new code; history keeps the old string"
+      className={`${INPUT_CLS} t-num text-[12px] w-full min-w-0`}
+    />
   ) : (
     <div>
       <CodeChip>{sku.sku}</CodeChip>
@@ -670,7 +681,25 @@ const SkuRowView = memo(function SkuRowView({
           {category ? CATEGORY_LABEL[category] : "—"}
         </div>
       )}
-      <div className="t-small text-base-700">{sku.variant}</div>
+      {inlineEdit ? (
+        <input
+          defaultValue={sku.variant}
+          onBlur={(e) => commitSize(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          placeholder={noVariantAxis ? "no size" : undefined}
+          aria-label={`${sku.sku} size`}
+          title={
+            noVariantAxis
+              ? "Optional — accessories/services carry no size"
+              : "The SIZE label — editing it never changes the code"
+          }
+          className={`${INPUT_CLS} t-small text-[12px] w-full min-w-0`}
+        />
+      ) : (
+        <div className="t-small text-base-700">{sku.variant || "—"}</div>
+      )}
 
       {/* Price */}
       <div className="text-right">

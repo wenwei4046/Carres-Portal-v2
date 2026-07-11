@@ -28,6 +28,7 @@ import {
   type StorageFeeImportRow,
   type BalanceImportRow,
   type StockEtaImportResult,
+  type OpsStockImportRow,
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
@@ -2147,7 +2148,7 @@ export interface operationOrderDetailFreeUnit {
   unitCode: string | null;
   sku: string;
   warehouseId: string;
-  condition: "new" | "exhibition" | "old" | "damaged";
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
   poNo: string | null;
   sourceRef: string | null;
   dateIn: string | null;
@@ -5055,6 +5056,24 @@ export function useImportStockEta() {
   });
 }
 
+/** On Hand C+ P3 — bulk book-in from the "Klg Warehouse" ready-stock sheet.
+ *  Add-only: sends the chosen import rows to /api/ops/stock/import (server
+ *  expands qty + inserts). Refreshes every ops-stock list + the dashboard. */
+export function useImportStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rows: OpsStockImportRow[] }) =>
+      apiFetch<{ created: number }>(
+        "/api/ops/stock/import",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+      void qc.invalidateQueries({ queryKey: qk.operation.dashboard() });
+    },
+  });
+}
+
 /** GRN per-line receive (migration 0208) — book n units of one order line into
  *  stock (reserved to the SO). Refreshes the order detail + control overlay +
  *  the ops-stock listing so the Recv X/N + readiness update. */
@@ -5755,6 +5774,32 @@ export function useOrderTimeline(orderId: string | null) {
       apiFetch<TimelineEntry[]>(`/api/operation/orders/${orderId}/timeline`),
     enabled: !!orderId,
     staleTime: 10_000,
+  });
+}
+
+/** A row in the GLOBAL activity feed — same as TimelineEntry but carries the
+ *  order it belongs to (so + customer) so it can be shown across all orders. */
+export interface GlobalActivityRow {
+  id: string;
+  kind: "annotation" | "activity";
+  order_id: string | null;
+  so: number | null;
+  customer_name: string | null;
+  action?: string | null;
+  detail?: Record<string, unknown> | null;
+  content?: string | null;
+  tag?: AnnotationTag | null;
+  actor_name?: string | null;
+  occurred_at: string;
+}
+
+/** The global cross-order activity feed (monitor view). */
+export function useOperationActivity() {
+  return useQuery({
+    queryKey: ["operation", "activity"] as const,
+    queryFn: () => apiFetch<GlobalActivityRow[]>("/api/operation/activity"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 

@@ -5,7 +5,11 @@ import OperationStockOnHand from "./OperationStockOnHand";
 import type { OpsStockItem } from "@carres/shared";
 
 /**
- * OperationStockOnHand — the unified per-unit Stock list (Jess redesign step 3).
+ * OperationStockOnHand — the unified per-unit Stock list. On Hand redesign C+ ·
+ * P1: the four status chips moved into an always-visible LEFT filter rail
+ * (Design 2). They are now buttons in the "Status" group; the filtering logic
+ * (ready / reserved / defective predicates) is unchanged, so these tests target
+ * the status buttons by accessible name.
  *
  * Mocks apiFetch so the single /inventory fetch returns a fixture; OpsStockListView
  * is rendered for real with injected rows (its own fetch is disabled via the
@@ -37,7 +41,7 @@ function makeUnit(p: Partial<OpsStockItem> & { id: string; unitCode: string }): 
   };
 }
 
-// all=7, ready=2 (u1,u2), reserved=1 (u3), defective=2 (u4 old, u5 needsRepair)
+// all=7, ready=3 (u1 new, u2 display, u4 fair-used), reserved=1 (u3), defective=1 (u5 needsRepair)
 const UNITS: OpsStockItem[] = [
   makeUnit({ id: "1", unitCode: "id-aaa111", condition: "new", status: "free" }),
   makeUnit({ id: "2", unitCode: "id-bbb222", condition: "exhibition", status: "free" }),
@@ -53,6 +57,11 @@ function wrap(node: React.ReactNode) {
   return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
 }
 
+const statusBtn = (name: RegExp) => screen.getByRole("button", { name });
+// Default view is grouped (rollup, collapsed) — switch to Flat to assert on
+// individual unit rows.
+const showFlat = () => fireEvent.click(screen.getByRole("tab", { name: /Flat/ }));
+
 beforeEach(() => {
   apiFetchMock.mockReset();
   apiFetchMock.mockImplementation((path: string) => {
@@ -64,22 +73,21 @@ beforeEach(() => {
 });
 
 describe("OperationStockOnHand", () => {
-  it("renders 4 filter chips with counts derived from the inventory grid", async () => {
+  it("renders the 4 status filters with counts derived from the inventory grid", async () => {
     wrap(<OperationStockOnHand />);
-    expect(await screen.findAllByRole("tab")).toHaveLength(4);
     // Counts start at 0 during the inventory fetch, then settle — wait for it.
     await waitFor(() => {
-      const tabs = screen.getAllByRole("tab");
-      expect(within(tabs[0]).getByText("7")).toBeInTheDocument(); // All
+      expect(within(statusBtn(/^All\b/)).getByText("7")).toBeInTheDocument();
     });
-    const tabs = screen.getAllByRole("tab");
-    expect(within(tabs[1]).getByText("2")).toBeInTheDocument(); // Ready
-    expect(within(tabs[2]).getByText("1")).toBeInTheDocument(); // Reserved
-    expect(within(tabs[3]).getByText("2")).toBeInTheDocument(); // Defective
+    expect(within(statusBtn(/^Ready\b/)).getByText("3")).toBeInTheDocument();
+    expect(within(statusBtn(/^Reserved\b/)).getByText("1")).toBeInTheDocument();
+    expect(within(statusBtn(/^Defective\b/)).getByText("1")).toBeInTheDocument();
   });
 
-  it("defaults to All and lists every unit with its Unit ID", async () => {
+  it("Flat view lists every unit with its Unit ID", async () => {
     wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    showFlat();
     await waitFor(() =>
       expect(screen.getAllByRole("row").length).toBeGreaterThan(7),
     );
@@ -88,39 +96,58 @@ describe("OperationStockOnHand", () => {
     expect(screen.getByText("id-ggg777")).toBeInTheDocument();
   });
 
-  it("Ready chip filters to free + good-condition + not-flagged units", async () => {
+  it("Ready filter shows free + sellable-grade + not-flagged units", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[1]); // Ready
+    await waitFor(() => statusBtn(/^Ready\b/));
+    showFlat();
+    fireEvent.click(statusBtn(/^Ready\b/));
     await waitFor(() => {
-      expect(screen.getByText("id-aaa111")).toBeInTheDocument();
-      expect(screen.getByText("id-bbb222")).toBeInTheDocument();
+      expect(screen.getByText("id-aaa111")).toBeInTheDocument(); // new
+      expect(screen.getByText("id-bbb222")).toBeInTheDocument(); // display
+      expect(screen.getByText("id-ddd444")).toBeInTheDocument(); // fair (used) — now sellable
     });
-    // reserved / old / needsRepair / incoming / sold are excluded
+    // reserved / needsRepair / incoming / sold are excluded
     expect(screen.queryByText("id-ccc333")).not.toBeInTheDocument();
-    expect(screen.queryByText("id-ddd444")).not.toBeInTheDocument();
     expect(screen.queryByText("id-eee555")).not.toBeInTheDocument();
   });
 
-  it("Defective chip filters to needs-repair OR old/damaged units", async () => {
+  it("Defective filter shows needs-repair OR damaged units", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[3]); // Defective
+    await waitFor(() => statusBtn(/^Defective\b/));
+    showFlat();
+    fireEvent.click(statusBtn(/^Defective\b/));
     await waitFor(() => {
-      expect(screen.getByText("id-ddd444")).toBeInTheDocument(); // old
       expect(screen.getByText("id-eee555")).toBeInTheDocument(); // needsRepair
     });
+    // fair (used) is now sellable, no longer defective
+    expect(screen.queryByText("id-ddd444")).not.toBeInTheDocument();
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument(); // ready
   });
 
-  it("Reserved chip shows the customer ref", async () => {
+  it("Reserved filter shows the customer ref", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[2]); // Reserved
+    await waitFor(() => statusBtn(/^Reserved\b/));
+    showFlat();
+    fireEvent.click(statusBtn(/^Reserved\b/));
     await waitFor(() => {
       expect(screen.getByText("id-ccc333")).toBeInTheDocument();
     });
     expect(screen.getByText("SO-1142")).toBeInTheDocument();
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument();
+  });
+
+  it("Grouped view rolls units up by model (collapsed by default), expandable", async () => {
+    wrap(<OperationStockOnHand />);
+    // Default is grouped: the shared SKU-1 model appears as one collapsed group
+    // header, and the individual unit ids are hidden until expanded.
+    await waitFor(() =>
+      expect(screen.getByText("SKU-1")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument();
+    // Expanding the group reveals its units.
+    fireEvent.click(screen.getByText("SKU-1"));
+    await waitFor(() =>
+      expect(screen.getByText("id-aaa111")).toBeInTheDocument(),
+    );
   });
 });

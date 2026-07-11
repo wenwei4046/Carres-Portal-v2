@@ -25,7 +25,7 @@ export interface ReserveFreeUnit {
   id: string;
   unitCode: string | null;
   sku: string;
-  condition: "new" | "exhibition" | "old" | "damaged";
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
   poNo: string | null;
   sourceRef: string | null;
   dateIn: string | null;
@@ -43,8 +43,9 @@ interface Props {
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "New",
-  exhibition: "Exhibition",
-  old: "Old",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
   damaged: "Damaged",
 };
 

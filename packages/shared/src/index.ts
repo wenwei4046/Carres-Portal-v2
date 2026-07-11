@@ -580,6 +580,9 @@ export * from "./schemas/ops-cockpit";
 // Sofa engine Phase 4 — build-line attrs schema + guard (server-recompute trust
 // gate re-parses the build out of order_lines.attrs free jsonb before pricing).
 export * from "./schemas/sofa-build";
+// Order activity history (P1) — canonical event taxonomy + the customer /
+// operation / management visibility rule shared by all three views.
+export * from "./order-activity";
 
 // Migration 0184 — order payment ledger (balance job foundation).
 export {
@@ -874,6 +877,18 @@ export {
   type StockEtaImportInput,
   type StockEtaImportResult,
 } from "./stock-eta-import";
+
+// On Hand C+ P3 — parse the "Klg Warehouse" ready-stock sheet into
+// ops_stock_items import rows (shared by the ImportStockDialog preview + the
+// /api/ops/stock/import endpoint).
+export {
+  normalizeStockCondition,
+  warehouseSheetRecordToImportRow,
+  opsStockImportRowSchema,
+  opsStockImportInputSchema,
+  type OpsStockImportRow,
+  type OpsStockImportInput,
+} from "./ops-stock-import";
 
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4

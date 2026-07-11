@@ -73,6 +73,8 @@ import opsNotesRouter from "./routes/ops/notes";
 import opsTasksRouter from "./routes/ops/tasks";
 // Phase B (migration 0138) — order annotations + activity timeline.
 import annotationsRouter, { escalationsRouter } from "./routes/operation/annotations";
+// Order activity history (P1) — the global cross-order activity feed.
+import activityRouter from "./routes/operation/activity";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import type { AppEnv, Bindings } from "./types";
 
@@ -170,6 +172,7 @@ api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
+api.route("/operation/activity", activityRouter);
 
 app.route("/api", api);
 

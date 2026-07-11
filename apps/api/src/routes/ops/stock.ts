@@ -9,6 +9,7 @@ import {
   opsStockFlagRepairInputSchema,
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
+  opsStockImportInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -42,7 +43,7 @@ opsStockRouter.get("/ready", requireOperationOrPrincipal, async (c) => {
     .from("ops_stock_items")
     .select("*")
     .eq("status", "free")
-    .in("condition", ["new", "exhibition"])
+    .in("condition", ["new", "exhibition", "old", "refurbished"])
     .eq("needs_repair", false)
     .order("date_in", { ascending: true, nullsFirst: false });
   if (error) throw new HTTPException(500, { message: error.message });
@@ -67,7 +68,7 @@ opsStockRouter.get("/repair", requireOperationOrPrincipal, async (c) => {
   const { data, error } = await sb
     .from("ops_stock_items")
     .select("*")
-    .or("needs_repair.eq.true,condition.in.(old,damaged)")
+    .or("needs_repair.eq.true,condition.in.(damaged)")
     .order("updated_at", { ascending: false });
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ items: shape(data ?? []), total: (data ?? []).length });
@@ -103,6 +104,15 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
     throw new HTTPException(404, {
       message: "No matching free unit available for this SKU",
     });
+  }
+  // 0212 — stamp WHY the ready-pool unit was pulled (urgent vs exchange).
+  // Best-effort under write_internal RLS: the reserve itself already succeeded,
+  // so a reason-stamp hiccup must not surface as a false reserve failure.
+  if (parsed.reason) {
+    await sb
+      .from("ops_stock_items")
+      .update({ reserve_reason: parsed.reason })
+      .eq("id", data as string);
   }
   return c.json({ itemId: data });
 });
@@ -249,6 +259,56 @@ opsStockRouter.post("/", requireOperationOrPrincipal, async (c) => {
   return c.json({ created: (data ?? []).length }, 201);
 });
 
+// POST /import — bulk book-in from the "Klg Warehouse" ready-stock sheet
+// (On Hand C+ P3). Add-only: each import row is expanded to `qty` units and
+// inserted (same RLS insert as "+ Add stock", chunked for a large sheet). The
+// client does the New-vs-duplicate preview + only sends the rows to add;
+// snapshot-replace is intentionally NOT here (it would wipe reserved links —
+// deferred to a guarded P3b). Defaults to Carres Klang.
+opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockImportInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let whId = parsed.warehouseId ?? null;
+  if (!whId) {
+    const { data: wh } = await sb
+      .from("warehouses")
+      .select("id")
+      .ilike("name", "%klang%")
+      .limit(1)
+      .maybeSingle();
+    whId = (wh as { id: string } | null)?.id ?? null;
+  }
+  if (!whId) {
+    throw new HTTPException(400, { message: "Carres Klang warehouse not found" });
+  }
+
+  const units = parsed.rows.flatMap((r) =>
+    Array.from({ length: r.qty }, () => ({
+      sku: r.sku,
+      warehouse_id: whId,
+      condition: r.condition,
+      status: r.status,
+      reserved_ref: r.status === "reserved" ? r.reservedRef ?? null : null,
+      supplier: r.supplier ?? null,
+      po_no: r.poNo ?? null,
+      source_ref: r.sourceRef ?? null,
+      date_in: r.dateIn ?? null,
+    })),
+  );
+
+  let created = 0;
+  for (let i = 0; i < units.length; i += 500) {
+    const { data, error } = await sb
+      .from("ops_stock_items")
+      .insert(units.slice(i, i + 500))
+      .select("id");
+    if (error) throw mapErr(error);
+    created += (data ?? []).length;
+  }
+  return c.json({ created }, 201);
+});
+
 // DELETE /:itemId — remove a mis-keyed unit (hard delete). For fixing a wrong
 // entry; selling/transferring goes through /takeout, not this.
 opsStockRouter.delete("/:itemId", requireOperationOrPrincipal, async (c) => {
@@ -269,7 +329,7 @@ interface RawRow {
   unit_code: string | null;
   sku: string;
   warehouse_id: string;
-  condition: "new" | "exhibition" | "old" | "damaged";
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
   // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled).
   status: "incoming" | "free" | "reserved" | "sold" | "transferred" | "voided";
   reserved_ref: string | null;
@@ -279,6 +339,8 @@ interface RawRow {
   po_no: string | null;
   source_ref: string | null;
   date_in: string | null;
+  // 0212 — why a ready-pool unit was pulled: 'urgent' | 'exchange' | null.
+  reserve_reason: string | null;
   // 0153 — sale linkage set on delivery.
   sold_at: string | null;
   sold_order_id: string | null;
@@ -301,6 +363,7 @@ function shape(rows: RawRow[]) {
     poNo: r.po_no,
     sourceRef: r.source_ref,
     dateIn: r.date_in,
+    reserveReason: r.reserve_reason ?? null,
     soldAt: r.sold_at,
     soldOrderId: r.sold_order_id,
     createdAt: r.created_at,

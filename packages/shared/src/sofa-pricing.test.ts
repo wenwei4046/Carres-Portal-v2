@@ -616,6 +616,173 @@ describe("computeSofaPrice — combo override", () => {
   });
 });
 
+/* ─── computeSofaPrice — connectivity gating (rule 1b, Loo 2026-07-10) ────
+ * A combo only matches WITHIN one connected sofa. Layouts reuse the KNOWN
+ * connected / disconnected geometries from sofa-geometry.test.ts (depth "24"
+ * → zero cushion widening: 2A w=158, 1A w=95, 1NA w=75). */
+
+describe("computeSofaPrice — connectivity gating", () => {
+  const pairCombo = (over: Partial<SofaComboLike> = {}): SofaComboLike =>
+    combo({
+      id: "pair-2a",
+      slots: [["2A(LHF)"], ["2A(RHF)"]],
+      pricesByHeight: { "24": 1900 },
+      ...over,
+    });
+  const PRICES = { "2A(LHF)": 1000, "2A(RHF)": 1000, "1A(LHF)": 500, "1A(RHF)": 500, "1NA": 300 };
+
+  it("disconnected compartments matching the combo's slots do NOT get the combo", () => {
+    // The reported bug: two pieces sitting APART (7cm gap) still priced as a combo.
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: 165, y: 0, rot: 0 }, // 7cm gap → own group
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("a_la_carte");
+    expect(r.comboId).toBeUndefined();
+    expect(r.total).toBe(2000); // full à-la-carte, no combo saving
+  });
+
+  it("the SAME compartments connected flush DO get the combo", () => {
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: 158, y: 0, rot: 0 }, // flush → one sofa
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.comboPrice).toBe(1900);
+    expect(r.total).toBe(1900);
+    expect(r.matchedCellIndices).toEqual([0, 1]);
+  });
+
+  it("within-tolerance contact (1cm gap) still counts as connected", () => {
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: 159, y: 0, rot: 0 }, // 1cm ≤ CONTACT_TOL
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.total).toBe(1900);
+  });
+
+  it("a combo can never cherry-pick cells ACROSS two separate groups", () => {
+    // Slots need one 2A(LHF) + one 1A(RHF); each sits in its own group → no match
+    // (pre-gate the flat code list matched).
+    const cross = combo({
+      id: "cross",
+      slots: [["2A(LHF)"], ["1A(RHF)"]],
+      pricesByHeight: { "24": 1200 },
+    });
+    const snap = snapshotFrom(PRICES, { combos: [cross] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "1A(RHF)", x: 1000, y: 0, rot: 0 },
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("a_la_carte");
+    expect(r.total).toBe(1500);
+  });
+
+  it("TWO separate complete sofas each win their OWN combo (per-group pricing)", () => {
+    const oneCombo = combo({
+      id: "pair-1a",
+      slots: [["1A(LHF)"], ["1A(RHF)"]],
+      pricesByHeight: { "24": 900 },
+    });
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo(), oneCombo] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: 158, y: 0, rot: 0 }, // sofa 1 (connected)
+          { moduleCode: "1A(LHF)", x: 1000, y: 0, rot: 0 },
+          { moduleCode: "1A(RHF)", x: 1095, y: 0, rot: 0 }, // sofa 2 (connected)
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.comboPrice).toBe(2800); // 1900 + 900 (aggregate across groups)
+    expect(r.comboSubsetSum).toBe(3000); // 2000 + 1000
+    expect(r.matchedCellIndices).toEqual([0, 1, 2, 3]);
+    expect(r.total).toBe(2800);
+  });
+
+  it("a connected combo sofa + a distant stray piece: combo + the stray at full price", () => {
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: 158, y: 0, rot: 0 },
+          { moduleCode: "1NA", x: 1000, y: 0, rot: 0 }, // its own group, no combo
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.comboPrice).toBe(1900);
+    expect(r.comboExtras).toBe(300);
+    expect(r.total).toBe(2200);
+    expect(r.matchedCellIndices).toEqual([0, 1]);
+  });
+
+  it("geometry-free cells (no x/y) fall back to ONE group — combo still applies", () => {
+    // Quick-pick code-list pricing + legacy lines: pre-gate behavior preserved.
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "2A(RHF)" }],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.total).toBe(1900);
+  });
+
+  it("ANY cell missing coordinates disables the gate for the whole build (fail-open)", () => {
+    const snap = snapshotFrom(PRICES, { combos: [pairCombo()] });
+    const r = computeSofaPrice(
+      build({
+        height: "24",
+        cells: [
+          { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+          { moduleCode: "2A(RHF)", x: null, y: null, rot: null }, // legacy null geometry
+        ],
+      }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.total).toBe(1900);
+  });
+});
+
 describe("computeSofaPrice — fabric tier delta", () => {
   it("PRICE_1 delta = 0 (no surcharge)", () => {
     const snap = snapshotFrom(

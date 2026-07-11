@@ -595,6 +595,23 @@ catalogRouter.post("/skus", async (c) => {
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
+  const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
+
+  // Accessory / service carry NO variant axis (one SKU per model, Loo
+  // 2026-07-11) — an empty variant is allowed for them and the SKU code is the
+  // bare MODEL_KEY. Every other category still requires a variant (the size /
+  // preset IS the code suffix).
+  if (parsed.data.variant === "" && !supplierless) {
+    return c.json(
+      {
+        error: "validation",
+        code: "variant_required",
+        message: `A size / variant is required for ${modelRow.category} SKUs.`,
+      },
+      422,
+    );
+  }
+
   // Mattress/bedframe sizes resolve through the canonical table so the SKU code
   // stays SHORT (`-K`) while the stored variant (the SIZE shown) is the FULL
   // name (`King`). Non-size variants (sofa presets, accessories) pass through.
@@ -604,8 +621,9 @@ catalogRouter.post("/skus", async (c) => {
   const resolvedVariant = isBedSize
     ? canonicalSize(parsed.data.variant)
     : { code: parsed.data.variant, name: parsed.data.variant };
-  const skuCode = deriveSkuCode(modelRow.model_key, resolvedVariant.code);
-  const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
+  const skuCode = resolvedVariant.code
+    ? deriveSkuCode(modelRow.model_key, resolvedVariant.code)
+    : modelRow.model_key.toUpperCase();
 
   // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id was NOT NULL on
   // staging/prod. Auto-resolve from suppliers.cat_covered[] when the caller
@@ -672,6 +690,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // pos_active, description, supplier, restore toggle) stay open to internal.
   gateSkuPatchPriceCost(c, parsed.data);
   const patch: Record<string, unknown> = {};
+  // Loo 2026-07-11 — the CODE is a free, directly-renameable field (AutoCount
+  // style). DB unique(sku) turns a collision into a clean 409 via mapPgError.
+  if (parsed.data.sku !== undefined) patch.sku = parsed.data.sku;
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
@@ -695,9 +716,11 @@ catalogRouter.patch("/skus/:id", async (c) => {
 
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // If variant changed we re-derive the sku code so it stays consistent with the
-  // {MODEL_KEY}-{variant} scheme. Look up the model first to know model_key.
-  if (parsed.data.variant !== undefined) {
+  // Loo 2026-07-11 — a variant/SIZE edit no longer rewrites the code (the CODE
+  // is a free field renamed via the explicit `sku` patch above). Only the
+  // CLEAR gate remains: '' is allowed solely for the no-variant-axis
+  // categories (accessory/service) — every other category needs its size.
+  if (parsed.data.variant === "") {
     const { data: skuRow, error: skuErr } = await sb
       .from("product_skus")
       .select("model_id")
@@ -712,11 +735,18 @@ catalogRouter.patch("/skus/:id", async (c) => {
     }
     const { data: modelRow } = await sb
       .from("product_models")
-      .select("model_key")
+      .select("category")
       .eq("id", skuRow.model_id)
       .maybeSingle();
-    if (modelRow) {
-      patch.sku = deriveSkuCode(modelRow.model_key, parsed.data.variant);
+    if (modelRow && !SUPPLIERLESS_CATEGORIES.has(modelRow.category as string)) {
+      return c.json(
+        {
+          error: "validation",
+          code: "variant_required",
+          message: `A size / variant is required for ${modelRow.category} SKUs.`,
+        },
+        422,
+      );
     }
   }
 

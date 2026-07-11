@@ -1,31 +1,116 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  FileInput,
+} from "lucide-react";
+import type { OrderEventCategory } from "@carres/shared";
+import {
   useOrderTimeline,
+  useOperationOrder,
   useAddAnnotation,
   type TimelineEntry,
   type AnnotationTag,
 } from "@/lib/queries";
+import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate } from "@/lib/fmt-date";
+import {
+  CATEGORY_LABEL,
+  CATEGORY_ORDER,
+  IconChip,
+  describeActivity,
+  isImport,
+  isToday,
+} from "./activity-display";
 
-// ─── Tag helpers ─────────────────────────────────────────────────────────────
+// ─── Lifecycle tracker — "where is this order?" at a glance ────────────────────
+
+const STEPS = ["Placed", "Confirmed", "Production", "Delivery", "Delivered"] as const;
+
+function stepIndexOf(
+  order: { status?: string | null; operation_stage?: string | null } | undefined,
+): { index: number; cancelled: boolean } {
+  if (!order) return { index: 0, cancelled: false };
+  if (order.status === "cancelled") return { index: 0, cancelled: true };
+  switch (order.operation_stage) {
+    case "placed":
+      return { index: 0, cancelled: false };
+    case "confirmed":
+      return { index: 1, cancelled: false };
+    case "in_production":
+      return { index: 2, cancelled: false };
+    case "ready_to_dispatch":
+    case "dispatched":
+      return { index: 3, cancelled: false };
+    case "delivered":
+      return { index: 4, cancelled: false };
+  }
+  if (order.status === "delivered") return { index: 4, cancelled: false };
+  if (order.status === "proceed_order") return { index: 1, cancelled: false };
+  return { index: 0, cancelled: false };
+}
+
+function LifecycleStepper({ index, cancelled }: { index: number; cancelled: boolean }) {
+  if (cancelled) {
+    return (
+      <div className="flex items-center gap-2 px-1 py-1.5 text-[12px] text-red-700">
+        <AlertTriangle size={14} /> Order cancelled
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start">
+      {STEPS.map((label, i) => {
+        const done = i < index;
+        const current = i === index;
+        const dot = done ? "#3B6D11" : current ? "#185FA5" : "#F1EFE8";
+        const line = i <= index ? "#97C459" : "#E5E1D8";
+        return (
+          <div key={label} className="flex-1 text-center relative">
+            {i > 0 && (
+              <div
+                className="absolute top-[9px] left-[-50%] w-full h-[2px]"
+                style={{ background: line }}
+              />
+            )}
+            <div
+              className="relative w-5 h-5 rounded-full grid place-items-center mx-auto"
+              style={{
+                background: dot,
+                color: done || current ? "#fff" : "#B4B2A9",
+                border: !done && !current ? "1px solid #E5E1D8" : undefined,
+              }}
+            >
+              {done && <Check size={11} strokeWidth={3} />}
+            </div>
+            <div
+              className="text-[10px] mt-1"
+              style={{ color: current ? "#185FA5" : "#8A8378", fontWeight: current ? 500 : 400 }}
+            >
+              {label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Note tag badge ───────────────────────────────────────────────────────────
 
 const TAG_LABEL: Record<AnnotationTag, string> = {
   follow_up: "Follow up",
   escalate: "Escalate to Jess",
   resolved: "Resolved",
 };
-
 const TAG_CLASS: Record<AnnotationTag, string> = {
   follow_up: "bg-yellow-50 text-yellow-700 border border-yellow-200",
   escalate: "bg-red-50 text-red-700 border border-red-200",
   resolved: "bg-green-50 text-green-700 border border-green-200",
-};
-
-const TAG_ICON: Record<AnnotationTag, string> = {
-  follow_up: "🔔",
-  escalate: "🚨",
-  resolved: "✅",
 };
 
 function TagBadge({ tag }: { tag: AnnotationTag }) {
@@ -33,89 +118,101 @@ function TagBadge({ tag }: { tag: AnnotationTag }) {
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TAG_CLASS[tag]}`}
     >
-      {TAG_ICON[tag]} {TAG_LABEL[tag]}
+      {TAG_LABEL[tag]}
     </span>
   );
 }
 
-// ─── Activity action label ────────────────────────────────────────────────────
+// ─── Rows ─────────────────────────────────────────────────────────────────────
 
-const ACTION_LABEL: Record<string, string> = {
-  annotation_added:  "Note",
-  inbox_assign:      "Assign logistic",
-  autocount_import:  "AutoCount import",
-  stock_reserve:     "Stock reserve",
-  stock_release:     "Stock release",
-  stock_reassign:    "Reassign",
-  stock_takeout:     "Takeout",
-  stock_flag_repair: "Flag repair",
-};
-
-function actionLabel(action: string): string {
-  return ACTION_LABEL[action] ?? action.replace(/_/g, " ");
-}
-
-// ─── Single timeline entry ────────────────────────────────────────────────────
-
-function TimelineRow({
-  entry,
-  first,
-}: {
-  entry: TimelineEntry;
-  first: boolean;
-}) {
+function TimelineRow({ entry }: { entry: TimelineEntry }) {
   const time = fmtDate(entry.occurred_at, { time: true });
-
-  if (entry.kind === "annotation") {
-    return (
-      <div
-        className={`py-2 ${first ? "" : "border-t border-dashed border-base-100"}`}
-      >
-        <div className="flex items-start gap-2">
+  const { category, title, body } = describeActivity(entry);
+  const isNote = entry.kind === "annotation";
+  return (
+    <div
+      className={`flex gap-2.5 py-2 border-t border-dashed border-base-100 first:border-t-0 ${
+        category === "exception" ? "-mx-4 px-4 bg-red-50/60" : ""
+      }`}
+    >
+      <div className="pt-0.5">
+        <IconChip category={category} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[12px] font-medium text-base-800 leading-snug">
+            {title}
+            {isNote && entry.tag && (
+              <span className="ml-1.5 align-middle">
+                <TagBadge tag={entry.tag} />
+              </span>
+            )}
+          </span>
           <span className="font-mono text-[10px] text-base-400 whitespace-nowrap mt-0.5">
             {time}
           </span>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 mb-1">
-              <span className="text-[11px] font-medium text-base-600">
-                {entry.actor_name ?? "—"}
-              </span>
-              {entry.tag && <TagBadge tag={entry.tag} />}
-            </div>
-            <p className="text-[12px] text-base-800 leading-relaxed whitespace-pre-wrap break-words">
-              {entry.content}
-            </p>
-          </div>
         </div>
+        {body ? (
+          <p className="text-[12px] text-base-700 leading-relaxed whitespace-pre-wrap break-words mt-0.5">
+            {body}
+          </p>
+        ) : (
+          <div className="text-[11px] text-base-500 mt-0.5">{entry.actor_name ?? "System"}</div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // activity row — muted, system-generated
-  const detail = entry.detail as Record<string, unknown> | null | undefined;
-  const detailSnippet = detail
-    ? Object.entries(detail)
-        .filter(([k]) => k !== "preview")
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(" · ")
-    : null;
-
+function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const latest = run[0];
+  const earliest = run[run.length - 1];
+  const range =
+    run.length > 1
+      ? `${fmtDate(earliest.occurred_at)} – ${fmtDate(latest.occurred_at)}`
+      : fmtDate(latest.occurred_at);
   return (
-    <div
-      className={`py-1.5 ${first ? "" : "border-t border-dashed border-base-100"}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] text-base-400 whitespace-nowrap">
-          {time}
-        </span>
-        <span className="text-[11px] text-base-500">
-          {actionLabel(entry.action ?? "")}
-          {entry.actor_name ? ` · ${entry.actor_name}` : ""}
-          {detailSnippet ? (
-            <span className="text-base-400"> ({detailSnippet})</span>
-          ) : null}
-        </span>
-      </div>
+    <div className="border-t border-dashed border-base-100 first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-base-50 rounded"
+      >
+        <div
+          className="flex-none w-7 h-7 rounded-full grid place-items-center"
+          style={{ backgroundColor: "#F1EFE8", color: "#5F5E5A" }}
+          aria-hidden
+        >
+          <FileInput size={15} strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] text-base-600">
+            Imported from AutoCount <span className="text-base-400">· {run.length} times</span>
+          </div>
+          <div className="text-[11px] text-base-400">{range}</div>
+        </div>
+        {open ? (
+          <ChevronDown size={14} className="text-base-400" />
+        ) : (
+          <ChevronRight size={14} className="text-base-400" />
+        )}
+      </button>
+      {open && (
+        <div className="pl-9 pb-1">
+          {run.map((e) => (
+            <div
+              key={e.id}
+              className="flex items-center justify-between py-1 text-[11px] text-base-500"
+            >
+              <span>{e.actor_name ?? "System"}</span>
+              <span className="font-mono text-[10px] text-base-400">
+                {fmtDate(e.occurred_at, { time: true })}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -150,23 +247,23 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         onChange={(e) => setContent(e.target.value)}
         placeholder="Write a note…"
         rows={2}
-        className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[4px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
+        className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[8px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
       />
       <div className="flex items-center gap-2">
         <select
           value={tag}
           onChange={(e) => setTag(e.target.value as AnnotationTag | "")}
-          className="text-[11px] border border-base-200 rounded-[4px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+          className="text-[11px] border border-base-200 rounded-[8px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">General note · no action</option>
-          <option value="follow_up">🔔 Follow up</option>
-          <option value="escalate">🚨 Escalate to Jess</option>
-          <option value="resolved">✅ Resolved</option>
+          <option value="follow_up">Follow up</option>
+          <option value="escalate">Escalate to Jess</option>
+          <option value="resolved">Resolved</option>
         </select>
         <button
           type="submit"
           disabled={!content.trim() || mutation.isPending}
-          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[4px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
+          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[8px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
         >
           {mutation.isPending ? "Saving…" : "Save note"}
         </button>
@@ -177,28 +274,172 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
+type RenderItem =
+  | { kind: "row"; entry: TimelineEntry; category: OrderEventCategory }
+  | { kind: "group"; run: TimelineEntry[] };
+
+function itemTime(it: RenderItem): string {
+  return it.kind === "row" ? it.entry.occurred_at : it.run[0].occurred_at;
+}
+
 interface Props {
   orderId: string;
 }
 
 export default function AnnotationTimeline({ orderId }: Props) {
   const { data, isLoading } = useOrderTimeline(orderId);
-  const entries = data ?? [];
+  const { data: orderData } = useOperationOrder(orderId);
+  const setActiveOrder = useActiveOrder((s) => s.set);
+  const entries = useMemo(() => data ?? [], [data]);
+  const [filter, setFilter] = useState<OrderEventCategory | "all">("all");
+
+  const described = useMemo(
+    () => entries.map((e) => ({ entry: e, category: describeActivity(e).category })),
+    [entries],
+  );
+  const counts = useMemo(() => {
+    const m = {} as Record<OrderEventCategory, number>;
+    for (const d of described) m[d.category] = (m[d.category] ?? 0) + 1;
+    return m;
+  }, [described]);
+  const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
+
+  const items = useMemo<RenderItem[]>(() => {
+    const filtered =
+      filter === "all" ? described : described.filter((d) => d.category === filter);
+    const out: RenderItem[] = [];
+    let i = 0;
+    while (i < filtered.length) {
+      if (isImport(filtered[i].entry)) {
+        let j = i;
+        while (j < filtered.length && isImport(filtered[j].entry)) j++;
+        const run = filtered.slice(i, j).map((d) => d.entry);
+        out.push(
+          run.length > 1
+            ? { kind: "group", run }
+            : { kind: "row", entry: run[0], category: "system" },
+        );
+        i = j;
+      } else {
+        out.push({ kind: "row", entry: filtered[i].entry, category: filtered[i].category });
+        i++;
+      }
+    }
+    return out;
+  }, [described, filter]);
+
+  const today = items.filter((it) => isToday(itemTime(it)));
+  const earlier = items.filter((it) => !isToday(itemTime(it)));
+  const step = stepIndexOf(orderData?.order);
+
+  const renderItem = (it: RenderItem) =>
+    it.kind === "group" ? (
+      <ImportGroupRow key={it.run[0].id} run={it.run} />
+    ) : (
+      <TimelineRow key={it.entry.id} entry={it.entry} />
+    );
 
   return (
     <div>
+      {/* Back to the global feed — this panel is scoped to one order. */}
+      <button
+        type="button"
+        onClick={() => setActiveOrder(null)}
+        className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-base-900 mb-2"
+      >
+        <ChevronLeft size={13} /> All activity
+      </button>
+
+      {orderData?.order && (
+        <div className="mb-3 px-1">
+          <LifecycleStepper index={step.index} cancelled={step.cancelled} />
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-[12px] text-base-400 py-2">Loading…</div>
       ) : entries.length === 0 ? (
         <div className="text-[12px] text-base-500 py-2">No notes or activity yet.</div>
       ) : (
-        <div className="bg-white border border-base-200 rounded-[4px] px-4 py-1 mb-3">
-          {entries.map((e, i) => (
-            <TimelineRow key={e.id} entry={e} first={i === 0} />
-          ))}
-        </div>
+        <>
+          {presentCategories.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1 mb-2">
+              <FilterChip
+                label="All"
+                count={described.length}
+                active={filter === "all"}
+                onClick={() => setFilter("all")}
+              />
+              {presentCategories.map((c) => (
+                <FilterChip
+                  key={c}
+                  label={CATEGORY_LABEL[c]}
+                  count={counts[c]}
+                  active={filter === c}
+                  onClick={() => setFilter(c)}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="bg-white border border-base-200 rounded-[8px] px-4 py-2 mb-3">
+            {today.length > 0 && (
+              <>
+                <div className="text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1">
+                  Today
+                </div>
+                {today.map(renderItem)}
+              </>
+            )}
+            {earlier.length > 0 && (
+              <>
+                <div
+                  className={`text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1 ${
+                    today.length > 0 ? "pt-3" : ""
+                  }`}
+                >
+                  Earlier
+                </div>
+                {earlier.map(renderItem)}
+              </>
+            )}
+            {items.length === 0 && (
+              <div className="text-[12px] text-base-400 py-2">Nothing in this filter.</div>
+            )}
+          </div>
+        </>
       )}
       <AddAnnotationForm orderId={orderId} />
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors"
+      style={{
+        color: active ? "#FFFFFF" : "#4B5563",
+        background: active ? "#221F20" : "#FFFFFF",
+        borderColor: active ? "#221F20" : "#DDD8CE",
+      }}
+    >
+      {label}
+      <span className="tabular-nums" style={{ color: active ? "rgba(255,255,255,0.7)" : "#9CA3AF" }}>
+        {count}
+      </span>
+    </button>
   );
 }
