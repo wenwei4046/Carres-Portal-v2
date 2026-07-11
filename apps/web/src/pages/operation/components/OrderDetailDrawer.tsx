@@ -492,6 +492,7 @@ interface DrawerBodyProps {
 function Panel({
   title,
   summary,
+  actions,
   grow,
   className,
   children,
@@ -499,6 +500,8 @@ function Panel({
   title: string;
   /** Pinned to the header's right edge — the at-a-glance status badge. */
   summary?: ReactNode;
+  /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
+  actions?: ReactNode;
   grow?: boolean;
   className?: string;
   children: ReactNode;
@@ -546,12 +549,58 @@ function Panel({
           )}
           <span className="t-h4 text-base-900 truncate">{title}</span>
         </button>
-        {summary != null && (
-          <span className="shrink-0 flex items-center gap-1.5">{summary}</span>
-        )}
+        <span className="shrink-0 flex items-center gap-1.5">
+          {summary}
+          {actions}
+        </span>
       </header>
       {open && children}
     </section>
+  );
+}
+
+/** A panel header's own ⋮ actions menu (Jess 2026-07-11) — every panel that has
+ *  actions passes one via `Panel actions=…`. Self-contained dropdown. */
+function PanelMenu({
+  items,
+}: {
+  items: { label: string; onClick: () => void; icon?: ReactNode; disabled?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Panel actions"
+        onClick={() => setOpen((o) => !o)}
+        className="p-0.5 text-base-400 hover:text-base-800 leading-none"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-48 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg py-1">
+            {items.map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+                className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
+              >
+                {it.icon}
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1105,6 +1154,17 @@ function DrawerBody({
                 waiting={waitingN}
                 ready={readyN}
                 total={goodsLines.length}
+              />
+            }
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Export items (CSV)",
+                    icon: <Download size={14} />,
+                    onClick: () => downloadOrderCsv(order, lines),
+                  },
+                ]}
               />
             }
           >
