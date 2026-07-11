@@ -570,12 +570,18 @@ export {
 } from "./schemas/ops-order-control";
 
 export {
+  LOAN_SOURCES,
   loanSofaInput,
+  borrowLoanInput,
   returnLoanInput,
+  returnToSupplierInput,
   sofaLoanSchema,
   sofaLoansResponseSchema,
+  type LoanSource,
   type LoanSofaInput,
+  type BorrowLoanInput,
   type ReturnLoanInput,
+  type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
 } from "./schemas/sofa-loan";

@@ -32,7 +32,9 @@ import {
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
+  type BorrowLoanInput,
   type ReturnLoanInput,
+  type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
   type AutocountImportInput,
@@ -5141,6 +5143,39 @@ export function useReturnLoan(orderId: string) {
       void qc.invalidateQueries({ queryKey: loansKey(orderId) });
       void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+    },
+  });
+}
+
+/** Borrow a piece from a supplier to loan (migration 0217) — creates a return
+ *  obligation. No own-stock unit is touched. */
+export function useBorrowLoan(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BorrowLoanInput) =>
+      apiFetch<{ loan: SofaLoanDto }>(
+        `/api/operation/orders/${orderId}/loan-borrow`,
+        catalogJson("POST", input),
+      ).then((r) => r.loan),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+    },
+  });
+}
+
+/** Close the supplier return obligation — the borrowed piece went back. */
+export function useReturnLoanSupplier(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReturnToSupplierInput) =>
+      apiFetch<{ ok: true }>(
+        `/api/operation/orders/${orderId}/loan-return-supplier`,
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
     },
   });
 }

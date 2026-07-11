@@ -43,7 +43,7 @@ import {
   useReceiveLine,
   useOrderLoans,
   useLoanSofa,
-  useReturnLoan,
+  useOperationSuppliers,
   useDeliveryPartners,
   useUpdateOrder,
   useOrderPayments,
@@ -67,6 +67,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import DeliveryChain from "./DeliveryChain";
+import LoanPanel from "./LoanPanel";
 import {
   RouteJourneyBar,
   RouteLegEditor,
@@ -794,12 +795,19 @@ function DrawerBody({
     (partnersData?.partners ?? []).find(
       (p) => p.id === order.ops_assigned_logistic,
     )?.name ?? null;
-  // Sofa loans (migration 0209) — active loaners against this order.
+  // Loaners against this order (migration 0209 + generalized 0217). A loan is
+  // "live" while out (on_loan) OR a supplier borrow still owed back.
   const loansQuery = useOrderLoans(order.id);
-  const activeLoans = (loansQuery.data?.loans ?? []).filter(
-    (l) => l.status === "on_loan",
+  const allLoans = loansQuery.data?.loans ?? [];
+  const activeLoans = allLoans.filter((l) => l.status === "on_loan");
+  const owedLoans = allLoans.filter(
+    (l) => l.source === "supplier" && !l.returned_to_supplier_at,
   );
-  const returnLoan = useReturnLoan(order.id);
+  const liveLoanCount = new Set([
+    ...activeLoans.map((l) => l.id),
+    ...owedLoans.map((l) => l.id),
+  ]).size;
+  const { data: suppliersData } = useOperationSuppliers();
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
@@ -1767,56 +1775,26 @@ function DrawerBody({
             </Panel>
           )}
 
-          {/* On loan (migration 0209) — active loaner sofas out against this order;
-              collected back (swap) at the real delivery. Only when a loan is live. */}
-          {activeLoans.length > 0 && (
-            <Panel
-              title="On loan"
-              summary={<MiniBadge tone="waiting">{activeLoans.length} out</MiniBadge>}
-            >
-              <div className="p-3 space-y-2">
-                {activeLoans.map((loan) => (
-                  <div
-                    key={loan.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-base-100 bg-base-50 px-2 py-1.5"
-                  >
-                    <div className="min-w-0">
-                      <div
-                        className="text-[12px] font-medium truncate"
-                        title={loan.item_sku ?? ""}
-                      >
-                        {loan.item_sku ?? "Sofa"}
-                      </div>
-                      <div className="text-[10px] text-base-500">
-                        {loan.item_condition ?? "—"}
-                        {loan.do_number ? ` · DO ${loan.do_number}` : ""} · loaned{" "}
-                        {fmtDate(loan.loaned_at.slice(0, 10))}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        returnLoan.mutate(
-                          { loanId: loan.id },
-                          {
-                            onSuccess: () =>
-                              toast.success("Loaner collected — back in stock"),
-                            onError: (e) =>
-                              toast.error(`Couldn't return — ${e.message}`),
-                          },
-                        )
-                      }
-                      disabled={returnLoan.isPending}
-                      title="Collect the loaner at delivery — it returns to free stock"
-                      className="btn-secondary text-[11px] whitespace-nowrap shrink-0"
-                    >
-                      Collect (swap)
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          {/* Loan (migration 0209 + 0217) — a SEPARATE panel (Jess) for lending a
+              substitute piece now → swapping back when the real one lands. Two
+              sources: own warehouse OR borrowed from a supplier (a return
+              obligation). The lend entry stays even at 0 loans. */}
+          <Panel
+            title="Loan"
+            summary={
+              liveLoanCount > 0 ? (
+                <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">none</MiniBadge>
+              )
+            }
+          >
+            <LoanPanel
+              orderId={order.id}
+              loans={allLoans}
+              suppliers={suppliersData?.suppliers ?? []}
+            />
+          </Panel>
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 2 remark rows; then a Route section only
