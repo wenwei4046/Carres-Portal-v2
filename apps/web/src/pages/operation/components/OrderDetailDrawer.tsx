@@ -69,10 +69,9 @@ import { Modal } from "./Modal";
 import DeliveryChain from "./DeliveryChain";
 import {
   RouteJourneyBar,
-  RouteLegList,
+  RouteLegEditor,
   RouteQuietButton,
-  deriveRouteLegs,
-  isSpecialRoute,
+  legsToDisplay,
 } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
@@ -1297,15 +1296,12 @@ function DrawerBody({
                     // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =
                       form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                    // Route "Option D" legs — derived from location + carrier +
-                    // readiness (real per-leg authoring lands with the migration).
-                    const routeLegs = isService
-                      ? []
-                      : deriveRouteLegs({
-                          location: locValue,
-                          carrier: assignedLogisticName,
-                          readiness: rd ?? "ready",
-                        });
+                    // Route "Option D" — a SPECIAL transfer is the authored legs
+                    // (line_legs, migration 0216); empty = the standard single hop
+                    // to the default warehouse (locValue).
+                    const savedLegs = form.draft.line_legs[l.sku] ?? [];
+                    const hasSpecialRoute = savedLegs.length > 0;
+                    const displayLegs = legsToDisplay(savedLegs);
                     const routeOpen = routeOpenSku === l.sku;
                     // One row per SKU (duplicate lines combined above) → key on SKU.
                     return (
@@ -1405,9 +1401,9 @@ function DrawerBody({
                           </td>
                         ) : (
                           <td className="border border-base-200 px-1 py-0.5 align-middle">
-                            {isSpecialRoute(routeLegs) ? (
+                            {hasSpecialRoute ? (
                               <RouteJourneyBar
-                                legs={routeLegs}
+                                legs={displayLegs}
                                 open={routeOpen}
                                 onClick={() =>
                                   setRouteOpenSku((cur) =>
@@ -1436,10 +1432,9 @@ function DrawerBody({
                             className="border border-base-200 px-3 py-2"
                           >
                             <div className="space-y-2">
-                              <RouteLegList legs={routeLegs} />
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
-                                  Current location
+                                  Default location
                                 </span>
                                 <select
                                   value={locValue}
@@ -1459,10 +1454,24 @@ function DrawerBody({
                                     </option>
                                   ))}
                                 </select>
-                                <span className="text-[10px] text-base-400 ml-auto">
-                                  Per-leg carrier + Add leg — with the transfer
-                                  update
-                                </span>
+                              </div>
+                              <div className="border-t border-base-100 pt-2">
+                                <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D] mb-1">
+                                  Special transfer
+                                </div>
+                                {savedLegs.length === 0 && (
+                                  <p className="text-[10px] text-base-400 mb-1.5">
+                                    Standard: {locValue || "Carres Klang"} →
+                                    Customer. Add a leg only for a special
+                                    transfer (supplier pickup, cross-warehouse).
+                                  </p>
+                                )}
+                                <RouteLegEditor
+                                  legs={savedLegs}
+                                  onChange={(legs) =>
+                                    form.setLineLegs(l.sku, legs)
+                                  }
+                                />
                               </div>
                             </div>
                           </td>

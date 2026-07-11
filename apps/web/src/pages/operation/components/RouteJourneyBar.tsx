@@ -1,11 +1,19 @@
 import {
   AlertTriangle,
   Building2,
+  Check,
   Factory,
   MapPin,
+  Plus,
   Route as RouteIcon,
+  Trash2,
   Warehouse,
 } from "lucide-react";
+import {
+  ROUTE_CARRIERS,
+  STOCK_LOCATIONS,
+  type OrderRouteLeg,
+} from "@carres/shared";
 
 /**
  * RouteJourneyBar — the per-item transfer "Option D" design (Jess 2026-07-11,
@@ -183,6 +191,130 @@ export function RouteQuietButton({
       <span className="truncate">{label}</span>
       <RouteIcon className="w-3 h-3 shrink-0 text-base-300 ml-auto" strokeWidth={2} />
     </button>
+  );
+}
+
+/**
+ * Map STORED legs (migration 0216 `line_legs`, {from,to,carrier,done}) to DISPLAY
+ * legs for the bar: done → green, the first not-done → blue (moving), rest → grey.
+ */
+export function legsToDisplay(legs: OrderRouteLeg[]): RouteLeg[] {
+  let firstOpen = true;
+  return legs.map((l) => {
+    let status: JourneyStatus;
+    if (l.done) status = "done";
+    else if (firstOpen) {
+      status = "moving";
+      firstOpen = false;
+    } else status = "pending";
+    return { from: l.from, to: l.to, carrier: l.carrier, status };
+  });
+}
+
+const LEG_PLACES = [...STOCK_LOCATIONS, "Customer"] as const;
+
+/**
+ * The in-place transfer-leg editor (Jess 2026-07-11 Route "Option D" — the real
+ * Add-leg). Each row = from → to · carrier · done, with remove; "Add leg" appends
+ * a hop starting where the last one ended. Persisted to line_legs via the form.
+ */
+export function RouteLegEditor({
+  legs,
+  onChange,
+}: {
+  legs: OrderRouteLeg[];
+  onChange: (legs: OrderRouteLeg[]) => void;
+}) {
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const update = (i: number, patch: Partial<OrderRouteLeg>) =>
+    onChange(legs.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const add = () => {
+    const from = legs.length ? legs[legs.length - 1].to : "Carres Klang";
+    onChange([...legs, { from, to: "Customer", carrier: null, done: false }]);
+  };
+  const sel =
+    "border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[11px] focus:border-primary focus:outline-none";
+  return (
+    <div className="space-y-1.5">
+      {legs.map((leg, i) => (
+        <div key={i} className="flex items-center gap-1 flex-wrap text-[11px]">
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e);
+              update(i, { done: !leg.done });
+            }}
+            title={leg.done ? "Done" : "Mark done"}
+            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+              leg.done
+                ? "bg-[#16A34A] border-[#16A34A] text-white"
+                : "border-base-300 text-transparent"
+            }`}
+          >
+            <Check className="w-3 h-3" strokeWidth={3} />
+          </button>
+          <select
+            value={leg.from}
+            onClick={stop}
+            onChange={(e) => update(i, { from: e.target.value })}
+            className={sel}
+          >
+            {LEG_PLACES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <span className="text-base-300">→</span>
+          <select
+            value={leg.to}
+            onClick={stop}
+            onChange={(e) => update(i, { to: e.target.value })}
+            className={sel}
+          >
+            {LEG_PLACES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <select
+            value={leg.carrier ?? ""}
+            onClick={stop}
+            onChange={(e) => update(i, { carrier: e.target.value || null })}
+            className={sel}
+          >
+            <option value="">carrier…</option>
+            {ROUTE_CARRIERS.map((carr) => (
+              <option key={carr} value={carr}>
+                {carr}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e);
+              onChange(legs.filter((_, j) => j !== i));
+            }}
+            title="Remove leg"
+            className="text-base-300 hover:text-danger shrink-0 ml-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={(e) => {
+          stop(e);
+          add();
+        }}
+        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+      >
+        <Plus className="w-3 h-3" /> Add leg
+      </button>
+    </div>
   );
 }
 

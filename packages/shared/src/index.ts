@@ -537,6 +537,9 @@ export {
 // Migration 0159 — Orders control-grid overlay (P2 editable drawer).
 export {
   STOCK_LOCATIONS,
+  ROUTE_CARRIERS,
+  orderRouteLegSchema,
+  type OrderRouteLeg,
   PAYMENT_STATUSES,
   DELIVERY_TIME_SLOTS,
   STORAGE_RATES,

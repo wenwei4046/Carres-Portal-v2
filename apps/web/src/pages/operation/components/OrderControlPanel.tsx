@@ -13,6 +13,7 @@ import {
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type LineStockStatus,
+  type OrderRouteLeg,
   type OrderPaymentRow,
   type OrderPaymentMethod,
   type PaymentKind,
@@ -69,6 +70,7 @@ interface Draft {
   paid_amount: string;
   storage_paid: string;
   line_locations: Record<string, string[]>;
+  line_legs: Record<string, OrderRouteLeg[]>;
   line_etas: Record<string, string>;
   line_stock_status: Record<string, LineStockStatus>;
   called_customer: boolean;
@@ -93,6 +95,7 @@ const EMPTY: Draft = {
   paid_amount: "",
   storage_paid: "",
   line_locations: {},
+  line_legs: {},
   line_etas: {},
   line_stock_status: {},
   called_customer: false,
@@ -152,6 +155,9 @@ export interface OrderControlForm {
   remarkCount: number;
   /** Set the stock location(s) for one order line (per-SKU; migration 0168). */
   setLineLocation: (sku: string, locs: string[]) => void;
+  /** Set the transfer route legs for one order line (per-SKU; migration 0216).
+   *  Empty array = clear back to the standard single hop. */
+  setLineLegs: (sku: string, legs: OrderRouteLeg[]) => void;
   /** Set the stock ETA for one order line (per-SKU; migration 0170 — products
    *  don't all arrive on the same date, Jess). */
   setLineEta: (sku: string, eta: string) => void;
@@ -197,6 +203,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
       storage_paid: c.storage_paid ?? "",
       line_locations: c.line_locations ?? {},
+      line_legs: c.line_legs ?? {},
       line_etas: c.line_etas ?? {},
       line_stock_status: c.line_stock_status ?? {},
       called_customer: c.called_customer ?? false,
@@ -247,6 +254,8 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         Object.keys(draft.line_locations).length > 0
           ? draft.line_locations
           : null,
+      line_legs:
+        Object.keys(draft.line_legs).length > 0 ? draft.line_legs : null,
       line_etas:
         Object.keys(draft.line_etas).length > 0 ? draft.line_etas : null,
       line_stock_status:
@@ -280,6 +289,13 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         ...d,
         line_locations: { ...d.line_locations, [sku]: locs },
       })),
+    setLineLegs: (sku, legs) =>
+      setDraft((d) => {
+        const next = { ...d.line_legs };
+        if (legs.length === 0) delete next[sku];
+        else next[sku] = legs;
+        return { ...d, line_legs: next };
+      }),
     setLineEta: (sku, eta) =>
       setDraft((d) => ({
         ...d,
