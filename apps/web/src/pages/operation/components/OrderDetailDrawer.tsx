@@ -77,6 +77,7 @@ import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import ReceivePOModal from "./ReceivePOModal";
+import AnnotationTimeline from "./AnnotationTimeline";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -1034,13 +1035,15 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* main | side — the two locked columns (content untouched this batch);
-            items-start so they take natural height and the BODY scrolls as one. */}
+        {/* side | main — support cards on the LEFT, items + warehouse on the RIGHT
+            (Jess 2026-07-11). Grid AREAS do the flip: "side main" puts the cards
+            column (gridArea:side) first and the items column (gridArea:main)
+            second — no panel code moves. Cards get a fixed ~300px; items fill. */}
         <div
           className="grid gap-2.5 items-start"
           style={{
-            gridTemplateColumns: "1.05fr 0.95fr",
-            gridTemplateAreas: '"main side"',
+            gridTemplateColumns: "300px minmax(0, 1fr)",
+            gridTemplateAreas: '"side main"',
           }}
         >
 
@@ -1320,20 +1323,10 @@ function DrawerBody({
           className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-auto"
         >
           {/* 1. Customer — a quiet identity card (name / phone / address, with an
-              inline Edit on a Place order). Header summary = the area. */}
-          <Panel
-            title="Customer"
-            summary={
-              loc.label ? (
-                <span
-                  title={loc.label}
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 max-w-[140px] truncate"
-                >
-                  {loc.label}
-                </span>
-              ) : undefined
-            }
-          >
+              inline Edit on a Place order). No region pill (Jess 2026-07-11): the
+              region is a DELIVERY attribute (it shows on the Delivery card), not
+              customer identity. */}
+          <Panel title="Customer">
             <div className="p-3">
               <OrderCustomerCard order={order} />
             </div>
@@ -1527,11 +1520,11 @@ function DrawerBody({
           )}
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
-              Logistic update; then the 3 remark rows; then a Route section only
-              for a cross-border / multi-leg order. Grows to fill the column. */}
+              Logistic update; then the 2 remark rows; then a Route section only
+              for a cross-border / multi-leg order. (Natural height now — the
+              Activity card below carries `grow` to fill the column bottom.) */}
           <Panel
             title="Delivery"
-            grow
             summary={
               loc.area === "KV" ? (
                 <MiniBadge tone="kv">Klang Valley</MiniBadge>
@@ -1593,7 +1586,13 @@ function DrawerBody({
                   )}
                 </div>
               </div>
-              {/* 3 remark rows (span full width). */}
+              {/* 2 remark rows (span full width). The old single-field
+                  "Carrier's remark" (carres_remark) was REMOVED (Jess 2026-07-11,
+                  Option 1): all hand-written follow-up now lives in ONE place —
+                  the Activity & notes timeline card below — which stacks entries
+                  with who + when + history instead of overwriting one box.
+                  customer_request + action_for_logistic keep their own semantics
+                  (a customer ask / a standing instruction, not follow-up chatter). */}
               <div className="border-t border-base-100 pt-2">
                 <FieldGrid>
                   <RemarkControlField
@@ -1607,12 +1606,6 @@ function DrawerBody({
                     field="action_for_logistic"
                     label="Action for logistic"
                     placeholder="e.g. call customer before delivery"
-                  />
-                  <RemarkControlField
-                    form={form}
-                    field="carres_remark"
-                    label="Carrier's remark"
-                    placeholder="Internal note"
                   />
                 </FieldGrid>
               </div>
@@ -1638,6 +1631,20 @@ function DrawerBody({
                   }
                 />
               </div>
+            </div>
+          </Panel>
+
+          {/* Card C — Activity & notes (Jess 2026-07-11, Option 1). THE single
+              place for all hand-written follow-up on this order: the compose box
+              lives here, so a note auto-attaches to THIS order (no order-picker),
+              and every entry stacks with author + timestamp + tag — replacing the
+              old overwrite-one-box "Carrier's remark". Also merges the system
+              activity (imports, stock moves) so a new joiner reads the whole
+              in-flight order at a glance. Carries `grow` to fill the column;
+              scrolls its own body. Reuses the already-live AnnotationTimeline. */}
+          <Panel title="Activity & notes" grow>
+            <div className="p-3 overflow-auto min-h-0">
+              <AnnotationTimeline orderId={order.id} />
             </div>
           </Panel>
         </div>{/* /right column */}
