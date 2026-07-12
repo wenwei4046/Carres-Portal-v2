@@ -353,7 +353,9 @@ export function parseMoneyLoose(
 /** Map ONE raw Master "Ops" record to a per-order balance row. "Payment Status"
  *  drives it: Paid → settled (owing 0); Follow Up Balance → the "Balance" column
  *  is the outstanding to chase; Partial/Unpaid likewise carry the Balance amount.
- *  A row with no Ref, or no status + no balance, is skipped. */
+ *  Blank / unrecognized status + a positive Balance → owing = that amount (Operation
+ *  records only the unpaid balance, so a bare Balance means money still owed).
+ *  A row with no Ref, or no status + no/zero balance, is skipped. */
 export function masterRecordToBalance(
   rec: Record<string, string | number>,
 ): BalanceRowResult {
@@ -378,6 +380,14 @@ export function masterRecordToBalance(
   } else if (/paid/i.test(rawStatus)) {
     payStatus = "Paid";
     owing = 0; // settled — the Master "Balance" note is the already-paid amount
+  }
+  // Blank / unrecognized status but a positive "Balance" amount → treat as owing.
+  // Operation records ONLY the unpaid balance in the "Balance" column (there is no
+  // total-billing column), so any positive Balance not marked "Paid" is money still
+  // owed. Left unlabelled (no payStatus) — the panel derives owing from the amount.
+  if (payStatus === undefined && owing === undefined) {
+    const bal = parseMoneyLoose(rawBal);
+    if (bal !== null && bal > 0) owing = bal;
   }
   if (!payStatus && owing === undefined) {
     return { ok: false, reason: "no payment status or balance" };
