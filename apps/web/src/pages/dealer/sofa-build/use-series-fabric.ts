@@ -30,13 +30,29 @@ export function sellingFabricSeries(fabrics: SellingFabric[]): string[] {
   return out;
 }
 
-export function useSeriesFabric(sellingFabrics: SellingFabric[]) {
+export function useSeriesFabric(
+  sellingFabrics: SellingFabric[],
+  /** Cart-line EDIT prefill (read once at mount — the host remounts to load a
+   *  different line): `key` restores a concrete colour (its series follows);
+   *  `series` alone restores a series-picked-colour-KIV state. A key/series
+   *  that no longer exists in the list falls back to the default init. */
+  initial?: { key?: string | null; series?: string | null },
+) {
   const seriesList = useMemo(() => sellingFabricSeries(sellingFabrics), [sellingFabrics]);
   // A sole series auto-selects so the series step collapses to just the colours.
-  const [series, setSeries] = useState<string>(() =>
-    seriesList.length === 1 ? seriesList[0]! : "",
+  const [series, setSeries] = useState<string>(() => {
+    if (initial?.key) {
+      const f = sellingFabrics.find((x) => x.key === initial.key);
+      if (f) return f.series ?? "Other";
+    }
+    if (initial?.series && seriesList.includes(initial.series)) return initial.series;
+    return seriesList.length === 1 ? seriesList[0]! : "";
+  });
+  const [colourKey, setColourKey] = useState<string>(() =>
+    initial?.key && sellingFabrics.some((x) => x.key === initial.key)
+      ? initial.key
+      : FABRIC_KIV,
   );
-  const [colourKey, setColourKey] = useState<string>(FABRIC_KIV);
 
   const seriesColours = useMemo(
     () => (series ? sellingFabrics.filter((f) => (f.series ?? "Other") === series) : []),

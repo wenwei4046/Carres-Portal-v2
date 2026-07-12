@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Plus, Gift, Ticket, UserRound } from "lucide-react";
+import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Pencil, Plus, Gift, Ticket, UserRound } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
@@ -9,7 +9,7 @@ import {
   type DraftLine,
   type WizardDraft,
 } from "../new-order/draft";
-import { cartAddonSubtotal, cartItemCount, cartLineSubtotal } from "./cart";
+import { cartAddonSubtotal, cartItemCount, cartLineSubtotal, lineEditTarget } from "./cart";
 import { saveQuote } from "./quotes";
 import { SpecialsSummary } from "../new-order/special-addons-picker";
 import {
@@ -60,6 +60,7 @@ export default function CartDrawer({
   customerPhone,
   pwpAvailableVouchers,
   onApplyVoucherCode,
+  onEditLine,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -94,6 +95,11 @@ export default function CartDrawer({
    *  null. OPTIONAL — absent → the manual-entry field is hidden (auto-suggest still
    *  works from `pwpAvailableVouchers`). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Cart-line EDIT (Loo 2026-07-12) — the ✎ pencil beside a line's remove.
+   *  Shown only for lines a configurator can re-open (`lineEditTarget`: sofa
+   *  builds + mattress/bedframe). OPTIONAL — absent → no pencil (older callers
+   *  / tests render byte-identical). */
+  onEditLine?: (line: DraftLine) => void;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -263,6 +269,11 @@ export default function CartDrawer({
                 // name on top, the configuration as the muted detail line.
                 const [name, ...detailParts] = l.label.split(" · ");
                 const detail = detailParts.join(" · ");
+                // ✎ shows only when a configurator can actually re-open this
+                // line (sofa build / mattress / bedframe) — same helper the
+                // CatalogStep routes with, so the two never drift.
+                const editable =
+                  !!onEditLine && !!catalog && lineEditTarget(l, catalog) !== null;
                 return (
                   <div key={l.localId} className="cart-item">
                     <div
@@ -325,17 +336,32 @@ export default function CartDrawer({
                       )}
                     </div>
 
-                    {/* Remove on top, price under (FREE when free / promo-claimed,
-                        PWP price when claimed under a 'pwp' rule) */}
+                    {/* Edit + remove on top, price under (FREE when free /
+                        promo-claimed, PWP price when claimed under a 'pwp'
+                        rule) */}
                     <div className="cart-item__right">
-                      <button
-                        type="button"
-                        onClick={() => removeLine(l.localId)}
-                        aria-label={`Remove ${l.label}`}
-                        className="cart-item__remove"
-                      >
-                        <Trash2 />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {editable && (
+                          <button
+                            type="button"
+                            onClick={() => onEditLine!(l)}
+                            aria-label={`Edit ${l.label}`}
+                            title="Edit this item"
+                            className="cart-item__remove"
+                            data-testid={`cart-line-edit-${l.localId}`}
+                          >
+                            <Pencil />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeLine(l.localId)}
+                          aria-label={`Remove ${l.label}`}
+                          className="cart-item__remove"
+                        >
+                          <Trash2 />
+                        </button>
+                      </div>
                       {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
                         <span
                           className="pill pill-confirmed"

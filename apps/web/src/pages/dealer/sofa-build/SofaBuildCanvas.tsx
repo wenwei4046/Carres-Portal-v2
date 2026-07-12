@@ -128,6 +128,10 @@ export default function SofaBuildCanvas({
   onClose,
   embedded = false,
   initialCells,
+  initialFabricKey,
+  initialFabricSeries,
+  initialLegHeight,
+  addLabel,
 }: {
   model: ProductModelDto;
   /** The model's SKUs — reserved for Task 4's representative-sku DraftLine map
@@ -183,6 +187,14 @@ export default function SofaBuildCanvas({
    *  mount — the parent remounts (key) to load a different pick. Ids are
    *  minted here so callers pass pure geometry. */
   initialCells?: Array<{ moduleCode: string; x: number; y: number; rot: Rot }>;
+  /** Cart-line EDIT prefill (read once at mount): the line's fabric selection
+   *  (`sf:{id}` legacy / `cf:{code}` master key), its series (restores a
+   *  series-picked-colour-KIV state), and its leg height. */
+  initialFabricKey?: string | null;
+  initialFabricSeries?: string | null;
+  initialLegHeight?: string | null;
+  /** CTA text override — "Update item" when editing a cart line. */
+  addLabel?: string;
 }) {
   /* ─── Catalog lookups ────────────────────────────────────────────── */
 
@@ -257,9 +269,15 @@ export default function SofaBuildCanvas({
   );
   // Fabric Series → Colour with two-level KIV — the SAME hook the POS quick-pick
   // rail uses, so the two fabric pickers are identical (Loo 2026-07-06).
-  const fab = useSeriesFabric(fabricChoices);
+  const fab = useSeriesFabric(fabricChoices, {
+    key: initialFabricKey,
+    series: initialFabricSeries,
+  });
   // 0201-wiring — leg height ('' = confirm later / none).
-  const [legHeight, setLegHeight] = useState<string>("");
+  const [legHeight, setLegHeight] = useState<string>(() => {
+    const v = initialLegHeight ?? "";
+    return v && (legHeightOptions ?? []).some((o) => o.value === v) ? v : "";
+  });
   const legOpts = legHeightOptions ?? [];
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
@@ -290,8 +308,19 @@ export default function SofaBuildCanvas({
   // Expand room (2990s CustomBuilder parity, Loo 2026-07-06): 1× = the single-
   // sofa 600×480 room; 1.5× = 900×720 (2.25× the area) for laying out three
   // to four sofa sets. Same ratio, more floor — the fit-to-viewport transform
-  // below re-fits automatically.
-  const [roomScale, setRoomScale] = useState(1);
+  // below re-fits automatically. A cart-line edit whose stored geometry was
+  // laid out in the expanded room starts at 1.5× so no cell lands off-floor.
+  const [roomScale, setRoomScale] = useState(() => {
+    const overflow = (initialCells ?? []).some((c) => {
+      const fp = moduleFootprint(
+        findModule(c.moduleCode) ?? { w: 95, d: 95, cushions: 0 },
+        c.rot,
+        height,
+      );
+      return c.x + fp.w > ROOM_W || c.y + fp.h > ROOM_H;
+    });
+    return overflow ? 1.5 : 1;
+  });
   const roomW = ROOM_W * roomScale;
   const roomH = ROOM_H * roomScale;
 
@@ -1135,7 +1164,7 @@ export default function SofaBuildCanvas({
             className="btn btn--primary btn--lg"
             data-testid="sofa-build-add"
           >
-            {blocker ?? "Add to cart"}
+            {blocker ?? addLabel ?? "Add to cart"}
           </button>
         </div>
       </footer>

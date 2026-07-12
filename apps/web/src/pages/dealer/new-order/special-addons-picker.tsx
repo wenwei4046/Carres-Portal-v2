@@ -46,9 +46,13 @@ export interface UseSpecials {
 export function useSpecials(
   model: ProductModelDto,
   specialAddons: SpecialAddonDto[] | null | undefined,
+  /** Cart-line EDIT prefill — read once at mount (the host remounts per line).
+   *  Picks whose code is no longer offered price to 0 via resolveSpecialsTotal
+   *  and can simply be un-ticked by the operator. */
+  initialPicks?: SpecialAddonPick[],
 ): UseSpecials {
   const offered = offeredSpecialsFor(model, specialAddons);
-  const [picks, setPicks] = useState<SpecialAddonPick[]>([]);
+  const [picks, setPicks] = useState<SpecialAddonPick[]>(initialPicks ?? []);
   const defsByCode = new Map(offered.map((d) => [d.code, d]));
   const { total: surcharge, lines: resolvedLines } = resolveSpecialsTotal(picks, defsByCode);
   const complete = picks.every((p) => {

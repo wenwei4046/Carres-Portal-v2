@@ -292,6 +292,7 @@ export default function SofaConfigurePage({
   pwpClaimGroup,
   customerPhone,
   onApplyVoucherCode,
+  editLine,
   onAdd,
   onClose,
 }: {
@@ -323,6 +324,12 @@ export default function SofaConfigurePage({
   customerPhone?: string;
   /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Cart-line EDIT (Loo 2026-07-12): a sofa-BUILD DraftLine to prefill from —
+   *  opens straight in Customize with the stored geometry on the canvas and
+   *  the fabric / leg / height restored. Read once at mount; `onAdd` then
+   *  REPLACES the line in the cart. A PWP claim on the old line is NOT
+   *  restored — the cart re-offers it. */
+  editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -342,6 +349,43 @@ export default function SofaConfigurePage({
     () => sellingFabricsFor(model, fabrics, masterFabrics),
     [model, fabrics, masterFabrics],
   );
+
+  // Cart-line EDIT prefill — the stored `attrs.sofa_build` geometry + the
+  // fabric / leg / remark picks, parsed tolerantly off the free jsonb. Read
+  // ONCE at mount (the caller mounts a fresh page per edit) — it feeds state
+  // initializers + the canvas's mount-time initial props only.
+  const editBuild = useMemo(() => {
+    const attrs = (editLine?.attrs ?? null) as Record<string, unknown> | null;
+    const sb = attrs?.sofa_build as { cells?: unknown; height?: unknown } | undefined;
+    if (!sb || !Array.isArray(sb.cells)) return null;
+    const cells = (sb.cells as Array<Record<string, unknown>>)
+      .filter((c) => typeof c?.moduleCode === "string")
+      .map((c) => ({
+        moduleCode: c.moduleCode as string,
+        x: typeof c.x === "number" ? c.x : 0,
+        y: typeof c.y === "number" ? c.y : 0,
+        rot: (typeof c.rot === "number" && [0, 90, 180, 270].includes(c.rot)
+          ? c.rot
+          : 0) as Rot,
+      }));
+    if (cells.length === 0) return null;
+    const fabricKey =
+      typeof attrs?.fabric_id === "string" && attrs.fabric_id
+        ? `sf:${attrs.fabric_id}`
+        : typeof attrs?.fabric_code === "string" && attrs.fabric_code
+          ? `cf:${attrs.fabric_code}`
+          : null;
+    return {
+      cells,
+      height: typeof sb.height === "string" ? sb.height : null,
+      fabricKey,
+      fabricSeries: typeof attrs?.fabric_series === "string" ? attrs.fabric_series : null,
+      legHeight: typeof attrs?.leg_height === "string" ? attrs.leg_height : null,
+      remark: typeof attrs?.remark === "string" ? attrs.remark : "",
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fabric SERIES → COLOUR with two-level KIV (Loo 2026-07-06). The exact same
   // hook drives the Customize canvas, so the two surfaces never drift. Aliased
   // to the quick-pick names below.
@@ -355,13 +399,17 @@ export default function SofaConfigurePage({
     fabric: qpFabric,
     deferred: qpDeferred,
     fabricSeries: qpFabricSeries,
-  } = useSeriesFabric(sellingFabrics);
+  } = useSeriesFabric(sellingFabrics, {
+    key: editBuild?.fabricKey,
+    series: editBuild?.fabricSeries,
+  });
   // Customize size — CONTROLLED here so the header chips (Loo 2026-07-06) and
   // the canvas's bottom-bar picker drive the same value; survives the canvas
   // remount when a quick pick is loaded (seedKey).
-  const [custSize, setCustSize] = useState<string>(() =>
-    sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24",
-  );
+  const [custSize, setCustSize] = useState<string>(() => {
+    if (editBuild?.height && sofaSizes.includes(editBuild.height)) return editBuild.height;
+    return sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24";
+  });
   // Customize LIVE total — mirrored up from the canvas engine (onLiveTotal) so
   // the header price follows every module placed/removed; null = empty canvas.
   const [custTotal, setCustTotal] = useState<number | null>(null);
@@ -392,7 +440,10 @@ export default function SofaConfigurePage({
     [sofaCombos, model.id],
   );
 
-  const [mode, setMode] = useState<"quick" | "custom">(picks.length > 0 ? "quick" : "custom");
+  // An EDIT opens straight in Customize with the stored geometry loaded.
+  const [mode, setMode] = useState<"quick" | "custom">(
+    editBuild ? "custom" : picks.length > 0 ? "quick" : "custom",
+  );
   // Principal-only "Create combo" (Loo 2026-07-06): a Master Admin can capture
   // the current Customize build as a priced sofa combo. `comboCodes` = the
   // arranged compartment codes handed up by the canvas (null = modal closed).
@@ -410,7 +461,7 @@ export default function SofaConfigurePage({
     x: number;
     y: number;
     rot: Rot;
-  }> | null>(null);
+  }> | null>(editBuild ? editBuild.cells : null);
   // Remount key — bumps when a pick is loaded so the canvas re-reads the seed.
   const [seedKey, setSeedKey] = useState(0);
 
@@ -540,9 +591,15 @@ export default function SofaConfigurePage({
     null;
 
   // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
-  const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
-  const [qpLeg, setQpLeg] = useState<string>("");
-  const [qpRemark, setQpRemark] = useState("");
+  const [qpHeight, setQpHeight] = useState<SofaHeight>(() => {
+    const h = editBuild?.height as SofaHeight | null | undefined;
+    return h && offeredHeights.includes(h) ? h : offeredHeights[0] ?? "24";
+  });
+  const [qpLeg, setQpLeg] = useState<string>(() => {
+    const v = editBuild?.legHeight ?? "";
+    return v && legOpts.some((o) => o.value === v) ? v : "";
+  });
+  const [qpRemark, setQpRemark] = useState(editBuild?.remark ?? "");
 
   // Heights = the model's full offered sizes (à-la-carte prices any size; a
   // matched combo may cover only some, and the engine falls back per size).
@@ -1012,7 +1069,7 @@ export default function SofaConfigurePage({
                 onClick={() => heroPick && addQuickPick(heroPick)}
                 data-testid="sofa-qp-add"
               >
-                <Plus size={14} strokeWidth={2} /> Add to Cart
+                <Plus size={14} strokeWidth={2} /> {editLine ? "Update item" : "Add to Cart"}
               </button>
             )}
           </span>
@@ -1348,6 +1405,10 @@ export default function SofaConfigurePage({
             key={seedKey}
             embedded
             initialCells={seed ?? []}
+            initialFabricKey={seedKey === 0 ? editBuild?.fabricKey : undefined}
+            initialFabricSeries={seedKey === 0 ? editBuild?.fabricSeries : undefined}
+            initialLegHeight={seedKey === 0 ? editBuild?.legHeight : undefined}
+            addLabel={editLine ? "Update item" : undefined}
             model={model}
             skus={skus}
             compartmentPool={sofaCompartments}
