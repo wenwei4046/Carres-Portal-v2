@@ -35,7 +35,7 @@ vi.mock("@/lib/auth", () => ({
     selector({ role: roleMock.current }),
 }));
 
-import SofaConfigurePage from "./SofaConfigurePage";
+import SofaConfigurePage, { centerSeedInRoom } from "./SofaConfigurePage";
 
 beforeAll(() => {
   if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "undefined") {
@@ -85,8 +85,8 @@ const PRESET_SKU: ProductSkuDto = {
 function storedCells(height: string) {
   const w1 = moduleFootprint(findModule("1A(LHF)")!, 0, height).w;
   return [
-    { moduleCode: "1A(LHF)", x: 60, y: 60, rot: 0 },
-    { moduleCode: "2A(RHF)", x: 60 + w1, y: 60, rot: 0 },
+    { moduleCode: "1A(LHF)", x: 60, y: 60, rot: 0 as const },
+    { moduleCode: "2A(RHF)", x: 60 + w1, y: 60, rot: 0 as const },
   ];
 }
 
@@ -151,13 +151,17 @@ describe("SofaConfigurePage — edit mode", () => {
     // The canvas CTA flips to Update item.
     expect(screen.getByTestId("sofa-build-add").textContent).toContain("Update item");
 
-    // Saving re-emits the SAME build contract (2 cells @ 28″).
+    // Saving re-emits the SAME build contract (2 cells @ 28″) — and the
+    // geometry re-landed CENTRED in the room (Loo 2026-07-12), exactly like a
+    // loaded quick pick, not at whatever corner the line was built in.
     fireEvent.click(screen.getByTestId("sofa-build-add"));
     expect(onAdd).toHaveBeenCalledTimes(1);
     const line = onAdd.mock.calls[0][0] as DraftLine;
-    const attrs = line.attrs as { sofa_build: { cells: unknown[]; height: string } };
+    const attrs = line.attrs as {
+      sofa_build: { cells: Array<{ moduleCode: string; x: number; y: number; rot: number }>; height: string };
+    };
     expect(attrs.sofa_build.height).toBe("28");
-    expect(attrs.sofa_build.cells).toHaveLength(2);
+    expect(attrs.sofa_build.cells).toEqual(centerSeedInRoom(storedCells("28"), "28"));
     expect(line.sku).toBe(PRESET_SKU.sku);
   });
 

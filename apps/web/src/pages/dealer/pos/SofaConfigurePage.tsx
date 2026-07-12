@@ -369,6 +369,7 @@ export default function SofaConfigurePage({
           : 0) as Rot,
       }));
     if (cells.length === 0) return null;
+    const height = typeof sb.height === "string" ? sb.height : null;
     const fabricKey =
       typeof attrs?.fabric_id === "string" && attrs.fabric_id
         ? `sf:${attrs.fabric_id}`
@@ -376,8 +377,11 @@ export default function SofaConfigurePage({
           ? `cf:${attrs.fabric_code}`
           : null;
     return {
-      cells,
-      height: typeof sb.height === "string" ? sb.height : null,
+      // Same treatment as a loaded quick pick (Loo 2026-07-12): the stored
+      // geometry re-lands CENTRED in the room, wherever it was left when the
+      // line was built. Pure translation — grouping/pricing are unaffected.
+      cells: centerSeedInRoom(cells, height ?? "24"),
+      height,
       fabricKey,
       fabricSeries: typeof attrs?.fabric_series === "string" ? attrs.fabric_series : null,
       legHeight: typeof attrs?.leg_height === "string" ? attrs.leg_height : null,
