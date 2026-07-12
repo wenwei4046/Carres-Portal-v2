@@ -751,9 +751,11 @@
 .summary__items { display: flex; flex-direction: column; gap: var(--space-3); }
 .summary__item {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  grid-template-columns: 48px 1fr auto;
   gap: var(--space-3);
-  align-items: center;
+  /* Top-aligned (Loo 2026-07-12) — a wrapping detail line used to float the
+     photo + price mid-row, reading as fragments. Name row anchors all three. */
+  align-items: start;
 }
 .summary__item--sofa {
   align-items: start;
@@ -765,10 +767,16 @@
 .summary__item--sofa + .summary__item--sofa { margin-top: 0; }
 .summary__item-main { min-width: 0; }
 .summary__item-photo {
-  width: 40px; height: 40px;
+  width: 48px; height: 48px;
   border-radius: var(--radius-sm);
   background-color: var(--c-beige);
-  background-size: cover; background-position: center;
+  border: 1px solid var(--line);
+  /* CONTAIN, not cover (Loo 2026-07-12) — a 40px cover crop of a product
+     shot read as a random sliver ("像被裁剪"). Show the WHOLE photo on a
+     white tile instead. */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .summary__item--sofa .summary__item-photo { margin-top: 2px; }
 .summary__item-name {

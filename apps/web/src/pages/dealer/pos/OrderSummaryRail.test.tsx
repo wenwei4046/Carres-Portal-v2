@@ -82,3 +82,27 @@ describe("OrderSummaryRail — default free gift", () => {
     expect(screen.getByText("Items · 1")).toBeInTheDocument();
   });
 });
+
+describe("OrderSummaryRail — item row label split (Loo 2026-07-12)", () => {
+  it("bold model name on top, config as the muted detail line", () => {
+    render(
+      <OrderSummaryRail
+        draft={draftWith({ label: 'Booqit · 1A(LHF) + 2A(RHF) · 24″ · CG-007 Deep Grey · leg 4"' })}
+        catalog={catalog()}
+      />,
+    );
+    // Name and detail render as SEPARATE nodes (not one long bold line).
+    expect(screen.getByText("Booqit")).toBeInTheDocument();
+    expect(screen.getByText('1A(LHF) + 2A(RHF) · 24″ · CG-007 Deep Grey · leg 4"')).toBeInTheDocument();
+    expect(screen.getByText("qty 1")).toBeInTheDocument();
+  });
+
+  it("a variant-less label ('Mattress Protector · ') strands no separator", () => {
+    render(
+      <OrderSummaryRail draft={draftWith({ label: "Mattress Protector · " })} catalog={catalog()} />,
+    );
+    expect(screen.getByText("Mattress Protector")).toBeInTheDocument();
+    // No empty detail line — the row is name + qty only.
+    expect(screen.queryByText("·")).not.toBeInTheDocument();
+  });
+});
