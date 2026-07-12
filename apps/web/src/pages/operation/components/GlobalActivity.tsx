@@ -158,9 +158,75 @@ function DayGroup({
       <div className="text-[10px] uppercase tracking-[0.05em] text-base-400 pt-2 pb-0.5">
         {label}
       </div>
-      {items.map((d) => (
-        <FeedRow key={`${d.row.kind}-${d.row.id}`} d={d} onOpen={onOpen} />
-      ))}
+      {foldImports(items).map((u, i) =>
+        u.type === "row" ? (
+          <FeedRow key={`${u.d.row.kind}-${u.d.row.id}`} d={u.d} onOpen={onOpen} />
+        ) : (
+          <ImportGroupRow key={`imports-${i}`} items={u.items} onOpen={onOpen} />
+        ),
+      )}
+    </>
+  );
+}
+
+/** Fold consecutive AutoCount-import rows into ONE collapsible unit (Jess
+ *  2026-07-12) — 150 identical machine rows become a single "Imported from
+ *  AutoCount · N" line that expands on demand, so the feed reads as signal. */
+type FeedUnit = { type: "row"; d: Decorated } | { type: "imports"; items: Decorated[] };
+
+function foldImports(items: Decorated[]): FeedUnit[] {
+  const units: FeedUnit[] = [];
+  for (const d of items) {
+    if (isImport(d.row)) {
+      const last = units[units.length - 1];
+      if (last && last.type === "imports") last.items.push(d);
+      else units.push({ type: "imports", items: [d] });
+    } else {
+      units.push({ type: "row", d });
+    }
+  }
+  return units;
+}
+
+function ImportGroupRow({
+  items,
+  onOpen,
+}: {
+  items: Decorated[];
+  onOpen: (orderId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const n = items.length;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex gap-2.5 py-2 text-left border-t border-dashed border-base-100 first:border-t-0 hover:bg-base-50"
+      >
+        <div className="pt-0.5">
+          <IconChip category="system" size={26} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] text-base-800 leading-snug truncate">
+            <span className="font-medium">Imported from AutoCount</span>
+            <span className="text-base-500"> · {n} {n === 1 ? "order" : "orders"}</span>
+          </div>
+          <div className="text-[11px] text-base-500 truncate">
+            {fmtDate(items[n - 1].row.occurred_at, { time: true })}
+            {n > 1 ? ` – ${fmtDate(items[0].row.occurred_at, { time: true })}` : ""}
+            {" · tap to expand"}
+          </div>
+        </div>
+        <ChevronRight
+          size={14}
+          className={`text-base-300 self-center shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+        />
+      </button>
+      {open &&
+        items.map((d) => (
+          <FeedRow key={`${d.row.kind}-${d.row.id}`} d={d} onOpen={onOpen} />
+        ))}
     </>
   );
 }
