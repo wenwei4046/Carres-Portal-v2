@@ -41,7 +41,7 @@ describe("PortalSidebar — role visibility", () => {
   it("operation sees Operations items only — no Finance / Admin", () => {
     mockRole = "operation";
     renderAt("/operation");
-    expect(screen.getByText("SO Maintenance")).toBeInTheDocument();
+    expect(screen.getByText("Purchase Order")).toBeInTheDocument();
     expect(screen.getByText("Product & Maintenance")).toBeInTheDocument();
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
@@ -52,7 +52,7 @@ describe("PortalSidebar — role visibility", () => {
     renderAt("/finance/dashboard");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
     expect(screen.getByText("Reconciliation")).toBeInTheDocument();
-    expect(screen.queryByText("SO Maintenance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Purchase Order")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
 
@@ -75,6 +75,6 @@ describe("PortalSidebar — role visibility", () => {
     renderAt("/finance/ar");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
     // Operations now collapsed.
-    expect(screen.queryByText("SO Maintenance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Purchase Order")).not.toBeInTheDocument();
   });
 });

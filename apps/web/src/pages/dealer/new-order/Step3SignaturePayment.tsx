@@ -113,7 +113,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   }
 
   // ---------- Payment methods (0219 — config-driven) ----------
-  // The list renders from order_entry_config (SO Maintenance edits it);
+  // The list renders from order_entry_config (the Order Entry page edits it);
   // empty/absent config → code defaults = the historical trio + Cash.
   const methods = useMemo(
     () => resolvePaymentMethods(catalog.orderEntryConfig),

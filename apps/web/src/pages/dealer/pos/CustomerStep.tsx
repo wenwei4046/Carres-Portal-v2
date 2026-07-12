@@ -79,7 +79,7 @@ export default function CustomerStep({
   const c = draft.customer;
   const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(initialSubStep);
 
-  // 0219 — the form renders from order_entry_config (SO Maintenance edits it):
+  // 0219 — the form renders from order_entry_config (the Order Entry page edits it):
   // toggleable builtins (email/race/gender/birthday, the emergency block) +
   // operator-defined custom fields per tab. Absent config → code defaults =
   // the exact pre-0219 form.
@@ -758,7 +758,7 @@ export default function CustomerStep({
   );
 }
 
-/** 0219 — operator-configured CUSTOM fields for one tab (SO Maintenance
+/** 0219 — operator-configured CUSTOM fields for one tab (the Order Entry page
  *  "Order Entry" editor authors them). Values live in draft.customer.custom
  *  and submit as entry_data.fields. */
 function CustomFieldsInputs({

@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   ClipboardList,
-  Table2,
   ShoppingCart,
   PackageCheck,
   Boxes,
@@ -102,7 +101,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/orders",
         badge: "orders",
       },
-      { key: "sales-order-maintenance", label: "SO Maintenance", icon: Table2 },
       {
         key: "procurement",
         label: "Purchase Order",
