@@ -64,18 +64,30 @@ export default function OrderSummaryRail({
             <div className="summary__items">
               {draft.lines.map((l) => {
                 const photo = photoBySku.get(l.sku);
+                // "Booqit · 1A(LHF) + 2A(RHF) · 24″ · …" → bold MODEL NAME on
+                // top, the configuration as a muted detail line (the same split
+                // the cart rows use — Loo 2026-07-12: one long bold line read
+                // as fragments). Empty segments drop, so a variant-less label
+                // ("Mattress Protector · ") strands no separator.
+                const segs = (l.label || l.sku)
+                  .split(" · ")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                const name = segs[0] ?? l.sku;
+                const detail = segs.slice(1).join(" · ");
                 return (
                   <div key={l.localId} className="summary__item">
                     <div
                       className="summary__item-photo"
                       style={
                         photo
-                          ? { backgroundImage: `url(${photo})` }
-                          : { background: "var(--c-beige)" }
+                          ? { backgroundImage: `url(${photo})`, backgroundColor: "#fff" }
+                          : undefined
                       }
                     />
                     <div className="summary__item-main">
-                      <div className="summary__item-name">{l.label || l.sku}</div>
+                      <div className="summary__item-name">{name}</div>
+                      {detail && <div className="summary__item-meta">{detail}</div>}
                       <div className="summary__item-meta">qty {l.qty}</div>
                     </div>
                     <span className="summary__item-price">
@@ -95,8 +107,8 @@ export default function OrderSummaryRail({
                       className="summary__item-photo"
                       style={
                         photo
-                          ? { backgroundImage: `url(${photo})` }
-                          : { background: "var(--c-beige)" }
+                          ? { backgroundImage: `url(${photo})`, backgroundColor: "#fff" }
+                          : undefined
                       }
                     />
                     <div className="summary__item-main">

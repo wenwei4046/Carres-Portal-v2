@@ -222,7 +222,9 @@ export default function CatalogStep({
         qty: 1,
         attrs: null,
         unitPrice: s.price,
-        label: `${model.name} · ${s.variant}`,
+        // A variant-less sku (plain accessory) is just the model name — no
+        // stranded " · " separator (Loo 2026-07-12).
+        label: s.variant?.trim() ? `${model.name} · ${s.variant}` : model.name,
       });
       return;
     }
