@@ -1114,7 +1114,10 @@ export const floorConfigPatchInput = z
   .strict();
 export type FloorConfigPatchInput = z.infer<typeof floorConfigPatchInput>;
 
-/** Add-ons CRUD (Maintenance tab). */
+/** Add-ons CRUD (Maintenance tab). `serviceDescription` is NOT an addons
+ *  column — it feeds the auto-minted SVC- product_skus row's description
+ *  (Loo 2026-07-12: creating an add-on also creates its Service SKU in the
+ *  SKU master so the link is real, mirroring the 0172 hand-minted rows). */
 export const addonCreateInput = z
   .object({
     key: z.string().trim().min(2).max(60).regex(/^[a-z0-9-]+$/, "key must be kebab-case"),
@@ -1122,6 +1125,7 @@ export const addonCreateInput = z
     price: z.number().nonnegative(),
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
+    serviceDescription: z.string().trim().max(200).optional(),
   })
   .strict();
 export type AddonCreateInput = z.infer<typeof addonCreateInput>;
@@ -1132,6 +1136,7 @@ export const addonPatchInput = z
     price: z.number().nonnegative().optional(),
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
+    serviceDescription: z.string().trim().max(200).optional(),
   })
   .strict();
 export type AddonPatchInput = z.infer<typeof addonPatchInput>;

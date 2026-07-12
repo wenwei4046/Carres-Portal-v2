@@ -1557,6 +1557,150 @@ describe("Maintenance — floor-config + addons role gate", () => {
     });
   });
 
+  it("addons POST mints the Service SKU row — UNPRICED for a non-principal (0175 lock)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "service", model_key: "service-addons" },
+          ],
+        },
+        writeReturn: {
+          key: "dispose-old-rug",
+          name: "Dispose old rug",
+          price: 60,
+          active: true,
+          service_sku: "SVC-DISPOSE-OLD-RUG",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dispose-old-rug",
+          name: "Dispose old rug",
+          price: 60,
+          serviceSku: "SVC-DISPOSE-OLD-RUG",
+          serviceDescription: "Haul away the old rug",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const mint = recorded.find((r) => r.table === "product_skus" && r.op === "upsert");
+    expect(mint?.payload).toMatchObject({
+      model_id: MODEL_ID_LIVE,
+      sku: "SVC-DISPOSE-OLD-RUG",
+      variant: "SVC-DISPOSE-OLD-RUG",
+      variant_kind: "preset",
+      price: 0, // operation may not price a sku — principal prices later
+      pos_active: true,
+      description: "Haul away the old rug",
+    });
+  });
+
+  it("addons POST by a PRINCIPAL mints the Service SKU with the real price", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "service", model_key: "service-addons" },
+          ],
+        },
+        writeReturn: {
+          key: "dispose-old-rug",
+          name: "Dispose old rug",
+          price: 60,
+          active: true,
+          service_sku: "SVC-DISPOSE-OLD-RUG",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dispose-old-rug",
+          name: "Dispose old rug",
+          price: 60,
+          serviceSku: "SVC-DISPOSE-OLD-RUG",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const mint = recorded.find((r) => r.table === "product_skus" && r.op === "upsert");
+    expect(mint?.payload).toMatchObject({
+      sku: "SVC-DISPOSE-OLD-RUG",
+      price: 60,
+      description: "Dispose old rug", // no serviceDescription sent → falls back to name
+    });
+  });
+
+  it("addons PATCH price by a PRINCIPAL mirrors it onto the linked Service SKU", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 95,
+          active: true,
+          service_sku: "SVC-DISPOSE-MATTRESS",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons/dispose-mattress", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 95 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const sync = recorded.find((r) => r.table === "product_skus" && r.op === "update");
+    expect(sync?.payload).toMatchObject({ price: 95 });
+  });
+
+  it("addons PATCH price by a NON-principal does NOT touch the Service SKU (0175 lock)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 95,
+          active: true,
+          service_sku: "SVC-DISPOSE-MATTRESS",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons/dispose-mattress", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 95 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(recorded.find((r) => r.table === "product_skus")).toBeUndefined();
+  });
+
   it("addons POST 422s an invalid service SKU code", async () => {
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
