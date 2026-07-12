@@ -1435,17 +1435,16 @@ catalogRouter.patch("/addons/:key", async (c) => {
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.serviceSku !== undefined) patch.service_sku = parsed.data.serviceSku;
-  // serviceDescription is NOT an addons column — it only feeds the SKU mint below.
-  if (Object.keys(patch).length === 0) {
+  // serviceDescription is NOT an addons column — it lands on the linked SKU
+  // row below. A description-only patch is therefore valid (no column patch).
+  if (Object.keys(patch).length === 0 && parsed.data.serviceDescription === undefined) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("addons")
-    .update(patch)
-    .eq("key", key)
-    .select("*")
-    .maybeSingle();
+  const { data, error } =
+    Object.keys(patch).length > 0
+      ? await sb.from("addons").update(patch).eq("key", key).select("*").maybeSingle()
+      : await sb.from("addons").select("*").eq("key", key).maybeSingle();
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
@@ -1454,6 +1453,8 @@ catalogRouter.patch("/addons/:key", async (c) => {
   const isPrincipal = c.var.auth.role === "principal";
   // Keep the Service SKU link REAL (Loo 2026-07-12), best-effort:
   //  - a (re)assigned serviceSku → make sure the SVC- row exists (restore path);
+  //  - a serviceDescription → write it onto the linked SKU row (description is
+  //    internal-writable — not 0175-locked);
   //  - a principal price change → mirror it onto the linked SKU row so the
   //    SKU Master shows the same number (non-principal skips — 0175 lock).
   if (parsed.data.serviceSku) {
@@ -1463,6 +1464,12 @@ catalogRouter.patch("/addons/:key", async (c) => {
       price: row.price,
       isPrincipal,
     });
+  }
+  if (parsed.data.serviceDescription !== undefined && row.service_sku) {
+    await sb
+      .from("product_skus")
+      .update({ description: parsed.data.serviceDescription || null })
+      .eq("sku", row.service_sku);
   }
   if (parsed.data.price !== undefined && isPrincipal && row.service_sku) {
     await sb.from("product_skus").update({ price: row.price }).eq("sku", row.service_sku);
