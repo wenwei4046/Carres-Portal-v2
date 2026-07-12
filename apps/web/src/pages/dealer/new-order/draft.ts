@@ -48,18 +48,22 @@ export interface DraftAddon {
   attrs?: { size?: string } | null;
 }
 
-/** Returns true if the addon is a disposal service (size tag required). */
-export function isDisposalAddon(key: string): boolean {
-  return key.startsWith("dispose-");
-}
-
 /** Size options keyed by disposal sub-kind. Mattress + Bedframe share one set
- *  per Loo 2026-05-19; Sofa uses its own seating-config sizes. */
+ *  per Loo 2026-05-19. Sofa disposal needs NO size (Loo 2026-07-12 — small /
+ *  big sofa are separate add-ons now, so the size tag is redundant; the old
+ *  "dispose-sofa" seating-config list is dropped). */
 export const DISPOSAL_SIZE_OPTIONS: Readonly<Record<string, readonly string[]>> = {
   "dispose-mattress": ["King", "Queen", "Super Single", "Single"] as const,
   "dispose-bedframe": ["King", "Queen", "Super Single", "Single"] as const,
-  "dispose-sofa":     ["2-seater", "3-seater", "L-shape"] as const,
 };
+
+/** True when the addon requires a size pick — i.e. it HAS a size-options list.
+ *  Was `key.startsWith("dispose-")`, which also trapped operator-created
+ *  dispose-* add-ons behind an EMPTY size dropdown they could never satisfy
+ *  (Loo 2026-07-12 — the "(big sofa)" add-on blocked the cart). */
+export function isDisposalAddon(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DISPOSAL_SIZE_OPTIONS, key);
+}
 
 /**
  * Slip / signature attachment cached in the wizard before upload. We keep the
