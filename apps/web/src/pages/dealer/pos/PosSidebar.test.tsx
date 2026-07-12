@@ -42,7 +42,7 @@ describe("PosSidebar", () => {
     expect(screen.queryByTestId("pos-maintain")).toBeNull();
   });
 
-  it("shows the MAINTAIN section (New Order / Products / SO Maintenance / Sales analysis) for the principal only", () => {
+  it("shows the MAINTAIN section (New Order / Products / SO Maintenance / Order Entry / Sales analysis) for the principal only", () => {
     useAuth.setState({ role: "principal" });
     renderSidebar();
     expect(screen.getByTestId("pos-maintain")).toBeTruthy();
@@ -52,6 +52,9 @@ describe("PosSidebar", () => {
     );
     expect(screen.getByTestId("pos-maintain-so-maintenance").getAttribute("href")).toContain(
       "sales-order-maintenance",
+    );
+    expect(screen.getByTestId("pos-maintain-order-entry").getAttribute("href")).toContain(
+      "/principal?tab=order-entry",
     );
     expect(screen.getByTestId("pos-maintain-sales-analysis")).toBeTruthy();
   });

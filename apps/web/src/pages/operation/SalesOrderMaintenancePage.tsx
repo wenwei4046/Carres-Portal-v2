@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Columns3, CreditCard, Save, Search, Settings2 } from "lucide-react";
+import { Columns3, Save, Search, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   SO_GRID_COLUMNS,
@@ -9,7 +9,6 @@ import {
 import { useSalesOrderGrid, useUpdateSoGridConfig } from "@/lib/queries";
 import DataGrid, { type DataGridColumn, type DataGridRow } from "@/components/data-grid/DataGrid";
 import SalesOrderColumnSettings from "./SalesOrderColumnSettings";
-import OrderEntryConfigPanel from "./OrderEntryConfigPanel";
 
 // ===========================================================================
 // Sales Order Maintenance (2026-06-16) — AutoCount-style configurable SO grid.
@@ -27,7 +26,6 @@ export default function SalesOrderMaintenancePage() {
   const [search, setSearch] = useState("");
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [entryConfigOpen, setEntryConfigOpen] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
 
   // Sync the draft config from the server whenever there are no local edits.
@@ -198,14 +196,6 @@ export default function SalesOrderMaintenancePage() {
           <Settings2 className="w-3.5 h-3.5" /> Column Settings
         </button>
 
-        <button
-          type="button"
-          onClick={() => setEntryConfigOpen(true)}
-          className="btn-secondary text-[12px] inline-flex items-center gap-1.5"
-        >
-          <CreditCard className="w-3.5 h-3.5" /> Order Entry
-        </button>
-
         <div className="ml-auto flex items-center gap-2">
           {dirty && <span className="t-tiny text-warning">Unsaved changes</span>}
           {dirty && (
@@ -249,8 +239,6 @@ export default function SalesOrderMaintenancePage() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-
-      {entryConfigOpen && <OrderEntryConfigPanel onClose={() => setEntryConfigOpen(false)} />}
     </div>
   );
 }

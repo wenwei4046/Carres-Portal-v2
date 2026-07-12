@@ -5,6 +5,7 @@ import {
   Bath,
   Bed,
   BedDouble,
+  CreditCard,
   Lamp,
   LayoutGrid,
   Lock,
@@ -164,6 +165,14 @@ export default function PosSidebar({
           >
             <Settings2 size={16} strokeWidth={1.75} />
             <span>SO Maintenance</span>
+          </Link>
+          <Link
+            to="/principal?tab=order-entry"
+            className="cat-side__item"
+            data-testid="pos-maintain-order-entry"
+          >
+            <CreditCard size={16} strokeWidth={1.75} />
+            <span>Order Entry</span>
           </Link>
           <Link
             to="/principal?tab=sales-analysis"
