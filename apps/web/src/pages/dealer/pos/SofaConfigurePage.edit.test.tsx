@@ -201,4 +201,47 @@ describe("SofaConfigurePage — edit mode", () => {
     expect(attrs.fabric_deferred).toBe(false);
     expect(attrs.leg_height).toBe('4"');
   });
+
+  it("restores the stored remark + ± adjustment and re-emits them (adjusted price)", () => {
+    const onAdd = vi.fn();
+    renderEdit(
+      buildEditLine({
+        attrs: { remark: "custom armrest", remark_surcharge: 250 },
+      }),
+      { onAdd },
+    );
+    // The page-level remark state feeds the canvas (controlled) — both the
+    // textarea-equivalents carry the stored values.
+    expect((screen.getByTestId("sofa-build-remark") as HTMLInputElement).value).toBe(
+      "custom armrest",
+    );
+    expect((screen.getByTestId("sofa-build-remark-price") as HTMLInputElement).value).toBe("250");
+
+    fireEvent.click(screen.getByTestId("sofa-build-add"));
+    const line = onAdd.mock.calls[0][0] as DraftLine;
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.remark).toBe("custom armrest");
+    expect(attrs.remark_surcharge).toBe(250);
+    // à-la-carte 1200 + 1900 = 3100 engine + 250 adjustment.
+    expect(line.unitPrice).toBe(3350);
+  });
+
+  it("typing a discount in the canvas updates the emitted price; below RM 0 blocks Add", () => {
+    const onAdd = vi.fn();
+    renderEdit(buildEditLine(), { onAdd });
+    fireEvent.change(screen.getByTestId("sofa-build-remark-price"), {
+      target: { value: "-100" },
+    });
+    fireEvent.click(screen.getByTestId("sofa-build-add"));
+    const line = onAdd.mock.calls[0][0] as DraftLine;
+    expect((line.attrs as Record<string, unknown>).remark_surcharge).toBe(-100);
+    expect(line.unitPrice).toBe(3000); // 3100 − 100
+
+    // A discount past the engine total blocks the CTA (fail-closed, like the
+    // server's negative-total 400).
+    fireEvent.change(screen.getByTestId("sofa-build-remark-price"), {
+      target: { value: "-9999" },
+    });
+    expect(screen.getByTestId("sofa-build-add")).toHaveProperty("disabled", true);
+  });
 });

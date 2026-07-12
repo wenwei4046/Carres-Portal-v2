@@ -191,7 +191,24 @@ export async function recomputeAndExplodeSofaBuildLines(
         ? { ...ctx.snapshot, sofaCombos: pwpSwappedCombos(ctx.snapshot.sofaCombos, new Set(rewardIds)) }
         : ctx.snapshot;
     const priceResult = computeSofaPrice(sofaBuild, snapshot);
-    const serverTotal = round2(priceResult.total);
+
+    // 4b. Remark price adjustment (Loo 2026-07-12) — an operator-decided ± RM
+    //     riding `attrs.remark_surcharge` (typed-finite via the schema). It has
+    //     no config to verify against, so it joins the EXPECTED total verbatim;
+    //     the drift gate then still catches any unitPrice that doesn't match
+    //     engine + adjustment. Ignored on a PWP-claimed line — the reward price
+    //     is forced and the client strips the adjustment on claim.
+    const pwpClaimed = Boolean((line.attrs as Record<string, unknown> | null)?.pwp);
+    const remarkAdj = pwpClaimed ? 0 : parsed.data.remark_surcharge ?? 0;
+    const serverTotal = round2(priceResult.total + remarkAdj);
+    if (serverTotal < 0) {
+      return {
+        status: "bad_request",
+        message:
+          `Remark adjustment (RM ${remarkAdj.toFixed(2)}) puts the sofa below RM 0 — ` +
+          `reduce the discount.`,
+      };
+    }
 
     // 5. Drift gate.
     if (!sofaPriceWithinTolerance(line.unitPrice, serverTotal)) {
@@ -234,6 +251,14 @@ export async function recomputeAndExplodeSofaBuildLines(
         ...(parsed.data.leg_height
           ? { leg_height: parsed.data.leg_height, leg_surcharge: priceResult.legDelta }
           : {}),
+        // Remark + its adjustment ride EVERY exploded line like fabric_surcharge
+        // (whole-sofa metadata — the adjustment is ALREADY inside the split
+        // unitPrice, never to be summed per line). Without this the quick-pick
+        // remark died at the explode and never reached the order.
+        ...(typeof line.attrs?.remark === "string" && line.attrs.remark
+          ? { remark: line.attrs.remark }
+          : {}),
+        ...(remarkAdj !== 0 ? { remark_surcharge: remarkAdj } : {}),
         // 0186 sofa-as-reward — a SLIM pwp marker rides every exploded line
         // (ruleId + type only; the voucher code was already claimed pre-explode)
         // so the carry-forward sweep's reward-line detection (promo one-way)

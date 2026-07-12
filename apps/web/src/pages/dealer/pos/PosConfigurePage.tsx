@@ -411,6 +411,11 @@ export default function PosConfigurePage({
       specials: specialsFromAttrs(editLine.attrs)
         .filter((s) => typeof s.code === "string" && offeredCodes.has(s.code))
         .map((s) => ({ code: s.code as string, choiceLabels: s.choiceLabels ?? [] })),
+      remark: typeof attrs.remark === "string" ? attrs.remark : "",
+      remarkSurcharge:
+        typeof attrs.remark_surcharge === "number" && Number.isFinite(attrs.remark_surcharge)
+          ? attrs.remark_surcharge
+          : 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -459,6 +464,18 @@ export default function PosConfigurePage({
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons, edit?.specials);
 
+  // Remark + optional ± RM price adjustment (Loo 2026-07-12) — a special
+  // remark sometimes ADJUSTS the price ("custom headboard +200"). The amount
+  // is optional (empty = plain note), PER UNIT like every other surcharge, and
+  // folds into unitPrice + attrs.remark_surcharge. Non-sofa unitPrice is
+  // client-priced (only options/specials totals are server-verified), so no
+  // API change is needed here.
+  const [remark, setRemark] = useState(edit?.remark ?? "");
+  const [remarkPrice, setRemarkPrice] = useState<string>(() =>
+    edit?.remarkSurcharge ? String(edit.remarkSurcharge) : "",
+  );
+  const remarkAdj = Math.round((parseFloat(remarkPrice) || 0) * 100) / 100;
+
   // The option picks + their server-verifiable total — the SAME pure resolver
   // Hono re-runs on submit (option-picks-recompute), so this preview cannot
   // drift from the authoritative figure.
@@ -495,21 +512,26 @@ export default function PosConfigurePage({
 
   const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
 
-  const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal;
+  const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal + remarkAdj;
 
   /** The DraftLine this configuration would emit — byte-identical to the old
-   *  drawer configurators (same attrs, same unitPrice math, same label); used
-   *  by BOTH `add()` and the PWP eligibility candidate below. */
+   *  drawer configurators when no remark is set (same attrs, same unitPrice
+   *  math, same label); used by BOTH `add()` and the PWP eligibility candidate
+   *  below. */
   function composeLine(localId: string, lineQty: number): DraftLine | null {
     if (!sku) return null;
     const optionsPatch =
       resolvedOptions.lines.length > 0
         ? { options: resolvedOptions.lines, options_total: optionsTotal }
         : {};
+    const remarkPatch = {
+      ...(remark.trim() ? { remark: remark.trim() } : {}),
+      ...(remarkAdj !== 0 ? { remark_surcharge: remarkAdj } : {}),
+    };
     const attrs = isBed
-      ? { gap, ...optionsPatch, ...sp.attrsPatch }
-      : sp.picks.length > 0
-        ? sp.attrsPatch
+      ? { gap, ...optionsPatch, ...sp.attrsPatch, ...remarkPatch }
+      : sp.picks.length > 0 || Object.keys(remarkPatch).length > 0
+        ? { ...sp.attrsPatch, ...remarkPatch }
         : null;
     return {
       localId,
@@ -666,7 +688,9 @@ export default function PosConfigurePage({
 
   const effUnitPrice = pwpActive ? (pwpPrice as number) : unitPrice;
   const total = effUnitPrice * qty;
-  const canAdd = !!sku && sp.complete;
+  // A remark discount can't take the line below RM 0 (the ± field is the only
+  // way unitPrice goes negative — every other component is non-negative).
+  const canAdd = !!sku && sp.complete && effUnitPrice >= 0;
 
   const title = sku
     ? `${model.name} · ${sku.variant}`
@@ -703,6 +727,9 @@ export default function PosConfigurePage({
             price: o.surcharge,
           })),
           ...(sp.surcharge > 0 ? [{ label: "Special add-ons", price: sp.surcharge }] : []),
+          ...(remarkAdj !== 0
+            ? [{ label: remark.trim() ? `Remark · ${remark.trim()}` : "Remark adjustment", price: remarkAdj }]
+            : []),
           ...(qty > 1 ? [{ label: `× ${qty} pieces`, price: total - unitPrice }] : []),
         ];
 
@@ -1095,6 +1122,56 @@ export default function PosConfigurePage({
                 >
                   <Plus size={16} strokeWidth={1.75} />
                 </button>
+              </div>
+            </div>
+
+            {/* Remark + optional ± RM price adjustment (Loo 2026-07-12): a
+                special remark sometimes ADJUSTS the price — the amount is
+                optional (per unit) and folds into the live total. Locked while
+                a PWP voucher is applied (the reward price is forced). */}
+            <div className="cfg-section" data-testid="cfg-remark-section">
+              <div className="cfg-section__head">
+                <span className="pos-eyebrow">Remark</span>
+                <span className="cfg-section__detail">
+                  {remarkAdj !== 0
+                    ? `${remarkAdj > 0 ? "+" : "−"}RM ${Math.abs(remarkAdj).toLocaleString("en-MY")}`
+                    : "± RM optional · adjusts the price"}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <textarea
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="e.g. custom headboard, deliver before CNY…"
+                  rows={2}
+                  className="cfg-select"
+                  style={{ resize: "vertical" }}
+                  data-testid="cfg-remark"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={remarkPrice}
+                  onChange={(e) => setRemarkPrice(e.target.value)}
+                  placeholder="± RM 0.00"
+                  aria-label="Remark price adjustment (RM)"
+                  disabled={pwpActive}
+                  title={
+                    pwpActive
+                      ? "A PWP-priced item can't take a manual adjustment"
+                      : undefined
+                  }
+                  className="cfg-select font-mono disabled:opacity-40"
+                  data-testid="cfg-remark-price"
+                />
+                {effUnitPrice < 0 && (
+                  <p
+                    style={{ margin: 0, fontSize: 12, color: "var(--c-danger, #B4321A)" }}
+                    data-testid="cfg-remark-negative"
+                  >
+                    The adjustment puts this item below RM 0 — reduce the discount.
+                  </p>
+                )}
               </div>
             </div>
 

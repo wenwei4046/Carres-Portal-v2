@@ -38,6 +38,13 @@ export function buildToDraftLine(
   const repSku = representativeSofaSku(skus);
   if (!repSku) return null;
 
+  // Remark price adjustment (Loo 2026-07-12) — an operator-decided ± RM folded
+  // into the line unitPrice ON TOP of the engine total. The server recompute
+  // reads `attrs.remark_surcharge` and adds it to ITS expected total, so the
+  // drift gate stays honest.
+  const remark = payload.remark?.trim() ?? "";
+  const remarkAdj = Math.round((payload.remarkSurcharge ?? 0) * 100) / 100;
+
   const attrs: Record<string, unknown> = {
     mode: "build",
     // Same fabric convention as SofaConfigurator so the operation CreatePOModal
@@ -62,6 +69,11 @@ export function buildToDraftLine(
     ...(payload.legHeight
       ? { leg_height: payload.legHeight, leg_surcharge: payload.legSurcharge }
       : {}),
+    // Remark (+ optional ± price adjustment) — the free-text note travels on
+    // the line; the adjustment is inside unitPrice AND declared in attrs so the
+    // Phase-4 recompute can include it in the expected total.
+    ...(remark ? { remark } : {}),
+    ...(remarkAdj !== 0 ? { remark_surcharge: remarkAdj } : {}),
     // Full build geometry descriptor (cells + height) — Phase 4 reads this to
     // server-recompute + explode into per-compartment lines.
     sofa_build: { cells: payload.cells, height: payload.height },
@@ -74,7 +86,7 @@ export function buildToDraftLine(
     sku: repSku.sku,
     qty: 1,
     attrs,
-    unitPrice: payload.total,
+    unitPrice: Math.round((payload.total + remarkAdj) * 100) / 100,
     label: buildLabel(payload, model),
   };
 }

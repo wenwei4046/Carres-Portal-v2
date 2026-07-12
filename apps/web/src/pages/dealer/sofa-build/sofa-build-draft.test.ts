@@ -86,6 +86,33 @@ describe("buildToDraftLine", () => {
     expect((attrs.sofa_build_key as string).length).toBeGreaterThan(0);
   });
 
+  it("remark + ± adjustment: attrs stamped, unitPrice = engine total + adjustment", () => {
+    const skus = [sku("s-preset", "m-ohana", "OH-PRESET", "3-seater", "preset", 3000)];
+    const line = buildToDraftLine(
+      payload({ remark: " custom armrest ", remarkSurcharge: 200 }),
+      model,
+      skus,
+    )!;
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.remark).toBe("custom armrest"); // trimmed
+    expect(attrs.remark_surcharge).toBe(200);
+    expect(line.unitPrice).toBe(4450); // 4250 engine + 200 adjustment
+
+    // A discount subtracts.
+    const disc = buildToDraftLine(payload({ remarkSurcharge: -150 }), model, skus)!;
+    expect((disc.attrs as Record<string, unknown>).remark_surcharge).toBe(-150);
+    expect(disc.unitPrice).toBe(4100);
+  });
+
+  it("no remark / zero adjustment → NO remark keys, unitPrice = total (legacy shape)", () => {
+    const skus = [sku("s-preset", "m-ohana", "OH-PRESET", "3-seater", "preset", 3000)];
+    const line = buildToDraftLine(payload({ remark: "  ", remarkSurcharge: 0 }), model, skus)!;
+    const attrs = line.attrs as Record<string, unknown>;
+    expect("remark" in attrs).toBe(false);
+    expect("remark_surcharge" in attrs).toBe(false);
+    expect(line.unitPrice).toBe(4250);
+  });
+
   it("falls back to the first sku when the model has no preset sku", () => {
     const skus = [sku("s-part", "m-ohana", "OH-PART-1A", "1-seat", "part", 1000)];
     const line = buildToDraftLine(payload(), model, skus)!;

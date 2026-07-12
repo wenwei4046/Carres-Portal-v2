@@ -183,22 +183,17 @@ export default function CatalogStep({
   }
 
   /** Cart-line EDIT save — swap the edited line IN PLACE (same localId, so the
-   *  row identity + the PWP reserve reconciler's cartLineKey survive). The
-   *  quick-pick remark carries forward when the canvas path (no remark field)
-   *  re-emits without one; a PWP / free claim the re-emit dropped is called
-   *  out so the operator can re-apply it from the cart. */
+   *  row identity + the PWP reserve reconciler's cartLineKey survive). Every
+   *  edit surface now owns a remark field, so the new line's remark is
+   *  authoritative (clearing it clears it — no carry-forward resurrection).
+   *  A PWP / free claim the re-emit dropped is called out so the operator can
+   *  re-apply it from the cart. */
   function replaceEditedLine(next: DraftLine) {
     const old = editingLine;
     if (!old) return;
     const oldAttrs = old.attrs as Record<string, unknown> | null;
     const nextAttrs = (next.attrs ?? null) as Record<string, unknown> | null;
-    const keepRemark =
-      typeof oldAttrs?.remark === "string" && oldAttrs.remark.trim() && !nextAttrs?.remark;
-    const merged: DraftLine = {
-      ...next,
-      localId: old.localId,
-      attrs: keepRemark ? { ...(nextAttrs ?? {}), remark: oldAttrs!.remark } : next.attrs,
-    };
+    const merged: DraftLine = { ...next, localId: old.localId };
     onChange({
       ...draft,
       lines: draft.lines.map((l) => (l.localId === old.localId ? merged : l)),

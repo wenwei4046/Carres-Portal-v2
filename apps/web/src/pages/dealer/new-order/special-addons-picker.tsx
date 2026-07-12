@@ -124,7 +124,12 @@ export function SpecialsSummary({
   // Sofa-build leg rides flat attr keys (the engine, not attrs.options).
   const legHeight = typeof attrs?.leg_height === "string" ? attrs.leg_height : null;
   const legSurcharge = typeof attrs?.leg_surcharge === "number" ? attrs.leg_surcharge : 0;
-  if (lines.length === 0 && options.length === 0 && !legHeight) return null;
+  // Remark (+ optional ± RM adjustment, Loo 2026-07-12) — flat attr keys too.
+  const remark = typeof attrs?.remark === "string" && attrs.remark ? attrs.remark : null;
+  const remarkSurcharge =
+    typeof attrs?.remark_surcharge === "number" ? attrs.remark_surcharge : 0;
+  if (lines.length === 0 && options.length === 0 && !legHeight && !remark && remarkSurcharge === 0)
+    return null;
   const fmtSur = (n: number | undefined): string =>
     typeof n === "number" && n !== 0
       ? ` · ${n < 0 ? "−" : "+"}RM ${Math.abs(n).toLocaleString()}`
@@ -142,6 +147,12 @@ export function SpecialsSummary({
         <div className="t-tiny text-base-500" data-testid="leg-summary">
           + Leg {legHeight}
           {fmtSur(legSurcharge)}
+        </div>
+      )}
+      {(remark || remarkSurcharge !== 0) && (
+        <div className="t-tiny text-base-500" data-testid="remark-summary">
+          ✎ {remark ?? "Price adjustment"}
+          {fmtSur(remarkSurcharge)}
         </div>
       )}
       {lines.map((s, i) => {
