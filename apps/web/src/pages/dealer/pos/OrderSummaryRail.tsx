@@ -1,16 +1,14 @@
 import { useMemo } from "react";
-import type { CatalogResponse, Rot } from "@carres/shared";
+import type { CatalogResponse } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import type { DraftLine, WizardDraft } from "../new-order/draft";
-import SofaPlanView, { type PlanCell } from "../sofa-build/SofaPlanView";
 import { cartTotalExStair } from "./cart";
 import { previewDefaultGifts } from "./free-line";
 
-/** A sofa-BUILD line's plan geometry + option picks, read tolerantly off the
- *  free jsonb (Loo 2026-07-12 — the summary draws the actual layout instead
- *  of a photo crop, prototype-style). Null for every non-build line. */
+/** A sofa-BUILD line's size + option picks, read tolerantly off the free
+ *  jsonb — feeds the structured spec lines under the model name (prototype
+ *  style, Loo 2026-07-12). Null for every non-build line. */
 function sofaBuildOf(l: DraftLine): {
-  cells: PlanCell[];
   height: string;
   fabricName: string | null;
   fabricDeferred: boolean;
@@ -24,18 +22,8 @@ function sofaBuildOf(l: DraftLine): {
   const attrs = l.attrs as Record<string, unknown> | null;
   const sb = attrs?.sofa_build as { cells?: unknown; height?: unknown } | undefined;
   if (!sb || !Array.isArray(sb.cells) || sb.cells.length === 0) return null;
-  const cells: PlanCell[] = (sb.cells as Array<Record<string, unknown>>)
-    .filter((c) => typeof c?.moduleCode === "string")
-    .map((c) => ({
-      moduleCode: c.moduleCode as string,
-      x: typeof c.x === "number" ? c.x : 0,
-      y: typeof c.y === "number" ? c.y : 0,
-      rot: (typeof c.rot === "number" && [0, 90, 180, 270].includes(c.rot) ? c.rot : 0) as Rot,
-    }));
-  if (cells.length === 0) return null;
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
   return {
-    cells,
     height: typeof sb.height === "string" ? sb.height : "24",
     fabricName: typeof attrs?.fabric_name === "string" ? attrs.fabric_name : null,
     fabricDeferred: attrs?.fabric_deferred === true,
@@ -130,10 +118,10 @@ export default function OrderSummaryRail({
                 const build = sofaBuildOf(l);
 
                 // ── Sofa BUILD row (prototype style, Loo 2026-07-12): the
-                // thumbnail DRAWS the actual layout (SofaPlanView), the bold
-                // line is "Booqit · 1B(LHF) + CNR + 2A(RHF)", then
-                // "Custom (1B+CNR+2A) · 24″ · qty 1" + per-pick surcharge
-                // lines (fabric / leg / remark). ──
+                // MODEL PHOTO tile (rounded square — the plan-view sketch was
+                // reverted same-day), the bold line "Booqit · 1B(LHF) + CNR +
+                // 2A(RHF)", then mono spec lines: "Custom (1B+CNR+2A) · 24″ ·
+                // qty 1" + per-pick surcharges (fabric / leg / remark). ──
                 if (build) {
                   const composition = segs[1] ?? "";
                   const fabricLine = build.fabricName
@@ -145,9 +133,14 @@ export default function OrderSummaryRail({
                         : null;
                   return (
                     <div key={l.localId} className="summary__item" data-testid={`summary-build-${l.localId}`}>
-                      <div className="summary__item-photo summary__item-photo--plan">
-                        <SofaPlanView cells={build.cells} depth={build.height} className="h-full w-full" />
-                      </div>
+                      <div
+                        className="summary__item-photo"
+                        style={
+                          photo
+                            ? { backgroundImage: `url(${photo})`, backgroundColor: "#fff" }
+                            : undefined
+                        }
+                      />
                       <div className="summary__item-main">
                         <div className="summary__item-name">
                           {name}
