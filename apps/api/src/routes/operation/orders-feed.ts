@@ -51,12 +51,15 @@ operationOrdersFeedRouter.get("/", async (c) => {
   if (dealer) qb = qb.eq("dealer_id", dealer);
   if (status && status !== "all") qb = qb.eq("status", status);
   if (q) {
+    // Match SO# (exact when numeric), customer name, AND each imported invoice
+    // number (source_ref token, sanitised to invoice chars) — so searching a
+    // single invoice finds the combined order too. Mirrors the orders list.
+    const clauses = [`customer_name.ilike.%${q}%`];
+    const refTerm = q.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
+    if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
     const asNum = Number.parseInt(q, 10);
-    if (Number.isFinite(asNum)) {
-      qb = qb.or(`so.eq.${asNum},customer_name.ilike.%${q}%`);
-    } else {
-      qb = qb.ilike("customer_name", `%${q}%`);
-    }
+    if (Number.isFinite(asNum)) clauses.push(`so.eq.${asNum}`);
+    qb = qb.or(clauses.join(","));
   }
   const { data, error } = await qb;
   if (error) throw new HTTPException(500, { message: error.message });
