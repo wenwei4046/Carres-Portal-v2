@@ -9,6 +9,7 @@ import {
   CATEGORY_ORDER,
   IconChip,
   describeActivity,
+  isImport,
   isToday,
   isYesterday,
 } from "./activity-display";
@@ -40,6 +41,9 @@ export default function GlobalActivity() {
     return m;
   }, [decorated]);
   const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
+  // "All" counts only what the All view shows — imports are excluded (they live
+  // under the System tab), so the chip number matches the list (Jess 2026-07-12).
+  const allCount = useMemo(() => decorated.filter((d) => !isImport(d.row)).length, [decorated]);
 
   const staffNames = useMemo(
     () => [...new Set(rows.map((r) => r.actor_name).filter(Boolean) as string[])].sort(),
@@ -49,6 +53,10 @@ export default function GlobalActivity() {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return decorated.filter((d) => {
+      // Default "All" hides routine AutoCount imports (Jess 2026-07-12) — 150+
+      // machine rows that buried the real notes/actions. They stay reachable
+      // under the explicit "System" tab; every other view is unaffected.
+      if (cat === "all" && isImport(d.row)) return false;
       if (cat !== "all" && d.category !== cat) return false;
       if (staff !== "all" && d.row.actor_name !== staff) return false;
       if (needle) {
@@ -88,7 +96,7 @@ export default function GlobalActivity() {
 
       {/* Category tabs */}
       <div className="flex flex-wrap items-center gap-1 mb-1.5">
-        <Chip label="All" count={decorated.length} active={cat === "all"} onClick={() => setCat("all")} />
+        <Chip label="All" count={allCount} active={cat === "all"} onClick={() => setCat("all")} />
         {presentCategories.map((c) => (
           <Chip
             key={c}
