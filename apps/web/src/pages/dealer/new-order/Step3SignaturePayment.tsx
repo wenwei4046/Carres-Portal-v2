@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import type { CatalogResponse } from "@carres/shared";
+import { resolvePaymentMethods, type CatalogResponse } from "@carres/shared";
 import { deliveryFeePreview, floorSurchargeRaw } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
 import {
@@ -16,15 +16,63 @@ interface Props {
   catalog: CatalogResponse;
 }
 
-const PAYMENT_METHODS: ReadonlyArray<{
-  id: DraftPayment["method"];
-  label: string;
-  sub: string;
-}> = [
-  { id: "online", label: "Online transfer", sub: "FPX / DuitNow" },
-  { id: "credit", label: "Credit / Debit", sub: "Full payment" },
-  { id: "installment", label: "Installment", sub: "6 / 12 months" },
-];
+/** Per-method copy for the approval-code field. Known builtin keys keep their
+ *  specialized labels/hints (Loo 2026-05-10 reconciliation wording); any
+ *  operator-created method falls back to the generic reference copy. */
+const APPROVAL_COPY: Record<
+  string,
+  { label: string; hint: string; placeholder: string; maxLength: number }
+> = {
+  online: {
+    label: "Bank reference number *",
+    hint: "Transaction reference from the bank slip / DuitNow confirmation (e.g. FT2026... / DN-...). Finance uses this to reconcile against the bank statement.",
+    placeholder: "e.g. FT2026050012345",
+    maxLength: 32,
+  },
+  credit: {
+    label: "Approval code *",
+    hint: "Read the approval code from the EDC terminal slip after the card is charged.",
+    placeholder: "e.g. 472019",
+    maxLength: 12,
+  },
+  installment: {
+    label: "Approval code *",
+    hint: "Bank-issued installment approval code from the EDC slip.",
+    placeholder: "e.g. 8821-INST",
+    maxLength: 16,
+  },
+};
+const APPROVAL_COPY_GENERIC = {
+  label: "Reference code *",
+  hint: "The receipt / approval reference finance reconciles this payment with.",
+  placeholder: "e.g. REF-2026-001",
+  maxLength: 32,
+};
+
+/** Per-method slip copy — same pattern (builtin keys specialized, generic
+ *  fallback for operator-created methods incl. cash). */
+const SLIP_COPY: Record<string, { label: string; hint: string }> = {
+  online: {
+    label: "Bank slip / receipt photo *",
+    hint: "Bank transfer slip, e-receipt screenshot, or DuitNow confirmation",
+  },
+  credit: {
+    label: "EDC slip / payment receipt *",
+    hint: "Photo of the credit / debit card terminal slip",
+  },
+  installment: {
+    label: "EDC slip / installment confirmation *",
+    hint: "Photo of the installment approval slip from the bank",
+  },
+  cash: {
+    label: "Cash receipt photo *",
+    hint: "Photo of the signed cash receipt / payment voucher",
+  },
+};
+const SLIP_COPY_GENERIC = {
+  label: "Payment receipt photo *",
+  hint: "Photo of the payment receipt or confirmation",
+};
 
 /**
  * Step 3 — Confirm + sign + record payment. Mirrors proto/new-order-step3.jsx
@@ -92,19 +140,26 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
     onChange({ ...draft, payment: { ...draft.payment, ...patch } });
   }
 
+  // ---------- Payment methods (0219 — config-driven) ----------
+  // The list renders from order_entry_config (SO Maintenance edits it);
+  // empty/absent config → code defaults = the historical trio + Cash.
+  const methods = useMemo(
+    () => resolvePaymentMethods(catalog.orderEntryConfig),
+    [catalog.orderEntryConfig],
+  );
+  const selectedMethod = methods.find((m) => m.key === draft.payment.method);
+
   // ---------- Submit-eligibility helpers (proto parity) ----------
   const hasSlip = !!draft.payment.slip;
   const hasApproval = draft.payment.approvalCode.trim().length >= 3;
-  // 2026-05-10 (Loo) — approval / reference code now required for every
-  // payment method (online used to skip this; finance couldn't reconcile).
+  const missingFollowUp = selectedMethod?.followUps.find(
+    (fu) => fu.required && !(draft.payment.followUps?.[fu.key] ?? "").trim(),
+  );
   const paymentMethodOk =
-    draft.payment.method === "online"
-      ? hasApproval && hasSlip
-      : draft.payment.method === "credit"
-        ? hasApproval && hasSlip
-        : draft.payment.method === "installment"
-          ? hasApproval && hasSlip
-          : false;
+    !!selectedMethod &&
+    hasSlip &&
+    (!selectedMethod.approvalCodeRequired || hasApproval) &&
+    !missingFollowUp;
   const willProceed =
     paidPct >= 50 &&
     !draft.customer.addressUnknown &&
@@ -113,11 +168,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
 
   function paymentBlockerLabel(): string | null {
     if (paymentMethodOk) return null;
-    // 2026-05-10 (Loo) — online now also requires the bank reference code
-    // for finance reconciliation; same blocker hierarchy as the other
-    // methods (both → both, missing one → name it).
-    if (!hasApproval && !hasSlip) return "approval / reference code & slip are added";
-    if (!hasApproval) return "approval / reference code is entered";
+    if (!selectedMethod) return "a payment method is picked";
+    const needApproval = selectedMethod.approvalCodeRequired && !hasApproval;
+    if (needApproval && !hasSlip) return "approval / reference code & slip are added";
+    if (needApproval) return "approval / reference code is entered";
+    if (missingFollowUp) return `${missingFollowUp.label} is selected`;
     return "payment slip is attached";
   }
 
@@ -381,111 +436,120 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
         )}
       </Section>
 
-      {/* ---------- Payment method ---------- */}
+      {/* ---------- Payment method (0219 — config-driven) ---------- */}
       <Section title="Payment method" hint="How the customer is paying">
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {PAYMENT_METHODS.map((m) => {
-            const active = draft.payment.method === m.id;
+        <div
+          className="grid gap-2 mb-3"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(Math.max(methods.length, 1), 4)}, minmax(0, 1fr))`,
+          }}
+        >
+          {methods.map((m) => {
+            const active = draft.payment.method === m.key;
             return (
               <button
-                key={m.id}
+                key={m.key}
                 type="button"
                 aria-pressed={active}
-                onClick={() => setPay({ method: m.id })}
+                onClick={() =>
+                  // Switching methods clears the follow-up answers — a bank
+                  // picked for credit must not silently ride along to cash.
+                  setPay({ method: m.key, followUps: {} })
+                }
                 className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
+                data-testid={`pay-method-${m.key}`}
               >
                 <div className="text-[13px] font-semibold">{m.label}</div>
-                <div className="text-[11px] text-base-500 mt-0.5">{m.sub}</div>
+                <div className="text-[11px] text-base-500 mt-0.5">{m.sublabel}</div>
               </button>
             );
           })}
         </div>
 
-        {draft.payment.method === "online" && (
+        {selectedMethod && (
           <div className="flex flex-col gap-3.5">
-            {/* 2026-05-10 (Loo) — bank reference / FT number is required so
-                finance can match the deposit on the bank statement. Was
-                previously hidden for online and the slip alone wasn't
-                enough — orders sat unprocessed until someone manually
-                chased the dealer for the reference. */}
-            <ApprovalCodeField
-              label="Bank reference number *"
-              value={draft.payment.approvalCode}
-              onChange={(v) =>
-                setPay({ approvalCode: v.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() })
-              }
-              maxLength={32}
-              hint="Transaction reference from the bank slip / DuitNow confirmation (e.g. FT2026... / DN-...). Finance uses this to reconcile against the bank statement."
-              placeholder="e.g. FT2026050012345"
-            />
-            <PaymentSlipPicker
-              label="Bank slip / receipt photo *"
-              hint="Bank transfer slip, e-receipt screenshot, or DuitNow confirmation"
-              slip={draft.payment.slip}
-              onChange={(slip) => setPay({ slip })}
-            />
-          </div>
-        )}
+            {/* Installment keeps its months picker (builtin behavior). */}
+            {selectedMethod.key === "installment" && (
+              <FieldLabel label="Installment plan *">
+                <div className="grid grid-cols-2 gap-2">
+                  {([6, 12] as const).map((m) => {
+                    const active = draft.payment.installmentMonths === m;
+                    const monthly = total > 0 ? total / m : 0;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setPay({ installmentMonths: m })}
+                        className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
+                      >
+                        <div className="text-[13px] font-semibold">{m} months</div>
+                        <div className="font-mono text-[11px] text-base-500 mt-0.5">
+                          ≈ RM {Math.round(monthly).toLocaleString()} / mo
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </FieldLabel>
+            )}
 
-        {draft.payment.method === "credit" && (
-          <div className="flex flex-col gap-3.5">
-            <ApprovalCodeField
-              label="Approval code *"
-              value={draft.payment.approvalCode}
-              onChange={(v) => setPay({ approvalCode: v.replace(/[^0-9A-Za-z]/g, "").toUpperCase() })}
-              maxLength={12}
-              hint="Read the approval code from the EDC terminal slip after the card is charged."
-              placeholder="e.g. 472019"
-            />
-            <PaymentSlipPicker
-              label="EDC slip / payment receipt *"
-              hint="Photo of the credit / debit card terminal slip"
-              slip={draft.payment.slip}
-              onChange={(slip) => setPay({ slip })}
-            />
-          </div>
-        )}
+            {/* Follow-up dropdowns (e.g. Bank for Credit/Debit) — from config. */}
+            {selectedMethod.followUps.map((fu) => (
+              <FieldLabel key={fu.key} label={`${fu.label}${fu.required ? " *" : ""}`}>
+                <select
+                  value={draft.payment.followUps?.[fu.key] ?? ""}
+                  onChange={(e) =>
+                    setPay({
+                      followUps: {
+                        ...(draft.payment.followUps ?? {}),
+                        [fu.key]: e.target.value,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
+                  data-testid={`pay-followup-${fu.key}`}
+                >
+                  <option value="">— select {fu.label.toLowerCase()} —</option>
+                  {fu.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </FieldLabel>
+            ))}
 
-        {draft.payment.method === "installment" && (
-          <div className="flex flex-col gap-3.5">
-            <FieldLabel label="Installment plan *">
-              <div className="grid grid-cols-2 gap-2">
-                {([6, 12] as const).map((m) => {
-                  const active = draft.payment.installmentMonths === m;
-                  const monthly = total > 0 ? total / m : 0;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setPay({ installmentMonths: m })}
-                      className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
-                    >
-                      <div className="text-[13px] font-semibold">{m} months</div>
-                      <div className="font-mono text-[11px] text-base-500 mt-0.5">
-                        ≈ RM {Math.round(monthly).toLocaleString()} / mo
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </FieldLabel>
-            <ApprovalCodeField
-              label="Approval code *"
-              value={draft.payment.approvalCode}
-              onChange={(v) =>
-                setPay({ approvalCode: v.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() })
-              }
-              maxLength={16}
-              hint="Bank-issued installment approval code from the EDC slip."
-              placeholder="e.g. 8821-INST"
-            />
-            <PaymentSlipPicker
-              label="EDC slip / installment confirmation *"
-              hint="Photo of the installment approval slip from the bank"
-              slip={draft.payment.slip}
-              onChange={(slip) => setPay({ slip })}
-            />
+            {/* Approval / reference code — per the method's config flag. */}
+            {selectedMethod.approvalCodeRequired &&
+              (() => {
+                const copy = APPROVAL_COPY[selectedMethod.key] ?? APPROVAL_COPY_GENERIC;
+                return (
+                  <ApprovalCodeField
+                    label={copy.label}
+                    value={draft.payment.approvalCode}
+                    onChange={(v) =>
+                      setPay({ approvalCode: v.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() })
+                    }
+                    maxLength={copy.maxLength}
+                    hint={copy.hint}
+                    placeholder={copy.placeholder}
+                  />
+                );
+              })()}
+
+            {/* Slip / receipt photo — required for every method. */}
+            {(() => {
+              const copy = SLIP_COPY[selectedMethod.key] ?? SLIP_COPY_GENERIC;
+              return (
+                <PaymentSlipPicker
+                  label={copy.label}
+                  hint={copy.hint}
+                  slip={draft.payment.slip}
+                  onChange={(slip) => setPay({ slip })}
+                />
+              );
+            })()}
           </div>
         )}
       </Section>

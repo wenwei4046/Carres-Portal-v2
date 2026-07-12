@@ -268,6 +268,40 @@ export {
   type PwpDiscoverResponse,
 } from "./schemas/catalog";
 
+// 0219 — Order Entry config (payment methods + form fields).
+export {
+  paymentFollowUpSchema,
+  paymentMethodConfigSchema,
+  customFieldSchema,
+  customFieldTypeSchema,
+  builtinOverrideSchema,
+  formTabConfigSchema,
+  formFieldsConfigSchema,
+  orderEntryConfigSchema,
+  setOrderEntryConfigInput,
+  MY_BANKS,
+  DEFAULT_PAYMENT_METHODS,
+  ORDER_ENTRY_TABS,
+  POS_FORM_BUILTINS,
+  resolvePaymentMethods,
+  resolveFormTab,
+  allCustomFields,
+  parseOrderEntryConfigRow,
+  type PaymentFollowUp,
+  type PaymentMethodConfig,
+  type CustomField,
+  type CustomFieldType,
+  type BuiltinOverride,
+  type FormTabConfig,
+  type FormFieldsConfig,
+  type OrderEntryConfigDto,
+  type SetOrderEntryConfigInput,
+  type OrderEntryTab,
+  type PosBuiltinField,
+  type ResolvedBuiltin,
+  type ResolvedFormTab,
+} from "./schemas/order-entry";
+
 export {
   decideApprovalInput,
   listApprovalsQuery,

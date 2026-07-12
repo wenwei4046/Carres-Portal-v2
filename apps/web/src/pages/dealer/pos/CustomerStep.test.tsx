@@ -152,6 +152,60 @@ describe("CustomerStep — 2990s Image-#4 parity", () => {
   });
 });
 
+describe("CustomerStep — 0219 config-driven form fields", () => {
+  function catalogWithFormCfg(): CatalogResponse {
+    return {
+      ...catalog(),
+      orderEntryConfig: {
+        paymentMethods: [],
+        formFields: {
+          customer: {
+            builtins: {
+              race: { enabled: false }, // hidden entirely
+              birthday: { enabled: true, required: false }, // optional now
+            },
+            custom: [
+              {
+                key: "occupation",
+                label: "Occupation",
+                type: "select",
+                required: true,
+                options: ["Engineer", "Teacher"],
+              },
+            ],
+          },
+        },
+      },
+    } as unknown as CatalogResponse;
+  }
+
+  it("hides a disabled builtin, renders the custom field, and writes its value to customer.custom", () => {
+    const onChange = vi.fn();
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={onChange}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalogWithFormCfg()}
+        minLeadDays={14}
+      />,
+    );
+    // race disabled → gone; gender untouched → still there.
+    expect(screen.queryByTestId("pos-customer-race")).toBeNull();
+    expect(screen.getByTestId("pos-customer-gender")).toBeTruthy();
+    // The operator-defined custom select renders on the Customer tab.
+    const field = screen.getByTestId("pos-custom-customer-occupation");
+    const select = field.querySelector("select")!;
+    fireEvent.change(select, { target: { value: "Engineer" } });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: expect.objectContaining({ custom: { occupation: "Engineer" } }),
+      }),
+    );
+  });
+});
+
 describe("CustomerStep — Full-name autocomplete (existing customers)", () => {
   const HIT = {
     name: "Jamie Tan",

@@ -588,6 +588,8 @@ export const orderFromRow = (
   // 0007 added payment_method/approval_code/installment_months. Pre-0007 rows
   // surface as undefined → null here so zod nullable enums stay happy.
   paymentMethod: r.payment_method ?? null,
+  // 0219 — POS entry extras (payment follow-ups e.g. bank + custom fields).
+  entryData: r.entry_data ?? null,
   approvalCode: r.approval_code ?? null,
   installmentMonths: r.installment_months ?? null,
   operationStage: r.operation_stage,
@@ -787,6 +789,9 @@ export const orderInputToRpcPayload = (
   payment_method: input.paymentMethod,
   approval_code: input.approvalCode,
   installment_months: input.installmentMonths,
+  // 0219 — POS entry extras; absent/empty → null so pre-0219 payloads stay
+  // byte-identical and create_order stores NULL.
+  entry_data: input.entryData ?? null,
   lines: input.lines.map((l) => ({
     sku: l.sku,
     qty: l.qty,

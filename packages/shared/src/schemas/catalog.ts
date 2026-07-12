@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { SOFA_HEIGHTS } from "../sofa-constants";
+import { orderEntryConfigSchema } from "./order-entry";
 
 /**
  * Catalog bundle — single endpoint that returns everything the wizard's product
@@ -885,6 +886,10 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0219 — Order Entry config (payment methods + form fields; additive,
+  // OPTIONAL). The POS renders payment methods + the Customer-step form from
+  // it; empty/absent → code defaults (pre-0219 behavior + Cash).
+  orderEntryConfig: orderEntryConfigSchema.nullable().optional(),
   // 0202 — global procurement fabric master (additive, OPTIONAL). Pre-0202
   // clients that don't read this are wholly unaffected.
   fabrics: z.array(catalogFabricSchema).optional(),

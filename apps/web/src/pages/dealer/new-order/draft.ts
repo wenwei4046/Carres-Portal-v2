@@ -1,3 +1,11 @@
+import {
+  ORDER_ENTRY_TABS,
+  resolveFormTab,
+  resolvePaymentMethods,
+  type FormFieldsConfig,
+  type PaymentMethodConfig,
+} from "@carres/shared";
+
 /**
  * Wizard draft state — local UI shape, not the DB row.
  *
@@ -78,14 +86,16 @@ export interface DraftAttachment {
   dataUrl: string;  // base64 — preview + upload Blob source
 }
 
-/** Payment metadata captured in Step 3. method/approvalCode/installmentMonths
- *  are UI-side only (not persisted in 2B.3.c — see Phase 2D). slip is the
- *  bank/EDC slip the dealer attached. */
+/** Payment metadata captured in Step 3. slip is the bank/EDC slip the dealer
+ *  attached. 0219 — `method` is any configured method key (config-driven;
+ *  e.g. "cash"), and `followUps` holds the method's follow-up dropdown
+ *  answers keyed by followUp key (e.g. { bank: "Maybank" }). */
 export interface DraftPayment {
-  method: "online" | "credit" | "installment";
+  method: string;
   approvalCode: string;
   installmentMonths: 6 | 12;
   slip: DraftAttachment | null;
+  followUps?: Record<string, string>;
 }
 
 export interface WizardDraft {
@@ -126,6 +136,10 @@ export interface WizardDraft {
     race: string;
     gender: string;
     birthday: string;
+    /** 0219 — operator-configured CUSTOM form-field values, keyed by the
+     *  configured field key (all 4 tabs share one bag — keys are unique per
+     *  config). Optional so pre-0219 drafts restore cleanly. */
+    custom?: Record<string, string>;
   };
   delivery: {
     date: string;
@@ -281,6 +295,7 @@ export function loadDraft(): WizardDraft | null {
             installmentMonths:
               parsed.payment.installmentMonths === 12 ? 12 : empty.payment.installmentMonths,
             slip: parsed.payment.slip ?? null,
+            followUps: parsed.payment.followUps ?? {},
           }
         : empty.payment,
       signature: parsed.signature ?? empty.signature,
@@ -317,8 +332,8 @@ export function clearDraft(): void {
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
-export function step1Valid(d: WizardDraft): boolean {
-  return step1FirstIssue(d) === null;
+export function step1Valid(d: WizardDraft, formCfg?: FormFieldsConfig | null): boolean {
+  return step1FirstIssue(d, formCfg) === null;
 }
 
 /**
@@ -332,22 +347,37 @@ export function step1Valid(d: WizardDraft): boolean {
  * bedframe = today + 14 days, sofa = today + 21 days). See
  * `step3DateFirstIssue` for the new gate.
  */
-export function step1FirstIssue(d: WizardDraft): string | null {
+export function step1FirstIssue(
+  d: WizardDraft,
+  formCfg?: FormFieldsConfig | null,
+): string | null {
   const c = d.customer;
+  // 0219 — the customer/emergency builtin fields are config-toggleable (SO
+  // Maintenance "Order Entry" editor). Absent config → defaults = the exact
+  // pre-0219 gates. Locked fields (outlet/salesperson/name/phone/address)
+  // always apply.
+  const cust = resolveFormTab(formCfg ?? null, "customer").builtins;
+  const emg = resolveFormTab(formCfg ?? null, "emergency").builtins["emergency"];
   if (!d.outletId)        return "Sale info — pick an Outlet";
   if (!d.salespersonId)   return "Sale info — pick a Salesperson";
   if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
   if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
   // 0200 — POS-parity demographics (2990s: POS-required, server-lenient).
-  if (!EMAIL_RE.test(c.email.trim())) return "Customer — email";
-  if (!c.race)                    return "Customer — race";
-  if (!c.gender)                  return "Customer — gender";
-  if (!c.birthday)                return "Customer — birthday";
-  if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
-  if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
-  if (!c.emergencyRelationship)            return "Emergency Contact — relationship";
-  if (c.emergencyRelationship === "__OTHER__" && c.emergencyRelationshipOther.trim().length < 2) {
-    return "Emergency Contact — describe the 'Other' relationship";
+  // Required per config; a NON-required but filled email still needs a valid shape.
+  if (cust["email"]?.required && !EMAIL_RE.test(c.email.trim())) return "Customer — email";
+  if (cust["email"]?.enabled && !cust["email"]?.required && c.email.trim() && !EMAIL_RE.test(c.email.trim())) {
+    return "Customer — email (invalid format)";
+  }
+  if (cust["race"]?.required && !c.race)         return "Customer — race";
+  if (cust["gender"]?.required && !c.gender)     return "Customer — gender";
+  if (cust["birthday"]?.required && !c.birthday) return "Customer — birthday";
+  if (emg?.required) {
+    if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
+    if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
+    if (!c.emergencyRelationship)            return "Emergency Contact — relationship";
+    if (c.emergencyRelationship === "__OTHER__" && c.emergencyRelationshipOther.trim().length < 2) {
+      return "Emergency Contact — describe the 'Other' relationship";
+    }
   }
   if (!c.addressUnknown) {
     if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars), or tick 'Unknown'";
@@ -356,6 +386,16 @@ export function step1FirstIssue(d: WizardDraft): string | null {
     if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
   }
   if (!c.billingSame && c.billing.trim().length < 5) return "Billing — fill billing address, or tick 'Same as delivery'";
+  // 0219 — operator-defined REQUIRED custom fields (all 4 tabs share the
+  // d.customer.custom bag; target-tab customs gate here too so the shell's
+  // customerReady covers everything before CONFIRM).
+  for (const tab of ORDER_ENTRY_TABS) {
+    for (const f of resolveFormTab(formCfg ?? null, tab).custom) {
+      if (f.required && !(c.custom?.[f.key] ?? "").trim()) {
+        return `${f.label} — required`;
+      }
+    }
+  }
   return null;
 }
 
@@ -447,16 +487,23 @@ export function step3DateFirstIssue(
  * 2026-05-22 (Loo) — renamed from step3Valid when the wizard added a new
  * step 3 for delivery date. Body unchanged.
  */
-export function step4Valid(d: WizardDraft): boolean {
+export function step4Valid(d: WizardDraft, methods?: PaymentMethodConfig[]): boolean {
   if (!d.signature || !d.signature.startsWith("data:image/")) return false;
   if (!d.termsAccepted) return false;
   if (!d.payment.slip) return false;
-  // 2026-05-10 (Loo) — approval code / reference number is REQUIRED for
-  // every payment method, including online bank transfer. Without it the
-  // accountant can't reconcile the deposit against the bank statement and
-  // the order sits unprocessed. Was previously gated only on
-  // method !== 'online' and online was let through with just a slip.
-  if (d.payment.approvalCode.trim().length < 3) return false;
+  // 0219 — payment gates are CONFIG-DRIVEN. The method must be one of the
+  // resolved ACTIVE methods (caller passes the catalog's list; absent →
+  // code defaults incl. cash). Approval code (Loo 2026-05-10, finance
+  // reconciliation) is required per the method's approvalCodeRequired flag —
+  // cash defaults to exempt; every required follow-up (e.g. the Credit/Debit
+  // bank) must be answered.
+  const resolved = methods ?? resolvePaymentMethods(null);
+  const method = resolved.find((m) => m.key === d.payment.method);
+  if (!method) return false;
+  if (method.approvalCodeRequired && d.payment.approvalCode.trim().length < 3) return false;
+  for (const fu of method.followUps) {
+    if (fu.required && !(d.payment.followUps?.[fu.key] ?? "").trim()) return false;
+  }
   if (d.payment.method === "installment") {
     if (d.payment.installmentMonths !== 6 && d.payment.installmentMonths !== 12) return false;
   }
