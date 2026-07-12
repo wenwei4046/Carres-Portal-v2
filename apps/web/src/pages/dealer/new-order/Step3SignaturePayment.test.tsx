@@ -112,7 +112,7 @@ describe("step4Valid — 0219 method rules", () => {
       termsAccepted: true,
       payment: {
         ...d.payment,
-        slip: { mime: "image/png", dataUrl: "data:image/png;base64,y" },
+        slip: { name: "slip.png", size: 1024, mime: "image/png", dataUrl: "data:image/png;base64,y" },
         ...payment,
       },
     };
