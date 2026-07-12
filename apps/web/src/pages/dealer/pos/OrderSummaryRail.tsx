@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { CatalogResponse } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
+import { draftTotals } from "@/lib/order-totals";
 import type { WizardDraft } from "../new-order/draft";
-import { cartTotalExStair } from "./cart";
 import { previewDefaultGifts } from "./free-line";
 
 /**
@@ -35,7 +35,10 @@ export default function OrderSummaryRail({
     return map;
   }, [catalog]);
 
-  const itemsSubtotal = cartTotalExStair(draft.lines, draft.addons);
+  // Shared draftTotals — the SAME math as the Step-3 recap + the DealerPos
+  // footer (Loo 2026-07-12: this rail said RM 2,570 while the footer said
+  // RM 2,920 — stair carry + the delivery fee were missing here).
+  const totals = useMemo(() => draftTotals(draft, catalog), [draft, catalog]);
   const c = draft.customer;
   const customerCaptured = c.name.trim().length > 0 || c.phone.trim().length > 0;
   // Default free gifts the server WILL append at submit — show them here as RM0
@@ -253,26 +256,43 @@ export default function OrderSummaryRail({
           )}
         </div>
 
-        {/* Totals */}
+        {/* Totals — full breakdown, same rows as the Step-3 recap. Stair +
+            delivery appear once the delivery details set them (>0), and the
+            foot Total ALWAYS equals the footer bar's number. */}
         <div className="summary__section">
           <div className="summary__section-label">Totals</div>
           <div className="summary__row">
             <span className="key">Items subtotal</span>
-            <span className="val">{rm(itemsSubtotal)}</span>
+            <span className="val">{rm(totals.lineSub)}</span>
           </div>
+          {totals.addonSub > 0 && (
+            <div className="summary__row">
+              <span className="key">Add-ons</span>
+              <span className="val">{rm(totals.addonSub)}</span>
+            </div>
+          )}
+          {totals.stair > 0 && (
+            <div className="summary__row">
+              <span className="key">Stair carry</span>
+              <span className="val">{rm(totals.stair)}</span>
+            </div>
+          )}
+          {totals.deliveryTotal > 0 && (
+            <div className="summary__row">
+              <span className="key">Delivery fee</span>
+              <span className="val">{rm(totals.deliveryTotal)}</span>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="summary__foot">
         <div className="summary__total-row">
           <span className="summary__total-label">Total</span>
-          <span className="summary__total-num">
+          <span className="summary__total-num" data-testid="summary-grand-total">
             <sup>RM</sup>
-            {itemsSubtotal.toLocaleString("en-MY")}
+            {totals.grand.toLocaleString("en-MY")}
           </span>
-        </div>
-        <div style={{ fontSize: 11, color: "var(--fg-muted)", textAlign: "right" }}>
-          Delivery + stair carry are finalised at confirm.
         </div>
       </div>
     </aside>

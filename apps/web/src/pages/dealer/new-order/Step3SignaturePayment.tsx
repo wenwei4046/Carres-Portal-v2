@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import type { CatalogResponse } from "@carres/shared";
-import { deliveryFeePreview, floorSurchargeRaw } from "@/lib/order-totals";
+import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
 import {
   composeEmergency,
@@ -36,8 +36,6 @@ const PAYMENT_METHODS: ReadonlyArray<{
  * + drives the draft mutations that step3Valid() reads.
  */
 export default function Step3SignaturePayment({ draft, onChange, catalog }: Props) {
-  const cfg = catalog.floorConfig;
-
   // Lazily mint a wizard session id the first time Step 3 mounts. Stays stable
   // across re-renders so the dealer can edit fields without resetting the
   // Storage folder each keystroke.
@@ -48,43 +46,17 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live totals — same formula as Step 2 (single source of truth via
-  // floorSurchargeRaw). Recomputed each render; no dependency on memo since
-  // input arrays are tiny.
-  const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-  const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
-  const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  // Dealer-picked stair-carry count, falling back to all items when null.
-  // Mirrors Step 2 + order-totals.floorSurcharge semantics.
-  const stairItemsEffective =
-    draft.delivery.stairItems == null
-      ? itemsTotal
-      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
-  const stair = floorSurchargeRaw(
-    draft.delivery.floor,
-    draft.delivery.hasLift,
-    stairItemsEffective,
-    cfg,
-  );
+  // Live totals — the shared draftTotals (single source of truth with the
+  // OrderSummaryRail + the DealerPos footer, so the three can never drift).
+  // The 0184 delivery portion runs the SAME pure engine the Hono recompute
+  // uses; the server is authoritative at submit (NOT submitted from here —
+  // DealerPos sends only additionalDeliveryFee + crossCategorySourceSo).
+  // Dormant config (0/0) + no matching rule + no additional fee → 0 (hidden).
+  const totals = useMemo(() => draftTotals(draft, catalog), [draft, catalog]);
+  const { lineSub, addonSub, stair, deliveryTotal } = totals;
+  const deliveryPreview = totals.delivery;
 
-  // 0184 — delivery TRIP fee preview. Runs the SAME pure engine the Hono
-  // recompute uses, so the dealer sees the fee the server will charge in the
-  // common case. The server is authoritative; this is preview only (NOT
-  // submitted — DealerPos sends only the two client inputs below). Dormant
-  // config (0/0) + no matching rule + no additional fee → 0 (nothing shows).
-  const additionalFee = Math.max(0, draft.additionalDeliveryFee ?? 0);
-  const followupSo = (draft.crossCategorySourceSo ?? "").trim();
-  const deliveryPreview = useMemo(
-    () =>
-      deliveryFeePreview(draft.lines, catalog, {
-        additionalFee,
-        isCrossCategoryFollowup: followupSo.length > 0,
-      }),
-    [draft.lines, catalog, additionalFee, followupSo],
-  );
-  const deliveryTotal = deliveryPreview?.total ?? 0;
-
-  const total = lineSub + addonSub + stair + deliveryTotal;
+  const total = totals.grand;
   const minDeposit = useMemo(() => Math.round(total * 0.5), [total]);
   const paidPct = total > 0 ? Math.round((draft.paid / total) * 100) : 0;
 
