@@ -135,6 +135,66 @@ export function buildDeliveryRuleLines(
   return out;
 }
 
+/** Structural subset of the POS `WizardDraft` that `draftTotals` reads — kept
+ *  structural (like `DeliveryCartLine`) so this lib module doesn't import the
+ *  page-level draft type. A `WizardDraft` satisfies it as-is. */
+export interface DraftTotalsInput {
+  lines: Array<DeliveryCartLine & { qty: number; unitPrice: number }>;
+  addons: Array<{ qty: number; unitPrice: number }>;
+  delivery: { floor: number; hasLift: boolean; stairItems: number | null };
+  additionalDeliveryFee?: number;
+  crossCategorySourceSo?: string;
+}
+
+export interface DraftTotals {
+  lineSub: number;
+  addonSub: number;
+  /** Stair-carry surcharge — dealer-picked `stairItems` count (clamped to the
+   *  cart's unit total; null = all items), same semantics as `floorSurcharge`. */
+  stair: number;
+  /** 0184 delivery TRIP fee preview breakdown (null when the bundle carries no
+   *  `deliveryFeeConfig`). Server-authoritative at submit; preview-only here. */
+  delivery: DeliveryFeeResult | null;
+  deliveryTotal: number;
+  /** lineSub + addonSub + stair + deliveryTotal. */
+  grand: number;
+}
+
+/**
+ * Live POS draft totals — THE single source for every total the POS shows
+ * (Step-3 recap, OrderSummaryRail, DealerPos footer), so they can never drift
+ * (Loo 2026-07-12: the summary rail said RM 2,570 while the footer said
+ * RM 2,920 — the rail was omitting stair carry + the delivery fee).
+ */
+export function draftTotals(draft: DraftTotalsInput, catalog: CatalogResponse): DraftTotals {
+  const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+  const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
+  const stairItems =
+    draft.delivery.stairItems == null
+      ? itemsTotal
+      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  const stair = floorSurchargeRaw(
+    draft.delivery.floor,
+    draft.delivery.hasLift,
+    stairItems,
+    catalog.floorConfig,
+  );
+  const delivery = deliveryFeePreview(draft.lines, catalog, {
+    additionalFee: Math.max(0, draft.additionalDeliveryFee ?? 0),
+    isCrossCategoryFollowup: (draft.crossCategorySourceSo ?? "").trim().length > 0,
+  });
+  const deliveryTotal = delivery?.total ?? 0;
+  return {
+    lineSub,
+    addonSub,
+    stair,
+    delivery,
+    deliveryTotal,
+    grand: lineSub + addonSub + stair + deliveryTotal,
+  };
+}
+
 /**
  * POS delivery-fee preview. Returns null when the bundle carries no
  * `deliveryFeeConfig` (pre-0184 / not loaded). Dormant config (0/0) + no

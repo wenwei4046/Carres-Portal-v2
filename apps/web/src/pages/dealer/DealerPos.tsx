@@ -6,7 +6,7 @@ import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } fro
 import { maxLeadDaysFor, resolvePaymentMethods } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import { deliveryFeePreview } from "@/lib/order-totals";
+import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import {
@@ -401,26 +401,14 @@ export default function DealerPos({
     [draft, asapDepositOk, paymentMethods],
   );
 
-  // Footer total — lines + addons + stair carry (shown on steps 2/3).
-  const footerTotal = useMemo(() => {
-    if (!catalogQ.data) return 0;
-    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
-    const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-    const stair = draft.delivery.hasLift
-      ? 0
-      : Math.max(0, draft.delivery.floor - catalogQ.data.floorConfig.freeUpToFloor) *
-        catalogQ.data.floorConfig.perFloorPerItem *
-        itemsTotal;
-    // 0184 — delivery TRIP fee preview (same pure engine the server recomputes).
-    // Dormant config (0/0) → 0, so totals stay byte-identical until rates are set.
-    const delivery =
-      deliveryFeePreview(draft.lines, catalogQ.data, {
-        additionalFee: draft.additionalDeliveryFee,
-        isCrossCategoryFollowup: Boolean((draft.crossCategorySourceSo ?? "").trim()),
-      })?.total ?? 0;
-    return lineSub + addonSub + stair + delivery;
-  }, [draft, catalogQ.data]);
+  // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
+  // the Step-3 recap, and the OrderSummaryRail always show the SAME number.
+  // (The old hand-rolled stair math here also ignored the dealer-picked
+  // delivery.stairItems count — draftTotals applies it.)
+  const footerTotal = useMemo(
+    () => (catalogQ.data ? draftTotals(draft, catalogQ.data).grand : 0),
+    [draft, catalogQ.data],
+  );
 
   const submitDisabled =
     !confirmReady || uploading || createOrder.isPending || !effectiveDealerId;

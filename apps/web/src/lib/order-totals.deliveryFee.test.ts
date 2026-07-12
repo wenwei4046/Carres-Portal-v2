@@ -7,10 +7,12 @@
  *  - additionalFee + cross-category follow-up paths.
  *  - buildDeliveryRuleLines resolves category/size from the catalog + reads a
  *    sofa build's compartments.
+ *  - draftTotals folds lines + addons + stair + delivery into ONE grand total
+ *    (the shared number every POS surface shows).
  */
 import { describe, it, expect } from "vitest";
 import type { CatalogResponse } from "@carres/shared";
-import { buildDeliveryRuleLines, deliveryFeePreview } from "./order-totals";
+import { buildDeliveryRuleLines, deliveryFeePreview, draftTotals } from "./order-totals";
 
 const SOFA_MODEL = "00000000-0000-0000-0000-0000000000s1";
 const MAT_MODEL = "00000000-0000-0000-0000-0000000000m1";
@@ -130,6 +132,89 @@ describe("deliveryFeePreview — configured", () => {
     const res = deliveryFeePreview([matLine], catalog);
     expect(res!.isSpecial).toBe(true);
     expect(res!.base).toBe(250);
+  });
+});
+
+describe("draftTotals — the ONE grand total every POS surface shows", () => {
+  // floorConfig in baseCatalog: freeUpToFloor 1, perFloorPerItem 50.
+  const noStairDelivery = { floor: 1, hasLift: false, stairItems: null };
+
+  it("grand = lines + addons + stair + delivery (the RM 2,570 vs RM 2,920 mismatch)", () => {
+    const catalog = baseCatalog({
+      deliveryFeeConfig: { ...baseCatalog().deliveryFeeConfig!, baseFee: 100 },
+    });
+    const t = draftTotals(
+      {
+        lines: [{ ...matLine, qty: 1, unitPrice: 2000 }],
+        addons: [{ qty: 2, unitPrice: 80 }],
+        delivery: { floor: 3, hasLift: false, stairItems: null },
+      },
+      catalog,
+    );
+    expect(t.lineSub).toBe(2000);
+    expect(t.addonSub).toBe(160);
+    expect(t.stair).toBe(100); // (3−1) flights × 50 × 1 item
+    expect(t.deliveryTotal).toBe(100);
+    expect(t.grand).toBe(2360);
+  });
+
+  it("respects the dealer-picked stairItems count, clamped to the cart's units", () => {
+    const lines = [{ ...matLine, qty: 3, unitPrice: 1000 }];
+    const pick = (stairItems: number | null) =>
+      draftTotals(
+        { lines, addons: [], delivery: { floor: 3, hasLift: false, stairItems } },
+        baseCatalog(),
+      ).stair;
+    expect(pick(null)).toBe(300); // all 3 units
+    expect(pick(1)).toBe(100); // dealer charged only 1 unit
+    expect(pick(99)).toBe(300); // clamped to the 3 units in the cart
+  });
+
+  it("no deliveryFeeConfig in the bundle → delivery null, grand still includes stair", () => {
+    const t = draftTotals(
+      {
+        lines: [{ ...matLine, qty: 1, unitPrice: 500 }],
+        addons: [{ qty: 2, unitPrice: 80 }],
+        delivery: { floor: 3, hasLift: false, stairItems: null },
+      },
+      baseCatalog({ deliveryFeeConfig: undefined }),
+    );
+    expect(t.delivery).toBeNull();
+    expect(t.deliveryTotal).toBe(0);
+    expect(t.grand).toBe(500 + 160 + 100);
+  });
+
+  it("threads additionalDeliveryFee + the cross-category follow-up flag into the preview", () => {
+    const catalog = baseCatalog({
+      deliveryFeeConfig: { ...baseCatalog().deliveryFeeConfig!, baseFee: 100, crossCategoryFee: 40 },
+    });
+    const t = draftTotals(
+      {
+        lines: [{ ...matLine, qty: 1, unitPrice: 500 }],
+        addons: [],
+        delivery: noStairDelivery,
+        additionalDeliveryFee: 25,
+        crossCategorySourceSo: " SO-1042 ", // whitespace-only would NOT count
+      },
+      catalog,
+    );
+    expect(t.delivery!.isFollowup).toBe(true);
+    expect(t.delivery!.base).toBe(40); // follow-up rate replaces the base
+    expect(t.delivery!.additional).toBe(25);
+    expect(t.grand).toBe(500 + 40 + 25);
+  });
+
+  it("a negative additionalDeliveryFee is clamped to 0", () => {
+    const t = draftTotals(
+      {
+        lines: [{ ...matLine, qty: 1, unitPrice: 500 }],
+        addons: [],
+        delivery: noStairDelivery,
+        additionalDeliveryFee: -50,
+      },
+      baseCatalog(),
+    );
+    expect(t.grand).toBe(500);
   });
 });
 
