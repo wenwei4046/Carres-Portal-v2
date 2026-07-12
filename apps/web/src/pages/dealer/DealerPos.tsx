@@ -289,10 +289,12 @@ export default function DealerPos({
 
       // Reserve new triggers + qty/reward-flag changes (sequential, single-flight
       // per key). The diff key includes `rewardLine` so marking a trigger line as
-      // a reward re-reconciles it (the server then trims its promo reservations).
+      // a reward re-reconciles it (the server then trims its promo reservations),
+      // and the sku + built compartments so an in-place cart-line EDIT (Loo
+      // 2026-07-12 — same localId, different product/build) re-reserves too.
       for (const t of triggerLines) {
         if (inFlightRef.current.has(t.cartLineKey)) continue;
-        const diffKey = `${t.qty}:${t.rewardLine}`;
+        const diffKey = `${t.sku}:${t.qty}:${t.rewardLine}:${(t.builtCompartments ?? []).join("+")}`;
         if (prev.get(t.cartLineKey) === diffKey) continue; // unchanged → no-op
         inFlightRef.current.add(t.cartLineKey);
         reservePwp.mutate(
