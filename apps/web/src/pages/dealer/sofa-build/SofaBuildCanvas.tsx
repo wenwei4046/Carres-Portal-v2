@@ -80,6 +80,12 @@ export interface SofaBuildAddPayload {
    *  surcharge (computeSofaPrice legDelta; already inside `total`). */
   legHeight: string | null;
   legSurcharge: number;
+  /** Free-text remark travelling on the line (Loo 2026-07-12). */
+  remark?: string | null;
+  /** Remark ± RM price adjustment — NOT inside `total` (which stays the pure
+   *  engine figure); buildToDraftLine folds it into the line unitPrice and
+   *  stamps `attrs.remark_surcharge` for the server recompute. */
+  remarkSurcharge?: number;
   total: number;
   priceBasis: "combo" | "a_la_carte";
 }
@@ -121,6 +127,11 @@ export default function SofaBuildCanvas({
   heights,
   heightValue,
   onHeightChange,
+  remarkValue,
+  onRemarkChange,
+  remarkPriceValue,
+  onRemarkPriceChange,
+  remarkPriceDisabled,
   onAddBuild,
   onLiveTotal,
   onCreateCombo,
@@ -165,6 +176,18 @@ export default function SofaBuildCanvas({
    *  bottom-bar picker. Absent → the canvas keeps its internal size state. */
   heightValue?: string;
   onHeightChange?: (h: string) => void;
+  /** Optional CONTROLLED remark + ± RM adjustment (Loo 2026-07-12) — the POS
+   *  sofa page shares ONE remark across its Quick pick rail and this canvas so
+   *  tab hops / seed remounts never lose it. Absent → internal state (the
+   *  standalone drawer path keeps its own). `remarkPriceValue` is the RAW input
+   *  string ("", "-150", "200.50"); the canvas parses it. */
+  remarkValue?: string;
+  onRemarkChange?: (v: string) => void;
+  remarkPriceValue?: string;
+  onRemarkPriceChange?: (v: string) => void;
+  /** True while the host has a PWP voucher applied — the reward price is
+   *  forced, so the ± adjustment input locks (the host zeroes it at add). */
+  remarkPriceDisabled?: boolean;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   /** Live engine-total feed (Loo 2026-07-10) — fires whenever the build
    *  reprices (cells / size / fabric / leg), `null` while the canvas is empty.
@@ -279,6 +302,25 @@ export default function SofaBuildCanvas({
     return v && (legHeightOptions ?? []).some((o) => o.value === v) ? v : "";
   });
   const legOpts = legHeightOptions ?? [];
+  // Remark + ± RM adjustment — optionally CONTROLLED (POS page shares one
+  // remark across Quick pick + Customize); internal state otherwise.
+  const [remarkState, setRemarkState] = useState("");
+  const [remarkPriceState, setRemarkPriceState] = useState("");
+  const remark = remarkValue ?? remarkState;
+  const remarkPrice = remarkPriceValue ?? remarkPriceState;
+  const setRemark = (v: string) => {
+    setRemarkState(v);
+    onRemarkChange?.(v);
+  };
+  const setRemarkPrice = (v: string) => {
+    setRemarkPriceState(v);
+    onRemarkPriceChange?.(v);
+  };
+  // While the host disables the adjustment (a PWP reward's price is forced),
+  // the typed amount is ignored EVERYWHERE — display, blocker, payload.
+  const remarkAdj = remarkPriceDisabled
+    ? 0
+    : Math.round((parseFloat(remarkPrice) || 0) * 100) / 100;
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
 
@@ -620,11 +662,15 @@ export default function SofaBuildCanvas({
     return computeSofaPrice(build, snapshot);
   }, [cells, model.id, fabricTier, height, legHeight, snapshot]);
 
+  // The customer-facing figure = engine total + the remark ± adjustment (the
+  // engine total itself stays pure — the server drift-gates engine + adj).
+  const adjustedTotal = Math.round((priceResult.total + remarkAdj) * 100) / 100;
+
   // Mirror the live total up to the host (POS header) — null while the canvas
   // is empty so the host shows a placeholder instead of RM 0.
   useEffect(() => {
-    onLiveTotal?.(cells.length > 0 ? priceResult.total : null);
-  }, [onLiveTotal, cells.length, priceResult.total]);
+    onLiveTotal?.(cells.length > 0 ? adjustedTotal : null);
+  }, [onLiveTotal, cells.length, adjustedTotal]);
 
   // Cell indices the winning combo consumed → flame badge on those cells.
   const matchedCellIds = useMemo(() => {
@@ -643,8 +689,10 @@ export default function SofaBuildCanvas({
     if (cells.length === 0) return "Add modules to start";
     const open = analyses.find((a) => !a.closed);
     if (open) return `Resolve · ${open.reason ?? "not closed"}`;
+    // A remark discount can't take the sofa below RM 0 (server rejects too).
+    if (adjustedTotal < 0) return "Adjustment below RM 0";
     return null;
-  }, [cells.length, analyses]);
+  }, [cells.length, analyses, adjustedTotal]);
 
   const canAdd = blocker === null;
 
@@ -663,6 +711,8 @@ export default function SofaBuildCanvas({
       fabricDeferred,
       legHeight: legHeight || null,
       legSurcharge: priceResult.legDelta,
+      remark: remark.trim() || null,
+      remarkSurcharge: remarkAdj,
       total: priceResult.total,
       priceBasis: priceResult.basis,
     });
@@ -1084,6 +1134,41 @@ export default function SofaBuildCanvas({
           </label>
         )}
 
+        {/* Remark + optional ± RM price adjustment (Loo 2026-07-12) — a special
+            note sometimes ADJUSTS the price ("custom armrest +200"); the amount
+            is optional and joins the live total + the drift-gated line price. */}
+        <label className="flex items-center gap-2 t-small text-base-600">
+          <span className="flex flex-col leading-tight">
+            Remark
+            <span className="t-micro text-base-400">Optional · ± RM adjusts price</span>
+          </span>
+          <input
+            type="text"
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            placeholder="e.g. custom armrest"
+            aria-label="Remark"
+            className="w-40 rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+            data-testid="sofa-build-remark"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={remarkPrice}
+            onChange={(e) => setRemarkPrice(e.target.value)}
+            placeholder="± RM"
+            aria-label="Remark price adjustment (RM)"
+            disabled={remarkPriceDisabled}
+            title={
+              remarkPriceDisabled
+                ? "A PWP-priced sofa can't take a manual adjustment"
+                : undefined
+            }
+            className="w-24 rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono disabled:opacity-40"
+            data-testid="sofa-build-remark-price"
+          />
+        </label>
+
         {/* Size picker — the ACTIVE Maintenance sofa sizes (0201 + 0204: also
             the per-size à-la-carte price axis). Shown ONLY when the size is
             uncontrolled; the POS configurator drives it from the top-bar size
@@ -1126,7 +1211,7 @@ export default function SofaBuildCanvas({
               }}
               data-testid="sofa-build-total"
             >
-              RM {fmtRM(priceResult.total)}
+              RM {fmtRM(adjustedTotal)}
             </div>
           </div>
           {onCreateCombo && (

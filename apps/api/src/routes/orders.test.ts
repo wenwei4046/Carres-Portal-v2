@@ -2493,6 +2493,103 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
+  // ── Remark ± price adjustment (Loo 2026-07-12) — attrs.remark_surcharge is an
+  // operator-decided amount the drift gate ADDS to the engine total; the remark
+  // text + the adjustment ride every exploded line (whole-sofa metadata).
+  it("remark_surcharge joins the expected total: engine 1600 + 200 accepts unitPrice 1800 and explodes to Σ1800", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          buildOrderBody(1800, { remark: "custom armrest", remark_surcharge: 200 }),
+        ),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ unit_price: number; qty: number; attrs: Record<string, unknown> }>;
+    };
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.reduce((s, l) => s + l.unit_price * l.qty, 0)).toBe(1800);
+    // Remark + adjustment ride every exploded line (already inside the split).
+    expect(payload.lines.every((l) => l.attrs.remark === "custom armrest")).toBe(true);
+    expect(payload.lines.every((l) => l.attrs.remark_surcharge === 200)).toBe(true);
+  });
+
+  it("a NEGATIVE remark adjustment (discount) is honoured: engine 1600 − 200 accepts 1400", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1400, { remark_surcharge: -200 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ unit_price: number; qty: number }>;
+    };
+    expect(payload.lines.reduce((s, l) => s + l.unit_price * l.qty, 0)).toBe(1400);
+  });
+
+  it("an adjusted unitPrice WITHOUT the declared remark_surcharge still drifts (422)", async () => {
+    // unitPrice 1800 but no attrs declaration → server expects 1600 → reject.
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1800)),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("sofa_price_drift");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a discount below RM 0 → 400 bad_request (fail-closed), no create", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(0, { remark_surcharge: -1700 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a NON-NUMERIC remark_surcharge is rejected by the attrs schema (400)", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1800, { remark_surcharge: "200" })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
   it("server price 0 + client 0 → accepted (genuine free build, still explodes)", async () => {
     // Both compartments offered but priced 0 → server total 0; the build still
     // explodes into 2 real (RM0) lines whose skus map.

@@ -40,6 +40,13 @@ export const sofaBuildLineAttrsSchema = z
      *  leg surcharge. The recompute feeds it into `computeSofaPrice`, which
      *  prices an unknown/inactive value at 0 (a bad claim drifts + rejects). */
     leg_height: z.string().nullable().optional(),
+    /** Remark price adjustment (Loo 2026-07-12) — an OPERATOR-DECIDED ± RM
+     *  folded into the line unitPrice alongside a special remark ("custom
+     *  armrest +200"). There is no config to verify it against, so the server
+     *  TRUSTS the number but requires it typed-finite here (a NaN/string can't
+     *  poison the drift gate) and adds it to the expected engine total. Ignored
+     *  on a PWP-claimed line (the reward price is forced). */
+    remark_surcharge: z.number().finite().nullable().optional(),
     sofa_build_key: z.string().optional(),
   })
   .passthrough();
