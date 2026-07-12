@@ -16,10 +16,10 @@ import type { WizardDraft } from "./draft";
  *   - When cart has mixed categories, the longest lead wins
  *   - "Confirm later" (TBD) still allowed — order parks in Place until a
  *     real date is entered later
- *   - "As Fast As Possible" pill = min date (= today + minLeadDays). Caps
- *     to 20 days when no lead-restricted category is in cart (matches the
- *     old Step 1 behavior so non-furniture / pure-addon orders aren't
- *     held up artificially).
+ *
+ * 2026-07-12 (Loo) — the "As Fast As Possible" pill is REMOVED. The dealer
+ * always picks explicit dates; the `delivery.asap` draft flag stays in the
+ * shape (date edits keep clearing it) but nothing sets it anymore.
  */
 interface Props {
   draft: WizardDraft;
@@ -42,11 +42,6 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
   // Phase 11.1 — proceed (production-start) date floor = today; ceiling = the
   // delivery date. minDeliveryDateISO(0) is today in the same TZ as minDate.
   const todayIso = useMemo(() => minDeliveryDateISO(0), []);
-  // 2026-05-22 (Loo) — ASAP pill snaps exactly to the cart's lead time
-  // (mattress 14 / sofa 21). Fallback to 1 day when the cart has no gated
-  // categories so the pill doesn't show "0 days". The old Math.max(..,20)
-  // floor was a holdover from the legacy fixed-20-day rush rule.
-  const asapDays = Math.max(minLeadDays, 1);
 
   // Category breakdown is consumed only for the hint header copy now. The
   // duplicate "Lead time driven by: ..." chip below the pill was redundant
@@ -127,35 +122,6 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             before delivery) so we don't reserve stock too early. Must be on or
             before the delivery date.
           </p>
-        </div>
-
-        {/* "As Fast As Possible" pill — same auto-Proceed semantics as
-            before, but the date it sets is the actual lead-time floor when
-            the cart has gated categories (vs the old fixed 20 days). */}
-        <div className="flex items-center gap-2.5 mt-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              const iso = minDeliveryDateISO(asapDays);
-              // Phase 11.1 — ASAP = start production now, so proceed date = today.
-              setD({ date: iso, proceedDate: todayIso, dateTbd: false, asap: true });
-            }}
-            disabled={d.dateTbd}
-            className={`px-3 py-1.5 rounded text-[12px] font-semibold transition-colors ${
-              d.asap
-                ? "bg-primary text-white"
-                : "border border-primary text-primary hover:bg-primary/5"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            data-testid="delivery-asap-pill"
-          >
-            ⚡ As Fast As Possible ({asapDays} days)
-          </button>
-          {d.asap && (
-            <span className="text-[11px] text-base-600 font-body">
-              Order will auto-proceed once submitted (skips the manual
-              Place → Proceed click).
-            </span>
-          )}
         </div>
 
         {d.dateTbd && (

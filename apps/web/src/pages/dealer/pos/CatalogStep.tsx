@@ -20,7 +20,7 @@ import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
-import AddonsPanel from "./AddonsPanel";
+import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 
 const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory"];
@@ -75,7 +75,7 @@ export default function CatalogStep({
       buildCatalogIndex(catalog, catalog.fabricTierConfig, catalog.modelFabricTierOverrides),
     [catalog],
   );
-  const activeAddons = useMemo(() => catalog.addons.filter((a) => a.active), [catalog.addons]);
+  const activeAddons = useMemo(() => offerableAddons(catalog.addons), [catalog.addons]);
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
   const [rawSearch, setRawSearch] = useState("");

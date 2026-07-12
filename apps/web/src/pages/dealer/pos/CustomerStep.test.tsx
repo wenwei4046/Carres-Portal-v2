@@ -137,3 +137,77 @@ describe("CustomerStep — 2990s Image-#4 parity", () => {
     );
   });
 });
+
+describe("CustomerStep — Target-date sub-step (Loo 2026-07-12)", () => {
+  function catalogWithAddons(): CatalogResponse {
+    return {
+      ...catalog(),
+      addons: [
+        { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true },
+        { key: "dispose-sofa", name: "Dispose old sofa", price: 120, active: false },
+        // Server-exclusive delivery-fee keys — must NEVER be pickable.
+        { key: "DELIVERY", name: "Delivery fee", price: 0, active: true },
+        { key: "DELIVERY_CROSS", name: "Cross-category delivery fee", price: 0, active: true },
+        { key: "DELIVERY_ADD", name: "Additional delivery fee", price: 0, active: true },
+      ],
+    } as unknown as CatalogResponse;
+  }
+
+  it("initialSubStep=3 opens directly on Target date (Back from CONFIRM lands here, not on the Customer form)", () => {
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalogWithAddons()}
+        minLeadDays={14}
+        initialSubStep={3}
+      />,
+    );
+    // Target-date content is up; the Customer form is not.
+    expect(screen.getAllByText(/Delivery date/i).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("pos-customer-race")).toBeNull();
+    // No ASAP pill anymore.
+    expect(screen.queryByTestId("delivery-asap-pill")).toBeNull();
+  });
+
+  it("shows the order add-ons inline under Target date — active only, DELIVERY* filtered out", () => {
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalogWithAddons()}
+        minLeadDays={14}
+        initialSubStep={3}
+      />,
+    );
+    const section = screen.getByTestId("pos-target-date-addons");
+    expect(section.textContent).toContain("Dispose old mattress");
+    expect(section.textContent).not.toContain("Dispose old sofa"); // inactive
+    expect(section.textContent).not.toContain("Delivery fee"); // server-exclusive
+  });
+
+  it("adding an add-on flows through onChange with qty 1", () => {
+    const onChange = vi.fn();
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={onChange}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalogWithAddons()}
+        minLeadDays={14}
+        initialSubStep={3}
+      />,
+    );
+    fireEvent.click(screen.getByText("Dispose old mattress"));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        addons: [expect.objectContaining({ key: "dispose-mattress", qty: 1, unitPrice: 80 })],
+      }),
+    );
+  });
+});
