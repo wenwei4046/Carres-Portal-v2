@@ -32,6 +32,7 @@ import {
   loadDraft,
   saveDraft,
   step1Valid,
+  step2Valid,
   step3DateValid,
   step4Valid,
 } from "./new-order/draft";
@@ -118,7 +119,17 @@ export default function DealerPos({
 } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [draft, setDraft] = useState<WizardDraft>(() => loadDraft() ?? emptyDraft());
+  // Which CUSTOMER sub-step to open on: 0 (Customer form) when arriving from
+  // the cart, 3 (Target date) when backing out of the CONFIRM step — Back
+  // returns to the previous SCREEN, not the start of the wizard (Loo 2026-07-12).
+  const [customerSubStep, setCustomerSubStep] = useState<0 | 3>(0);
+  const [draft, setDraft] = useState<WizardDraft>(() => {
+    const d = loadDraft() ?? emptyDraft();
+    // The ASAP pill was removed 2026-07-12 — neutralize a stale flag from an
+    // older saved draft so the hidden auto-proceed / 50%-deposit gate can't
+    // fire with no UI showing why.
+    return d.delivery.asap ? { ...d, delivery: { ...d.delivery, asap: false } } : d;
+  });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -367,8 +378,15 @@ export default function DealerPos({
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
   // An internal operator must have picked the acting dealer before advancing.
+  // step2Valid re-checked here too: the Target-date sub-step now hosts the
+  // order add-ons picker, so a disposal add-on picked there must have its size
+  // before CONFIRM (the cart drawer's gate alone no longer covers it).
   const customerReady = useMemo(
-    () => !!effectiveDealerId && step1Valid(draft) && step3DateValid(draft, minLeadDays),
+    () =>
+      !!effectiveDealerId &&
+      step1Valid(draft) &&
+      step2Valid(draft) &&
+      step3DateValid(draft, minLeadDays),
     [draft, minLeadDays, effectiveDealerId],
   );
   const confirmReady = useMemo(
@@ -767,7 +785,10 @@ export default function DealerPos({
               draft={draft}
               onChange={setDraft}
               catalog={catalogQ.data}
-              onProceed={() => setStep(2)}
+              onProceed={() => {
+                setCustomerSubStep(0);
+                setStep(2);
+              }}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
@@ -787,6 +808,7 @@ export default function DealerPos({
                 salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
+                initialSubStep={customerSubStep}
                 onBackToCart={() => setStep(1)}
                 onProceed={() => customerReady && setStep(3)}
                 dealerPick={
@@ -878,7 +900,12 @@ export default function DealerPos({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                // Back = the PREVIOUS screen (Target date sub-step), not the
+                // first Customer form (Loo 2026-07-12).
+                setCustomerSubStep(3);
+                setStep(2);
+              }}
               className="btn btn--ghost"
               disabled={uploading || createOrder.isPending}
             >

@@ -5,8 +5,9 @@ import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerTypeProbe } from "@/lib/queries";
-import { step3DateValid, type WizardDraft } from "../new-order/draft";
+import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
+import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
 
@@ -63,6 +64,7 @@ export default function CustomerStep({
   dealerPick,
   onBackToCart,
   onProceed,
+  initialSubStep = 0,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -73,9 +75,12 @@ export default function CustomerStep({
   dealerPick?: DealerPick;
   onBackToCart?: () => void;
   onProceed?: () => void;
+  /** Sub-step to open on (Loo 2026-07-12): Back from the CONFIRM step lands on
+   *  Target date (3) — the previous screen — not the first Customer form. */
+  initialSubStep?: 0 | 1 | 2 | 3;
 }) {
   const c = draft.customer;
-  const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(0);
+  const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(initialSubStep);
 
   // CUSTOMER TYPE (AUTO) — probe visible orders by the (debounced) phone.
   const debouncedPhone = useDebouncedValue(c.phone.trim(), 400);
@@ -145,7 +150,10 @@ export default function CustomerStep({
           c.emergencyRelationshipOther.trim().length >= 2)
       );
     }
-    return step3DateValid(draft, minLeadDays);
+    // Target date: date rules + every picked disposal add-on must have a size
+    // (the add-ons picker lives on this sub-step now — same gate the cart
+    // drawer applies via step2Valid).
+    return step3DateValid(draft, minLeadDays) && step2FirstDisposalIssue(draft) === null;
   }
 
   function next() {
@@ -520,7 +528,7 @@ export default function CustomerStep({
               </div>
             )}
 
-            {/* ── 4 · Target date + delivery access ── */}
+            {/* ── 4 · Target date + delivery access + order add-ons ── */}
             {stepIdx === 3 && (
               <div className="fade-in">
                 <Step3Delivery
@@ -532,6 +540,28 @@ export default function CustomerStep({
                 <div style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 24 }}>
                   <StairCarryFields draft={draft} onChange={onChange} cfg={catalog.floorConfig} />
                 </div>
+                {/* Order add-ons (Loo 2026-07-12) — inline under Target date,
+                    not a 5th sub-step. Same catalog `addons` the maintenance
+                    "Order Add-ons" tab configures (disposal services etc.);
+                    shares the cart's AddonsPanel so selections stay in sync. */}
+                {offerableAddons(catalog.addons).length > 0 && (
+                  <div
+                    style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 24 }}
+                    data-testid="pos-target-date-addons"
+                  >
+                    <div className="flex items-baseline justify-between mb-3">
+                      <h3 className="kicker">Order add-ons</h3>
+                      <p className="text-[11px] text-base-500">
+                        Optional services charged on this order — e.g. dispose old mattress
+                      </p>
+                    </div>
+                    <AddonsPanel
+                      addons={offerableAddons(catalog.addons)}
+                      draft={draft}
+                      onChange={onChange}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </>

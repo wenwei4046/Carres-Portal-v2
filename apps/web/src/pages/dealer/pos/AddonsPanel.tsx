@@ -8,8 +8,21 @@ import {
   type WizardDraft,
 } from "../new-order/draft";
 
+/** 0184 — the delivery-fee addon keys are SERVER-EXCLUSIVE: the Hono order
+ *  recompute appends them itself and STRIPS any client-sent copy, so offering
+ *  them in a POS picker would be a silent no-op. Filter them out everywhere
+ *  the POS renders a selectable add-on list. */
+const SERVER_EXCLUSIVE_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+
+/** The add-ons a POS operator may actually pick: active + not server-owned. */
+export function offerableAddons(addons: AddonDto[]): AddonDto[] {
+  return addons.filter((a) => a.active && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.key));
+}
+
 /**
- * Add-ons grid for the POS catalog "Add-ons" rail entry. Re-skinned as small
+ * Add-ons grid for the POS catalog "Add-ons" rail entry AND the Customer
+ * step's Target-date section (Loo 2026-07-12 — order add-ons live inline
+ * under the delivery date, not behind a 5th sub-step). Re-skinned as small
  * .pos-card tiles; disposal add-ons keep the required-size gate (red border
  * until a size is chosen). All toggle/qty/size logic: UNCHANGED.
  */
