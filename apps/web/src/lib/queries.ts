@@ -134,9 +134,6 @@ import {
   type DecideStorageWaiverInput,
   type RecordStorageExtensionInput,
   type SetOpsAssignedLogisticInput,
-  type SoGridResponse,
-  type SoGridConfig,
-  type UpdateSoGridConfigInput,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
   type OrderEntryConfigDto,
@@ -348,13 +345,9 @@ export const qk = {
     print: (eventId: string) => ["pickupEvent", eventId] as const,
     byPo:  (poId: string)  => ["pickupEvents", poId] as const,
   },
-  // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
-  // Top-level prefix `["sales-order-grid"]` so a single blunt invalidate after
-  // a config save refreshes both the grid (carries config) and the config read.
+  // 0219 — the Order Entry (POS form) config editor read. (The 0174 SO grid
+  // that shared this prefix was deleted 2026-07-12; the key stays stable.)
   salesOrderGrid: {
-    grid:   () => ["sales-order-grid", "grid"] as const,
-    config: () => ["sales-order-grid", "config"] as const,
-    // 0219 — the Order Entry (POS form) config editor read.
     entryConfig: () => ["sales-order-grid", "entry-config"] as const,
   },
 };
@@ -1001,45 +994,8 @@ export function useCancelOrder(
 }
 
 // ===========================================================================
-// 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid)
+// 0219 — Order Entry config (POS payment methods + form fields)
 // ===========================================================================
-/** GET /api/operation/sales-order-maintenance/grid — flattened order×line rows
- *  + the shared column config. Internal (operation/principal) only. */
-export function useSalesOrderGrid(
-  opts?: Partial<UseQueryOptions<SoGridResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.salesOrderGrid.grid(),
-    queryFn: () =>
-      apiFetch<SoGridResponse>("/api/operation/sales-order-maintenance/grid"),
-    staleTime: 30_000,
-    ...opts,
-  });
-}
-
-/** PUT /api/operation/sales-order-maintenance/config — replace the shared
- *  column/option config. Invalidates the whole `["sales-order-grid"]` sub-tree
- *  so the grid + config reads re-fetch the merged result. */
-export function useUpdateSoGridConfig(
-  opts?: Partial<
-    UseMutationOptions<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>({
-    mutationFn: (input) =>
-      apiFetch<{ config: SoGridConfig }>(
-        "/api/operation/sales-order-maintenance/config",
-        { method: "PUT", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["sales-order-grid"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 /** 0219 — GET /api/operation/sales-order-maintenance/entry-config — the Order
  *  Entry config (payment methods + POS form fields). Internal only. */
 export function useOrderEntryConfig(

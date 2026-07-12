@@ -14,11 +14,12 @@ import {
   type PaymentMethodConfig,
 } from "@carres/shared";
 import { useOrderEntryConfig, useUpdateOrderEntryConfig } from "@/lib/queries";
-import { Modal, INPUT_CLS } from "./components/Modal";
+import { INPUT_CLS } from "./components/Modal";
 
 // ===========================================================================
-// Order Entry config editor (0219) — SO Maintenance is the config center for
-// the POS "Open Sales Order" format. Two sections:
+// Order Entry config page (0219) — the config center for the POS "Open Sales
+// Order" format, reached from the POS sidebar's Maintain section (was a modal
+// inside SO Maintenance until 2026-07-12). Two sections:
 //   1. Payment methods — add/remove/toggle methods, per-method approval-code
 //      toggle + follow-up dropdowns (e.g. the Bank list on Credit/Debit).
 //   2. Form fields — the Customer step's 4 tabs: builtin enable/require
@@ -96,7 +97,7 @@ function initDraft(cfg: OrderEntryConfigDto): Draft {
   return { methods, tabs };
 }
 
-export default function OrderEntryConfigPanel({ onClose }: { onClose: () => void }) {
+export default function OrderEntryPage() {
   const cfgQ = useOrderEntryConfig();
   const saveMut = useUpdateOrderEntryConfig();
 
@@ -392,23 +393,31 @@ export default function OrderEntryConfigPanel({ onClose }: { onClose: () => void
     saveMut.mutate(
       { paymentMethods, formFields },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
           toast.success("Order entry config saved — the POS updates on next load");
-          onClose();
+          setDraft(initDraft(res.entryConfig));
         },
         onError: (e) => toast.error(e.message ?? "Save failed"),
       },
     );
   }
 
+  function onReset() {
+    if (entryConfig) setDraft(initDraft(entryConfig));
+  }
+
   // ----------------------------------------------------------------- render
 
   return (
-    <Modal title="Order Entry" onClose={onClose} size="lg">
-      <p className="t-small text-base-600 mb-4">
-        Configure the POS "Open Sales Order" format: the payment methods offered at
-        checkout and the Customer-step form fields. Saved config is shared for everyone.
-      </p>
+    <div className="px-9 py-8 pb-14 max-w-[880px]">
+      <div className="mb-6">
+        <div className="kicker">Point of Sale</div>
+        <h1 className="t-h1 font-display mt-1.5 text-base-900">Order Entry</h1>
+        <p className="t-small text-base-600 mt-1">
+          Configure the POS "Open Sales Order" format: the payment methods offered at
+          checkout and the Customer-step form fields. Saved config is shared for everyone.
+        </p>
+      </div>
 
       {cfgQ.isLoading && <div className="t-small text-base-500">Loading config…</div>}
       {cfgQ.isError && !cfgQ.isLoading && (
@@ -692,8 +701,8 @@ export default function OrderEntryConfigPanel({ onClose }: { onClose: () => void
 
           {/* ---------------------------------------------------------- save */}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
-              Cancel
+            <button type="button" onClick={onReset} className="btn-ghost text-[12px]">
+              Reset
             </button>
             <button
               type="button"
@@ -706,6 +715,6 @@ export default function OrderEntryConfigPanel({ onClose }: { onClose: () => void
           </div>
         </>
       )}
-    </Modal>
+    </div>
   );
 }

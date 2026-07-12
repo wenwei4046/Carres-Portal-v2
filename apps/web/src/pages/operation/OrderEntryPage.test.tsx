@@ -9,7 +9,7 @@ vi.mock("@/lib/queries", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { useOrderEntryConfig, useUpdateOrderEntryConfig } from "@/lib/queries";
-import OrderEntryConfigPanel from "./OrderEntryConfigPanel";
+import OrderEntryPage from "./OrderEntryPage";
 
 const EMPTY_CONFIG: OrderEntryConfigDto = { paymentMethods: [], formFields: {} };
 
@@ -35,9 +35,9 @@ function savedPayload(): SetOrderEntryConfigInput {
   return mutateSpy.mock.calls[0][0] as SetOrderEntryConfigInput;
 }
 
-describe("OrderEntryConfigPanel", () => {
+describe("OrderEntryPage", () => {
   it("prefills the 4 default methods (incl. cash) + the Bank follow-up on credit when config is empty", () => {
-    render(<OrderEntryConfigPanel onClose={vi.fn()} />);
+    render(<OrderEntryPage />);
 
     expect(screen.getByDisplayValue("Online transfer")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Credit / Debit")).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("OrderEntryConfigPanel", () => {
   });
 
   it("toggling a builtin (race → not required) saves formFields.customer.builtins.race.required === false", () => {
-    render(<OrderEntryConfigPanel onClose={vi.fn()} />);
+    render(<OrderEntryPage />);
 
     const raceRequired = screen.getByLabelText("Race required") as HTMLInputElement;
     expect(raceRequired.checked).toBe(true); // defaultRequired
@@ -75,7 +75,7 @@ describe("OrderEntryConfigPanel", () => {
   });
 
   it("adding a method 'E-wallet' derives the key e-wallet and includes it in the saved paymentMethods", () => {
-    render(<OrderEntryConfigPanel onClose={vi.fn()} />);
+    render(<OrderEntryPage />);
 
     fireEvent.change(screen.getByLabelText("New method name"), {
       target: { value: "E-wallet" },

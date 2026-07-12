@@ -15,6 +15,7 @@ import PrincipalOrders from "./PrincipalOrders";
 // 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
 // order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
+import OrderEntryPage from "@/pages/operation/OrderEntryPage";
 
 /**
  * Principal shell — sidebar + main routing area. Mirrors the proto's tab-state
@@ -59,6 +60,9 @@ export default function PrincipalApp() {
         {tab === "new-order" && <PrincipalNewOrder setTab={setTab} />}
         {/* MAINTAIN → Sales analysis — overview / customer data / products. */}
         {tab === "sales-analysis" && <PrincipalSalesAnalysis />}
+        {/* MAINTAIN → Order Entry — POS payment methods + Customer-step form
+            fields (moved out of the SO Maintenance modal 2026-07-12). */}
+        {tab === "order-entry" && <OrderEntryPage />}
         {tab === "orders" && <PrincipalOrders />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
