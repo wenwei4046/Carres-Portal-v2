@@ -663,9 +663,14 @@ export interface OrderRow {
   signature_url: string | null;
   payment_slip_url: string | null;
   terms_accepted: boolean;
-  payment_method: "online" | "credit" | "installment" | null;
+  // 0219 — config-driven methods (the 3-value CHECK is gone; any configured
+  // key e.g. 'cash' persists).
+  payment_method: string | null;
   approval_code: string | null;
   installment_months: 6 | 12 | null;
+  // 0219 — POS entry extras (payment follow-ups e.g. bank + custom fields).
+  // Optional so legacy fixtures/constructors don't break.
+  entry_data?: Record<string, unknown> | null;
   operation_stage: OperationStage | null;
   warehouse_id: string | null;
   delivery_partner_id: string | null;

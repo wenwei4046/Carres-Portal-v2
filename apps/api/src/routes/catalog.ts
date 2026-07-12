@@ -5,6 +5,7 @@ import {
   Adapters,
   DB,
   catalogResponseSchema,
+  parseOrderEntryConfigRow,
   productModelCreateInput,
   productModelPatchInput,
   productSkuCreateInput,
@@ -196,7 +197,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -251,6 +252,10 @@ catalogRouter.get("/", async (c) => {
     // Fabrics tab editor must see OFF rows). Read-only reference — NOT a source
     // of truth for any order-side consumer (selling fabrics stay sofa_fabrics).
     sb.from(CATALOG_FABRICS).select("*"),
+    // 0219 — Order Entry config singleton (payment methods + form fields).
+    // maybeSingle + LENIENT parse below: a missing/garbage row degrades to the
+    // code defaults (pre-0219 behavior + Cash) instead of breaking the bundle.
+    sb.from("order_entry_config").select("*").eq("id", true).maybeSingle(),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -317,6 +322,14 @@ catalogRouter.get("/", async (c) => {
     sofaFabrics: liveFabrics.map((f) => Adapters.sofaFabricFromRow(f as DB.SofaFabricRow)),
     addons: (addonsR.data ?? []).map((a) => Adapters.addonFromRow(a as DB.AddonRow)),
     floorConfig: Adapters.floorConfigFromRow(floorR.data as DB.FloorConfigRow),
+    // 0219 — Order Entry config (additive, OPTIONAL; lenient row parse — read
+    // errors / missing row degrade to the empty config = code defaults apply).
+    orderEntryConfig: parseOrderEntryConfigRow(
+      (entryConfigR && !entryConfigR.error ? entryConfigR.data : null) as {
+        payment_methods?: unknown;
+        form_fields?: unknown;
+      } | null,
+    ),
     // 0176 — fabric tier pricing (additive; pre-0176 clients ignore these keys).
     fabricTierConfig,
     modelFabricTierOverrides: (tierOverridesR.data ?? []).map(

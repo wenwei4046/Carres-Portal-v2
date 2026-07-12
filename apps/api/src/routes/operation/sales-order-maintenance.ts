@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   mergeSoGridConfig,
+  parseOrderEntryConfigRow,
+  setOrderEntryConfigInput,
   updateSoGridConfigSchema,
   type SoGridConfig,
   type SoGridRow,
@@ -259,6 +261,43 @@ router.put("/config", async (c) => {
   // Echo back the merged config (catalog-aligned) so the client stays in sync.
   const config = await readConfig(sb);
   return c.json({ config });
+});
+
+// ---------------------------------------------------------------------------
+// 0219 — Order Entry config (payment methods + POS form fields). SO
+// Maintenance is the config center for the "Open Sales Order" FORMAT (Loo
+// 2026-07-12): what the POS asks at order entry, not just how the grid shows.
+// ---------------------------------------------------------------------------
+
+router.get("/entry-config", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("order_entry_config")
+    .select("payment_methods, form_fields")
+    .eq("id", true)
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ entryConfig: parseOrderEntryConfigRow(data) });
+});
+
+router.put("/entry-config", async (c) => {
+  const parsed = await parseJsonBody(c, setOrderEntryConfigInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("set_order_entry_config", {
+    p_payment_methods: parsed.data.paymentMethods,
+    p_form_fields: parsed.data.formFields,
+  });
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json({
+    entryConfig: parseOrderEntryConfigRow(
+      data as { payment_methods?: unknown; form_fields?: unknown } | null,
+    ),
+  });
 });
 
 export default router;

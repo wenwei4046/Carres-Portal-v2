@@ -13,6 +13,8 @@ import {
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
+  parseOrderEntryConfigRow,
+  resolvePaymentMethods,
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -285,6 +287,70 @@ ordersRouter.post("/", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+
+  // 0219 — config-driven payment methods. The DB whitelist is gone; the key
+  // must match an ACTIVE method from order_entry_config (code defaults incl.
+  // "cash" when the config list is empty), and per-method rules apply:
+  // approvalCodeRequired + every required follow-up (e.g. the Credit/Debit
+  // bank) must be answered from the configured options. A config READ error
+  // degrades to the code defaults (never blocks the default methods).
+  {
+    const cfgR = await sb
+      .from("order_entry_config")
+      .select("payment_methods, form_fields")
+      .eq("id", true)
+      .maybeSingle();
+    const entryCfg = parseOrderEntryConfigRow(cfgR && !cfgR.error ? cfgR.data : null);
+    const methods = resolvePaymentMethods(entryCfg);
+    const method = methods.find((m) => m.key === parsed.data.paymentMethod);
+    if (!method) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "invalid_payment_method",
+          message: `payment method "${parsed.data.paymentMethod}" is not an active configured method`,
+        },
+        422,
+      );
+    }
+    if (
+      method.approvalCodeRequired &&
+      (!parsed.data.approvalCode || parsed.data.approvalCode.trim().length < 3)
+    ) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "approval_code_required",
+          message: `approval / reference code (≥3 chars) is required for ${method.label}`,
+        },
+        422,
+      );
+    }
+    const followAnswers = parsed.data.entryData?.payment ?? {};
+    for (const fu of method.followUps) {
+      const answer = (followAnswers[fu.key] ?? "").trim();
+      if (fu.required && !answer) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "payment_followup_required",
+            message: `${fu.label} is required for ${method.label}`,
+          },
+          422,
+        );
+      }
+      if (answer && !fu.options.includes(answer)) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "payment_followup_invalid",
+            message: `${fu.label} must be one of the configured options`,
+          },
+          422,
+        );
+      }
+    }
+  }
 
   // Server-side lead-time floor (mattress + bedframe = 14d, sofa = 21d). The
   // wizard's Step 3 picker already enforces this client-side, but a curl or

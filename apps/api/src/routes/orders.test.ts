@@ -370,7 +370,11 @@ function validCreateBody(over: Record<string, unknown> = {}) {
     termsAccepted: true,
     depositPct: 50,
     paymentMethod: "online",
-    approvalCode: null,
+    // 0219 — the approval / reference code is server-required now for any
+    // method whose config says approvalCodeRequired (the default methods
+    // mirror Loo's 2026-05-10 rule: everything except cash). The real POS has
+    // sent it for every method since 2026-06-16 (step4Valid ≥3 gate).
+    approvalCode: "FT2026TEST01",
     installmentMonths: null,
     ...over,
   };
@@ -848,9 +852,11 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(403);
-    // RPC was attempted; no follow-up fetch happened
+    // RPC was attempted; no follow-up ORDER fetch happened. (The single eq
+    // recorded is the 0219 order_entry_config singleton read — pre-create
+    // payment-method validation, not a follow-up fetch.)
     expect(sb._rpcCalls).toHaveLength(1);
-    expect(sb._eqs).toEqual([]);
+    expect(sb._eqs).toEqual([["id", true]]);
   });
 
   it("maps RPC 22023 (validation in PL/pgSQL) to HTTP 400", async () => {
@@ -3011,5 +3017,102 @@ describe("POST /api/orders — option picks recompute (0201/0202 wiring)", () =>
     expect(body.code).toBe("sofa_price_drift");
     expect(body.serverTotal).toBe(1600);
     expect(sb._rpcCalls).toHaveLength(0);
+  });
+});
+
+// =====================================================================
+// 0219 — config-driven payment methods (cash + follow-ups + entry_data)
+// =====================================================================
+
+describe("POST /api/orders — 0219 payment-method config gates", () => {
+  // The RPC erroring with 22023 stops the flow right AFTER create_order is
+  // called — perfect probe: reaching the RPC proves the 0219 gate passed,
+  // and _rpcCalls[0].payload shows exactly what would have been persisted.
+  function sbStopAtRpc() {
+    return buildSbForCreate({ rpcError: { code: "22023", message: "stop-probe" } });
+  }
+  async function post(body: unknown) {
+    const jwt = await makeJwt("dealer", DEALER_A);
+    return app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("CASH is accepted with NO approval code (default-config method, approvalCodeRequired=false)", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "cash", approvalCode: null }));
+    expect(res.status).toBe(400); // the stop-probe 22023 — i.e. the gate PASSED
+    expect(sb._rpcCalls).toHaveLength(1);
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.payment_method).toBe("cash");
+    expect(payload.entry_data).toBeNull();
+  });
+
+  it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "bitcoin" }));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("invalid_payment_method");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a method with approvalCodeRequired and no code → 422 approval_code_required", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "online", approvalCode: null }));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("approval_code_required");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("credit + a configured bank answer rides entry_data into the create payload", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        paymentMethod: "credit",
+        entryData: { payment: { bank: "Maybank" } },
+      }),
+    );
+    expect(res.status).toBe(400); // stop-probe → gate passed
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" } });
+  });
+
+  it("credit + a bank NOT in the configured options → 422 payment_followup_invalid", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        paymentMethod: "credit",
+        entryData: { payment: { bank: "Bank of Mars" } },
+      }),
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("payment_followup_invalid");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("custom form-field values ride entry_data.fields through untouched", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        entryData: { fields: { occupation: "Engineer" } },
+      }),
+    );
+    expect(res.status).toBe(400); // stop-probe → gate passed
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer" } });
   });
 });

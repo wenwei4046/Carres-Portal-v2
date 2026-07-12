@@ -623,9 +623,12 @@ export interface Order {
   signatureUrl: string | null;
   paymentSlipUrl: string | null;
   termsAccepted: boolean;
-  paymentMethod: "online" | "credit" | "installment" | null;
+  /** 0219 — config-driven methods: any configured key (e.g. "cash"). */
+  paymentMethod: string | null;
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
+  /** 0219 — POS entry extras: { payment: { bank... }, fields: {...} }. */
+  entryData?: Record<string, unknown> | null;
 
   // v3-S3 (migration 0028) added `in_production` + `waiting`.
   // Phase 4.5a (2026-05-05): legacy `awaiting_stock` value fully removed —

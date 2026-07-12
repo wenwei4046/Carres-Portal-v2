@@ -139,6 +139,8 @@ import {
   type UpdateSoGridConfigInput,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
+  type OrderEntryConfigDto,
+  type SetOrderEntryConfigInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -352,6 +354,8 @@ export const qk = {
   salesOrderGrid: {
     grid:   () => ["sales-order-grid", "grid"] as const,
     config: () => ["sales-order-grid", "config"] as const,
+    // 0219 — the Order Entry (POS form) config editor read.
+    entryConfig: () => ["sales-order-grid", "entry-config"] as const,
   },
 };
 
@@ -991,6 +995,46 @@ export function useUpdateSoGridConfig(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["sales-order-grid"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 0219 — GET /api/operation/sales-order-maintenance/entry-config — the Order
+ *  Entry config (payment methods + POS form fields). Internal only. */
+export function useOrderEntryConfig(
+  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto }>>,
+) {
+  return useQuery({
+    queryKey: qk.salesOrderGrid.entryConfig(),
+    queryFn: () =>
+      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+        "/api/operation/sales-order-maintenance/entry-config",
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** 0219 — PUT the Order Entry config (full replace via the role-gated RPC).
+ *  Invalidates the editor read AND the catalog bundle (the POS renders from
+ *  catalog.orderEntryConfig). */
+export function useUpdateOrderEntryConfig(
+  opts?: Partial<
+    UseMutationOptions<{ entryConfig: OrderEntryConfigDto }, ApiError, SetOrderEntryConfigInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ entryConfig: OrderEntryConfigDto }, ApiError, SetOrderEntryConfigInput>({
+    mutationFn: (input) =>
+      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+        "/api/operation/sales-order-maintenance/entry-config",
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.salesOrderGrid.entryConfig() });
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
