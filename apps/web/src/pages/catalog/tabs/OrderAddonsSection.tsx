@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AddonDto } from "@carres/shared";
+import type { AddonDto, ProductSkuDto } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useCreateAddon, useDeleteAddon, usePatchAddon } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
@@ -13,8 +13,17 @@ import { CodeChip } from "../components/atoms";
  * Open to internal roles (operation + principal) like before — the underlying
  * addons writes are is_internal()-gated at RLS, not principal-only.
  */
-export default function OrderAddonsSection({ addons }: { addons: AddonDto[] }) {
+export default function OrderAddonsSection({
+  addons,
+  skus = [],
+}: {
+  addons: AddonDto[];
+  /** Catalog SKUs — the linked SVC- row supplies each add-on's editable
+   *  description (Loo 2026-07-12; description lives on the Service SKU). */
+  skus?: ProductSkuDto[];
+}) {
   const [adding, setAdding] = useState(false);
+  const descBySku = new Map(skus.map((s) => [s.sku, s.description ?? ""]));
 
   return (
     <section>
@@ -38,9 +47,10 @@ export default function OrderAddonsSection({ addons }: { addons: AddonDto[] }) {
       <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(140px,1.4fr) 120px 150px 110px" }}
+          style={{ gridTemplateColumns: "minmax(130px,1.1fr) minmax(150px,1.4fr) 110px 150px 100px" }}
         >
           <div className="label">Name</div>
+          <div className="label">Description</div>
           <div className="label text-right">Price (RM)</div>
           <div className="label">Service SKU</div>
           <div className="label text-right">Actions</div>
@@ -49,14 +59,26 @@ export default function OrderAddonsSection({ addons }: { addons: AddonDto[] }) {
           <div className="t-small text-base-500 px-3 py-4">No add-ons configured.</div>
         )}
         {addons.map((a) => (
-          <AddonRow key={a.key} addon={a} />
+          <AddonRow
+            key={a.key}
+            addon={a}
+            description={a.serviceSku ? (descBySku.get(a.serviceSku) ?? "") : null}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function AddonRow({ addon }: { addon: AddonDto }) {
+function AddonRow({
+  addon,
+  description,
+}: {
+  addon: AddonDto;
+  /** Current description of the linked Service SKU; null = no linked SKU
+   *  (e.g. the server-owned DELIVERY* rows) → the cell shows a dash. */
+  description: string | null;
+}) {
   const patch = usePatchAddon();
   const del = useDeleteAddon();
 
@@ -65,6 +87,14 @@ function AddonRow({ addon }: { addon: AddonDto }) {
     if (next.length < 2 || next === addon.name) return;
     patch.mutate(
       { key: addon.key, patch: { name: next } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+  function commitDescription(raw: string) {
+    const next = raw.trim();
+    if (description === null || next === (description ?? "")) return;
+    patch.mutate(
+      { key: addon.key, patch: { serviceDescription: next } },
       { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
     );
   }
@@ -93,7 +123,7 @@ function AddonRow({ addon }: { addon: AddonDto }) {
   return (
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: "minmax(140px,1.4fr) 120px 150px 110px" }}
+      style={{ gridTemplateColumns: "minmax(130px,1.1fr) minmax(150px,1.4fr) 110px 150px 100px" }}
       data-testid={`addon-row-${addon.key}`}
     >
       <input
@@ -105,6 +135,21 @@ function AddonRow({ addon }: { addon: AddonDto }) {
         aria-label={`${addon.key} name`}
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
       />
+      {description === null ? (
+        <span className="t-tiny text-base-400">—</span>
+      ) : (
+        <input
+          key={`${addon.key}-desc-${description}`}
+          defaultValue={description}
+          placeholder="Add a description…"
+          onBlur={(e) => commitDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          aria-label={`${addon.key} description`}
+          className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[12.5px] text-base-600 outline-none bg-transparent"
+        />
+      )}
       <input
         type="number"
         min={0}

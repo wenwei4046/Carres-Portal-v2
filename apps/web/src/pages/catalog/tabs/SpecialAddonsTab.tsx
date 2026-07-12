@@ -156,7 +156,7 @@ export default function SpecialAddonsTab({
         )}
         {active === "order" && (
           <div className="flex flex-col gap-8">
-            <OrderAddonsSection addons={catalog.addons} />
+            <OrderAddonsSection addons={catalog.addons} skus={catalog.skus} />
             <StairCarryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
           </div>
         )}

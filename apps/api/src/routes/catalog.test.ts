@@ -1674,6 +1674,40 @@ describe("Maintenance — floor-config + addons role gate", () => {
     expect(sync?.payload).toMatchObject({ price: 95 });
   });
 
+  it("addons PATCH with ONLY serviceDescription writes it to the linked SKU row (no addons update)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          addons: [
+            {
+              key: "dispose-mattress",
+              name: "Dispose old mattress",
+              price: 80,
+              active: true,
+              service_sku: "SVC-DISPOSE-MATTRESS",
+            },
+          ],
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons/dispose-mattress", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceDescription: "We collect & dispose responsibly" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // No addons column changed → no addons write; the SKU description updated.
+    expect(recorded.find((r) => r.table === "addons")).toBeUndefined();
+    const descSync = recorded.find((r) => r.table === "product_skus" && r.op === "update");
+    expect(descSync?.payload).toEqual({ description: "We collect & dispose responsibly" });
+  });
+
   it("addons PATCH price by a NON-principal does NOT touch the Service SKU (0175 lock)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(

@@ -9,6 +9,7 @@ const createAsync = vi.fn();
 const patchAsync = vi.fn();
 const delAsync = vi.fn();
 const addonCreateAsync = vi.fn();
+const addonPatchMutate = vi.fn();
 vi.mock("@/lib/queries", () => ({
   useCreateSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: createAsync, isPending: false }),
   usePatchSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: patchAsync, isPending: false }),
@@ -18,7 +19,7 @@ vi.mock("@/lib/queries", () => ({
   useCatalogConfigHistory: () => ({ data: undefined, isLoading: false }),
   // Order Add-ons section (hosted here since 0201).
   useCreateAddon: () => ({ mutate: vi.fn(), mutateAsync: addonCreateAsync, isPending: false }),
-  usePatchAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  usePatchAddon: () => ({ mutate: addonPatchMutate, mutateAsync: vi.fn(), isPending: false }),
   useDeleteAddon: () => ({ mutate: vi.fn(), isPending: false }),
   // Stair-carry fee (hosted in the Order Add-ons panel since 2026-07-06).
   usePatchFloorConfig: () => ({ mutate: vi.fn(), isPending: false }),
@@ -53,6 +54,7 @@ beforeEach(() => {
   patchAsync.mockReset().mockResolvedValue({ specialAddon: SA });
   delAsync.mockReset().mockResolvedValue({ ok: true });
   addonCreateAsync.mockReset().mockResolvedValue({ addon: {} });
+  addonPatchMutate.mockReset();
 });
 
 /** 0201 — the tab is sidebar-driven now: the special_addons editor lives
@@ -129,6 +131,46 @@ describe("SpecialAddonsTab", () => {
       serviceSku: "SVC-DISPOSE-OLD-RUG-LARGE",
       serviceDescription: "Haul away the customer's old rug",
     });
+  });
+
+  it("Order Add-ons rows show an editable Description (from the linked Service SKU) that PATCHes serviceDescription", () => {
+    const cat = {
+      ...catalog([]),
+      addons: [
+        {
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 80,
+          active: true,
+          serviceSku: "SVC-DISPOSE-MATTRESS",
+        },
+        // Server-owned delivery row — no linked SKU → dash, not an input.
+        { key: "DELIVERY", name: "Delivery fee", price: 0, active: true, serviceSku: null },
+      ],
+      skus: [
+        {
+          sku: "SVC-DISPOSE-MATTRESS",
+          description: "Dispose old mattress",
+        },
+      ],
+    } as unknown as CatalogResponse;
+    render(<SpecialAddonsTab catalog={cat} isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId("maint-nav-order"));
+
+    const descInput = screen.getByLabelText("dispose-mattress description") as HTMLInputElement;
+    expect(descInput.value).toBe("Dispose old mattress");
+    // The unlinked DELIVERY row has no description input.
+    expect(screen.queryByLabelText("DELIVERY description")).not.toBeInTheDocument();
+
+    fireEvent.change(descInput, { target: { value: "We collect & dispose responsibly" } });
+    fireEvent.blur(descInput);
+    expect(addonPatchMutate).toHaveBeenCalledWith(
+      {
+        key: "dispose-mattress",
+        patch: { serviceDescription: "We collect & dispose responsibly" },
+      },
+      expect.anything(),
+    );
   });
 
   it("Order Add-ons panel hosts the stair-carry fee editor (moved from Delivery)", () => {
