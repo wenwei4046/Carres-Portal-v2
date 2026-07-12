@@ -627,6 +627,42 @@
 .field textarea { resize: vertical; min-height: 80px; }
 .field__hint { font-size: 11px; color: var(--fg-muted); }
 
+/* Full-name autocomplete — existing-customer suggestions (anchored under the
+   input via an inline position:relative wrapper). */
+.cust-suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  z-index: 30;
+  background: var(--pos-panel, #fff);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(34, 31, 32, 0.14);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.cust-suggest__head {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--fg-muted);
+  padding: 10px 14px 6px;
+}
+.cust-suggest__item {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: none; border: 0; cursor: pointer;
+  font: inherit;
+}
+.cust-suggest__item:hover { background: color-mix(in oklab, var(--c-orange) 8%, transparent); }
+.cust-suggest__item + .cust-suggest__item { border-top: 1px solid var(--line); }
+.cust-suggest__name { font-size: 14px; font-weight: 600; }
+.cust-suggest__meta {
+  font-size: 11px; color: var(--fg-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* Date picker */
 .datepick {
   display: grid; grid-template-columns: repeat(7, 1fr);

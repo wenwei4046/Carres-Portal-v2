@@ -468,6 +468,137 @@ describe("GET /api/orders", () => {
   });
 });
 
+describe("GET /api/orders/customer-search", () => {
+  /** Chain mock for .select().ilike().order().limit() — records the ilike
+   *  pattern + limit and resolves rows at .limit(). */
+  function buildSbForSearch(rows: unknown[]) {
+    const calls: { ilike?: [string, string]; limit?: number } = {};
+    const chain = {
+      ilike(col: string, pattern: string) {
+        calls.ilike = [col, pattern];
+        return chain;
+      },
+      order() {
+        return chain;
+      },
+      limit: async (n: number) => {
+        calls.limit = n;
+        return { data: rows, error: null };
+      },
+    };
+    return Object.assign(
+      { from: () => ({ select: () => chain }), _calls: calls },
+      {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ) as any;
+  }
+
+  function customerRow(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      customer_name: "Jamie Tan",
+      customer_phone: "012-3456789",
+      customer_email: "jamie@example.com",
+      customer_address: "12 Jalan Besar, Petaling Jaya 46200, Selangor",
+      customer_address_unknown: false,
+      customer_billing: null,
+      customer_billing_same: true,
+      customer_emergency: "Mei Tan · 012-9988776 · Spouse",
+      customer_race: "Chinese",
+      customer_gender: "Female",
+      customer_birthday: "1990-04-01",
+      placed_at: "2026-07-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request("http://t/api/orders/customer-search?q=jam"), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("short query (<2 chars) returns empty without touching the DB", async () => {
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=j", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ customers: [] });
+    expect(vi.mocked(userClient)).not.toHaveBeenCalled();
+  });
+
+  it("maps the full customer block to camelCase", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForSearch([customerRow()]));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=jam", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customers: Array<Record<string, unknown>> };
+    expect(body.customers).toEqual([
+      {
+        name: "Jamie Tan",
+        phone: "012-3456789",
+        email: "jamie@example.com",
+        address: "12 Jalan Besar, Petaling Jaya 46200, Selangor",
+        addressUnknown: false,
+        billing: null,
+        billingSame: true,
+        emergency: "Mei Tan · 012-9988776 · Spouse",
+        race: "Chinese",
+        gender: "Female",
+        birthday: "1990-04-01",
+      },
+    ]);
+  });
+
+  it("dedupes by phone digits (newest order wins) and by name when phone is null", async () => {
+    const rows = [
+      customerRow({ customer_email: "newest@example.com" }),
+      // Same phone, different formatting → same customer, older order dropped.
+      customerRow({ customer_phone: "0123456789", customer_email: "older@example.com" }),
+      // No phone → keyed by lowercased name.
+      customerRow({ customer_name: "James Lee", customer_phone: null }),
+      customerRow({ customer_name: "james lee", customer_phone: null }),
+    ];
+    vi.mocked(userClient).mockReturnValue(buildSbForSearch(rows));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=ja", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as { customers: Array<{ name: string; email: string }> };
+    expect(body.customers).toHaveLength(2);
+    expect(body.customers[0]?.email).toBe("newest@example.com");
+    expect(body.customers[1]?.name).toBe("James Lee");
+  });
+
+  it("escapes ilike wildcards in the query and caps results at 8", async () => {
+    const rows = Array.from({ length: 12 }, (_, i) =>
+      customerRow({ customer_name: `Jam ${i}`, customer_phone: `012-000000${i}` }),
+    );
+    const sb = buildSbForSearch(rows);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/customer-search?q=${encodeURIComponent("ja%m")}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb._calls.ilike).toEqual(["customer_name", "%ja\\%m%"]);
+    const body = (await res.json()) as { customers: unknown[] };
+    expect(body.customers).toHaveLength(8);
+  });
+});
+
 describe("GET /api/orders/:id", () => {
   it("returns order with rels populated via PostgREST nested fetch", async () => {
     const oneRow = {

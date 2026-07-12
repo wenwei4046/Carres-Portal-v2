@@ -201,6 +201,59 @@ ordersRouter.get("/customer-type", async (c) => {
 });
 
 /**
+ * GET /api/orders/customer-search?q= — POS Full-name autocomplete.
+ *
+ * Carres has no customer entity, so "the customer list" = the customers on
+ * RLS-visible past orders (dealer sees own orders; internal roles see all —
+ * scoped by design, same as /customer-type). Matches customer_name with a
+ * case-insensitive contains, dedupes to one row per customer (phone digits;
+ * name fallback when phone is null), newest order wins, and returns the full
+ * customer block so the POS can prefill address + emergency contact.
+ */
+ordersRouter.get("/customer-search", async (c) => {
+  const q = (new URL(c.req.url).searchParams.get("q") ?? "").trim();
+  if (q.length < 2) return c.json({ customers: [] });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // Escape PostgREST ilike wildcards so a literal "%"/"_" in the query
+  // doesn't widen the match.
+  const pattern = "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%";
+  const { data, error } = await sb
+    .from("orders")
+    .select(
+      "customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_billing, customer_billing_same, customer_emergency, customer_race, customer_gender, customer_birthday, placed_at",
+    )
+    .ilike("customer_name", pattern)
+    .order("placed_at", { ascending: false })
+    .limit(40);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  const seen = new Set<string>();
+  const customers: Array<Record<string, unknown>> = [];
+  for (const row of (data ?? []) as Array<DB.OrderRow>) {
+    const key =
+      (row.customer_phone ?? "").replace(/\D/g, "") ||
+      "name:" + row.customer_name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    customers.push({
+      name: row.customer_name,
+      phone: row.customer_phone,
+      email: row.customer_email,
+      address: row.customer_address,
+      addressUnknown: row.customer_address_unknown,
+      billing: row.customer_billing,
+      billingSame: row.customer_billing_same,
+      emergency: row.customer_emergency,
+      race: row.customer_race,
+      gender: row.customer_gender,
+      birthday: row.customer_birthday,
+    });
+    if (customers.length >= 8) break;
+  }
+  return c.json({ customers });
+});
+
+/**
  * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
  *
  * Flow:

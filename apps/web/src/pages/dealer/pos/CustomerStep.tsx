@@ -4,23 +4,13 @@ import type { CatalogResponse, OutletDto, SalespersonDto } from "@carres/shared"
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { useCustomerTypeProbe } from "@/lib/queries";
+import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
 import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
-
-const RELATIONSHIPS = [
-  "Spouse",
-  "Parent",
-  "Child",
-  "Sibling",
-  "Relative",
-  "Friend",
-  "Colleague",
-  "Helper",
-] as const;
+import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 
 /** MY-standard demographic option lists (0200 — feed Sales analysis). */
 const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
@@ -81,6 +71,20 @@ export default function CustomerStep({
 }) {
   const c = draft.customer;
   const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(initialSubStep);
+
+  // FULL NAME autocomplete — search past orders' customers by the (debounced)
+  // typed name; picking a hit prefills the whole customer block (address +
+  // emergency contact included). The dropdown opens on typing/focus and closes
+  // on blur or pick; item mousedown fires before the input's blur.
+  const [showSuggest, setShowSuggest] = useState(false);
+  const debouncedName = useDebouncedValue(c.name.trim(), 300);
+  const search = useCustomerSearch(debouncedName);
+  const suggestions = showSuggest ? (search.data?.customers ?? []) : [];
+
+  function pickCustomer(hit: CustomerSearchHit) {
+    onChange({ ...draft, customer: { ...c, ...customerPatchFromHit(hit) } });
+    setShowSuggest(false);
+  }
 
   // CUSTOMER TYPE (AUTO) — probe visible orders by the (debounced) phone.
   const debouncedPhone = useDebouncedValue(c.phone.trim(), 400);
@@ -276,11 +280,48 @@ export default function CustomerStep({
                   </div>
                   <div className="field">
                     <span className="field__label">Full name *</span>
-                    <input
-                      value={c.name}
-                      placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
-                      onChange={(e) => setC({ name: e.target.value })}
-                    />
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
+                      <input
+                        value={c.name}
+                        placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
+                        autoComplete="off"
+                        data-testid="pos-customer-name"
+                        onChange={(e) => {
+                          setC({ name: e.target.value });
+                          setShowSuggest(true);
+                        }}
+                        onFocus={() => setShowSuggest(true)}
+                        onBlur={() => setShowSuggest(false)}
+                      />
+                      {suggestions.length > 0 && (
+                        <div className="cust-suggest" data-testid="pos-customer-suggest">
+                          <div className="cust-suggest__head">Existing customers</div>
+                          {suggestions.map((h, i) => (
+                            <button
+                              type="button"
+                              key={(h.phone ?? h.name) + i}
+                              className="cust-suggest__item"
+                              data-testid={`pos-customer-suggest-${i}`}
+                              // mousedown (not click) — must beat the input's
+                              // blur, which unmounts the dropdown.
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                pickCustomer(h);
+                              }}
+                            >
+                              <span className="cust-suggest__name">{h.name}</span>
+                              <span className="cust-suggest__meta">
+                                {[h.phone, h.address].filter(Boolean).join(" · ") ||
+                                  "no phone / address on file"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="field__hint">
+                      Returning customer? Pick from the list to auto-fill their info.
+                    </span>
                   </div>
                   <div className="field">
                     <span className="field__label">Phone *</span>
