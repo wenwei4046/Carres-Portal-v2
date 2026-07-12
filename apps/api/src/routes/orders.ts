@@ -832,11 +832,26 @@ ordersRouter.post("/raw", async (c) => {
 // ---------------------------------------------------------------------------
 
 /** Split a combined Ref ("TCF0282/CR1009", "TCF0282 + CR1009") → sorted uniq. */
-function normalizeRefs(ref: string): string[] {
+/**
+ * Canonical dedup key for a (possibly combined) AutoCount Ref.
+ *
+ * A combined invoice Ref can arrive in ANY order or separator — "CR0925+TCF0394"
+ * and "TCF0394 & CR0925" are the SAME order (one customer / one delivery / one
+ * shared balance). Split on `+ / , &`, trim, upper-case, dedupe, then **sort**
+ * so the token set is order-insensitive: the grouping key (`refs.join("|")`) and
+ * the stored `orders.source_ref[]` are canonical, and Postgres array-equality in
+ * the import RPC dedups regardless of the order/separator the export used. Each
+ * token is also a per-invoice alias (searchable — see operation/orders list).
+ *
+ * NOTE: `/` is treated as a separator; an invoice format that embeds a slash
+ * (e.g. "TCF2024/06-461") would be split. Not observed at scale in prod (checked
+ * 2026-07-12); revisit the separator set if such formats become common.
+ */
+export function normalizeRefs(ref: string): string[] {
   return Array.from(
     new Set(
       ref
-        .split(/[/+,]/)
+        .split(/[/+,&]/)
         .map((r) => r.trim().toUpperCase())
         .filter((r) => r.length > 0),
     ),
