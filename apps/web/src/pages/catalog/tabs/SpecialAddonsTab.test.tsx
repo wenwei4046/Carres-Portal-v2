@@ -97,6 +97,31 @@ describe("SpecialAddonsTab", () => {
     expect(screen.getByText("Create").closest("button")).toBeDisabled();
   });
 
+  it("Add add-on form auto-generates the Service SKU from the key, until manually edited", () => {
+    render(<SpecialAddonsTab catalog={catalog([])} isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId("maint-nav-order"));
+    fireEvent.click(screen.getByText("+ Add add-on"));
+
+    const keyInput = screen.getByPlaceholderText("dispose-mattress");
+    const skuInput = screen.getByTestId("addon-service-sku") as HTMLInputElement;
+
+    // Auto: tracks the key, uppercased with the SVC- prefix.
+    fireEvent.change(keyInput, { target: { value: "dispose-rug" } });
+    expect(skuInput.value).toBe("SVC-DISPOSE-RUG");
+    fireEvent.change(keyInput, { target: { value: "dispose-carpet" } });
+    expect(skuInput.value).toBe("SVC-DISPOSE-CARPET");
+
+    // Manual edit takes over — a later key change no longer overwrites it.
+    fireEvent.change(skuInput, { target: { value: "SVC-CUSTOM" } });
+    fireEvent.change(keyInput, { target: { value: "dispose-other" } });
+    expect(skuInput.value).toBe("SVC-CUSTOM");
+
+    // Clearing it manually means "no service SKU" — stays empty.
+    fireEvent.change(skuInput, { target: { value: "" } });
+    fireEvent.change(keyInput, { target: { value: "dispose-final" } });
+    expect(skuInput.value).toBe("");
+  });
+
   it("Order Add-ons panel hosts the stair-carry fee editor (moved from Delivery)", () => {
     render(<SpecialAddonsTab catalog={catalog([])} isPrincipal={true} />);
     fireEvent.click(screen.getByTestId("maint-nav-order"));

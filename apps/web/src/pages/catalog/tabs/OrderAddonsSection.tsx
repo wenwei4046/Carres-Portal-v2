@@ -138,7 +138,12 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [serviceSku, setServiceSku] = useState("");
+  // Service SKU auto-generates from the key (Loo 2026-07-12):
+  // dispose-mattress → SVC-DISPOSE-MATTRESS. Typing in the field takes over
+  // (including clearing it = "no service SKU"); until then it tracks the key.
+  const [serviceSkuOverride, setServiceSkuOverride] = useState<string | null>(null);
+  const autoServiceSku = key.trim() ? `SVC-${key.trim().toUpperCase()}` : "";
+  const serviceSku = serviceSkuOverride ?? autoServiceSku;
   const busy = create.isPending || patch.isPending;
 
   const keyValid = /^[a-z0-9-]{2,60}$/.test(key.trim());
@@ -219,12 +224,15 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
         />
       </label>
       <label className="block">
-        <span className="label block mb-1">Service SKU (optional)</span>
+        <span className="label block mb-1">
+          Service SKU {serviceSkuOverride === null ? "(auto from key)" : "(optional)"}
+        </span>
         <input
           value={serviceSku}
-          onChange={(e) => setServiceSku(e.target.value)}
+          onChange={(e) => setServiceSkuOverride(e.target.value)}
           placeholder="SVC-DISPOSE-MATTRESS"
           className={`${INPUT_CLS} w-52 font-mono`}
+          data-testid="addon-service-sku"
         />
       </label>
       <button
