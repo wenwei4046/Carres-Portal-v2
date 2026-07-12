@@ -27,6 +27,15 @@ export interface SellingFabric {
   series: string | null;
 }
 
+/** "CODE · description" display name — but when the authored description
+ *  ALREADY leads with the code ("CG-007 Deep Grey"), use it as-is instead of
+ *  doubling the code ("CG-007 · CG-007 Deep Grey" — Loo 2026-07-12). */
+export function fabricDisplayName(code: string, description: string | null | undefined): string {
+  const desc = (description ?? "").trim();
+  if (!desc) return code;
+  return desc.toLowerCase().startsWith(code.trim().toLowerCase()) ? desc : `${code} · ${desc}`;
+}
+
 export function sellingFabricsFor(
   model: ProductModelDto,
   legacy: SofaFabricDto[],
@@ -43,7 +52,7 @@ export function sellingFabricsFor(
   }));
   const fromMaster: SellingFabric[] = allowedFabricsFor(model, master).map((f) => ({
     key: `cf:${f.fabricCode}`,
-    name: f.description ? `${f.fabricCode} · ${f.description}` : f.fabricCode,
+    name: fabricDisplayName(f.fabricCode, f.description),
     tier: f.sofaTier,
     id: null,
     code: f.fabricCode,

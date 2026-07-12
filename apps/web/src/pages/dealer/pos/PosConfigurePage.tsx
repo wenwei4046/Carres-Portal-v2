@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
+import { ArrowLeft, Check, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
@@ -23,9 +23,15 @@ import {
 } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { newLocalId } from "../new-order/configurators";
-import { SpecialAddonsPicker, useSpecials } from "../new-order/special-addons-picker";
+import {
+  SpecialAddonsPicker,
+  offeredSpecialsFor,
+  optionsFromAttrs,
+  specialsFromAttrs,
+  useSpecials,
+} from "../new-order/special-addons-picker";
 import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
-import type { SellingFabric } from "../sofa-build/selling-fabrics";
+import { fabricDisplayName, type SellingFabric } from "../sofa-build/selling-fabrics";
 import type { ModelMeta } from "./catalog-index";
 import {
   coveringPwpForLine,
@@ -312,6 +318,7 @@ export default function PosConfigurePage({
   pwpClaimGroup,
   customerPhone,
   onApplyVoucherCode,
+  editLine,
   onAdd,
   onClose,
 }: {
@@ -342,6 +349,11 @@ export default function PosConfigurePage({
   customerPhone?: string;
   /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Cart-line EDIT (Loo 2026-07-12): the existing DraftLine to prefill from.
+   *  Read once at mount (the caller mounts a fresh page per edit); `onAdd`
+   *  then REPLACES the line in the cart instead of appending. A PWP / free
+   *  claim on the old line is NOT restored — the cart re-offers it. */
+  editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -376,15 +388,44 @@ export default function PosConfigurePage({
     [isBed, model, fabrics],
   );
 
-  const [skuId, setSkuId] = useState<string>("");
+  // Cart-line EDIT prefill — the line's stored picks, mapped back to control
+  // state. Read once at mount (the caller mounts a fresh page per edit), so
+  // feeding useState initializers is enough. Specials are filtered to the
+  // codes STILL offered — a delisted pick would wedge `sp.complete` with no
+  // way to un-tick it.
+  const edit = useMemo(() => {
+    if (!editLine) return null;
+    const attrs = (editLine.attrs ?? {}) as Record<string, unknown>;
+    const opts = optionsFromAttrs(editLine.attrs);
+    const optVal = (kind: string) =>
+      opts.find((o) => o.kind === kind && typeof o.value === "string")?.value ?? "";
+    const offeredCodes = new Set(offeredSpecialsFor(model, specialAddons).map((d) => d.code));
+    const fabricCode = optVal("fabric");
+    return {
+      skuId: skus.find((s) => s.sku === editLine.sku)?.id ?? "",
+      qty: editLine.qty,
+      gap: typeof attrs.gap === "string" ? attrs.gap : "",
+      divan: optVal("divan_height"),
+      leg: optVal("bedframe_leg_height"),
+      fabricKey: fabricCode ? `cf:${fabricCode}` : null,
+      specials: specialsFromAttrs(editLine.attrs)
+        .filter((s) => typeof s.code === "string" && offeredCodes.has(s.code))
+        .map((s) => ({ code: s.code as string, choiceLabels: s.choiceLabels ?? [] })),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [skuId, setSkuId] = useState<string>(edit?.skuId ?? "");
   // Mattress gap is THREE-state (Loo 2026-07-11): Confirm later (KIV, the
   // default — the customer hasn't decided yet; rides attrs.gap = "KIV" so the
   // PO/PDF show the pending choice) · None ("" — explicitly no gap) · a value.
-  const [gap, setGap] = useState<string>(gapChoices.length > 0 ? GAP_KIV : "");
+  const [gap, setGap] = useState<string>(() =>
+    edit ? edit.gap : gapChoices.length > 0 ? GAP_KIV : "",
+  );
   // Divan / leg / fabric are OPTIONAL (2990s "Confirm later", Loo 2026-06-11):
   // "" = customer confirms the dimension later; no surcharge applies.
-  const [divan, setDivan] = useState<string>("");
-  const [leg, setLeg] = useState<string>("");
+  const [divan, setDivan] = useState<string>(edit?.divan ?? "");
+  const [leg, setLeg] = useState<string>(edit?.leg ?? "");
   // Fabric IS the bed's colour / finish (Loo 2026-07-06 — a bed frame follows
   // the fabric). A two-level Series → Colour dropdown with KIV-to-defer at each
   // level, driven by the SAME `useSeriesFabric` hook the sofa uses (Loo
@@ -394,7 +435,7 @@ export default function PosConfigurePage({
     () =>
       fabricOpts.map((f) => ({
         key: `cf:${f.fabricCode}`,
-        name: f.description ? `${f.fabricCode} · ${f.description}` : f.fabricCode,
+        name: fabricDisplayName(f.fabricCode, f.description),
         tier: f.bedframeTier,
         id: null,
         code: f.fabricCode,
@@ -411,12 +452,12 @@ export default function PosConfigurePage({
     setColourKey: setFabColourKey,
     seriesColours: fabSeriesColours,
     fabric: selFabric,
-  } = useSeriesFabric(bedFabrics);
+  } = useSeriesFabric(bedFabrics, { key: edit?.fabricKey });
   const fabricCode = selFabric?.code ?? "";
   const finishName = selFabric?.name ?? "";
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(edit?.qty ?? 1);
   const sku = skus.find((s) => s.id === skuId);
-  const sp = useSpecials(model, specialAddons);
+  const sp = useSpecials(model, specialAddons, edit?.specials);
 
   // The option picks + their server-verifiable total — the SAME pure resolver
   // Hono re-runs on submit (option-picks-recompute), so this preview cannot
@@ -761,7 +802,15 @@ export default function PosConfigurePage({
               title={!sku ? "Pick a size first" : !sp.complete ? "Finish the add-on options" : undefined}
               data-testid="cfg-add-to-cart"
             >
-              <Plus size={16} strokeWidth={1.75} /> Add to Cart
+              {editLine ? (
+                <>
+                  <Check size={16} strokeWidth={1.75} /> Update item
+                </>
+              ) : (
+                <>
+                  <Plus size={16} strokeWidth={1.75} /> Add to Cart
+                </>
+              )}
             </button>
           </div>
         </div>

@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
+import type { CatalogResponse } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import {
   attrsKey,
   cartItemCount,
   cartLineSubtotal,
   cartTotalExStair,
+  lineEditTarget,
   mergeLine,
   sameLine,
 } from "./cart";
@@ -95,5 +97,41 @@ describe("cart math", () => {
   });
   it("total excludes stair (lines + addons only)", () => {
     expect(cartTotalExStair(lines, [{ key: "a", qty: 2, unitPrice: 50, name: "Install" }])).toBe(2600);
+  });
+});
+
+// ── cart-line EDIT routing (the ✎ pencil, Loo 2026-07-12) ────────────────────
+
+const EDIT_CATALOG = {
+  models: [
+    { id: "m-sofa", category: "sofa", name: "Booqit" },
+    { id: "m-matt", category: "mattress", name: "Lumi" },
+    { id: "m-bed", category: "bedframe", name: "Kayu" },
+    { id: "m-acc", category: "accessory", name: "Protector" },
+  ],
+  skus: [
+    { sku: "BOOQIT-P", modelId: "m-sofa" },
+    { sku: "LUMI-Q", modelId: "m-matt" },
+    { sku: "KAYU-K", modelId: "m-bed" },
+    { sku: "PROT-1", modelId: "m-acc" },
+  ],
+} as unknown as CatalogResponse;
+
+describe("lineEditTarget", () => {
+  it("routes a sofa BUILD line (attrs.sofa_build) to the sofa page", () => {
+    const l = line({ sku: "BOOQIT-P", attrs: { sofa_build: { cells: [], height: "24" } } });
+    expect(lineEditTarget(l, EDIT_CATALOG)).toBe("sofa_build");
+  });
+  it("routes mattress + bedframe lines to the configure page", () => {
+    expect(lineEditTarget(line({ sku: "LUMI-Q" }), EDIT_CATALOG)).toBe("bed_mattress");
+    expect(lineEditTarget(line({ sku: "KAYU-K", attrs: { gap: "KIV" } }), EDIT_CATALOG)).toBe(
+      "bed_mattress",
+    );
+  });
+  it("accessory / unknown-sku / preset-sofa lines are not editable", () => {
+    expect(lineEditTarget(line({ sku: "PROT-1" }), EDIT_CATALOG)).toBeNull();
+    expect(lineEditTarget(line({ sku: "GONE-1" }), EDIT_CATALOG)).toBeNull();
+    // A sofa line WITHOUT a stored build (preset dropdown) has no canvas to reopen.
+    expect(lineEditTarget(line({ sku: "BOOQIT-P", attrs: null }), EDIT_CATALOG)).toBeNull();
   });
 });

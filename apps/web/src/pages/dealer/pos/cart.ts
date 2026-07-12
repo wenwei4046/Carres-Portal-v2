@@ -1,3 +1,4 @@
+import type { CatalogResponse } from "@carres/shared";
 import type { DraftAddon, DraftLine } from "../new-order/draft";
 
 /**
@@ -6,6 +7,27 @@ import type { DraftAddon, DraftLine } from "../new-order/draft";
  * IDENTICAL to what the submit pipeline (`DealerNewOrder` → `create_order`)
  * expects — the POS only ever changes `qty`, never the line shape.
  */
+
+/** Where a cart line can be re-opened for editing (the ✎ pencil, Loo
+ *  2026-07-12). One helper so the CartDrawer's pencil visibility and the
+ *  CatalogStep's routing never drift:
+ *    - `sofa_build`  → SofaConfigurePage (the stored geometry back on canvas)
+ *    - `bed_mattress` → PosConfigurePage (size / options / specials restored)
+ *    - null → not editable in a configurator (accessory / service / preset
+ *      lines — qty is already editable in the cart itself). */
+export type LineEditTarget = "sofa_build" | "bed_mattress";
+export function lineEditTarget(
+  line: DraftLine,
+  catalog: CatalogResponse,
+): LineEditTarget | null {
+  const sku = catalog.skus.find((s) => s.sku === line.sku);
+  const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
+  if (!model) return null;
+  const attrs = line.attrs as Record<string, unknown> | null;
+  if (attrs?.sofa_build) return model.category === "sofa" ? "sofa_build" : null;
+  if (model.category === "mattress" || model.category === "bedframe") return "bed_mattress";
+  return null;
+}
 
 /** Stable JSON key for a line's attrs (sorted keys) so two adds of the same
  *  sku + same options collapse into one cart line. */
