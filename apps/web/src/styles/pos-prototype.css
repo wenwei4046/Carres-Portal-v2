@@ -804,7 +804,8 @@
 .summary__item-main { min-width: 0; }
 .summary__item-photo {
   width: 48px; height: 48px;
-  border-radius: var(--radius-sm);
+  /* Rounded square, not a sharp tile (Loo 2026-07-12). */
+  border-radius: 10px;
   background-color: var(--c-beige);
   border: 1px solid var(--line);
   /* CONTAIN, not cover (Loo 2026-07-12) — a 40px cover crop of a product
@@ -815,14 +816,6 @@
   background-position: center;
 }
 .summary__item--sofa .summary__item-photo { margin-top: 2px; }
-/* Sofa BUILD rows draw the actual plan-view layout in the tile (Loo
-   2026-07-12, prototype parity) — white stage, svg contained. */
-.summary__item-photo--plan {
-  background-color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  padding: 3px;
-}
-.summary__item-photo--plan svg { max-width: 100%; max-height: 100%; }
 .summary__item-name {
   font-family: var(--font-title);
   font-weight: var(--w-bold);
@@ -851,9 +844,13 @@
   color: var(--c-festive-b);
 }
 .summary__item-meta {
-  font-family: var(--font-sans);
-  font-size: var(--fs-12);
-  line-height: 1.4;
+  /* Spec lines read in the MONO spec face, one step smaller than the name
+     (Loo 2026-07-12) — same voice as prod-card__sku / cfg-comp__meta, so
+     the model name (font-title) and its spec clearly separate. */
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--fg-muted);
   margin-top: 2px;
 }

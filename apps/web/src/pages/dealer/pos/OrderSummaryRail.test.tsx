@@ -106,7 +106,7 @@ describe("OrderSummaryRail — item row label split (Loo 2026-07-12)", () => {
     expect(screen.queryByText("·")).not.toBeInTheDocument();
   });
 
-  it("a sofa BUILD line draws the plan view + the Custom(bare codes) detail (prototype style)", () => {
+  it("a sofa BUILD line shows the photo tile + the Custom(bare codes) spec lines (prototype style)", () => {
     render(
       <OrderSummaryRail
         draft={draftWith({
@@ -139,7 +139,9 @@ describe("OrderSummaryRail — item row label split (Loo 2026-07-12)", () => {
     // Fabric surcharge itemised, prototype-style.
     expect(row.textContent).toContain("Fabric · CG-007 Deep Grey · +RM 250");
     expect(row.textContent).toContain('Leg 4"');
-    // The tile draws the layout (an svg), not a photo crop.
-    expect(row.querySelector(".summary__item-photo--plan svg")).toBeTruthy();
+    // The tile is the PHOTO treatment (Loo reverted the plan-view sketch) —
+    // the spec lines carry the structure instead.
+    expect(row.querySelector(".summary__item-photo")).toBeTruthy();
+    expect(row.querySelector(".summary__item-photo--plan")).toBeNull();
   });
 });
