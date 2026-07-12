@@ -5,7 +5,21 @@ import type { CatalogResponse } from "@carres/shared";
 import { emptyDraft } from "../new-order/draft";
 import CustomerStep from "./CustomerStep";
 
+// Full-name autocomplete — stub only useCustomerSearch (keeps the real
+// useCustomerTypeProbe, which stays idle below 8 phone chars).
+const { mockCustomerSearch } = vi.hoisted(() => ({
+  mockCustomerSearch: vi.fn((): { data?: { customers: unknown[] } } => ({ data: undefined })),
+}));
+vi.mock("@/lib/queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/queries")>()),
+  useCustomerSearch: mockCustomerSearch,
+}));
+
 afterEach(cleanup);
+afterEach(() => {
+  mockCustomerSearch.mockReset();
+  mockCustomerSearch.mockReturnValue({ data: undefined });
+});
 
 function catalog(): CatalogResponse {
   return {
@@ -135,6 +149,102 @@ describe("CustomerStep — 2990s Image-#4 parity", () => {
         customer: expect.objectContaining({ race: "Chinese" }),
       }),
     );
+  });
+});
+
+describe("CustomerStep — Full-name autocomplete (existing customers)", () => {
+  const HIT = {
+    name: "Jamie Tan",
+    phone: "012-3456789",
+    email: "jamie@example.com",
+    address: "12 Jalan Besar, Petaling Jaya 46200, Selangor",
+    addressUnknown: false,
+    billing: null,
+    billingSame: true,
+    emergency: "Mei Tan · 012-9988776 · Spouse",
+    race: "Chinese",
+    gender: "Female",
+    birthday: "1990-04-01",
+  };
+
+  it("dropdown hidden until typing; a pick prefills the whole customer block and closes it", () => {
+    mockCustomerSearch.mockReturnValue({ data: { customers: [HIT] } });
+    const onChange = vi.fn();
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={onChange}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+      />,
+    );
+
+    expect(screen.queryByTestId("pos-customer-suggest")).toBeNull();
+    fireEvent.change(screen.getByTestId("pos-customer-name"), { target: { value: "jam" } });
+    const item = screen.getByTestId("pos-customer-suggest-0");
+    expect(item.textContent).toContain("Jamie Tan");
+    expect(item.textContent).toContain("012-3456789");
+
+    fireEvent.mouseDown(item);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: expect.objectContaining({
+          name: "Jamie Tan",
+          phone: "012-3456789",
+          email: "jamie@example.com",
+          race: "Chinese",
+          gender: "Female",
+          birthday: "1990-04-01",
+          addressLine1: "12 Jalan Besar",
+          addressState: "Selangor",
+          addressCity: "Petaling Jaya",
+          addressPostcode: "46200",
+          billingSame: true,
+          emergencyName: "Mei Tan",
+          emergencyPhone: "012-9988776",
+          emergencyRelationship: "Spouse",
+        }),
+      }),
+    );
+    // Pick closes the dropdown.
+    expect(screen.queryByTestId("pos-customer-suggest")).toBeNull();
+  });
+
+  it("no dropdown when the search returns no matches", () => {
+    mockCustomerSearch.mockReturnValue({ data: { customers: [] } });
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("pos-customer-name"), { target: { value: "zzz" } });
+    expect(screen.queryByTestId("pos-customer-suggest")).toBeNull();
+  });
+
+  it("blur closes the dropdown", () => {
+    mockCustomerSearch.mockReturnValue({ data: { customers: [HIT] } });
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+      />,
+    );
+    const input = screen.getByTestId("pos-customer-name");
+    fireEvent.change(input, { target: { value: "jam" } });
+    expect(screen.getByTestId("pos-customer-suggest")).toBeTruthy();
+    fireEvent.blur(input);
+    expect(screen.queryByTestId("pos-customer-suggest")).toBeNull();
   });
 });
 

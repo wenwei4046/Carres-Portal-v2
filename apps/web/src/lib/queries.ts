@@ -715,6 +715,46 @@ export function useCustomerTypeProbe(
   });
 }
 
+/** One customer distilled from RLS-visible past orders (newest order wins) —
+ *  the wire shape of GET /api/orders/customer-search. `address` / `emergency`
+ *  are the composed DB strings; the POS parses them back into structured
+ *  fields via `customerPatchFromHit`. */
+export interface CustomerSearchHit {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  addressUnknown: boolean;
+  billing: string | null;
+  billingSame: boolean;
+  emergency: string | null;
+  race: string | null;
+  gender: string | null;
+  birthday: string | null;
+}
+
+/**
+ * useCustomerSearch — GET /api/orders/customer-search?q= (POS Full-name
+ * autocomplete). Returns up to 8 distinct customers from RLS-visible past
+ * orders whose name contains `q`. Disabled until 2+ chars are typed.
+ */
+export function useCustomerSearch(
+  q: string,
+  opts?: Partial<UseQueryOptions<{ customers: CustomerSearchHit[] }>>,
+) {
+  const trimmed = q.trim();
+  return useQuery<{ customers: CustomerSearchHit[] }>({
+    queryKey: ["orders", "customer-search", trimmed],
+    queryFn: () =>
+      apiFetch<{ customers: CustomerSearchHit[] }>(
+        `/api/orders/customer-search?q=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: trimmed.length >= 2,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 /**
  * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
  * Internal-only raw creation: free-form line skus + prices, no POS gates.
