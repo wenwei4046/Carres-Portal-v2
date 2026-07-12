@@ -8,6 +8,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const createAsync = vi.fn();
 const patchAsync = vi.fn();
 const delAsync = vi.fn();
+const addonCreateAsync = vi.fn();
 vi.mock("@/lib/queries", () => ({
   useCreateSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: createAsync, isPending: false }),
   usePatchSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: patchAsync, isPending: false }),
@@ -16,7 +17,7 @@ vi.mock("@/lib/queries", () => ({
   useBatchSaveOptionPool: () => ({ mutate: vi.fn(), isPending: false }),
   useCatalogConfigHistory: () => ({ data: undefined, isLoading: false }),
   // Order Add-ons section (hosted here since 0201).
-  useCreateAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useCreateAddon: () => ({ mutate: vi.fn(), mutateAsync: addonCreateAsync, isPending: false }),
   usePatchAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useDeleteAddon: () => ({ mutate: vi.fn(), isPending: false }),
   // Stair-carry fee (hosted in the Order Add-ons panel since 2026-07-06).
@@ -51,6 +52,7 @@ beforeEach(() => {
   createAsync.mockReset().mockResolvedValue({ specialAddon: SA });
   patchAsync.mockReset().mockResolvedValue({ specialAddon: SA });
   delAsync.mockReset().mockResolvedValue({ ok: true });
+  addonCreateAsync.mockReset().mockResolvedValue({ addon: {} });
 });
 
 /** 0201 — the tab is sidebar-driven now: the special_addons editor lives
@@ -97,29 +99,36 @@ describe("SpecialAddonsTab", () => {
     expect(screen.getByText("Create").closest("button")).toBeDisabled();
   });
 
-  it("Add add-on form auto-generates the Service SKU from the key, until manually edited", () => {
+  it("Add add-on form: Name/Description/Price only — key + Service SKU auto-generate from the name", async () => {
     render(<SpecialAddonsTab catalog={catalog([])} isPrincipal={true} />);
     fireEvent.click(screen.getByTestId("maint-nav-order"));
     fireEvent.click(screen.getByText("+ Add add-on"));
 
-    const keyInput = screen.getByPlaceholderText("dispose-mattress");
-    const skuInput = screen.getByTestId("addon-service-sku") as HTMLInputElement;
+    // No key / service-sku inputs anymore — just the 3 fields.
+    expect(screen.queryByPlaceholderText("dispose-mattress")).not.toBeInTheDocument();
 
-    // Auto: tracks the key, uppercased with the SVC- prefix.
-    fireEvent.change(keyInput, { target: { value: "dispose-rug" } });
-    expect(skuInput.value).toBe("SVC-DISPOSE-RUG");
-    fireEvent.change(keyInput, { target: { value: "dispose-carpet" } });
-    expect(skuInput.value).toBe("SVC-DISPOSE-CARPET");
+    fireEvent.change(screen.getByTestId("addon-name"), {
+      target: { value: "Dispose old rug (large)" },
+    });
+    fireEvent.change(screen.getByTestId("addon-description"), {
+      target: { value: "Haul away the customer's old rug" },
+    });
+    fireEvent.change(screen.getByTestId("addon-price"), { target: { value: "60" } });
 
-    // Manual edit takes over — a later key change no longer overwrites it.
-    fireEvent.change(skuInput, { target: { value: "SVC-CUSTOM" } });
-    fireEvent.change(keyInput, { target: { value: "dispose-other" } });
-    expect(skuInput.value).toBe("SVC-CUSTOM");
+    // Live preview of the derived identifiers.
+    const preview = screen.getByTestId("addon-auto-preview");
+    expect(preview).toHaveTextContent("dispose-old-rug-large");
+    expect(preview).toHaveTextContent("SVC-DISPOSE-OLD-RUG-LARGE");
 
-    // Clearing it manually means "no service SKU" — stays empty.
-    fireEvent.change(skuInput, { target: { value: "" } });
-    fireEvent.change(keyInput, { target: { value: "dispose-final" } });
-    expect(skuInput.value).toBe("");
+    fireEvent.click(screen.getByText("Add"));
+    await waitFor(() => expect(addonCreateAsync).toHaveBeenCalledOnce());
+    expect(addonCreateAsync.mock.calls[0][0]).toEqual({
+      key: "dispose-old-rug-large",
+      name: "Dispose old rug (large)",
+      price: 60,
+      serviceSku: "SVC-DISPOSE-OLD-RUG-LARGE",
+      serviceDescription: "Haul away the customer's old rug",
+    });
   });
 
   it("Order Add-ons panel hosts the stair-carry fee editor (moved from Delivery)", () => {

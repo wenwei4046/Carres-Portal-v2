@@ -132,41 +132,48 @@ function AddonRow({ addon }: { addon: AddonDto }) {
   );
 }
 
+/** Kebab-case an add-on name into its stable key: "Old mattress disposal" →
+ *  "old-mattress-disposal". Non-alphanumerics collapse to single dashes. */
+export function addonKeyFromName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 function AddonAddForm({ onDone }: { onDone: () => void }) {
   const create = useCreateAddon();
   const patch = usePatchAddon();
-  const [key, setKey] = useState("");
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  // Service SKU auto-generates from the key (Loo 2026-07-12):
-  // dispose-mattress → SVC-DISPOSE-MATTRESS. Typing in the field takes over
-  // (including clearing it = "no service SKU"); until then it tracks the key.
-  const [serviceSkuOverride, setServiceSkuOverride] = useState<string | null>(null);
-  const autoServiceSku = key.trim() ? `SVC-${key.trim().toUpperCase()}` : "";
-  const serviceSku = serviceSkuOverride ?? autoServiceSku;
   const busy = create.isPending || patch.isPending;
 
-  const keyValid = /^[a-z0-9-]{2,60}$/.test(key.trim());
+  // Loo 2026-07-12 — the operator fills Name / Description / Price ONLY.
+  // Key + Service SKU both derive from the name; the server also mints the
+  // SVC- row in the SKU master so the link is real.
+  const key = addonKeyFromName(name);
+  const serviceSku = key ? `SVC-${key.toUpperCase()}` : "";
+
+  const keyValid = /^[a-z0-9-]{2,60}$/.test(key);
   const priceNum = Number(price);
-  const skuValid = serviceSku.trim() === "" || /^SVC-[A-Z0-9-]+$/.test(serviceSku.trim());
   const valid =
-    keyValid &&
-    name.trim().length >= 2 &&
-    Number.isFinite(priceNum) &&
-    priceNum >= 0 &&
-    skuValid;
+    keyValid && name.trim().length >= 2 && price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
 
   async function submit() {
     if (!valid) return;
     const body = {
-      key: key.trim(),
+      key,
       name: name.trim(),
       price: priceNum,
-      serviceSku: serviceSku.trim() || null,
+      serviceSku,
+      ...(description.trim() ? { serviceDescription: description.trim() } : {}),
     };
     try {
       await create.mutateAsync(body);
-      toast.success(`Added ${name}`);
+      toast.success(`Added ${name} · ${serviceSku} created in SKU Master`);
       onDone();
     } catch (e) {
       // The GET bundle is active-only, so a previously-disabled add-on with
@@ -182,7 +189,13 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
       try {
         await patch.mutateAsync({
           key: body.key,
-          patch: { name: body.name, price: body.price, active: true, serviceSku: body.serviceSku },
+          patch: {
+            name: body.name,
+            price: body.price,
+            active: true,
+            serviceSku: body.serviceSku,
+            ...(description.trim() ? { serviceDescription: description.trim() } : {}),
+          },
         });
         toast.success(`Restored ${name}`);
         onDone();
@@ -195,21 +208,23 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-wrap gap-3 items-end">
       <label className="block">
-        <span className="label block mb-1">Key (kebab-case)</span>
-        <input
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder="dispose-mattress"
-          className={`${INPUT_CLS} w-44`}
-        />
-      </label>
-      <label className="block">
         <span className="label block mb-1">Name</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Old mattress disposal"
           className={`${INPUT_CLS} w-52`}
+          data-testid="addon-name"
+        />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Description (optional)</span>
+        <input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Shown on the Service SKU in the SKU master"
+          className={`${INPUT_CLS} w-64`}
+          data-testid="addon-description"
         />
       </label>
       <label className="block">
@@ -221,18 +236,7 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           className={`${INPUT_CLS} w-28`}
-        />
-      </label>
-      <label className="block">
-        <span className="label block mb-1">
-          Service SKU {serviceSkuOverride === null ? "(auto from key)" : "(optional)"}
-        </span>
-        <input
-          value={serviceSku}
-          onChange={(e) => setServiceSkuOverride(e.target.value)}
-          placeholder="SVC-DISPOSE-MATTRESS"
-          className={`${INPUT_CLS} w-52 font-mono`}
-          data-testid="addon-service-sku"
+          data-testid="addon-price"
         />
       </label>
       <button
@@ -243,8 +247,17 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
       >
         {busy ? "Saving…" : "Add"}
       </button>
-      <p className="t-tiny text-base-400 basis-full">
-        Re-using a disabled add-on's key restores it.
+      <p className="t-tiny text-base-400 basis-full" data-testid="addon-auto-preview">
+        {name.trim().length >= 2 && keyValid ? (
+          <>
+            Auto-generated — key: <span className="font-mono">{key}</span> · Service SKU:{" "}
+            <span className="font-mono">{serviceSku}</span> (created in the SKU master on Add).
+          </>
+        ) : name.trim().length >= 2 ? (
+          <>Name needs some letters or numbers — they build the key and Service SKU.</>
+        ) : (
+          <>Key + Service SKU are auto-generated from the name. Re-adding a disabled add-on's name restores it.</>
+        )}
       </p>
     </div>
   );
