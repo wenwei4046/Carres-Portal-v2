@@ -56,6 +56,9 @@ function validDraft(): WizardDraft {
       approvalCode: "",
       installmentMonths: 6,
       slip: null,
+      // 0219 — loadDraft backfills this for pre-0219 drafts, so the roundtrip
+      // fixture carries it too.
+      followUps: {},
     },
     signature: null,
     termsAccepted: false,

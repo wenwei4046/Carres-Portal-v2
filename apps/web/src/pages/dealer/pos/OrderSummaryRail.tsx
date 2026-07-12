@@ -2,8 +2,49 @@ import { useMemo } from "react";
 import type { CatalogResponse } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import { draftTotals } from "@/lib/order-totals";
-import type { WizardDraft } from "../new-order/draft";
+import type { DraftLine, WizardDraft } from "../new-order/draft";
 import { previewDefaultGifts } from "./free-line";
+
+/** A sofa-BUILD line's size + option picks, read tolerantly off the free
+ *  jsonb — feeds the structured spec lines under the model name (prototype
+ *  style, Loo 2026-07-12). Null for every non-build line. */
+function sofaBuildOf(l: DraftLine): {
+  height: string;
+  fabricName: string | null;
+  fabricDeferred: boolean;
+  fabricSeries: string | null;
+  fabricSurcharge: number;
+  legHeight: string | null;
+  legSurcharge: number;
+  remark: string | null;
+  remarkSurcharge: number;
+} | null {
+  const attrs = l.attrs as Record<string, unknown> | null;
+  const sb = attrs?.sofa_build as { cells?: unknown; height?: unknown } | undefined;
+  if (!sb || !Array.isArray(sb.cells) || sb.cells.length === 0) return null;
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return {
+    height: typeof sb.height === "string" ? sb.height : "24",
+    fabricName: typeof attrs?.fabric_name === "string" ? attrs.fabric_name : null,
+    fabricDeferred: attrs?.fabric_deferred === true,
+    fabricSeries: typeof attrs?.fabric_series === "string" ? attrs.fabric_series : null,
+    fabricSurcharge: num(attrs?.fabric_surcharge),
+    legHeight: typeof attrs?.leg_height === "string" ? attrs.leg_height : null,
+    legSurcharge: num(attrs?.leg_surcharge),
+    remark: typeof attrs?.remark === "string" && attrs.remark ? attrs.remark : null,
+    remarkSurcharge: num(attrs?.remark_surcharge),
+  };
+}
+
+/** "1B(LHF) + CNR + 2A(RHF)" → "1B+CNR+2A" (the compact code string the
+ *  prototype's "Custom (…)" detail line shows). */
+function bareCodes(composition: string): string {
+  return composition
+    .split("+")
+    .map((s) => s.trim().replace(/\(.*?\)/g, ""))
+    .filter(Boolean)
+    .join("+");
+}
 
 /**
  * Right-hand Order summary rail (02 Customer + 03 Confirm) — prototype skin
@@ -77,6 +118,64 @@ export default function OrderSummaryRail({
                   .map((s) => s.trim())
                   .filter(Boolean);
                 const name = segs[0] ?? l.sku;
+                const build = sofaBuildOf(l);
+
+                // ── Sofa BUILD row (prototype style, Loo 2026-07-12): the
+                // MODEL PHOTO tile (rounded square — the plan-view sketch was
+                // reverted same-day), the bold line "Booqit · 1B(LHF) + CNR +
+                // 2A(RHF)", then mono spec lines: "Custom (1B+CNR+2A) · 24″ ·
+                // qty 1" + per-pick surcharges (fabric / leg / remark). ──
+                if (build) {
+                  const composition = segs[1] ?? "";
+                  const fabricLine = build.fabricName
+                    ? `Fabric · ${build.fabricName}${build.fabricSurcharge > 0 ? ` · +${rm(build.fabricSurcharge)}` : ""}`
+                    : build.fabricSeries
+                      ? `Fabric · ${build.fabricSeries} series · colour KIV`
+                      : build.fabricDeferred
+                        ? "Fabric · KIV"
+                        : null;
+                  return (
+                    <div key={l.localId} className="summary__item" data-testid={`summary-build-${l.localId}`}>
+                      <div
+                        className="summary__item-photo"
+                        style={
+                          photo
+                            ? { backgroundImage: `url(${photo})`, backgroundColor: "#fff" }
+                            : undefined
+                        }
+                      />
+                      <div className="summary__item-main">
+                        <div className="summary__item-name">
+                          {name}
+                          {composition ? ` · ${composition}` : ""}
+                        </div>
+                        <div className="summary__item-meta">
+                          Custom{composition ? ` (${bareCodes(composition)})` : ""} · {build.height}″ · qty {l.qty}
+                        </div>
+                        {fabricLine && <div className="summary__item-meta">{fabricLine}</div>}
+                        {build.legHeight && (
+                          <div className="summary__item-meta">
+                            Leg {build.legHeight}
+                            {build.legSurcharge > 0 ? ` · +${rm(build.legSurcharge)}` : ""}
+                          </div>
+                        )}
+                        {(build.remark || build.remarkSurcharge !== 0) && (
+                          <div className="summary__item-meta">
+                            ✎ {build.remark ?? "Price adjustment"}
+                            {build.remarkSurcharge !== 0
+                              ? ` · ${build.remarkSurcharge > 0 ? "+" : "−"}${rm(Math.abs(build.remarkSurcharge))}`
+                              : ""}
+                          </div>
+                        )}
+                      </div>
+                      <span className="summary__item-price">
+                        <sup>RM</sup>
+                        {(l.unitPrice * l.qty).toLocaleString("en-MY")}
+                      </span>
+                    </div>
+                  );
+                }
+
                 const detail = segs.slice(1).join(" · ");
                 return (
                   <div key={l.localId} className="summary__item">

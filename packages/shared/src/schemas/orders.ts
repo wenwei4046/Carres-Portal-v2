@@ -96,9 +96,15 @@ export const orderSchema = z.object({
   signatureUrl: z.string().nullable(),
   paymentSlipUrl: z.string().nullable(),
   termsAccepted: z.boolean(),
-  paymentMethod: z.enum(["online", "credit", "installment"]).nullable(),
+  // 0219 — config-driven methods: any configured key (e.g. "cash"), not just
+  // the historical trio. Widened from the old enum; existing values parse.
+  paymentMethod: z.string().max(40).nullable(),
   approvalCode: z.string().nullable(),
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  /** 0219 — POS entry extras: payment follow-up answers (e.g.
+   *  { payment: { bank: "Maybank" } }) + custom form-field values
+   *  ({ fields: {...} }). Optional so pre-0219 responses still parse. */
+  entryData: z.record(z.unknown()).nullable().optional(),
   operationStage: operationStageSchema.nullable(),
   // Origin marker — 'autocount' for imported legacy rows (null = native).
   // Optional so responses fetched before the field existed still parse.
@@ -210,11 +216,11 @@ export const createOrderInputSchema = z.object({
   paymentSlipPath: z.string().nullable(),
   termsAccepted: z.literal(true),
   depositPct: z.number().int().min(0).max(100),
-  /** Payment instrument used at order time. Persisted as `orders.payment_method`
-   *  (DB CHECK gates the enum). Phase 2D's payments table will reference this
-   *  for full-payment workflows; this field always represents the *initial*
-   *  deposit method. */
-  paymentMethod: z.enum(["online", "credit", "installment"]),
+  /** Payment instrument used at order time. Persisted as `orders.payment_method`.
+   *  0219 — config-driven: the route validates the key against the ACTIVE
+   *  `order_entry_config` method list (code defaults incl. "cash" when the
+   *  config is empty); the old 3-value DB CHECK is gone. */
+  paymentMethod: z.string().trim().min(1).max(40),
   /** Bank/EDC approval (or bank reference) code from the slip. Required for ALL
    *  methods (≥ 3 chars) as of 2026-06-16: online = bank reference / FT number,
    *  credit/installment = EDC approval code — Finance reconciles the deposit
@@ -250,6 +256,18 @@ export const createOrderInputSchema = z.object({
    *  never claimed). Mirrors the additionalDeliveryFee / crossCategorySourceSo
    *  precedent. */
   pwpCartLineKeys: z.array(z.string()).optional().default([]),
+  /** 0219 — POS entry extras. `payment` holds follow-up answers keyed by the
+   *  method's followUp keys (e.g. { bank: "Maybank" }); `fields` holds custom
+   *  form-field values keyed by the configured field keys. OPTIONAL — non-POS
+   *  callers omit it (byte-identical payloads). The route validates required
+   *  follow-ups against the config; create_order re-checks shape + a 16KB cap. */
+  entryData: z
+    .object({
+      payment: z.record(z.string().max(120)).optional(),
+      fields: z.record(z.string().max(400)).optional(),
+    })
+    .strict()
+    .optional(),
 }).superRefine((data, ctx) => {
   // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
   // marked TBD, both dates are required and proceed date must be on/before the
@@ -266,18 +284,12 @@ export const createOrderInputSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
     }
   }
-  if (data.paymentMethod === "installment") {
-    if (data.installmentMonths === null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "required for installment" });
-    }
-    if (!data.approvalCode || data.approvalCode.trim().length < 3) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["approvalCode"], message: "approval code must be ≥3 chars for installment" });
-    }
-  }
-  if (data.paymentMethod === "credit") {
-    if (!data.approvalCode || data.approvalCode.trim().length < 3) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["approvalCode"], message: "approval code must be ≥3 chars for credit" });
-    }
+  // 0219 — the per-method approval-code requirement is CONFIG-DRIVEN now
+  // (order_entry_config.approvalCodeRequired), so it's enforced in the route
+  // against the resolved method — not here. The installment↔months pairing
+  // stays universal (create_order re-raises 22023 on violation).
+  if (data.paymentMethod === "installment" && data.installmentMonths === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "required for installment" });
   }
   if (data.paymentMethod !== "installment" && data.installmentMonths !== null) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "only valid when paymentMethod is installment" });

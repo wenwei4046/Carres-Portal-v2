@@ -1,26 +1,23 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import type { CatalogResponse, OutletDto, SalespersonDto } from "@carres/shared";
+import {
+  resolveFormTab,
+  type CatalogResponse,
+  type CustomField,
+  type OrderEntryTab,
+  type OutletDto,
+  type SalespersonDto,
+} from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { useCustomerTypeProbe } from "@/lib/queries";
+import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
 import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
-
-const RELATIONSHIPS = [
-  "Spouse",
-  "Parent",
-  "Child",
-  "Sibling",
-  "Relative",
-  "Friend",
-  "Colleague",
-  "Helper",
-] as const;
+import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 
 /** MY-standard demographic option lists (0200 — feed Sales analysis). */
 const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
@@ -82,6 +79,42 @@ export default function CustomerStep({
   const c = draft.customer;
   const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(initialSubStep);
 
+  // 0219 — the form renders from order_entry_config (SO Maintenance edits it):
+  // toggleable builtins (email/race/gender/birthday, the emergency block) +
+  // operator-defined custom fields per tab. Absent config → code defaults =
+  // the exact pre-0219 form.
+  const formCfg = catalog.orderEntryConfig?.formFields ?? null;
+  const custTab = resolveFormTab(formCfg, "customer");
+  const addrTab = resolveFormTab(formCfg, "address");
+  const emgTab = resolveFormTab(formCfg, "emergency");
+  const targetTab = resolveFormTab(formCfg, "target");
+  const custB = custTab.builtins;
+  const emergencyBlock = emgTab.builtins["emergency"];
+
+  function setCustom(key: string, value: string) {
+    onChange({
+      ...draft,
+      customer: { ...c, custom: { ...(c.custom ?? {}), [key]: value } },
+    });
+  }
+  function customsValid(tab: ReturnType<typeof resolveFormTab>): boolean {
+    return tab.custom.every((f) => !f.required || (c.custom?.[f.key] ?? "").trim().length > 0);
+  }
+
+  // FULL NAME autocomplete — search past orders' customers by the (debounced)
+  // typed name; picking a hit prefills the whole customer block (address +
+  // emergency contact included). The dropdown opens on typing/focus and closes
+  // on blur or pick; item mousedown fires before the input's blur.
+  const [showSuggest, setShowSuggest] = useState(false);
+  const debouncedName = useDebouncedValue(c.name.trim(), 300);
+  const search = useCustomerSearch(debouncedName);
+  const suggestions = showSuggest ? (search.data?.customers ?? []) : [];
+
+  function pickCustomer(hit: CustomerSearchHit) {
+    onChange({ ...draft, customer: { ...c, ...customerPatchFromHit(hit) } });
+    setShowSuggest(false);
+  }
+
   // CUSTOMER TYPE (AUTO) — probe visible orders by the (debounced) phone.
   const debouncedPhone = useDebouncedValue(c.phone.trim(), 400);
   const probe = useCustomerTypeProbe(debouncedPhone);
@@ -117,18 +150,24 @@ export default function CustomerStep({
   const todayIso = new Date().toISOString().slice(0, 10);
 
   // Per-sub-step advance gates (mirror draft.ts step1FirstIssue's groups).
+  // 0219 — toggleable builtins gate per the resolved config; required custom
+  // fields gate their own tab.
   function canAdvance(): boolean {
     if (dealerPending) return false;
     if (stepIdx === 0) {
+      const emailOk = custB["email"]?.required
+        ? EMAIL_RE.test(c.email.trim())
+        : !c.email.trim() || EMAIL_RE.test(c.email.trim());
       return (
         !!draft.outletId &&
         !!draft.salespersonId &&
         c.name.trim().length >= 2 &&
         PHONE_RE.test(c.phone) &&
-        EMAIL_RE.test(c.email.trim()) &&
-        !!c.race &&
-        !!c.gender &&
-        !!c.birthday
+        emailOk &&
+        (!custB["race"]?.required || !!c.race) &&
+        (!custB["gender"]?.required || !!c.gender) &&
+        (!custB["birthday"]?.required || !!c.birthday) &&
+        customsValid(custTab)
       );
     }
     if (stepIdx === 1) {
@@ -139,21 +178,26 @@ export default function CustomerStep({
           !!c.addressCity &&
           !!c.addressPostcode);
       const billingOk = c.billingSame || c.billing.trim().length >= 5;
-      return addressOk && billingOk;
+      return addressOk && billingOk && customsValid(addrTab);
     }
     if (stepIdx === 2) {
-      return (
-        c.emergencyName.trim().length >= 2 &&
-        PHONE_RE.test(c.emergencyPhone) &&
-        !!c.emergencyRelationship &&
-        (c.emergencyRelationship !== "__OTHER__" ||
-          c.emergencyRelationshipOther.trim().length >= 2)
-      );
+      const blockOk =
+        !emergencyBlock?.required ||
+        (c.emergencyName.trim().length >= 2 &&
+          PHONE_RE.test(c.emergencyPhone) &&
+          !!c.emergencyRelationship &&
+          (c.emergencyRelationship !== "__OTHER__" ||
+            c.emergencyRelationshipOther.trim().length >= 2));
+      return blockOk && customsValid(emgTab);
     }
     // Target date: date rules + every picked disposal add-on must have a size
     // (the add-ons picker lives on this sub-step now — same gate the cart
     // drawer applies via step2Valid).
-    return step3DateValid(draft, minLeadDays) && step2FirstDisposalIssue(draft) === null;
+    return (
+      step3DateValid(draft, minLeadDays) &&
+      step2FirstDisposalIssue(draft) === null &&
+      customsValid(targetTab)
+    );
   }
 
   function next() {
@@ -276,11 +320,48 @@ export default function CustomerStep({
                   </div>
                   <div className="field">
                     <span className="field__label">Full name *</span>
-                    <input
-                      value={c.name}
-                      placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
-                      onChange={(e) => setC({ name: e.target.value })}
-                    />
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
+                      <input
+                        value={c.name}
+                        placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
+                        autoComplete="off"
+                        data-testid="pos-customer-name"
+                        onChange={(e) => {
+                          setC({ name: e.target.value });
+                          setShowSuggest(true);
+                        }}
+                        onFocus={() => setShowSuggest(true)}
+                        onBlur={() => setShowSuggest(false)}
+                      />
+                      {suggestions.length > 0 && (
+                        <div className="cust-suggest" data-testid="pos-customer-suggest">
+                          <div className="cust-suggest__head">Existing customers</div>
+                          {suggestions.map((h, i) => (
+                            <button
+                              type="button"
+                              key={(h.phone ?? h.name) + i}
+                              className="cust-suggest__item"
+                              data-testid={`pos-customer-suggest-${i}`}
+                              // mousedown (not click) — must beat the input's
+                              // blur, which unmounts the dropdown.
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                pickCustomer(h);
+                              }}
+                            >
+                              <span className="cust-suggest__name">{h.name}</span>
+                              <span className="cust-suggest__meta">
+                                {[h.phone, h.address].filter(Boolean).join(" · ") ||
+                                  "no phone / address on file"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="field__hint">
+                      Returning customer? Pick from the list to auto-fill their info.
+                    </span>
                   </div>
                   <div className="field">
                     <span className="field__label">Phone *</span>
@@ -290,72 +371,93 @@ export default function CustomerStep({
                       onChange={(e) => setC({ phone: e.target.value })}
                     />
                   </div>
-                  <div className="field field--span">
-                    <span className="field__label">
-                      Email <span style={{ color: "var(--c-orange)" }}>*</span>
-                    </span>
-                    <input
-                      type="email"
-                      value={c.email}
-                      placeholder="customer@example.com — for receipt & order updates"
-                      onChange={(e) => setC({ email: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <span className="field__label">Customer type (auto)</span>
-                    <input
-                      value={customerType}
-                      readOnly
-                      disabled
-                      data-testid="pos-customer-type"
-                      style={{
-                        background: "var(--pos-rail)",
-                        color: "var(--fg-muted)",
-                        cursor: "not-allowed",
-                      }}
-                    />
-                    <span className="field__hint">Auto-detected from past orders (phone)</span>
-                  </div>
-                  <div className="field">
-                    <span className="field__label">Race *</span>
-                    <select
-                      value={c.race}
-                      onChange={(e) => setC({ race: e.target.value })}
-                      data-testid="pos-customer-race"
-                    >
-                      <option value="">— select —</option>
-                      {RACE_OPTIONS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <span className="field__label">Gender *</span>
-                    <select
-                      value={c.gender}
-                      onChange={(e) => setC({ gender: e.target.value })}
-                      data-testid="pos-customer-gender"
-                    >
-                      <option value="">— select —</option>
-                      {GENDER_OPTIONS.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <span className="field__label">Birthday *</span>
-                    <input
-                      type="date"
-                      value={c.birthday}
-                      max={todayIso}
-                      onChange={(e) => setC({ birthday: e.target.value })}
-                      data-testid="pos-customer-birthday"
-                    />
-                  </div>
+                  {custB["email"]?.enabled && (
+                    <div className="field field--span">
+                      <span className="field__label">
+                        Email{" "}
+                        {custB["email"]?.required && (
+                          <span style={{ color: "var(--c-orange)" }}>*</span>
+                        )}
+                      </span>
+                      <input
+                        type="email"
+                        value={c.email}
+                        placeholder="customer@example.com — for receipt & order updates"
+                        onChange={(e) => setC({ email: e.target.value })}
+                      />
+                    </div>
+                  )}
+                  {custB["customerType"]?.enabled && (
+                    <div className="field">
+                      <span className="field__label">Customer type (auto)</span>
+                      <input
+                        value={customerType}
+                        readOnly
+                        disabled
+                        data-testid="pos-customer-type"
+                        style={{
+                          background: "var(--pos-rail)",
+                          color: "var(--fg-muted)",
+                          cursor: "not-allowed",
+                        }}
+                      />
+                      <span className="field__hint">Auto-detected from past orders (phone)</span>
+                    </div>
+                  )}
+                  {custB["race"]?.enabled && (
+                    <div className="field">
+                      <span className="field__label">Race{custB["race"]?.required ? " *" : ""}</span>
+                      <select
+                        value={c.race}
+                        onChange={(e) => setC({ race: e.target.value })}
+                        data-testid="pos-customer-race"
+                      >
+                        <option value="">— select —</option>
+                        {RACE_OPTIONS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {custB["gender"]?.enabled && (
+                    <div className="field">
+                      <span className="field__label">Gender{custB["gender"]?.required ? " *" : ""}</span>
+                      <select
+                        value={c.gender}
+                        onChange={(e) => setC({ gender: e.target.value })}
+                        data-testid="pos-customer-gender"
+                      >
+                        <option value="">— select —</option>
+                        {GENDER_OPTIONS.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {custB["birthday"]?.enabled && (
+                    <div className="field">
+                      <span className="field__label">
+                        Birthday{custB["birthday"]?.required ? " *" : ""}
+                      </span>
+                      <input
+                        type="date"
+                        value={c.birthday}
+                        max={todayIso}
+                        onChange={(e) => setC({ birthday: e.target.value })}
+                        data-testid="pos-customer-birthday"
+                      />
+                    </div>
+                  )}
+                  <CustomFieldsInputs
+                    tab="customer"
+                    fields={custTab.custom}
+                    values={c.custom ?? {}}
+                    onSet={setCustom}
+                  />
                 </div>
               </div>
             )}
@@ -467,14 +569,43 @@ export default function CustomerStep({
                     </div>
                   </div>
                 )}
+                {addrTab.custom.length > 0 && (
+                  <div className="form-grid" style={{ marginTop: 22 }}>
+                    <CustomFieldsInputs
+                      tab="address"
+                      fields={addrTab.custom}
+                      values={c.custom ?? {}}
+                      onSet={setCustom}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
             {/* ── 3 · Emergency ── */}
-            {stepIdx === 2 && (
+            {stepIdx === 2 && !emergencyBlock?.enabled && (
+              <div className="fade-in">
+                <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 16 }}>
+                  Emergency contact is switched off in the order-entry config — nothing to
+                  fill here.
+                </p>
+                {emgTab.custom.length > 0 && (
+                  <div className="form-grid">
+                    <CustomFieldsInputs
+                      tab="emergency"
+                      fields={emgTab.custom}
+                      values={c.custom ?? {}}
+                      onSet={setCustom}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            {stepIdx === 2 && emergencyBlock?.enabled && (
               <div className="fade-in">
                 <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 16 }}>
                   Used only if we cannot reach the customer on delivery day.
+                  {!emergencyBlock?.required && " Optional."}
                 </p>
                 <div className="form-grid">
                   <div className="field">
@@ -524,6 +655,12 @@ export default function CustomerStep({
                       />
                     </div>
                   )}
+                  <CustomFieldsInputs
+                    tab="emergency"
+                    fields={emgTab.custom}
+                    values={c.custom ?? {}}
+                    onSet={setCustom}
+                  />
                 </div>
               </div>
             )}
@@ -560,6 +697,20 @@ export default function CustomerStep({
                       draft={draft}
                       onChange={onChange}
                     />
+                  </div>
+                )}
+                {targetTab.custom.length > 0 && (
+                  <div
+                    style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 24 }}
+                  >
+                    <div className="form-grid">
+                      <CustomFieldsInputs
+                        tab="target"
+                        fields={targetTab.custom}
+                        values={c.custom ?? {}}
+                        onSet={setCustom}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -604,5 +755,50 @@ export default function CustomerStep({
       {/* ── Right: live order summary rail ── */}
       <OrderSummaryRail draft={draft} catalog={catalog} />
     </div>
+  );
+}
+
+/** 0219 — operator-configured CUSTOM fields for one tab (SO Maintenance
+ *  "Order Entry" editor authors them). Values live in draft.customer.custom
+ *  and submit as entry_data.fields. */
+function CustomFieldsInputs({
+  tab,
+  fields,
+  values,
+  onSet,
+}: {
+  tab: OrderEntryTab;
+  fields: CustomField[];
+  values: Record<string, string>;
+  onSet: (key: string, value: string) => void;
+}) {
+  if (fields.length === 0) return null;
+  return (
+    <>
+      {fields.map((f) => (
+        <div key={f.key} className="field" data-testid={`pos-custom-${tab}-${f.key}`}>
+          <span className="field__label">
+            {f.label}
+            {f.required && <span style={{ color: "var(--c-orange)" }}> *</span>}
+          </span>
+          {f.type === "select" ? (
+            <select value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
+              <option value="">— select —</option>
+              {f.options.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
+              value={values[f.key] ?? ""}
+              onChange={(e) => onSet(f.key, e.target.value)}
+            />
+          )}
+        </div>
+      ))}
+    </>
   );
 }

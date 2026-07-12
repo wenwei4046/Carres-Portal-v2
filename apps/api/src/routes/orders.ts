@@ -13,6 +13,8 @@ import {
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
+  parseOrderEntryConfigRow,
+  resolvePaymentMethods,
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -201,6 +203,59 @@ ordersRouter.get("/customer-type", async (c) => {
 });
 
 /**
+ * GET /api/orders/customer-search?q= — POS Full-name autocomplete.
+ *
+ * Carres has no customer entity, so "the customer list" = the customers on
+ * RLS-visible past orders (dealer sees own orders; internal roles see all —
+ * scoped by design, same as /customer-type). Matches customer_name with a
+ * case-insensitive contains, dedupes to one row per customer (phone digits;
+ * name fallback when phone is null), newest order wins, and returns the full
+ * customer block so the POS can prefill address + emergency contact.
+ */
+ordersRouter.get("/customer-search", async (c) => {
+  const q = (new URL(c.req.url).searchParams.get("q") ?? "").trim();
+  if (q.length < 2) return c.json({ customers: [] });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // Escape PostgREST ilike wildcards so a literal "%"/"_" in the query
+  // doesn't widen the match.
+  const pattern = "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%";
+  const { data, error } = await sb
+    .from("orders")
+    .select(
+      "customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_billing, customer_billing_same, customer_emergency, customer_race, customer_gender, customer_birthday, placed_at",
+    )
+    .ilike("customer_name", pattern)
+    .order("placed_at", { ascending: false })
+    .limit(40);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  const seen = new Set<string>();
+  const customers: Array<Record<string, unknown>> = [];
+  for (const row of (data ?? []) as Array<DB.OrderRow>) {
+    const key =
+      (row.customer_phone ?? "").replace(/\D/g, "") ||
+      "name:" + row.customer_name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    customers.push({
+      name: row.customer_name,
+      phone: row.customer_phone,
+      email: row.customer_email,
+      address: row.customer_address,
+      addressUnknown: row.customer_address_unknown,
+      billing: row.customer_billing,
+      billingSame: row.customer_billing_same,
+      emergency: row.customer_emergency,
+      race: row.customer_race,
+      gender: row.customer_gender,
+      birthday: row.customer_birthday,
+    });
+    if (customers.length >= 8) break;
+  }
+  return c.json({ customers });
+});
+
+/**
  * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
  *
  * Flow:
@@ -285,6 +340,70 @@ ordersRouter.post("/", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+
+  // 0219 — config-driven payment methods. The DB whitelist is gone; the key
+  // must match an ACTIVE method from order_entry_config (code defaults incl.
+  // "cash" when the config list is empty), and per-method rules apply:
+  // approvalCodeRequired + every required follow-up (e.g. the Credit/Debit
+  // bank) must be answered from the configured options. A config READ error
+  // degrades to the code defaults (never blocks the default methods).
+  {
+    const cfgR = await sb
+      .from("order_entry_config")
+      .select("payment_methods, form_fields")
+      .eq("id", true)
+      .maybeSingle();
+    const entryCfg = parseOrderEntryConfigRow(cfgR && !cfgR.error ? cfgR.data : null);
+    const methods = resolvePaymentMethods(entryCfg);
+    const method = methods.find((m) => m.key === parsed.data.paymentMethod);
+    if (!method) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "invalid_payment_method",
+          message: `payment method "${parsed.data.paymentMethod}" is not an active configured method`,
+        },
+        422,
+      );
+    }
+    if (
+      method.approvalCodeRequired &&
+      (!parsed.data.approvalCode || parsed.data.approvalCode.trim().length < 3)
+    ) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "approval_code_required",
+          message: `approval / reference code (≥3 chars) is required for ${method.label}`,
+        },
+        422,
+      );
+    }
+    const followAnswers = parsed.data.entryData?.payment ?? {};
+    for (const fu of method.followUps) {
+      const answer = (followAnswers[fu.key] ?? "").trim();
+      if (fu.required && !answer) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "payment_followup_required",
+            message: `${fu.label} is required for ${method.label}`,
+          },
+          422,
+        );
+      }
+      if (answer && !fu.options.includes(answer)) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "payment_followup_invalid",
+            message: `${fu.label} must be one of the configured options`,
+          },
+          422,
+        );
+      }
+    }
+  }
 
   // Server-side lead-time floor (mattress + bedframe = 14d, sofa = 21d). The
   // wizard's Step 3 picker already enforces this client-side, but a curl or

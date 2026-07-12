@@ -141,4 +141,43 @@ describe("OrderSummaryRail — item row label split (Loo 2026-07-12)", () => {
     // No empty detail line — the row is name + qty only.
     expect(screen.queryByText("·")).not.toBeInTheDocument();
   });
+
+  it("a sofa BUILD line shows the photo tile + the Custom(bare codes) spec lines (prototype style)", () => {
+    render(
+      <OrderSummaryRail
+        draft={draftWith({
+          sku: "BOOQIT-P",
+          unitPrice: 3240,
+          label: 'Booqit · 1B(LHF) + CNR + 2A(RHF) · 24″ · CG-007 Deep Grey · leg 4"',
+          attrs: {
+            mode: "build",
+            fabric_name: "CG-007 Deep Grey",
+            fabric_surcharge: 250,
+            fabric_deferred: false,
+            leg_height: '4"',
+            leg_surcharge: 0,
+            sofa_build: {
+              cells: [
+                { moduleCode: "1B(LHF)", x: 60, y: 60, rot: 0 },
+                { moduleCode: "2A(RHF)", x: 160, y: 60, rot: 0 },
+              ],
+              height: "24",
+            },
+          },
+        })}
+        catalog={catalog()}
+      />,
+    );
+    const row = screen.getByTestId("summary-build-L1");
+    // Bold line = model + composition; detail = Custom (bare codes) · size · qty.
+    expect(row.textContent).toContain("Booqit · 1B(LHF) + CNR + 2A(RHF)");
+    expect(row.textContent).toContain("Custom (1B+CNR+2A) · 24″ · qty 1");
+    // Fabric surcharge itemised, prototype-style.
+    expect(row.textContent).toContain("Fabric · CG-007 Deep Grey · +RM 250");
+    expect(row.textContent).toContain('Leg 4"');
+    // The tile is the PHOTO treatment (Loo reverted the plan-view sketch) —
+    // the spec lines carry the structure instead.
+    expect(row.querySelector(".summary__item-photo")).toBeTruthy();
+    expect(row.querySelector(".summary__item-photo--plan")).toBeNull();
+  });
 });

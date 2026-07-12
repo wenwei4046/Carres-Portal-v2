@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
-import { maxLeadDaysFor } from "@carres/shared";
+import { maxLeadDaysFor, resolvePaymentMethods } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { draftTotals } from "@/lib/order-totals";
@@ -381,17 +381,24 @@ export default function DealerPos({
   // step2Valid re-checked here too: the Target-date sub-step now hosts the
   // order add-ons picker, so a disposal add-on picked there must have its size
   // before CONFIRM (the cart drawer's gate alone no longer covers it).
+  // 0219 — the customer-form + payment gates are CONFIG-AWARE (order_entry_config
+  // rides the catalog bundle; absent → code defaults = pre-0219 behavior + cash).
+  const entryFormCfg = catalogQ.data?.orderEntryConfig?.formFields ?? null;
+  const paymentMethods = useMemo(
+    () => resolvePaymentMethods(catalogQ.data?.orderEntryConfig),
+    [catalogQ.data],
+  );
   const customerReady = useMemo(
     () =>
       !!effectiveDealerId &&
-      step1Valid(draft) &&
+      step1Valid(draft, entryFormCfg) &&
       step2Valid(draft) &&
       step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays, effectiveDealerId],
+    [draft, minLeadDays, effectiveDealerId, entryFormCfg],
   );
   const confirmReady = useMemo(
-    () => step4Valid(draft) && asapDepositOk,
-    [draft, asapDepositOk],
+    () => step4Valid(draft, paymentMethods) && asapDepositOk,
+    [draft, asapDepositOk, paymentMethods],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
@@ -520,6 +527,28 @@ export default function DealerPos({
         // fallback sweep). Empty on a DORMANT / no-PWP cart — equal to the schema
         // default, so the server-side effect is byte-identical.
         pwpCartLineKeys: triggerLines.map((t) => t.cartLineKey),
+        // 0219 — POS entry extras: the payment follow-up answers (e.g. the
+        // Credit/Debit bank) + custom form-field values. Omitted entirely when
+        // both are empty so a default-config order submits a byte-identical
+        // payload.
+        ...(() => {
+          const payment = Object.fromEntries(
+            Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
+          );
+          const fields = Object.fromEntries(
+            Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
+          );
+          const hasPayment = Object.keys(payment).length > 0;
+          const hasFields = Object.keys(fields).length > 0;
+          return hasPayment || hasFields
+            ? {
+                entryData: {
+                  ...(hasPayment ? { payment } : {}),
+                  ...(hasFields ? { fields } : {}),
+                },
+              }
+            : {};
+        })(),
       };
 
       const created = await createOrder.mutateAsync(input);

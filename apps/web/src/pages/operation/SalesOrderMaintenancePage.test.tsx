@@ -5,10 +5,17 @@ import { defaultSoGridConfig, type SoGridResponse } from "@carres/shared";
 vi.mock("@/lib/queries", () => ({
   useSalesOrderGrid: vi.fn(),
   useUpdateSoGridConfig: vi.fn(),
+  useOrderEntryConfig: vi.fn(),
+  useUpdateOrderEntryConfig: vi.fn(),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { useSalesOrderGrid, useUpdateSoGridConfig } from "@/lib/queries";
+import {
+  useSalesOrderGrid,
+  useUpdateSoGridConfig,
+  useOrderEntryConfig,
+  useUpdateOrderEntryConfig,
+} from "@/lib/queries";
 import SalesOrderMaintenancePage from "./SalesOrderMaintenancePage";
 
 const RESPONSE: SoGridResponse = {
@@ -43,6 +50,17 @@ beforeEach(() => {
     isPending: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
+  vi.mocked(useOrderEntryConfig).mockReturnValue({
+    data: { entryConfig: { paymentMethods: [], formFields: {} } },
+    isLoading: false,
+    isError: false,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  vi.mocked(useUpdateOrderEntryConfig).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 });
 
 describe("SalesOrderMaintenancePage", () => {
@@ -58,6 +76,13 @@ describe("SalesOrderMaintenancePage", () => {
     render(<SalesOrderMaintenancePage />);
     fireEvent.click(screen.getByRole("button", { name: /Columns/i }));
     expect(screen.getByText("Show columns")).toBeInTheDocument();
+  });
+
+  it("Order Entry button opens the order-entry config panel", () => {
+    render(<SalesOrderMaintenancePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Order Entry/i }));
+    expect(screen.getByRole("dialog", { name: "Order Entry" })).toBeInTheDocument();
+    expect(screen.getByText("Payment methods")).toBeInTheDocument();
   });
 
   it("Column Settings button opens the settings modal", () => {
