@@ -136,8 +136,14 @@
 }
 .pos-topbar__count svg { width: 13px; height: 13px; }
 
-/* ========= Page transitions ========= */
-.page-shell { animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both; will-change: transform, opacity; height: 100%; min-height: 0; }
+/* ========= Page transitions =========
+   NO `will-change` and NO `both` fill here (Loo 2026-07-12): the permanent
+   compositor-layer promotion made Chrome show a STALE BLANK layer for the
+   whole step content after the native file-picker dialog froze the renderer
+   (Attach file → page appears wiped until a tab switch forces a repaint).
+   The one-shot enter animation needs neither — after 320ms the element must
+   return to plain, normally-composited rendering. */
+.page-shell { animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1); height: 100%; min-height: 0; }
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
