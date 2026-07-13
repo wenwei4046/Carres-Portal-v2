@@ -175,12 +175,17 @@ export default function CartDrawer({
       lines: draft.lines,
       addons: draft.addons,
     });
+    // The cart is parked in the quote — clear it (Loo 2026-07-14) so the
+    // salesperson starts the next customer fresh; the quote holds the items.
     onChange({
       ...draft,
+      lines: [],
+      addons: [],
       customer: { ...draft.customer, name: quoteName.trim(), phone: quotePhone.trim() },
     });
     setQuoteFormOpen(false);
-    toast.success(`Quote saved — "${q.label}"`);
+    toast.success(`Quote saved — "${q.label}". Cart cleared.`);
+    onClose();
   }
 
   // 0185 — deterministic default-gift preview (display-only; the server appends
