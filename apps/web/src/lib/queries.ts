@@ -2036,6 +2036,12 @@ export interface opsRemarkEmbed {
   storage_collected_at?: string | null;
   storage_waiver_status?: string | null;
   called_customer?: boolean | null;
+  /** Per-line supplier ETA + stock status (Import from Master → migration 0170).
+   *  `line_etas` maps a line key → ISO ETA; `line_stock_status` maps it →
+   *  "waiting" / "ready". The Orders list STOCK column reads the latest waiting
+   *  ETA from these (Jess spec §5, stock_eta version, 2026-07-12). */
+  line_etas?: Record<string, string> | null;
+  line_stock_status?: Record<string, string> | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

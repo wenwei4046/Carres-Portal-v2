@@ -22,26 +22,27 @@ import {
 } from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
+import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
+import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
-  PanelLeft,
   ChevronDown,
   ChevronRight,
+  ChevronsLeft,
   ExternalLink,
-  MoreVertical,
   Truck,
   Download,
-  ListTodo,
   CheckCircle2,
   X,
   Flag,
   Lock,
   Printer,
+  MoreVertical,
   type LucideIcon,
 } from "lucide-react";
 
@@ -86,7 +87,7 @@ type ControlTab =
   | "all";
 
 // The 5 pipeline stages + "All". Default = All, but completed orders sort to the
-// bottom (see compareByDeadline), so the live work shows first WITHOUT a separate
+// bottom (see compareBySlack), so the live work shows first WITHOUT a separate
 // "Open" tab (Jess 2026-06-29: dropped the Open meta-tab — it confused him).
 const TABS: { key: ControlTab; label: string }[] = [
   { key: "all", label: "All" },
@@ -260,6 +261,87 @@ function daysToDue(o: operationOrderListRow): number | null {
   return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
 
+/** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
+function todayIso(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+/** Shift an ISO date by n days (n may be negative), returned as ISO. */
+function addDaysIso(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// ─── Stock supplier ETA (stock_eta version, 2026-07-12) ──────────────────────
+// The STOCK column carries the SUPPLIER arrival ETA, read from the imported
+// per-line data on the ops_order_control overlay (Import from Master →
+// line_etas + line_stock_status; migration 0170). "When can the whole order
+// ship" = the LATEST ETA among lines still WAITING; a Ready order shows no ETA
+// (no noise once the goods are in). Measured against the customer DEADLINE:
+//   • OVERDUE = the ETA has passed and the goods still haven't arrived.
+//   • LATE    = the ETA is later than deadline − 3d (misses the promise buffer).
+// NOTE the PO-date+lead formula (下PO日 + MS/BF 7d · SOF 5d) is deferred to
+// Phase 2 — there's no PO-raised date on the order; this reads stock_eta only.
+type StockEtaState = "ready" | "on_track" | "late" | "overdue" | "no_eta" | "none";
+interface StockEta {
+  /** Latest ETA among waiting lines (ISO), or null when none / all ready. */
+  etaIso: string | null;
+  /** Any line still waiting on stock. */
+  waiting: boolean;
+  state: StockEtaState;
+}
+export function stockEtaOf(o: operationOrderListRow): StockEta {
+  const ovl = ovlOf(o);
+  const etas = (ovl?.line_etas ?? null) as Record<string, string> | null;
+  const status = (ovl?.line_stock_status ?? null) as Record<string, string> | null;
+  if (!etas && !status) return { etaIso: null, waiting: false, state: "none" };
+
+  // Waiting lines: prefer the imported per-line status; without it, treat any
+  // ETA'd line as still-waiting (an ETA is only entered while awaiting arrival).
+  const waitingKeys =
+    status && Object.keys(status).length > 0
+      ? Object.entries(status)
+          .filter(([, v]) => String(v).toLowerCase() !== "ready")
+          .map(([k]) => k)
+      : Object.keys(etas ?? {});
+  if (waitingKeys.length === 0) return { etaIso: null, waiting: false, state: "ready" };
+
+  // Latest ETA among the waiting lines (fall back to any ETA present).
+  let etaIso: string | null = null;
+  if (etas) {
+    const pool = waitingKeys.map((k) => etas[k]).filter(Boolean);
+    for (const d of pool.length ? pool : Object.values(etas))
+      if (!etaIso || d > etaIso) etaIso = d;
+  }
+  if (!etaIso) return { etaIso: null, waiting: true, state: "no_eta" };
+
+  if (etaIso < todayIso()) return { etaIso, waiting: true, state: "overdue" };
+  const dd = !o.delivery_date_tbd && o.delivery_date ? o.delivery_date : null;
+  if (dd && etaIso > addDaysIso(dd, -3)) return { etaIso, waiting: true, state: "late" };
+  return { etaIso, waiting: true, state: "on_track" };
+}
+
+/** Slack (days) = buffer before this order is late; LOWER = more dangerous, so
+ *  the list sorts ascending. OPTION B (Loo 2026-07-12): the customer DEADLINE is
+ *  the spine (deadline − today); a blocked stock track applies a BOUNDED upward
+ *  BUMP — overdue / late / no-ETA stock floats an order a few days up the queue,
+ *  but an order already past its promise still outranks one merely due soon (the
+ *  bump never overrides a much-later deadline). Completed sinks to the bottom;
+ *  TBD / undated sit just above it. */
+export function slackDays(o: operationOrderListRow): number {
+  if (controlTabOf(o) === "completed") return 99_999;
+  const dd = daysToDue(o);
+  if (dd == null) return 9_000; // TBD / undated → tail, above completed
+  const se = stockEtaOf(o);
+  let bump = 0;
+  if (se.waiting) {
+    if (se.state === "overdue") bump = 5; // stock overdue → strongest bump
+    else if (se.state === "late" || se.state === "no_eta") bump = 3; // late / unknown ETA
+  }
+  return dd - bump;
+}
+
 /** DUE filter group (Jess 2026-06-25): one standardised urgency ladder by
  *  days-to-deadline, so urgency is a proper filter dimension like Status/Stock —
  *    Overdue (past) · Urgent (≤1d, today/tomorrow) · Attention (2–3d) ·
@@ -333,14 +415,13 @@ function ovlOf(o: operationOrderListRow) {
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-/** The one action the operator should take next on an order. Priority (Jess
- *  2026-07-08): money is only chased once stock is READY and we're arranging
- *  delivery — an owing balance/storage then suppresses the green action and
- *  HOLDS dispatch (🔒). While stock isn't ready the order leads with its
- *  supplier / PO step (you don't chase payment before the goods even exist).
- *  ETA wording is logistic-only; the supplier line uses overdue / waiting /
- *  no-PO. "Supplier overdue" fires once we're inside the stock-arrival window
- *  and it still hasn't landed: MS/BF = deadline−7d, Sofa = deadline−5d. */
+/** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
+ *  a stock track ∥ a logistic track, surfaced as the one most-urgent verb —
+ *    Order PO → Chase supplier → Book logistic → Chase logistic → Confirm.
+ *  Stock leads while it isn't secured (you don't arrange delivery of goods that
+ *  don't exist yet); once Ready the logistic track takes over. Confirm is the
+ *  close, and it stays 🔒 LOCKED while a money-hold (unpaid balance / storage) is
+ *  outstanding. Operation neither schedules nor calls the customer from here. */
 export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
@@ -348,57 +429,63 @@ export function nextActionOf(
 ): NextAction {
   if (controlTabOf(o) === "completed") return { label: "Done", tone: "neutral" };
 
+  // PAST-DEADLINE ESCALATION (Loo locked, freeze gate 2026-07-12): once the
+  // promise date has passed with a partner assigned but no delivery booked, the
+  // responsibility shifts from the partner's "call now" (LOGISTIC) to OPS's
+  // "Chase logistic" (NEXT) — this OVERRIDES the stock track. Scoped to
+  // has-partner (you can't chase a logistic that isn't assigned yet) AND to
+  // stock NOT "unknown": a No-PO order's real unblock is RUNG 1 "Order PO", which
+  // the escalation must never leapfrog (chasing a partner for un-ordered goods is
+  // an empty action).
+  const dd = daysToDue(o);
+  const hasPartner = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
+  if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !logisticEtaOf(o))
+    return { label: "Chase logistic", tone: "danger" };
+
   const ready = stock.state === "ready" || stock.state === "in_stock";
 
-  // Stock not secured yet → the supplier / PO step leads.
+  // STOCK TRACK — leads until the goods are secured.
   if (!ready) {
-    if (stock.state === "unknown") return { label: "No PO · order it", tone: "danger" };
-    const dd = daysToDue(o);
+    if (stock.state === "unknown") return { label: "Order PO", tone: "danger" };
+    // "Chase supplier" turns red once we're inside the stock-arrival window and
+    // it still hasn't landed (MS/BF = deadline−7d, Sofa = deadline−5d), amber otherwise.
     const hasMsbf = lines.some((l) => {
       const c = lineCategory(l.sku);
       return c === "mattress" || c === "bedframe";
     });
     const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
     const lead = hasMsbf ? 7 : hasSofa ? 5 : 7;
-    if (dd !== null && dd < lead) return { label: "Supplier overdue", tone: "danger" };
-    return { label: "Waiting stock", tone: "warning" };
+    const overdue = dd !== null && dd < lead;
+    return { label: "Chase supplier", tone: overdue ? "danger" : "warning" };
   }
 
-  // Stock READY → delivery stage. Payment hold: owing balance/storage holds it.
+  // LOGISTIC TRACK — stock is in; arrange the delivery.
+  if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
+    return { label: "Book logistic", tone: "info" };
+  if (!logisticEtaOf(o)) return { label: "Chase logistic", tone: "info" };
+
+  // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate action).
   const ovl = ovlOf(o);
   const owingBalance = Number(ovl?.balance ?? 0) > 0;
   const storageFee =
     (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
   const owingStorage =
     storageFee > 0 && !ovl?.storage_collected_at && ovl?.storage_waiver_status !== "approved";
-  if (owingBalance) return { label: "Collect $ · balance", tone: "danger", locked: true };
-  if (owingStorage) return { label: "Collect $ · storage", tone: "danger", locked: true };
-
-  // Paid → arrange the delivery (assign → chase ETA → confirm customer → go).
-  const hasLogistic = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
-  if (!hasLogistic) return { label: "Assign logistic", tone: "info" };
-  if (!logisticEtaOf(o)) return { label: "Logistic · no ETA", tone: "info" };
-  if (!ovl?.called_customer) return { label: "Call customer", tone: "info" };
-  return { label: "Schedule delivery", tone: "success" };
+  if (owingBalance || owingStorage)
+    return { label: "Confirm", tone: "warning", locked: true };
+  return { label: "Confirm", tone: "success" };
 }
 
-/** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
- *  table reads as a work queue. TBD + undated sink to the bottom; within that
- *  tail (and on date ties) newest placed_at first, the old list default. */
-function compareByDeadline(
+/** Sort by SLACK ascending (Jess spec §5) — the most dangerous order (least
+ *  buffer, adjusted for the blocking stock track) floats to the top; completed
+ *  sinks to the bottom. Ties keep the old newest-placed-first order. */
+function compareBySlack(
   a: operationOrderListRow,
   b: operationOrderListRow,
 ): number {
-  // Completed orders sink to the bottom (Jess 2026-06-29): the work-in-progress
-  // shows first on the default "All" view; finished history sits at the end.
-  const ca = controlTabOf(a) === "completed" ? 1 : 0;
-  const cb = controlTabOf(b) === "completed" ? 1 : 0;
-  if (ca !== cb) return ca - cb;
-  const da = !a.delivery_date_tbd && a.delivery_date ? a.delivery_date : null;
-  const db = !b.delivery_date_tbd && b.delivery_date ? b.delivery_date : null;
-  if (da && db && da !== db) return da < db ? -1 : 1; // ISO dates compare lexically
-  if (da && !db) return -1;
-  if (!da && db) return 1;
+  const sa = slackDays(a);
+  const sb = slackDays(b);
+  if (sa !== sb) return sa - sb;
   return (b.placed_at ?? "").localeCompare(a.placed_at ?? "");
 }
 
@@ -424,6 +511,34 @@ function logisticOf(
   );
 }
 const NO_CARRIER = "—";
+
+// ─── Logistic delivery state (locked列 spec, 2026-07-12) ──────────────────────
+// The LOGISTIC column = partner tag + delivery date, as a small state machine.
+// The logistic PARTNER queries the slot + calls the customer; ops only chases —
+// so "call now" is a time-window alarm (inside the deadline−1..3d window), NOT a
+// stock signal. Uses the committed delivery date (ops_order_control.logistic_eta).
+type LogisticStateKey = "delivered" | "scheduled" | "call_now" | "no_date" | "unassigned";
+interface LogisticState {
+  key: LogisticStateKey;
+  partner: string | null;
+  /** ISO committed delivery date — only on "scheduled". */
+  date: string | null;
+}
+export function logisticStateOf(
+  o: operationOrderListRow,
+  partnerName: Map<string, string>,
+): LogisticState {
+  const partner = logisticOf(o, partnerName);
+  if (controlTabOf(o) === "completed") return { key: "delivered", partner, date: null };
+  const eta = logisticEtaOf(o);
+  if (eta) return { key: "scheduled", partner, date: eta }; // date booked → Deliver <date>
+  if (!partner) return { key: "unassigned", partner: null, date: null };
+  // No date yet: "call now" once inside the arrangement window (≤3 days to the
+  // promise, incl. today/overdue), regardless of stock; else it's still early.
+  const dd = daysToDue(o);
+  if (dd !== null && dd <= 3) return { key: "call_now", partner, date: null };
+  return { key: "no_date", partner, date: null };
+}
 
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
  *  / Sofa need POs + stock; everything else is accessory/service. Native SKUs
@@ -685,6 +800,46 @@ function openPrint(html: string) {
   setTimeout(() => w.print(), 200);
 }
 
+// ─── Column show/hide (locked spec §4 "control strip: tabs + count + Columns") ──
+// Reuses the SO Maintenance control pattern (btn + N/M + popover of checkboxes)
+// over the hand-rolled table. The 2 structural columns (select, flag) always
+// show; these 8 DATA columns toggle. Base widths sum to 94% (select+flag = 3%+3%);
+// when some are hidden the visible widths scale up so the table stays exactly
+// full-width. The preference persists per-browser in localStorage (client-only —
+// no server config; Saved Views deferred per Jess).
+interface OrderColDef {
+  key: string;
+  label: string;
+  w: number;
+}
+const ORDER_COL_DEFS: OrderColDef[] = [
+  { key: "orderId", label: "Order ID", w: 7 },
+  { key: "ref", label: "Ref No", w: 8 },
+  { key: "customer", label: "Customer", w: 14 },
+  { key: "region", label: "Region", w: 8 },
+  { key: "logistic", label: "Logistic", w: 11 },
+  { key: "deadline", label: "Deadline", w: 13 },
+  { key: "stock", label: "Stock", w: 13 },
+  { key: "next", label: "Next", w: 20 },
+];
+const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
+function loadHiddenCols(): Set<string> {
+  if (typeof localStorage === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(HIDDEN_COLS_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+function saveHiddenCols(s: Set<string>) {
+  try {
+    localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify([...s]));
+  } catch {
+    /* ignore quota / private-mode errors */
+  }
+}
+
 export default function OperationOrdersControl({ onImport }: Props) {
   const params = useParams<{ stage?: string }>();
   const [tab, setTab] = useState<ControlTab>(
@@ -721,10 +876,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
   // matches if it hits ANY selected category (OR). Empty set = no filter.
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
-  // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle.
+  // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle. (The
+  // facet scroll container is now owned by <ListPageShell>.)
   const [kanbanOpen, setKanbanOpen] = useState(true);
-  // Scroll shadow — a faint top line appears once the kanban is scrolled down.
-  const [kanbanScrolled, setKanbanScrolled] = useState(false);
   // GMAIL_FINAL C3 — per-group collapse; CATEGORY starts collapsed at the bottom.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(["CATEGORY"]),
@@ -747,6 +901,34 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [etaOnly, setEtaOnly] = useState(false);
   // Import stock ETA from the Master "Ops" sheet (fills each line's Stock ETA).
   const [etaImportOpen, setEtaImportOpen] = useState(false);
+  // Column show/hide (locked §4) — hidden data-column keys (localStorage-persisted)
+  // + the popover open state; the popover closes on an outside click.
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadHiddenCols);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const columnsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!columnsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (columnsRef.current && !columnsRef.current.contains(e.target as Node))
+        setColumnsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [columnsOpen]);
+  const toggleCol = (key: string) =>
+    setHiddenCols((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      saveHiddenCols(n);
+      return n;
+    });
+  const showCol = (key: string) => !hiddenCols.has(key);
+  const visibleColDefs = ORDER_COL_DEFS.filter((d) => showCol(d.key));
+  // Scale visible data widths to fill 94% (select+flag keep 3%+3%) so the table
+  // stays exactly full-width no matter how many columns are hidden.
+  const colScale = 94 / (visibleColDefs.reduce((s, d) => s + d.w, 0) || 94);
+  const visibleColSpan = 2 + visibleColDefs.length; // select + flag + visible data
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -840,6 +1022,26 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return c;
   }, [orders]);
 
+  // AT A GLANCE (locked spec) — the facet's top health summary, computed over the
+  // WHOLE live book (stable headline, not reactive to the status tab):
+  //   • Outstanding = Σ money customers still owe HQ (ops_order_control.balance > 0)
+  //   • At-risk     = open orders past the safe line (slackDays < 0 — the frozen
+  //                   engine's deadline+stock danger score; reused, no new logic)
+  //   • On-time     = open orders still with buffer (slackDays ≥ 0)
+  const glance = useMemo(() => {
+    let outstanding = 0;
+    let atRisk = 0;
+    let onTime = 0;
+    for (const o of orders) {
+      const bal = Number(ovlOf(o)?.balance ?? 0);
+      if (bal > 0) outstanding += bal;
+      if (controlTabOf(o) === "completed") continue;
+      if (slackDays(o) < 0) atRisk += 1;
+      else onTime += 1;
+    }
+    return { outstanding, atRisk, onTime };
+  }, [orders]);
+
   // Status-tab filter first; the Urgent chip + region pills layer on top (all
   // stackable). The chip/region counts are computed over the tab-filtered set
   // so they reflect the current view.
@@ -929,7 +1131,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
-    return [...r].sort(compareByDeadline);
+    return [...r].sort(compareBySlack);
   }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
@@ -1113,138 +1315,275 @@ export default function OperationOrdersControl({ onImport }: Props) {
     );
   }
 
+  // Active-filter chips + Reset (surfaced through <ListPageShell>). Derived from
+  // the same filter state the facet kanban drives, so a chip's ✕ and a Reset
+  // clear exactly what the kanban set.
+  const anyFilter =
+    !!search ||
+    !!stockFilter ||
+    !!logisticFilter ||
+    !!regionFilter ||
+    !!dueFilter ||
+    categoryFilter.size > 0 ||
+    etaOnly ||
+    flaggedOnly ||
+    escalateOnly;
+
+  function resetFilters() {
+    setSearch("");
+    setStockFilter(null);
+    setLogisticFilter(null);
+    setRegionFilter(null);
+    setDueFilter(null);
+    setCategoryFilter(new Set());
+    setEtaOnly(false);
+    setFlaggedOnly(false);
+    setEscalateOnly(false);
+  }
+
+  const activeChips: ActiveChip[] = [];
+  if (search) activeChips.push({ label: `Search: ${search}`, onClear: () => setSearch("") });
+  if (stockFilter)
+    activeChips.push({ label: `Stock: ${stockFilter}`, onClear: () => setStockFilter(null) });
+  if (logisticFilter)
+    activeChips.push({
+      label: logisticFilter === NO_CARRIER ? "Unassigned" : `Logistic: ${logisticFilter}`,
+      onClear: () => setLogisticFilter(null),
+    });
+  if (regionFilter)
+    activeChips.push({
+      label: regionFilter === OTHERS_LABEL ? "No region" : `Region: ${regionFilter}`,
+      onClear: () => setRegionFilter(null),
+    });
+  if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
+  if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
+  if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
+  if (escalateOnly) activeChips.push({ label: "For Jess", onClear: () => setEscalateOnly(false) });
+  for (const key of categoryFilter)
+    activeChips.push({
+      label: `Cat: ${key}`,
+      onClear: () =>
+        setCategoryFilter((prev) => {
+          const n = new Set(prev);
+          n.delete(key);
+          return n;
+        }),
+    });
+
   return (
-    <div
-      className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#ECE8E0]"
-      data-testid="operation-orders-control"
-    >
-      {/* Breadcrumb row — static location label (left) + the data-freshness
-          stamp paired with refresh (right). "Last import" lives here, out of the
-          way of the Import CTAs, and shares this line so it adds no extra height. */}
-      <div className="flex items-center justify-between gap-3 mb-1.5 shrink-0">
-        <div className="flex items-center gap-1.5 text-[12px] text-base-400">
-          <span>Operations</span>
-          <ChevronRight size={12} className="text-base-300" />
-          <span className="text-base-600">Orders</span>
-        </div>
-        {latestIn && (
-          <div className="flex items-center gap-1 text-[12px] text-base-400">
-            <span className="tabular-nums" title="Most recent order / import">
-              Synced {fmtDateShort(latestIn)}
-            </span>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              title="Refresh"
-              aria-label="Refresh orders"
-              className="p-1 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
-            >
-              <RefreshCw size={14} strokeWidth={2} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Header — title + search + import (fixed; does not scroll). The order
-          count moved out — the "All" tab already carries the total. */}
-      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
-        <h1 className="t-h1 font-display">Orders</h1>
-        <div className="flex items-center gap-2.5">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="SO number or customer…"
-            className="w-[230px] px-4 py-2 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
-          />
-          <button
-            type="button"
-            onClick={() => setEtaImportOpen(true)}
-            className="btn-secondary text-[12px] whitespace-nowrap rounded-xl"
-            title="Fill each order line's Stock ETA + status from your Master sheet"
-          >
-            Import from Master
-          </button>
-          {onImport && (
-            <button
-              type="button"
-              onClick={onImport}
-              className="btn-hero text-[12px] whitespace-nowrap rounded-xl"
-            >
-              + Import from AutoCount
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Toolbar — result count + bulk actions, full-width above the split (P2 D:
-          keeps the kanban + table header on one line). */}
-      <div className="shrink-0 mb-2">
-        {/* Tabs ALWAYS stay put — selection no longer swaps them for a bar; the
-            bulk actions fill the table-header row instead (see thead below), so
-            nothing shifts when rows are picked. */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            {/* Filter-panel toggle — lives in the toolbar (above the panel), so
-                it adds no body width and leaves no dead rail column. */}
-            <button
-              type="button"
-              onClick={() => setKanbanOpen((v) => !v)}
-              title={kanbanOpen ? "Hide filters" : "Show filters"}
-              aria-label={kanbanOpen ? "Hide filters" : "Show filters"}
-              data-testid="orders-filter-rail"
-              className="shrink-0 p-1.5 rounded-lg border transition-colors"
-              style={{
-                borderColor: kanbanOpen ? "#221F20" : "#DDD8CE",
-                color: kanbanOpen ? "#221F20" : "#6B7280",
-                background: "#FFFFFF",
-              }}
-            >
-              <PanelLeft size={15} />
-            </button>
-            {/* H — STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */}
-            <StatusTabs
-              tabs={TABS.map((t) => ({
-                key: t.key,
-                label: t.label,
-                count: counts[t.key],
-                title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
-              }))}
-              active={tab}
-              onSelect={setTab}
+    <>
+      <ListPageShell
+        testId="operation-orders-control"
+        breadcrumb={
+          <>
+            <span>Operations</span>
+            <ChevronRight size={12} className="text-base-300" />
+            <span className="text-base-600">Orders</span>
+          </>
+        }
+        title={
+          <span className="inline-flex items-baseline gap-3">
+            <span>Orders</span>
+            {latestIn && (
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-base-400">
+                <span className="tabular-nums" title="Most recent order / import">
+                  Synced {fmtDateShort(latestIn)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  title="Refresh"
+                  aria-label="Refresh orders"
+                  className="p-0.5 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
+                >
+                  <RefreshCw size={13} strokeWidth={2} />
+                </button>
+              </span>
+            )}
+          </span>
+        }
+        actions={
+          /* Header right cluster (ONE white header surface): search → Bell →
+             HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
+          <>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SO number or customer…"
+              className="w-[230px] px-4 py-1.5 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
             />
-          </div>
-          {total > 0 && (
-            <span
-              className="text-[12px] text-base-500 tabular-nums"
-              title="Rows loaded / total in this tab"
+            <TopBarIcons />
+          </>
+        }
+        facetOpen={kanbanOpen}
+        onFacetToggle={() => setKanbanOpen((v) => !v)}
+        toolbar={
+          /* STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */
+          <StatusTabs
+            tabs={TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              count: counts[t.key],
+              title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
+            }))}
+            active={tab}
+            onSelect={setTab}
+          />
+        }
+        toolbarRight={
+          /* ONE-row toolbar, right cluster in this exact order:
+             N of M · + Master · + AutoCount · ⋮ (the overflow sits at the far
+             corner; its menu = Show columns, with room for Density/Export). */
+          <>
+            {total > 0 && (
+              <span
+                className="text-[12px] text-base-500 tabular-nums"
+                title="Rows loaded / total in this tab"
+              >
+                {Math.min(shown.length, total)} of {total}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setEtaImportOpen(true)}
+              className="btn-secondary text-[12px] whitespace-nowrap rounded-xl"
+              title="Import from Master — fill each order line's Stock ETA + status from your Master sheet"
             >
-              {Math.min(shown.length, total)} of {total}
+              + Master
+            </button>
+            {onImport && (
+              <button
+                type="button"
+                onClick={onImport}
+                className="btn-hero text-[12px] whitespace-nowrap rounded-xl"
+                title="Import orders from AutoCount"
+              >
+                + AutoCount
+              </button>
+            )}
+            {hiddenCols.size > 0 && (
+              <span
+                className="t-tiny text-base-500 tabular-nums"
+                title="Some columns are hidden"
+              >
+                {visibleColDefs.length}/{ORDER_COL_DEFS.length}
+              </span>
+            )}
+            <div className="relative" ref={columnsRef}>
+              <button
+                type="button"
+                onClick={() => setColumnsOpen((o) => !o)}
+                aria-label="Table options"
+                title="Table options"
+                aria-haspopup="menu"
+                aria-expanded={columnsOpen}
+                className="p-1 rounded-md border border-base-200 text-base-500 hover:text-base-800 hover:bg-base-50 transition-colors"
+              >
+                <MoreVertical size={15} />
+              </button>
+              {columnsOpen && (
+                <div className="absolute z-30 mt-1 right-0 w-56 max-h-80 overflow-auto bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
+                  <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">Show columns</div>
+                  <div className="px-1.5 pb-1">
+                    {ORDER_COL_DEFS.map((d) => (
+                      <label
+                        key={d.key}
+                        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-base-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={showCol(d.key)}
+                          onChange={() => toggleCol(d.key)}
+                        />
+                        <span className="t-small text-base-700 truncate">{d.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        }
+        bulkBar={
+          selected.size > 0 ? (
+            <OrdersBulkBar
+              count={selected.size}
+              total={total}
+              tabLabel={TABS.find((t) => t.key === tab)?.label ?? "this tab"}
+              allChecked={allPagedSelected}
+              someChecked={somePagedSelected}
+              onSelectAllInTab={selectAllInTab}
+              menu={bulkMenu}
+              setMenu={setBulkMenu}
+              partners={partnersQ.data?.partners ?? []}
+              onAssign={bulkAssignLogistic}
+              onFlag={bulkCreateTasks}
+              onExport={exportSelectedCsv}
+              onPrint={printSelected}
+              onComplete={bulkMarkCompleted}
+              onClear={clearSel}
+              busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
+            />
+          ) : undefined
+        }
+        activeChips={activeChips}
+        footer={
+          <>
+            <span className="tabular-nums">
+              {total} {total === 1 ? "order" : "orders"}
             </span>
-          )}
-        </div>
-      </div>
+            {anyFilter && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="hover:text-base-900 transition-colors"
+              >
+                Reset filters
+              </button>
+            )}
+          </>
+        }
+        facet={
+          /* ONE white panel — every section is a cream title bar (collapsible ˅).
+             SUMMARY sits on top and carries the whole-panel collapse ‹; the 240px
+             scroll container is owned by <ListPageShell>. Token classes only
+             (design-standard: no raw hex in new code). */
+          <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
+              {/* SUMMARY — whole-book health (Outstanding · at-risk · on-time). The
+                  ‹ on its title bar collapses the entire filter panel. */}
+              <KanbanGroup
+                title="SUMMARY"
+                collapsed={collapsedGroups.has("SUMMARY")}
+                onToggle={() => toggleGroup("SUMMARY")}
+                headerRight={
+                  <button
+                    type="button"
+                    onClick={() => setKanbanOpen(false)}
+                    title="Collapse filters"
+                    aria-label="Collapse filters"
+                    className="shrink-0 p-0.5 rounded text-base-400 hover:text-base-800 hover:bg-base-200/60 transition-colors"
+                  >
+                    <ChevronsLeft size={15} />
+                  </button>
+                }
+              >
+                {[
+                  {
+                    label: "Outstanding",
+                    value: `RM ${Math.round(glance.outstanding).toLocaleString("en-MY")}`,
+                    cls: glance.outstanding > 0 ? "text-danger" : "text-base-600",
+                  },
+                  { label: "At-risk", value: String(glance.atRisk), cls: glance.atRisk > 0 ? "text-warning" : "text-base-600" },
+                  { label: "On-time", value: String(glance.onTime), cls: "text-success" },
+                ].map((s) => (
+                  <div key={s.label} className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-[13px] text-base-700">{s.label}</span>
+                    <span className={`text-[13px] font-bold tabular-nums ${s.cls}`}>{s.value}</span>
+                  </div>
+                ))}
+              </KanbanGroup>
 
-      {/* Body split (Loo 2026-07-09, P1) — a left FILTER KANBAN (240px, collapsible
-          to a 28px rail) + the LIST column. The filter GROUPS + their state move
-          here verbatim from the old top band; only the container changes (a
-          vertical stack, chips wrap within 240). Regroup (CHASE NOW…) + the
-          vertical-row chip restyle are P2 (deferred). */}
-      <div className="flex-1 flex gap-4 min-h-0">
-        {kanbanOpen && (
-          <aside
-            className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
-            data-testid="orders-filter-kanban"
-            onScroll={(e) => setKanbanScrolled(e.currentTarget.scrollTop > 2)}
-            style={{
-              boxShadow: kanbanScrolled
-                ? "inset 0 8px 6px -7px rgba(34,31,32,0.14)"
-                : undefined,
-            }}
-          >
-            {/* One white card (P2 G) — Gmail-nav rows. Collapse now lives on the
-                edge rail between this panel and the table (no in-card row). */}
-            <div className="bg-white border rounded-[12px] p-1.5" style={{ borderColor: "#E5E1D8" }}>
               {/* CHASE NOW — the triage lane (title reads dark red). */}
               <KanbanGroup
                 title="CHASE NOW"
@@ -1407,13 +1746,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   />
                 ))}
               </KanbanGroup>
-            </div>
-          </aside>
-        )}
-
-        {/* List column — the scrolling listing (the toolbar moved full-width
-            above the split so the kanban + table header line up, P2 D). */}
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          </div>
+        }
+      >
           {/* Listing — the ONLY scroll area (the page stays put, only the rows
               scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
@@ -1421,7 +1756,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
@@ -1433,15 +1768,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
           <colgroup>
             <col style={{ width: "3%" }} />
             <col style={{ width: "3%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "6.5%" }} />
-            <col style={{ width: "6.5%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "23%" }} />
+            {visibleColDefs.map((d) => (
+              <col key={d.key} style={{ width: `${(d.w * colScale).toFixed(2)}%` }} />
+            ))}
           </colgroup>
           {/* Wireframe header band (P11) — the old solid black #221F20 band is
               gone: a light warm surface + a 0.5px hairline, dark micro-uppercase
@@ -1449,59 +1778,43 @@ export default function OperationOrdersControl({ onImport }: Props) {
               with the bulk actions (BulkHeadRow) — Gmail-style, so the table
               never jumps. sticky so the header stays put as the list scrolls. */}
           <thead className="sticky top-0 z-10">
-            {selected.size > 0 ? (
-              <BulkHeadRow
-                count={selected.size}
-                total={total}
-                tabLabel={TABS.find((t) => t.key === tab)?.label ?? "this tab"}
-                allChecked={allPagedSelected}
-                someChecked={somePagedSelected}
-                onSelectAllInTab={selectAllInTab}
-                menu={bulkMenu}
-                setMenu={setBulkMenu}
-                partners={partnersQ.data?.partners ?? []}
-                onAssign={bulkAssignLogistic}
-                onExport={exportSelectedCsv}
-                onPrint={printSelected}
-                onTasks={bulkCreateTasks}
-                onComplete={bulkMarkCompleted}
-                onClear={clearSel}
-                busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
-              />
-            ) : (
-              <tr
-                className="border-b"
-                style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
-              >
-                <th className="px-2 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={allPagedSelected}
-                    onChange={toggleAllPaged}
-                    aria-label="Select all on this page"
-                    className="cursor-pointer accent-base-700 align-middle"
-                  />
-                </th>
-                <th className="px-1 py-1.5 text-center" title="Follow-up">
-                  <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
-                </th>
-                <Th>Order ID</Th>
-                <Th>Ref No</Th>
-                <Th>Customer</Th>
-                <Th>Region</Th>
-                <Th>Logistic</Th>
-                <Th>ETA</Th>
-                <Th>Deadline</Th>
-                <Th>Stock</Th>
-                <Th>Manage</Th>
-              </tr>
-            )}
+            {/* One header row (the bulk actions live in the top bar now, so the
+                table never swaps its head). The select-all shows Gmail's
+                indeterminate dash on a partial tick. */}
+            <tr
+              className="border-b"
+              style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
+            >
+              <th className="px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={allPagedSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = somePagedSelected;
+                  }}
+                  onChange={toggleAllPaged}
+                  aria-label="Select all on this page"
+                  className="cursor-pointer accent-base-700 align-middle"
+                />
+              </th>
+              <th className="px-1 py-1.5 text-center" title="Follow-up">
+                <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
+              </th>
+              {showCol("orderId") && <Th>Order ID</Th>}
+              {showCol("ref") && <Th>Ref No</Th>}
+              {showCol("customer") && <Th>Customer</Th>}
+              {showCol("region") && <Th>Region</Th>}
+              {showCol("logistic") && <Th>Logistic</Th>}
+              {showCol("deadline") && <Th>Deadline</Th>}
+              {showCol("stock") && <Th>Stock</Th>}
+              {showCol("next") && <Th>Next</Th>}
+            </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={visibleColSpan}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1519,12 +1832,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
                 onFlag={openFollowUp}
+                showCol={showCol}
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
             {shown.length < total && (
               <tr ref={sentinelRef} aria-hidden>
-                <td colSpan={11} className="text-center text-[11px] text-base-400">
+                <td colSpan={visibleColSpan} className="text-center text-[11px] text-base-400">
                   Loading more… ({shown.length} of {total})
                 </td>
               </tr>
@@ -1532,10 +1846,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </tbody>
         </table>
           </div>
-          {/* /list column */}
-        </div>
-        {/* /body split */}
-      </div>
+      </ListPageShell>
 
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
@@ -1548,18 +1859,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
           onClose={() => setComposeOrder(null)}
         />
       )}
-
-    </div>
+    </>
   );
 }
 
-/** Gmail-style bulk-action row (P11) — fills the table-header row itself (same
- *  height) with a GREY band when ≥1 order is selected, so the table never jumps.
- *  The select-all checkbox STAYS put (checked / indeterminate) so you can untick
- *  in place like Gmail. When the loaded window is a subset of the tab it offers
- *  "Select all N in <tab>". The two daily actions (Assign · Mark completed) are
- *  inline; Export / Print / Create-tasks tuck under ⋮. Colours stay quiet. */
-function BulkHeadRow({
+/** Gmail-style bulk-action band — REPLACES the tabs row in place (via the shell's
+ *  `bulkBar` slot) when ≥1 order is selected, so the left facet + the table never
+ *  move. A warm flame band (token classes, no raw hex). The leading checkbox
+ *  stays checked / indeterminate so you can untick in place like Gmail; when the
+ *  loaded window is a subset of the tab it offers "Select all N in <tab>". Inline:
+ *  Assign logistic · Flag · Export ▾ (CSV / Print / Mark delivered); ✕ clears. */
+function OrdersBulkBar({
   count,
   total,
   tabLabel,
@@ -1570,9 +1880,9 @@ function BulkHeadRow({
   setMenu,
   partners,
   onAssign,
+  onFlag,
   onExport,
   onPrint,
-  onTasks,
   onComplete,
   onClear,
   busy,
@@ -1587,116 +1897,109 @@ function BulkHeadRow({
   setMenu: (m: null | "menu" | "assign") => void;
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
+  onFlag: () => void;
   onExport: () => void;
   onPrint: () => void;
-  onTasks: () => void;
   onComplete: () => void;
   onClear: () => void;
   busy: boolean;
 }) {
+  const btn =
+    "inline-flex items-center gap-1 text-[13px] px-2 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
   return (
-    <tr
-      className="border-b"
-      style={{ backgroundColor: "#D3E4F4", borderBottomColor: "rgba(31,111,191,0.22)" }}
-    >
-      {/* Col 1 — the select-all box stays in its column, untickable in place. */}
-      <th className="px-2 py-1.5">
-        <input
-          type="checkbox"
-          checked={allChecked}
-          ref={(el) => {
-            if (el) el.indeterminate = someChecked;
-          }}
-          onChange={onClear}
-          aria-label="Deselect all"
-          title="Deselect all"
-          className="cursor-pointer accent-base-700 align-middle"
-        />
-      </th>
-      <th colSpan={10} className="pl-1 pr-3 py-1.5 text-left font-normal">
-        <div className="flex items-center gap-2 text-base-800">
-          <span className="text-[12px] font-semibold tabular-nums whitespace-nowrap">
-            {count} selected
-          </span>
-          {/* Gmail cross-page select-all — only while the tab holds more. */}
-          {count < total && (
-            <button
-              type="button"
-              onClick={onSelectAllInTab}
-              className="text-[12px] text-[#1F6FBF] hover:underline whitespace-nowrap"
-            >
-              Select all {total} in {tabLabel}
-            </button>
-          )}
-          <span className="mx-1 h-4 w-px bg-black/10" aria-hidden />
-          {/* Daily actions — inline, one click, labelled (no icon-guessing). */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenu(menu === "assign" ? null : "assign")}
-              disabled={busy}
-              className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
-            >
-              <Truck size={14} /> Assign <ChevronDown size={12} />
-            </button>
-            {menu === "assign" && (
-              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
-                <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
-                  Assign to…
-                </div>
-                {partners.length === 0 && (
-                  <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
-                )}
-                {partners.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => onAssign(p.id)}
-                    className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
+    <div className="flex items-center gap-2 rounded-xl border border-signature-100 bg-signature-50 px-3 py-1.5 text-base-800">
+      <input
+        type="checkbox"
+        checked={allChecked}
+        ref={(el) => {
+          if (el) el.indeterminate = someChecked;
+        }}
+        onChange={onClear}
+        aria-label="Deselect all"
+        title="Deselect all"
+        className="cursor-pointer accent-primary align-middle"
+      />
+      <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap">
+        {count} selected
+      </span>
+      {/* Gmail cross-page select-all — only while the tab holds more. */}
+      {count < total && (
+        <button
+          type="button"
+          onClick={onSelectAllInTab}
+          className="text-[12px] text-primary hover:underline whitespace-nowrap"
+        >
+          Select all {total} in {tabLabel}
+        </button>
+      )}
+      <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
+      {/* Assign logistic — inline dropdown of partners. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenu(menu === "assign" ? null : "assign")}
+          disabled={busy}
+          className={btn}
+        >
+          <Truck size={14} /> Assign logistic <ChevronDown size={12} />
+        </button>
+        {menu === "assign" && (
+          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+            <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
+              Assign to…
+            </div>
+            {partners.length === 0 && (
+              <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
             )}
+            {partners.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onAssign(p.id)}
+                className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
+              >
+                {p.name}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={onComplete}
-            disabled={busy}
-            className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
-          >
-            <CheckCircle2 size={14} /> {busy ? "Working…" : "Mark delivered"}
-          </button>
-          {/* Occasional actions — folded under ⋮. */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenu(menu === "menu" ? null : "menu")}
-              disabled={busy}
-              aria-label="More actions"
-              className="inline-flex items-center text-[12px] px-1.5 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
-            >
-              <MoreVertical size={14} />
-            </button>
-            {menu === "menu" && (
-              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
-                <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
-                <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
-                <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
-              </div>
-            )}
+        )}
+      </div>
+      {/* Flag for follow-up (creates a follow-up task per selected order). */}
+      <button type="button" onClick={onFlag} disabled={busy} className={btn}>
+        <Flag size={14} /> Flag
+      </button>
+      {/* Export ▾ — CSV / Print / Mark delivered. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenu(menu === "menu" ? null : "menu")}
+          disabled={busy}
+          className={btn}
+        >
+          <Download size={14} /> Export <ChevronDown size={12} />
+        </button>
+        {menu === "menu" && (
+          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+            <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+            <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
+            <BulkMenuItem
+              icon={CheckCircle2}
+              label={busy ? "Working…" : "Mark delivered"}
+              onClick={onComplete}
+            />
           </div>
-          <button
-            type="button"
-            onClick={onClear}
-            className="ml-auto inline-flex items-center gap-1 text-[12px] text-base-500 hover:text-base-900"
-          >
-            <X size={14} /> Clear
-          </button>
-        </div>
-      </th>
-    </tr>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label="Clear selection"
+        title="Clear selection"
+        className="ml-auto inline-flex items-center gap-1 text-[13px] text-base-500 hover:text-base-900"
+      >
+        <X size={15} />
+      </button>
+    </div>
   );
 }
 
@@ -1775,6 +2078,7 @@ function KanbanGroup({
   collapsed,
   onToggle,
   testid,
+  headerRight,
   children,
 }: {
   title: string;
@@ -1785,32 +2089,42 @@ function KanbanGroup({
   collapsed: boolean;
   onToggle: () => void;
   testid?: string;
+  /** Extra control pinned to the right of the cream title bar (e.g. the SUMMARY
+   *  row's whole-panel collapse ‹). Rendered OUTSIDE the toggle button so it's a
+   *  sibling, never a button-in-button. */
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div data-testid={testid} className="mb-1">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-1 rounded-md px-2 py-1.5 hover:brightness-[0.97]"
+      {/* Cream title bar — a flex row; the toggle is the main clickable area, the
+          optional headerRight sits beside the total. */}
+      <div
+        className="flex items-center gap-1 rounded-md pl-2 pr-1.5 py-1.5"
         style={{ background: "#F1EFE8" }}
       >
-        {collapsed ? (
-          <ChevronRight size={12} className="shrink-0 text-base-500" />
-        ) : (
-          <ChevronDown size={12} className="shrink-0 text-base-500" />
-        )}
-        <span
-          className="uppercase flex-1 text-left"
-          style={{
-            fontSize: "11px",
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-            color: danger ? "#991B1B" : "#221F20",
-          }}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 min-w-0 flex items-center gap-1 text-left hover:brightness-[0.97]"
         >
-          {title}
-        </span>
+          {collapsed ? (
+            <ChevronRight size={12} className="shrink-0 text-base-500" />
+          ) : (
+            <ChevronDown size={12} className="shrink-0 text-base-500" />
+          )}
+          <span
+            className="uppercase flex-1 truncate"
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              color: danger ? "#991B1B" : "#221F20",
+            }}
+          >
+            {title}
+          </span>
+        </button>
         {total !== undefined && (
           <span
             className="tabular-nums shrink-0"
@@ -1819,7 +2133,8 @@ function KanbanGroup({
             {total}
           </span>
         )}
-      </button>
+        {headerRight}
+      </div>
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
   );
@@ -1885,6 +2200,7 @@ function OrderRow({
   onToggle,
   onOpen,
   onFlag,
+  showCol,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -1896,22 +2212,19 @@ function OrderRow({
   onOpen: () => void;
   /** Open the side follow-up form for this order (#2). */
   onFlag: (o: operationOrderListRow) => void;
+  /** Column visibility predicate (Columns show/hide) — gates the 8 data cells. */
+  showCol: (key: string) => boolean;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const stock = stockReadiness(o, availableBySku);
+  const se = stockEtaOf(o);
   const loc = locationForAddress(o.customer_address ?? null);
   const msQty = catQty(lines, "mattress");
   const bfQty = catQty(lines, "bedframe");
   const sofaQty = catQty(lines, "sofa");
 
-  // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
-  // assignment resolved via the partners map.
-  const logistic =
-    o.delivery_partners?.name ??
-    (o.ops_assigned_logistic
-      ? partnerName.get(o.ops_assigned_logistic) ?? "…"
-      : null);
+  const logi = logisticStateOf(o, partnerName);
 
   return (
     <tr
@@ -1935,6 +2248,7 @@ function OrderRow({
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
           here; paired tight with the Ref No column to its right. */}
+      {showCol("orderId") && (
       <td className="pl-1 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
         <span
           className="font-mono tabular-nums"
@@ -1943,8 +2257,10 @@ function OrderRow({
           SO-{o.so}
         </span>
       </td>
+      )}
       {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. All refs
           stack vertically; only >3 fold to "+N". Tight to the identity trio. */}
+      {showCol("ref") && (
       <td className="px-1 py-1.5">
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
@@ -1967,7 +2283,9 @@ function OrderRow({
           </div>
         )}
       </td>
+      )}
       {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
+      {showCol("customer") && (
       <td className="pl-1 pr-2 py-2">
         {o.customer_name ? (
           <span
@@ -1981,7 +2299,9 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
+      )}
       {/* Region — its own group; gap before it separates it from the identity trio. */}
+      {showCol("region") && (
       <td className="pl-4 pr-2 py-2">
         {loc.label ? (
           <span
@@ -1999,44 +2319,48 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Logistic — carrier name, moved up next to Region (who's delivering +
-          where). Neutral grey. */}
-      <td className="pl-4 pr-1 py-2 whitespace-nowrap">
-        {logistic ? (
-          <span className="text-[14px] block truncate" style={{ color: "#4B5563" }}>{logistic}</span>
+      )}
+      {/* Logistic — partner tag + delivery-date state machine (伙伴 + 送货日):
+          — unassigned · no date yet (grey) · call now (red, ≤3d window) ·
+          Deliver <date> (green, booked) · Delivered ✓. Never "by". */}
+      {showCol("logistic") && (
+      <td className="pl-4 pr-1 py-2 whitespace-nowrap leading-[1.25]">
+        {logi.key === "unassigned" ? (
+          <span className="text-[13px]" style={{ color: "#9CA3AF" }}>— unassigned</span>
         ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </td>
-      {/* Logistic ETA — the logistic's committed delivery date
-          (ops_order_control.logistic_eta), just before the customer Deadline for
-          a quick compare. "No ETA" (red) when it's overdue for chasing. */}
-      <td className="px-1 py-2 whitespace-nowrap">
-        {(() => {
-          const eta = logisticEtaOf(o);
-          if (eta) {
-            const [d, wd] = fmtDate(eta).split(", ");
-            return (
-              <span className="inline-flex items-baseline gap-1.5">
+          <>
+            <span className="text-[14px] block truncate" style={{ color: "#4B5563" }}>
+              {logi.partner}
+            </span>
+            <div style={{ marginTop: 1 }}>
+              {logi.key === "delivered" ? (
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534" }}>
+                  Delivered ✓
+                </span>
+              ) : logi.key === "scheduled" && logi.date ? (
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
+                  style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}
                 >
-                  {d}
+                  Deliver {fmtDate(logi.date).split(", ")[0]}
                 </span>
-                {wd && <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{wd}</span>}
-              </span>
-            );
-          }
-          return needsEta(o) ? (
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#991B1B" }}>No ETA</span>
-          ) : (
-            <span className="text-base-300">—</span>
-          );
-        })()}
+              ) : logi.key === "call_now" ? (
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#991B1B" }}>
+                  call now
+                </span>
+              ) : (
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#9CA3AF" }}>
+                  no date yet
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </td>
+      )}
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
+      {showCol("deadline") && (
       <td
         className="pl-1 pr-2 py-2 leading-[1.2] whitespace-nowrap"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
@@ -2045,7 +2369,7 @@ function OrderRow({
           <span className="text-[11px] font-medium" style={{ color: "#9A7B3F" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
+            const datePart = fmtDate(o.delivery_date).split(", ")[0];
             // Reuse the SAME DUE bucket as the top filter header so they can never
             // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
             const dd = daysToDue(o);
@@ -2088,9 +2412,6 @@ function OrderRow({
                 >
                   {datePart}
                 </span>
-                {dayPart && (
-                  <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{dayPart}</span>
-                )}
               </div>
             );
           })()
@@ -2098,12 +2419,16 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
+      )}
       {/* Stock — its own group; gap before it separates it from the logistic trio. */}
+      {showCol("stock") && (
       <td className="pl-4 pr-2 py-2 whitespace-nowrap">
-        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
+        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
       </td>
+      )}
       {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
           actions (open / flag / assign) that appear on row hover (P2 F). */}
+      {showCol("next") && (
       <td className="pl-2 pr-2 py-2 whitespace-nowrap relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
@@ -2161,6 +2486,7 @@ function OrderRow({
           </button>
         </div>
       </td>
+      )}
     </tr>
   );
 }
@@ -2229,50 +2555,95 @@ const STOCK_PILL: Record<
  *  so they're excluded). Numerator: Ready = all core, No PO = 0; Waiting shows
  *  "–" because the list payload carries no per-line GRN-received qty (esp.
  *  AutoCount orders). `data-stock-state` kept verbatim for the tests. */
-function StockDot({ info, coreTotal }: { info: StockInfo; coreTotal: number }) {
+function StockDot({
+  info,
+  coreTotal,
+  se,
+}: {
+  info: StockInfo;
+  coreTotal: number;
+  se: StockEta;
+}) {
   let key: "ready" | "waiting" | "no_po";
   let title: string;
-  switch (info.state) {
-    case "ready":
-    case "in_stock":
-      key = "ready";
-      title = "All core stock secured for this order";
-      break;
-    case "unknown":
-      key = "no_po";
-      title = "No PO raised yet — open the order to reserve stock or raise a PO";
-      break;
-    default: // awaiting / need_po → Waiting (Partial merged in)
-      key = "waiting";
-      title = "Core stock not all in yet — PO open / awaiting arrival";
-      break;
+  // The imported per-line status is authoritative for "all in" — when it says
+  // every line is ready, show Ready (no ETA noise), even where the free-balance
+  // heuristic can't confirm it (AutoCount free-text SKUs never match a catalog
+  // SKU, so the heuristic alone would read "No PO" forever).
+  if (se.state === "ready") {
+    key = "ready";
+    title = "All lines marked in-stock (imported)";
+  } else {
+    switch (info.state) {
+      case "ready":
+      case "in_stock":
+        key = "ready";
+        title = "All core stock secured for this order";
+        break;
+      case "unknown":
+        key = "no_po";
+        title = "No PO raised yet — open the order to reserve stock or raise a PO";
+        break;
+      default: // awaiting / need_po → Waiting (Partial merged in)
+        key = "waiting";
+        title = "Core stock not all in yet — PO open / awaiting arrival";
+        break;
+    }
   }
   const S = STOCK_PILL[key];
-  // ONE pill = status + core ratio, e.g. "Waiting 0/2" (Loo 2026-07-09). Ready =
-  // all core; Waiting / No PO start at 0 received (the list payload has no
-  // per-line GRN-received qty, so 0 is the confirmed-received baseline).
   const num = key === "ready" ? String(coreTotal) : "0";
+
+  // Supplier ETA line (stock_eta version) — shown only while waiting; coloured
+  // vs the customer deadline: OVERDUE red · LATE orange · on-track grey · no-ETA
+  // faint. Ready shows nothing (no ETA noise once the goods are in).
+  const eta = (() => {
+    if (key === "ready" || se.state === "ready" || se.state === "none") return null;
+    // Colour carries the state (red=overdue · orange=late · grey=on-track), like
+    // the DEADLINE pill — no text suffix, so the line stays short + never clips.
+    if (se.state === "no_eta")
+      return { text: "ETA —", color: "#9CA3AF", tip: "Waiting on stock — no supplier ETA entered yet" };
+    if (!se.etaIso) return null;
+    const d = fmtDate(se.etaIso).split(", ")[0];
+    if (se.state === "overdue")
+      return { text: `ETA ${d}`, color: "#991B1B", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
+    if (se.state === "late")
+      return { text: `ETA ${d}`, color: "#B45309", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
+    return { text: `ETA ${d}`, color: "#6B7280", tip: "Supplier arrival ETA — on track" };
+  })();
+
   return (
-    <span
-      className="inline-flex items-center rounded-full whitespace-nowrap"
-      style={{
-        fontSize: "11.5px",
-        fontWeight: 600,
-        padding: "1px 9px",
-        color: S.text,
-        background: S.bg,
-        border: `1px solid ${S.border}`,
-      }}
-      title={title}
-      data-stock-state={info.state}
-    >
-      <span>{S.label}</span>
-      {coreTotal > 0 && (
-        <span className="tabular-nums" style={{ marginLeft: 6, fontWeight: 700 }}>
-          {num}/{coreTotal}
-        </span>
+    <div className="leading-[1.3]">
+      <span
+        className="inline-flex items-center rounded-full whitespace-nowrap"
+        style={{
+          fontSize: "11.5px",
+          fontWeight: 600,
+          padding: "1px 9px",
+          color: S.text,
+          background: S.bg,
+          border: `1px solid ${S.border}`,
+        }}
+        title={title}
+        data-stock-state={info.state}
+      >
+        <span>{S.label}</span>
+        {coreTotal > 0 && (
+          <span className="tabular-nums" style={{ marginLeft: 6, fontWeight: 700 }}>
+            {num}/{coreTotal}
+          </span>
+        )}
+      </span>
+      {eta && (
+        <div
+          className="tabular-nums"
+          style={{ fontSize: "10.5px", fontWeight: 600, color: eta.color, marginTop: 1 }}
+          title={eta.tip}
+          data-stock-eta={se.state}
+        >
+          {eta.text}
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 

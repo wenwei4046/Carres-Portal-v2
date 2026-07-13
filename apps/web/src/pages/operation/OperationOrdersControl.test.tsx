@@ -7,6 +7,9 @@ import OperationOrdersControl, {
   buildOrdersPrintHtml,
   catQty,
   nextActionOf,
+  stockEtaOf,
+  slackDays,
+  logisticStateOf,
 } from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
@@ -304,7 +307,7 @@ describe("OperationOrdersControl", () => {
   it("fires onImport when the import button is clicked", () => {
     const onImport = vi.fn();
     wrap(<OperationOrdersControl onImport={onImport} />);
-    fireEvent.click(screen.getByText(/Import from AutoCount/i));
+    fireEvent.click(screen.getByText(/\+ AutoCount/i));
     expect(onImport).toHaveBeenCalledOnce();
   });
 
@@ -709,12 +712,12 @@ describe("orders export", () => {
     expect(html).toContain("A &amp; &lt;B&gt;");
   });
 
-  it("bulk ⋮ menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
+  it("bulk Export menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
     wrap(<OperationOrdersControl />);
-    // Export/print live behind the row checkboxes + ⋮ — NOT a top-bar button
-    // (Jess 2026-06-26: tick one customer → ⋮ → Print prints just that order).
+    // Export/print live behind the row checkboxes + the bulk-bar Export ▾ menu
+    // (tick one customer → Export → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
     expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
@@ -737,7 +740,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
     fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -760,7 +763,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
     fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
 
     expect(open).toHaveBeenCalledTimes(1);
@@ -791,109 +794,278 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({ label: "Done", tone: "neutral" });
   });
 
-  it("no PO (unknown stock) → No PO · order it (red)", () => {
+  // ── Past-deadline escalation (Loo locked): overdue + partner + unbooked ──
+  it("past deadline + partner assigned + unbooked → Chase logistic (ops escalation, overrides the stock track)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
+    // stock is still awaiting, but the overdue unbooked delivery escalates to ops
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Chase logistic",
+      tone: "danger",
+    });
+  });
+
+  it("past deadline + NO partner → stays on the stock track (not Chase logistic — can't chase an unassigned logistic)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2) });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).not.toBe("Chase logistic");
+  });
+
+  it("past deadline + partner + No PO → Order PO (RUNG 1 not leapfrogged by the overdue escalation — SO-1104)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
+    // stock.state 'unknown' = No PO → the real unblock is Order PO, not Chase logistic.
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Order PO");
+  });
+
+  // ── STOCK TRACK — leads until goods are secured ──
+  it("no PO (unknown stock) → Order PO (red)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "unknown" }, [])).toMatchObject({
-      label: "No PO · order it",
+      label: "Order PO",
       tone: "danger",
     });
   });
 
-  it("PO open + inside the MS/BF window (deadline−7d) → Supplier overdue (red)", () => {
+  it("PO open + inside the MS/BF window (deadline−7d) → Chase supplier (red)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(5) });
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Supplier overdue",
+      label: "Chase supplier",
       tone: "danger",
     });
   });
 
-  it("PO open + still outside the window → Waiting stock (amber)", () => {
+  it("PO open + still outside the window → Chase supplier (amber)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(10) });
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Waiting stock",
+      label: "Chase supplier",
       tone: "warning",
     });
   });
 
-  it("Sofa uses a 5-day window, not 7 (deadline−6d = still Waiting, −3d = overdue)", () => {
+  it("Sofa uses a 5-day window, not 7 (deadline−6d = amber, −3d = red)", () => {
     expect(
-      nextActionOf(makeRow({ id: "x", so: 1, delivery_date: inDays(6) }), { state: "awaiting" }, SOFA).label,
-    ).toBe("Waiting stock");
+      nextActionOf(makeRow({ id: "x", so: 1, delivery_date: inDays(6) }), { state: "awaiting" }, SOFA).tone,
+    ).toBe("warning");
     expect(
-      nextActionOf(makeRow({ id: "y", so: 2, delivery_date: inDays(3) }), { state: "awaiting" }, SOFA).label,
-    ).toBe("Supplier overdue");
+      nextActionOf(makeRow({ id: "y", so: 2, delivery_date: inDays(3) }), { state: "awaiting" }, SOFA).tone,
+    ).toBe("danger");
   });
 
-  it("ready + owing balance → Collect $ · balance, held (🔒) — payment hold", () => {
-    const o = makeRow({
-      id: "x",
-      so: 1,
-      ops_assigned_logistic: "p1",
-      ops_order_control: { balance: 2248 },
-    });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect $ · balance",
-      tone: "danger",
-      locked: true,
-    });
-  });
-
-  it("ready + owing storage (no balance) → Collect $ · storage, held", () => {
-    const o = makeRow({
-      id: "x",
-      so: 1,
-      ops_assigned_logistic: "p1",
-      ops_order_control: { storage_fee_msbf: 150 },
-    });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect $ · storage",
-      locked: true,
-    });
-  });
-
-  it("ready + storage waived → NOT held (no Collect $)", () => {
-    const o = makeRow({
-      id: "x",
-      so: 1,
-      ops_assigned_logistic: "p1",
-      ops_order_control: { storage_fee_msbf: 150, storage_waiver_status: "approved" },
-    });
-    expect(nextActionOf(o, { state: "ready" }, []).label).not.toContain("Collect");
-  });
-
-  it("ready + paid + no carrier → Assign logistic (blue)", () => {
+  // ── LOGISTIC TRACK — stock in, arrange delivery ──
+  it("ready + no carrier → Book logistic (blue)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Assign logistic",
+      label: "Book logistic",
       tone: "info",
     });
   });
 
-  it("ready + paid + carrier + no ETA → Logistic · no ETA", () => {
+  it("ready + carrier + no ETA → Chase logistic", () => {
     const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Logistic · no ETA");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
   });
 
-  it("ready + carrier + ETA + customer not called → Call customer", () => {
+  // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──
+  it("ready + carrier + ETA + paid → Confirm (green)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { logistic_eta: "2026-08-01" },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Call customer");
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Confirm",
+      tone: "success",
+    });
   });
 
-  it("ready + carrier + ETA + called → Schedule delivery (green)", () => {
+  it("ready + carrier + ETA + owing balance → Confirm, held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
-      ops_order_control: { logistic_eta: "2026-08-01", called_customer: true },
+      ops_order_control: { logistic_eta: "2026-08-01", balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Schedule delivery",
-      tone: "success",
+      label: "Confirm",
+      locked: true,
     });
+  });
+
+  it("ready + carrier + ETA + owing storage → Confirm, held", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { logistic_eta: "2026-08-01", storage_fee_msbf: 150 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Confirm",
+      locked: true,
+    });
+  });
+
+  it("ready + carrier + ETA + storage waived → Confirm, NOT held", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: {
+        logistic_eta: "2026-08-01",
+        storage_fee_msbf: 150,
+        storage_waiver_status: "approved",
+      },
+    });
+    const r = nextActionOf(o, { state: "ready" }, []);
+    expect(r.label).toBe("Confirm");
+    expect(r.locked).toBeFalsy();
+  });
+});
+
+// Relative local-midnight ISO date, N days from today (daysToDue → exactly N).
+const relISO = (n: number) => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
+
+describe("stockEtaOf (STOCK supplier ETA — stock_eta version)", () => {
+  it("no overlay → none", () => {
+    expect(stockEtaOf(makeRow({ id: "x", so: 1 })).state).toBe("none");
+  });
+
+  it("all lines ready → ready, no ETA line", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_order_control: { line_stock_status: { A: "ready", B: "ready" } },
+    });
+    expect(stockEtaOf(o)).toMatchObject({ state: "ready", waiting: false });
+  });
+
+  it("waiting + ETA in the past → overdue", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: relISO(10),
+      ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: relISO(-2) } },
+    });
+    expect(stockEtaOf(o).state).toBe("overdue");
+  });
+
+  it("waiting + ETA later than deadline−3d → late", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: relISO(5),
+      ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: relISO(4) } },
+    });
+    expect(stockEtaOf(o).state).toBe("late");
+  });
+
+  it("waiting + ETA well before deadline−3d → on_track", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: relISO(10),
+      ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: relISO(2) } },
+    });
+    expect(stockEtaOf(o).state).toBe("on_track");
+  });
+
+  it("waiting + no ETA entered → no_eta (Not set, never a made-up date)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_order_control: { line_stock_status: { A: "waiting" } },
+    });
+    expect(stockEtaOf(o)).toMatchObject({ state: "no_eta", etaIso: null });
+  });
+
+  it("latest ETA among the waiting lines wins (when the whole order can ship)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: relISO(30),
+      ops_order_control: {
+        line_stock_status: { A: "waiting", B: "waiting" },
+        line_etas: { A: relISO(3), B: relISO(9) },
+      },
+    });
+    expect(stockEtaOf(o).etaIso).toBe(relISO(9));
+  });
+});
+
+describe("slackDays (Option B — DEADLINE-primary + bounded stock bump)", () => {
+  it("completed sinks to the bottom; TBD / undated sit just above it", () => {
+    expect(
+      slackDays(makeRow({ id: "x", so: 1, status: "delivered", operation_stage: "delivered" })),
+    ).toBe(99_999);
+    expect(slackDays(makeRow({ id: "y", so: 2, delivery_date: null }))).toBe(9_000);
+  });
+
+  it("DEADLINE is the spine — a past-deadline order outranks one due tomorrow with OVERDUE stock", () => {
+    const pastDeadline = makeRow({ id: "a", so: 1, delivery_date: relISO(-6) }); // slack −6
+    const dueSoonStockOverdue = makeRow({
+      id: "b",
+      so: 2,
+      delivery_date: relISO(1), // 1 − 5 bump = −4
+      ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: relISO(-1) } },
+    });
+    expect(slackDays(pastDeadline)).toBeLessThan(slackDays(dueSoonStockOverdue));
+  });
+
+  it("stock risk is a BOUNDED bump: overdue −5, late/no-eta −3, ready/none 0", () => {
+    const at = (extra: Partial<operationOrderListRow>) =>
+      slackDays(makeRow({ id: "x", so: 1, delivery_date: relISO(10), ...extra }));
+    expect(at({})).toBe(10); // no stock data → no bump
+    expect(
+      at({ ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: relISO(-1) } } }),
+    ).toBe(5); // overdue → −5
+    expect(at({ ops_order_control: { line_stock_status: { A: "waiting" } } })).toBe(7); // no-eta → −3
+  });
+});
+
+describe("logisticStateOf (LOGISTIC delivery state machine)", () => {
+  const pn = new Map<string, string>();
+
+  it("completed → delivered", () => {
+    const o = makeRow({ id: "x", so: 1, status: "delivered", operation_stage: "delivered" });
+    expect(logisticStateOf(o, pn).key).toBe("delivered");
+  });
+
+  it("committed delivery date → scheduled (+ the date)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_partners: { id: "p", name: "NETS" },
+      ops_order_control: { logistic_eta: "2026-08-01" },
+    });
+    expect(logisticStateOf(o, pn)).toMatchObject({ key: "scheduled", date: "2026-08-01" });
+  });
+
+  it("no partner → unassigned", () => {
+    expect(logisticStateOf(makeRow({ id: "x", so: 1 }), pn).key).toBe("unassigned");
+  });
+
+  it("partner + no date + inside the ≤3-day window → call_now", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_partners: { id: "p", name: "NETS" },
+      delivery_date: relISO(2),
+    });
+    expect(logisticStateOf(o, pn).key).toBe("call_now");
+  });
+
+  it("partner + no date + still early → no_date", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_partners: { id: "p", name: "NETS" },
+      delivery_date: relISO(10),
+    });
+    expect(logisticStateOf(o, pn).key).toBe("no_date");
   });
 });
