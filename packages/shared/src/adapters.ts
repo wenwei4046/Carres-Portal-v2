@@ -789,9 +789,14 @@ export const orderInputToRpcPayload = (
   payment_method: input.paymentMethod,
   approval_code: input.approvalCode,
   installment_months: input.installmentMonths,
-  // 0219 — POS entry extras; absent/empty → null so pre-0219 payloads stay
-  // byte-identical and create_order stores NULL.
-  entry_data: input.entryData ?? null,
+  // 0219 — POS entry extras. OMIT the key entirely when absent: sending
+  // `entry_data: null` lands in Postgres as jsonb 'null' (which is NOT SQL
+  // NULL — `payload->'entry_data' IS NOT NULL` is TRUE for it), tripping
+  // create_order's `entry_data must be a json object` guard on every
+  // no-extras order (Loo hit this 2026-07-14 on an installment order whose
+  // follow-ups carry no text answers). An absent key reads as SQL NULL →
+  // guard skipped → column stores NULL, the pre-0219 payload shape.
+  ...(input.entryData != null ? { entry_data: input.entryData } : {}),
   lines: input.lines.map((l) => ({
     sku: l.sku,
     qty: l.qty,

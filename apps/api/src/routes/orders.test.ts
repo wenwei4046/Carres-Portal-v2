@@ -3346,7 +3346,12 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     expect(sb._rpcCalls).toHaveLength(1);
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
     expect(payload.payment_method).toBe("cash");
-    expect(payload.entry_data).toBeNull();
+    // REGRESSION (2026-07-14): the key must be ABSENT, not `null` — a JSON
+    // null arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
+    // create_order's `entry_data must be a json object` guard, killing every
+    // order without entry extras (e.g. installment with only an approval
+    // code + EDC slip).
+    expect("entry_data" in payload).toBe(false);
   });
 
   it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
