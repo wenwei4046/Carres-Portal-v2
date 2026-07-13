@@ -17,6 +17,7 @@ import {
   ExternalLink,
   FileText,
   Flag,
+  Lock,
   MoreVertical,
   PackagePlus,
   Pencil,
@@ -49,6 +50,7 @@ import {
   useOrderPayments,
   useRecordPayment,
   useVoidPayment,
+  useSaveOrderControl,
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -57,6 +59,12 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
+import { lineReadiness } from "@/lib/line-readiness";
+// The list's NEXT engine — the drawer banner shows the SAME verb the Orders
+// list shows, from the same function (import cycle with the list page is safe:
+// both only call each other's exports at render time, never during module eval).
+import { nextActionOf } from "../OperationOrdersControl";
+import type { operationOrderListRow } from "@/lib/queries";
 import {
   lineCategory,
   lineKind,
@@ -511,6 +519,7 @@ function Panel({
   summary,
   actions,
   grow,
+  defaultOpen = true,
   className,
   children,
 }: {
@@ -520,19 +529,26 @@ function Panel({
   /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
   actions?: ReactNode;
   grow?: boolean;
+  /** Initial state when the user hasn't toggled this panel yet (Jess 2026-07-13:
+   *  Balance + Delivery open, Customer + Storage collapsed). */
+  defaultOpen?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   // Per-panel hide / expand (Jess 2026-07-11) — every panel header toggles its
   // own body (accordion), so a big order can collapse the cards it doesn't need.
   // State persists across orders via localStorage, keyed by the panel title.
-  const storeKey = `ops-drawer-panel:${title}`;
+  // Key bumped v2 (2026-07-13) so the new per-card defaults actually land for
+  // users who toggled panels under the old defaults.
+  const storeKey = `ops-drawer-panel-v2:${title}`;
   const [open, setOpen] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(storeKey) !== "0";
+      const stored = localStorage.getItem(storeKey);
+      if (stored !== null) return stored !== "0";
     } catch {
-      return true;
+      /* fall through to the default */
     }
+    return defaultOpen;
   });
   const toggle = () => {
     setOpen((v) => {
@@ -649,40 +665,8 @@ function MiniBadge({
   );
 }
 
-/** Items-ordered header readiness — shows only the states present (No PO grey →
- *  Waiting amber → Ready green), each counted against the total goods lines. */
-function ReadinessBadge({
-  nopo,
-  waiting,
-  ready,
-  total,
-}: {
-  nopo: number;
-  waiting: number;
-  ready: number;
-  total: number;
-}) {
-  if (total === 0) return <MiniBadge tone="muted">no goods</MiniBadge>;
-  return (
-    <>
-      {nopo > 0 && (
-        <MiniBadge tone="nopo">
-          No PO {nopo}/{total}
-        </MiniBadge>
-      )}
-      {waiting > 0 && (
-        <MiniBadge tone="waiting">
-          Waiting {waiting}/{total}
-        </MiniBadge>
-      )}
-      {ready > 0 && (
-        <MiniBadge tone="ready">
-          Ready {ready}/{total}
-        </MiniBadge>
-      )}
-    </>
-  );
-}
+// (ReadinessBadge removed 2026-07-13 — the Items header now shows
+//  "<ready> ready · <toReserve> to reserve" inline, from the shared lineReadiness.)
 
 function DrawerBody({
   data,
@@ -886,22 +870,18 @@ function DrawerBody({
     return poSkus.has(k) || soPoBySku.has(k);
   };
   const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
-  const derivedReadiness = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
-    const free = (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length;
-    if (free >= qty) return "ready";
-    if (hasPoForSku(sku)) return "waiting";
-    return "nopo";
-  };
-  // Per-line override (Master-sheet import or keyed in the Stock cell) wins over
-  // the derived free-stock value (migration 0199) — AutoCount receipts live in
-  // the sheet, not the portal, so the derived value alone never shows Ready.
-  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
-    // Accessories (pillow / M.P / protector) are ALWAYS ready warehouse stock
-    // (Jess 2026-07-07) — they don't go through a PO / receive; they're deducted
-    // from the Klang warehouse. Only core items run the PO/stock readiness.
-    if (lineKind(sku) === "acc") return "ready";
-    return form.draft.line_stock_status[sku] ?? derivedReadiness(sku, qty);
-  };
+  // ONE readiness rule (lib/line-readiness, Jess 2026-07-13) — the header badge
+  // and every row pill call this same helper, so they can never contradict:
+  // accessory→always ready · per-line override wins (migration 0199) · else
+  // derived from free same-model+size stock / PO existence.
+  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" =>
+    lineReadiness({
+      sku,
+      qty,
+      freeCount: (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length,
+      hasPo: hasPoForSku(sku),
+      override: form.draft.line_stock_status[sku],
+    });
   // GRN received-so-far per line (migration 0208) — drives the Recv X/N column.
   const lineReceivedOf = (sku: string): number =>
     Number(form.control?.line_received?.[sku] ?? 0);
@@ -997,6 +977,64 @@ function DrawerBody({
   // Outstanding drives them all, so pill / strip / header sticker never disagree.
   const isOwing = balanceOwing;
   const owingAmt = moneyOutstanding;
+
+  // ── Next banner (Jess 2026-07-13) — the SAME verb the Orders list shows, from
+  // the SAME engine (nextActionOf). The detail payload is adapted to the list-row
+  // shape the engine reads: identity/stage fields + the control overlay; the
+  // formal LP name resolves through the partners map like the list does.
+  const formalPartnerName =
+    (partnersData?.partners ?? []).find((p) => p.id === order.delivery_partner_id)
+      ?.name ?? null;
+  const nextRow = {
+    status: order.status,
+    operation_stage: order.operation_stage,
+    source_system: order.source_system,
+    delivery_date: order.delivery_date,
+    delivery_date_tbd: order.delivery_date_tbd,
+    ops_assigned_logistic: order.ops_assigned_logistic,
+    delivery_partners: formalPartnerName
+      ? { id: order.delivery_partner_id, name: formalPartnerName }
+      : null,
+    ops_order_control: form.control ?? undefined,
+  } as unknown as operationOrderListRow;
+  // Per-order stock state for the engine — folded from the SAME per-line
+  // readiness the Items badge counts: any No-PO line → the Order-PO rung; all
+  // ready (or a goods-less service order) → the logistic track; else waiting.
+  const nextStock = {
+    state:
+      nopoN > 0
+        ? ("unknown" as const)
+        : goodsLines.length === 0 || readyN === goodsLines.length
+          ? ("ready" as const)
+          : ("awaiting" as const),
+  };
+  const next = nextActionOf(nextRow, nextStock, orderedLines);
+  const nextReason = (() => {
+    switch (next.label) {
+      case "Order PO":
+        return `${nopoN} of ${goodsLines.length} item${goodsLines.length === 1 ? "" : "s"} has no PO`;
+      case "Chase supplier":
+        return `${waitingN || goodsLines.length - readyN} item${(waitingN || 1) === 1 ? "" : "s"} waiting on supplier stock`;
+      case "Book logistic":
+        return "stock ready — no carrier assigned";
+      case "Chase logistic":
+        return daysToDelivery !== null && daysToDelivery < 0
+          ? "past the deadline — no delivery booked"
+          : "carrier hasn't committed a delivery date";
+      case "Confirm":
+        return next.locked
+          ? "money hold — collect the balance / storage first"
+          : "all clear — confirm the delivery";
+      default:
+        return "delivered";
+    }
+  })();
+  // Customer-confirmed marker (migration 0220) — a plain field, saved on toggle
+  // via the sparse control PUT. NO alert-engine wiring: the list stays unaffected.
+  const confirmSave = useSaveOrderControl(order.id, {
+    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+  });
+  const customerConfirmed = form.control?.customer_confirmed ?? false;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1155,6 +1193,36 @@ function DrawerBody({
 
       </header>
 
+      {/* ═══ NEXT BANNER (fixed bar 2, Jess 2026-07-13) ═══ Full-width, spans both
+          columns, never scrolls. Flame-neutral tint. Left: the SAME verb the
+          Orders-list NEXT column shows (one engine — nextActionOf) + a short
+          reason. Right: the customer-confirmed marker (a plain field, saved on
+          toggle; no alert wiring). */}
+      <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2 bg-signature-50 border-b border-signature-100">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="t-small font-bold text-primary whitespace-nowrap inline-flex items-center gap-1">
+            Next:
+            {next.locked && <Lock size={12} strokeWidth={2.5} aria-hidden="true" />}
+            {next.label}
+          </span>
+          <span className="t-tiny text-base-500 truncate">{nextReason}</span>
+        </div>
+        <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={customerConfirmed}
+            disabled={confirmSave.isPending}
+            onChange={() =>
+              confirmSave.mutate({ customer_confirmed: !customerConfirmed })
+            }
+            className="cursor-pointer accent-primary"
+          />
+          <span className="t-tiny text-base-700 whitespace-nowrap">
+            Customer confirmed?
+          </span>
+        </label>
+      </div>
+
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
           each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
           scroll — it clips, and each column owns its own overflow-y. */}
@@ -1198,7 +1266,7 @@ function DrawerBody({
             grows to fill so the column bottom lines up with the right side). */}
         <div
           style={{ gridArea: "main" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar pr-0.5"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
@@ -1206,12 +1274,25 @@ function DrawerBody({
           <Panel
             title="Items ordered"
             summary={
-              <ReadinessBadge
-                nopo={nopoN}
-                waiting={waitingN}
-                ready={readyN}
-                total={goodsLines.length}
-              />
+              /* Header badge (Jess 2026-07-13): "<ready> ready · <toReserve> to
+                 reserve", both counted by the SAME shared lineReadiness the row
+                 pills use (toReserve = waiting + no-PO). No "3/3" ratio. */
+              goodsLines.length === 0 ? (
+                <MiniBadge tone="muted">no goods</MiniBadge>
+              ) : (
+                <>
+                  <MiniBadge tone={readyN > 0 ? "ready" : "muted"}>
+                    {readyN} ready
+                  </MiniBadge>
+                  <MiniBadge
+                    tone={
+                      nopoN > 0 ? "nopo" : waitingN > 0 ? "waiting" : "muted"
+                    }
+                  >
+                    {waitingN + nopoN} to reserve
+                  </MiniBadge>
+                </>
+              )
             }
             actions={
               <PanelMenu
@@ -1562,6 +1643,27 @@ function DrawerBody({
               </div>
             </Panel>
           )}
+
+          {/* Loan (migration 0209 + 0217) — AFTER Warehouse stock in the work
+              column (Jess 2026-07-13): lending a substitute is a stock action.
+              Two sources: own warehouse OR borrowed from a supplier (a return
+              obligation). The lend entry stays even at 0 loans. */}
+          <Panel
+            title="Loan"
+            summary={
+              liveLoanCount > 0 ? (
+                <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">none</MiniBadge>
+              )
+            }
+          >
+            <LoanPanel
+              orderId={order.id}
+              loans={allLoans}
+              suppliers={suppliersData?.suppliers ?? []}
+            />
+          </Panel>
         </div>
 
         {/* LEFT column (after the flip) — the support cards: Customer · Balance ·
@@ -1569,7 +1671,7 @@ function DrawerBody({
             column on the right (Jess 2026-07-11). */}
         <div
           style={{ gridArea: "side" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
           {/* 1. Customer — a quiet identity card (name / phone / address, with an
               inline Edit on a Place order). No region pill (Jess 2026-07-11): the
@@ -1577,6 +1679,20 @@ function DrawerBody({
               customer identity. */}
           <Panel
             title="Customer"
+            defaultOpen={false}
+            summary={
+              /* Collapsed row reads "Customer · <name>" (Jess 2026-07-13). */
+              order.customer_name ? (
+                <span
+                  className={`t-tiny text-base-600 truncate max-w-[150px] ${cjkClassName(order.customer_name)}`}
+                  title={order.customer_name}
+                >
+                  {order.customer_name}
+                </span>
+              ) : (
+                <MiniBadge tone="muted">—</MiniBadge>
+              )
+            }
             actions={
               <PanelMenu
                 items={[
@@ -1742,6 +1858,7 @@ function DrawerBody({
           {(hasMsbf || hasSof) && (
             <Panel
               title="Storage"
+              defaultOpen={false}
               actions={
                 <PanelMenu
                   items={[
@@ -1790,7 +1907,8 @@ function DrawerBody({
                     {storageFee > 0 ? `${RM(storageFee)} fee` : "fee due"}
                   </span>
                 ) : (
-                  <MiniBadge tone="muted">fee if held</MiniBadge>
+                  /* Collapsed row reads the per-day rate (Jess 2026-07-13). */
+                  <MiniBadge tone="muted">RM5/day</MiniBadge>
                 )
               }
             >
@@ -1823,26 +1941,8 @@ function DrawerBody({
             </Panel>
           )}
 
-          {/* Loan (migration 0209 + 0217) — a SEPARATE panel (Jess) for lending a
-              substitute piece now → swapping back when the real one lands. Two
-              sources: own warehouse OR borrowed from a supplier (a return
-              obligation). The lend entry stays even at 0 loans. */}
-          <Panel
-            title="Loan"
-            summary={
-              liveLoanCount > 0 ? (
-                <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
-              ) : (
-                <MiniBadge tone="muted">none</MiniBadge>
-              )
-            }
-          >
-            <LoanPanel
-              orderId={order.id}
-              loans={allLoans}
-              suppliers={suppliersData?.suppliers ?? []}
-            />
-          </Panel>
+          {/* Loan moved to the RIGHT (work) column, after Warehouse stock
+              (Jess 2026-07-13) — lending is a stock action, not a view card. */}
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 2 remark rows; then a Route section only
@@ -1873,20 +1973,30 @@ function DrawerBody({
               />
             }
             summary={
-              assignedLogisticName ? (
-                // Assigned → show the carrier (green = handled).
-                <MiniBadge tone="kv">{assignedLogisticName}</MiniBadge>
-              ) : pipelineStatus === "ready" ? (
-                // Ready but no carrier → the ALERT lives on the header (Jess
-                // 2026-07-11): amber, no sentence row. Assign via the picker below.
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
-                  <AlertCircle size={10} strokeWidth={2.5} /> Assign logistic
-                </span>
-              ) : loc.area === "Outstation" ? (
-                <MiniBadge tone="outstation">Outstation</MiniBadge>
-              ) : (
-                <MiniBadge tone="muted">{loc.label ?? "Area —"}</MiniBadge>
-              )
+              /* Collapsed row reads "<logistic> · <deadline>" (Jess 2026-07-13):
+                 green when a carrier is on it; amber Assign-logistic alert when
+                 the order is ready with no carrier. Region moved into the body. */
+              (() => {
+                const deadline = order.delivery_date_tbd
+                  ? "TBD"
+                  : order.delivery_date
+                    ? fmtDate(order.delivery_date).split(", ")[0]
+                    : "no date";
+                if (assignedLogisticName || formalPartnerName)
+                  return (
+                    <MiniBadge tone="kv">
+                      {assignedLogisticName ?? formalPartnerName} · {deadline}
+                    </MiniBadge>
+                  );
+                if (pipelineStatus === "ready")
+                  return (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
+                      <AlertCircle size={10} strokeWidth={2.5} /> Assign logistic ·{" "}
+                      {deadline}
+                    </span>
+                  );
+                return <MiniBadge tone="muted">unassigned · {deadline}</MiniBadge>;
+              })()
             }
           >
             <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">

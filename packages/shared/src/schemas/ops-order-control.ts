@@ -151,6 +151,10 @@ export const opsOrderControlSchema = z.object({
    *  /receive-line endpoint, never the generic control PUT (migration 0208). */
   line_received: z.record(z.string(), z.number()).nullable().default(null),
   called_customer: z.boolean().default(false),
+  /** Customer confirmed the delivery (migration 0220) — the drawer Next-banner
+   *  marker. Distinct from called_customer (= ops made the call): this records
+   *  the customer's own yes. Plain field — no alert-engine wiring. */
+  customer_confirmed: z.boolean().default(false),
   /** Balance job (migration 0184) — when the customer's balance is due. Key-in;
    *  the Payments panel + drawer flag overdue (due < today AND outstanding > 0).
    *  NOT the delivery deadline — that's orders.delivery_date. */
@@ -341,6 +345,9 @@ export const updateOpsOrderControlInput = z
       .record(z.string(), z.enum(["ready", "waiting", "nopo"]))
       .nullable(),
     called_customer: z.boolean(),
+    // Customer confirmed the delivery (migration 0220) — the drawer Next-banner
+    // marker. Plain writable boolean; no alert-engine wiring.
+    customer_confirmed: z.boolean(),
     // Balance job (migration 0184) — payment due date. The storage_collected_at
     // / storage_waiver_* columns are intentionally NOT writable here: those go
     // through the dedicated collect / waiver endpoints (a waiver approval must

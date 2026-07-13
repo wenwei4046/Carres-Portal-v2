@@ -285,6 +285,23 @@
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+  /* Overlay-style scrollbar (order drawer columns, 2026-07-13): thin, transparent
+     at rest (fades in on hover/scroll intent), near-zero reserved gutter — the
+     6px track is transparent so it reads as overlaid on the content. True
+     `overflow: overlay` is gone from Chromium; this is the closest faithful match. */
+  .scroll-overlay { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .scroll-overlay:hover { scrollbar-color: hsl(var(--base-300)) transparent; }
+  .scroll-overlay::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-overlay::-webkit-scrollbar-track { background: transparent; }
+  .scroll-overlay::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+    transition: background 0.2s;
+  }
+  .scroll-overlay:hover::-webkit-scrollbar-thumb,
+  .scroll-overlay:active::-webkit-scrollbar-thumb {
+    background: hsl(var(--base-300));
+  }
   @media (prefers-reduced-motion: reduce) {
     .animate-page-enter, .animate-cart-pulse { animation: none; }
     .animate-drawer-slide-in { animation: none; }
