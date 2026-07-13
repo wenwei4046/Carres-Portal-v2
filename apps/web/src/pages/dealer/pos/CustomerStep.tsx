@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
+  minDeliveryDateISO,
   resolveFormTab,
   type CatalogResponse,
   type CustomField,
@@ -14,6 +15,7 @@ import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
 import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
+import BirthdayWheelField from "./date-keyin/BirthdayWheelField";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
@@ -147,7 +149,9 @@ export default function CustomerStep({
     : salespersons;
 
   const dealerPending = !!dealerPick && !dealerPick.value;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Same "today" source as the Step3Delivery pickers (shared helper — keeps
+  // the birthday wheel's age/year cap on the same clock as the date floors).
+  const todayIso = minDeliveryDateISO(0);
 
   // Per-sub-step advance gates (mirror draft.ts step1FirstIssue's groups).
   // 0219 — toggleable builtins gate per the resolved config; required custom
@@ -443,12 +447,11 @@ export default function CustomerStep({
                       <span className="field__label">
                         Birthday{custB["birthday"]?.required ? " *" : ""}
                       </span>
-                      <input
-                        type="date"
+                      <BirthdayWheelField
                         value={c.birthday}
-                        max={todayIso}
-                        onChange={(e) => setC({ birthday: e.target.value })}
-                        data-testid="pos-customer-birthday"
+                        todayIso={todayIso}
+                        onChange={(iso) => setC({ birthday: iso })}
+                        testId="pos-customer-birthday"
                       />
                     </div>
                   )}
