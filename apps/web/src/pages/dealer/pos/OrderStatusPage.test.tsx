@@ -131,8 +131,9 @@ describe("OrderStatusPage", () => {
     render(<OrderStatusPage onClose={() => {}} />);
     expect(screen.getByTestId("os-pin-gate")).toBeTruthy();
 
-    // Wrong pin shakes + clears — board stays hidden.
-    for (const d of "111111") fireEvent.click(screen.getByTestId(`os-pin-${d}`));
+    // Wrong pin shakes + clears — board stays hidden. (Any 6 digits that are
+    // NOT the real ORDER_STATUS_PIN.)
+    for (const d of "990099") fireEvent.click(screen.getByTestId(`os-pin-${d}`));
     expect(screen.queryByTestId("os-lane-place")).toBeNull();
     // The gate clears a wrong entry after ~700ms; keys are ignored until then.
     await new Promise((r) => setTimeout(r, 800));

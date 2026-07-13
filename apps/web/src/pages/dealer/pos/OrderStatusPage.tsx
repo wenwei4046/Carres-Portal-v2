@@ -48,8 +48,8 @@ import PosOrderDetail from "./PosOrderDetail";
  *   the DEALER, not a staff member, so "mine" is the picked filter).
  */
 
-/** C·A·R·R·E·S on a phone keypad. Rotate in code when it leaks. */
-export const ORDER_STATUS_PIN = "227737";
+/** Loo 2026-07-14. Rotate in code when it leaks. */
+export const ORDER_STATUS_PIN = "111111";
 
 // Lane bucketing moved to order-edit-scope.ts (2026-07-14) so the pure
 // edit-scope helper and this board share ONE lane definition. Re-exported
@@ -189,7 +189,7 @@ function PinGate({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () =>
           </button>
         </div>
 
-        <div className="pin-gate__hint">Hint · CARRES on the keypad</div>
+        <div className="pin-gate__hint">Ask your manager for the passcode</div>
       </div>
     </div>
   );
