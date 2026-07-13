@@ -59,7 +59,8 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
-import { lineReadiness } from "@/lib/line-readiness";
+import { lineReadiness, readinessCounts, type LineReadiness } from "@/lib/line-readiness";
+import { buildLogisticChase, buildSupplierChase } from "@/lib/wa-templates";
 // The list's NEXT engine — the drawer banner shows the SAME verb the Orders
 // list shows, from the same function (import cycle with the list page is safe:
 // both only call each other's exports at render time, never during module eval).
@@ -563,10 +564,12 @@ function Panel({
   };
   return (
     <section
-      className={`bg-white rounded-2xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow && open ? "flex-1" : ""} ${className ?? ""}`}
+      className={`bg-white rounded-xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow && open ? "flex-1" : ""} ${className ?? ""}`}
     >
+      {/* Cream header band (Round 1A) — chevron + title left · status chip + ⋮
+          right; page-cream fill so the band reads as the card's handle. */}
       <header
-        className={`flex items-center justify-between gap-3 px-3 py-2 shrink-0 ${open ? "border-b border-base-100" : ""}`}
+        className={`flex items-center justify-between gap-3 px-3 py-2 shrink-0 bg-background ${open ? "border-b border-base-100" : ""}`}
       >
         <button
           type="button"
@@ -870,28 +873,31 @@ function DrawerBody({
     return poSkus.has(k) || soPoBySku.has(k);
   };
   const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
-  // ONE readiness rule (lib/line-readiness, Jess 2026-07-13) — the header badge
-  // and every row pill call this same helper, so they can never contradict:
-  // accessory→always ready · per-line override wins (migration 0199) · else
-  // derived from free same-model+size stock / PO existence.
-  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" =>
+  // GRN received-so-far per line (migration 0208) — the units RESERVED to this
+  // SO. Drives the Recv X/N counter AND the new strict readiness (Round 1A).
+  const lineReceivedOf = (sku: string): number =>
+    Number(form.control?.line_received?.[sku] ?? 0);
+  // ONE readiness rule (lib/line-readiness, Round 1A) — the header stat strip,
+  // the Items badge, every row pill, and the warehouse footer call this same
+  // helper, so they can never contradict. STRICT vocab: a line is "ready" ONLY
+  // when reserved-to-this-SO covers the qty; free shelf stock = "to reserve".
+  const readinessOf = (sku: string, qty: number) =>
     lineReadiness({
       sku,
       qty,
+      reservedCount: lineReceivedOf(sku),
       freeCount: (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length,
       hasPo: hasPoForSku(sku),
       override: form.draft.line_stock_status[sku],
     });
-  // GRN received-so-far per line (migration 0208) — drives the Recv X/N column.
-  const lineReceivedOf = (sku: string): number =>
-    Number(form.control?.line_received?.[sku] ?? 0);
-  const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
-  const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
-  const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
-  // Every goods line reads "ready" (Master override + accessories-always-ready +
-  // free stock — see readinessOf). Hoisted so the header status strip + ActionBar
-  // (batch 1) share the SAME readiness the pill uses — no "Ready pill / waiting
-  // buttons" disagreement. Empty goods list (service-only) is NOT "all received".
+  const rCounts = readinessCounts(
+    goodsLines.map((l) => readinessOf(l.sku, l.qty)),
+  );
+  const readyN = rCounts.ready;
+  const toReserveN = rCounts.toReserve;
+  const nopoN = rCounts.noPo;
+  // Every goods line is reserved to this SO. Empty goods list (service-only) is
+  // NOT "all received". Feeds the pipeline status + delivered gating.
   const allReceived = goodsLines.length > 0 && readyN === goodsLines.length;
 
   // Header pipeline status (BUG 2) — derived from the order's real work signals,
@@ -997,24 +1003,26 @@ function DrawerBody({
       : null,
     ops_order_control: form.control ?? undefined,
   } as unknown as operationOrderListRow;
-  // Per-order stock state for the engine — folded from the SAME per-line
-  // readiness the Items badge counts: any No-PO line → the Order-PO rung; all
-  // ready (or a goods-less service order) → the logistic track; else waiting.
+  // Per-order stock state for the engine — folded to MIRROR the list's coarser
+  // per-order bucket (free-stock-covered counts as ready there), so the banner
+  // verb always equals the list's NEXT verb. The Items badge stays strict
+  // (ready = reserved-to-this-SO only).
   const nextStock = {
     state:
       nopoN > 0
         ? ("unknown" as const)
-        : goodsLines.length === 0 || readyN === goodsLines.length
+        : goodsLines.length === 0 || readyN + toReserveN === goodsLines.length
           ? ("ready" as const)
           : ("awaiting" as const),
   };
   const next = nextActionOf(nextRow, nextStock, orderedLines);
+  const isOverdueNext = next.tone === "danger";
   const nextReason = (() => {
     switch (next.label) {
       case "Order PO":
         return `${nopoN} of ${goodsLines.length} item${goodsLines.length === 1 ? "" : "s"} has no PO`;
       case "Chase supplier":
-        return `${waitingN || goodsLines.length - readyN} item${(waitingN || 1) === 1 ? "" : "s"} waiting on supplier stock`;
+        return `${rCounts.onPo || goodsLines.length - readyN - toReserveN} item${(rCounts.onPo || 1) === 1 ? "" : "s"} waiting on supplier stock`;
       case "Book logistic":
         return "stock ready — no carrier assigned";
       case "Chase logistic":
@@ -1029,12 +1037,75 @@ function DrawerBody({
         return "delivered";
     }
   })();
-  // Customer-confirmed marker (migration 0220) — a plain field, saved on toggle
-  // via the sparse control PUT. NO alert-engine wiring: the list stays unaffected.
-  const confirmSave = useSaveOrderControl(order.id, {
+  // One sparse-save mutation shared by the banner's quick writes: the
+  // customer-confirmed toggle (0220) + the last-chased stamp (0221). Plain
+  // fields, NO alert-engine wiring — the list stays unaffected.
+  const quickSave = useSaveOrderControl(order.id, {
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
   const customerConfirmed = form.control?.customer_confirmed ?? false;
+  // WhatsApp chase (Round 1A = COPY the locked template + stamp last_chased_at;
+  // the stored partner number + wa.me deep link is 1B).
+  const chasePartnerName = assignedLogisticName ?? formalPartnerName ?? null;
+  const firstPoNo =
+    [...soPoBySku.values()][0] ?? (pos[0] ? pos[0].id.slice(0, 8) : null);
+  const deadlineLabel = order.delivery_date_tbd
+    ? "TBD"
+    : order.delivery_date
+      ? fmtDate(order.delivery_date).split(", ")[0]
+      : "—";
+  const copyChase = (kind: "logistic" | "supplier") => {
+    const text =
+      kind === "supplier"
+        ? buildSupplierChase({
+            poNo: firstPoNo,
+            ref: (order.source_ref ?? [])[0] ?? null,
+            soId: soRef,
+            lines: orderedLines,
+            deadline: deadlineLabel,
+          })
+        : buildLogisticChase({
+            logistic: chasePartnerName,
+            soId: soRef,
+            ref: (order.source_ref ?? [])[0] ?? null,
+            customer: order.customer_name ?? null,
+            region: loc.label ?? null,
+            lines: orderedLines,
+            deadline: deadlineLabel,
+            overdue: daysToDelivery !== null && daysToDelivery < 0,
+          });
+    void navigator.clipboard.writeText(text);
+    toast.success("Chase message copied — paste into WhatsApp");
+    quickSave.mutate({ last_chased_at: new Date().toISOString() });
+  };
+  // Primary flame action per verb — focuses / opens the relevant card field.
+  const focusField = (id: string) => {
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    (el as HTMLElement | null)?.focus();
+  };
+  const primary = (() => {
+    switch (next.label) {
+      case "Chase logistic":
+        return { label: "Record ETA & slot", run: () => focusField("fld-logistic-eta") };
+      case "Order PO":
+        return { label: "Raise PO", run: () => onIssuePOsClick() };
+      case "Book logistic":
+        return { label: "Book partner", run: () => focusField("fld-logistic") };
+      case "Chase supplier":
+        return { label: "Copy chase", run: () => copyChase("supplier") };
+      case "Confirm":
+        return {
+          label: "Confirm & collect",
+          run: () =>
+            document
+              .getElementById("card-balance")
+              ?.scrollIntoView({ block: "start", behavior: "smooth" }),
+        };
+      default:
+        return null; // Done — nothing to push
+    }
+  })();
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1089,66 +1160,43 @@ function DrawerBody({
           Flex SIBLINGS (not position:sticky — sticky breaks inside nested overflow
           parents). Lining-box style: pale surface + hairline border, colour only
           for alerts. */}
-      <header className="shrink-0 bg-base-50/80 border-b border-base-200/70 px-5 pt-3 pb-2.5 flex flex-col gap-2.5">
-        {/* Row 1 — identity (breadcrumb · pill · #id · items · ref · sticker ·
-            deadline) on the left; flag / ⋯ / close on the right. */}
+      <header className="shrink-0 bg-white border-b border-base-200/70 px-5 pt-3">
+        {/* Row 1 (Jess Round 1A) — "#<id>" mono 20px/500 + a state pill coloured
+            by ORDER STATE (never danger red — the colour lock reserves red for the
+            banner + inline alert numbers): placed/pre-work grey · on-hold amber ·
+            scheduled blue · delivered green. Right: flag / more / close. */}
         <div className="flex items-center justify-between gap-3 min-w-0">
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            {/* Header = status only (Jess 2026-07-11): stage pill · #id · ref ·
-                alert stickers. No breadcrumb, no item-count/region (region → the
-                Delivery card), no deadline (it drives Stock ETA + on-hold, not the
-                header). */}
-            {balanceOwing ? (
-              // Derived "On hold delivery" (Jess 2026-07-11) — an owing balance
-              // holds the delivery; the WHY (amount / due) is on the Balance card.
-              <span
-                className="pill pill-overdue"
-                title="Delivery is on hold until the balance is collected — see the Balance card"
-              >
-                On hold delivery
-              </span>
-            ) : (
-              <span
-                className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
-                title={PIPELINE_HINT[pipelineStatus]}
-              >
-                {pipelineStatus === "ready"
-                  ? "Ready to deliver"
-                  : PIPELINE_LABEL[pipelineStatus]}
-              </span>
-            )}
-            <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="font-mono text-[20px] font-medium text-base-900 shrink-0">
               #{order.so}
             </span>
-            {order.source_ref?.[0] && (
-              <span className="t-small text-base-400 font-mono shrink-0 uppercase">
-                Ref {order.source_ref[0]}
-              </span>
-            )}
-            {/* Ordered date moved into the header (Jess 2026-07-11) — compact, off
-                the Customer card. */}
-            {order.placed_at && (
-              <span className="t-tiny text-base-400 shrink-0 whitespace-nowrap">
-                · Ordered {fmtDate(order.placed_at)}
-              </span>
-            )}
-            {/* Special sticker — the operator's own "action needed" note as a
-                compact amber chip (full text stays in the body banner). This is
-                the only real "sticker" signal today; not invented. */}
-            {form.draft.action_for_logistic.trim() && (
-              <span
-                title={form.draft.action_for_logistic}
-                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0 max-w-[170px] truncate"
-              >
-                <AlertCircle size={10} strokeWidth={2.5} /> Action needed
-              </span>
-            )}
-            {/* (Removed the separate "Outstanding · hold" sticker — the status pill
-                now derives to "On hold delivery" when a balance is owed, so this
-                would just repeat it. The amount lives on the Balance card.) */}
-            {/* Deadline removed from the header (Jess 2026-07-11) — it drives the
-                Stock ETA + the on-hold logic, and shows on the Delivery card; not a
-                header field. */}
+            {(() => {
+              const onHold = balanceOwing || storageOwing;
+              const pill =
+                pipelineStatus === "completed"
+                  ? { cls: "pill-confirmed", label: "Delivered", hint: PIPELINE_HINT.completed }
+                  : onHold && pipelineStatus !== "completed"
+                    ? {
+                        cls: "pill-warning",
+                        label: "On hold",
+                        hint: "Delivery is held until the balance / storage is collected — see the Balance card",
+                      }
+                    : pipelineStatus === "scheduled"
+                      ? { cls: "pill-sent", label: "Scheduled", hint: PIPELINE_HINT.scheduled }
+                      : {
+                          cls: "pill-neutral",
+                          label:
+                            pipelineStatus === "ready"
+                              ? "Ready to deliver"
+                              : PIPELINE_LABEL[pipelineStatus],
+                          hint: PIPELINE_HINT[pipelineStatus],
+                        };
+              return (
+                <span className={`pill ${pill.cls}`} title={pill.hint}>
+                  {pill.label}
+                </span>
+              );
+            })()}
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1186,41 +1234,135 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Row 2 removed (Jess 2026-07-11) — the STOCK/LOGISTIC/MONEY strip
-            duplicated status that now lives in its home: stock → the Items table
-            header badge (Ready N/N); money → the Balance card; logistic → the
-            stage action below. Header stays clean. */}
+        {/* Meta line — customer · region · ref · ordered (13px, secondary). */}
+        <div className="mt-0.5 text-[13px] text-base-500 truncate">
+          {order.customer_name ?? "—"}
+          {loc.label ? ` · ${loc.label}` : ""}
+          {order.source_ref?.[0] ? ` · REF ${order.source_ref[0]}` : ""}
+          {order.placed_at ? ` · ordered ${fmtDate(order.placed_at)}` : ""}
+        </div>
 
+        {/* Stat strip — Outstanding · Deadline · Items (12px, top hairline).
+            Red is INLINE TEXT only (owing amount / overdue date), never a block. */}
+        <div className="mt-2 border-t border-base-100 py-1.5 flex items-center gap-4 text-[12px] text-base-500 flex-wrap">
+          <span className="whitespace-nowrap">
+            Outstanding{" "}
+            <span
+              className={`tabular-nums font-semibold ${moneyOutstanding > 0 ? "text-danger" : "text-base-700"}`}
+            >
+              {RM(moneyOutstanding)}
+            </span>
+          </span>
+          <span className="whitespace-nowrap">
+            Deadline{" "}
+            {order.delivery_date_tbd ? (
+              <span className="font-semibold text-base-700">TBD</span>
+            ) : order.delivery_date ? (
+              <span
+                className={`tabular-nums font-semibold ${
+                  daysToDelivery !== null && daysToDelivery < 0
+                    ? "text-danger"
+                    : "text-base-700"
+                }`}
+              >
+                {fmtDate(order.delivery_date).split(", ")[0]}
+                {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
+              </span>
+            ) : (
+              <span className="font-semibold text-base-700">—</span>
+            )}
+          </span>
+          <span className="whitespace-nowrap">
+            Items{" "}
+            <span className="tabular-nums font-semibold text-base-700">
+              {readyN}/{goodsLines.length} ready
+            </span>
+          </span>
+        </div>
       </header>
 
-      {/* ═══ NEXT BANNER (fixed bar 2, Jess 2026-07-13) ═══ Full-width, spans both
-          columns, never scrolls. Flame-neutral tint. Left: the SAME verb the
-          Orders-list NEXT column shows (one engine — nextActionOf) + a short
-          reason. Right: the customer-confirmed marker (a plain field, saved on
-          toggle; no alert wiring). */}
-      <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2 bg-signature-50 border-b border-signature-100">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <span className="t-small font-bold text-primary whitespace-nowrap inline-flex items-center gap-1">
-            Next:
-            {next.locked && <Lock size={12} strokeWidth={2.5} aria-hidden="true" />}
-            {next.label}
+      {/* ═══ NEXT BANNER (fixed bar 2, Round 1A) ═══ Full-width, spans both
+          columns, never scrolls. ONE action — the SAME verb the Orders-list NEXT
+          column shows (one engine, nextActionOf). Skin by urgency: overdue /
+          at-risk = the ONLY red block on screen; on-track = flame tint.
+          Right: customer-confirmed marker · WhatsApp copy-chase · primary push. */}
+      <div
+        className={`shrink-0 flex items-center justify-between gap-3 px-5 py-2 border-l-[3px] ${
+          isOverdueNext
+            ? "bg-danger/10 border-l-danger border-b border-b-danger/20"
+            : "bg-[#FAECE7] border-l-primary border-b border-b-signature-100"
+        }`}
+      >
+        <div className="min-w-0">
+          <span
+            className={`text-[13px] font-medium whitespace-nowrap inline-flex items-center gap-1.5 ${
+              isOverdueNext ? "text-danger" : "text-[#993C1D]"
+            }`}
+          >
+            {isOverdueNext ? (
+              <AlertCircle size={14} strokeWidth={2.5} aria-hidden="true" />
+            ) : next.label === "Order PO" ? (
+              <PackagePlus size={14} strokeWidth={2.25} aria-hidden="true" />
+            ) : next.label === "Confirm" || next.label === "Done" ? (
+              <CheckCircle2 size={14} strokeWidth={2.25} aria-hidden="true" />
+            ) : next.label === "Chase supplier" ? (
+              <Phone size={14} strokeWidth={2.25} aria-hidden="true" />
+            ) : (
+              <Truck size={14} strokeWidth={2.25} aria-hidden="true" />
+            )}
+            <span>
+              Next: {next.label}
+              {next.locked && (
+                <Lock size={12} strokeWidth={2.5} className="inline ml-1 -mt-0.5" aria-hidden="true" />
+              )}
+            </span>
           </span>
-          <span className="t-tiny text-base-500 truncate">{nextReason}</span>
+          <span
+            className={`block text-[12px] truncate ${
+              isOverdueNext ? "text-danger/80" : "text-[#993C1D]/75"
+            }`}
+          >
+            {nextReason}
+          </span>
         </div>
-        <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={customerConfirmed}
-            disabled={confirmSave.isPending}
-            onChange={() =>
-              confirmSave.mutate({ customer_confirmed: !customerConfirmed })
+        <div className="flex items-center gap-2.5 shrink-0">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={customerConfirmed}
+              disabled={quickSave.isPending}
+              onChange={() =>
+                quickSave.mutate({ customer_confirmed: !customerConfirmed })
+              }
+              className="cursor-pointer accent-primary"
+            />
+            <span className="text-[12px] text-base-700 whitespace-nowrap">
+              Customer confirmed?
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              copyChase(next.label === "Chase supplier" ? "supplier" : "logistic")
             }
-            className="cursor-pointer accent-primary"
-          />
-          <span className="t-tiny text-base-700 whitespace-nowrap">
-            Customer confirmed?
-          </span>
-        </label>
+            title="Copy the chase message to the clipboard (paste into WhatsApp) + stamp last chased"
+            className="text-[12px] font-medium px-2.5 py-1 rounded-md border bg-white border-[#1D9E75] text-[#0F6E56] hover:bg-[#1D9E75]/5 whitespace-nowrap"
+          >
+            WhatsApp{" "}
+            {next.label === "Chase supplier"
+              ? "supplier"
+              : chasePartnerName ?? "logistic"}
+          </button>
+          {primary && (
+            <button
+              type="button"
+              onClick={primary.run}
+              className="text-[12px] font-semibold px-3 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap"
+            >
+              {primary.label}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
@@ -1242,7 +1384,7 @@ function DrawerBody({
               aria-hidden="true"
             />
             <span className="text-base-900">
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
+              <span className="block text-[10px] font-semibold text-warning">
                 Action needed
               </span>
               {form.draft.action_for_logistic}
@@ -1256,7 +1398,9 @@ function DrawerBody({
         <div
           className="grid gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden"
           style={{
-            gridTemplateColumns: "300px minmax(0, 1fr)",
+            // Round 1A: left view column 340px (was 300 — Delivery inputs were
+            // truncating), right work column fills.
+            gridTemplateColumns: "340px minmax(0, 1fr)",
             gridTemplateAreas: '"side main"',
           }}
         >
@@ -1274,9 +1418,9 @@ function DrawerBody({
           <Panel
             title="Items ordered"
             summary={
-              /* Header badge (Jess 2026-07-13): "<ready> ready · <toReserve> to
-                 reserve", both counted by the SAME shared lineReadiness the row
-                 pills use (toReserve = waiting + no-PO). No "3/3" ratio. */
+              /* Header badge (Round 1A): "<ready> ready · <toReserve> to reserve",
+                 both from the SAME shared lineReadiness the row pills use —
+                 ready = reserved-to-this-SO only (strict). No "3/3" ratio. */
               goodsLines.length === 0 ? (
                 <MiniBadge tone="muted">no goods</MiniBadge>
               ) : (
@@ -1284,12 +1428,8 @@ function DrawerBody({
                   <MiniBadge tone={readyN > 0 ? "ready" : "muted"}>
                     {readyN} ready
                   </MiniBadge>
-                  <MiniBadge
-                    tone={
-                      nopoN > 0 ? "nopo" : waitingN > 0 ? "waiting" : "muted"
-                    }
-                  >
-                    {waitingN + nopoN} to reserve
+                  <MiniBadge tone={toReserveN > 0 ? "waiting" : "muted"}>
+                    {toReserveN} to reserve
                   </MiniBadge>
                 </>
               )
@@ -1331,25 +1471,25 @@ function DrawerBody({
                       cell — no separate Recv column. */}
                   <tr className="bg-[#F1EDE6] text-[#8C877D]">
                     <th
-                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]"
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]"
                       title="Waiting / Ready / No PO. The count = received / ordered — click to book in received units (GRN)."
                     >
                       Status
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
+                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       Stock ETA
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
+                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
                       Item
                     </th>
-                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
+                    <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
                       Qty
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
+                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
                     </th>
                     <th
-                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32"
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-32"
                       title="Where this item is received / where it routes to (the transfer destination). Per-item legs come with the transfer feature."
                     >
                       Route
@@ -1413,9 +1553,9 @@ function DrawerBody({
                           ) : isAcc ? (
                             <span
                               title="Accessory — always in the Klang warehouse; deducted from ready stock"
-                              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] whitespace-nowrap"
+                              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-soft text-success whitespace-nowrap"
                             >
-                              Ready
+                              Reserved
                             </span>
                           ) : (
                             <div className="flex items-center gap-1 flex-wrap">
@@ -1527,7 +1667,7 @@ function DrawerBody({
                           >
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
+                                <span className="text-[10px] font-semibold text-[#8C877D]">
                                   Default location
                                 </span>
                                 <select
@@ -1550,7 +1690,7 @@ function DrawerBody({
                                 </select>
                               </div>
                               <div className="border-t border-base-100 pt-2">
-                                <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D] mb-1">
+                                <div className="text-[10px] font-semibold text-[#8C877D] mb-1">
                                   Special transfer
                                 </div>
                                 {savedLegs.length === 0 && (
@@ -1612,11 +1752,19 @@ function DrawerBody({
               capped it to a fixed 340px, which left a big void below). No active
               line → a placeholder that also grows. */}
           {activeLineSku && stage !== "delivered" ? (
-            <div className="flex-1 min-h-0 flex flex-col">
+            /* Natural height (Round 1A) — the column scrolls; the picker caps
+               its own row area instead of growing to fill. */
+            <div className="min-h-0 flex flex-col">
               <StockPickerGrid
                 sku={activeLineSku}
                 soRef={soRef}
-                need={orderedLines.find((l) => l.sku === activeLineSku)?.qty ?? 1}
+                need={(() => {
+                  // Remaining to reserve = qty − already reserved to this SO,
+                  // same numbers the row pill / badge read (Round 1A parity).
+                  const line = orderedLines.find((l) => l.sku === activeLineSku);
+                  if (!line) return 1;
+                  return Math.max(0, line.qty - lineReceivedOf(line.sku));
+                })()}
                 units={freeUnits}
                 isSofa={lineCategory(activeLineSku) === "sofa"}
                 onReserved={() => {
@@ -1745,35 +1893,17 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary is
-              a STATUS PILL, not a sentence (Jess 2026-07-08): the owing AMOUNT when
-              money is due — red if the delivery gate is HOLD, amber if it's a WARN,
-              neutral otherwise — else Settled / No balance. Operation shows only the
-              OUTSTANDING owed (no Bill/Total). */}
+          {/* 2. Balance — its OWN card (Jess: split from Storage). Chip = the
+              owing amount as danger TEXT (colour lock). The id anchors the
+              banner's "Confirm & collect" push. */}
+          <div id="card-balance" className="min-w-0 flex flex-col min-h-0">
           <Panel
             title="Balance"
             actions={
+              /* Round 1A ⋮ discipline: only WIRED actions — invoice / receipt
+                 printing is hidden until 1B (no dead menu entries). */
               <PanelMenu
                 items={[
-                  {
-                    label: "Print invoice",
-                    icon: <FileText size={14} />,
-                    onClick: () => void openInvoicePdf(order.id, order.so),
-                  },
-                  {
-                    label: "Print receipt (latest)",
-                    icon: <FileText size={14} />,
-                    disabled: ledger.length === 0,
-                    onClick: () => {
-                      const latest = ledger.reduce((a, b) =>
-                        b.paid_on > a.paid_on ? b : a,
-                      );
-                      void openReceipt(latest, {
-                        orderCode: `SO-${order.so}`,
-                        customerName: order.customer_name ?? "",
-                      });
-                    },
-                  },
                   {
                     label: "Copy outstanding",
                     icon: <Copy size={14} />,
@@ -1787,6 +1917,8 @@ function DrawerBody({
               />
             }
             summary={
+              /* Colour lock: the owing amount is danger TEXT on a neutral chip —
+                 never a red block (the banner is the only red block). */
               isOwing ? (
                 <span
                   title={
@@ -1796,13 +1928,7 @@ function DrawerBody({
                         ? "Collect before delivery"
                         : "Outstanding balance"
                   }
-                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                    balanceGate === "hold"
-                      ? "bg-[#FEE2E2] text-[#991B1B]"
-                      : balanceGate === "warn"
-                        ? "bg-[#FEF3C7] text-[#92400E]"
-                        : "bg-base-100 text-base-700"
-                  }`}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
                 >
                   {balanceGate === "hold" && (
                     <AlertCircle size={10} strokeWidth={2.5} />
@@ -1810,21 +1936,23 @@ function DrawerBody({
                   {RM(owingAmt)} owing
                 </span>
               ) : totalSet ? (
-                <MiniBadge tone="ready">Settled</MiniBadge>
+                <MiniBadge tone="muted">paid</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">No balance</MiniBadge>
+                <MiniBadge tone="muted">no total</MiniBadge>
               )
             }
           >
             <div className="p-3">
               {balanceOwing && collectByLabel && (
+                /* Colour lock: no red block here — hold/warn read as coloured
+                   TEXT on the neutral surface (the banner owns the red block). */
                 <div
-                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] ${
+                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] bg-base-50 ${
                     balanceGate === "hold"
-                      ? "bg-[#FEE2E2] text-[#991B1B]"
+                      ? "text-danger"
                       : balanceGate === "warn"
-                        ? "bg-[#FEF3C7] text-[#92400E]"
-                        : "bg-base-50 text-base-500"
+                        ? "text-warning"
+                        : "text-base-500"
                   }`}
                 >
                   <span>Collect by {collectByLabel}</span>
@@ -1849,40 +1977,16 @@ function DrawerBody({
               />
             </div>
           </Panel>
+          </div>
 
-          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary is
-              a STATUS PILL, not a sentence (Jess 2026-07-08): the fee amount when a
-              fee is running (red if the delivery gate is HOLD, amber if WARN, neutral
-              otherwise) — else "fee if held". Only shows when a storable category is
-              on the order. */}
+          {/* 3. Storage — its OWN card (Jess: split from Balance). Chip (Round
+              1A): "held <n>d" while a fee is accruing (danger TEXT on hold —
+              never a red block) · "not accruing" otherwise. ⋮ hidden until 1B
+              (receipt printing not wired into the new pattern yet). */}
           {(hasMsbf || hasSof) && (
             <Panel
               title="Storage"
               defaultOpen={false}
-              actions={
-                <PanelMenu
-                  items={[
-                    {
-                      label: "Print storage receipt (latest)",
-                      icon: <FileText size={14} />,
-                      disabled: !ledger.some((p) => p.kind === "storage"),
-                      onClick: () => {
-                        const storagePays = ledger.filter(
-                          (p) => p.kind === "storage",
-                        );
-                        if (storagePays.length === 0) return;
-                        const latest = storagePays.reduce((a, b) =>
-                          b.paid_on > a.paid_on ? b : a,
-                        );
-                        void openReceipt(latest, {
-                          orderCode: `SO-${order.so}`,
-                          customerName: order.customer_name ?? "",
-                        });
-                      },
-                    },
-                  ]}
-                />
-              }
               summary={
                 storageOwing ? (
                   <span
@@ -1893,22 +1997,31 @@ function DrawerBody({
                           ? "Collect storage before delivery"
                           : "Storage fee running"
                     }
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                      storageGate === "hold"
-                        ? "bg-[#FEE2E2] text-[#991B1B]"
-                        : storageGate === "warn"
-                          ? "bg-[#FEF3C7] text-[#92400E]"
-                          : "bg-base-100 text-base-700"
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
+                      storageGate === "hold" ? "text-danger" : "text-warning"
                     }`}
                   >
                     {storageGate === "hold" && (
                       <AlertCircle size={10} strokeWidth={2.5} />
                     )}
-                    {storageFee > 0 ? `${RM(storageFee)} fee` : "fee due"}
+                    {(() => {
+                      const from =
+                        form.control?.storage_from ?? form.draft.storage_from;
+                      if (from && from.trim()) {
+                        const days = Math.max(
+                          0,
+                          Math.round(
+                            (Date.now() - new Date(`${from}T00:00:00`).getTime()) /
+                              86_400_000,
+                          ),
+                        );
+                        return `held ${days}d`;
+                      }
+                      return storageFee > 0 ? `${RM(storageFee)} fee` : "fee due";
+                    })()}
                   </span>
                 ) : (
-                  /* Collapsed row reads the per-day rate (Jess 2026-07-13). */
-                  <MiniBadge tone="muted">RM5/day</MiniBadge>
+                  <MiniBadge tone="muted">not accruing</MiniBadge>
                 )
               }
             >
@@ -1951,13 +2064,10 @@ function DrawerBody({
           <Panel
             title="Delivery"
             actions={
+              /* Round 1A ⋮ discipline: only WIRED actions — Print DO hidden
+                 until 1B. */
               <PanelMenu
                 items={[
-                  {
-                    label: "Print DO",
-                    icon: <FileText size={14} />,
-                    onClick: () => void openDoPdf(order.id),
-                  },
                   {
                     label: "Copy address",
                     icon: <Copy size={14} />,
@@ -1973,94 +2083,69 @@ function DrawerBody({
               />
             }
             summary={
-              /* Collapsed row reads "<logistic> · <deadline>" (Jess 2026-07-13):
-                 green when a carrier is on it; amber Assign-logistic alert when
-                 the order is ready with no carrier. Region moved into the body. */
+              /* Round 1A chip: "overdue" (danger text) · "booked <date>" (green)
+                 · "not booked" (grey). */
               (() => {
-                const deadline = order.delivery_date_tbd
-                  ? "TBD"
-                  : order.delivery_date
-                    ? fmtDate(order.delivery_date).split(", ")[0]
-                    : "no date";
-                if (assignedLogisticName || formalPartnerName)
+                const eta = form.control?.logistic_eta ?? null;
+                if (eta)
                   return (
                     <MiniBadge tone="kv">
-                      {assignedLogisticName ?? formalPartnerName} · {deadline}
+                      booked {fmtDate(eta).split(", ")[0]}
                     </MiniBadge>
                   );
-                if (pipelineStatus === "ready")
+                if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
-                      <AlertCircle size={10} strokeWidth={2.5} /> Assign logistic ·{" "}
-                      {deadline}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
+                      overdue
                     </span>
                   );
-                return <MiniBadge tone="muted">unassigned · {deadline}</MiniBadge>;
+                return <MiniBadge tone="muted">not booked</MiniBadge>;
               })()
             }
           >
             <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
-              {/* No sentence row (Jess 2026-07-11) — the header pill signals the
-                  state (⚑ Assign logistic / carrier name); the carrier picker below
-                  IS the assign action. Stage actions (Issue PO / Confirm delivery)
-                  live in the header ⋮ menu. */}
-              {/* Original (what operation sets) | Logistic update (what the
-                  carrier commits back). */}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
-                <div className="min-w-0">
-                  <FieldGrid>
-                    <RoutingFields
-                      orderId={order.id}
-                      customerAddress={order.customer_address ?? null}
-                      deliveryDate={order.delivery_date}
-                      proceedDate={order.proceed_date ?? null}
-                      opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-                      form={form}
-                      hideRegion
+              {/* Round 1A: ONE full-width column — label left / input right,
+                  nothing truncated (the old two-column split squeezed each input
+                  to ~140px). Field order: Logistic · Deadline · Logistic ETA ·
+                  Time slot · Call window · Customer request. */}
+              <FieldGrid>
+                <RoutingFields
+                  orderId={order.id}
+                  customerAddress={order.customer_address ?? null}
+                  deliveryDate={order.delivery_date}
+                  proceedDate={order.proceed_date ?? null}
+                  opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                  form={form}
+                  hideRegion
+                />
+                <LogisticEtaField form={form} />
+                <DeliveryTimeSlotField form={form} />
+              </FieldGrid>
+              {/* Call window — reach the customer N days before the deadline;
+                  a daily cron drops the task on this date. */}
+              {contactByLabel && (
+                <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
+                  <span className="flex items-center gap-1 text-[11.5px] font-medium text-info min-w-0">
+                    <Phone size={12} strokeWidth={2.25} className="shrink-0" />
+                    <span className="truncate">Call customer by {contactByLabel}</span>
+                  </span>
+                  <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
+                    <span>−</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={form.draft.contact_by_days}
+                      onChange={(e) => form.set("contact_by_days", e.target.value)}
+                      placeholder="3"
+                      aria-label="Call window — days before the deadline to call the customer"
+                      title="Days before the deadline to call the customer"
+                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11px] text-center outline-none focus:border-primary"
                     />
-                  </FieldGrid>
+                    <span>d</span>
+                  </span>
                 </div>
-                <div className="min-w-0">
-                  <div className="t-micro text-base-400 mb-1">Logistic update</div>
-                  <FieldGrid>
-                    <LogisticEtaField form={form} />
-                    <DeliveryTimeSlotField form={form} />
-                  </FieldGrid>
-                  {/* Call-by — reach the customer BEFORE the deadline to confirm
-                      stock + timing; a daily cron drops the task on this date. The
-                      lead-days stepper is the quiet knob; the DATE is the headline. */}
-                  {contactByLabel && (
-                    <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                      <span className="flex items-center gap-1 text-[11.5px] font-medium text-info min-w-0">
-                        <Phone size={12} strokeWidth={2.25} className="shrink-0" />
-                        <span className="truncate">Call customer by {contactByLabel}</span>
-                      </span>
-                      <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
-                        <span>−</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={60}
-                          value={form.draft.contact_by_days}
-                          onChange={(e) => form.set("contact_by_days", e.target.value)}
-                          placeholder="3"
-                          aria-label="Call-by lead days before the deadline"
-                          title="Days before the deadline to call the customer"
-                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11px] text-center outline-none focus:border-primary"
-                        />
-                        <span>d</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* 2 remark rows (span full width). The old single-field
-                  "Carrier's remark" (carres_remark) was REMOVED (Jess 2026-07-11,
-                  Option 1): all hand-written follow-up now lives in ONE place —
-                  the Activity & notes timeline card below — which stacks entries
-                  with who + when + history instead of overwriting one box.
-                  customer_request + action_for_logistic keep their own semantics
-                  (a customer ask / a standing instruction, not follow-up chatter). */}
+              )}
               <div className="border-t border-base-100 pt-2">
                 <FieldGrid>
                   <RemarkControlField
@@ -2068,12 +2153,6 @@ function DrawerBody({
                     field="customer_request"
                     label="Customer request"
                     placeholder="e.g. postponed to end of May"
-                  />
-                  <RemarkControlField
-                    form={form}
-                    field="action_for_logistic"
-                    label="Action for logistic"
-                    placeholder="e.g. call customer before delivery"
                   />
                 </FieldGrid>
               </div>
@@ -2084,7 +2163,7 @@ function DrawerBody({
                   read-out reflects the carrier picked above. */}
               <div className="border-t border-base-100 pt-2">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="t-micro text-base-400">Carriers / route</span>
+                  <span className="text-[11px] text-base-400">Carriers / route</span>
                   <MiniBadge tone="muted">
                     {order.delivery_stops?.length
                       ? `${order.delivery_stops.length} legs`
@@ -2640,7 +2719,7 @@ function MoneyRow({
     <div
       className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
     >
-      <span className="t-micro text-base-400">{label}</span>
+      <span className="text-[11px] text-base-400">{label}</span>
       <span className="text-right">{children}</span>
     </div>
   );
@@ -3176,7 +3255,7 @@ function PoRow({
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <span
-          className={`text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
+          className={`text-[9px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
         >
           {po.status}
         </span>
@@ -3257,10 +3336,14 @@ function PrintDoButton({
 
 /** Readiness pill label + colour by status (locked vocab: No PO red · Waiting
  *  amber · Ready green). */
-const STOCK_STATUS_META: Record<LineStockStatus, { t: string; c: string }> = {
-  ready: { t: "Ready", c: "bg-[#DCFCE7] text-[#166534]" },
-  waiting: { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" },
-  nopo: { t: "No PO", c: "bg-[#DC2626] text-white" },
+/** Row pill per the Round 1A readiness vocab (colour lock: green = reserved to
+ *  this SO, amber = free stock to reserve, grey = on PO / nothing raised — red
+ *  is reserved for the banner). */
+const STOCK_STATUS_META: Record<LineReadiness, { t: string; c: string }> = {
+  reserved: { t: "Reserved", c: "bg-success-soft text-success" },
+  to_reserve: { t: "To reserve", c: "bg-warning-soft text-warning" },
+  on_po: { t: "On PO", c: "bg-base-100 text-base-600" },
+  no_po: { t: "No PO", c: "bg-base-100 text-base-500" },
 };
 
 /**
@@ -3279,8 +3362,12 @@ function StockStatusCell({
   onPick,
 }: {
   sku: string;
-  status: LineStockStatus;
+  /** The DERIVED readiness (shared lineReadiness) — the pill face always shows
+   *  this, so row / badge / footer can never contradict (Round 1A). */
+  status: LineReadiness;
   isOverride: boolean;
+  /** Writes the Master override (line_stock_status) — an INPUT to the derived
+   *  readiness ("stock arrived" hint), not the displayed value itself. */
   onSet: (s: LineStockStatus | null) => void;
   onPick: () => void;
 }) {
@@ -3307,19 +3394,21 @@ function StockStatusCell({
         <>
           <div className="fixed inset-0 z-40" onClick={(e) => { stop(e); setOpen(false); }} />
           <div className="absolute z-50 mt-1 left-0 w-[168px] bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden py-1">
-            {(["ready", "waiting", "nopo"] as const).map((s) => (
+            {(
+              [
+                { v: "ready", t: "Stock arrived", dot: "bg-success" },
+                { v: "waiting", t: "Waiting (on PO)", dot: "bg-warning" },
+                { v: "nopo", t: "Nothing raised", dot: "bg-base-400" },
+              ] as const
+            ).map((s) => (
               <button
-                key={s}
+                key={s.v}
                 type="button"
-                onClick={(e) => { stop(e); onSet(s); setOpen(false); }}
-                className={`w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 flex items-center gap-2 ${
-                  status === s ? "font-semibold" : ""
-                }`}
+                onClick={(e) => { stop(e); onSet(s.v); setOpen(false); }}
+                className="w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 flex items-center gap-2"
               >
-                <span className={`inline-block w-2 h-2 rounded-full ${
-                  s === "ready" ? "bg-[#16A34A]" : s === "waiting" ? "bg-[#D97706]" : "bg-[#DC2626]"
-                }`} />
-                {STOCK_STATUS_META[s].t}
+                <span className={`inline-block w-2 h-2 rounded-full ${s.dot}`} />
+                {s.t}
               </button>
             ))}
             <div className="border-t border-base-100 my-1" />

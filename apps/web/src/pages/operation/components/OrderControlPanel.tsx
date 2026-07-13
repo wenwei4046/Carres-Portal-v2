@@ -377,12 +377,13 @@ export function RoutingFields({
       <FieldRow label="Logistic">
         <div className="flex items-center gap-2 flex-wrap w-full px-1">
           <select
+            id="fld-logistic"
             value={opsAssignedLogistic ?? ""}
             disabled={setLogistic.isPending}
             onChange={(e) =>
               setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
             }
-            className={`${CELL} flex-1 min-w-[110px] disabled:opacity-50`}
+            className={`${CELL} flex-1 min-w-[150px] disabled:opacity-50`}
           >
             <option value="">— pick carrier —</option>
             {partners.map((p) => (
@@ -449,10 +450,11 @@ export function LogisticEtaField({ form }: { form: OrderControlForm }) {
   return (
     <FieldRow label="Logistic ETA">
       <input
+        id="fld-logistic-eta"
         type="date"
         value={form.draft.logistic_eta}
         onChange={(e) => form.set("logistic_eta", e.target.value)}
-        className={CELL}
+        className={`${CELL} min-w-[150px]`}
       />
     </FieldRow>
   );

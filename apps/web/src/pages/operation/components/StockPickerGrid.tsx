@@ -82,12 +82,14 @@ interface Props {
   actions?: ReactNode;
 }
 
-// ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
-const GRID = "30px 78px 88px minmax(160px,1fr) 56px 104px 84px 92px";
-
-// Header labels only — the 7 per-column funnel filters were replaced by ONE
-// search box (Jess 2026-07-13); the header is plain again.
-const COL_LABELS = ["Date", "Category", "Item", "Size", "PO", "Old ref", "Cond"];
+// Round 1A: Category / Item / Size columns removed — under "same model + size"
+// every row is identical on all three, so they were noise. ☐ · Date · PO ·
+// Old ref · Cond. The LOAN view lists DIFFERENT sofa models, so it keeps an
+// Item column (you must see which sofa you're lending).
+const GRID = "30px 90px minmax(110px,1fr) minmax(100px,1fr) 92px";
+const GRID_LOAN = "30px 90px minmax(160px,1.4fr) 110px 100px 92px";
+const COL_LABELS = ["Date", "PO", "Old ref", "Cond"];
+const COL_LABELS_LOAN = ["Date", "Item", "PO", "Old ref", "Cond"];
 
 export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -215,7 +217,10 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
   // units on top.)
 
   return (
-    <div className="flex flex-col h-full min-h-0 border border-base-200 rounded-[12px] overflow-hidden bg-white">
+    // Natural height (Round 1A) — the right column scrolls as a whole now, so
+    // the old grow-to-fill collapsed this card to its chrome; the row area caps
+    // at ~6 rows and scrolls inside itself instead (same pattern as Items).
+    <div className="flex flex-col min-h-0 border border-base-200 rounded-[12px] overflow-hidden bg-white">
       <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between gap-2 shrink-0">
         <div className="min-w-0">
           <span className="t-h4 text-base-900">Warehouse stock</span>
@@ -274,28 +279,29 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         />
       </div>
 
-      <div className="flex-1 overflow-auto min-h-0">
-        <div className="min-w-[640px]">
-          {/* header — plain labels (the funnels are gone; the search box above
-              is the one filter). */}
+      <div className="overflow-auto" style={{ maxHeight: 268 }}>
+        <div className={loanMode ? "min-w-[560px]" : "min-w-[420px]"}>
+          {/* header — plain sentence-case labels (the search box above is the
+              one filter). */}
           <div
-            className="grid sticky top-0 z-20 bg-[#F1EDE6] border-b border-[#DDD8CE] text-[#8C877D] text-[10px] uppercase tracking-[0.02em] font-bold"
-            style={{ gridTemplateColumns: GRID }}
+            className="grid sticky top-0 z-20 bg-[#F1EDE6] border-b border-[#DDD8CE] text-[#8C877D] text-[10px] font-bold"
+            style={{ gridTemplateColumns: loanMode ? GRID_LOAN : GRID }}
           >
             <div className="px-1.5 py-1.5" />
-            {COL_LABELS.map((label) => (
+            {(loanMode ? COL_LABELS_LOAN : COL_LABELS).map((label) => (
               <div key={label} className="px-2 py-1.5 truncate">
                 {label}
               </div>
             ))}
           </div>
-          {/* body */}
+          {/* body — 40px rows */}
           {view.map((r, i) => {
             const on = checked.has(r.id);
             return (
               <div
                 key={r.id}
                 onClick={() => toggle(r.id)}
+                title={r.sku}
                 className={`grid items-center min-h-[40px] border-b border-base-100 cursor-pointer text-[11px] ${
                   on
                     ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
@@ -303,7 +309,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                       ? "bg-base-100/60 hover:bg-primary/5"
                       : "bg-white hover:bg-primary/5"
                 }`}
-                style={{ gridTemplateColumns: GRID }}
+                style={{ gridTemplateColumns: loanMode ? GRID_LOAN : GRID }}
               >
                 <div className="px-1.5 py-1 flex items-center justify-center">
                   <input
@@ -315,11 +321,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   />
                 </div>
                 <div className="px-2 py-1 text-base-500 truncate">{r.dateLabel || "—"}</div>
-                <div className="px-2 py-1 text-base-600 truncate">{r.cat}</div>
-                <div className="px-2 py-1 font-mono text-base-900 truncate" title={r.sku}>
-                  {r.sku}
-                </div>
-                <div className="px-2 py-1 text-base-600">{r.size === "Other" ? "—" : r.size}</div>
+                {loanMode && (
+                  <div className="px-2 py-1 font-mono text-base-900 truncate">
+                    {r.sku}
+                  </div>
+                )}
                 <div className="px-2 py-1 font-mono text-base-600 truncate" title={r.poNo ?? ""}>
                   {r.poNo ?? "—"}
                 </div>
@@ -373,7 +379,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
               ? loanMode
                 ? "Loaning…"
                 : "Reserving…"
-              : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
+              : checked.size === 0
+                ? "Select stock to reserve"
+                : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
           </button>
         )}
       </div>
