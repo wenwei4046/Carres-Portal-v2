@@ -780,6 +780,7 @@ export default function DealerPos({
           <div className="page-shell h-full overflow-hidden">
             <ThankYou
               order={submitted}
+              catalog={catalogQ.data ?? null}
               onNewOrder={startAnotherOrder}
               onClose={() => {
                 clearDraft();
