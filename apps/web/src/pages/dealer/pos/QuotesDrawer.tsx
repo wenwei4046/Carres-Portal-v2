@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Bookmark, Trash2, X } from "lucide-react";
+import { ArrowRight, Bookmark, Eye, Trash2, X } from "lucide-react";
 import type { CatalogResponse } from "@carres/shared";
 import { deleteQuote, listQuotes, quoteAgeLabel, type SavedQuote } from "./quotes";
 
@@ -9,6 +9,10 @@ import { deleteQuote, listQuotes, quoteAgeLabel, type SavedQuote } from "./quote
  * catalog, label + age + piece meta, Bodoni total, Delete / Load). Loading is
  * the caller's job (`onLoad` — DealerPos replaces the cart and returns to the
  * catalog). Quote storage/sanitising: UNCHANGED (pos/quotes.ts).
+ *
+ * Detail preview (2026-07-14): the Eye button opens a floating card window
+ * (`.quote-detail`) listing every line + addon in the quote, with its own Load
+ * CTA — so the salesperson can verify what's inside before replacing the cart.
  */
 export default function QuotesDrawer({
   catalog,
@@ -20,6 +24,7 @@ export default function QuotesDrawer({
   onClose: () => void;
 }) {
   const [version, setVersion] = useState(0);
+  const [detail, setDetail] = useState<SavedQuote | null>(null);
   const quotes = useMemo(() => listQuotes(), [version]);
   const now = useMemo(() => new Date(), []);
 
@@ -30,6 +35,8 @@ export default function QuotesDrawer({
     for (const s of catalog.skus) map.set(s.sku, modelById.get(s.modelId)?.photoUrl ?? null);
     return map;
   }, [catalog]);
+
+  const fmt = (n: number) => n.toLocaleString("en-MY");
 
   return (
     <div className="quotes-overlay" onClick={onClose}>
@@ -89,9 +96,18 @@ export default function QuotesDrawer({
                 <div className="quote-row__right">
                   <span className="quote-row__total">
                     <sup>RM</sup>
-                    {q.total.toLocaleString("en-MY")}
+                    {fmt(q.total)}
                   </span>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => setDetail(q)}
+                      aria-label="View quote details"
+                      data-testid={`pos-quote-detail-${q.id}`}
+                    >
+                      <Eye size={16} strokeWidth={1.75} />
+                    </button>
                     <button
                       type="button"
                       className="icon-btn"
@@ -119,6 +135,102 @@ export default function QuotesDrawer({
           )}
         </div>
       </aside>
+
+      {detail && (
+        <div
+          className="quote-detail"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDetail(null);
+          }}
+        >
+          <div
+            className="quote-detail__panel"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Quote details"
+            data-testid="pos-quote-detail-modal"
+          >
+            <div className="quote-detail__head">
+              <div>
+                <div className="quotes-drawer__eyebrow">Quote detail</div>
+                <div className="quote-detail__title">{detail.label}</div>
+                <div className="quote-row__meta">
+                  {detail.lines.reduce((s, l) => s + l.qty, 0)} pieces
+                  {detail.phone ? ` · ${detail.phone}` : ""} · saved{" "}
+                  {quoteAgeLabel(detail.savedAt, now)}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setDetail(null)}
+                aria-label="Close details"
+              >
+                <X size={18} strokeWidth={1.75} />
+              </button>
+            </div>
+            <div className="quote-detail__body">
+              {detail.lines.map((l) => {
+                const photo = photoBySku.get(l.sku);
+                return (
+                  <div key={l.localId} className="quote-detail__card">
+                    <div
+                      className="quote-detail__photo"
+                      style={photo ? { backgroundImage: `url(${photo})` } : undefined}
+                    >
+                      {!photo && (l.label || l.sku).slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="quote-detail__info">
+                      <div className="quote-detail__name">{l.label || l.sku}</div>
+                      <div className="quote-detail__meta">
+                        {l.sku} · {l.qty} × RM {fmt(l.unitPrice)}
+                      </div>
+                    </div>
+                    <span className="quote-detail__price">
+                      <sup>RM</sup>
+                      {fmt(l.unitPrice * l.qty)}
+                    </span>
+                  </div>
+                );
+              })}
+              {detail.addons.map((a, i) => (
+                <div key={`${a.key}-${i}`} className="quote-detail__card quote-detail__card--addon">
+                  <div className="quote-detail__photo quote-detail__photo--addon">+</div>
+                  <div className="quote-detail__info">
+                    <div className="quote-detail__name">{a.name}</div>
+                    <div className="quote-detail__meta">
+                      Add-on · {a.qty} × RM {fmt(a.unitPrice)}
+                    </div>
+                  </div>
+                  <span className="quote-detail__price">
+                    <sup>RM</sup>
+                    {fmt(a.unitPrice * a.qty)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="quote-detail__foot">
+              <div>
+                <div className="quote-detail__total-label">Total</div>
+                <span className="quote-row__total">
+                  <sup>RM</sup>
+                  {fmt(detail.total)}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => onLoad(detail)}
+                data-testid="pos-quote-detail-load"
+              >
+                Load
+                <ArrowRight size={14} strokeWidth={1.75} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
