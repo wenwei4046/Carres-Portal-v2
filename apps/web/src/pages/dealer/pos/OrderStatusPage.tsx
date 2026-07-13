@@ -363,7 +363,15 @@ const LANES: { key: Lane; num: string; title: string; sub: string }[] = [
   { key: "delivered", num: "03", title: "Delivered", sub: "Closed · signed off" },
 ];
 
-export default function OrderStatusPage({ onClose }: { onClose: () => void }) {
+export default function OrderStatusPage({
+  onClose,
+  dealerId,
+}: {
+  onClose: () => void;
+  /** Scope the board to one dealer — set when a principal is acting on a
+   *  picked dealer's behalf (undefined = the caller's own JWT scope). */
+  dealerId?: string;
+}) {
   const [unlocked, setUnlocked] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -372,7 +380,7 @@ export default function OrderStatusPage({ onClose }: { onClose: () => void }) {
   const [monthAnchor, setMonthAnchor] = useState(() => new Date());
   const [peopleOpen, setPeopleOpen] = useState(false);
 
-  const ordersQ = useOrders(undefined, { enabled: unlocked });
+  const ordersQ = useOrders(dealerId ? { dealerId } : undefined, { enabled: unlocked });
   const salespersonsQ = useSalespersons(undefined, { enabled: unlocked });
   const orders = useMemo(
     () => (ordersQ.data?.orders ?? []).filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) !== null),
