@@ -1919,6 +1919,73 @@ describe("POST /api/orders/:id/proceed", () => {
 });
 
 // =============================================================================
+// POST /api/orders/:id/unproceed — 0220 sales-side Proceed→Place reversal
+// =============================================================================
+
+const unproceedUrl = `http://t/api/orders/${PROCEED_ID}/unproceed`;
+
+describe("POST /api/orders/:id/unproceed", () => {
+  it("200 — calls unproceed_order RPC with p_order_id and returns the re-fetched Place order", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        status: "place",
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(unproceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status?: string };
+    expect(body.status).toBe("place");
+    expect(sb._rpcCalls).toHaveLength(1);
+    expect(sb._rpcCalls[0].name).toBe("unproceed_order");
+    expect(sb._rpcCalls[0].args).toEqual({ p_order_id: PROCEED_ID });
+  });
+
+  it("422 with code='wrong_stage' when RPC raises 22023 (ops already working the order)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: {
+        code: "22023",
+        message: "HQ operation has already started on this order",
+        details: "wrong_stage",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(unproceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string };
+    expect(body.error).toBe("unproceed_blocked");
+    expect(body.code).toBe("wrong_stage");
+  });
+
+  it("403 for a role outside the order-writing list (supplier)", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("supplier", null);
+    const res = await app.fetch(
+      new Request(unproceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("401 without Authorization header", async () => {
+    const res = await app.fetch(new Request(unproceedUrl, { method: "POST" }), env);
+    expect(res.status).toBe(401);
+  });
+});
+
+// =============================================================================
 // POST /api/orders/:id/top-up — partial payment toward order total
 // POST /api/orders/:id/address — fill in deferred delivery address
 // POST /api/orders/:id/date — confirm TBD delivery date
@@ -2213,6 +2280,50 @@ describe("PATCH /api/orders/:id", () => {
     expect(args.p_payload.customer_phone).toBe("012-9988776");
     expect(args.p_payload.delivery_floor).toBe(3);
     expect(args.p_payload.delivery_has_lift).toBe(true);
+  });
+
+  // 0220 — POS proceed-lane edits: customer.email flows to the RPC payload.
+  it("200 — flattens customer.email to customer_email (null → '' so the RPC clears it)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ customer: { email: "loo@carres.com" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("update_order");
+    const args = sb._rpcCalls[0].args as { p_payload: Record<string, unknown> };
+    expect(args.p_payload.customer_email).toBe("loo@carres.com");
+
+    // null clears — flattened to "" (the RPC's nullif(trim(…), '') nulls it).
+    const sb2 = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb2);
+    const res2 = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ customer: { email: null } }),
+      }),
+      env,
+    );
+    expect(res2.status).toBe(200);
+    const args2 = sb2._rpcCalls[0].args as { p_payload: Record<string, unknown> };
+    expect(args2.p_payload.customer_email).toBe("");
   });
 
   it("422 with code='wrong_status' when RPC says order isn't in Place", async () => {

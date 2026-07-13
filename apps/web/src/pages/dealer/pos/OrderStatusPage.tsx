@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import type { Order } from "@carres/shared";
 import { useOrders, useSalespersons } from "@/lib/queries";
-import DealerOrderDetail from "../DealerOrderDetail";
+import { laneOf, type Lane } from "./order-edit-scope";
+import PosOrderDetail from "./PosOrderDetail";
 
 /**
  * Order Status — the POS "My orders" sales view (design contract:
@@ -36,8 +37,8 @@ import DealerOrderDetail from "../DealerOrderDetail";
  *   03 Delivered    → status 'delivered'
  *
  * Cancelled orders stay off the board (the design has no lane for them).
- * Card click opens the EXISTING DealerOrderDetail overlay — request-proceed /
- * top-up / edit flows live there already; this screen never duplicates them.
+ * Card click opens the POS-native PosOrderDetail drawer (2026-07-14 — 2990s
+ * drawer parity: proceed-lane customer/payment edits, un-proceed, checklist).
  *
  * Carres adaptations from the 2990s design (data the list endpoint has):
  * - Revenue rows = Products & add-ons / Collected / Outstanding (no
@@ -50,24 +51,11 @@ import DealerOrderDetail from "../DealerOrderDetail";
 /** C·A·R·R·E·S on a phone keypad. Rotate in code when it leaks. */
 export const ORDER_STATUS_PIN = "227737";
 
-export type Lane = "place" | "proceed" | "delivered";
-
-export function laneOf(
-  status: Order["status"],
-  operationStage?: Order["operationStage"],
-  sourceSystem?: Order["sourceSystem"],
-): Lane | null {
-  if (status === "delivered") return "delivered";
-  if (status === "proceed_order") return "proceed";
-  if (status === "place") {
-    // A 'place' order that's already out of the dealer's hands sits in the
-    // Proceed lane: operation picked it up (stage set), or it's an AutoCount
-    // import (those enter the pipeline already proceeded — same rule the
-    // operation grid uses).
-    return operationStage || sourceSystem === "autocount" ? "proceed" : "place";
-  }
-  return null; // cancelled — off the board
-}
+// Lane bucketing moved to order-edit-scope.ts (2026-07-14) so the pure
+// edit-scope helper and this board share ONE lane definition. Re-exported
+// here so existing imports (tests) keep working.
+export { laneOf };
+export type { Lane };
 
 export interface Revenue {
   products: number;
@@ -603,9 +591,18 @@ export default function OrderStatusPage({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* Full order detail — the existing dealer overlay (request-proceed /
-          top-up / edit all live there; nothing duplicated here). */}
-      {activeId && <DealerOrderDetail id={activeId} onClose={() => setActiveId(null)} />}
+      {/* Full order detail — the POS-native drawer (2990s parity: proceed-lane
+          customer/payment edits, un-proceed, place-lane checklist + proceed). */}
+      {activeId &&
+        (() => {
+          const active = orders.find((o) => o.id === activeId);
+          const staffName = active?.salespersonId
+            ? staffById.get(active.salespersonId) ?? null
+            : null;
+          return (
+            <PosOrderDetail id={activeId} staffName={staffName} onClose={() => setActiveId(null)} />
+          );
+        })()}
     </div>,
     document.body,
   );
