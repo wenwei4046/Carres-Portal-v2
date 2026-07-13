@@ -9,7 +9,9 @@ import {
   aggregateBalancesByRef,
   receiveLineInput,
   loanSofaInput,
+  borrowLoanInput,
   returnLoanInput,
+  returnToSupplierInput,
   type OrderLineRef,
   type StockEtaImportResult,
   type ReceiveLineResult,
@@ -62,7 +64,7 @@ orderControlRouter.get("/:id/control", async (c) => {
   const { data, error } = await sb
     .from("ops_order_control")
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, line_received, called_customer, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, updated_at, updated_by",
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
@@ -123,7 +125,7 @@ orderControlRouter.put("/:id/control", async (c) => {
       { onConflict: "order_id" },
     )
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, line_received, called_customer, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, updated_at, updated_by",
     )
     .single();
   if (error) {
@@ -551,7 +553,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, item_id, do_number, status, loaned_at, returned_at, notes, ops_stock_items(sku, condition)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, ops_stock_items(sku, condition), suppliers(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
@@ -559,25 +561,37 @@ orderControlRouter.get("/:id/loans", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  const loans: SofaLoanDto[] = (data ?? []).map((r) => {
-    const row = r as Record<string, unknown> & {
-      ops_stock_items?: { sku?: string | null; condition?: string | null } | null;
-    };
-    return {
-      id: row.id as string,
-      order_id: row.order_id as string,
-      item_id: row.item_id as string,
-      item_sku: row.ops_stock_items?.sku ?? null,
-      item_condition: row.ops_stock_items?.condition ?? null,
-      do_number: (row.do_number as string | null) ?? null,
-      status: row.status as "on_loan" | "returned",
-      loaned_at: row.loaned_at as string,
-      returned_at: (row.returned_at as string | null) ?? null,
-      notes: (row.notes as string | null) ?? null,
-    };
-  });
+  const loans: SofaLoanDto[] = (data ?? []).map((r) => mapLoanRow(r));
   return c.json({ loans });
 });
+
+/** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */
+function mapLoanRow(r: unknown): SofaLoanDto {
+  const row = r as Record<string, unknown> & {
+    ops_stock_items?: { sku?: string | null; condition?: string | null } | null;
+    suppliers?: { name?: string | null } | null;
+  };
+  return {
+    id: row.id as string,
+    order_id: row.order_id as string,
+    source: (row.source as "warehouse" | "supplier" | null) ?? "warehouse",
+    category: (row.category as string | null) ?? null,
+    item_id: (row.item_id as string | null) ?? null,
+    item_sku: row.ops_stock_items?.sku ?? null,
+    item_condition: row.ops_stock_items?.condition ?? null,
+    supplier_id: (row.supplier_id as string | null) ?? null,
+    supplier_name: row.suppliers?.name ?? null,
+    borrowed_sku: (row.borrowed_sku as string | null) ?? null,
+    borrowed_label: (row.borrowed_label as string | null) ?? null,
+    returned_to_supplier_at:
+      (row.returned_to_supplier_at as string | null) ?? null,
+    do_number: (row.do_number as string | null) ?? null,
+    status: row.status as "on_loan" | "returned",
+    loaned_at: row.loaned_at as string,
+    returned_at: (row.returned_at as string | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
+  };
+}
 
 // POST /:id/loan-sofa — lend a free sofa to the order: claim the unit (free →
 // reserved with a "LOAN SO-{n}" marker, atomic on status='free') + record the
@@ -662,9 +676,16 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
   const dto: SofaLoanDto = {
     id: loan.id as string,
     order_id: loan.order_id as string,
+    source: "warehouse",
+    category: null,
     item_id: loan.item_id as string,
     item_sku: (claimed.sku as string | null) ?? null,
     item_condition: (claimed.condition as string | null) ?? null,
+    supplier_id: null,
+    supplier_name: null,
+    borrowed_sku: null,
+    borrowed_label: null,
+    returned_to_supplier_at: null,
     do_number: (loan.do_number as string | null) ?? null,
     status: loan.status as "on_loan" | "returned",
     loaned_at: loan.loaned_at as string,
@@ -672,6 +693,62 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     notes: (loan.notes as string | null) ?? null,
   };
   return c.json({ loan: dto });
+});
+
+// POST /:id/loan-borrow — BORROW a piece from a supplier to loan to the order
+// (migration 0217). No own-stock unit is claimed; the borrowed piece is described
+// inline + we owe the supplier a piece back (the return obligation, closed later
+// via /loan-return-supplier). The real line is untouched (stays Waiting).
+orderControlRouter.post("/:id/loan-borrow", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = borrowLoanInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: `Invalid borrow input at ${path}: ${issue?.message ?? "validation failed"}` },
+      422,
+    );
+  }
+  const { supplierId, category, borrowedSku, borrowedLabel, doNumber, notes } =
+    parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+
+  const { data: loan, error: loanErr } = await sb
+    .from("ops_sofa_loans")
+    .insert({
+      order_id: orderId,
+      source: "supplier",
+      supplier_id: supplierId,
+      category: category ?? null,
+      borrowed_sku: borrowedSku ?? null,
+      borrowed_label: borrowedLabel,
+      item_id: null,
+      do_number: doNumber ?? null,
+      status: "on_loan",
+      loaned_by: auth.id,
+      notes: notes ?? null,
+    })
+    .select(
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, suppliers(name)",
+    )
+    .single();
+  if (loanErr) {
+    const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ loan: mapLoanRow(loan) });
 });
 
 // POST /:id/loan-return — the swap at final delivery: mark the loan returned +
@@ -727,12 +804,79 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     const m = mapPgError(upErr);
     return c.json(m.body, m.status);
   }
-  const { error: freeErr } = await sb
-    .from("ops_stock_items")
-    .update({ status: "free", reserved_ref: null, updated_at: now })
-    .eq("id", loan.item_id as string);
-  if (freeErr) {
-    const m = mapPgError(freeErr);
+  // Only a WAREHOUSE loan has an own-stock unit to free back; a supplier borrow
+  // has item_id = null (the piece goes back to the supplier via a separate step).
+  if (loan.item_id) {
+    const { error: freeErr } = await sb
+      .from("ops_stock_items")
+      .update({ status: "free", reserved_ref: null, updated_at: now })
+      .eq("id", loan.item_id as string);
+    if (freeErr) {
+      const m = mapPgError(freeErr);
+      return c.json(m.body, m.status);
+    }
+  }
+  return c.json({ ok: true });
+});
+
+// POST /:id/loan-return-supplier — close the supplier RETURN OBLIGATION: stamp
+// returned_to_supplier_at once the borrowed piece has physically gone back to the
+// supplier (source='supplier' only). Independent of the customer swap.
+orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = returnToSupplierInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "loanId must be a uuid" },
+      422,
+    );
+  }
+  const { loanId } = parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+
+  const { data: loan, error: loanErr } = await sb
+    .from("ops_sofa_loans")
+    .select("id, source, returned_to_supplier_at")
+    .eq("id", loanId)
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (loanErr) {
+    const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  if (!loan) throw new HTTPException(404, { message: "Loan not found" });
+  if (loan.source !== "supplier") {
+    return c.json(
+      { error: "not_supplier_loan", code: "conflict", message: "Only a supplier borrow has a return-to-supplier obligation" },
+      409,
+    );
+  }
+  if (loan.returned_to_supplier_at) {
+    return c.json(
+      { error: "already_returned", code: "conflict", message: "Already returned to the supplier" },
+      409,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const { error: upErr } = await sb
+    .from("ops_sofa_loans")
+    .update({ returned_to_supplier_at: now, updated_at: now })
+    .eq("id", loanId)
+    .is("returned_to_supplier_at", null);
+  if (upErr) {
+    const m = mapPgError(upErr);
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });

@@ -7,9 +7,13 @@ import {
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
+  opsStockRefurbishInputSchema,
+  opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
   opsStockImportInputSchema,
+  reconcileStockImport,
+  type StockUnitKeyParts,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -221,6 +225,55 @@ opsStockRouter.post("/flag-repair", requireOperationOrPrincipal, async (c) => {
   return c.json({ itemId: data });
 });
 
+// POST /refurbish — send a Free unit (typically a Display / ex-exhibition
+// piece) into repair. It leaves the ready-stock pool (needs_repair=true) until
+// completed. Guarded direct update (mirrors /reserve-item): only a genuinely
+// free, in-pool unit can enter repair, else 409 — no silent no-op.
+opsStockRouter.post("/refurbish", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockRefurbishInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .update({ needs_repair: true, updated_at: new Date().toISOString() })
+    .eq("id", parsed.itemId)
+    .eq("status", "free")
+    .eq("needs_repair", false)
+    .select("id")
+    .maybeSingle();
+  if (error) throw mapErr(error);
+  if (!data) {
+    throw new HTTPException(409, {
+      message:
+        "Unit is not a free in-pool unit (already reserved/sold, or already in repair)",
+    });
+  }
+  return c.json({ itemId: (data as { id: string }).id });
+});
+
+// POST /refurbish-complete — repair done: grade the unit up to 'refurbished'
+// (sellable as new) and return it to the Free ready-stock pool. Guarded on
+// needs_repair=true so completing a unit that isn't in repair 409s.
+opsStockRouter.post("/refurbish-complete", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockRefurbishCompleteInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .update({
+      condition: "refurbished",
+      needs_repair: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.itemId)
+    .eq("needs_repair", true)
+    .select("id")
+    .maybeSingle();
+  if (error) throw mapErr(error);
+  if (!data) {
+    throw new HTTPException(409, { message: "Unit is not in repair" });
+  }
+  return c.json({ itemId: (data as { id: string }).id });
+});
+
 // POST / — "+ Add stock": book in a new unit (or N identical units) at the
 // warehouse (GRN-in). Direct insert via the user session (RLS), mirroring the
 // /condition PATCH; no RPC needed (Jess 2026-06-29). Defaults to Carres Klang.
@@ -259,12 +312,15 @@ opsStockRouter.post("/", requireOperationOrPrincipal, async (c) => {
   return c.json({ created: (data ?? []).length }, 201);
 });
 
-// POST /import — bulk book-in from the "Klg Warehouse" ready-stock sheet
-// (On Hand C+ P3). Add-only: each import row is expanded to `qty` units and
-// inserted (same RLS insert as "+ Add stock", chunked for a large sheet). The
-// client does the New-vs-duplicate preview + only sends the rows to add;
-// snapshot-replace is intentionally NOT here (it would wipe reserved links —
-// deferred to a guarded P3b). Defaults to Carres Klang.
+// POST /import — bulk book-in from the "Klg Warehouse" ready-stock sheet.
+// The sheet is LINE-based: one sheet line = one stock record carrying its `qty`
+// (0218) — a bulk accessory line (e.g. 555 pillows) is ONE record, NOT 555
+// serialized units. Idempotency is COUNT-BASED per stable physical-identity key
+// and is server-authoritative: we fetch the current pool, reconcile against it,
+// and insert only the deficit. Re-importing the same sheet adds nothing, while
+// genuinely-identical units (same model, blank OLD REF/PO) are still all kept.
+// Add-only: existing rows are never updated/removed (snapshot-replace deferred).
+// Defaults to Carres Klang.
 opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockImportInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -283,19 +339,58 @@ opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
     throw new HTTPException(400, { message: "Carres Klang warehouse not found" });
   }
 
-  const units = parsed.rows.flatMap((r) =>
-    Array.from({ length: r.qty }, () => ({
-      sku: r.sku,
-      warehouse_id: whId,
-      condition: r.condition,
-      status: r.status,
-      reserved_ref: r.status === "reserved" ? r.reservedRef ?? null : null,
-      supplier: r.supplier ?? null,
-      po_no: r.poNo ?? null,
-      source_ref: r.sourceRef ?? null,
-      date_in: r.dateIn ?? null,
-    })),
+  // Server-authoritative reconcile: the client preview is advisory; the truth
+  // is the current pool for THIS warehouse. Any status counts (a unit reserved
+  // since the sheet was cut still counts against the sheet's line, so we don't
+  // re-add it). Paginate — PostgREST caps a single select at 1000 rows, and the
+  // pool can grow past that (scale target 1000+ units); a truncated read would
+  // silently re-add duplicates.
+  const existing: StockUnitKeyParts[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error: exErr } = await sb
+      .from("ops_stock_items")
+      .select("sku, condition, po_no, source_ref, supplier")
+      .eq("warehouse_id", whId)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (exErr) throw mapErr(exErr);
+    const rows = (page ?? []) as Array<{
+      sku: string;
+      condition: string;
+      po_no: string | null;
+      source_ref: string | null;
+      supplier: string | null;
+    }>;
+    for (const r of rows) {
+      existing.push({
+        sku: r.sku,
+        condition: r.condition,
+        poNo: r.po_no,
+        sourceRef: r.source_ref,
+        supplier: r.supplier,
+      });
+    }
+    if (rows.length < PAGE) break;
+  }
+
+  const { toInsert, alreadyInCount, desiredCount } = reconcileStockImport(
+    parsed.rows,
+    existing,
   );
+
+  const units = toInsert.map((r) => ({
+    sku: r.sku,
+    warehouse_id: whId,
+    condition: r.condition,
+    status: r.status,
+    qty: r.qty,
+    reserved_ref: r.status === "reserved" ? r.reservedRef ?? null : null,
+    supplier: r.supplier ?? null,
+    po_no: r.poNo ?? null,
+    source_ref: r.sourceRef ?? null,
+    date_in: r.dateIn ?? null,
+  }));
 
   let created = 0;
   for (let i = 0; i < units.length; i += 500) {
@@ -306,7 +401,10 @@ opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
     if (error) throw mapErr(error);
     created += (data ?? []).length;
   }
-  return c.json({ created }, 201);
+  return c.json(
+    { created, alreadyIn: alreadyInCount, total: desiredCount },
+    201,
+  );
 });
 
 // DELETE /:itemId — remove a mis-keyed unit (hard delete). For fixing a wrong
@@ -335,6 +433,8 @@ interface RawRow {
   reserved_ref: string | null;
   ref_history: string[];
   needs_repair: boolean;
+  // 0218 — units represented by this record (1 for serialized furniture).
+  qty: number;
   supplier: string | null;
   po_no: string | null;
   source_ref: string | null;
@@ -359,6 +459,7 @@ function shape(rows: RawRow[]) {
     reservedRef: r.reserved_ref,
     refHistory: r.ref_history ?? [],
     needsRepair: r.needs_repair,
+    qty: r.qty ?? 1,
     supplier: r.supplier,
     poNo: r.po_no,
     sourceRef: r.source_ref,

@@ -95,6 +95,7 @@ const ALL_ACTIONS = [
   "reassign",
   "takeout",
   "flag-repair",
+  "refurbish",
   "add",
   "remove",
 ] as const;

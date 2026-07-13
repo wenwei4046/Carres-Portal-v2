@@ -138,7 +138,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // 2026-06-09 (Jess P2, project-orders-control-spec) — customer_address
       // added so the control table can tag each row KV / Outstation + suggest a
       // default carrier (apps/web/src/lib/region.ts) without opening the drawer.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, source_po), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, source_po), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -158,12 +158,18 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   if (channel === "dealers") q = q.is("outlet_id", null);
   if (channel === "showrooms") q = q.not("outlet_id", "is", null);
   if (search) {
+    // Match customer name (ILIKE), the SO number (exact, when numeric), AND
+    // each imported invoice number. A combined Ref is tokenised into
+    // source_ref[] (normalizeRefs), so an exact contains-match makes searching
+    // any single invoice — e.g. "CR0854" — find the combined order too (alias).
+    // The ref term is sanitised to invoice chars [A-Z0-9/-] so it can't break
+    // the PostgREST or()/cs.{} grammar.
+    const clauses = [`customer_name.ilike.%${search}%`];
+    const refTerm = search.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
+    if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
     const asInt = Number.parseInt(search, 10);
-    if (Number.isFinite(asInt)) {
-      q = q.or(`customer_name.ilike.%${search}%,so.eq.${asInt}`);
-    } else {
-      q = q.ilike("customer_name", `%${search}%`);
-    }
+    if (Number.isFinite(asInt)) clauses.push(`so.eq.${asInt}`);
+    q = q.or(clauses.join(","));
   }
 
   q = q.order("placed_at", { ascending: false }).limit(200);

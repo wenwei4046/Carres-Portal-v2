@@ -50,6 +50,10 @@ vi.mock("./procurement/TabbedProcurementShell", () => ({
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
 }));
+// The global top bar self-fetches (orders/tasks for Alerts) — stub it too.
+vi.mock("./components/GlobalTopBar", () => ({
+  default: () => <div data-testid="global-topbar-stub">topbar</div>,
+}));
 
 import OperationApp from "./OperationApp";
 

@@ -8,6 +8,8 @@
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "lint": "node ../../scripts/check-design-standard.mjs",
+    "lint:baseline": "node ../../scripts/check-design-standard.mjs --update-baseline",
     "test": "vitest run"
   },
   "dependencies": {

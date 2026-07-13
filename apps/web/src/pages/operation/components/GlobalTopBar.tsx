@@ -1,0 +1,286 @@
+/**
+ * GlobalTopBar — the slim site-wide utility bar pinned to the top of every
+ * operation page (Jess 2026-07-13). Right-aligned cluster only; the account menu
+ * deliberately STAYS at the bottom-left of the sidebar (not moved up here).
+ *
+ *   Bell · Alerts   — REAL. Derives system alerts from the live order book + tasks
+ *                 feed (overdue orders · deliveries with no ETA to chase ·
+ *                 escalations for Jess); the badge shows the total count.
+ *   HelpCircle · Help — two-item menu (Help · Training/SOP), placeholders.
+ *   Settings — button + a "coming soon" placeholder. No settings page built.
+ *
+ * Token classes only (design-standard §2: no raw hex in a new file).
+ */
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
+import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
+import { apiFetch } from "@/lib/api";
+import { TASKS_KEY } from "./rail/TasksPanel";
+import type { OpsTasksListResponse } from "@carres/shared";
+
+/** ops_order_control is sometimes an array (embed) — normalise to the row. */
+function ovlOf(o: operationOrderListRow) {
+  const raw = o.ops_order_control;
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+function isCompleted(o: operationOrderListRow) {
+  return o.status === "delivered" || o.operation_stage === "delivered";
+}
+/** Days from today to the customer deadline (negative = overdue); null = TBD. */
+function daysToDue(o: operationOrderListRow): number | null {
+  if (o.delivery_date_tbd || !o.delivery_date) return null;
+  const d = new Date(`${o.delivery_date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86_400_000);
+}
+
+/** The slim site-wide bar (other operation pages). The Orders list instead
+ *  embeds <TopBarIcons /> directly in its own white header surface, so
+ *  OperationApp hides this bar on /operation/orders. */
+export default function GlobalTopBar() {
+  return (
+    <div className="shrink-0 h-11 px-4 flex items-center justify-end gap-1 border-b border-base-200 bg-white">
+      <TopBarIcons />
+    </div>
+  );
+}
+
+/** The Bell / HelpCircle / Settings cluster (Lucide, no emoji) with popovers —
+ *  reusable: sits in the slim bar on most pages, and inline in the Orders
+ *  header's right cluster. */
+export function TopBarIcons() {
+  const navigate = useNavigate();
+  const { data } = useOperationOrders({});
+  const orders = useMemo(() => data?.orders ?? [], [data]);
+  const tasksQ = useQuery<OpsTasksListResponse>({
+    queryKey: TASKS_KEY,
+    queryFn: () => apiFetch("/api/ops/tasks"),
+    refetchInterval: 60_000,
+  });
+
+  const alerts = useMemo(() => {
+    const overdue: operationOrderListRow[] = [];
+    const chase: operationOrderListRow[] = [];
+    for (const o of orders) {
+      if (isCompleted(o)) continue;
+      const dd = daysToDue(o);
+      if (dd === null) continue;
+      if (dd < 0) {
+        overdue.push(o);
+        continue;
+      }
+      // "to chase" = deadline within a week + the logistic hasn't committed an ETA.
+      if (dd <= 7 && !ovlOf(o)?.logistic_eta) chase.push(o);
+    }
+    const escalated = (tasksQ.data?.tasks ?? []).filter(
+      (t) => t.escalatedAt && t.status !== "done" && t.status !== "cancelled",
+    );
+    return {
+      overdue,
+      chase,
+      escalated,
+      total: overdue.length + chase.length + escalated.length,
+    };
+  }, [orders, tasksQ.data]);
+
+  const [open, setOpen] = useState<null | "alerts" | "help" | "settings">(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) setOpen(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const goOrders = () => {
+    setOpen(null);
+    navigate("/operation/orders");
+  };
+
+  return (
+    <div ref={barRef} className="flex items-center gap-1">
+      {/* Bell · Alerts — real counts from the order book + tasks feed. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => (o === "alerts" ? null : "alerts"))}
+          aria-label="Alerts"
+          title="Alerts"
+          aria-haspopup="menu"
+          aria-expanded={open === "alerts"}
+          className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+        >
+          <Bell size={17} />
+          {alerts.total > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-bold leading-[16px] text-center">
+              {alerts.total > 99 ? "99+" : alerts.total}
+            </span>
+          )}
+        </button>
+        {open === "alerts" && (
+          <div className="absolute right-0 top-full mt-1 z-40 w-80 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between">
+              <span className="t-h4">Alerts</span>
+              <span className="t-tiny text-base-400 tabular-nums">
+                {alerts.total} to action
+              </span>
+            </div>
+            <div className="max-h-[380px] overflow-auto">
+              <AlertGroup
+                title="Overdue"
+                tone="text-danger"
+                rows={alerts.overdue}
+                onOpen={goOrders}
+                empty="Nothing overdue"
+              />
+              <AlertGroup
+                title="Chase logistic — no ETA"
+                tone="text-warning"
+                rows={alerts.chase}
+                onOpen={goOrders}
+                empty="All near deliveries have an ETA"
+              />
+              <button
+                type="button"
+                onClick={goOrders}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-base-50"
+              >
+                <span className="t-micro text-info">Escalated to Jess</span>
+                <span className="t-tiny text-base-400 tabular-nums">
+                  {alerts.escalated.length}
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={goOrders}
+              className="w-full text-center py-2 t-small text-primary hover:bg-base-50 border-t border-base-100"
+            >
+              Open Orders
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* HelpCircle — a two-item menu: Help · Training / SOP (both placeholders;
+          the SOP library fills in later). */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => (o === "help" ? null : "help"))}
+          aria-label="Help"
+          title="Help"
+          aria-haspopup="menu"
+          aria-expanded={open === "help"}
+          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+        >
+          <HelpCircle size={17} />
+        </button>
+        {open === "help" && (
+          <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1">
+            <button
+              type="button"
+              onClick={() => setOpen(null)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
+            >
+              <HelpCircle size={15} className="shrink-0 text-base-400" />
+              <span className="min-w-0">
+                <span className="t-small text-base-800 block">Help</span>
+                <span className="t-tiny text-base-400 block">Coming soon</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(null)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
+            >
+              <GraduationCap size={15} className="shrink-0 text-base-400" />
+              <span className="min-w-0">
+                <span className="t-small text-base-800 block">Training · SOP</span>
+                <span className="t-tiny text-base-400 block">
+                  Standard operating procedures — coming soon
+                </span>
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Settings — coming-soon placeholder (no page built). */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => (o === "settings" ? null : "settings"))}
+          aria-label="Settings"
+          title="Settings"
+          aria-haspopup="dialog"
+          aria-expanded={open === "settings"}
+          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+        >
+          <Settings size={17} />
+        </button>
+        {open === "settings" && (
+          <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg p-4 text-center">
+            <Settings size={22} className="mx-auto text-base-300 mb-2" />
+            <div className="t-small text-base-700 font-semibold mb-0.5">Settings</div>
+            <div className="t-tiny text-base-400">Coming soon.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** One alert category — a coloured label + count, then up to 5 clickable SO rows
+ *  (click → the Orders list). */
+function AlertGroup({
+  title,
+  tone,
+  rows,
+  onOpen,
+  empty,
+}: {
+  title: string;
+  tone: string;
+  rows: operationOrderListRow[];
+  onOpen: () => void;
+  empty: string;
+}) {
+  return (
+    <div className="px-3 py-2 border-b border-base-100">
+      <div className="flex items-center justify-between mb-1">
+        <span className={`t-micro ${tone}`}>{title}</span>
+        <span className="t-tiny text-base-400 tabular-nums">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="t-tiny text-base-400">{empty}</div>
+      ) : (
+        <ul className="space-y-0.5">
+          {rows.slice(0, 5).map((o) => (
+            <li key={o.id}>
+              <button
+                type="button"
+                onClick={onOpen}
+                className="w-full text-left px-1 py-0.5 rounded hover:bg-base-50"
+              >
+                <span className="t-small text-base-700 truncate block">
+                  <span className="font-mono tabular-nums">SO-{o.so}</span>
+                  {o.customer_name ? ` · ${o.customer_name}` : ""}
+                </span>
+              </button>
+            </li>
+          ))}
+          {rows.length > 5 && (
+            <li className="t-tiny text-base-400 px-1">+{rows.length - 5} more</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}

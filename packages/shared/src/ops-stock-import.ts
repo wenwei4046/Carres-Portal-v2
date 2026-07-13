@@ -19,7 +19,10 @@ export const opsStockImportRowSchema = z.object({
   sku: z.string().trim().min(1),
   condition: opsStockConditionSchema.default("new"),
   status: z.enum(["free", "reserved"]).default("free"),
-  qty: z.coerce.number().int().min(1).max(200).default(1),
+  // A bulk accessory line can be large (the Klg sheet has pillow lines at 555,
+  // protector lines at 319) — this is the record's quantity, NOT a serialize
+  // count, so the cap is generous.
+  qty: z.coerce.number().int().min(1).max(100_000).default(1),
   reservedRef: z.string().trim().optional(),
   supplier: z.string().trim().optional(),
   poNo: z.string().trim().optional(),
@@ -123,5 +126,101 @@ export function warehouseSheetRecordToImportRow(
       sourceRef,
       dateIn,
     },
+  };
+}
+
+// =====================================================================
+// Idempotent import — count-based reconciliation
+// =====================================================================
+//
+// The Klg Warehouse sheet has NO per-unit id, and genuinely-identical units
+// recur (e.g. the same display bedframe listed 3× with a blank OLD REF + blank
+// PO). So dedup CANNOT be "skip if this key was seen" — that would merge those
+// 3 real units into 1. Nor can it key on OLD REF alone (usually blank → every
+// blank-ref row looked "new" → re-import duplicated them: the actual bug).
+//
+// Instead we reconcile by COUNT per stable physical-identity key: the sheet
+// declares N rows for a key, the pool is brought to exactly N. First import
+// inserts all N; a re-import of the same sheet inserts max(0, N − already-in)
+// = 0. Idempotent AND preserves legitimate multiplicity.
+
+/** The subset of a stock record that identifies the PHYSICAL unit for dedup.
+ *  Deliberately EXCLUDES:
+ *   - status + reservedRef — a unit is the same unit whether free or reserved;
+ *     including them would re-import a unit that got reserved after the sheet
+ *     was cut.
+ *   - qty — a bulk line is ONE record carrying its count.
+ *   - dateIn (DATE IN) — the most volatile, hand-keyed field; a corrected date
+ *     between exports must NOT make a re-import look like a new unit. Genuine
+ *     receipts are already distinguished by PO/ref, and the count-based
+ *     reconcile preserves multiplicity without needing the date.
+ *  `dateIn` is still accepted (and ignored) so callers can pass a whole record. */
+export interface StockUnitKeyParts {
+  sku: string;
+  condition: string;
+  poNo?: string | null;
+  sourceRef?: string | null;
+  supplier?: string | null;
+  dateIn?: string | null;
+}
+
+const KEY_SEP = "\u0001";
+
+/** Stable, case/space-insensitive composite natural key. */
+export function stockUnitKey(u: StockUnitKeyParts): string {
+  const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+  return [
+    norm(u.sku),
+    norm(u.condition),
+    norm(u.poNo),
+    norm(u.sourceRef),
+    norm(u.supplier),
+  ].join(KEY_SEP);
+}
+
+export interface StockImportReconcileResult {
+  /** The desired rows that are NOT yet represented in the pool — insert these. */
+  toInsert: OpsStockImportRow[];
+  /** Count of `toInsert`. */
+  toAddCount: number;
+  /** Desired rows already represented (skipped as duplicates). */
+  alreadyInCount: number;
+  /** Total desired rows in the sheet. */
+  desiredCount: number;
+}
+
+/**
+ * Count-based reconciliation. `existing` is the current pool (each row counts
+ * as one occurrence of its key, regardless of its qty/status). Returns the
+ * rows to insert so the pool ends up holding exactly as many of each key as the
+ * sheet declares — never fewer (add-only: it never removes/updates existing
+ * rows, matching the shipped import contract).
+ */
+export function reconcileStockImport(
+  desired: OpsStockImportRow[],
+  existing: StockUnitKeyParts[],
+): StockImportReconcileResult {
+  const remaining = new Map<string, number>();
+  for (const e of existing) {
+    const k = stockUnitKey(e);
+    remaining.set(k, (remaining.get(k) ?? 0) + 1);
+  }
+  const toInsert: OpsStockImportRow[] = [];
+  let alreadyIn = 0;
+  for (const row of desired) {
+    const k = stockUnitKey(row);
+    const left = remaining.get(k) ?? 0;
+    if (left > 0) {
+      remaining.set(k, left - 1);
+      alreadyIn += 1;
+    } else {
+      toInsert.push(row);
+    }
+  }
+  return {
+    toInsert,
+    toAddCount: toInsert.length,
+    alreadyInCount: alreadyIn,
+    desiredCount: desired.length,
   };
 }

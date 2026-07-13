@@ -32,7 +32,9 @@ import {
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
+  type BorrowLoanInput,
   type ReturnLoanInput,
+  type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
   type AutocountImportInput,
@@ -603,6 +605,11 @@ export interface FinancePaymentRow {
 export type operationOrderFilters = Partial<ListOperationOrdersQuery>;
 export type operationPoFilters = Partial<ListPurchaseOrdersQuery>;
 export type MovementsFilters = Partial<ListMovementsQuery>;
+// Re-export the payment-ledger row type so consumers (OrderDetailDrawer) can pull
+// it from the queries boundary alongside the payment hooks, matching the pattern
+// used for the other operation detail types. (It was imported above for internal
+// use but never re-exported — batch-2 build gap.)
+export type { OrderPaymentRow };
 
 function toSearch(f?: OrderFilters): string {
   if (!f) return "";
@@ -2069,6 +2076,12 @@ export interface opsRemarkEmbed {
   storage_collected_at?: string | null;
   storage_waiver_status?: string | null;
   called_customer?: boolean | null;
+  /** Per-line supplier ETA + stock status (Import from Master → migration 0170).
+   *  `line_etas` maps a line key → ISO ETA; `line_stock_status` maps it →
+   *  "waiting" / "ready". The Orders list STOCK column reads the latest waiting
+   *  ETA from these (Jess spec §5, stock_eta version, 2026-07-12). */
+  line_etas?: Record<string, string> | null;
+  line_stock_status?: Record<string, string> | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
@@ -5091,14 +5104,15 @@ export function useImportStockEta() {
   });
 }
 
-/** On Hand C+ P3 — bulk book-in from the "Klg Warehouse" ready-stock sheet.
- *  Add-only: sends the chosen import rows to /api/ops/stock/import (server
- *  expands qty + inserts). Refreshes every ops-stock list + the dashboard. */
+/** On Hand — bulk book-in from the "Klg Warehouse" ready-stock sheet. Sends ALL
+ *  parsed lines; the server reconciles against the live pool (count-based, per
+ *  stable key) and inserts only the deficit — idempotent. One line = one record
+ *  carrying its qty. Refreshes every ops-stock list + the dashboard. */
 export function useImportStock() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { rows: OpsStockImportRow[] }) =>
-      apiFetch<{ created: number }>(
+      apiFetch<{ created: number; alreadyIn: number; total: number }>(
         "/api/ops/stock/import",
         catalogJson("POST", input),
       ),
@@ -5176,6 +5190,39 @@ export function useReturnLoan(orderId: string) {
       void qc.invalidateQueries({ queryKey: loansKey(orderId) });
       void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+    },
+  });
+}
+
+/** Borrow a piece from a supplier to loan (migration 0217) — creates a return
+ *  obligation. No own-stock unit is touched. */
+export function useBorrowLoan(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BorrowLoanInput) =>
+      apiFetch<{ loan: SofaLoanDto }>(
+        `/api/operation/orders/${orderId}/loan-borrow`,
+        catalogJson("POST", input),
+      ).then((r) => r.loan),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+    },
+  });
+}
+
+/** Close the supplier return obligation — the borrowed piece went back. */
+export function useReturnLoanSupplier(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReturnToSupplierInput) =>
+      apiFetch<{ ok: true }>(
+        `/api/operation/orders/${orderId}/loan-return-supplier`,
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
     },
   });
 }

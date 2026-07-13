@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Filter, X, Handshake } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -77,6 +77,9 @@ interface Props {
   /** When provided, the loan view's action LOANS the picked sofa (issue a DO +
    *  on-loan tracking) via the parent instead of a plain reserve (migration 0209). */
   onLoan?: (itemId: string, itemSku: string) => void;
+  /** The panel header ⋮ (Jess 2026-07-11 per-panel ⋮) — rendered at the header's
+   *  right edge so the Warehouse-stock panel matches the others. */
+  actions?: ReactNode;
 }
 
 // ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
@@ -102,7 +105,7 @@ const COLS: {
   { key: "cond", label: "Cond", kind: "select", optKey: "cond" },
 ];
 
-export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan }: Props) {
+export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
@@ -293,6 +296,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
               <X size={11} strokeWidth={2.5} /> clear
             </button>
           )}
+          {actions}
         </div>
       </div>
 
@@ -300,7 +304,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         <div className="min-w-[640px]">
           {/* header — Google-sheets funnel filter per column (no filter row) */}
           <div
-            className="grid sticky top-0 z-20 bg-base-700 border-b-2 border-primary text-white text-[10px] uppercase tracking-[0.02em] font-bold"
+            className="grid sticky top-0 z-20 bg-[#F1EDE6] border-b border-[#DDD8CE] text-[#8C877D] text-[10px] uppercase tracking-[0.02em] font-bold"
             style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
@@ -319,13 +323,13 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                     );
                   }}
                   title={active ? `Filtering: ${f[col.key]}` : `Filter ${col.label}`}
-                  className="px-2 py-1.5 flex items-center justify-between gap-1 text-left hover:bg-base-600 transition-colors"
+                  className="px-2 py-1.5 flex items-center justify-between gap-1 text-left hover:bg-[#E8E4DB] transition-colors"
                 >
                   <span className="truncate">{col.label}</span>
                   <Filter
                     size={11}
                     strokeWidth={2.5}
-                    className={active ? "text-primary fill-primary shrink-0" : "text-white/40 shrink-0"}
+                    className={active ? "text-primary fill-primary shrink-0" : "text-[#B4B0A6] shrink-0"}
                   />
                 </button>
               );

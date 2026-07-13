@@ -19,6 +19,7 @@ type Action =
   | "reassign"
   | "takeout"
   | "flag-repair"
+  | "refurbish"
   | "add"
   | "remove";
 
@@ -121,6 +122,24 @@ export default function OpsStockListView(props: Props) {
       apiFetch(`/api/ops/stock/flag-repair`, {
         method: "POST",
         body: JSON.stringify(args),
+      }),
+    onSuccess: invalidateAll,
+  });
+  // Refurbish lifecycle: a Free Display unit → In repair (out of ready-stock),
+  // then completion grades it up to 'refurbished' (sellable as new) + Free.
+  const refurbishMut = useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch(`/api/ops/stock/refurbish`, {
+        method: "POST",
+        body: JSON.stringify({ itemId }),
+      }),
+    onSuccess: invalidateAll,
+  });
+  const refurbishCompleteMut = useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch(`/api/ops/stock/refurbish-complete`, {
+        method: "POST",
+        body: JSON.stringify({ itemId }),
       }),
     onSuccess: invalidateAll,
   });
@@ -245,6 +264,16 @@ export default function OpsStockListView(props: Props) {
           }
         }}
         onFlagRepair={(flag) => flagRepairMut.mutate({ itemId: r.id, flag })}
+        onRefurbish={() => refurbishMut.mutate(r.id)}
+        onRefurbishComplete={() => {
+          if (
+            window.confirm(
+              `Mark refurbish of ${r.sku} complete? It returns to Free stock, graded as Refurbished (sellable as new).`,
+            )
+          ) {
+            refurbishCompleteMut.mutate(r.id);
+          }
+        }}
         onRemove={() => {
           if (
             window.confirm(
@@ -259,6 +288,8 @@ export default function OpsStockListView(props: Props) {
           reassignMut.isPending ||
           takeoutMut.isPending ||
           flagRepairMut.isPending ||
+          refurbishMut.isPending ||
+          refurbishCompleteMut.isPending ||
           conditionMut.isPending ||
           deleteMut.isPending
         }
@@ -615,6 +646,8 @@ function RowItem({
   onReassign,
   onTakeout,
   onFlagRepair,
+  onRefurbish,
+  onRefurbishComplete,
   onRemove,
   busy,
 }: {
@@ -625,6 +658,8 @@ function RowItem({
   onReassign: (newRef: string) => void;
   onTakeout: () => void;
   onFlagRepair: (flag: boolean) => void;
+  onRefurbish: () => void;
+  onRefurbishComplete: () => void;
   onRemove: () => void;
   busy: boolean;
 }) {
@@ -640,7 +675,17 @@ function RowItem({
       <td className="px-3 py-2 font-mono text-[11px] text-base-900 whitespace-nowrap">
         {row.unitCode ?? <span className="text-base-400">—</span>}
       </td>
-      <td className="px-3 py-2 font-mono text-base-700">{row.sku}</td>
+      <td className="px-3 py-2 font-mono text-base-700">
+        {row.sku}
+        {row.qty && row.qty > 1 ? (
+          <span
+            className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-[10px] font-semibold text-base-600"
+            title="Bulk line — this record represents this many units"
+          >
+            ×{row.qty}
+          </span>
+        ) : null}
+      </td>
       <td className="px-3 py-2">
         <select
           value={row.condition}
@@ -725,6 +770,14 @@ function RowItem({
               onClick={() => onFlagRepair(!row.needsRepair)}
               disabled={busy}
             />
+          ) : null}
+          {actions.includes("refurbish") &&
+          row.needsRepair ? (
+            <ActionBtn label="Refurbish done" onClick={onRefurbishComplete} disabled={busy} />
+          ) : actions.includes("refurbish") &&
+            row.status === "free" &&
+            row.condition === "exhibition" ? (
+            <ActionBtn label="Refurbish" onClick={onRefurbish} disabled={busy} />
           ) : null}
           {actions.includes("remove") ? (
             <ActionBtn label="Remove" onClick={onRemove} disabled={busy} />
