@@ -484,6 +484,8 @@ export {
   opsStockReserveItemInputSchema,
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
+  opsStockRefurbishInputSchema,
+  opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
   opsStockItemSchema,
@@ -496,6 +498,8 @@ export {
   type OpsStockReserveItemInput,
   type OpsStockTakeoutInput,
   type OpsStockFlagRepairInput,
+  type OpsStockRefurbishInput,
+  type OpsStockRefurbishCompleteInput,
   type OpsStockUpdateConditionInput,
   type OpsStockCreateInput,
   type OpsStockItem,
@@ -571,6 +575,9 @@ export {
 // Migration 0159 — Orders control-grid overlay (P2 editable drawer).
 export {
   STOCK_LOCATIONS,
+  ROUTE_CARRIERS,
+  orderRouteLegSchema,
+  type OrderRouteLeg,
   PAYMENT_STATUSES,
   DELIVERY_TIME_SLOTS,
   STORAGE_RATES,
@@ -601,12 +608,18 @@ export {
 } from "./schemas/ops-order-control";
 
 export {
+  LOAN_SOURCES,
   loanSofaInput,
+  borrowLoanInput,
   returnLoanInput,
+  returnToSupplierInput,
   sofaLoanSchema,
   sofaLoansResponseSchema,
+  type LoanSource,
   type LoanSofaInput,
+  type BorrowLoanInput,
   type ReturnLoanInput,
+  type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
 } from "./schemas/sofa-loan";
@@ -918,10 +931,14 @@ export {
 export {
   normalizeStockCondition,
   warehouseSheetRecordToImportRow,
+  stockUnitKey,
+  reconcileStockImport,
   opsStockImportRowSchema,
   opsStockImportInputSchema,
   type OpsStockImportRow,
   type OpsStockImportInput,
+  type StockUnitKeyParts,
+  type StockImportReconcileResult,
 } from "./ops-stock-import";
 
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /

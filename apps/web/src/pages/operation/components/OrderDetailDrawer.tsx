@@ -1,9 +1,20 @@
-import { type ReactNode, type MouseEvent, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  type MouseEvent,
+  type MutableRefObject,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
   Download,
+  ExternalLink,
   FileText,
   Flag,
   MoreVertical,
@@ -11,6 +22,7 @@ import {
   Pencil,
   Phone,
   RotateCcw,
+  Truck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,8 +34,8 @@ import {
   type LineStockStatus,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
-import { renderDoPdf } from "@/lib/pdf/render";
-import type { DoTemplateData } from "@/lib/pdf/types";
+import { renderDoPdf, renderReceiptPdf, renderInvoicePdf } from "@/lib/pdf/render";
+import type { DoTemplateData, InvoiceTemplateData } from "@/lib/pdf/types";
 import {
   qk,
   useOperationOrder,
@@ -31,12 +43,15 @@ import {
   useReceiveLine,
   useOrderLoans,
   useLoanSofa,
-  useReturnLoan,
+  useOperationSuppliers,
   useDeliveryPartners,
   useUpdateOrder,
+  useOrderPayments,
+  useRecordPayment,
+  useVoidPayment,
+  type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
-  type operationOrderDetailStockBalance,
   type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
@@ -52,12 +67,18 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import DeliveryChain from "./DeliveryChain";
+import LoanPanel from "./LoanPanel";
+import {
+  RouteJourneyBar,
+  RouteLegEditor,
+  RouteQuietButton,
+  legsToDisplay,
+} from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
   DeliveryTimeSlotField,
   LogisticEtaField,
-  PaymentControlFields,
   StorageControlFields,
   RemarkControlField,
   OrderControlSaveBar,
@@ -66,7 +87,7 @@ import {
 import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import StageChip, { type OperationStage } from "./StageChip";
+import { type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
@@ -75,6 +96,7 @@ import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import ReceivePOModal from "./ReceivePOModal";
+import AnnotationTimeline from "./AnnotationTimeline";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -105,21 +127,85 @@ interface Props {
   onClose: () => void;
 }
 
-function calcShortages(
-  lines: operationOrderDetailLine[],
-  stockBalances: operationOrderDetailStockBalance[],
-): { sku: string; need: number; have: number; short: number }[] {
-  const totalsBySku: Record<string, number> = {};
-  for (const b of stockBalances) {
-    totalsBySku[b.sku] = (totalsBySku[b.sku] ?? 0) + Math.max(0, Number(b.qty) - Number(b.reserved));
-  }
-  const out: { sku: string; need: number; have: number; short: number }[] = [];
-  for (const l of lines) {
-    const have = totalsBySku[l.sku] ?? 0;
-    if (have < l.qty) out.push({ sku: l.sku, need: l.qty, have, short: l.qty - have });
-  }
-  return out;
+/**
+ * Header pipeline status (BUG 2, Loo 2026-07-09) — derived from the order's ACTUAL
+ * work signals (PO? ETA? goods in? confirmed?), NOT a status-string guess. The old
+ * header fell through to "In Production" for any AutoCount import that carried no
+ * operation_stage — inventing a stage that wasn't real. `deriveOrderStage` instead
+ * reads the real signals and, when NONE are present, says "Needs setup".
+ *
+ * Ladder — first match wins, most-advanced first:
+ *   completed     ← delivered
+ *   ready         ← every goods line in stock  (beats scheduled — Loo: 货齐 > 排物流)
+ *   scheduled     ← LP leg live (dispatched / ready_to_dispatch)
+ *   in_production ← a linked PO carries an ETA date
+ *   pending       ← a PO exists but no ETA yet
+ *   proceed       ← order confirmed, nothing procured yet
+ *   needs_setup   ← none of the above (fresh import: no PO / ETA / stock)
+ *
+ * ⚠️ Drawer-only richer vocab. The Orders LIST keeps its coarser 5-tab bucketing
+ * (`controlTabOf`) for now — aligning the list to this ladder is a SEPARATE task
+ * (Loo). Display-only: the functional `stage: OperationStage` that drives the
+ * ActionBar / StockPickerGrid is UNCHANGED.
+ */
+type PipelineStatus =
+  | "needs_setup"
+  | "proceed"
+  | "pending"
+  | "in_production"
+  | "ready"
+  | "scheduled"
+  | "completed";
+
+function deriveOrderStage(sig: {
+  delivered: boolean;
+  scheduled: boolean;
+  allReceived: boolean;
+  etaFilled: boolean;
+  hasPo: boolean;
+  confirmed: boolean;
+}): PipelineStatus {
+  if (sig.delivered) return "completed";
+  if (sig.allReceived) return "ready"; // Loo: goods-ready outranks scheduled
+  if (sig.scheduled) return "scheduled";
+  if (sig.etaFilled) return "in_production";
+  if (sig.hasPo) return "pending";
+  if (sig.confirmed) return "proceed";
+  return "needs_setup";
 }
+
+const PIPELINE_LABEL: Record<PipelineStatus, string> = {
+  needs_setup: "Needs setup",
+  proceed: "Proceed",
+  pending: "Pending",
+  in_production: "In Production",
+  ready: "Ready",
+  scheduled: "Scheduled",
+  completed: "Completed",
+};
+
+/** Pill class per status — grey (no work) → purple → amber → blue → green →
+ *  indigo → grey (done). */
+const PIPELINE_PILL: Record<PipelineStatus, string> = {
+  needs_setup: "pill-neutral", // grey — no work started yet
+  proceed: "pill-draft", // purple — confirmed, being arranged
+  pending: "pill-warning", // amber — PO raised, waiting on stock
+  in_production: "pill-sent", // blue — factory has an ETA
+  ready: "pill-confirmed", // green — all goods in
+  scheduled: "pill-collected", // indigo — LP assigned / en route
+  completed: "pill-neutral", // grey — done
+};
+
+/** Hover copy per status — one plain-English line explaining what it means. */
+const PIPELINE_HINT: Record<PipelineStatus, string> = {
+  needs_setup: "No PO, ETA, or stock yet — this order hasn't been set up",
+  proceed: "Confirmed — being arranged",
+  pending: "PO raised — waiting for stock at the warehouse",
+  in_production: "Supplier has given an ETA — in production",
+  ready: "All goods are in stock — ready to schedule delivery",
+  scheduled: "Delivery partner assigned / out for delivery",
+  completed: "Delivered and closed",
+};
 
 export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
@@ -230,7 +316,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     <div
       role="region"
       aria-label="Order detail"
-      className="bg-card text-card-foreground flex flex-col h-full w-full min-w-0"
+      className="bg-background text-card-foreground flex flex-col h-full w-full min-w-0"
       data-testid="order-detail-drawer"
     >
         {isLoading && <DrawerSkeleton onClose={onClose} />}
@@ -423,6 +509,7 @@ interface DrawerBodyProps {
 function Panel({
   title,
   summary,
+  actions,
   grow,
   className,
   children,
@@ -430,22 +517,107 @@ function Panel({
   title: string;
   /** Pinned to the header's right edge — the at-a-glance status badge. */
   summary?: ReactNode;
+  /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
+  actions?: ReactNode;
   grow?: boolean;
   className?: string;
   children: ReactNode;
 }) {
+  // Per-panel hide / expand (Jess 2026-07-11) — every panel header toggles its
+  // own body (accordion), so a big order can collapse the cards it doesn't need.
+  // State persists across orders via localStorage, keyed by the panel title.
+  const storeKey = `ops-drawer-panel:${title}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(storeKey) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(storeKey, next ? "1" : "0");
+      } catch {
+        /* ignore quota / privacy-mode */
+      }
+      return next;
+    });
+  };
   return (
     <section
-      className={`border border-base-200 rounded-[12px] bg-white overflow-hidden flex flex-col min-h-0 ${grow ? "flex-1" : ""} ${className ?? ""}`}
+      className={`bg-white rounded-2xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow && open ? "flex-1" : ""} ${className ?? ""}`}
     >
-      <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100 shrink-0">
-        <span className="t-h4 text-base-900 truncate">{title}</span>
-        {summary != null && (
-          <span className="shrink-0 flex items-center gap-1.5">{summary}</span>
-        )}
+      <header
+        className={`flex items-center justify-between gap-3 px-3 py-2 shrink-0 ${open ? "border-b border-base-100" : ""}`}
+      >
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          title={open ? "Hide" : "Expand"}
+          className="flex items-center gap-1.5 min-w-0 text-left hover:text-base-950"
+        >
+          {open ? (
+            <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+          ) : (
+            <ChevronRight size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+          )}
+          <span className="t-h4 text-base-900 truncate">{title}</span>
+        </button>
+        <span className="shrink-0 flex items-center gap-1.5">
+          {summary}
+          {actions}
+        </span>
       </header>
-      {children}
+      {open && children}
     </section>
+  );
+}
+
+/** A panel header's own ⋮ actions menu (Jess 2026-07-11) — every panel that has
+ *  actions passes one via `Panel actions=…`. Self-contained dropdown. */
+function PanelMenu({
+  items,
+}: {
+  items: { label: string; onClick: () => void; icon?: ReactNode; disabled?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Panel actions"
+        onClick={() => setOpen((o) => !o)}
+        className="p-0.5 text-base-400 hover:text-base-800 leading-none"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-48 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg py-1">
+            {items.map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+                className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
+              >
+                {it.icon}
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -475,25 +647,6 @@ function MiniBadge({
       {children}
     </span>
   );
-}
-
-/** The collect-before-delivery gate badge (Jess 2026-07-02): amber "Collect
- *  before delivery" (warning, ETA still >1 day off) → red "Hold delivery" (block,
- *  from ETA−1 if uncollected). Renders on the Bill + Storage panel headers. */
-function GateBadge({ gate }: { gate: "hold" | "warn" | null }) {
-  if (gate === "hold")
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] whitespace-nowrap">
-        <AlertCircle size={10} strokeWidth={2.5} /> Hold delivery
-      </span>
-    );
-  if (gate === "warn")
-    return (
-      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
-        Collect before delivery
-      </span>
-    );
-  return null;
 }
 
 /** Items-ordered header readiness — shows only the states present (No PO grey →
@@ -544,7 +697,7 @@ function DrawerBody({
   onServiceNoteClick,
   onFollowUpClick,
 }: DrawerBodyProps) {
-  const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
+  const { order, lines, addons, total, warehouse, pos } = data;
   // Defensive default: an API build that predates freeUnits (web can deploy
   // ahead of the Worker) must not crash the drawer — just no picker until then.
   const freeUnits = data.freeUnits ?? [];
@@ -553,6 +706,12 @@ function DrawerBody({
   // free units grouped by normalized key, so each line resolves its real
   // available units across the order/warehouse naming drift.
   const [pickerSku, setPickerSku] = useState<string | null>(null);
+  // Route "Option D" — which item's journey legs are expanded in-place (one at a
+  // time; the heavy detail stays inside the drawer so the list never gets busy).
+  const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
+  // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
+  // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
+  const customerEditRef = useRef<(() => void) | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
@@ -575,15 +734,6 @@ function DrawerBody({
   }
   // reserved_ref written when the operator picks a unit for this order.
   const soRef = `SO-${order.so}`;
-  // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
-  // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
-  // column, per design spec §CQ1 option (b). True when ANY thread has a
-  // customer-leg LP assigned (multi-supplier orders may have N partners; the
-  // ActionBar only needs a boolean cue and the user opens the drill-down for
-  // detail).
-  const anyThreadPartnerAssigned = threads.some(
-    (t) => t.delivery_partner_id !== null,
-  );
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
@@ -598,16 +748,46 @@ function DrawerBody({
     if (order.status === "delivered") return "delivered";
     return "in_production";
   })();
-  const shortages = calcShortages(lines, stockBalances);
-  // Outstanding = order grand total − paid. AutoCount-imported orders often
-  // carry no line prices (total 0) → we can't compute a real balance, so the
-  // header pill hides rather than lie. Mirrors OrderControlPanel's PaymentSummary.
+  // Line-sum of the order (native/priced orders). AutoCount imports carry no line
+  // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
+  // Money block below). hasLineTotal drives whether Total is auto (read-only) or
+  // staff-keyed.
   const grandTotal = total + addonsSum(addons);
-  const outstanding = Math.max(0, grandTotal - Number(order.paid || 0));
-  const hasTotal = grandTotal > 0;
+  const hasLineTotal = grandTotal > 0;
   const loc = locationForAddress(order.customer_address ?? null);
 
+  const navigate = useNavigate();
   const form = useOrderControlForm(order.id);
+  // Re-derive per-line stock readiness on demand — the Items + Warehouse ⋮
+  // "Recheck stock" action (Jess 2026-07-11 per-panel ⋮).
+  const recheckStock = useRecheckStockMutation(order.id);
+  // The Warehouse-stock panel's header ⋮ (same actions on the grid + the
+  // placeholder). Recheck re-derives readiness; Open jumps to the full stock page.
+  const warehouseMenu = (
+    <PanelMenu
+      items={[
+        {
+          label: recheckStock.isPending ? "Rechecking…" : "Recheck stock",
+          icon: <RotateCcw size={14} />,
+          disabled: recheckStock.isPending,
+          onClick: () =>
+            recheckStock.mutate(undefined, {
+              onSuccess: () => toast.success("Stock rechecked"),
+              onError: (e) => toast.error(e.message),
+            }),
+        },
+        {
+          label: "Open full warehouse",
+          icon: <ExternalLink size={14} />,
+          onClick: () => navigate("/operation?tab=stock-onhand"),
+        },
+      ]}
+    />
+  );
+  // Payment ledger (order_payments, migration 0184) — the source of truth for
+  // Collected. Fetched at the drawer level so the header sticker + status strip +
+  // Money card all read ONE Outstanding.
+  const paymentsQuery = useOrderPayments(order.id);
   // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
   // drives the default stock Location (final consolidation point, not supplier).
   const { data: partnersData } = useDeliveryPartners();
@@ -615,12 +795,19 @@ function DrawerBody({
     (partnersData?.partners ?? []).find(
       (p) => p.id === order.ops_assigned_logistic,
     )?.name ?? null;
-  // Sofa loans (migration 0209) — active loaners against this order.
+  // Loaners against this order (migration 0209 + generalized 0217). A loan is
+  // "live" while out (on_loan) OR a supplier borrow still owed back.
   const loansQuery = useOrderLoans(order.id);
-  const activeLoans = (loansQuery.data?.loans ?? []).filter(
-    (l) => l.status === "on_loan",
+  const allLoans = loansQuery.data?.loans ?? [];
+  const activeLoans = allLoans.filter((l) => l.status === "on_loan");
+  const owedLoans = allLoans.filter(
+    (l) => l.source === "supplier" && !l.returned_to_supplier_at,
   );
-  const returnLoan = useReturnLoan(order.id);
+  const liveLoanCount = new Set([
+    ...activeLoans.map((l) => l.id),
+    ...owedLoans.map((l) => l.id),
+  ]).size;
+  const { data: suppliersData } = useOperationSuppliers();
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
@@ -678,19 +865,6 @@ function DrawerBody({
     deliveryMs !== null
       ? fmtDate(new Date(deliveryMs - 1 * 86_400_000).toISOString().slice(0, 10))
       : null;
-  // Header summary = the OWING amount (Jess: operation tracks outstanding, not a
-  // bill). Prefer the operator/import-keyed control balance; else the derived
-  // outstanding; never show "RM 0 paid" (that read as settled when it wasn't).
-  const controlOwing = form.draft.balance.trim() ? Number(form.draft.balance) : 0;
-  const paymentSummary =
-    controlOwing > 0
-      ? `${RM(controlOwing)} owing`
-      : hasTotal
-        ? outstanding <= 0
-          ? "Settled"
-          : `${RM(outstanding)} owing`
-        : "No balance";
-
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
   // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
   // stock, so they're excluded from the count. The panel header badge tallies
@@ -734,6 +908,39 @@ function DrawerBody({
   const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
+  // Every goods line reads "ready" (Master override + accessories-always-ready +
+  // free stock — see readinessOf). Hoisted so the header status strip + ActionBar
+  // (batch 1) share the SAME readiness the pill uses — no "Ready pill / waiting
+  // buttons" disagreement. Empty goods list (service-only) is NOT "all received".
+  const allReceived = goodsLines.length > 0 && readyN === goodsLines.length;
+
+  // Header pipeline status (BUG 2) — derived from the order's real work signals,
+  // each criterion reading ONE clear source (Loo 2026-07-09: annotate every one).
+  // Display-only; the functional `stage` above still drives the ActionBar.
+  const pipelineStatus = deriveOrderStage({
+    // delivered — the collapsed operation_stage enum (`orders.operation_stage`),
+    //   or `orders.status === "delivered"`, both folded into `stage` above.
+    delivered: stage === "delivered",
+    // scheduled — an LP leg is live: `orders.operation_stage` is dispatched /
+    //   ready_to_dispatch (via `stage`).
+    scheduled: stage === "dispatched" || stage === "ready_to_dispatch",
+    // allReceived — every goods line reads "ready". `readinessOf` already folds in
+    //   the Master `ops_order_control.line_stock_status` override + accessories-
+    //   always-ready + live free stock. Ready criterion = readyN === goodsLines.length
+    //   (Loo: match the Items-panel badge; not strict GRN line_received).
+    allReceived,
+    // etaFilled — a linked portal PO carries a delivery date (`purchase_orders.eta_date`,
+    //   collected into `poEtaBySku`). AutoCount inline POs carry no ETA, so they never trip this.
+    etaFilled: poEtaBySku.size > 0,
+    // hasPo — a portal `purchase_orders` line (`poSkus`) OR an AutoCount inline PO
+    //   (`order_lines.source_po` → `soPoBySku`) exists for any sku.
+    hasPo: poSkus.size > 0 || soPoBySku.size > 0,
+    // confirmed — the order has moved past raw entry: `orders.operation_stage` is set,
+    //   or `orders.status` is neither "place" nor "cancelled".
+    confirmed:
+      order.operation_stage != null ||
+      (order.status !== "place" && order.status !== "cancelled"),
+  });
 
   // Collect-before-delivery gate (Jess 2026-07-02), keyed to the Logistic ETA
   // (delivery date). Two stages: amber "Collect before delivery" while the ETA
@@ -750,7 +957,24 @@ function DrawerBody({
         )
       : null;
   const pastLastCall = daysToDelivery !== null && daysToDelivery <= 1;
-  const balanceOwing = hasTotal && outstanding > 0;
+  // ── Money (batch 2, Jess 2026-07-09) — ledger-based Total / Collected /
+  //    Outstanding. Path 1 (no migration): Total = the order's to-collect figure —
+  //    the line-sum when priced (native), else the keyed ops_order_control.balance
+  //    (AutoCount has no line prices → staff keys it once). Collected = Σ goods
+  //    payments (payment+deposit) from the order_payments ledger. Outstanding =
+  //    Total − Collected. The whole system already nets balance − ledger
+  //    (OperationPayments), so this stays consistent. Total-not-set ⇒ don't block.
+  const ledger = paymentsQuery.data?.payments ?? [];
+  const collected = ledger
+    .filter((p) => p.kind === "payment" || p.kind === "deposit")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const keyedTotal = form.draft.balance.trim()
+    ? Number(form.draft.balance)
+    : Number(form.control?.balance ?? 0);
+  const orderTotal = hasLineTotal ? grandTotal : keyedTotal;
+  const totalSet = orderTotal > 0;
+  const moneyOutstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
+  const balanceOwing = totalSet && moneyOutstanding > 0;
   // Storage is "incurred" when the operator set a From date, OR the Master import
   // carried a fee (migration 0207, Jess: a Master fee auto-marks incurred → it
   // enters the collect-before-delivery gate).
@@ -763,10 +987,16 @@ function DrawerBody({
     !!form.control?.storage_collected_at ||
     form.control?.storage_waiver_status === "approved";
   const storageOwing = storageIncurred && !storageCleared;
+  const storageFee =
+    Number(form.control?.storage_fee_msbf ?? 0) +
+    Number(form.control?.storage_fee_sof ?? 0);
   // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
-  const holdCount = (balanceGate === "hold" ? 1 : 0) + (storageGate === "hold" ? 1 : 0);
+  // Balance panel STATUS pill + status-strip Money cell (batch 2): the ledger
+  // Outstanding drives them all, so pill / strip / header sticker never disagree.
+  const isOwing = balanceOwing;
+  const owingAmt = moneyOutstanding;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -815,49 +1045,40 @@ function DrawerBody({
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
-      {/* Option-1 full-page grid (Jess 2026-06-30): Order/customer full-width on
-          top · Delivery | Payment as two columns · Items & stock the full-width
-          work area (only it scrolls) · Activity at the bottom. */}
-      <div
-        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5 items-stretch"
-        style={{
-          // Locked one-screen layout (Jess 2026-07-01): LEFT (~1.05fr) = two
-          // listing panels (Items ordered · Warehouse stock); RIGHT (~0.95fr) =
-          // stacked cards (Customer|Balance · Delivery). align-items:stretch →
-          // both columns EQUAL height, bottoms line up (no 高高低低).
-          gridTemplateColumns: "1.05fr 0.95fr",
-          gridTemplateRows: "auto auto auto minmax(0,1fr)",
-          gridTemplateAreas:
-            '"banner banner" "header header" "actions actions" "main side"',
-        }}
-      >
-        {/* Needs-action banner — the "action for logistic" note surfaced at the
-            top so it can't be missed (Jess). */}
-        {form.draft.action_for_logistic.trim() && (
-          <div className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]" style={{ gridArea: "banner" }}>
-            <AlertCircle
-              className="w-4 h-4 shrink-0 mt-0.5 text-warning"
-              aria-hidden="true"
-            />
-            <span className="text-base-900">
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
-                Action needed
+      {/* ═══ STICKY HEADER BAND (batch 1 #2) ═══ A shrink-0 lining-box that never
+          scrolls — breadcrumb · pill · #id · sticker · deadline · 3-cell status
+          strip · 1–2 stage actions. The body below is the single scroll region.
+          Flex SIBLINGS (not position:sticky — sticky breaks inside nested overflow
+          parents). Lining-box style: pale surface + hairline border, colour only
+          for alerts. */}
+      <header className="shrink-0 bg-base-50/80 border-b border-base-200/70 px-5 pt-3 pb-2.5 flex flex-col gap-2.5">
+        {/* Row 1 — identity (breadcrumb · pill · #id · items · ref · sticker ·
+            deadline) on the left; flag / ⋯ / close on the right. */}
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            {/* Header = status only (Jess 2026-07-11): stage pill · #id · ref ·
+                alert stickers. No breadcrumb, no item-count/region (region → the
+                Delivery card), no deadline (it drives Stock ETA + on-hold, not the
+                header). */}
+            {balanceOwing ? (
+              // Derived "On hold delivery" (Jess 2026-07-11) — an owing balance
+              // holds the delivery; the WHY (amount / due) is on the Balance card.
+              <span
+                className="pill pill-overdue"
+                title="Delivery is on hold until the balance is collected — see the Balance card"
+              >
+                On hold delivery
               </span>
-              {form.draft.action_for_logistic}
-            </span>
-          </div>
-        )}
-        {/* Header bar — status FIRST · Order # · customer name on the left;
-            flag / actions / close on the right. Full width above the 3 meta
-            columns (Jess Option 1). */}
-        <div
-          style={{ gridArea: "header" }}
-          className="flex items-center justify-between gap-3 min-w-0"
-        >
-          {/* Status · boxed order # · grey Ref — NO customer name (it lives in
-              the Customer card; Jess: don't repeat it here). */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <StageChip stage={stage} />
+            ) : (
+              <span
+                className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
+                title={PIPELINE_HINT[pipelineStatus]}
+              >
+                {pipelineStatus === "ready"
+                  ? "Ready to deliver"
+                  : PIPELINE_LABEL[pipelineStatus]}
+              </span>
+            )}
             <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
             </span>
@@ -866,14 +1087,30 @@ function DrawerBody({
                 Ref {order.source_ref[0]}
               </span>
             )}
-            {holdCount > 0 && (
-              <span
-                title="Delivery is blocked — clear the reasons in the Bill / Storage panels below"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] shrink-0"
-              >
-                <AlertCircle size={12} strokeWidth={2.5} /> HOLD DELIVERY ({holdCount})
+            {/* Ordered date moved into the header (Jess 2026-07-11) — compact, off
+                the Customer card. */}
+            {order.placed_at && (
+              <span className="t-tiny text-base-400 shrink-0 whitespace-nowrap">
+                · Ordered {fmtDate(order.placed_at)}
               </span>
             )}
+            {/* Special sticker — the operator's own "action needed" note as a
+                compact amber chip (full text stays in the body banner). This is
+                the only real "sticker" signal today; not invented. */}
+            {form.draft.action_for_logistic.trim() && (
+              <span
+                title={form.draft.action_for_logistic}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0 max-w-[170px] truncate"
+              >
+                <AlertCircle size={10} strokeWidth={2.5} /> Action needed
+              </span>
+            )}
+            {/* (Removed the separate "Outstanding · hold" sticker — the status pill
+                now derives to "On hold delivery" when a balance is owed, so this
+                would just repeat it. The amount lives on the Balance card.) */}
+            {/* Deadline removed from the header (Jess 2026-07-11) — it drives the
+                Stock ETA + the on-hold logic, and shows on the Delivery card; not a
+                header field. */}
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -889,7 +1126,16 @@ function DrawerBody({
               order={order}
               lines={lines}
               stage={stage}
+              orderId={order.id}
+              pipelineStatus={pipelineStatus}
               onServiceNoteClick={onServiceNoteClick}
+              onTransferReadyClick={onTransferReadyClick}
+              onConfirmProceedClick={onConfirmProceedClick}
+              onTopUpClick={onTopUpClick}
+              onAbandonClick={onAbandonClick}
+              onIssuePOsClick={onIssuePOsClick}
+              onDispatchClick={onDispatchClick}
+              onDOClick={onDOClick}
             />
             <button
               type="button"
@@ -902,39 +1148,57 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Action strip — the stage actions live at the TOP now (Jess 2026-07-02:
-            "bottom shouldn't be there, put top"), right under the header where the
-            operator lands, not buried at the drawer bottom. */}
-        <div
-          style={{ gridArea: "actions" }}
-          className="flex items-center justify-between gap-3 rounded-[8px] bg-base-50 border border-base-100 px-3 py-2 min-w-0"
-        >
-          <ActionBar
-            stage={stage}
-            orderId={order.id}
-            so={order.so}
-            warehouseName={warehouse?.name ?? null}
-            shortageCount={shortages.length}
-            partnerAssigned={anyThreadPartnerAssigned}
-            doNumber={order.do_number}
-            onDispatchClick={onDispatchClick}
-            onDOClick={onDOClick}
-            onIssuePOsClick={onIssuePOsClick}
-            onAbandonClick={onAbandonClick}
-            onConfirmProceedClick={onConfirmProceedClick}
-            onTransferReadyClick={onTransferReadyClick}
-            onTopUpClick={onTopUpClick}
-            proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
-          />
+        {/* Row 2 removed (Jess 2026-07-11) — the STOCK/LOGISTIC/MONEY strip
+            duplicated status that now lives in its home: stock → the Items table
+            header badge (Ready N/N); money → the Balance card; logistic → the
+            stage action below. Header stays clean. */}
+
+      </header>
+
+      {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
+          each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
+          scroll — it clips, and each column owns its own overflow-y. */}
+      <div className="flex-1 min-h-0 px-5 py-3 flex flex-col gap-2.5 overflow-hidden">
+        {/* Save bar only — the stage action moved into the Delivery card (Jess
+            2026-07-11). This slim row holds just the Save control for edited
+            fields (it renders nothing until there are unsaved changes), pinned
+            above the scrolling columns. */}
+        <div className="flex items-center justify-end gap-3 min-w-0 shrink-0 empty:hidden">
           <OrderControlSaveBar form={form} />
         </div>
+        {/* Operator's own free-text note — full text (the header only chips it). */}
+        {form.draft.action_for_logistic.trim() && (
+          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+            <AlertCircle
+              className="w-4 h-4 shrink-0 mt-0.5 text-warning"
+              aria-hidden="true"
+            />
+            <span className="text-base-900">
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
+                Action needed
+              </span>
+              {form.draft.action_for_logistic}
+            </span>
+          </div>
+        )}
+        {/* side | main — support cards on the LEFT, items + warehouse on the RIGHT
+            (Jess 2026-07-11). Grid AREAS do the flip: "side main" puts the cards
+            column (gridArea:side) first and the items column (gridArea:main)
+            second — no panel code moves. Cards get a fixed ~300px; items fill. */}
+        <div
+          className="grid gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden"
+          style={{
+            gridTemplateColumns: "300px minmax(0, 1fr)",
+            gridTemplateAreas: '"side main"',
+          }}
+        >
 
         {/* LEFT column — the two locked listing panels: Items ordered (fixed
             scroll table, ≤8 rows) on top · Warehouse stock (the reserve grid,
             grows to fill so the column bottom lines up with the right side). */}
         <div
           style={{ gridArea: "main" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar pr-0.5"
         >
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
@@ -949,40 +1213,65 @@ function DrawerBody({
                 total={goodsLines.length}
               />
             }
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Raise PO for shortages",
+                    icon: <PackagePlus size={14} />,
+                    onClick: () => onIssuePOsClick(),
+                  },
+                  {
+                    label: recheckStock.isPending
+                      ? "Rechecking…"
+                      : "Recheck stock",
+                    icon: <RotateCcw size={14} />,
+                    disabled: recheckStock.isPending,
+                    onClick: () =>
+                      recheckStock.mutate(undefined, {
+                        onSuccess: () => toast.success("Stock rechecked"),
+                        onError: (e) => toast.error(e.message),
+                      }),
+                  },
+                  {
+                    label: "Export items (CSV)",
+                    icon: <Download size={14} />,
+                    onClick: () => downloadOrderCsv(order, lines),
+                  },
+                ]}
+              />
+            }
           >
             <div className="overflow-auto min-h-0" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-base-700 text-white">
+                  {/* Order (Jess 2026-07-11): Status · Stock ETA · Item · Qty · PO ·
+                      Route. GRN (received count + book-in) folds INTO the Status
+                      cell — no separate Recv column. */}
+                  <tr className="bg-[#F1EDE6] text-[#8C877D]">
                     <th
-                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600"
-                      title="Has this item's stock been received? Received / Pending (waiting on PO) / No PO"
+                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]"
+                      title="Waiting / Ready / No PO. The count = received / ordered — click to book in received units (GRN)."
                     >
-                      Stock
+                      Status
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       Stock ETA
                     </th>
-                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
+                      Item
+                    </th>
+                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
                       Qty
                     </th>
-                    <th
-                      className="text-center text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-base-600"
-                      title="Received / ordered — click to book in received units (GRN)"
-                    >
-                      Recv
-                    </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
-                      Model
-                    </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
                     </th>
                     <th
                       className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32"
-                      title="Where this item's stock is received / consolidated before delivery"
+                      title="Where this item is received / where it routes to (the transfer destination). Per-item legs come with the transfer feature."
                     >
-                      Receive at
+                      Route
                     </th>
                   </tr>
                 </thead>
@@ -1020,13 +1309,23 @@ function DrawerBody({
                     // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =
                       form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+                    // Route "Option D" — a SPECIAL transfer is the authored legs
+                    // (line_legs, migration 0216); empty = the standard single hop
+                    // to the default warehouse (locValue).
+                    const savedLegs = form.draft.line_legs[l.sku] ?? [];
+                    const hasSpecialRoute = savedLegs.length > 0;
+                    const displayLegs = legsToDisplay(savedLegs);
+                    const routeOpen = routeOpenSku === l.sku;
                     // One row per SKU (duplicate lines combined above) → key on SKU.
                     return (
+                      <Fragment key={l.sku}>
                       <tr
-                        key={l.sku}
                         onClick={() => setPickerSku(l.sku)}
                         className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
                       >
+                        {/* Status (+ GRN folded in) — for a PO item the received
+                            count / book-in button sits next to the status pill, so
+                            there's no separate Recv column (Jess 2026-07-11). */}
                         <td className="border border-base-200 px-1.5 py-1 align-top">
                           {isService || !rd ? (
                             <span className="text-base-300 text-[11px]">—</span>
@@ -1035,21 +1334,46 @@ function DrawerBody({
                               title="Accessory — always in the Klang warehouse; deducted from ready stock"
                               className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] whitespace-nowrap"
                             >
-                              Ready · stock
+                              Ready
                             </span>
                           ) : (
-                            <StockStatusCell
-                              sku={l.sku}
-                              status={rd}
-                              isOverride={isStatusOverride}
-                              onSet={(s) => form.setLineStockStatus(l.sku, s)}
-                              onPick={() => setPickerSku(l.sku)}
-                            />
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <StockStatusCell
+                                sku={l.sku}
+                                status={rd}
+                                isOverride={isStatusOverride}
+                                onSet={(s) => form.setLineStockStatus(l.sku, s)}
+                                onPick={() => setPickerSku(l.sku)}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReceiveLine({
+                                    sku: l.sku,
+                                    qty: l.qty,
+                                    received: lineReceivedOf(l.sku),
+                                  });
+                                }}
+                                title="Book in received units (GRN)"
+                                className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1 py-0.5 rounded ${
+                                  lineReceivedOf(l.sku) >= l.qty
+                                    ? "text-success font-semibold"
+                                    : "text-primary hover:bg-primary/10"
+                                }`}
+                              >
+                                {lineReceivedOf(l.sku)}/{l.qty}
+                                {lineReceivedOf(l.sku) < l.qty && (
+                                  <PackagePlus size={11} strokeWidth={2} />
+                                )}
+                              </button>
+                            </div>
                           )}
                         </td>
+                        {/* Stock ETA */}
                         {isService || isAcc ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            {isAcc ? "from stock" : "N/A"}
+                            {isAcc ? "—" : "N/A"}
                           </td>
                         ) : (
                           <td className="border border-base-200 px-1 py-0.5 align-top">
@@ -1061,39 +1385,7 @@ function DrawerBody({
                             />
                           </td>
                         )}
-                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                          {l.qty}
-                        </td>
-                        {isService || isAcc ? (
-                          <td className="border border-base-200 px-2 py-1 text-[10px] text-base-400 text-center align-middle">
-                            {isAcc ? "from stock" : "—"}
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-1 text-center align-middle">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReceiveLine({
-                                  sku: l.sku,
-                                  qty: l.qty,
-                                  received: lineReceivedOf(l.sku),
-                                });
-                              }}
-                              title="Book in received units (GRN)"
-                              className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
-                                lineReceivedOf(l.sku) >= l.qty
-                                  ? "text-success font-semibold"
-                                  : "text-primary hover:bg-primary/10"
-                              }`}
-                            >
-                              {lineReceivedOf(l.sku)}/{l.qty}
-                              {lineReceivedOf(l.sku) < l.qty && (
-                                <PackagePlus size={11} strokeWidth={2} />
-                              )}
-                            </button>
-                          </td>
-                        )}
+                        {/* Item */}
                         <td className="border border-base-200 px-2 py-1 align-top">
                           <div
                             className="font-mono text-[10px] leading-tight break-words"
@@ -1102,6 +1394,11 @@ function DrawerBody({
                             {l.sku}
                           </div>
                         </td>
+                        {/* Qty */}
+                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                          {l.qty}
+                        </td>
+                        {/* PO */}
                         <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
                           {poNo ? (
                             <span className="text-primary">{poNo}</span>
@@ -1109,32 +1406,96 @@ function DrawerBody({
                             <span className="text-base-300">—</span>
                           )}
                         </td>
+                        {/* Route — Option D journey bar: icons = places, colour =
+                            progress. Click expands the legs in-place (below). */}
                         {isService ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
                             N/A
                           </td>
                         ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-top">
-                            <select
-                              value={locValue}
-                              onChange={(e) =>
-                                form.setLineLocation(
-                                  l.sku,
-                                  e.target.value ? [e.target.value] : [],
-                                )
-                              }
-                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                            >
-                              <option value="">—</option>
-                              {STOCK_LOCATIONS.map((locOpt) => (
-                                <option key={locOpt} value={locOpt}>
-                                  {locOpt}
-                                </option>
-                              ))}
-                            </select>
+                          <td className="border border-base-200 px-1 py-0.5 align-middle">
+                            {hasSpecialRoute ? (
+                              <RouteJourneyBar
+                                legs={displayLegs}
+                                open={routeOpen}
+                                onClick={() =>
+                                  setRouteOpenSku((cur) =>
+                                    cur === l.sku ? null : l.sku,
+                                  )
+                                }
+                              />
+                            ) : (
+                              <RouteQuietButton
+                                label={locValue || "Carres Klang"}
+                                open={routeOpen}
+                                onClick={() =>
+                                  setRouteOpenSku((cur) =>
+                                    cur === l.sku ? null : l.sku,
+                                  )
+                                }
+                              />
+                            )}
                           </td>
                         )}
                       </tr>
+                      {!isService && routeOpen && (
+                        <tr className="bg-base-50">
+                          <td
+                            colSpan={6}
+                            className="border border-base-200 px-3 py-2"
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
+                                  Default location
+                                </span>
+                                <select
+                                  value={locValue}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    form.setLineLocation(
+                                      l.sku,
+                                      e.target.value ? [e.target.value] : [],
+                                    )
+                                  }
+                                  className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                >
+                                  <option value="">—</option>
+                                  {STOCK_LOCATIONS.map((locOpt) => (
+                                    <option key={locOpt} value={locOpt}>
+                                      {locOpt}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="border-t border-base-100 pt-2">
+                                <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D] mb-1">
+                                  Special transfer
+                                </div>
+                                {savedLegs.length === 0 && (
+                                  <p className="text-[10px] text-base-400 mb-1.5">
+                                    Standard: sits at{" "}
+                                    {locValue || "Carres Klang"}. Add a leg only
+                                    for a special pickup (supplier → warehouse).
+                                    Delivery to the customer is set in the
+                                    Delivery panel.
+                                  </p>
+                                )}
+                                <RouteLegEditor
+                                  legs={savedLegs}
+                                  partners={(
+                                    partnersData?.partners ?? []
+                                  ).map((p) => p.name)}
+                                  onChange={(legs) =>
+                                    form.setLineLegs(l.sku, legs)
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1184,10 +1545,16 @@ function DrawerBody({
                 onLoan={(itemId, itemSku) =>
                   setLoanTarget({ itemId, sku: itemSku })
                 }
+                actions={warehouseMenu}
               />
             </div>
           ) : (
-            <Panel title="Warehouse stock" grow summary={<MiniBadge tone="muted">—</MiniBadge>}>
+            <Panel
+              title="Warehouse stock"
+              grow
+              summary={<MiniBadge tone="muted">—</MiniBadge>}
+              actions={warehouseMenu}
+            >
               <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
                 {stage === "delivered"
                   ? "Delivered — stock settled."
@@ -1197,44 +1564,139 @@ function DrawerBody({
           )}
         </div>
 
-        {/* RIGHT column — the two locked cards: a combined Customer | Balance
-            split card (+ conditional Storage strip), then a Delivery card that
-            grows to fill so both columns' bottoms line up. */}
+        {/* LEFT column (after the flip) — the support cards: Customer · Balance ·
+            Storage (conditional) · Delivery. Scrolls INDEPENDENTLY of the items
+            column on the right (Jess 2026-07-11). */}
         <div
           style={{ gridArea: "side" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-auto"
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto no-scrollbar"
         >
           {/* 1. Customer — a quiet identity card (name / phone / address, with an
-              inline Edit on a Place order). Header summary = the area. */}
+              inline Edit on a Place order). No region pill (Jess 2026-07-11): the
+              region is a DELIVERY attribute (it shows on the Delivery card), not
+              customer identity. */}
           <Panel
             title="Customer"
-            summary={
-              loc.label ? (
-                <span
-                  title={loc.label}
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 max-w-[140px] truncate"
-                >
-                  {loc.label}
-                </span>
-              ) : undefined
+            actions={
+              <PanelMenu
+                items={[
+                  ...(order.status === "place"
+                    ? [
+                        {
+                          label: "Edit details",
+                          icon: <Pencil size={14} />,
+                          onClick: () => customerEditRef.current?.(),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Copy address",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_address,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_address ?? "",
+                      );
+                      toast.success("Address copied");
+                    },
+                  },
+                  {
+                    label: "Copy phone",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_phone,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_phone ?? "",
+                      );
+                      toast.success("Phone copied");
+                    },
+                  },
+                  {
+                    label: "WhatsApp customer",
+                    icon: <Phone size={14} />,
+                    disabled: !order.customer_phone,
+                    onClick: () => {
+                      const wa = waLink(order.customer_phone);
+                      if (wa) window.open(wa, "_blank", "noopener");
+                    },
+                  },
+                ]}
+              />
             }
           >
             <div className="p-3">
-              <OrderCustomerCard order={order} />
+              <OrderCustomerCard order={order} startEditRef={customerEditRef} />
             </div>
           </Panel>
 
-          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary =
-              the gate (Collect before delivery / Hold delivery) or the owing amount.
-              Collect-by (ETA−7d) / last-call (ETA−1d) readout escalates with the
-              gate colour. Operation shows only the OUTSTANDING owed (no Bill/Total). */}
+          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary is
+              a STATUS PILL, not a sentence (Jess 2026-07-08): the owing AMOUNT when
+              money is due — red if the delivery gate is HOLD, amber if it's a WARN,
+              neutral otherwise — else Settled / No balance. Operation shows only the
+              OUTSTANDING owed (no Bill/Total). */}
           <Panel
             title="Balance"
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Print invoice",
+                    icon: <FileText size={14} />,
+                    onClick: () => void openInvoicePdf(order.id, order.so),
+                  },
+                  {
+                    label: "Print receipt (latest)",
+                    icon: <FileText size={14} />,
+                    disabled: ledger.length === 0,
+                    onClick: () => {
+                      const latest = ledger.reduce((a, b) =>
+                        b.paid_on > a.paid_on ? b : a,
+                      );
+                      void openReceipt(latest, {
+                        orderCode: `SO-${order.so}`,
+                        customerName: order.customer_name ?? "",
+                      });
+                    },
+                  },
+                  {
+                    label: "Copy outstanding",
+                    icon: <Copy size={14} />,
+                    disabled: !isOwing,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(RM(moneyOutstanding));
+                      toast.success("Outstanding copied");
+                    },
+                  },
+                ]}
+              />
+            }
             summary={
-              balanceGate ? (
-                <GateBadge gate={balanceGate} />
+              isOwing ? (
+                <span
+                  title={
+                    balanceGate === "hold"
+                      ? "Delivery on hold — collect before dispatch"
+                      : balanceGate === "warn"
+                        ? "Collect before delivery"
+                        : "Outstanding balance"
+                  }
+                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                    balanceGate === "hold"
+                      ? "bg-[#FEE2E2] text-[#991B1B]"
+                      : balanceGate === "warn"
+                        ? "bg-[#FEF3C7] text-[#92400E]"
+                        : "bg-base-100 text-base-700"
+                  }`}
+                >
+                  {balanceGate === "hold" && (
+                    <AlertCircle size={10} strokeWidth={2.5} />
+                  )}
+                  {RM(owingAmt)} owing
+                </span>
+              ) : totalSet ? (
+                <MiniBadge tone="ready">Settled</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
+                <MiniBadge tone="muted">No balance</MiniBadge>
               )
             }
           >
@@ -1255,11 +1717,15 @@ function DrawerBody({
                   </span>
                 </div>
               )}
-              <PaymentControlFields
-                form={form}
-                paid={Number(order.paid || 0)}
-                total={grandTotal}
+              <MoneyCard
                 orderId={order.id}
+                form={form}
+                hasLineTotal={hasLineTotal}
+                orderTotal={orderTotal}
+                totalSet={totalSet}
+                collected={collected}
+                outstanding={moneyOutstanding}
+                ledger={ledger}
                 receiptMeta={{
                   orderCode: `SO-${order.so}`,
                   customerName: order.customer_name ?? "",
@@ -1268,22 +1734,80 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary =
-              the storage gate or "fee if held". StorageControlFields lays the two
-              category fees (MS/BF · Sofa) 2-col; fee auto-computes today (Master
-              import is P2). Only shows when a storable category is on the order. */}
+          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary is
+              a STATUS PILL, not a sentence (Jess 2026-07-08): the fee amount when a
+              fee is running (red if the delivery gate is HOLD, amber if WARN, neutral
+              otherwise) — else "fee if held". Only shows when a storable category is
+              on the order. */}
           {(hasMsbf || hasSof) && (
             <Panel
               title="Storage"
+              actions={
+                <PanelMenu
+                  items={[
+                    {
+                      label: "Print storage receipt (latest)",
+                      icon: <FileText size={14} />,
+                      disabled: !ledger.some((p) => p.kind === "storage"),
+                      onClick: () => {
+                        const storagePays = ledger.filter(
+                          (p) => p.kind === "storage",
+                        );
+                        if (storagePays.length === 0) return;
+                        const latest = storagePays.reduce((a, b) =>
+                          b.paid_on > a.paid_on ? b : a,
+                        );
+                        void openReceipt(latest, {
+                          orderCode: `SO-${order.so}`,
+                          customerName: order.customer_name ?? "",
+                        });
+                      },
+                    },
+                  ]}
+                />
+              }
               summary={
-                storageGate ? (
-                  <GateBadge gate={storageGate} />
+                storageOwing ? (
+                  <span
+                    title={
+                      storageGate === "hold"
+                        ? "Delivery on hold — clear storage before dispatch"
+                        : storageGate === "warn"
+                          ? "Collect storage before delivery"
+                          : "Storage fee running"
+                    }
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      storageGate === "hold"
+                        ? "bg-[#FEE2E2] text-[#991B1B]"
+                        : storageGate === "warn"
+                          ? "bg-[#FEF3C7] text-[#92400E]"
+                          : "bg-base-100 text-base-700"
+                    }`}
+                  >
+                    {storageGate === "hold" && (
+                      <AlertCircle size={10} strokeWidth={2.5} />
+                    )}
+                    {storageFee > 0 ? `${RM(storageFee)} fee` : "fee due"}
+                  </span>
                 ) : (
                   <MiniBadge tone="muted">fee if held</MiniBadge>
                 )
               }
             >
-              <div className="p-3">
+              <div className="p-3 space-y-2">
+                {/* Per-day rate FRAME (batch 2 placeholder, Jess 2026-07-09): the
+                    new by-day rates. The actual per-day accrual (delivery window +
+                    public-holiday aware) is deferred — this only states the rates
+                    so the block reads right; the fee below still uses the existing
+                    calc until the by-day logic lands. */}
+                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[11px] text-base-500 flex items-center justify-between gap-2">
+                  <span>
+                    Rate · mattress{" "}
+                    <span className="font-mono text-base-700">RM5</span>/day · sofa{" "}
+                    <span className="font-mono text-base-700">RM14.30</span>/day
+                  </span>
+                  <span className="text-base-400 italic">by-day calc coming</span>
+                </div>
                 <StorageControlFields
                   form={form}
                   hasMsbf={hasMsbf}
@@ -1299,74 +1823,77 @@ function DrawerBody({
             </Panel>
           )}
 
-          {/* On loan (migration 0209) — active loaner sofas out against this order;
-              collected back (swap) at the real delivery. Only when a loan is live. */}
-          {activeLoans.length > 0 && (
-            <Panel
-              title="On loan"
-              summary={<MiniBadge tone="waiting">{activeLoans.length} out</MiniBadge>}
-            >
-              <div className="p-3 space-y-2">
-                {activeLoans.map((loan) => (
-                  <div
-                    key={loan.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-base-100 bg-base-50 px-2 py-1.5"
-                  >
-                    <div className="min-w-0">
-                      <div
-                        className="text-[12px] font-medium truncate"
-                        title={loan.item_sku ?? ""}
-                      >
-                        {loan.item_sku ?? "Sofa"}
-                      </div>
-                      <div className="text-[10px] text-base-500">
-                        {loan.item_condition ?? "—"}
-                        {loan.do_number ? ` · DO ${loan.do_number}` : ""} · loaned{" "}
-                        {fmtDate(loan.loaned_at.slice(0, 10))}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        returnLoan.mutate(
-                          { loanId: loan.id },
-                          {
-                            onSuccess: () =>
-                              toast.success("Loaner collected — back in stock"),
-                            onError: (e) =>
-                              toast.error(`Couldn't return — ${e.message}`),
-                          },
-                        )
-                      }
-                      disabled={returnLoan.isPending}
-                      title="Collect the loaner at delivery — it returns to free stock"
-                      className="btn-secondary text-[11px] whitespace-nowrap shrink-0"
-                    >
-                      Collect (swap)
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          {/* Loan (migration 0209 + 0217) — a SEPARATE panel (Jess) for lending a
+              substitute piece now → swapping back when the real one lands. Two
+              sources: own warehouse OR borrowed from a supplier (a return
+              obligation). The lend entry stays even at 0 loans. */}
+          <Panel
+            title="Loan"
+            summary={
+              liveLoanCount > 0 ? (
+                <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">none</MiniBadge>
+              )
+            }
+          >
+            <LoanPanel
+              orderId={order.id}
+              loans={allLoans}
+              suppliers={suppliersData?.suppliers ?? []}
+            />
+          </Panel>
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
-              Logistic update; then the 3 remark rows; then a Route section only
-              for a cross-border / multi-leg order. Grows to fill the column. */}
+              Logistic update; then the 2 remark rows; then a Route section only
+              for a cross-border / multi-leg order. (Natural height now — the
+              Activity card below carries `grow` to fill the column bottom.) */}
           <Panel
             title="Delivery"
-            grow
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Print DO",
+                    icon: <FileText size={14} />,
+                    onClick: () => void openDoPdf(order.id),
+                  },
+                  {
+                    label: "Copy address",
+                    icon: <Copy size={14} />,
+                    disabled: !order.customer_address,
+                    onClick: () => {
+                      void navigator.clipboard.writeText(
+                        order.customer_address ?? "",
+                      );
+                      toast.success("Address copied");
+                    },
+                  },
+                ]}
+              />
+            }
             summary={
-              loc.area === "KV" ? (
-                <MiniBadge tone="kv">Klang Valley</MiniBadge>
+              assignedLogisticName ? (
+                // Assigned → show the carrier (green = handled).
+                <MiniBadge tone="kv">{assignedLogisticName}</MiniBadge>
+              ) : pipelineStatus === "ready" ? (
+                // Ready but no carrier → the ALERT lives on the header (Jess
+                // 2026-07-11): amber, no sentence row. Assign via the picker below.
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
+                  <AlertCircle size={10} strokeWidth={2.5} /> Assign logistic
+                </span>
               ) : loc.area === "Outstation" ? (
                 <MiniBadge tone="outstation">Outstation</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">Area —</MiniBadge>
+                <MiniBadge tone="muted">{loc.label ?? "Area —"}</MiniBadge>
               )
             }
           >
             <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
+              {/* No sentence row (Jess 2026-07-11) — the header pill signals the
+                  state (⚑ Assign logistic / carrier name); the carrier picker below
+                  IS the assign action. Stage actions (Issue PO / Confirm delivery)
+                  live in the header ⋮ menu. */}
               {/* Original (what operation sets) | Logistic update (what the
                   carrier commits back). */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
@@ -1417,7 +1944,13 @@ function DrawerBody({
                   )}
                 </div>
               </div>
-              {/* 3 remark rows (span full width). */}
+              {/* 2 remark rows (span full width). The old single-field
+                  "Carrier's remark" (carres_remark) was REMOVED (Jess 2026-07-11,
+                  Option 1): all hand-written follow-up now lives in ONE place —
+                  the Activity & notes timeline card below — which stacks entries
+                  with who + when + history instead of overwriting one box.
+                  customer_request + action_for_logistic keep their own semantics
+                  (a customer ask / a standing instruction, not follow-up chatter). */}
               <div className="border-t border-base-100 pt-2">
                 <FieldGrid>
                   <RemarkControlField
@@ -1431,12 +1964,6 @@ function DrawerBody({
                     field="action_for_logistic"
                     label="Action for logistic"
                     placeholder="e.g. call customer before delivery"
-                  />
-                  <RemarkControlField
-                    form={form}
-                    field="carres_remark"
-                    label="Carrier's remark"
-                    placeholder="Internal note"
                   />
                 </FieldGrid>
               </div>
@@ -1464,9 +1991,23 @@ function DrawerBody({
               </div>
             </div>
           </Panel>
-        </div>{/* /right column */}
 
-      </div>
+          {/* Card C — Activity & notes (Jess 2026-07-11, Option 1). THE single
+              place for all hand-written follow-up on this order: the compose box
+              lives here, so a note auto-attaches to THIS order (no order-picker),
+              and every entry stacks with author + timestamp + tag — replacing the
+              old overwrite-one-box "Carrier's remark". Also merges the system
+              activity (imports, stock moves) so a new joiner reads the whole
+              in-flight order at a glance. Carries `grow` to fill the column;
+              scrolls its own body. Reuses the already-live AnnotationTimeline. */}
+          <Panel title="Activity & notes" grow>
+            <div className="p-3 overflow-auto min-h-0">
+              <AnnotationTimeline orderId={order.id} />
+            </div>
+          </Panel>
+        </div>{/* /right column */}
+        </div>{/* /main|side grid */}
+      </div>{/* /scroll body */}
     </div>
   );
 }
@@ -1712,6 +2253,7 @@ function LoanSofaModal({
  */
 export function OrderCustomerCard({
   order,
+  startEditRef,
 }: {
   order: {
     id: string;
@@ -1721,9 +2263,10 @@ export function OrderCustomerCard({
     customer_address: string | null;
     placed_at?: string | null;
   };
+  /** Lets an outside control (the panel ⋮) open this card's safe-edit mode. */
+  startEditRef?: MutableRefObject<(() => void) | null>;
 }) {
   const qc = useQueryClient();
-  const editable = order.status === "place";
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(order.customer_name ?? "");
   const [phone, setPhone] = useState(order.customer_phone ?? "");
@@ -1748,6 +2291,11 @@ export function OrderCustomerCard({
     setErr(null);
     setEditing(true);
   }
+
+  // Expose `start` to the panel ⋮ (Edit details) — kept current each render.
+  useEffect(() => {
+    if (startEditRef) startEditRef.current = start;
+  });
 
   function save() {
     setErr(null);
@@ -1837,25 +2385,31 @@ export function OrderCustomerCard({
           {order.customer_address || <span className="text-base-400">—</span>}
         </span>
       </CompactField>
-      <div className="mt-auto pt-2 border-t border-base-100 flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">Ordered</span>
-          <span className="font-medium text-base-800">
-            {order.placed_at ? fmtDate(order.placed_at) : "—"}
-          </span>
-        </span>
-        {editable && (
-          <button
-            type="button"
-            onClick={start}
-            className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-primary"
-          >
-            <Pencil className="w-3 h-3" /> Edit
-          </button>
-        )}
-      </div>
+      {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
+          its header ⋮; the redundant inline button is gone). Read-only by default;
+          the ⋮ "Edit details" opens the safe Save / Cancel mode. */}
     </div>
   );
+}
+
+/**
+ * Build a wa.me link from a MY customer phone (weak-English staff want one tap to
+ * message the customer). Takes the FIRST number if the field lists several
+ * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
+ */
+export function waLink(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const first = phone.split(/[|,/]/)[0] ?? "";
+  let d = first.replace(/\D/g, "");
+  if (!d) return null;
+  if (d.startsWith("60")) {
+    /* already international */
+  } else if (d.startsWith("0")) {
+    d = `60${d.slice(1)}`;
+  } else {
+    d = `60${d}`;
+  }
+  return `https://wa.me/${d}`;
 }
 
 /** Compact label-left / value-right read row (Jess: match the clean mockup). */
@@ -1896,18 +2450,321 @@ function downloadOrderCsv(
   URL.revokeObjectURL(url);
 }
 
+// ─── Money card (batch 2, Jess 2026-07-09) ───────────────────────────────────
+// The clean replacement for the old 5-field Balance mess. Three locked rows
+// (Total / Collected / Outstanding), a per-payment history list, and a 3-field
+// Record-payment form — all wired to the existing order_payments ledger + hooks
+// (useOrderPayments/useRecordPayment/useVoidPayment) and the existing receipt PDF
+// (renderReceiptPdf). Lining-box; colour only for Outstanding (red) / Collected
+// (green). Total store = ops_order_control.balance (path 1, no migration).
+
+/** Render + open a receipt PDF for one ledger entry (reuses the shared
+ *  renderReceiptPdf; receipt_no format R{so}-{n} until the PAY-/RCP- renumber). */
+async function openReceipt(
+  row: OrderPaymentRow,
+  meta: { orderCode: string; customerName: string },
+) {
+  try {
+    const blob = await renderReceiptPdf({
+      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+      issue_date: row.paid_on,
+      order_code: meta.orderCode,
+      customer: { name: meta.customerName },
+      amount: Number(row.amount),
+      method: row.method,
+      kind: row.kind,
+      reference: row.reference,
+      note: row.note,
+      currency: "MYR",
+    });
+    window.open(URL.createObjectURL(blob), "_blank");
+  } catch (e) {
+    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+  }
+}
+
+/** Fetch the order's invoice data + render the Sales Invoice PDF — the Balance ⋮
+ *  "Print invoice". The invoice row is auto-issued at dispatch (migration 0098),
+ *  so before dispatch the endpoint 404s → a clear toast. Mirrors
+ *  DownloadInvoiceButton. */
+async function openInvoicePdf(orderId: string, so: number) {
+  try {
+    const data = await apiFetch<InvoiceTemplateData>(
+      `/api/orders/${orderId}/invoice-pdf-data`,
+    );
+    const blob = await renderInvoicePdf(data);
+    window.open(URL.createObjectURL(blob), "_blank");
+    toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`No invoice yet (issued at dispatch) — ${msg}`);
+  }
+}
+
+/** Fetch DO data + render the Delivery Order PDF — the Delivery ⋮ "Print DO".
+ *  Mirrors PrintDoButton (same /print-do-data endpoint). */
+async function openDoPdf(orderId: string) {
+  try {
+    const data = await apiFetch<DoTemplateData>(
+      `/api/operation/orders/${orderId}/print-do-data`,
+    );
+    const blob = await renderDoPdf(data);
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`Print delivery order failed — ${msg}`);
+  }
+}
+
+/** One row of the Total / Collected / Outstanding stack. */
+function MoneyRow({
+  label,
+  children,
+  strong,
+}: {
+  label: string;
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
+    >
+      <span className="t-micro text-base-400">{label}</span>
+      <span className="text-right">{children}</span>
+    </div>
+  );
+}
+
+/** The 3-field Record-payment form (amount + date + note only, Jess: the whole
+ *  point — split the free-text mess into clean typed inputs). method='cash' /
+ *  kind='payment' are applied by the caller. */
+function RecordPaymentForm({
+  pending,
+  onCancel,
+  onSubmit,
+}: {
+  pending: boolean;
+  onCancel: () => void;
+  onSubmit: (input: { amount: number; paidOn: string; note: string | null }) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+  const amt = Number(amount);
+  const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
+  const cell =
+    "w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  return (
+    <div className="rounded-[8px] border border-base-200/70 bg-base-50 p-2 space-y-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Amount (RM)"
+          aria-label="Payment amount"
+          className={cell}
+        />
+        <input
+          type="date"
+          value={paidOn}
+          onChange={(e) => setPaidOn(e.target.value)}
+          aria-label="Payment date"
+          className={cell}
+        />
+      </div>
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Note (e.g. Deposit · 2nd payment · final)"
+        aria-label="Payment note"
+        className={cell}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() =>
+            onSubmit({ amount: amt, paidOn, note: note.trim() || null })
+          }
+          className="btn-hero text-[12px] disabled:opacity-50"
+        >
+          {pending ? "Recording…" : "Record payment"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[12px] text-base-500 hover:text-base-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MoneyCard({
+  orderId,
+  form,
+  hasLineTotal,
+  orderTotal,
+  totalSet,
+  collected,
+  outstanding,
+  ledger,
+  receiptMeta,
+}: {
+  orderId: string;
+  form: ReturnType<typeof useOrderControlForm>;
+  hasLineTotal: boolean;
+  orderTotal: number;
+  totalSet: boolean;
+  collected: number;
+  outstanding: number;
+  ledger: OrderPaymentRow[];
+  receiptMeta: { orderCode: string; customerName: string };
+}) {
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  const [adding, setAdding] = useState(false);
+  const record = useRecordPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+  });
+  const voidPay = useVoidPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+  });
+
+  return (
+    <div className="space-y-2.5">
+      {/* Three locked rows — Total / Collected / Outstanding. */}
+      <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
+        <MoneyRow label="Total">
+          {hasLineTotal ? (
+            <span
+              className="font-mono text-[13px] text-base-800"
+              title="Summed from the order items"
+            >
+              {RM(orderTotal)}
+            </span>
+          ) : (
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.draft.balance}
+              onChange={(e) => form.set("balance", e.target.value)}
+              placeholder="Set total (RM)"
+              aria-label="Order total"
+              className="w-32 text-right font-mono text-[13px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+            />
+          )}
+        </MoneyRow>
+        <MoneyRow label="Collected">
+          <span className="font-mono text-[13px] font-semibold text-success">
+            {RM(collected)}
+          </span>
+        </MoneyRow>
+        <MoneyRow label="Outstanding" strong>
+          {totalSet ? (
+            <span
+              className={`font-mono text-[17px] font-bold leading-none ${
+                outstanding > 0 ? "text-[#991B1B]" : "text-success"
+              }`}
+            >
+              {outstanding > 0 ? RM(outstanding) : "Settled"}
+            </span>
+          ) : (
+            <span className="text-[11px] text-base-400">Total not set</span>
+          )}
+        </MoneyRow>
+      </div>
+
+      {/* Payment history — one line per payment: label · date · amount · receipt. */}
+      {ledger.length === 0 ? (
+        <div className="text-[11px] text-base-400">No payments recorded yet.</div>
+      ) : (
+        <div className="space-y-1">
+          {ledger.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1 last:border-b-0"
+            >
+              <span className="min-w-0 truncate">
+                <span className="font-medium text-base-800">
+                  {p.note?.trim() || (p.kind === "deposit" ? "Deposit" : "Payment")}
+                </span>
+                <span className="text-base-400"> · {fmtDate(p.paid_on)}</span>
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="font-mono font-semibold text-success">
+                  {RM(Number(p.amount))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void openReceipt(p, receiptMeta)}
+                  title={`Receipt ${p.receipt_no ?? ""}`}
+                  aria-label={`Receipt ${p.receipt_no ?? p.id}`}
+                  className="text-base-400 hover:text-primary"
+                >
+                  <FileText size={13} />
+                </button>
+                {isPrincipal && (
+                  <button
+                    type="button"
+                    onClick={() => voidPay.mutate(p.id)}
+                    disabled={voidPay.isPending}
+                    title="Void this payment"
+                    aria-label={`Void payment ${p.receipt_no ?? p.id}`}
+                    className="text-[10px] text-base-300 hover:text-destructive"
+                  >
+                    void
+                  </button>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Record payment — the ONE flame CTA (Jess). Opens the 3-field form. */}
+      {adding ? (
+        <RecordPaymentForm
+          pending={record.isPending}
+          onCancel={() => setAdding(false)}
+          onSubmit={(input) =>
+            record.mutate(
+              { ...input, method: "cash", kind: "payment" },
+              { onSuccess: () => setAdding(false) },
+            )
+          }
+        />
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[12px]">
+          Record payment
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MenuItem({
   icon,
   label,
   onClick,
   disabled,
   title,
+  danger,
 }: {
   icon: ReactNode;
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
+  danger?: boolean;
 }) {
   return (
     <button
@@ -1915,9 +2772,15 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${disabled ? "opacity-40 cursor-not-allowed" : "text-base-900"}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${
+        disabled
+          ? "opacity-40 cursor-not-allowed"
+          : danger
+            ? "text-destructive"
+            : "text-base-900"
+      }`}
     >
-      <span className="text-base-500 shrink-0">{icon}</span>
+      <span className={`shrink-0 ${danger ? "text-destructive" : "text-base-500"}`}>{icon}</span>
       {label}
     </button>
   );
@@ -1929,12 +2792,30 @@ function ActionsMenu({
   order,
   lines,
   stage,
+  orderId,
+  pipelineStatus,
   onServiceNoteClick,
+  onTransferReadyClick,
+  onConfirmProceedClick,
+  onTopUpClick,
+  onAbandonClick,
+  onIssuePOsClick,
+  onDispatchClick,
+  onDOClick,
 }: {
   order: DrawerBodyProps["data"]["order"];
   lines: operationOrderDetailLine[];
   stage: OperationStage;
+  orderId: string;
+  pipelineStatus: PipelineStatus;
   onServiceNoteClick: () => void;
+  onTransferReadyClick: () => void;
+  onConfirmProceedClick: () => void;
+  onTopUpClick: () => void;
+  onAbandonClick: () => void;
+  onIssuePOsClick: () => void;
+  onDispatchClick: () => void;
+  onDOClick: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
@@ -1943,6 +2824,13 @@ function ActionsMenu({
     setOpen(false);
     setDlOpen(false);
   };
+  // Rare / secondary stage actions moved off the ActionBar (batch 1 #1). These
+  // still run the existing modals/mutations — the manual "Transfer to ready"
+  // bridge lives here so a Ready-by-override order can still be advanced through
+  // the functional stage machine (see "NEW/OLD STAGE NOT BRIDGED").
+  const recheck = useRecheckStockMutation(orderId);
+  const active = pipelineStatus !== "completed";
+  const preProcure = pipelineStatus === "needs_setup" || pipelineStatus === "proceed";
   return (
     <div className="relative shrink-0">
       <button
@@ -1960,6 +2848,84 @@ function ActionsMenu({
         <>
           <div className="fixed inset-0 z-10" onClick={close} />
           <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg">
+            {/* Stage actions (Jess 2026-07-11) — the per-stage "next step" lives in
+                the ⋮ now (no sentence row). Gated by pipelineStatus so only the
+                relevant one shows. */}
+            {active && (
+              <>
+                {(pipelineStatus === "needs_setup" || pipelineStatus === "proceed") && (
+                  <MenuItem
+                    icon={<PackagePlus className="w-4 h-4" />}
+                    label="Issue PO"
+                    onClick={() => {
+                      close();
+                      onIssuePOsClick();
+                    }}
+                  />
+                )}
+                {pipelineStatus === "ready" && (
+                  <MenuItem
+                    icon={<Truck className="w-4 h-4" />}
+                    label="Assign logistic"
+                    onClick={() => {
+                      close();
+                      onDispatchClick();
+                    }}
+                  />
+                )}
+                {pipelineStatus === "scheduled" && (
+                  <MenuItem
+                    icon={<CheckCircle2 className="w-4 h-4" />}
+                    label="Confirm delivery"
+                    onClick={() => {
+                      close();
+                      onDOClick();
+                    }}
+                  />
+                )}
+                <MenuItem
+                  icon={<RotateCcw className="w-4 h-4" />}
+                  label={recheck.isPending ? "Checking…" : "Re-check stock"}
+                  disabled={recheck.isPending}
+                  onClick={async () => {
+                    try {
+                      await recheck.mutateAsync();
+                      toast.info("Stock re-checked");
+                    } catch (e) {
+                      toast.error(e instanceof ApiError ? e.message : "Re-check failed");
+                    }
+                  }}
+                />
+                {preProcure && (
+                  <MenuItem
+                    icon={<ChevronRight className="w-4 h-4" />}
+                    label="Confirm proceed"
+                    onClick={() => {
+                      close();
+                      onConfirmProceedClick();
+                    }}
+                  />
+                )}
+                <MenuItem
+                  icon={<PackagePlus className="w-4 h-4" />}
+                  label="Transfer to ready"
+                  title="Mark stock on-hand → ready (manual bridge)"
+                  onClick={() => {
+                    close();
+                    onTransferReadyClick();
+                  }}
+                />
+                <MenuItem
+                  icon={<Pencil className="w-4 h-4" />}
+                  label="Record top-up"
+                  onClick={() => {
+                    close();
+                    onTopUpClick();
+                  }}
+                />
+                <div className="border-t border-base-100 my-0.5" />
+              </>
+            )}
             <MenuItem
               icon={<FileText className="w-4 h-4" />}
               label="Service note"
@@ -2042,212 +3008,23 @@ function ActionsMenu({
                 </div>
               )}
             </div>
+            {active && (
+              <>
+                <div className="border-t border-base-100 my-0.5" />
+                <MenuItem
+                  icon={<AlertCircle className="w-4 h-4" />}
+                  label="Abandon order"
+                  danger
+                  onClick={() => {
+                    close();
+                    onAbandonClick();
+                  }}
+                />
+              </>
+            )}
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-interface ActionBarProps {
-  stage: OperationStage;
-  orderId: string;
-  so: number;
-  warehouseName: string | null;
-  shortageCount: number;
-  partnerAssigned: boolean;
-  doNumber: string | null;
-  onDispatchClick: () => void;
-  onDOClick: () => void;
-  onIssuePOsClick: () => void;
-  onAbandonClick: () => void;
-  onConfirmProceedClick: () => void;
-  onTransferReadyClick: () => void;
-  onTopUpClick: () => void;
-  proceedBlocked?: boolean;
-}
-
-function ActionBar({
-  stage,
-  orderId,
-  warehouseName,
-  shortageCount,
-  doNumber,
-  onDispatchClick,
-  onDOClick,
-  onIssuePOsClick,
-  onAbandonClick,
-  onConfirmProceedClick,
-  onTransferReadyClick,
-  onTopUpClick,
-  proceedBlocked,
-}: ActionBarProps) {
-  const recheck = useRecheckStockMutation(orderId);
-
-  if (stage === "placed") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Order placed by dealer. Waiting for them to push it to operation — no
-          action available yet.
-        </div>
-      </div>
-    );
-  }
-  if (stage === "confirmed") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Dealer pushed this order. Confirm to triage — system will reserve
-          stock or queue a PO based on availability.
-        </div>
-        {proceedBlocked && (
-          <div className="text-[11px] text-warning mb-2 font-medium">
-            Outstation: call the customer to confirm the final ETA before
-            ordering stock, then tick "Call before PO" first.
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={onConfirmProceedClick}
-            disabled={proceedBlocked}
-            title={
-              proceedBlocked ? "Call the customer first (outstation)" : undefined
-            }
-          >
-            Confirm proceed
-          </button>
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "in_production") {
-    return (
-      <div>
-        {shortageCount > 0 ? (
-          <div className="text-[12px] text-warning mb-2 font-body">
-            Waiting on stock for {shortageCount} line{shortageCount === 1 ? "" : "s"}.
-            When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>{" "}
-            — or transfer manually if stock is already on-hand.
-          </div>
-        ) : (
-          <div className="text-[12px] text-base-700 mb-2 font-body">
-            Proceeded — stock is on-hand. Transfer to ready, then dispatch.
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={async () => {
-              try {
-                await recheck.mutateAsync();
-                toast.info("Stock re-checked");
-              } catch (e) {
-                toast.error(e instanceof ApiError ? e.message : "Re-check failed");
-              }
-            }}
-            disabled={recheck.isPending}
-          >
-            {recheck.isPending ? "Checking…" : "↻ Re-check stock"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTransferReadyClick}
-          >
-            Transfer to ready (stock on-hand)
-          </button>
-          {shortageCount > 0 && (
-            <button
-              type="button"
-              className="btn-primary text-[12px]"
-              onClick={onIssuePOsClick}
-            >
-              + Issue POs
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "ready_to_dispatch") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Stock secured at <strong>{warehouseName ?? "—"}</strong>. Pick a delivery partner.
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px]"
-            onClick={onDispatchClick}
-          >
-            Assign delivery partner
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTopUpClick}
-          >
-            Record top-up
-          </button>
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "dispatched") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Out for delivery. When the DO comes back signed, attach it to close the loop.
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px]"
-            onClick={onDOClick}
-          >
-            Attach DO &amp; mark delivered
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTopUpClick}
-          >
-            Record top-up
-          </button>
-        </div>
-      </div>
-    );
-  }
-  // delivered
-  return (
-    <div className="text-[12px] text-success font-body">
-      Delivered. {doNumber && <>DO <strong>{doNumber}</strong> on file.</>}
     </div>
   );
 }

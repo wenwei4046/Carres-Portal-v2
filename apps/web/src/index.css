@@ -196,17 +196,22 @@
   .t-micro { @apply text-[11px] font-medium uppercase tracking-[0.05em]; }
 
   /* v17 status pills (spec §STATUS PILLS) — bg/fg pairs hard-coded (not in the
-   * token ramp). Use `.pill` + one modifier. `.pill-neutral` uses tokens. */
-  .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full; }
+   * token ramp). Use `.pill` + one modifier. `.pill-neutral` uses tokens.
+   * FILLS unified 2026-07-12 to the warmer Orders-list palette (Jess) — the four
+   * semantic tones (amber/green/red/blue) now match `OperationOrdersControl`
+   * chips (soft warm fill + 1px border); INK text colours are unchanged. The base
+   * `.pill` carries a transparent border so bordered + border-less pills share the
+   * same box geometry (no height jump when they sit side by side). */
+  .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
-  .pill-sent      { background:#DBEAFE; color:#1E40AF; }
-  .pill-confirmed { background:#DCFCE7; color:#166534; }
+  .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue */
+  .pill-confirmed { background:#D6EFD9; border-color:#A9D8B0; color:#166534; } /* ready — green */
   .pill-collected { background:#E0E7FF; color:#3730A3; }
-  .pill-overdue   { background:#FEE2E2; color:#991B1B; }
+  .pill-overdue   { background:#FCE4E4; border-color:#F3B4B4; color:#991B1B; } /* overdue / no-PO — red */
   /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
-   * warning/low/pending/in-production states read as pills too (uses the v17
-   * --warning-soft #FEF3C7). Added 2026-06-12 per Jess. */
-  .pill-warning   { background:#FEF3C7; color:#92400E; }
+   * warning/low/pending/in-production states read as pills too. Added 2026-06-12
+   * per Jess; fill warmed to the Orders-list amber 2026-07-12. */
+  .pill-warning   { background:#FBE8C6; border-color:#F0D08A; color:#92400E; } /* waiting — amber */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 
   /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the

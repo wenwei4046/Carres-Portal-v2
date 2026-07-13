@@ -29,6 +29,27 @@ export const STOCK_LOCATIONS = [
   "at-supplier",
 ] as const;
 
+/** Carriers for a per-item transfer leg (Jess 2026-07-11 Route "Option D"). Free
+ *  set — the UI offers these first + suggests one per leg. */
+export const ROUTE_CARRIERS = [
+  "Lalamove",
+  "NETS",
+  "HOUZS",
+  "Supplier direct",
+  "Keep at Klang",
+] as const;
+
+/** One hop of a per-item transfer route: `from → to` via a carrier, `done` when
+ *  that leg has been completed. Stored per-line in ops_order_control.line_legs
+ *  (jsonb { <sku>: OrderRouteLeg[] }) — mirrors line_locations / line_etas. */
+export const orderRouteLegSchema = z.object({
+  from: z.string().max(60),
+  to: z.string().max(60),
+  carrier: z.string().max(40).nullable(),
+  done: z.boolean().default(false),
+});
+export type OrderRouteLeg = z.infer<typeof orderRouteLegSchema>;
+
 /** Suggested payment-follow-up states for the drawer dropdown. Stored as free
  *  text (column is `text`) so the operator isn't boxed in. */
 export const PAYMENT_STATUSES = [
@@ -107,6 +128,13 @@ export const opsOrderControlSchema = z.object({
   /** Per-line stock location { <sku>: string[] } + a call-first gate
    *  (migration 0168). */
   line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+  /** Per-line transfer route legs { <sku>: OrderRouteLeg[] } — a special
+   *  multi-hop arrangement (supplier pickup, cross-warehouse). Empty/absent =
+   *  the standard single hop to the default warehouse (migration 0216, Jess). */
+  line_legs: z
+    .record(z.string(), z.array(orderRouteLegSchema))
+    .nullable()
+    .default(null),
   /** Per-line stock ETA { <sku>: "yyyy-mm-dd" } — products don't all arrive on
    *  the same date (migration 0170, Jess). */
   line_etas: z.record(z.string(), z.string()).nullable(),
@@ -305,6 +333,9 @@ export const updateOpsOrderControlInput = z
     paid_amount: z.number().min(0).max(99_999_999).nullable(),
     storage_paid: z.string().max(100).nullable(),
     line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+    line_legs: z
+      .record(z.string(), z.array(orderRouteLegSchema))
+      .nullable(),
     line_etas: z.record(z.string(), z.string()).nullable(),
     line_stock_status: z
       .record(z.string(), z.enum(["ready", "waiting", "nopo"]))
