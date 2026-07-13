@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Home, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import {
   useDeliveryPartners,
@@ -117,19 +118,32 @@ export default function DeliveryChain({
   if (!hasChain) {
     return (
       <div className="text-xs">
-        <div className="mb-1.5">
-          <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">Type</div>
-          <div className="font-medium text-base-900">Single trip</div>
-        </div>
-        <div className="mb-1.5">
-          <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">Carrier</div>
-          <div className="text-base-900">
-            {fallbackPartnerName ? (
-              <span className="font-medium">{fallbackPartnerName}</span>
-            ) : (
-              <span className="text-base-400">— set in Delivery</span>
-            )}
-          </div>
+        {/* Single trip — the SAME wordless journey-bar language as the item Route
+            (Jess 2026-07-11): warehouse → partner → customer. Icons are the
+            places, colour is the progress; the only word is the partner pill. */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <Warehouse
+            className="w-3.5 h-3.5 text-base-400 shrink-0"
+            strokeWidth={2}
+          />
+          <span
+            className="h-1.5 flex-1 rounded-full min-w-[10px]"
+            style={{ backgroundColor: fallbackPartnerName ? "#2563EB" : "#D8D3C8" }}
+          />
+          {fallbackPartnerName ? (
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
+              {fallbackPartnerName}
+            </span>
+          ) : (
+            <span className="text-[10px] text-base-400 whitespace-nowrap">
+              set in Delivery
+            </span>
+          )}
+          <span className="h-1.5 flex-1 rounded-full min-w-[10px] bg-[#D8D3C8]" />
+          <Home
+            className="w-3.5 h-3.5 text-base-400 shrink-0"
+            strokeWidth={2}
+          />
         </div>
         {showAddLeg ? (
           <AddLegForm
@@ -148,17 +162,11 @@ export default function DeliveryChain({
         ) : (
           <button
             type="button"
-            className="mt-1 text-[11px] font-medium text-primary hover:underline"
+            className="text-[11px] font-medium text-primary hover:underline"
             onClick={() => setShowAddLeg(true)}
           >
             + Add stop (multi-leg)
           </button>
-        )}
-        {!showAddLeg && (
-          <p className="mt-1.5 text-[11px] text-base-400 leading-snug">
-            Cross-state / border? Split into legs (NETS → TEOW → EU) — each with its
-            own status, ETA + POD.
-          </p>
         )}
       </div>
     );

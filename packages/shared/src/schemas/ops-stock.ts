@@ -78,6 +78,22 @@ export const opsStockFlagRepairInputSchema = z.object({
 });
 export type OpsStockFlagRepairInput = z.infer<typeof opsStockFlagRepairInputSchema>;
 
+/** POST /api/ops/stock/refurbish — send a Free unit (typically Display) into
+ *  repair: it leaves the ready-stock pool (needs_repair=true) until completed. */
+export const opsStockRefurbishInputSchema = z.object({
+  itemId: z.string().uuid(),
+});
+export type OpsStockRefurbishInput = z.infer<typeof opsStockRefurbishInputSchema>;
+
+/** POST /api/ops/stock/refurbish-complete — repair done: grade the unit up to
+ *  'refurbished' (sellable as new) and return it to the Free ready-stock pool. */
+export const opsStockRefurbishCompleteInputSchema = z.object({
+  itemId: z.string().uuid(),
+});
+export type OpsStockRefurbishCompleteInput = z.infer<
+  typeof opsStockRefurbishCompleteInputSchema
+>;
+
 /** PATCH /api/ops/stock/:itemId/condition */
 export const opsStockUpdateConditionInputSchema = z.object({
   condition: opsStockConditionSchema,
@@ -115,6 +131,10 @@ export const opsStockItemSchema = z.object({
   reservedRef: z.string().nullable(),
   refHistory: z.array(z.string()),
   needsRepair: z.boolean(),
+  // 0218 — units represented by this record. 1 for serialized furniture (the
+  // norm); >1 only for bulk accessory lines from the Klg Warehouse sheet.
+  // Optional so older fixtures/constructors that pre-date the column don't break.
+  qty: z.number().int().min(1).default(1).optional(),
   supplier: z.string().nullable(),
   poNo: z.string().nullable(),
   sourceRef: z.string().nullable(),

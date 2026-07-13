@@ -52,8 +52,15 @@ interface Props {
   facetToggleTitle?: string;
   /** Control-bar content beside the facet toggle — typically the status tabs. */
   toolbar?: ReactNode;
-  /** Right-aligned control-bar content — typically the "N of M" row count. */
+  /** Right-aligned content on the SAME row as the tabs — typically search + the
+   *  page's import / create actions (moved off the header per the list template). */
   toolbarRight?: ReactNode;
+  /** A thin, right-aligned SECOND control row under the tabs — typically the
+   *  "N of M" count + the Columns picker. Auto-hidden while a bulkBar is active. */
+  toolbarSecondary?: ReactNode;
+  /** Gmail-style bulk band. When supplied (≥1 row selected) it REPLACES the whole
+   *  control area in place — the tabs row turns into the selection actions. */
+  bulkBar?: ReactNode;
   /** Active-filter chips; the row auto-hides when empty. */
   activeChips?: ActiveChip[];
   /** Footer content under the table — row count + a Reset affordance. */
@@ -75,6 +82,8 @@ export default function ListPageShell({
   facetToggleTitle,
   toolbar,
   toolbarRight,
+  toolbarSecondary,
+  bulkBar,
   activeChips,
   footer,
   children,
@@ -84,66 +93,27 @@ export default function ListPageShell({
   const hasFacet = facet != null && onFacetToggle != null;
   return (
     <div
-      className={`h-full flex flex-col px-6 pt-6 pb-5 bg-background ${className}`}
+      className={`h-full flex flex-col bg-background ${className}`}
       data-testid={testId}
     >
-      {/* Breadcrumb / freshness row (optional, thin) */}
-      {(breadcrumb || meta) && (
-        <div className="flex items-center justify-between gap-3 mb-1.5 shrink-0 text-[12px] text-base-400">
-          <div className="min-w-0 flex items-center gap-1.5">{breadcrumb}</div>
-          {meta && <div className="shrink-0 flex items-center gap-1">{meta}</div>}
-        </div>
-      )}
-
-      {/* Header — fixed 56px, title left, actions right */}
-      <PageHeader title={title} actions={actions} noBorder className="mb-3" />
-
-      {/* Control bar — facet toggle + tabs (left) · count (right) */}
-      {(toolbar || hasFacet || toolbarRight) && (
-        <div className="shrink-0 mb-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            {hasFacet && (
-              <button
-                type="button"
-                onClick={onFacetToggle}
-                title={facetToggleTitle ?? (facetOpen ? "Hide filters" : "Show filters")}
-                aria-label={facetOpen ? "Hide filters" : "Show filters"}
-                aria-pressed={facetOpen}
-                data-testid="listshell-facet-toggle"
-                className={`shrink-0 p-1.5 rounded-lg border transition-colors bg-white ${
-                  facetOpen
-                    ? "border-base-800 text-base-800"
-                    : "border-base-200 text-base-500 hover:text-base-800"
-                }`}
-              >
-                <PanelLeft size={15} />
-              </button>
-            )}
-            {toolbar}
+      {/* Header — ONE full-width WHITE surface band (no cream showing above or
+          between): breadcrumb + title + freshness on the left, the page's
+          search/utility cluster on the right, all inside this one strip. */}
+      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2.5">
+        {(breadcrumb || meta) && (
+          <div className="flex items-center justify-between gap-3 text-[12px] text-base-400">
+            <div className="min-w-0 flex items-center gap-1.5">{breadcrumb}</div>
+            {meta && <div className="shrink-0 flex items-center gap-1">{meta}</div>}
           </div>
-          {toolbarRight}
-        </div>
-      )}
+        )}
+        <PageHeader title={title} actions={actions} noBorder />
+      </div>
 
-      {/* Active-filter chips — auto-hidden when empty */}
-      {activeChips && activeChips.length > 0 && (
-        <div className="shrink-0 mb-2 flex items-center gap-1.5 flex-wrap" data-testid="listshell-active-chips">
-          {activeChips.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={c.onClear}
-              className="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border border-base-200 bg-white text-[12px] text-base-700 hover:border-base-400"
-            >
-              {c.label}
-              <X size={12} className="text-base-400" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Body split — facet aside (240px) + list column */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      {/* Body split — facet aside (left) + right column (control strip + table),
+          on the cream page bg. The strip lives INSIDE the right column, so it
+          NEVER spans above the facet: the facet's Summary top sits on the same
+          line as the strip top. */}
+      <div className="flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5">
         {hasFacet && facetOpen && (
           <aside
             className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
@@ -153,6 +123,65 @@ export default function ListPageShell({
           </aside>
         )}
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          {/* Control strip — the two-row control bar on ONE white surface panel
+              (so the tabs + search + actions + count row don't sit naked on the
+              cream page bg), OR (when a bulkBar is supplied because rows are
+              selected) the bulk band IN PLACE of it, so nothing jumps. */}
+          {bulkBar ? (
+            <div className="shrink-0 mb-3">{bulkBar}</div>
+          ) : (
+            (toolbar || hasFacet || toolbarRight || toolbarSecondary) && (
+              <div className="shrink-0 mb-3 bg-white border border-base-200 rounded-lg shadow-sm px-3 py-2.5">
+                {/* Row 1 — reopen toggle (only while collapsed; when open, the
+                    facet's own control collapses it) + tabs · search + actions. */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {hasFacet && !facetOpen && (
+                      <button
+                        type="button"
+                        onClick={onFacetToggle}
+                        title={facetToggleTitle ?? "Show filters"}
+                        aria-label="Show filters"
+                        aria-pressed={false}
+                        data-testid="listshell-facet-toggle"
+                        className="shrink-0 p-1.5 rounded-lg border transition-colors bg-white border-base-200 text-base-500 hover:text-base-800"
+                      >
+                        <PanelLeft size={15} />
+                      </button>
+                    )}
+                    {toolbar}
+                  </div>
+                  {toolbarRight && (
+                    <div className="flex items-center gap-2.5 shrink-0">{toolbarRight}</div>
+                  )}
+                </div>
+                {/* Row 2 — thin, right-aligned: count + the ⋮ overflow. */}
+                {toolbarSecondary && (
+                  <div className="mt-2 pt-2 border-t border-base-100 flex items-center justify-end gap-2.5">
+                    {toolbarSecondary}
+                  </div>
+                )}
+              </div>
+            )
+          )}
+
+          {/* Active-filter chips — auto-hidden when empty */}
+          {activeChips && activeChips.length > 0 && (
+            <div className="shrink-0 mb-2 flex items-center gap-1.5 flex-wrap" data-testid="listshell-active-chips">
+              {activeChips.map((c, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={c.onClear}
+                  className="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border border-base-200 bg-white text-[12px] text-base-700 hover:border-base-400"
+                >
+                  {c.label}
+                  <X size={12} className="text-base-400" />
+                </button>
+              ))}
+            </div>
+          )}
+
           {children}
           {footer && (
             <footer

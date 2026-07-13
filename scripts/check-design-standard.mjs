@@ -39,9 +39,7 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 // Directories/files where a raw hex is legitimate (no Tailwind at that layer).
 const HEX_ALLOW = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//, /\/pages\/print\//];
 // Pages that HAVE adopted the shell and must keep it (grows as pages migrate).
-// Empty on main: no page ships the shell yet. Add a page here in the SAME
-// commit that converts it, so a later regression (shell removed) fails the gate.
-const MUST_USE_SHELL = [];
+const MUST_USE_SHELL = ["pages/operation/OperationOrdersControl.tsx"];
 const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader)["']/;
 const OPT_OUT_RE = /design-standard:\s*not-a-list-page/;
 const LIST_MARKER_RE = /<table[\s>]|<DataGrid[\s/>]/;

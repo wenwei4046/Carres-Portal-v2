@@ -43,6 +43,7 @@ import OperationStockOnHand from "./OperationStockOnHand";
 import OperationServiceCases from "./OperationServiceCases";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import OperationRightRail from "./components/OperationRightRail";
+import GlobalTopBar from "./components/GlobalTopBar";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -197,7 +198,13 @@ export default function OperationApp() {
       }}
     >
       <PortalSidebar />
-      <main className="min-w-0 overflow-auto bg-base-50">
+      <main className="min-w-0 bg-base-50 flex flex-col overflow-hidden">
+        {/* Site-wide utility bar (Alerts · Help · Settings) — pinned above the
+            routed page on every operation screen. The Orders list is the ONE
+            exception: its own white header surface embeds <TopBarIcons />, so
+            the slim bar would duplicate them there. */}
+        {!isOrdersUrl && <GlobalTopBar />}
+        <div className="flex-1 min-h-0 overflow-auto">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
           //
@@ -286,6 +293,7 @@ export default function OperationApp() {
             {tab === "service-notes" && <OperationServiceCases />}
           </>
         )}
+        </div>
       </main>
       <OperationRightRail />
     </div>
