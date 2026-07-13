@@ -814,6 +814,36 @@ export function useProceedOrder(
 }
 
 /**
+ * useUnproceedOrder — POST /api/orders/:id/unproceed (0220). Reverses the
+ * sales-side Proceed marker: Proceed → Place while operation hasn't started
+ * (operation_stage still 'confirmed') and the proceed date hasn't passed.
+ * Mirrors useProceedOrder's cache mechanics (prime detail + invalidate list).
+ *
+ * Errors:
+ *   - 422 with `{ error: "unproceed_blocked", code }` — code is one of
+ *     wrong_status / wrong_stage / proceed_date_passed for inline copy.
+ *   - 403 / 404 / 500 — generic toast.
+ */
+export function useUnproceedOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, void>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<Order>(`/api/orders/${orderId}/unproceed`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
  * useTopUpOrder — POST /api/orders/:id/top-up. Records an additional partial
  * payment toward the order total. On success, primes the detail cache + busts
  * the list so kanban paid pct updates on next mount.

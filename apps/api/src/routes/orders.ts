@@ -1690,6 +1690,67 @@ ordersRouter.post("/:id/proceed", async (c) => {
 });
 
 /**
+ * POST /api/orders/:id/unproceed — 0220 POS proceed-lane edits. Reverses the
+ * sales-side Proceed marker via the `unproceed_order(uuid)` RPC: only while
+ * status='proceed_order' AND operation_stage is still 'confirmed' (what
+ * proceed_order stamps) AND the proceed date hasn't passed (MYT). Flips the
+ * order back to Place with operation_stage=NULL so the POS board restores it
+ * to lane 01.
+ *
+ * Error contract (matches RPC's RAISE EXCEPTION codes):
+ *   • 42501 (forbidden)                  → 403
+ *   • 42P01 (order_not_found)            → 404
+ *   • 22023 (wrong_status / wrong_stage /
+ *            proceed_date_passed)        → 422 { error: "unproceed_blocked", code }
+ *   • anything else                      → 500
+ */
+ordersRouter.post("/:id/unproceed", async (c) => {
+  const auth = c.var.auth;
+  const id = c.req.param("id");
+  const idCheck = z.string().uuid().safeParse(id);
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  if (
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
+    auth.role !== "finance" && auth.role !== "bd"
+  ) {
+    throw new HTTPException(403, { message: "Role cannot unproceed orders" });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { error: rpcError } = await sb.rpc("unproceed_order", { p_order_id: id });
+
+  if (rpcError) {
+    const sqlstate = rpcError.code;
+    if (sqlstate === "42501") {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (sqlstate === "42P01") {
+      throw new HTTPException(404, { message: "Order not found" });
+    }
+    if (sqlstate === "P0001" || sqlstate === "22023") {
+      // 422 — business precondition failed. `code` carries the RPC's DETAIL
+      // (wrong_status / wrong_stage / proceed_date_passed) so the drawer can
+      // show the matching friendly copy without parsing strings.
+      return c.json(
+        {
+          error: "unproceed_blocked",
+          code: rpcError.details ?? null,
+          message: rpcError.message,
+        },
+        422,
+      );
+    }
+    throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  // Re-fetch with relations — same shape as GET /:id so the client can
+  // setQueryData(qk.order(id), …) and skip a follow-up round-trip.
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
+/**
  * Shared body parser + RPC dispatcher for the three blocker-resolution
  * mutations (top-up / address / date). Keeps the route handlers small and
  * uniform: parse → validate → call RPC → map errors → re-fetch + return.
@@ -1937,6 +1998,9 @@ ordersRouter.patch("/:id", async (c) => {
   if (cust) {
     if ("name" in cust) flat.customer_name = cust.name;
     if ("phone" in cust) flat.customer_phone = cust.phone ?? "";
+    // 0220 — proceed-lane edits: email editable (null → "" so the RPC's
+    // nullif(trim(…), '') clears the column, same treatment as phone).
+    if ("email" in cust) flat.customer_email = cust.email ?? "";
     if ("address" in cust) flat.customer_address = cust.address ?? "";
     if ("addressUnknown" in cust) flat.customer_address_unknown = cust.addressUnknown;
     if ("billing" in cust) flat.customer_billing = cust.billing ?? "";

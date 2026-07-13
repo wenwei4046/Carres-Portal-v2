@@ -4078,6 +4078,38 @@
 .os-detail__cta {
   display: flex; gap: 10px; justify-content: flex-end;
 }
+/* Footer error line + un-proceed hint (PosOrderDetail, 2026-07-14 —
+   mirrors 2990s .detailFootError / .detailCtaHint). */
+.os-detail__err {
+  font-size: 12px; color: #B8331F;
+  margin-bottom: 10px;
+}
+.os-detail__hint {
+  margin-right: auto; align-self: center;
+  font-size: 12px; color: var(--fg-muted);
+}
+
+/* Record-payment method chips (PosOrderDetail §6 — cash / bank / online /
+   cheque / card, same values TopUpOrderInput accepts). */
+.os-paychips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.os-paychip {
+  padding: 7px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--pos-panel, #fff);
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+  transition: 150ms ease;
+}
+.os-paychip:hover { border-color: var(--c-orange); color: var(--c-burnt); }
+.os-paychip.is-on {
+  border-color: var(--c-orange);
+  color: var(--c-burnt);
+  background: color-mix(in oklab, var(--c-orange) 8%, var(--pos-panel, #fff));
+}
 
 
 /* Payment slip attachment */

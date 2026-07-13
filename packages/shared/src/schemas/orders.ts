@@ -402,6 +402,12 @@ export const updateOrderInputSchema = z
       .object({
         name: z.string().min(2).optional(),
         phone: z.string().regex(/^[0-9-+\s]{8,}/).optional(),
+        /** 0220 — POS proceed-lane edits. Editable email (0200 column); pass
+         *  null (or an empty string, coerced here) to clear it. */
+        email: z.preprocess(
+          (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+          z.string().trim().max(320).email().nullable(),
+        ).optional(),
         address: z.string().nullable().optional(),
         addressUnknown: z.boolean().optional(),
         billing: z.string().nullable().optional(),
