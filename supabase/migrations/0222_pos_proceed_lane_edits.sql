@@ -1,4 +1,6 @@
--- 0220_pos_proceed_lane_edits.sql
+-- 0222_pos_proceed_lane_edits.sql
+-- (authored as 0220; renumbered 2026-07-14 — Jess's parallel line had already
+--  applied 0220_ops_customer_confirmed + 0221_ops_last_chased_at to prod)
 -- ===========================================================================
 -- POS "My orders" order-detail drawer (2990s parity, Loo 2026-07-14) —
 -- proceed-lane edits + un-proceed:
@@ -27,18 +29,15 @@
 --       lane 01). Writes order_history (kind:'unproceed') + audit_log
 --       ('order.unproceeded').
 --
--- ⚠ NOT YET APPLIED (2026-07-14). Before applying: run `list_migrations`
---   against prod to re-verify the tail — Jess's parallel line (another
---   machine) may have advanced it past 0219; renumber this file if so, and
---   re-verify the live update_order definition still matches 0165 before
---   overwriting it.
+-- APPLIED to prod 2026-07-14 via MCP (tail verified = 0221 immediately
+-- before apply; live update_order re-verified == 0165 the same day).
 -- ===========================================================================
 
 BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 1. update_order — field-scoped proceed-lane gate + customer_email support.
---    Body based on 0165 (the live def); changes marked with "-- 0220:".
+--    Body based on 0165 (the live def); changes marked with "-- 0222:".
 -- ---------------------------------------------------------------------------
 create or replace function public.update_order(p_order_id uuid, p_payload jsonb)
  returns jsonb
@@ -57,7 +56,7 @@ begin
   v_role := public.app_role();
   v_caller_dealer_id := public.app_dealer_id();
 
-  -- 0220: NULL role (anon key / orphaned JWT) must not slip past the
+  -- 0222: NULL role (anon key / orphaned JWT) must not slip past the
   -- cross-dealer guard's NULL-boolean semantics — reject outright.
   if v_role is null then
     raise exception 'forbidden: no app role' using errcode = '42501';
@@ -73,7 +72,7 @@ begin
     raise exception 'forbidden: cross-dealer edit' using errcode = '42501';
   end if;
 
-  -- 0220: field-scoped status gate replaces the wholesale `<> 'place'` reject.
+  -- 0222: field-scoped status gate replaces the wholesale `<> 'place'` reject.
   -- Place orders stay fully editable; Proceed orders accept CUSTOMER fields
   -- only (the POS proceed lane keeps customer details/payment editable while
   -- products + dates lock); delivered/cancelled stay uneditable.
@@ -87,7 +86,7 @@ begin
       using errcode = '22023', detail = 'invalid_payload';
   end if;
 
-  -- 0220: in the Proceed lane the delivery/date fields are locked — the
+  -- 0222: in the Proceed lane the delivery/date fields are locked — the
   -- caller must un-proceed first ("move back to edit"). Whole edit rejects
   -- (not silently filtered) so the client never half-applies a patch.
   if v_order.status = 'proceed_order'
@@ -111,7 +110,7 @@ begin
     v_changed := array_append(v_changed, 'customer_name');
   end if;
   if p_payload ? 'customer_phone'           then v_changed := array_append(v_changed, 'customer_phone'); end if;
-  -- 0220: customer_email accepted (0200 column), nullable trim like phone.
+  -- 0222: customer_email accepted (0200 column), nullable trim like phone.
   if p_payload ? 'customer_email'           then v_changed := array_append(v_changed, 'customer_email'); end if;
   if p_payload ? 'customer_address'         then v_changed := array_append(v_changed, 'customer_address'); end if;
   if p_payload ? 'customer_address_unknown' then v_changed := array_append(v_changed, 'customer_address_unknown'); end if;
@@ -134,7 +133,7 @@ begin
                                     then trim(p_payload->>'customer_name') else customer_name end,
     customer_phone           = case when p_payload ? 'customer_phone'
                                     then nullif(trim(p_payload->>'customer_phone'), '') else customer_phone end,
-    -- 0220: email mirrors the phone treatment (trim, empty → null).
+    -- 0222: email mirrors the phone treatment (trim, empty → null).
     customer_email           = case when p_payload ? 'customer_email'
                                     then nullif(trim(p_payload->>'customer_email'), '') else customer_email end,
     customer_address         = case when p_payload ? 'customer_address'

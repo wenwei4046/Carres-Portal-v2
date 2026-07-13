@@ -68,7 +68,7 @@ export function getOrderEditScope(o: {
 Footer strips when nothing actionable: proceed lane without canUnproceed →
 `Locked · HQ operation handling`; delivered lane → `Delivered · managed in backend portal`.
 
-## 2. Migration `supabase/migrations/0220_pos_proceed_lane_edits.sql` (NOT applied by this session)
+## 2. Migration `supabase/migrations/0222_pos_proceed_lane_edits.sql` (renumbered from 0220 — Jess took 0220/0221; applied to prod 2026-07-14)
 
 **⚠ Before applying: `list_migrations` to re-verify the tail (Jess's parallel line) and
 renumber if needed. Live defs verified against prod 2026-07-14 (update_order = 0165
