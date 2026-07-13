@@ -132,6 +132,9 @@ export type SalesOrderTemplateData = {
 
   lines: Array<{
     sku: string;
+    /** Human product name (`Model name (Variant)`), server-resolved from the
+     *  sku since 2026-07-14 (2990s SO parity); older API builds echo the sku
+     *  code here — the template renders whatever arrives. */
     description: string;
     qty: number;
     unit_price: number;
@@ -144,6 +147,26 @@ export type SalesOrderTemplateData = {
     qty: number;
     unit_price: number;
     line_total: number;
+    /** order_addons.attrs (disposal size / delivery follow-up source SO) —
+     *  optional: pre-2026-07-14 API builds don't send it. */
+    attrs?: Record<string, unknown> | null;
+  }>;
+
+  /** "PAYMENTS RECEIVED" rows (2990s SO parity, 2026-07-14) — the
+   *  order_payments ledger for internal callers, else one synthesized row
+   *  from orders.paid + payment_method. Optional: pre-parity API builds
+   *  don't send it; the template then falls back to the paid amount. */
+  payments?: Array<{ label: string; reference: string | null; amount: number }>;
+
+  /** Voucher codes EARNED on this order (PWP carry-forward) — printed under
+   *  their trigger line ("PWP voucher issued: … · not redeemed yet").
+   *  Optional for the same rollout reason. */
+  vouchers?: Array<{
+    code: string;
+    redeemed: boolean;
+    type: "pwp" | "promo";
+    reward_category: string | null;
+    trigger_sku: string | null;
   }>;
 
   subtotal: number;

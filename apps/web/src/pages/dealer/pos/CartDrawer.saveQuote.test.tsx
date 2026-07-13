@@ -77,6 +77,24 @@ describe("CartDrawer — Save Quote requires customer name + phone", () => {
     expect(screen.queryByTestId("save-quote-form")).not.toBeInTheDocument();
   });
 
+  it("confirm clears the cart (lines + addons) and closes the drawer — the quote holds the items", () => {
+    const onChange = vi.fn();
+    const onClose = vi.fn();
+    const d = draft({
+      addons: [{ key: "dispose-old", qty: 1, unitPrice: 80, name: "Disposal", attrs: null }],
+    });
+    render(<CartDrawer draft={d} onChange={onChange} onProceed={noop} onClose={onClose} />);
+    fireEvent.click(screen.getByTestId("pos-save-quote"));
+    fireEvent.change(screen.getByTestId("save-quote-name"), { target: { value: "Tan Mei Ling" } });
+    fireEvent.change(screen.getByTestId("save-quote-phone"), { target: { value: "0123456789" } });
+    fireEvent.click(screen.getByTestId("save-quote-confirm"));
+
+    const next = onChange.mock.calls[0][0] as WizardDraft;
+    expect(next.lines).toEqual([]);
+    expect(next.addons).toEqual([]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("the form is pre-seeded from draft.customer when already known", () => {
     const d = draft();
     d.customer = { ...d.customer, name: "Known Customer", phone: "0111222333" };

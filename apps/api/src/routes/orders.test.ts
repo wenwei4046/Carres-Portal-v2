@@ -111,24 +111,40 @@ function buildStorageMock(opts: { signError?: boolean } = {}) {
 }
 
 function buildSb(
-  rowsFor: { list?: unknown[]; one?: unknown },
+  rowsFor: {
+    list?: unknown[];
+    one?: unknown;
+    /** Table-keyed rows for the sales-order-data enrichment lookups
+     *  (product_skus / addons / pwp_codes resolve on `.in()`,
+     *  order_payments on `.order()`). Absent tables resolve to [] — the
+     *  route's fail-soft fallbacks kick in, matching a dealer whose RLS
+     *  hides the table. */
+    byTable?: Record<string, unknown[]>;
+  },
   storageOpts: { signError?: boolean } = {},
 ) {
   // Simulates a Supabase PostgREST chain that records .eq() filters and
   // returns rows on .order() (list) or .maybeSingle() (single row).
   const eqs: Array<[string, unknown]> = [];
-  const chain = {
-    eq(col: string, val: unknown) {
-      eqs.push([col, val]);
-      return chain;
-    },
-    order: async () => ({ data: rowsFor.list ?? [], error: null }),
-    maybeSingle: async () => ({ data: rowsFor.one ?? null, error: null }),
-  };
+  function chainFor(table: string) {
+    const chain = {
+      eq(col: string, val: unknown) {
+        eqs.push([col, val]);
+        return chain;
+      },
+      in: async () => ({ data: rowsFor.byTable?.[table] ?? [], error: null }),
+      order: async () => ({
+        data: (table === "orders" ? rowsFor.list : rowsFor.byTable?.[table]) ?? [],
+        error: null,
+      }),
+      maybeSingle: async () => ({ data: rowsFor.one ?? null, error: null }),
+    };
+    return chain;
+  }
   const storage = buildStorageMock(storageOpts);
   return Object.assign(
     {
-      from: () => ({ select: () => chain }),
+      from: (table: string) => ({ select: () => chainFor(table) }),
       _eqs: eqs,
     },
     storage,
@@ -851,6 +867,154 @@ describe("GET /api/orders/:id/sales-order-data", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  // 2026-07-14 (Loo, 2990s SO parity) — description = PRODUCT NAME, addon
+  // labels humanized, PAYMENTS RECEIVED rows, earned voucher codes.
+  async function fetchPayload(sb: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await res.json()) as any;
+  }
+
+  it("resolves line description to the product name (model name + variant)", async () => {
+    const body = await fetchPayload(
+      buildSb({
+        one: makeJoinedRow(),
+        byTable: {
+          product_skus: [
+            {
+              sku: "sofa:atrium:part:L-piece",
+              variant: "L-piece",
+              product_models: { name: "Atrium Sofa" },
+            },
+          ],
+        },
+      }),
+    );
+    expect(body.lines[0].sku).toBe("sofa:atrium:part:L-piece"); // SKU column keeps the code
+    expect(body.lines[0].description).toBe("Atrium Sofa (L-piece)");
+  });
+
+  it("falls back to the sku code when the catalog lookup misses", async () => {
+    const body = await fetchPayload(buildSb({ one: makeJoinedRow() }));
+    expect(body.lines[0].description).toBe("sofa:atrium:part:L-piece");
+  });
+
+  it("humanizes addon labels via addons.name and passes addon attrs through", async () => {
+    const row = makeJoinedRow();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (row as any).order_addons = [
+      { addon_key: "dispose-mattress", qty: 3, unit_price: "80", attrs: { size: "King" } },
+    ];
+    const body = await fetchPayload(
+      buildSb({
+        one: row,
+        byTable: { addons: [{ key: "dispose-mattress", name: "Dispose old mattress" }] },
+      }),
+    );
+    expect(body.addons[0].label).toBe("Dispose old mattress");
+    expect(body.addons[0].attrs).toEqual({ size: "King" });
+  });
+
+  it("synthesizes ONE payments row from orders.paid + payment_method when the ledger is unreadable/empty", async () => {
+    const body = await fetchPayload(
+      buildSb({
+        one: makeJoinedRow({ paid: "750", payment_method: "credit", approval_code: "123123" }),
+      }),
+    );
+    expect(body.payments).toEqual([{ label: "Card", reference: "123123", amount: 750 }]);
+  });
+
+  it("returns no payments rows for an unpaid order", async () => {
+    const body = await fetchPayload(buildSb({ one: makeJoinedRow({ paid: "0" }) }));
+    expect(body.payments).toEqual([]);
+  });
+
+  it("prefers order_payments ledger rows (internal reprint) over the synthesized row", async () => {
+    const body = await fetchPayload(
+      buildSb({
+        one: makeJoinedRow(),
+        byTable: {
+          order_payments: [
+            {
+              amount: "500",
+              paid_on: "2026-07-01",
+              method: "bank",
+              kind: "deposit",
+              reference: "R-1",
+              receipt_no: null,
+            },
+            {
+              amount: "250",
+              paid_on: "2026-07-08",
+              method: "cash",
+              kind: "payment",
+              reference: null,
+              receipt_no: "RC-9",
+            },
+          ],
+        },
+      }),
+    );
+    expect(body.payments).toEqual([
+      { label: "Deposit · Bank transfer", reference: "R-1", amount: 500 },
+      { label: "Cash", reference: "RC-9", amount: 250 },
+    ]);
+  });
+
+  it("returns earned voucher codes (fail-soft to [] when the table is unreadable)", async () => {
+    const body = await fetchPayload(
+      buildSb({
+        one: makeJoinedRow(),
+        byTable: {
+          pwp_codes: [
+            {
+              code: "PWP-1401JXWP",
+              status: "AVAILABLE",
+              type: "pwp",
+              reward_category: "bedframe",
+              trigger_item_code: "sofa:atrium:part:L-piece",
+            },
+            {
+              code: "PWP-2988YJLO",
+              status: "USED",
+              type: "promo",
+              reward_category: null,
+              trigger_item_code: null,
+            },
+          ],
+        },
+      }),
+    );
+    expect(body.vouchers).toEqual([
+      {
+        code: "PWP-1401JXWP",
+        redeemed: false,
+        type: "pwp",
+        reward_category: "bedframe",
+        trigger_sku: "sofa:atrium:part:L-piece",
+      },
+      {
+        code: "PWP-2988YJLO",
+        redeemed: true,
+        type: "promo",
+        reward_category: null,
+        trigger_sku: null,
+      },
+    ]);
+    // and absent table → []
+    const bare = await fetchPayload(buildSb({ one: makeJoinedRow() }));
+    expect(bare.vouchers).toEqual([]);
   });
 });
 
@@ -3293,7 +3457,12 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     expect(sb._rpcCalls).toHaveLength(1);
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
     expect(payload.payment_method).toBe("cash");
-    expect(payload.entry_data).toBeNull();
+    // REGRESSION (2026-07-14): the key must be ABSENT, not `null` — a JSON
+    // null arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
+    // create_order's `entry_data must be a json object` guard, killing every
+    // order without entry extras (e.g. installment with only an approval
+    // code + EDC slip).
+    expect("entry_data" in payload).toBe(false);
   });
 
   it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
