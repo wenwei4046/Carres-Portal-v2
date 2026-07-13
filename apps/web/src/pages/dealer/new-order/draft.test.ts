@@ -56,6 +56,9 @@ function validDraft(): WizardDraft {
       approvalCode: "",
       installmentMonths: 6,
       slip: null,
+      // 0219 — loadDraft backfills this for pre-0219 drafts, so the roundtrip
+      // fixture carries it too.
+      followUps: {},
     },
     signature: null,
     termsAccepted: false,
@@ -290,6 +293,32 @@ describe("step2Valid — at least one line", () => {
         unitPrice: 1500,
         label: "Carres Classic · Queen",
       },
+    ];
+    expect(step2Valid(d)).toBe(true);
+  });
+
+  it("mattress/bedframe disposal still gates on size; sofa + operator-created dispose add-ons do NOT (Loo 2026-07-12)", () => {
+    const d = validDraft();
+    d.lines = [
+      {
+        localId: "x1",
+        sku: "mattress:carres-classic:queen",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1500,
+        label: "Carres Classic · Queen",
+      },
+    ];
+    // Size-less mattress disposal → blocked.
+    d.addons = [{ key: "dispose-mattress", qty: 1, unitPrice: 80, name: "Dispose old mattress", attrs: {} }];
+    expect(step2Valid(d)).toBe(false);
+    // Sized → ok.
+    d.addons = [{ key: "dispose-mattress", qty: 1, unitPrice: 80, name: "Dispose old mattress", attrs: { size: "Queen" } }];
+    expect(step2Valid(d)).toBe(true);
+    // Sofa disposal + a new operator-created dispose-* add-on: no size needed.
+    d.addons = [
+      { key: "dispose-sofa", qty: 1, unitPrice: 50, name: "Dispose old sofa (small size)" },
+      { key: "dispose-old-sofa-big-sofa", qty: 1, unitPrice: 80, name: "Dispose old sofa (big sofa)" },
     ];
     expect(step2Valid(d)).toBe(true);
   });

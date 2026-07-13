@@ -370,7 +370,11 @@ function validCreateBody(over: Record<string, unknown> = {}) {
     termsAccepted: true,
     depositPct: 50,
     paymentMethod: "online",
-    approvalCode: null,
+    // 0219 — the approval / reference code is server-required now for any
+    // method whose config says approvalCodeRequired (the default methods
+    // mirror Loo's 2026-05-10 rule: everything except cash). The real POS has
+    // sent it for every method since 2026-06-16 (step4Valid ≥3 gate).
+    approvalCode: "FT2026TEST01",
     installmentMonths: null,
     ...over,
   };
@@ -465,6 +469,137 @@ describe("GET /api/orders", () => {
       env,
     );
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/orders/customer-search", () => {
+  /** Chain mock for .select().ilike().order().limit() — records the ilike
+   *  pattern + limit and resolves rows at .limit(). */
+  function buildSbForSearch(rows: unknown[]) {
+    const calls: { ilike?: [string, string]; limit?: number } = {};
+    const chain = {
+      ilike(col: string, pattern: string) {
+        calls.ilike = [col, pattern];
+        return chain;
+      },
+      order() {
+        return chain;
+      },
+      limit: async (n: number) => {
+        calls.limit = n;
+        return { data: rows, error: null };
+      },
+    };
+    return Object.assign(
+      { from: () => ({ select: () => chain }), _calls: calls },
+      {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ) as any;
+  }
+
+  function customerRow(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      customer_name: "Jamie Tan",
+      customer_phone: "012-3456789",
+      customer_email: "jamie@example.com",
+      customer_address: "12 Jalan Besar, Petaling Jaya 46200, Selangor",
+      customer_address_unknown: false,
+      customer_billing: null,
+      customer_billing_same: true,
+      customer_emergency: "Mei Tan · 012-9988776 · Spouse",
+      customer_race: "Chinese",
+      customer_gender: "Female",
+      customer_birthday: "1990-04-01",
+      placed_at: "2026-07-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request("http://t/api/orders/customer-search?q=jam"), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("short query (<2 chars) returns empty without touching the DB", async () => {
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=j", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ customers: [] });
+    expect(vi.mocked(userClient)).not.toHaveBeenCalled();
+  });
+
+  it("maps the full customer block to camelCase", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForSearch([customerRow()]));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=jam", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customers: Array<Record<string, unknown>> };
+    expect(body.customers).toEqual([
+      {
+        name: "Jamie Tan",
+        phone: "012-3456789",
+        email: "jamie@example.com",
+        address: "12 Jalan Besar, Petaling Jaya 46200, Selangor",
+        addressUnknown: false,
+        billing: null,
+        billingSame: true,
+        emergency: "Mei Tan · 012-9988776 · Spouse",
+        race: "Chinese",
+        gender: "Female",
+        birthday: "1990-04-01",
+      },
+    ]);
+  });
+
+  it("dedupes by phone digits (newest order wins) and by name when phone is null", async () => {
+    const rows = [
+      customerRow({ customer_email: "newest@example.com" }),
+      // Same phone, different formatting → same customer, older order dropped.
+      customerRow({ customer_phone: "0123456789", customer_email: "older@example.com" }),
+      // No phone → keyed by lowercased name.
+      customerRow({ customer_name: "James Lee", customer_phone: null }),
+      customerRow({ customer_name: "james lee", customer_phone: null }),
+    ];
+    vi.mocked(userClient).mockReturnValue(buildSbForSearch(rows));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/customer-search?q=ja", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as { customers: Array<{ name: string; email: string }> };
+    expect(body.customers).toHaveLength(2);
+    expect(body.customers[0]?.email).toBe("newest@example.com");
+    expect(body.customers[1]?.name).toBe("James Lee");
+  });
+
+  it("escapes ilike wildcards in the query and caps results at 8", async () => {
+    const rows = Array.from({ length: 12 }, (_, i) =>
+      customerRow({ customer_name: `Jam ${i}`, customer_phone: `012-000000${i}` }),
+    );
+    const sb = buildSbForSearch(rows);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/customer-search?q=${encodeURIComponent("ja%m")}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb._calls.ilike).toEqual(["customer_name", "%ja\\%m%"]);
+    const body = (await res.json()) as { customers: unknown[] };
+    expect(body.customers).toHaveLength(8);
   });
 });
 
@@ -848,9 +983,11 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(403);
-    // RPC was attempted; no follow-up fetch happened
+    // RPC was attempted; no follow-up ORDER fetch happened. (The single eq
+    // recorded is the 0219 order_entry_config singleton read — pre-create
+    // payment-method validation, not a follow-up fetch.)
     expect(sb._rpcCalls).toHaveLength(1);
-    expect(sb._eqs).toEqual([]);
+    expect(sb._eqs).toEqual([["id", true]]);
   });
 
   it("maps RPC 22023 (validation in PL/pgSQL) to HTTP 400", async () => {
@@ -2493,6 +2630,103 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
+  // ── Remark ± price adjustment (Loo 2026-07-12) — attrs.remark_surcharge is an
+  // operator-decided amount the drift gate ADDS to the engine total; the remark
+  // text + the adjustment ride every exploded line (whole-sofa metadata).
+  it("remark_surcharge joins the expected total: engine 1600 + 200 accepts unitPrice 1800 and explodes to Σ1800", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          buildOrderBody(1800, { remark: "custom armrest", remark_surcharge: 200 }),
+        ),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ unit_price: number; qty: number; attrs: Record<string, unknown> }>;
+    };
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.reduce((s, l) => s + l.unit_price * l.qty, 0)).toBe(1800);
+    // Remark + adjustment ride every exploded line (already inside the split).
+    expect(payload.lines.every((l) => l.attrs.remark === "custom armrest")).toBe(true);
+    expect(payload.lines.every((l) => l.attrs.remark_surcharge === 200)).toBe(true);
+  });
+
+  it("a NEGATIVE remark adjustment (discount) is honoured: engine 1600 − 200 accepts 1400", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1400, { remark_surcharge: -200 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ unit_price: number; qty: number }>;
+    };
+    expect(payload.lines.reduce((s, l) => s + l.unit_price * l.qty, 0)).toBe(1400);
+  });
+
+  it("an adjusted unitPrice WITHOUT the declared remark_surcharge still drifts (422)", async () => {
+    // unitPrice 1800 but no attrs declaration → server expects 1600 → reject.
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1800)),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("sofa_price_drift");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a discount below RM 0 → 400 bad_request (fail-closed), no create", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(0, { remark_surcharge: -1700 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a NON-NUMERIC remark_surcharge is rejected by the attrs schema (400)", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1800, { remark_surcharge: "200" })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
   it("server price 0 + client 0 → accepted (genuine free build, still explodes)", async () => {
     // Both compartments offered but priced 0 → server total 0; the build still
     // explodes into 2 real (RM0) lines whose skus map.
@@ -2914,5 +3148,102 @@ describe("POST /api/orders — option picks recompute (0201/0202 wiring)", () =>
     expect(body.code).toBe("sofa_price_drift");
     expect(body.serverTotal).toBe(1600);
     expect(sb._rpcCalls).toHaveLength(0);
+  });
+});
+
+// =====================================================================
+// 0219 — config-driven payment methods (cash + follow-ups + entry_data)
+// =====================================================================
+
+describe("POST /api/orders — 0219 payment-method config gates", () => {
+  // The RPC erroring with 22023 stops the flow right AFTER create_order is
+  // called — perfect probe: reaching the RPC proves the 0219 gate passed,
+  // and _rpcCalls[0].payload shows exactly what would have been persisted.
+  function sbStopAtRpc() {
+    return buildSbForCreate({ rpcError: { code: "22023", message: "stop-probe" } });
+  }
+  async function post(body: unknown) {
+    const jwt = await makeJwt("dealer", DEALER_A);
+    return app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("CASH is accepted with NO approval code (default-config method, approvalCodeRequired=false)", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "cash", approvalCode: null }));
+    expect(res.status).toBe(400); // the stop-probe 22023 — i.e. the gate PASSED
+    expect(sb._rpcCalls).toHaveLength(1);
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.payment_method).toBe("cash");
+    expect(payload.entry_data).toBeNull();
+  });
+
+  it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "bitcoin" }));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("invalid_payment_method");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("a method with approvalCodeRequired and no code → 422 approval_code_required", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(validCreateBody({ paymentMethod: "online", approvalCode: null }));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("approval_code_required");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("credit + a configured bank answer rides entry_data into the create payload", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        paymentMethod: "credit",
+        entryData: { payment: { bank: "Maybank" } },
+      }),
+    );
+    expect(res.status).toBe(400); // stop-probe → gate passed
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" } });
+  });
+
+  it("credit + a bank NOT in the configured options → 422 payment_followup_invalid", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        paymentMethod: "credit",
+        entryData: { payment: { bank: "Bank of Mars" } },
+      }),
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("payment_followup_invalid");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("custom form-field values ride entry_data.fields through untouched", async () => {
+    const sb = sbStopAtRpc();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(
+      validCreateBody({
+        entryData: { fields: { occupation: "Engineer" } },
+      }),
+    );
+    expect(res.status).toBe(400); // stop-probe → gate passed
+    const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer" } });
   });
 });

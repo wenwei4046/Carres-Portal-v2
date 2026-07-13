@@ -39,6 +39,41 @@
   --pos-panel: #fff;
   --pos-rail: var(--c-paper);
 
+  /* ---- Later-section vocabulary (Loo 2026-07-12): sections added after the
+     prototype extraction reference these tokens but nothing ever DEFINED
+     them — an undefined var() invalidates the whole declaration (gap → 0,
+     radius → square, font-size → inherit), which is why summary rows sat
+     jammed together. Values sized to the family above. ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --rad-sm: 8px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-18: 18px;
+  --w-semibold: 600;
+  --w-bold: 700;
+  --w-black: 900;
+  --tk-tight: -0.01em;
+  --tk-loud: 0.12em;
+  --font-display: var(--font-title);
+  --fg-mute: var(--fg-muted);
+  --fg-accent-deep: var(--c-burnt);
+  --bg-cream: var(--c-cream);
+  --surface: #fff;
+  --surface-2: var(--c-paper);
+  --c-burnt-soft: rgba(188, 67, 25, 0.10);
+  --c-festive-b: #B4321A;
+  --c-secondary-a: #7A5C3E;
+  --shadow-1: 0 1px 2px rgba(34, 31, 32, 0.06);
+  --shadow-3: 0 12px 32px rgba(34, 31, 32, 0.14);
+
   font-family: var(--font-sans);
   color: var(--c-ink);
   background: var(--pos-bg);
@@ -136,8 +171,14 @@
 }
 .pos-topbar__count svg { width: 13px; height: 13px; }
 
-/* ========= Page transitions ========= */
-.page-shell { animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both; will-change: transform, opacity; height: 100%; min-height: 0; }
+/* ========= Page transitions =========
+   NO `will-change` and NO `both` fill here (Loo 2026-07-12): the permanent
+   compositor-layer promotion made Chrome show a STALE BLANK layer for the
+   whole step content after the native file-picker dialog froze the renderer
+   (Attach file → page appears wiped until a tab switch forces a repaint).
+   The one-shot enter animation needs neither — after 320ms the element must
+   return to plain, normally-composited rendering. */
+.page-shell { animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1); height: 100%; min-height: 0; }
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -621,6 +662,42 @@
 .field textarea { resize: vertical; min-height: 80px; }
 .field__hint { font-size: 11px; color: var(--fg-muted); }
 
+/* Full-name autocomplete — existing-customer suggestions (anchored under the
+   input via an inline position:relative wrapper). */
+.cust-suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  z-index: 30;
+  background: var(--pos-panel, #fff);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(34, 31, 32, 0.14);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.cust-suggest__head {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--fg-muted);
+  padding: 10px 14px 6px;
+}
+.cust-suggest__item {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: none; border: 0; cursor: pointer;
+  font: inherit;
+}
+.cust-suggest__item:hover { background: color-mix(in oklab, var(--c-orange) 8%, transparent); }
+.cust-suggest__item + .cust-suggest__item { border-top: 1px solid var(--line); }
+.cust-suggest__name { font-size: 14px; font-weight: 600; }
+.cust-suggest__meta {
+  font-size: 11px; color: var(--fg-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* Date picker */
 .datepick {
   display: grid; grid-template-columns: repeat(7, 1fr);
@@ -742,12 +819,16 @@
 .summary__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; }
 .summary__row .key { color: var(--fg-muted); }
 .summary__row .val { font-weight: 500; text-align: right; }
-.summary__items { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Items list breathes: 16px between rows (Loo 2026-07-12 — "分开来 有空间一点"). */
+.summary__items { display: flex; flex-direction: column; gap: var(--space-4); }
 .summary__item {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
-  gap: var(--space-3);
-  align-items: center;
+  grid-template-columns: 48px 1fr auto;
+  /* 14px photo↔text column air (Loo 2026-07-12 sketch). */
+  gap: var(--space-3) 14px;
+  /* Top-aligned (Loo 2026-07-12) — a wrapping detail line used to float the
+     photo + price mid-row, reading as fragments. Name row anchors all three. */
+  align-items: start;
 }
 .summary__item--sofa {
   align-items: start;
@@ -759,10 +840,17 @@
 .summary__item--sofa + .summary__item--sofa { margin-top: 0; }
 .summary__item-main { min-width: 0; }
 .summary__item-photo {
-  width: 40px; height: 40px;
-  border-radius: var(--radius-sm);
+  width: 48px; height: 48px;
+  /* Rounded square, not a sharp tile (Loo 2026-07-12). */
+  border-radius: 10px;
   background-color: var(--c-beige);
-  background-size: cover; background-position: center;
+  border: 1px solid var(--line);
+  /* CONTAIN, not cover (Loo 2026-07-12) — a 40px cover crop of a product
+     shot read as a random sliver ("像被裁剪"). Show the WHOLE photo on a
+     white tile instead. */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .summary__item--sofa .summary__item-photo { margin-top: 2px; }
 .summary__item-name {
@@ -793,9 +881,13 @@
   color: var(--c-festive-b);
 }
 .summary__item-meta {
-  font-family: var(--font-sans);
-  font-size: var(--fs-12);
-  line-height: 1.4;
+  /* Spec lines read in the MONO spec face, one step smaller than the name
+     (Loo 2026-07-12) — same voice as prod-card__sku / cfg-comp__meta, so
+     the model name (font-title) and its spec clearly separate. */
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--fg-muted);
   margin-top: 2px;
 }

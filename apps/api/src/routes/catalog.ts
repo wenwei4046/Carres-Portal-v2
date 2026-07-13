@@ -5,6 +5,7 @@ import {
   Adapters,
   DB,
   catalogResponseSchema,
+  parseOrderEntryConfigRow,
   productModelCreateInput,
   productModelPatchInput,
   productSkuCreateInput,
@@ -196,7 +197,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -251,6 +252,10 @@ catalogRouter.get("/", async (c) => {
     // Fabrics tab editor must see OFF rows). Read-only reference — NOT a source
     // of truth for any order-side consumer (selling fabrics stay sofa_fabrics).
     sb.from(CATALOG_FABRICS).select("*"),
+    // 0219 — Order Entry config singleton (payment methods + form fields).
+    // maybeSingle + LENIENT parse below: a missing/garbage row degrades to the
+    // code defaults (pre-0219 behavior + Cash) instead of breaking the bundle.
+    sb.from("order_entry_config").select("*").eq("id", true).maybeSingle(),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -317,6 +322,14 @@ catalogRouter.get("/", async (c) => {
     sofaFabrics: liveFabrics.map((f) => Adapters.sofaFabricFromRow(f as DB.SofaFabricRow)),
     addons: (addonsR.data ?? []).map((a) => Adapters.addonFromRow(a as DB.AddonRow)),
     floorConfig: Adapters.floorConfigFromRow(floorR.data as DB.FloorConfigRow),
+    // 0219 — Order Entry config (additive, OPTIONAL; lenient row parse — read
+    // errors / missing row degrade to the empty config = code defaults apply).
+    orderEntryConfig: parseOrderEntryConfigRow(
+      (entryConfigR && !entryConfigR.error ? entryConfigR.data : null) as {
+        payment_methods?: unknown;
+        form_fields?: unknown;
+      } | null,
+    ),
     // 0176 — fabric tier pricing (additive; pre-0176 clients ignore these keys).
     fabricTierConfig,
     modelFabricTierOverrides: (tierOverridesR.data ?? []).map(
@@ -1359,6 +1372,44 @@ catalogRouter.patch("/floor-config", async (c) => {
   return c.json({ floorConfig: Adapters.floorConfigFromRow(data as DB.FloorConfigRow) });
 });
 
+/**
+ * Ensure the addon's linked Service SKU EXISTS as a real product_skus row
+ * (Loo 2026-07-12 — the link must be real, not a dangling code). Mirrors the
+ * 0172 hand-minted rows: parent model = the `service-addons` service model,
+ * sku = variant = the bare SVC- code. Idempotent (upsert ignoreDuplicates on
+ * the sku UNIQUE) and best-effort — the addon itself is already committed, so
+ * a mint failure never fails the request; the row can be added via SKU Master.
+ *
+ * 0175 price lock: only the principal may INSERT a priced sku, so a
+ * non-principal internal caller mints it UNPRICED (0) for the principal to
+ * price later — same rule the trigger enforces for every other sku create.
+ */
+async function ensureServiceSkuRow(
+  sb: ReturnType<typeof userClient>,
+  opts: { sku: string; description: string; price: number; isPrincipal: boolean },
+): Promise<void> {
+  const modelR = await sb
+    .from("product_models")
+    .select("id")
+    .eq("category", "service")
+    .eq("model_key", "service-addons")
+    .maybeSingle();
+  if (modelR.error || !modelR.data) return; // stripped env — nothing to hang it on
+  const r = await sb.from("product_skus").upsert(
+    {
+      model_id: (modelR.data as { id: string }).id,
+      sku: opts.sku,
+      variant: opts.sku,
+      variant_kind: "preset",
+      price: opts.isPrincipal ? opts.price : 0,
+      pos_active: true,
+      description: opts.description,
+    },
+    { onConflict: "sku", ignoreDuplicates: true },
+  );
+  void r; // best-effort — errors intentionally swallowed (see docstring)
+}
+
 catalogRouter.post("/addons", async (c) => {
   internalOnly(c);
   const parsed = await parseJsonBody(c, addonCreateInput);
@@ -1376,6 +1427,14 @@ catalogRouter.post("/addons", async (c) => {
     .select("*")
     .single();
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (parsed.data.serviceSku) {
+    await ensureServiceSkuRow(sb, {
+      sku: parsed.data.serviceSku,
+      description: parsed.data.serviceDescription || parsed.data.name,
+      price: parsed.data.price,
+      isPrincipal: c.var.auth.role === "principal",
+    });
+  }
   return c.json({ addon: Adapters.addonFromRow(data as DB.AddonRow) }, 201);
 });
 
@@ -1389,21 +1448,46 @@ catalogRouter.patch("/addons/:key", async (c) => {
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.serviceSku !== undefined) patch.service_sku = parsed.data.serviceSku;
-  if (Object.keys(patch).length === 0) {
+  // serviceDescription is NOT an addons column — it lands on the linked SKU
+  // row below. A description-only patch is therefore valid (no column patch).
+  if (Object.keys(patch).length === 0 && parsed.data.serviceDescription === undefined) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("addons")
-    .update(patch)
-    .eq("key", key)
-    .select("*")
-    .maybeSingle();
+  const { data, error } =
+    Object.keys(patch).length > 0
+      ? await sb.from("addons").update(patch).eq("key", key).select("*").maybeSingle()
+      : await sb.from("addons").select("*").eq("key", key).maybeSingle();
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
-  return c.json({ addon: Adapters.addonFromRow(data as DB.AddonRow) });
+  const row = data as DB.AddonRow;
+  const isPrincipal = c.var.auth.role === "principal";
+  // Keep the Service SKU link REAL (Loo 2026-07-12), best-effort:
+  //  - a (re)assigned serviceSku → make sure the SVC- row exists (restore path);
+  //  - a serviceDescription → write it onto the linked SKU row (description is
+  //    internal-writable — not 0175-locked);
+  //  - a principal price change → mirror it onto the linked SKU row so the
+  //    SKU Master shows the same number (non-principal skips — 0175 lock).
+  if (parsed.data.serviceSku) {
+    await ensureServiceSkuRow(sb, {
+      sku: parsed.data.serviceSku,
+      description: parsed.data.serviceDescription || row.name,
+      price: row.price,
+      isPrincipal,
+    });
+  }
+  if (parsed.data.serviceDescription !== undefined && row.service_sku) {
+    await sb
+      .from("product_skus")
+      .update({ description: parsed.data.serviceDescription || null })
+      .eq("sku", row.service_sku);
+  }
+  if (parsed.data.price !== undefined && isPrincipal && row.service_sku) {
+    await sb.from("product_skus").update({ price: row.price }).eq("sku", row.service_sku);
+  }
+  return c.json({ addon: Adapters.addonFromRow(row) });
 });
 
 // Soft-disable (active=false) rather than hard delete so the service_sku link

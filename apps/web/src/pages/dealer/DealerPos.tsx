@@ -3,10 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
-import { maxLeadDaysFor } from "@carres/shared";
+import { maxLeadDaysFor, resolvePaymentMethods } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import { deliveryFeePreview } from "@/lib/order-totals";
+import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import {
@@ -32,6 +32,7 @@ import {
   loadDraft,
   saveDraft,
   step1Valid,
+  step2Valid,
   step3DateValid,
   step4Valid,
 } from "./new-order/draft";
@@ -118,7 +119,17 @@ export default function DealerPos({
 } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [draft, setDraft] = useState<WizardDraft>(() => loadDraft() ?? emptyDraft());
+  // Which CUSTOMER sub-step to open on: 0 (Customer form) when arriving from
+  // the cart, 3 (Target date) when backing out of the CONFIRM step — Back
+  // returns to the previous SCREEN, not the start of the wizard (Loo 2026-07-12).
+  const [customerSubStep, setCustomerSubStep] = useState<0 | 3>(0);
+  const [draft, setDraft] = useState<WizardDraft>(() => {
+    const d = loadDraft() ?? emptyDraft();
+    // The ASAP pill was removed 2026-07-12 — neutralize a stale flag from an
+    // older saved draft so the hidden auto-proceed / 50%-deposit gate can't
+    // fire with no UI showing why.
+    return d.delivery.asap ? { ...d, delivery: { ...d.delivery, asap: false } } : d;
+  });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -289,10 +300,12 @@ export default function DealerPos({
 
       // Reserve new triggers + qty/reward-flag changes (sequential, single-flight
       // per key). The diff key includes `rewardLine` so marking a trigger line as
-      // a reward re-reconciles it (the server then trims its promo reservations).
+      // a reward re-reconciles it (the server then trims its promo reservations),
+      // and the sku + built compartments so an in-place cart-line EDIT (Loo
+      // 2026-07-12 — same localId, different product/build) re-reserves too.
       for (const t of triggerLines) {
         if (inFlightRef.current.has(t.cartLineKey)) continue;
-        const diffKey = `${t.qty}:${t.rewardLine}`;
+        const diffKey = `${t.sku}:${t.qty}:${t.rewardLine}:${(t.builtCompartments ?? []).join("+")}`;
         if (prev.get(t.cartLineKey) === diffKey) continue; // unchanged → no-op
         inFlightRef.current.add(t.cartLineKey);
         reservePwp.mutate(
@@ -365,35 +378,37 @@ export default function DealerPos({
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
   // An internal operator must have picked the acting dealer before advancing.
+  // step2Valid re-checked here too: the Target-date sub-step now hosts the
+  // order add-ons picker, so a disposal add-on picked there must have its size
+  // before CONFIRM (the cart drawer's gate alone no longer covers it).
+  // 0219 — the customer-form + payment gates are CONFIG-AWARE (order_entry_config
+  // rides the catalog bundle; absent → code defaults = pre-0219 behavior + cash).
+  const entryFormCfg = catalogQ.data?.orderEntryConfig?.formFields ?? null;
+  const paymentMethods = useMemo(
+    () => resolvePaymentMethods(catalogQ.data?.orderEntryConfig),
+    [catalogQ.data],
+  );
   const customerReady = useMemo(
-    () => !!effectiveDealerId && step1Valid(draft) && step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays, effectiveDealerId],
+    () =>
+      !!effectiveDealerId &&
+      step1Valid(draft, entryFormCfg) &&
+      step2Valid(draft) &&
+      step3DateValid(draft, minLeadDays),
+    [draft, minLeadDays, effectiveDealerId, entryFormCfg],
   );
   const confirmReady = useMemo(
-    () => step4Valid(draft) && asapDepositOk,
-    [draft, asapDepositOk],
+    () => step4Valid(draft, paymentMethods) && asapDepositOk,
+    [draft, asapDepositOk, paymentMethods],
   );
 
-  // Footer total — lines + addons + stair carry (shown on steps 2/3).
-  const footerTotal = useMemo(() => {
-    if (!catalogQ.data) return 0;
-    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
-    const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-    const stair = draft.delivery.hasLift
-      ? 0
-      : Math.max(0, draft.delivery.floor - catalogQ.data.floorConfig.freeUpToFloor) *
-        catalogQ.data.floorConfig.perFloorPerItem *
-        itemsTotal;
-    // 0184 — delivery TRIP fee preview (same pure engine the server recomputes).
-    // Dormant config (0/0) → 0, so totals stay byte-identical until rates are set.
-    const delivery =
-      deliveryFeePreview(draft.lines, catalogQ.data, {
-        additionalFee: draft.additionalDeliveryFee,
-        isCrossCategoryFollowup: Boolean((draft.crossCategorySourceSo ?? "").trim()),
-      })?.total ?? 0;
-    return lineSub + addonSub + stair + delivery;
-  }, [draft, catalogQ.data]);
+  // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
+  // the Step-3 recap, and the OrderSummaryRail always show the SAME number.
+  // (The old hand-rolled stair math here also ignored the dealer-picked
+  // delivery.stairItems count — draftTotals applies it.)
+  const footerTotal = useMemo(
+    () => (catalogQ.data ? draftTotals(draft, catalogQ.data).grand : 0),
+    [draft, catalogQ.data],
+  );
 
   const submitDisabled =
     !confirmReady || uploading || createOrder.isPending || !effectiveDealerId;
@@ -512,6 +527,28 @@ export default function DealerPos({
         // fallback sweep). Empty on a DORMANT / no-PWP cart — equal to the schema
         // default, so the server-side effect is byte-identical.
         pwpCartLineKeys: triggerLines.map((t) => t.cartLineKey),
+        // 0219 — POS entry extras: the payment follow-up answers (e.g. the
+        // Credit/Debit bank) + custom form-field values. Omitted entirely when
+        // both are empty so a default-config order submits a byte-identical
+        // payload.
+        ...(() => {
+          const payment = Object.fromEntries(
+            Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
+          );
+          const fields = Object.fromEntries(
+            Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
+          );
+          const hasPayment = Object.keys(payment).length > 0;
+          const hasFields = Object.keys(fields).length > 0;
+          return hasPayment || hasFields
+            ? {
+                entryData: {
+                  ...(hasPayment ? { payment } : {}),
+                  ...(hasFields ? { fields } : {}),
+                },
+              }
+            : {};
+        })(),
       };
 
       const created = await createOrder.mutateAsync(input);
@@ -765,7 +802,10 @@ export default function DealerPos({
               draft={draft}
               onChange={setDraft}
               catalog={catalogQ.data}
-              onProceed={() => setStep(2)}
+              onProceed={() => {
+                setCustomerSubStep(0);
+                setStep(2);
+              }}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
@@ -785,6 +825,7 @@ export default function DealerPos({
                 salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
+                initialSubStep={customerSubStep}
                 onBackToCart={() => setStep(1)}
                 onProceed={() => customerReady && setStep(3)}
                 dealerPick={
@@ -876,7 +917,12 @@ export default function DealerPos({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                // Back = the PREVIOUS screen (Target date sub-step), not the
+                // first Customer form (Loo 2026-07-12).
+                setCustomerSubStep(3);
+                setStep(2);
+              }}
               className="btn btn--ghost"
               disabled={uploading || createOrder.isPending}
             >

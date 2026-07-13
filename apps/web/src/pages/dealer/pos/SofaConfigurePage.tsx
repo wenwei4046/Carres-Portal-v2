@@ -292,6 +292,7 @@ export default function SofaConfigurePage({
   pwpClaimGroup,
   customerPhone,
   onApplyVoucherCode,
+  editLine,
   onAdd,
   onClose,
 }: {
@@ -323,6 +324,12 @@ export default function SofaConfigurePage({
   customerPhone?: string;
   /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Cart-line EDIT (Loo 2026-07-12): a sofa-BUILD DraftLine to prefill from —
+   *  opens straight in Customize with the stored geometry on the canvas and
+   *  the fabric / leg / height restored. Read once at mount; `onAdd` then
+   *  REPLACES the line in the cart. A PWP claim on the old line is NOT
+   *  restored — the cart re-offers it. */
+  editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -342,6 +349,51 @@ export default function SofaConfigurePage({
     () => sellingFabricsFor(model, fabrics, masterFabrics),
     [model, fabrics, masterFabrics],
   );
+
+  // Cart-line EDIT prefill — the stored `attrs.sofa_build` geometry + the
+  // fabric / leg / remark picks, parsed tolerantly off the free jsonb. Read
+  // ONCE at mount (the caller mounts a fresh page per edit) — it feeds state
+  // initializers + the canvas's mount-time initial props only.
+  const editBuild = useMemo(() => {
+    const attrs = (editLine?.attrs ?? null) as Record<string, unknown> | null;
+    const sb = attrs?.sofa_build as { cells?: unknown; height?: unknown } | undefined;
+    if (!sb || !Array.isArray(sb.cells)) return null;
+    const cells = (sb.cells as Array<Record<string, unknown>>)
+      .filter((c) => typeof c?.moduleCode === "string")
+      .map((c) => ({
+        moduleCode: c.moduleCode as string,
+        x: typeof c.x === "number" ? c.x : 0,
+        y: typeof c.y === "number" ? c.y : 0,
+        rot: (typeof c.rot === "number" && [0, 90, 180, 270].includes(c.rot)
+          ? c.rot
+          : 0) as Rot,
+      }));
+    if (cells.length === 0) return null;
+    const height = typeof sb.height === "string" ? sb.height : null;
+    const fabricKey =
+      typeof attrs?.fabric_id === "string" && attrs.fabric_id
+        ? `sf:${attrs.fabric_id}`
+        : typeof attrs?.fabric_code === "string" && attrs.fabric_code
+          ? `cf:${attrs.fabric_code}`
+          : null;
+    return {
+      // Same treatment as a loaded quick pick (Loo 2026-07-12): the stored
+      // geometry re-lands CENTRED in the room, wherever it was left when the
+      // line was built. Pure translation — grouping/pricing are unaffected.
+      cells: centerSeedInRoom(cells, height ?? "24"),
+      height,
+      fabricKey,
+      fabricSeries: typeof attrs?.fabric_series === "string" ? attrs.fabric_series : null,
+      legHeight: typeof attrs?.leg_height === "string" ? attrs.leg_height : null,
+      remark: typeof attrs?.remark === "string" ? attrs.remark : "",
+      remarkSurcharge:
+        typeof attrs?.remark_surcharge === "number" && Number.isFinite(attrs.remark_surcharge)
+          ? attrs.remark_surcharge
+          : 0,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fabric SERIES → COLOUR with two-level KIV (Loo 2026-07-06). The exact same
   // hook drives the Customize canvas, so the two surfaces never drift. Aliased
   // to the quick-pick names below.
@@ -355,13 +407,17 @@ export default function SofaConfigurePage({
     fabric: qpFabric,
     deferred: qpDeferred,
     fabricSeries: qpFabricSeries,
-  } = useSeriesFabric(sellingFabrics);
+  } = useSeriesFabric(sellingFabrics, {
+    key: editBuild?.fabricKey,
+    series: editBuild?.fabricSeries,
+  });
   // Customize size — CONTROLLED here so the header chips (Loo 2026-07-06) and
   // the canvas's bottom-bar picker drive the same value; survives the canvas
   // remount when a quick pick is loaded (seedKey).
-  const [custSize, setCustSize] = useState<string>(() =>
-    sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24",
-  );
+  const [custSize, setCustSize] = useState<string>(() => {
+    if (editBuild?.height && sofaSizes.includes(editBuild.height)) return editBuild.height;
+    return sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24";
+  });
   // Customize LIVE total — mirrored up from the canvas engine (onLiveTotal) so
   // the header price follows every module placed/removed; null = empty canvas.
   const [custTotal, setCustTotal] = useState<number | null>(null);
@@ -392,7 +448,10 @@ export default function SofaConfigurePage({
     [sofaCombos, model.id],
   );
 
-  const [mode, setMode] = useState<"quick" | "custom">(picks.length > 0 ? "quick" : "custom");
+  // An EDIT opens straight in Customize with the stored geometry loaded.
+  const [mode, setMode] = useState<"quick" | "custom">(
+    editBuild ? "custom" : picks.length > 0 ? "quick" : "custom",
+  );
   // Principal-only "Create combo" (Loo 2026-07-06): a Master Admin can capture
   // the current Customize build as a priced sofa combo. `comboCodes` = the
   // arranged compartment codes handed up by the canvas (null = modal closed).
@@ -410,7 +469,7 @@ export default function SofaConfigurePage({
     x: number;
     y: number;
     rot: Rot;
-  }> | null>(null);
+  }> | null>(editBuild ? editBuild.cells : null);
   // Remount key — bumps when a pick is loaded so the canvas re-reads the seed.
   const [seedKey, setSeedKey] = useState(0);
 
@@ -540,9 +599,26 @@ export default function SofaConfigurePage({
     null;
 
   // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
-  const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
-  const [qpLeg, setQpLeg] = useState<string>("");
-  const [qpRemark, setQpRemark] = useState("");
+  const [qpHeight, setQpHeight] = useState<SofaHeight>(() => {
+    const h = editBuild?.height as SofaHeight | null | undefined;
+    return h && offeredHeights.includes(h) ? h : offeredHeights[0] ?? "24";
+  });
+  const [qpLeg, setQpLeg] = useState<string>(() => {
+    const v = editBuild?.legHeight ?? "";
+    return v && legOpts.some((o) => o.value === v) ? v : "";
+  });
+  // Remark + optional ± RM price adjustment (Loo 2026-07-12) — ONE pair of
+  // values shared by the Quick pick rail AND the Customize canvas (controlled
+  // props), so tab hops / seed remounts never lose them.
+  const [qpRemark, setQpRemark] = useState(editBuild?.remark ?? "");
+  const [qpRemarkPrice, setQpRemarkPrice] = useState<string>(() =>
+    editBuild?.remarkSurcharge ? String(editBuild.remarkSurcharge) : "",
+  );
+  // While a PWP voucher is applied the adjustment is ignored EVERYWHERE (the
+  // reward price is forced; the input locks) — display and payload agree.
+  const qpAdj = pwpApplied
+    ? 0
+    : Math.round((parseFloat(qpRemarkPrice) || 0) * 100) / 100;
 
   // Heights = the model's full offered sizes (à-la-carte prices any size; a
   // matched combo may cover only some, and the engine falls back per size).
@@ -594,6 +670,8 @@ export default function SofaConfigurePage({
         fabricDeferred: qpDeferred,
         legHeight: qpLeg || null,
         legSurcharge: qpLegDelta,
+        remark: qpRemark.trim() || null,
+        remarkSurcharge: qpAdj,
         total: priced.total,
         priceBasis: priced.basis,
       },
@@ -708,6 +786,11 @@ export default function SofaConfigurePage({
     qpAppliedRule && quickCandidate && catalog
       ? pwpRewardPrice(quickCandidate, catalog, qpAppliedRule)
       : null;
+  // The header figure: a PWP reward price wins outright (no manual adjustment
+  // stacks on a forced price); otherwise engine total + the remark ± RM.
+  const qpDisplayTotal =
+    qpPwpTotal ??
+    (qpTotal !== null ? Math.round((qpTotal + qpAdj) * 100) / 100 : null);
 
   /** Mark the emitted line as the applied PWP reward — validated against the
    *  REAL line via the same shared resolver the server runs. Not covered →
@@ -754,17 +837,17 @@ export default function SofaConfigurePage({
         fabricDeferred: qpDeferred,
         legHeight: qpLeg || null,
         legSurcharge: qpLegDelta,
+        remark: qpRemark.trim() || null,
+        // A PWP-priced sofa takes NO manual adjustment (the reward price is
+        // forced server-side; stamping one would only drift the gate).
+        remarkSurcharge: pwpApplied ? 0 : qpAdj,
         total: priced.total,
         priceBasis: priced.basis,
       },
       model,
       skus,
     );
-    if (line) {
-      const attrs = line.attrs as Record<string, unknown>;
-      if (qpRemark.trim()) attrs.remark = qpRemark.trim();
-      onAdd(finalizePwpLine(line));
-    }
+    if (line) onAdd(finalizePwpLine(line));
     onClose();
   }
 
@@ -962,10 +1045,10 @@ export default function SofaConfigurePage({
             <div className="cfg-header__total" tabIndex={0}>
               <div className="cfg-header__totalLabel">Live total</div>
               <div className="cfg-header__totalNum" data-testid="sofa-qp-total">
-                {(qpPwpTotal ?? qpTotal) !== null ? (
+                {qpDisplayTotal !== null ? (
                   <>
                     <sup>RM</sup>
-                    {(qpPwpTotal ?? qpTotal)!.toLocaleString("en-MY")}
+                    {qpDisplayTotal.toLocaleString("en-MY")}
                   </>
                 ) : (
                   "—"
@@ -1008,11 +1091,16 @@ export default function SofaConfigurePage({
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={!heroPick}
+                disabled={!heroPick || (qpDisplayTotal !== null && qpDisplayTotal < 0)}
+                title={
+                  qpDisplayTotal !== null && qpDisplayTotal < 0
+                    ? "The remark adjustment puts the sofa below RM 0 — reduce the discount"
+                    : undefined
+                }
                 onClick={() => heroPick && addQuickPick(heroPick)}
                 data-testid="sofa-qp-add"
               >
-                <Plus size={14} strokeWidth={2} /> Add to Cart
+                <Plus size={14} strokeWidth={2} /> {editLine ? "Update item" : "Add to Cart"}
               </button>
             )}
           </span>
@@ -1229,9 +1317,14 @@ export default function SofaConfigurePage({
                 </>
               )}
 
-              {/* Remark */}
+              {/* Remark + optional ± RM price adjustment (Loo 2026-07-12): a
+                  special remark sometimes ADJUSTS the price — the amount is
+                  optional, joins the live total, and the server drift-gates
+                  engine + adjustment. Disabled while a PWP voucher is applied
+                  (the reward price is forced; nothing stacks on it). */}
               <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
                 <span className="pos-eyebrow">Remark</span>
+                <span className="sof-qp__railDetail">± RM optional · adjusts the price</span>
               </div>
               <textarea
                 value={qpRemark}
@@ -1241,6 +1334,23 @@ export default function SofaConfigurePage({
                 className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
                 style={{ width: "100%", resize: "vertical" }}
                 data-testid="sofa-qp-remark"
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={qpRemarkPrice}
+                onChange={(e) => setQpRemarkPrice(e.target.value)}
+                placeholder="± RM 0.00"
+                aria-label="Remark price adjustment (RM)"
+                disabled={pwpApplied != null}
+                title={
+                  pwpApplied != null
+                    ? "A PWP-priced sofa can't take a manual adjustment"
+                    : undefined
+                }
+                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono disabled:opacity-40"
+                style={{ width: "100%", marginTop: 6 }}
+                data-testid="sofa-qp-remark-price"
               />
             </div>
 
@@ -1348,6 +1458,10 @@ export default function SofaConfigurePage({
             key={seedKey}
             embedded
             initialCells={seed ?? []}
+            initialFabricKey={seedKey === 0 ? editBuild?.fabricKey : undefined}
+            initialFabricSeries={seedKey === 0 ? editBuild?.fabricSeries : undefined}
+            initialLegHeight={seedKey === 0 ? editBuild?.legHeight : undefined}
+            addLabel={editLine ? "Update item" : undefined}
             model={model}
             skus={skus}
             compartmentPool={sofaCompartments}
@@ -1361,9 +1475,20 @@ export default function SofaConfigurePage({
             heights={sofaSizes}
             heightValue={custSize}
             onHeightChange={setCustSize}
+            remarkValue={qpRemark}
+            onRemarkChange={setQpRemark}
+            remarkPriceValue={qpRemarkPrice}
+            onRemarkPriceChange={setQpRemarkPrice}
+            remarkPriceDisabled={pwpApplied != null}
             onLiveTotal={setCustTotal}
             onAddBuild={(payload) => {
-              const line = buildToDraftLine(payload, model, skus);
+              // A PWP-priced sofa takes NO manual adjustment — the reward
+              // price is forced server-side (mirrors addQuickPick).
+              const line = buildToDraftLine(
+                pwpApplied ? { ...payload, remarkSurcharge: 0 } : payload,
+                model,
+                skus,
+              );
               // An applied voucher is validated against the REAL build here
               // (finalizePwpLine) — covered → the line goes in PWP-claimed at
               // the forced reward price; not covered → toast + normal price.

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { SOFA_HEIGHTS } from "../sofa-constants";
+import { orderEntryConfigSchema } from "./order-entry";
 
 /**
  * Catalog bundle — single endpoint that returns everything the wizard's product
@@ -885,6 +886,10 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0219 — Order Entry config (payment methods + form fields; additive,
+  // OPTIONAL). The POS renders payment methods + the Customer-step form from
+  // it; empty/absent → code defaults (pre-0219 behavior + Cash).
+  orderEntryConfig: orderEntryConfigSchema.nullable().optional(),
   // 0202 — global procurement fabric master (additive, OPTIONAL). Pre-0202
   // clients that don't read this are wholly unaffected.
   fabrics: z.array(catalogFabricSchema).optional(),
@@ -1114,7 +1119,10 @@ export const floorConfigPatchInput = z
   .strict();
 export type FloorConfigPatchInput = z.infer<typeof floorConfigPatchInput>;
 
-/** Add-ons CRUD (Maintenance tab). */
+/** Add-ons CRUD (Maintenance tab). `serviceDescription` is NOT an addons
+ *  column — it feeds the auto-minted SVC- product_skus row's description
+ *  (Loo 2026-07-12: creating an add-on also creates its Service SKU in the
+ *  SKU master so the link is real, mirroring the 0172 hand-minted rows). */
 export const addonCreateInput = z
   .object({
     key: z.string().trim().min(2).max(60).regex(/^[a-z0-9-]+$/, "key must be kebab-case"),
@@ -1122,6 +1130,7 @@ export const addonCreateInput = z
     price: z.number().nonnegative(),
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
+    serviceDescription: z.string().trim().max(200).optional(),
   })
   .strict();
 export type AddonCreateInput = z.infer<typeof addonCreateInput>;
@@ -1132,6 +1141,7 @@ export const addonPatchInput = z
     price: z.number().nonnegative().optional(),
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
+    serviceDescription: z.string().trim().max(200).optional(),
   })
   .strict();
 export type AddonPatchInput = z.infer<typeof addonPatchInput>;

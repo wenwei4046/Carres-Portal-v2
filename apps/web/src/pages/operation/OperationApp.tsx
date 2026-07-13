@@ -23,7 +23,6 @@ import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 import OperationReceiving from "./OperationReceiving";
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
-import SalesOrderMaintenancePage from "./SalesOrderMaintenancePage";
 // 2026-05-19 — Stock / All orders / Suppliers moved from Principal sidebar.
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
@@ -277,8 +276,6 @@ export default function OperationApp() {
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
             {tab === "catalog" && <ProductMaintenancePage />}
-            {/* 0174 — Sales Order Maintenance (configurable SO grid) */}
-            {tab === "sales-order-maintenance" && <SalesOrderMaintenancePage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
             {tab === "stock" && <OperationStock />}

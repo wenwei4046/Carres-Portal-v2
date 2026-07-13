@@ -13,14 +13,14 @@ import { type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
 import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
-import { cartItemCount, cartTotalExStair, mergeLine } from "./cart";
+import { cartItemCount, cartTotalExStair, lineEditTarget, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import ProductCard from "./ProductCard";
 import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
-import AddonsPanel from "./AddonsPanel";
+import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 
 const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory"];
@@ -75,12 +75,15 @@ export default function CatalogStep({
       buildCatalogIndex(catalog, catalog.fabricTierConfig, catalog.modelFabricTierOverrides),
     [catalog],
   );
-  const activeAddons = useMemo(() => catalog.addons.filter((a) => a.active), [catalog.addons]);
+  const activeAddons = useMemo(() => offerableAddons(catalog.addons), [catalog.addons]);
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim().toLowerCase(), 180);
   const [configureModelId, setConfigureModelId] = useState<string | null>(null);
+  // Cart-line EDIT (Loo 2026-07-12): the ✎ pencil re-opens the line's
+  // configurator prefilled; on save the line is REPLACED in place.
+  const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
   const [pulse, setPulse] = useState(false);
 
   const lockedCats = useMemo(
@@ -179,6 +182,32 @@ export default function CatalogStep({
     toast.success("Added to cart");
   }
 
+  /** Cart-line EDIT save — swap the edited line IN PLACE (same localId, so the
+   *  row identity + the PWP reserve reconciler's cartLineKey survive). Every
+   *  edit surface now owns a remark field, so the new line's remark is
+   *  authoritative (clearing it clears it — no carry-forward resurrection).
+   *  A PWP / free claim the re-emit dropped is called out so the operator can
+   *  re-apply it from the cart. */
+  function replaceEditedLine(next: DraftLine) {
+    const old = editingLine;
+    if (!old) return;
+    const oldAttrs = old.attrs as Record<string, unknown> | null;
+    const nextAttrs = (next.attrs ?? null) as Record<string, unknown> | null;
+    const merged: DraftLine = { ...next, localId: old.localId };
+    onChange({
+      ...draft,
+      lines: draft.lines.map((l) => (l.localId === old.localId ? merged : l)),
+    });
+    toast.success("Item updated");
+    const hadClaim = Boolean(oldAttrs?.pwp || oldAttrs?.free_item);
+    const hasClaim = Boolean(nextAttrs?.pwp || nextAttrs?.free_item);
+    if (hadClaim && !hasClaim) {
+      toast.info(
+        "The voucher / free claim on this item was reset — re-apply it from the cart if it still applies.",
+      );
+    }
+  }
+
   // Card tap. Accessories / services have no options to pick — a single-sku,
   // no-specials model adds STRAIGHT to the cart (Loo 2026-07-06: "can direct
   // add to cart", no drawer). Anything with a real choice opens the configurator.
@@ -193,7 +222,9 @@ export default function CatalogStep({
         qty: 1,
         attrs: null,
         unitPrice: s.price,
-        label: `${model.name} · ${s.variant}`,
+        // A variant-less sku (plain accessory) is just the model name — no
+        // stranded " · " separator (Loo 2026-07-12).
+        label: s.variant?.trim() ? `${model.name} · ${s.variant}` : model.name,
       });
       return;
     }
@@ -309,88 +340,123 @@ export default function CatalogStep({
         onClick={() => onCartOpenChange(true)}
       />
 
-      {configureModel &&
-        (() => {
-          // POS-parity (Loo 2026-07-04) — a MODULAR sofa (offers compartments)
-          // jumps STRAIGHT into the full-page configurator (Quick pick +
-          // Customize tabs), no drawer hop. Every other model (mattress /
-          // bedframe / accessory / dropdown-sofa) keeps the drawer.
-          const offered = (catalog.modelSofaCompartments ?? []).filter(
-            (mc) => mc.modelId === configureModel.id,
-          );
-          // Mattress + bed frame ALSO go full page now (prototype's
-          // ConfiguratorScreen — plan-view canvas + live total), same
-          // straight-in convention. Accessory / pillow / dropdown-sofa /
-          // service keep the drawer.
-          if (
-            configureModel.category === "mattress" ||
-            configureModel.category === "bedframe"
-          ) {
-            return (
-              <PosConfigurePage
-                model={configureModel}
-                meta={index.meta.get(configureModel.id)}
-                skus={index.skusByModel.get(configureModel.id) ?? []}
-                specialAddons={catalog.specialAddons}
-                optionPools={catalog.optionPools}
-                fabrics={catalog.fabrics}
-                fabricTierConfig={catalog.fabricTierConfig}
-                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-                catalog={catalog}
-                cartLines={draft.lines}
-                pwpReservedCodes={pwpReservedCodes}
-                pwpClaimGroup={pwpClaimGroup}
-                customerPhone={customerPhone}
-                onApplyVoucherCode={onApplyVoucherCode}
-                onAdd={addLine}
-                onClose={() => setConfigureModelId(null)}
-              />
-            );
-          }
-          if (configureModel.category === "sofa" && offered.length > 0) {
-            return (
-              <SofaConfigurePage
-                model={configureModel}
-                meta={index.meta.get(configureModel.id)}
-                skus={index.skusByModel.get(configureModel.id) ?? []}
-                fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
-                masterFabrics={catalog.fabrics}
-                optionPools={catalog.optionPools}
-                fabricTierConfig={catalog.fabricTierConfig}
-                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-                sofaCompartments={catalog.sofaCompartments ?? []}
-                modelCompartments={offered}
-                sofaCombos={catalog.sofaCombos ?? []}
-                catalog={catalog}
-                cartLines={draft.lines}
-                pwpReservedCodes={pwpReservedCodes}
-                pwpClaimGroup={pwpClaimGroup}
-                customerPhone={customerPhone}
-                onApplyVoucherCode={onApplyVoucherCode}
-                onAdd={addLine}
-                onClose={() => setConfigureModelId(null)}
-              />
-            );
-          }
+      {(() => {
+        // POS-parity (Loo 2026-07-04) — a MODULAR sofa (offers compartments)
+        // jumps STRAIGHT into the full-page configurator (Quick pick +
+        // Customize tabs), no drawer hop. Every other model (mattress /
+        // bedframe / accessory / dropdown-sofa) keeps the drawer.
+        //
+        // The SAME surfaces serve the cart-line EDIT (Loo 2026-07-12): the ✎
+        // pencil sets `editingLine` → its model is resolved from the sku, the
+        // page opens PREFILLED, and the emit REPLACES the line in place.
+        const editSku = editingLine ? catalog.skus.find((s) => s.sku === editingLine.sku) : null;
+        const editModel = editSku
+          ? index.productModels.find((m) => m.id === editSku.modelId) ?? null
+          : null;
+        const activeModel = editingLine ? editModel : configureModel;
+        if (!activeModel) return null;
+        const editing = editingLine ?? undefined;
+        const emitLine = editing ? replaceEditedLine : addLine;
+        const closeConfigure = () => {
+          setConfigureModelId(null);
+          setEditingLine(null);
+        };
+        // PWP eligibility must not count the line being edited (it's about to
+        // be replaced) — else its own trigger/claim skews the allowance.
+        const pwpCartLines = editing
+          ? draft.lines.filter((l) => l.localId !== editing.localId)
+          : draft.lines;
+        const offered = (catalog.modelSofaCompartments ?? []).filter(
+          (mc) => mc.modelId === activeModel.id,
+        );
+        // Mattress + bed frame ALSO go full page now (prototype's
+        // ConfiguratorScreen — plan-view canvas + live total), same
+        // straight-in convention. Accessory / pillow / dropdown-sofa /
+        // service keep the drawer.
+        if (
+          activeModel.category === "mattress" ||
+          activeModel.category === "bedframe"
+        ) {
           return (
-            <ConfigureDrawer
-              model={configureModel}
-              meta={index.meta.get(configureModel.id)}
-              skus={index.skusByModel.get(configureModel.id) ?? []}
-              fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+            <PosConfigurePage
+              key={editing?.localId ?? activeModel.id}
+              model={activeModel}
+              meta={index.meta.get(activeModel.id)}
+              skus={index.skusByModel.get(activeModel.id) ?? []}
+              specialAddons={catalog.specialAddons}
+              optionPools={catalog.optionPools}
+              fabrics={catalog.fabrics}
               fabricTierConfig={catalog.fabricTierConfig}
               modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-              sofaCompartments={catalog.sofaCompartments}
-              modelSofaCompartments={catalog.modelSofaCompartments}
-              sofaCombos={catalog.sofaCombos}
-              specialAddons={catalog.specialAddons}
-              onAdd={addLine}
-              onClose={() => setConfigureModelId(null)}
+              catalog={catalog}
+              cartLines={pwpCartLines}
+              pwpReservedCodes={pwpReservedCodes}
+              pwpClaimGroup={pwpClaimGroup}
+              customerPhone={customerPhone}
+              onApplyVoucherCode={onApplyVoucherCode}
+              editLine={editing}
+              onAdd={emitLine}
+              onClose={closeConfigure}
             />
           );
-        })()}
+        }
+        // An EDIT of a stored sofa build re-opens the sofa page even when the
+        // model's offered set has since gone empty — the geometry still
+        // renders; only the palette is empty.
+        if (
+          activeModel.category === "sofa" &&
+          (offered.length > 0 || Boolean(editing && lineEditTarget(editing, catalog) === "sofa_build"))
+        ) {
+          return (
+            <SofaConfigurePage
+              key={editing?.localId ?? activeModel.id}
+              model={activeModel}
+              meta={index.meta.get(activeModel.id)}
+              skus={index.skusByModel.get(activeModel.id) ?? []}
+              fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+              masterFabrics={catalog.fabrics}
+              optionPools={catalog.optionPools}
+              fabricTierConfig={catalog.fabricTierConfig}
+              modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+              sofaCompartments={catalog.sofaCompartments ?? []}
+              modelCompartments={offered}
+              sofaCombos={catalog.sofaCombos ?? []}
+              catalog={catalog}
+              cartLines={pwpCartLines}
+              pwpReservedCodes={pwpReservedCodes}
+              pwpClaimGroup={pwpClaimGroup}
+              customerPhone={customerPhone}
+              onApplyVoucherCode={onApplyVoucherCode}
+              editLine={editing}
+              onAdd={emitLine}
+              onClose={closeConfigure}
+            />
+          );
+        }
+        // The drawer never serves an edit (lineEditTarget gates the pencil to
+        // the two full-page surfaces) — this branch is add-flow only.
+        if (editing) return null;
+        return (
+          <ConfigureDrawer
+            model={activeModel}
+            meta={index.meta.get(activeModel.id)}
+            skus={index.skusByModel.get(activeModel.id) ?? []}
+            fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+            fabricTierConfig={catalog.fabricTierConfig}
+            modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+            sofaCompartments={catalog.sofaCompartments}
+            modelSofaCompartments={catalog.modelSofaCompartments}
+            sofaCombos={catalog.sofaCombos}
+            specialAddons={catalog.specialAddons}
+            onAdd={addLine}
+            onClose={closeConfigure}
+          />
+        );
+      })()}
 
-      {cartOpen && (
+      {/* The cart hides while a line-edit configurator is up (one Escape = one
+          layer; no stacking fight) and pops back — updated — when it closes. */}
+      {cartOpen && !editingLine && (
         <CartDrawer
           draft={draft}
           onChange={onChange}
@@ -405,6 +471,11 @@ export default function CatalogStep({
           customerPhone={customerPhone}
           pwpAvailableVouchers={pwpAvailableVouchers}
           onApplyVoucherCode={onApplyVoucherCode}
+          onEditLine={(line) => {
+            // The configurator portals to document.body (z-50) ABOVE the cart
+            // popup, edits land back in the still-open cart on close.
+            if (lineEditTarget(line, catalog)) setEditingLine(line);
+          }}
         />
       )}
     </div>

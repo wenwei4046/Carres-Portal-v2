@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
+import { ArrowLeft, Check, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
@@ -23,9 +23,15 @@ import {
 } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { newLocalId } from "../new-order/configurators";
-import { SpecialAddonsPicker, useSpecials } from "../new-order/special-addons-picker";
+import {
+  SpecialAddonsPicker,
+  offeredSpecialsFor,
+  optionsFromAttrs,
+  specialsFromAttrs,
+  useSpecials,
+} from "../new-order/special-addons-picker";
 import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
-import type { SellingFabric } from "../sofa-build/selling-fabrics";
+import { fabricDisplayName, type SellingFabric } from "../sofa-build/selling-fabrics";
 import type { ModelMeta } from "./catalog-index";
 import {
   coveringPwpForLine,
@@ -312,6 +318,7 @@ export default function PosConfigurePage({
   pwpClaimGroup,
   customerPhone,
   onApplyVoucherCode,
+  editLine,
   onAdd,
   onClose,
 }: {
@@ -342,6 +349,11 @@ export default function PosConfigurePage({
   customerPhone?: string;
   /** 0188 — manual voucher-code lookup (type/scan a number → stripped DTO). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Cart-line EDIT (Loo 2026-07-12): the existing DraftLine to prefill from.
+   *  Read once at mount (the caller mounts a fresh page per edit); `onAdd`
+   *  then REPLACES the line in the cart instead of appending. A PWP / free
+   *  claim on the old line is NOT restored — the cart re-offers it. */
+  editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -376,15 +388,49 @@ export default function PosConfigurePage({
     [isBed, model, fabrics],
   );
 
-  const [skuId, setSkuId] = useState<string>("");
+  // Cart-line EDIT prefill — the line's stored picks, mapped back to control
+  // state. Read once at mount (the caller mounts a fresh page per edit), so
+  // feeding useState initializers is enough. Specials are filtered to the
+  // codes STILL offered — a delisted pick would wedge `sp.complete` with no
+  // way to un-tick it.
+  const edit = useMemo(() => {
+    if (!editLine) return null;
+    const attrs = (editLine.attrs ?? {}) as Record<string, unknown>;
+    const opts = optionsFromAttrs(editLine.attrs);
+    const optVal = (kind: string) =>
+      opts.find((o) => o.kind === kind && typeof o.value === "string")?.value ?? "";
+    const offeredCodes = new Set(offeredSpecialsFor(model, specialAddons).map((d) => d.code));
+    const fabricCode = optVal("fabric");
+    return {
+      skuId: skus.find((s) => s.sku === editLine.sku)?.id ?? "",
+      qty: editLine.qty,
+      gap: typeof attrs.gap === "string" ? attrs.gap : "",
+      divan: optVal("divan_height"),
+      leg: optVal("bedframe_leg_height"),
+      fabricKey: fabricCode ? `cf:${fabricCode}` : null,
+      specials: specialsFromAttrs(editLine.attrs)
+        .filter((s) => typeof s.code === "string" && offeredCodes.has(s.code))
+        .map((s) => ({ code: s.code as string, choiceLabels: s.choiceLabels ?? [] })),
+      remark: typeof attrs.remark === "string" ? attrs.remark : "",
+      remarkSurcharge:
+        typeof attrs.remark_surcharge === "number" && Number.isFinite(attrs.remark_surcharge)
+          ? attrs.remark_surcharge
+          : 0,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [skuId, setSkuId] = useState<string>(edit?.skuId ?? "");
   // Mattress gap is THREE-state (Loo 2026-07-11): Confirm later (KIV, the
   // default — the customer hasn't decided yet; rides attrs.gap = "KIV" so the
   // PO/PDF show the pending choice) · None ("" — explicitly no gap) · a value.
-  const [gap, setGap] = useState<string>(gapChoices.length > 0 ? GAP_KIV : "");
+  const [gap, setGap] = useState<string>(() =>
+    edit ? edit.gap : gapChoices.length > 0 ? GAP_KIV : "",
+  );
   // Divan / leg / fabric are OPTIONAL (2990s "Confirm later", Loo 2026-06-11):
   // "" = customer confirms the dimension later; no surcharge applies.
-  const [divan, setDivan] = useState<string>("");
-  const [leg, setLeg] = useState<string>("");
+  const [divan, setDivan] = useState<string>(edit?.divan ?? "");
+  const [leg, setLeg] = useState<string>(edit?.leg ?? "");
   // Fabric IS the bed's colour / finish (Loo 2026-07-06 — a bed frame follows
   // the fabric). A two-level Series → Colour dropdown with KIV-to-defer at each
   // level, driven by the SAME `useSeriesFabric` hook the sofa uses (Loo
@@ -394,7 +440,7 @@ export default function PosConfigurePage({
     () =>
       fabricOpts.map((f) => ({
         key: `cf:${f.fabricCode}`,
-        name: f.description ? `${f.fabricCode} · ${f.description}` : f.fabricCode,
+        name: fabricDisplayName(f.fabricCode, f.description),
         tier: f.bedframeTier,
         id: null,
         code: f.fabricCode,
@@ -411,12 +457,24 @@ export default function PosConfigurePage({
     setColourKey: setFabColourKey,
     seriesColours: fabSeriesColours,
     fabric: selFabric,
-  } = useSeriesFabric(bedFabrics);
+  } = useSeriesFabric(bedFabrics, { key: edit?.fabricKey });
   const fabricCode = selFabric?.code ?? "";
   const finishName = selFabric?.name ?? "";
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(edit?.qty ?? 1);
   const sku = skus.find((s) => s.id === skuId);
-  const sp = useSpecials(model, specialAddons);
+  const sp = useSpecials(model, specialAddons, edit?.specials);
+
+  // Remark + optional ± RM price adjustment (Loo 2026-07-12) — a special
+  // remark sometimes ADJUSTS the price ("custom headboard +200"). The amount
+  // is optional (empty = plain note), PER UNIT like every other surcharge, and
+  // folds into unitPrice + attrs.remark_surcharge. Non-sofa unitPrice is
+  // client-priced (only options/specials totals are server-verified), so no
+  // API change is needed here.
+  const [remark, setRemark] = useState(edit?.remark ?? "");
+  const [remarkPrice, setRemarkPrice] = useState<string>(() =>
+    edit?.remarkSurcharge ? String(edit.remarkSurcharge) : "",
+  );
+  const remarkAdj = Math.round((parseFloat(remarkPrice) || 0) * 100) / 100;
 
   // The option picks + their server-verifiable total — the SAME pure resolver
   // Hono re-runs on submit (option-picks-recompute), so this preview cannot
@@ -454,21 +512,26 @@ export default function PosConfigurePage({
 
   const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
 
-  const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal;
+  const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal + remarkAdj;
 
   /** The DraftLine this configuration would emit — byte-identical to the old
-   *  drawer configurators (same attrs, same unitPrice math, same label); used
-   *  by BOTH `add()` and the PWP eligibility candidate below. */
+   *  drawer configurators when no remark is set (same attrs, same unitPrice
+   *  math, same label); used by BOTH `add()` and the PWP eligibility candidate
+   *  below. */
   function composeLine(localId: string, lineQty: number): DraftLine | null {
     if (!sku) return null;
     const optionsPatch =
       resolvedOptions.lines.length > 0
         ? { options: resolvedOptions.lines, options_total: optionsTotal }
         : {};
+    const remarkPatch = {
+      ...(remark.trim() ? { remark: remark.trim() } : {}),
+      ...(remarkAdj !== 0 ? { remark_surcharge: remarkAdj } : {}),
+    };
     const attrs = isBed
-      ? { gap, ...optionsPatch, ...sp.attrsPatch }
-      : sp.picks.length > 0
-        ? sp.attrsPatch
+      ? { gap, ...optionsPatch, ...sp.attrsPatch, ...remarkPatch }
+      : sp.picks.length > 0 || Object.keys(remarkPatch).length > 0
+        ? { ...sp.attrsPatch, ...remarkPatch }
         : null;
     return {
       localId,
@@ -625,7 +688,9 @@ export default function PosConfigurePage({
 
   const effUnitPrice = pwpActive ? (pwpPrice as number) : unitPrice;
   const total = effUnitPrice * qty;
-  const canAdd = !!sku && sp.complete;
+  // A remark discount can't take the line below RM 0 (the ± field is the only
+  // way unitPrice goes negative — every other component is non-negative).
+  const canAdd = !!sku && sp.complete && effUnitPrice >= 0;
 
   const title = sku
     ? `${model.name} · ${sku.variant}`
@@ -662,6 +727,9 @@ export default function PosConfigurePage({
             price: o.surcharge,
           })),
           ...(sp.surcharge > 0 ? [{ label: "Special add-ons", price: sp.surcharge }] : []),
+          ...(remarkAdj !== 0
+            ? [{ label: remark.trim() ? `Remark · ${remark.trim()}` : "Remark adjustment", price: remarkAdj }]
+            : []),
           ...(qty > 1 ? [{ label: `× ${qty} pieces`, price: total - unitPrice }] : []),
         ];
 
@@ -761,7 +829,15 @@ export default function PosConfigurePage({
               title={!sku ? "Pick a size first" : !sp.complete ? "Finish the add-on options" : undefined}
               data-testid="cfg-add-to-cart"
             >
-              <Plus size={16} strokeWidth={1.75} /> Add to Cart
+              {editLine ? (
+                <>
+                  <Check size={16} strokeWidth={1.75} /> Update item
+                </>
+              ) : (
+                <>
+                  <Plus size={16} strokeWidth={1.75} /> Add to Cart
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1046,6 +1122,56 @@ export default function PosConfigurePage({
                 >
                   <Plus size={16} strokeWidth={1.75} />
                 </button>
+              </div>
+            </div>
+
+            {/* Remark + optional ± RM price adjustment (Loo 2026-07-12): a
+                special remark sometimes ADJUSTS the price — the amount is
+                optional (per unit) and folds into the live total. Locked while
+                a PWP voucher is applied (the reward price is forced). */}
+            <div className="cfg-section" data-testid="cfg-remark-section">
+              <div className="cfg-section__head">
+                <span className="pos-eyebrow">Remark</span>
+                <span className="cfg-section__detail">
+                  {remarkAdj !== 0
+                    ? `${remarkAdj > 0 ? "+" : "−"}RM ${Math.abs(remarkAdj).toLocaleString("en-MY")}`
+                    : "± RM optional · adjusts the price"}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <textarea
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="e.g. custom headboard, deliver before CNY…"
+                  rows={2}
+                  className="cfg-select"
+                  style={{ resize: "vertical" }}
+                  data-testid="cfg-remark"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={remarkPrice}
+                  onChange={(e) => setRemarkPrice(e.target.value)}
+                  placeholder="± RM 0.00"
+                  aria-label="Remark price adjustment (RM)"
+                  disabled={pwpActive}
+                  title={
+                    pwpActive
+                      ? "A PWP-priced item can't take a manual adjustment"
+                      : undefined
+                  }
+                  className="cfg-select font-mono disabled:opacity-40"
+                  data-testid="cfg-remark-price"
+                />
+                {effUnitPrice < 0 && (
+                  <p
+                    style={{ margin: 0, fontSize: 12, color: "var(--c-danger, #B4321A)" }}
+                    data-testid="cfg-remark-negative"
+                  >
+                    The adjustment puts this item below RM 0 — reduce the discount.
+                  </p>
+                )}
               </div>
             </div>
 

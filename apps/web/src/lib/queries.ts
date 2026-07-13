@@ -136,11 +136,10 @@ import {
   type DecideStorageWaiverInput,
   type RecordStorageExtensionInput,
   type SetOpsAssignedLogisticInput,
-  type SoGridResponse,
-  type SoGridConfig,
-  type UpdateSoGridConfigInput,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
+  type OrderEntryConfigDto,
+  type SetOrderEntryConfigInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -348,12 +347,10 @@ export const qk = {
     print: (eventId: string) => ["pickupEvent", eventId] as const,
     byPo:  (poId: string)  => ["pickupEvents", poId] as const,
   },
-  // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
-  // Top-level prefix `["sales-order-grid"]` so a single blunt invalidate after
-  // a config save refreshes both the grid (carries config) and the config read.
+  // 0219 — the Order Entry (POS form) config editor read. (The 0174 SO grid
+  // that shared this prefix was deleted 2026-07-12; the key stays stable.)
   salesOrderGrid: {
-    grid:   () => ["sales-order-grid", "grid"] as const,
-    config: () => ["sales-order-grid", "config"] as const,
+    entryConfig: () => ["sales-order-grid", "entry-config"] as const,
   },
 };
 
@@ -722,6 +719,46 @@ export function useCustomerTypeProbe(
   });
 }
 
+/** One customer distilled from RLS-visible past orders (newest order wins) —
+ *  the wire shape of GET /api/orders/customer-search. `address` / `emergency`
+ *  are the composed DB strings; the POS parses them back into structured
+ *  fields via `customerPatchFromHit`. */
+export interface CustomerSearchHit {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  addressUnknown: boolean;
+  billing: string | null;
+  billingSame: boolean;
+  emergency: string | null;
+  race: string | null;
+  gender: string | null;
+  birthday: string | null;
+}
+
+/**
+ * useCustomerSearch — GET /api/orders/customer-search?q= (POS Full-name
+ * autocomplete). Returns up to 8 distinct customers from RLS-visible past
+ * orders whose name contains `q`. Disabled until 2+ chars are typed.
+ */
+export function useCustomerSearch(
+  q: string,
+  opts?: Partial<UseQueryOptions<{ customers: CustomerSearchHit[] }>>,
+) {
+  const trimmed = q.trim();
+  return useQuery<{ customers: CustomerSearchHit[] }>({
+    queryKey: ["orders", "customer-search", trimmed],
+    queryFn: () =>
+      apiFetch<{ customers: CustomerSearchHit[] }>(
+        `/api/orders/customer-search?q=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: trimmed.length >= 2,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 /**
  * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
  * Internal-only raw creation: free-form line skus + prices, no POS gates.
@@ -964,40 +1001,43 @@ export function useCancelOrder(
 }
 
 // ===========================================================================
-// 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid)
+// 0219 — Order Entry config (POS payment methods + form fields)
 // ===========================================================================
-/** GET /api/operation/sales-order-maintenance/grid — flattened order×line rows
- *  + the shared column config. Internal (operation/principal) only. */
-export function useSalesOrderGrid(
-  opts?: Partial<UseQueryOptions<SoGridResponse>>,
+/** 0219 — GET /api/operation/sales-order-maintenance/entry-config — the Order
+ *  Entry config (payment methods + POS form fields). Internal only. */
+export function useOrderEntryConfig(
+  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto }>>,
 ) {
   return useQuery({
-    queryKey: qk.salesOrderGrid.grid(),
+    queryKey: qk.salesOrderGrid.entryConfig(),
     queryFn: () =>
-      apiFetch<SoGridResponse>("/api/operation/sales-order-maintenance/grid"),
+      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+        "/api/operation/sales-order-maintenance/entry-config",
+      ),
     staleTime: 30_000,
     ...opts,
   });
 }
 
-/** PUT /api/operation/sales-order-maintenance/config — replace the shared
- *  column/option config. Invalidates the whole `["sales-order-grid"]` sub-tree
- *  so the grid + config reads re-fetch the merged result. */
-export function useUpdateSoGridConfig(
+/** 0219 — PUT the Order Entry config (full replace via the role-gated RPC).
+ *  Invalidates the editor read AND the catalog bundle (the POS renders from
+ *  catalog.orderEntryConfig). */
+export function useUpdateOrderEntryConfig(
   opts?: Partial<
-    UseMutationOptions<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>
+    UseMutationOptions<{ entryConfig: OrderEntryConfigDto }, ApiError, SetOrderEntryConfigInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>({
+  return useMutation<{ entryConfig: OrderEntryConfigDto }, ApiError, SetOrderEntryConfigInput>({
     mutationFn: (input) =>
-      apiFetch<{ config: SoGridConfig }>(
-        "/api/operation/sales-order-maintenance/config",
+      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+        "/api/operation/sales-order-maintenance/entry-config",
         { method: "PUT", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["sales-order-grid"] });
+      await qc.invalidateQueries({ queryKey: qk.salesOrderGrid.entryConfig() });
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
