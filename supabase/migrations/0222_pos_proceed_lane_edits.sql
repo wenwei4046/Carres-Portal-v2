@@ -273,6 +273,13 @@ revoke all on function public.unproceed_order(uuid) from public;
 revoke all on function public.unproceed_order(uuid) from anon;
 grant execute on function public.unproceed_order(uuid) to authenticated;
 
+-- update_order's anon EXECUTE was inherited via the default PUBLIC grant
+-- (0010-era function), so revoking anon alone is not enough — strip PUBLIC
+-- and re-grant the legit callers explicitly. (Verified post-apply:
+-- has_function_privilege('anon', …) = false on both functions.)
+revoke all on function public.update_order(uuid, jsonb) from public;
 revoke all on function public.update_order(uuid, jsonb) from anon;
+grant execute on function public.update_order(uuid, jsonb) to authenticated;
+grant execute on function public.update_order(uuid, jsonb) to service_role;
 
 COMMIT;
