@@ -95,9 +95,15 @@ pills. The facet and table never jump. Shell slot: `bulkBar`.
 - ONE white panel (240px) in the LEFT column; its top aligns with the toolbar
   top — the toolbar strip lives only in the right column, never spanning above
   the facet.
-- Every section is a **cream title bar** (`#F1EFE8`, 11px bold uppercase) with a
-  `˅/›` collapse chevron + right-aligned group total. Rows are Gmail-nav pills
-  (name left, count right; selection = light blue fill).
+- Every section is a **cream title band** — the shared `<SectionBand>`
+  (`components/SectionPanel.tsx`; tokens `.section-band*` in `index.css`,
+  recorded as `COLOR.sectionBand` #F1EFE8 in `design-standard.ts`) — 11px bold
+  uppercase title + `˅/›` collapse chevron + right-aligned group total. The
+  white card itself is the shared `<SectionCard>` (white `bg-white` + 1px
+  `border-base-200`, 12px radius). The **order drawer's panels render the same
+  two components** — list facet and drawer cards are 1:1 by construction; no
+  page hand-rolls this chrome. Rows are Gmail-nav pills (name left, count
+  right; selection = light blue fill).
 - **SUMMARY** is the top section (Outstanding / At-risk / On-time) and carries a
   small **«** (`ChevronsLeft`) on its bar = collapse the WHOLE panel → the table
   widens, active filters surface as toolbar chips, the reopen toggle appears in

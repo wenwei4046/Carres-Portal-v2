@@ -75,6 +75,7 @@ import {
 } from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
+import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import {
@@ -562,36 +563,24 @@ function Panel({
       return next;
     });
   };
+  // THE shared section chrome (components/SectionPanel.tsx) — the SAME
+  // SectionCard + SectionBand the Orders list facet renders, so list + drawer
+  // are 1:1 by construction (Jess 2026-07-13). No bespoke card styling here.
   return (
-    <section
-      className={`bg-white rounded-xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow && open ? "flex-1" : ""} ${className ?? ""}`}
-    >
-      {/* Cream header band (Round 1A) — chevron + title left · status chip + ⋮
-          right; page-cream fill so the band reads as the card's handle. */}
-      <header
-        className={`flex items-center justify-between gap-3 px-3 py-2 shrink-0 bg-background ${open ? "border-b border-base-100" : ""}`}
-      >
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={open}
-          title={open ? "Hide" : "Expand"}
-          className="flex items-center gap-1.5 min-w-0 text-left hover:text-base-950"
-        >
-          {open ? (
-            <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
-          ) : (
-            <ChevronRight size={14} className="shrink-0 text-base-400" aria-hidden="true" />
-          )}
-          <span className="t-h4 text-base-900 truncate">{title}</span>
-        </button>
-        <span className="shrink-0 flex items-center gap-1.5">
-          {summary}
-          {actions}
-        </span>
-      </header>
+    <SectionCard grow={grow && open} className={className}>
+      <SectionBand
+        title={title}
+        collapsed={!open}
+        onToggle={toggle}
+        right={
+          <span className="shrink-0 flex items-center gap-1.5">
+            {summary}
+            {actions}
+          </span>
+        }
+      />
       {open && children}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -1368,7 +1357,7 @@ function DrawerBody({
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
           each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
           scroll — it clips, and each column owns its own overflow-y. */}
-      <div className="flex-1 min-h-0 px-5 py-3 flex flex-col gap-2.5 overflow-hidden">
+      <div className="flex-1 min-h-0 px-5 py-3 flex flex-col gap-2.5 overflow-hidden bg-background">
         {/* Save bar only — the stage action moved into the Delivery card (Jess
             2026-07-11). This slim row holds just the Save control for edited
             fields (it renders nothing until there are unsaved changes), pinned

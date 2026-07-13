@@ -49,6 +49,15 @@ export const COLOR = {
   muted:       { hex: "#6B7280", cssVar: "--base-500",   class: "text-base-500" }, // gray-500 muted
   faint:       { hex: "#9CA3AF", cssVar: "--base-400",   class: "text-base-400" }, // icons at rest
 
+  // Section band — the ONE cream title band shared by the list facet groups
+  // (SUMMARY / CHASE NOW / …) and every order-drawer panel header. Values live
+  // in index.css `.section-band*` (2026-07-13); render via <SectionBand>
+  // (components/SectionPanel.tsx), never a bespoke bar. NOTE: deliberately a
+  // slightly deeper cream than pageBg (#F5F1EA) so the band reads on the card.
+  sectionBand:      { hex: "#F1EFE8", cssVar: "—", class: "section-band" },
+  sectionBandTitle: { hex: "#221F20", cssVar: "—", class: "section-band-title" }, // danger variant #991B1B = .section-band-title-danger
+  sectionBandTotal: { hex: "#6F6960", cssVar: "—", class: "section-band-total" },
+
   // Brand + primary action
   flame:       { hex: "#C44D2B", cssVar: "--primary",     class: "text-primary / bg-primary" }, // brand / hero CTA
   flameHover:  { hex: "#9A3D22", cssVar: "--signature-700", class: "hover:bg-signature-700" },

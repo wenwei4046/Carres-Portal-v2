@@ -282,6 +282,15 @@
   .animate-page-enter { animation: pos-page-enter .32s cubic-bezier(0.22,1,0.36,1); }
   .animate-cart-pulse { animation: pos-cart-pulse .28s cubic-bezier(0.22,1,0.36,1); }
   .animate-drawer-slide-in { animation: pos-drawer-slide-in 0.26s cubic-bezier(0.22,1,0.36,1) both; }
+  /* Section band (2026-07-13) — the ONE cream title band shared by the Orders
+     list facet groups (SUMMARY / CHASE NOW / …) and every order-drawer panel
+     header. Previously #F1EFE8 + its inks were bare hexes inside
+     OperationOrdersControl; now they live here as the single source
+     (recorded in lib/design-standard.ts COLOR.sectionBand). */
+  .section-band { background: #F1EFE8; }
+  .section-band-title { color: #221F20; }
+  .section-band-title-danger { color: #991B1B; }
+  .section-band-total { color: #6F6960; }
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }

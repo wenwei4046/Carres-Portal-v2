@@ -26,6 +26,7 @@ import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
@@ -1549,7 +1550,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
              SUMMARY sits on top and carries the whole-panel collapse ‹; the 240px
              scroll container is owned by <ListPageShell>. Token classes only
              (design-standard: no raw hex in new code). */
-          <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
+          <SectionCard>
               {/* SUMMARY — whole-book health (Outstanding · at-risk · on-time). The
                   ‹ on its title bar collapses the entire filter panel. */}
               <KanbanGroup
@@ -1746,7 +1747,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   />
                 ))}
               </KanbanGroup>
-          </div>
+          </SectionCard>
         }
       >
           {/* Listing — the ONLY scroll area (the page stays put, only the rows
@@ -2095,46 +2096,20 @@ function KanbanGroup({
   headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // The cream band is THE shared <SectionBand> (components/SectionPanel.tsx) —
+  // the order drawer's panels render the exact same component, so list + drawer
+  // stay 1:1 by construction (Jess 2026-07-13). Tokens: .section-band* in
+  // index.css, recorded in design-standard.ts COLOR.sectionBand.
   return (
     <div data-testid={testid} className="mb-1">
-      {/* Cream title bar — a flex row; the toggle is the main clickable area, the
-          optional headerRight sits beside the total. */}
-      <div
-        className="flex items-center gap-1 rounded-md pl-2 pr-1.5 py-1.5"
-        style={{ background: "#F1EFE8" }}
-      >
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex-1 min-w-0 flex items-center gap-1 text-left hover:brightness-[0.97]"
-        >
-          {collapsed ? (
-            <ChevronRight size={12} className="shrink-0 text-base-500" />
-          ) : (
-            <ChevronDown size={12} className="shrink-0 text-base-500" />
-          )}
-          <span
-            className="uppercase flex-1 truncate"
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              letterSpacing: "0.04em",
-              color: danger ? "#991B1B" : "#221F20",
-            }}
-          >
-            {title}
-          </span>
-        </button>
-        {total !== undefined && (
-          <span
-            className="tabular-nums shrink-0"
-            style={{ fontSize: "11px", fontWeight: 600, color: "#6F6960" }}
-          >
-            {total}
-          </span>
-        )}
-        {headerRight}
-      </div>
+      <SectionBand
+        title={title}
+        danger={danger}
+        collapsed={collapsed}
+        onToggle={onToggle}
+        total={total}
+        right={headerRight}
+      />
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
   );

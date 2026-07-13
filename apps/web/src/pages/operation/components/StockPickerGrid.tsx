@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Search, X, Handshake } from "lucide-react";
+import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -101,6 +102,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
   // Loan view (Jess 2026-07-01): a sofa line can loan ANY free sofa, so this
   // toggle drops the same-model filter and shows every free sofa instead.
   const [loanMode, setLoanMode] = useState(false);
+  // Whole-card accordion — same band behaviour as every other section.
+  const [collapsedCard, setCollapsedCard] = useState(false);
 
   // Reset the picker whenever the operator switches to a different order line —
   // ticks, the search, and the loan view all belong to the previous line.
@@ -217,58 +220,66 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
   // units on top.)
 
   return (
-    // Natural height (Round 1A) — the right column scrolls as a whole now, so
-    // the old grow-to-fill collapsed this card to its chrome; the row area caps
-    // at ~6 rows and scrolls inside itself instead (same pattern as Items).
-    <div className="flex flex-col min-h-0 border border-base-200 rounded-[12px] overflow-hidden bg-white">
-      <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between gap-2 shrink-0">
-        <div className="min-w-0">
-          <span className="t-h4 text-base-900">Warehouse stock</span>
-          <span className="ml-1.5 t-tiny text-base-400 truncate">
-            {loanMode ? "· any sofa — loan" : "· same model + size"}
+    // THE shared section chrome (components/SectionPanel.tsx) — same white card
+    // + cream band as the list facet + every drawer panel (Jess 2026-07-13; no
+    // bespoke card styling). Natural height; the row area caps at ~6 rows and
+    // scrolls inside itself (the right column scrolls as a whole).
+    <SectionCard>
+      <SectionBand
+        title="Warehouse stock"
+        collapsed={collapsedCard}
+        onToggle={() => setCollapsedCard((v) => !v)}
+        right={
+          <span className="shrink-0 flex items-center gap-1.5 text-[11px] text-base-500">
+            <span className="whitespace-nowrap">
+              {rows.length} free · {checked.size} picked
+              {q.trim() ? ` · ${view.length} shown` : ""}
+            </span>
+            {actions}
           </span>
-        </div>
-        <div className="t-tiny text-base-500 flex items-center gap-2 shrink-0">
-          {isSofa && (
-            <button
-              type="button"
-              onClick={() => setLoanMode((v) => !v)}
-              title={
-                loanMode
-                  ? "Back to this line's exact model + size"
-                  : "Show every free sofa so you can loan one (any model / fabric)"
-              }
-              className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 transition-colors ${
-                loanMode
-                  ? "border-primary bg-primary/10 text-primary font-semibold"
-                  : "border-base-200 text-base-600 hover:border-primary hover:text-primary"
-              }`}
-            >
-              {loanMode ? (
-                <>
-                  <X size={11} strokeWidth={2.5} /> Same model only
-                </>
-              ) : (
-                <>
-                  <Handshake size={11} strokeWidth={2.5} /> Loan any sofa
-                </>
-              )}
-            </button>
-          )}
-          <span className="whitespace-nowrap">
-            {rows.length} free · {checked.size} picked
-            {q.trim() ? ` · ${view.length} shown` : ""}
-          </span>
-          {actions}
-        </div>
+        }
+      />
+      {!collapsedCard && (
+      <>
+      {/* Scope row — the same-model note + the sofa loan toggle. */}
+      <div className="px-1.5 pt-1.5 pb-1 flex items-center justify-between gap-2 shrink-0">
+        <span className="t-tiny text-base-400 truncate">
+          {loanMode ? "any sofa — loan" : "same model + size"}
+        </span>
+        {isSofa && (
+          <button
+            type="button"
+            onClick={() => setLoanMode((v) => !v)}
+            title={
+              loanMode
+                ? "Back to this line's exact model + size"
+                : "Show every free sofa so you can loan one (any model / fabric)"
+            }
+            className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 t-tiny transition-colors ${
+              loanMode
+                ? "border-primary bg-primary/10 text-primary font-semibold"
+                : "border-base-200 text-base-600 hover:border-primary hover:text-primary"
+            }`}
+          >
+            {loanMode ? (
+              <>
+                <X size={11} strokeWidth={2.5} /> Same model only
+              </>
+            ) : (
+              <>
+                <Handshake size={11} strokeWidth={2.5} /> Loan any sofa
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ONE search box (Jess 2026-07-13) — replaces the 7 per-column funnels.
           Matches model / size / category / PO / old ref / date / condition. */}
-      <div className="px-3 py-1.5 border-b border-base-100 shrink-0 relative">
+      <div className="px-1.5 pb-1.5 shrink-0 relative">
         <Search
           size={13}
-          className="absolute left-5 top-1/2 -translate-y-1/2 text-base-400 pointer-events-none"
+          className="absolute left-3.5 top-1/2 -translate-y-[calc(50%+3px)] text-base-400 pointer-events-none"
         />
         <input
           type="search"
@@ -354,7 +365,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         </div>
       </div>
 
-      <div className="px-3 py-2 border-t border-base-200 bg-base-50/50 flex items-center justify-end gap-2">
+      <div className="px-1.5 py-2 border-t border-base-100 flex items-center justify-end gap-2">
         <span className="t-tiny text-base-500 mr-auto">
           need {need} · {checked.size} picked
         </span>
@@ -385,7 +396,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           </button>
         )}
       </div>
-
-    </div>
+      </>
+      )}
+    </SectionCard>
   );
 }
