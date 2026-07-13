@@ -16,7 +16,7 @@ const ORDER = "00000000-0000-0000-0000-0000000order1";
 const MATT_MODEL = "00000000-0000-0000-0000-0000000matt01";
 const RULE = "00000000-0000-0000-0000-00000000rule01";
 
-type ReservedRow = { code: string; rule_id: string | null; cart_line_key: string | null; trigger_item_code: string | null };
+type ReservedRow = { code: string; rule_id: string | null; cart_line_key: string | null; trigger_item_code: string | null; created_at?: string };
 type RuleRow = Record<string, unknown>;
 
 function activeRule(over: Partial<RuleRow> = {}): RuleRow {
@@ -252,5 +252,80 @@ describe("sweepReservedForSubmit", () => {
     const { sb } = mockSb({ reserved: [], rules: [], reservedError: "db down" });
     const r = await sweepReservedForSubmit(sb, args());
     expect(r.status).toBe("server_error");
+  });
+
+  // ─── ENTITLEMENT CAP (2026-07-14, closes `pwp-sweep-cross-cart-contamination`) ──
+  // Live repro: CO-1174 (2× trigger) printed 8 vouchers — 4 legit + 4 orphan
+  // RESERVED codes minted 2026-07-06/10 by ABANDONED carts sharing the SAME
+  // trigger SKU, hoovered in by the trigger-sku scope. The sweep now carries at
+  // most Σ(trigger qty) × qty_per_trigger per rule — this cart's codes first,
+  // then newest — and DELETES the excess.
+  it("CAP — stale same-SKU orphans from dead carts are DELETED, only this cart's entitlement carries", async () => {
+    const reserved: ReservedRow[] = [
+      { code: "PWP-STALE001", rule_id: RULE, cart_line_key: "L-dead-1", trigger_item_code: "MATT-1", created_at: "2026-07-06T15:20:00Z" },
+      { code: "PWP-STALE002", rule_id: RULE, cart_line_key: "L-dead-2", trigger_item_code: "MATT-1", created_at: "2026-07-10T17:23:00Z" },
+      { code: "PWP-CART0001", rule_id: RULE, cart_line_key: "L-matt", trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:00Z" },
+    ];
+    const { sb, ops } = mockSb({ reserved, rules: [activeRule()], skus: skuRows() });
+    // 1 trigger unit × qty_per_trigger 1 → entitled 1.
+    const r = await sweepReservedForSubmit(sb, args({ clientCartLineKeys: ["L-matt"] }));
+    expect(r.status).toBe("ok");
+    expect(r.carried).toBe(1);
+    expect(r.deleted).toBe(2);
+    expect(ops.find((o) => o.kind === "update")?.codes).toEqual(["PWP-CART0001"]);
+    expect(ops.find((o) => o.kind === "delete")?.codes.sort()).toEqual([
+      "PWP-STALE001",
+      "PWP-STALE002",
+    ]);
+  });
+
+  it("CAP — entitlement scales with trigger line qty (2× mattress → 2 codes carry, excess deleted)", async () => {
+    const reserved: ReservedRow[] = [
+      { code: "PWP-STALE003", rule_id: RULE, cart_line_key: "L-dead-3", trigger_item_code: "MATT-1", created_at: "2026-07-06T15:20:00Z" },
+      { code: "PWP-CART0002", rule_id: RULE, cart_line_key: "L-matt", trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:00Z" },
+      { code: "PWP-CART0003", rule_id: RULE, cart_line_key: "L-matt", trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:01Z" },
+    ];
+    const { sb, ops } = mockSb({ reserved, rules: [activeRule()], skus: skuRows() });
+    const r = await sweepReservedForSubmit(
+      sb,
+      args({ finalLines: [{ ...mattLine(), qty: 2 }], clientCartLineKeys: ["L-matt"] }),
+    );
+    expect(r.carried).toBe(2);
+    expect(r.deleted).toBe(1);
+    expect(ops.find((o) => o.kind === "update")?.codes.sort()).toEqual([
+      "PWP-CART0002",
+      "PWP-CART0003",
+    ]);
+    expect(ops.find((o) => o.kind === "delete")?.codes).toEqual(["PWP-STALE003"]);
+  });
+
+  it("CAP — qty_per_trigger multiplies the entitlement (1 trigger × 2/trigger → 2 carry)", async () => {
+    const reserved: ReservedRow[] = [
+      { code: "PWP-OLD00001", rule_id: RULE, cart_line_key: "L-dead-4", trigger_item_code: "MATT-1", created_at: "2026-07-06T15:20:00Z" },
+      { code: "PWP-NEW00001", rule_id: RULE, cart_line_key: "L-matt", trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:00Z" },
+      { code: "PWP-NEW00002", rule_id: RULE, cart_line_key: "L-matt", trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:01Z" },
+    ];
+    const { sb, ops } = mockSb({
+      reserved,
+      rules: [activeRule({ qty_per_trigger: 2 })],
+      skus: skuRows(),
+    });
+    const r = await sweepReservedForSubmit(sb, args({ clientCartLineKeys: ["L-matt"] }));
+    expect(r.carried).toBe(2);
+    expect(r.deleted).toBe(1);
+    expect(ops.find((o) => o.kind === "delete")?.codes).toEqual(["PWP-OLD00001"]);
+  });
+
+  it("CAP — no in-cart hint: newest codes win the entitled slots (recency fallback)", async () => {
+    const reserved: ReservedRow[] = [
+      { code: "PWP-OLDER001", rule_id: RULE, cart_line_key: null, trigger_item_code: "MATT-1", created_at: "2026-07-06T15:20:00Z" },
+      { code: "PWP-NEWER001", rule_id: RULE, cart_line_key: null, trigger_item_code: "MATT-1", created_at: "2026-07-13T17:46:00Z" },
+    ];
+    const { sb, ops } = mockSb({ reserved, rules: [activeRule()], skus: skuRows() });
+    const r = await sweepReservedForSubmit(sb, args({ clientCartLineKeys: [] }));
+    expect(r.carried).toBe(1);
+    expect(r.deleted).toBe(1);
+    expect(ops.find((o) => o.kind === "update")?.codes).toEqual(["PWP-NEWER001"]);
+    expect(ops.find((o) => o.kind === "delete")?.codes).toEqual(["PWP-OLDER001"]);
   });
 });

@@ -40,6 +40,17 @@ import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
  * hint (UNION'd as a belt, never the sole source). Correctness never hinges on the
  * client field.
  *
+ * THE ENTITLEMENT CAP (2026-07-14 — closes `pwp-sweep-cross-cart-contamination`):
+ * the trigger-SKU scope over-matches when the SAME trigger SKU recurs across carts
+ * — orphan RESERVED codes from ABANDONED earlier carts (reserved, never submitted,
+ * reaper cron unwired) share the sku and were swept into the NEXT order wholesale
+ * (live hit: CO-1174 printed 8 vouchers — 4 of them minted 2026-07-06/10 by dead
+ * carts). An order's carry grant is defined by ITS OWN content, exactly like
+ * `resolvePwp`: per rule, entitled = Σ(trigger-line qty) × qty_per_trigger. The
+ * carry keeps at most `entitled` codes per rule — THIS cart's codes first
+ * (`cart_line_key` ∈ client hint), then newest — and DELETES the excess, so stale
+ * pool build-up self-heals on the next same-SKU submit instead of inflating it.
+ *
  * Uses the USER JWT (RLS) only — the caller OWNS their own RESERVED codes, and the
  * owner CAN flip their own RESERVED → AVAILABLE (only a CROSS-order AVAILABLE→USED
  * claim needs a DEFINER), so no new RPC: the carry UPDATE + the delete run via the
@@ -115,7 +126,7 @@ export async function sweepReservedForSubmit(
   //    short-circuit: 0 rows → early return, no rules fetch, no write.
   const reservedR = await sb
     .from(PWP_CODES)
-    .select("code, rule_id, cart_line_key, trigger_item_code")
+    .select("code, rule_id, cart_line_key, trigger_item_code, created_at")
     .eq("owner_staff_id", args.ownerStaffId)
     .eq("status", "RESERVED");
   if (reservedR.error) {
@@ -126,6 +137,9 @@ export async function sweepReservedForSubmit(
     rule_id: string | null;
     cart_line_key: string | null;
     trigger_item_code: string | null;
+    /** Recency key for the entitlement cap's this-cart-first ordering. Optional
+     *  defensively (older mocks omit it). */
+    created_at?: string | null;
   }>;
   if (reservedRows.length === 0) return { status: "ok", carried: 0, deleted: 0 };
 
@@ -193,12 +207,13 @@ export async function sweepReservedForSubmit(
       );
     }
   }
-  // Per rule: does ANY genuine NON-reward build in this order match its sofa
-  // trigger? (The promo one-way partition below consults this for codes whose
-  // trigger sku is a build rep sku absent from the exploded line set.)
-  const ruleHasNonRewardBuildTrigger = new Map<string, boolean>();
+  // Per rule: how many genuine NON-reward builds in this order match its sofa
+  // trigger? (>0 feeds the promo one-way partition below for codes whose trigger
+  // sku is a build rep sku absent from the exploded line set; the count feeds the
+  // entitlement cap — each matching build is one trigger unit.)
+  const nonRewardBuildTriggersByRule = new Map<string, number>();
   for (const rule of activeRules) {
-    let ok = false;
+    let count = 0;
     if (upper(rule.triggerCategory) === "SOFA") {
       for (const g of buildGroups.values()) {
         if (g.isReward || g.codes.length === 0) continue;
@@ -208,13 +223,10 @@ export async function sweepReservedForSubmit(
           sizeCode: null,
           builtCompartments: g.codes,
         };
-        if (lineMatchesTargets(rl, rule.triggerTargets, comboModulesById)) {
-          ok = true;
-          break;
-        }
+        if (lineMatchesTargets(rl, rule.triggerTargets, comboModulesById)) count += 1;
       }
     }
-    ruleHasNonRewardBuildTrigger.set(rule.id, ok);
+    nonRewardBuildTriggersByRule.set(rule.id, count);
   }
 
   const emptyCombos = comboModulesById;
@@ -226,6 +238,10 @@ export async function sweepReservedForSubmit(
   // one genuine NON-reward line; a promo code whose trigger is reward-only is
   // deleted at the partition below (2990s deletes such codes at confirm).
   const nonRewardTriggerSkus = new Set<string>();
+  // Per-rule trigger UNITS in this order (flat lines; matching non-reward builds
+  // are added below) — × qty_per_trigger = the rule's carry ENTITLEMENT, the cap
+  // that keeps stale same-SKU orphans from dead carts out of the carry.
+  const entitledUnitsByRule = new Map<string, number>();
   for (const line of args.finalLines) {
     const info = skuRes.skuInfo.get(line.sku) ?? null;
     const rl = deriveRuleLine(info);
@@ -236,8 +252,21 @@ export async function sweepReservedForSubmit(
       if (!lineMatchesTargets(rl, rule.triggerTargets, emptyCombos)) continue;
       triggerSkus.add(line.sku);
       if (!isRewardLine) nonRewardTriggerSkus.add(line.sku);
-      break;
+      // Promo one-way parity: a reward line never opens a PROMO entitlement.
+      if (!(rule.type === "promo" && isRewardLine)) {
+        entitledUnitsByRule.set(
+          rule.id,
+          (entitledUnitsByRule.get(rule.id) ?? 0) + Math.max(0, line.qty),
+        );
+      }
     }
+  }
+  const entitledByRule = new Map<string, number>();
+  for (const rule of activeRules) {
+    const units =
+      (entitledUnitsByRule.get(rule.id) ?? 0) + (nonRewardBuildTriggersByRule.get(rule.id) ?? 0);
+    const perTrigger = Math.max(1, Math.floor(rule.qtyPerTrigger || 1));
+    entitledByRule.set(rule.id, units * perTrigger);
   }
 
   // 4. Scope to THIS submit: a RESERVED row is in-scope iff its trigger SKU is a
@@ -255,8 +284,8 @@ export async function sweepReservedForSubmit(
   //    is deleted (rule inactive / no-carry, OR would-carry but no phone → warn).
   const boundPhone = phoneKeyMy(args.customerPhone);
   const boundName = nameKey(args.customerName) || null; // NULL = phone-only (legacy shape)
-  // Group carried codes by rule so a per-rule carry_forward_days expiry applies.
-  const carryByRule = new Map<string, string[]>();
+  // Carry CANDIDATES per rule — the entitlement cap below picks from these.
+  const carryCandidatesByRule = new Map<string, typeof inScope>();
   const toDelete: string[] = [];
   let skippedForNoPhone = 0;
   for (const r of inScope) {
@@ -267,16 +296,16 @@ export async function sweepReservedForSubmit(
     if (
       rule?.type === "promo" &&
       !(r.trigger_item_code != null && nonRewardTriggerSkus.has(r.trigger_item_code)) &&
-      !ruleHasNonRewardBuildTrigger.get(rule.id)
+      (nonRewardBuildTriggersByRule.get(rule.id) ?? 0) === 0
     ) {
       toDelete.push(r.code);
       continue;
     }
     if (rule && rule.carryForward !== false) {
       if (boundPhone) {
-        const arr = carryByRule.get(rule.id) ?? [];
-        arr.push(r.code);
-        carryByRule.set(rule.id, arr);
+        const arr = carryCandidatesByRule.get(rule.id) ?? [];
+        arr.push(r);
+        carryCandidatesByRule.set(rule.id, arr);
       } else {
         toDelete.push(r.code); // would carry, but no phone to bind → delete + warn
         skippedForNoPhone++;
@@ -284,6 +313,33 @@ export async function sweepReservedForSubmit(
     } else {
       toDelete.push(r.code); // rule inactive / carry_forward=false → delete
     }
+  }
+
+  // ENTITLEMENT CAP: keep at most `entitled` codes per rule — THIS cart's codes
+  // first (cart_line_key ∈ client hint), then newest-minted — and DELETE the
+  // excess (stale same-SKU orphans from dead carts). Group survivors by rule so
+  // the per-rule carry_forward_days expiry applies.
+  const ts = (s?: string | null): number => {
+    const t = s ? Date.parse(s) : NaN;
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const carryByRule = new Map<string, string[]>();
+  for (const [ruleId, candidates] of carryCandidatesByRule) {
+    const entitled = entitledByRule.get(ruleId) ?? 0;
+    const sorted = [...candidates].sort((a, b) => {
+      const aCart = a.cart_line_key != null && clientKeys.has(a.cart_line_key) ? 1 : 0;
+      const bCart = b.cart_line_key != null && clientKeys.has(b.cart_line_key) ? 1 : 0;
+      if (aCart !== bCart) return bCart - aCart;
+      return ts(b.created_at) - ts(a.created_at);
+    });
+    const keep = sorted.slice(0, entitled);
+    if (keep.length > 0) {
+      carryByRule.set(
+        ruleId,
+        keep.map((r) => r.code),
+      );
+    }
+    for (const r of sorted.slice(entitled)) toDelete.push(r.code);
   }
 
   // 6. CARRY: RESERVED → AVAILABLE, stamped source + bound phone + dealer + expiry.
