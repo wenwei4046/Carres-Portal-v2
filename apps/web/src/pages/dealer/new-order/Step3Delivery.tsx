@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { minDeliveryDateISO, type CatalogResponse } from "@carres/shared";
 import type { WizardDraft } from "./draft";
+import CalendarDateField from "../pos/date-keyin/CalendarDateField";
+import { fmtChipDate } from "../pos/date-keyin/date-keyin";
 
 /**
  * Step 3 — Delivery date.
@@ -20,6 +22,12 @@ import type { WizardDraft } from "./draft";
  * 2026-07-12 (Loo) — the "As Fast As Possible" pill is REMOVED. The dealer
  * always picks explicit dates; the `delivery.asap` draft flag stays in the
  * shape (date edits keep clearing it) but nothing sets it anymore.
+ *
+ * 2026-07-14 (Loo) — native `<input type="date">` replaced by
+ * `CalendarDateField`: a POS-skinned calendar popover that greys out days
+ * before the lead-time floor (quick-date chips were tried and dropped the
+ * same day — Loo wants calendar-only). Draft contract unchanged (ISO
+ * strings).
  */
 interface Props {
   draft: WizardDraft;
@@ -35,9 +43,8 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
     onChange({ ...draft, delivery: { ...d, ...patch } });
   }
 
-  // ISO yyyy-mm-dd of today + lead. `<input type="date" min={...}>` enforces
-  // it natively on most browsers; the wizard footer ALSO validates via
-  // step3DateValid for browsers that ignore the min attribute (Safari old).
+  // ISO yyyy-mm-dd of today + lead — the calendar's selectable floor; the
+  // wizard footer ALSO validates via step3DateValid (defence in depth).
   const minDate = useMemo(() => minDeliveryDateISO(minLeadDays), [minLeadDays]);
   // Phase 11.1 — proceed (production-start) date floor = today; ceiling = the
   // delivery date. minDeliveryDateISO(0) is today in the same TZ as minDate.
@@ -71,17 +78,27 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
       >
         <div className="grid grid-cols-[1fr_auto] gap-3.5 items-end">
           <Field label={d.dateTbd ? "Delivery date (TBD)" : "Delivery date *"}>
-            <input
-              type="date"
+            <CalendarDateField
               value={d.date}
-              min={minDate}
-              disabled={d.dateTbd}
-              onChange={(e) =>
-                // User edited the date manually — drop the ASAP flag so we
-                // don't auto-proceed against a date the dealer overrode.
-                setD({ date: e.target.value, asap: false })
+              onChange={(iso) =>
+                // User picked a date — drop the ASAP flag so we don't
+                // auto-proceed against a date the dealer overrode.
+                setD({ date: iso, asap: false })
               }
-              className={inputClass({ disabled: d.dateTbd })}
+              minIso={minDate}
+              todayIso={todayIso}
+              disabled={d.dateTbd}
+              ariaLabel="Pick delivery date"
+              footNote={
+                minLeadDays > 0 ? (
+                  <>
+                    {minLeadDays}-day lead time · earliest <strong>{fmtChipDate(minDate)}</strong>
+                  </>
+                ) : (
+                  <>Today onwards</>
+                )
+              }
+              testId="delivery-date-input"
             />
           </Field>
           <div className="pb-2.5">
@@ -106,15 +123,24 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             delivery. Bounded today..deliveryDate. Hidden value when TBD. */}
         <div className="mt-3.5">
           <Field label={d.dateTbd ? "Proceed date · production start (TBD)" : "Proceed date · production start *"}>
-            <input
-              type="date"
+            <CalendarDateField
               value={d.proceedDate}
-              min={todayIso}
-              max={d.date || undefined}
+              onChange={(iso) => setD({ proceedDate: iso, asap: false })}
+              minIso={todayIso}
+              maxIso={d.date || undefined}
+              todayIso={todayIso}
               disabled={d.dateTbd}
-              onChange={(e) => setD({ proceedDate: e.target.value, asap: false })}
-              className={inputClass({ disabled: d.dateTbd })}
-              data-testid="proceed-date-input"
+              ariaLabel="Pick proceed date"
+              footNote={
+                d.date ? (
+                  <>
+                    Today → delivery (<strong>{fmtChipDate(d.date)}</strong>)
+                  </>
+                ) : (
+                  <>Today onwards · pick the delivery date first to cap it</>
+                )
+              }
+              testId="proceed-date-input"
             />
           </Field>
           <p className="text-[11px] text-base-500 mt-1.5">
@@ -158,11 +184,13 @@ function Section({
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  // A <div>, not a <label> — the picker children are buttons (chips/trigger),
+  // and a wrapping label would re-dispatch text clicks onto the first one.
   return (
-    <label className="block">
+    <div className="block">
       <span className="label block mb-1.5">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -186,13 +214,4 @@ function InlineCheckbox({
       {label}
     </label>
   );
-}
-
-function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  // 2990s re-skin: rounded-xl, 1.5px border, flame focus ring.
-  return `w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm outline-none transition-colors ${
-    disabled
-      ? "bg-base-50 text-base-500 cursor-not-allowed border-base-300"
-      : "bg-white focus:border-primary focus:ring-2 focus:ring-primary/10"
-  }`;
 }
