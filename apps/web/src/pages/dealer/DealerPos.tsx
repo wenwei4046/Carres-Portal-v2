@@ -641,11 +641,10 @@ export default function DealerPos({
   const itemCount = cartItemCount(draft.lines);
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
 
-  // Topbar staff chip (2990s parity: avatar + name + role) + My-orders target.
+  // Topbar staff chip (2990s parity: avatar + name + role).
   const displayName = dealerQ.data?.name ?? (userEmail ? userEmail.split("@")[0] : "Staff");
   const initials = (dealerQ.data?.name || userEmail || "··").slice(0, 2).toUpperCase();
   const roleLabel = (role ?? "dealer").replace(/_/g, " ");
-  const myOrdersHref = role === "principal" ? "/principal?tab=orders" : "/dealer/orders";
 
   const STEPS: Array<{ n: 1 | 2 | 3; label: string }> = [
     { n: 1, label: "Cart" },
@@ -703,31 +702,20 @@ export default function DealerPos({
             <Bookmark size={13} strokeWidth={1.75} />
             <span>Quotes</span>
           </button>
-          {role === "principal" ? (
-            // Principal traces orders in the portal tab — keep the link.
-            <Link
-              to={myOrdersHref}
-              className="topbar-pill"
-              aria-label="My orders"
-              data-testid="pos-topbar-my-orders"
-              style={{ textDecoration: "none" }}
-            >
-              <ListOrdered size={13} strokeWidth={1.75} />
-              <span>My orders</span>
-            </Link>
-          ) : (
-            // Dealer/showroom get the in-POS Order Status board (PIN-gated).
-            <button
-              type="button"
-              onClick={() => setStatusOpen(true)}
-              className="topbar-pill"
-              aria-label="My orders"
-              data-testid="pos-topbar-my-orders"
-            >
-              <ListOrdered size={13} strokeWidth={1.75} />
-              <span>My orders</span>
-            </button>
-          )}
+          {/* Every role gets the in-POS Order Status board (PIN-gated) — the
+              principal's board scopes to the dealer they're acting for (all
+              dealers until one is picked). The portal Orders trace tab still
+              exists for deep oversight. */}
+          <button
+            type="button"
+            onClick={() => setStatusOpen(true)}
+            className="topbar-pill"
+            aria-label="My orders"
+            data-testid="pos-topbar-my-orders"
+          >
+            <ListOrdered size={13} strokeWidth={1.75} />
+            <span>My orders</span>
+          </button>
           {!submitted && itemCount > 0 && (
             <button
               type="button"
@@ -884,7 +872,9 @@ export default function DealerPos({
         />
       )}
 
-      {statusOpen && <OrderStatusPage onClose={() => setStatusOpen(false)} />}
+      {statusOpen && (
+        <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
+      )}
 
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·
