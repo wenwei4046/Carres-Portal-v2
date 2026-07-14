@@ -205,6 +205,8 @@ const PIPELINE_PILL: Record<PipelineStatus, string> = {
   scheduled: "pill-collected", // indigo — LP assigned / en route
   completed: "pill-neutral", // grey — done
 };
+// Not wired since the Round-1A header pill took over — kept for the list pass.
+void PIPELINE_PILL;
 
 /** Hover copy per status — one plain-English line explaining what it means. */
 const PIPELINE_HINT: Record<PipelineStatus, string> = {
