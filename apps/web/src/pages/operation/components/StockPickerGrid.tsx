@@ -81,18 +81,27 @@ interface Props {
   /** The panel header ⋮ (Jess 2026-07-11 per-panel ⋮) — rendered at the header's
    *  right edge so the Warehouse-stock panel matches the others. */
   actions?: ReactNode;
+  /** UI-KIT §5.1 — render as a SECTION (band + body, no own SectionCard) so the
+   *  grid stacks inside the column's ONE shared white card like every other
+   *  section. Omit for the standalone-card layout. */
+  bare?: boolean;
 }
 
-// Round 1A: Category / Item / Size columns removed — under "same model + size"
-// every row is identical on all three, so they were noise. ☐ · Date · PO ·
-// Old ref · Cond. The LOAN view lists DIFFERENT sofa models, so it keeps an
-// Item column (you must see which sofa you're lending).
-const GRID = "30px 90px minmax(110px,1fr) minmax(100px,1fr) 92px";
-const GRID_LOAN = "30px 90px minmax(160px,1.4fr) 110px 100px 92px";
-const COL_LABELS = ["Date", "PO", "Old ref", "Cond"];
-const COL_LABELS_LOAN = ["Date", "Item", "PO", "Old ref", "Cond"];
+// §7.8 columns (2026-07-13): ☐ · Item (model) · Size · Location · Cond ·
+// Age (days in) · PO · a per-row Reserve action. One grid for both the
+// same-model view and the loan view (the Item column shows the model either
+// way; old-ref stays searchable but is no longer a column).
+const GRID = "26px minmax(120px,1.5fr) 58px 90px 84px 50px 90px 72px";
+const COL_LABELS = ["Item", "Size", "Location", "Cond", "Age", "PO", ""];
 
-export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions }: Props) {
+/** `bare` wrapper — a plain section stack slot (band + body) inside the
+ *  caller's shared SectionCard. Module-level so its identity is stable across
+ *  renders (an inline component would remount the grid every keystroke). */
+function BareSection({ children }: { children: ReactNode }) {
+  return <div className="mb-1 flex flex-col min-h-0 shrink-0">{children}</div>;
+}
+
+export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions, bare }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   // ONE search box (Jess 2026-07-13, replaces the 7 per-column funnels) — every
@@ -128,12 +137,23 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         const ut = tokenize(u.sku);
         let score = 0;
         for (const t of ut) if (want.has(t)) score += 1;
+        // Age = whole days since the unit came in (§7.8 "days in").
+        const ageDays = u.dateIn
+          ? Math.max(
+              0,
+              Math.floor(
+                (Date.now() - new Date(`${u.dateIn.slice(0, 10)}T00:00:00`).getTime()) /
+                  86_400_000,
+              ),
+            )
+          : null;
         return {
           ...u,
           cat: unitCategory(u.sku),
           size: unitSize(u.sku),
           cond: CONDITION_LABEL[u.condition] ?? u.condition,
           dateLabel: u.dateIn ? fmtDate(u.dateIn) : "",
+          ageDays,
           score,
         };
       })
@@ -179,8 +199,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
   }
   const loaning = loanMode && !!onLoan;
 
-  async function reserve() {
-    const ids = [...checked];
+  async function reserveIds(ids: string[]) {
     if (ids.length === 0) return;
     setSubmitting(true);
     const results = await Promise.allSettled(
@@ -196,8 +215,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
     const failed = results.length - ok;
     if (ok > 0) {
       toast.success(
-        `${loanMode ? "Loaned" : "Reserved"} ${ok} unit${ok === 1 ? "" : "s"} to ${soRef}` +
-          (failed ? ` · ${failed} could not be ${loanMode ? "loaned" : "reserved"}` : ""),
+        `Reserved ${ok} unit${ok === 1 ? "" : "s"} to ${soRef}` +
+          (failed ? ` · ${failed} could not be reserved` : ""),
       );
       setChecked(new Set());
       onReserved();
@@ -214,17 +233,41 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
     }
   }
 
+  function reserve() {
+    void reserveIds([...checked]);
+  }
+
+  // Auto-match & reserve (§7.8): pick the OLDEST matching free unit(s) — FIFO,
+  // covering the line's remaining need — and reserve them in one click.
+  function autoMatch() {
+    if (submitting || loanMode) return;
+    const oldest = [...rows].sort((a, b) => {
+      if (!a.dateIn && !b.dateIn) return 0;
+      if (!a.dateIn) return 1;
+      if (!b.dateIn) return -1;
+      return a.dateIn.localeCompare(b.dateIn);
+    });
+    const picked = oldest.slice(0, Math.max(1, need)).map((r) => r.id);
+    if (picked.length === 0) {
+      toast.info("No matching free unit to reserve");
+      return;
+    }
+    void reserveIds(picked);
+  }
+
   // Pre-tick the top `need` rows once, only the first time a line's units load.
   // (Kept simple: tick on mount via a derived initial set would re-run on filter
   // change, so we leave ticking to the operator here — relevance puts the right
   // units on top.)
 
+  // THE shared section chrome (components/SectionPanel.tsx) — same cream band
+  // as the list facet + every drawer panel (Jess 2026-07-13; no bespoke card
+  // styling). `bare` = band + body only, stacked inside the caller's ONE shared
+  // SectionCard (UI-KIT §5.1); else the standalone white card. Natural height;
+  // the row area caps at ~6 rows and scrolls inside itself.
+  const Wrapper = bare ? BareSection : SectionCard;
   return (
-    // THE shared section chrome (components/SectionPanel.tsx) — same white card
-    // + cream band as the list facet + every drawer panel (Jess 2026-07-13; no
-    // bespoke card styling). Natural height; the row area caps at ~6 rows and
-    // scrolls inside itself (the right column scrolls as a whole).
-    <SectionCard>
+    <Wrapper>
       <SectionBand
         title="Warehouse stock"
         collapsed={collapsedCard}
@@ -291,16 +334,15 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       </div>
 
       <div className="overflow-auto" style={{ maxHeight: 268 }}>
-        <div className={loanMode ? "min-w-[560px]" : "min-w-[420px]"}>
-          {/* header — plain sentence-case labels (the search box above is the
-              one filter). */}
+        <div className="min-w-[560px]">
+          {/* header — §7.8 columns; neutral base-50 (the cream is the band's). */}
           <div
-            className="grid sticky top-0 z-20 bg-[#F1EDE6] border-b border-[#DDD8CE] text-[#8C877D] text-[10px] font-bold"
-            style={{ gridTemplateColumns: loanMode ? GRID_LOAN : GRID }}
+            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[10px] font-bold"
+            style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
-            {(loanMode ? COL_LABELS_LOAN : COL_LABELS).map((label) => (
-              <div key={label} className="px-2 py-1.5 truncate">
+            {COL_LABELS.map((label, i) => (
+              <div key={i} className="px-2 py-1.5 truncate">
                 {label}
               </div>
             ))}
@@ -320,7 +362,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                       ? "bg-base-100/60 hover:bg-primary/5"
                       : "bg-white hover:bg-primary/5"
                 }`}
-                style={{ gridTemplateColumns: loanMode ? GRID_LOAN : GRID }}
+                style={{ gridTemplateColumns: GRID }}
               >
                 <div className="px-1.5 py-1 flex items-center justify-center">
                   <input
@@ -331,22 +373,57 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                     className="accent-primary w-3.5 h-3.5"
                   />
                 </div>
-                <div className="px-2 py-1 text-base-500 truncate">{r.dateLabel || "—"}</div>
-                {loanMode && (
-                  <div className="px-2 py-1 font-mono text-base-900 truncate">
-                    {r.sku}
-                  </div>
-                )}
-                <div className="px-2 py-1 font-mono text-base-600 truncate" title={r.poNo ?? ""}>
-                  {r.poNo ?? "—"}
+                <div className="px-2 py-1 font-mono text-base-900 truncate">
+                  {r.sku}
                 </div>
-                <div className="px-2 py-1 font-mono text-base-500 truncate" title={r.sourceRef ?? ""}>
-                  {r.sourceRef ?? "—"}
+                <div className="px-2 py-1 text-base-600 truncate">{r.size}</div>
+                <div
+                  className="px-2 py-1 text-base-500 truncate"
+                  title={r.location ?? ""}
+                >
+                  {r.location ?? "—"}
                 </div>
                 <div className="px-2 py-1">
                   <span className={`pill ${r.condition === "exhibition" ? "pill-warning" : "pill-confirmed"}`}>
                     {r.cond}
                   </span>
+                </div>
+                <div
+                  className="px-2 py-1 text-base-500 tabular-nums truncate"
+                  title={r.dateLabel ? `in since ${r.dateLabel}` : ""}
+                >
+                  {r.ageDays != null ? `${r.ageDays}d` : "—"}
+                </div>
+                <div className="px-2 py-1 font-mono text-base-600 truncate" title={r.poNo ?? ""}>
+                  {r.poNo ?? "—"}
+                </div>
+                <div className="px-1 py-1 text-right">
+                  {loaning ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLoan?.(r.id, r.sku);
+                      }}
+                      title="Issue a loan DO + mark this unit on-loan to the order"
+                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap"
+                    >
+                      Lend
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void reserveIds([r.id]);
+                      }}
+                      title={`Reserve this unit to ${soRef}`}
+                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
+                    >
+                      Reserve
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -380,24 +457,34 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
             Loan to {soRef}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={reserve}
-            disabled={submitting || checked.size === 0}
-            className="btn-primary t-tiny py-1.5 px-4"
-          >
-            {submitting
-              ? loanMode
-                ? "Loaning…"
-                : "Reserving…"
-              : checked.size === 0
-                ? "Select stock to reserve"
-                : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
-          </button>
+          <>
+            {/* §7.8 — FIFO shortcut: reserve the oldest matching unit(s). */}
+            <button
+              type="button"
+              onClick={autoMatch}
+              disabled={submitting || rows.length === 0}
+              title="Reserve the oldest matching free unit(s) covering this line"
+              className="btn-secondary t-tiny py-1.5 px-3 disabled:opacity-40"
+            >
+              Auto-match & reserve
+            </button>
+            <button
+              type="button"
+              onClick={reserve}
+              disabled={submitting || checked.size === 0}
+              className="btn-primary t-tiny py-1.5 px-4"
+            >
+              {submitting
+                ? "Reserving…"
+                : checked.size === 0
+                  ? "Select stock to reserve"
+                  : `Reserve ${checked.size} to ${soRef}`}
+            </button>
+          </>
         )}
       </div>
       </>
       )}
-    </SectionCard>
+    </Wrapper>
   );
 }

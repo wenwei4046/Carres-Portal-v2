@@ -1,25 +1,102 @@
 /**
- * wa-templates — the locked WhatsApp chase templates (Jess Round 1A, 2026-07-13).
- * Round 1A copies the text to the clipboard (no stored partner number yet);
- * `waEncode` readies the same text for a wa.me deep link later.
+ * wa-templates — the locked WhatsApp templates (Jess 2026-07-13, two-tone
+ * refine; copy source of truth = docs/whatsapp-chase-templates.md).
+ *
+ * Every audience gets TWO tones:
+ *   Reminder — gentle, first contact.
+ *   Chase    — firmer follow-up.
+ *
+ * Audience → lead id (locked): CUSTOMER + LOGISTIC are REF-led, SUPPLIER is
+ * PO-led — never the SO number (external parties don't speak SO).
+ *
+ * Copy rules (locked):
+ *  - Multi-line: REAL line breaks ("\n"); `waEncode` turns them into %0A for a
+ *    wa.me deep link. Clipboard copy keeps the real breaks.
+ *  - {items} = ONE line per item: "{qty}× {model}".
+ *  - Customer messages carry NO delivery date and no pressure phrasing
+ *    ("settle by", "deliver on time") — the logistic partner contacts the
+ *    customer for the final slot; if the customer asks about delivery, ops
+ *    replies with the partner's contact.
+ *  - {salutation} = the optional preferred-name/title field when set, else the
+ *    Title-Cased customer name. NEVER auto-infer Mr/Ms.
  */
 
-export interface ChaseItemsInput {
-  /** Combined order lines (sku + qty). */
+/** "LEE WEI YANG" → "Lee Wei Yang". Leaves CJK and mixed tokens intact. */
+export function titleCaseName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((w) =>
+      /^[A-Za-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w,
+    )
+    .join(" ");
+}
+
+/** The customer salutation: the optional preferred-name/title field if set,
+ *  else Title-Case of the customer name. Never auto-infers Mr/Ms. */
+export function salutationOf(
+  preferred: string | null | undefined,
+  customerName: string | null | undefined,
+): string {
+  const p = (preferred ?? "").trim();
+  if (p) return p;
+  const n = (customerName ?? "").trim();
+  return n ? titleCaseName(n) : "there";
+}
+
+/** RM figure for templates — thousands-separated, no currency prefix
+ *  (the template carries "RM " itself). */
+export function rmAmount(n: number): string {
+  return Math.round(Number(n) || 0).toLocaleString();
+}
+
+/** {items} block — ONE line per item: "{qty}× {model}". */
+export function itemsBlock(lines: { sku: string; qty: number }[]): string {
+  if (lines.length === 0) return "—";
+  return lines.map((l) => `${l.qty}× ${l.sku}`).join("\n");
+}
+
+// ── CUSTOMER (money) — REF-led, no delivery date, no pressure ───────────────
+export interface CustomerChaseInput {
+  /** Resolved salutation (see salutationOf). */
+  salutation: string;
+  ref: string | null;
+  /** Live Outstanding = Total − Collected, already thousands-formatted. */
+  outstanding: string;
   lines: { sku: string; qty: number }[];
 }
 
-/** Items summary: single line → the sku itself; multi → "{n} items ({units} units)". */
-export function chaseItemsLabel(lines: { sku: string; qty: number }[]): string {
-  if (lines.length === 0) return "—";
-  if (lines.length === 1) return lines[0].sku;
-  const units = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
-  return `${lines.length} items (${units} units)`;
+/** Gentle first contact. */
+export function buildCustomerReminder(i: CustomerChaseInput): string {
+  return (
+    `Hi ${i.salutation},\n` +
+    `Just a friendly reminder regarding your order.\n` +
+    `\n` +
+    `REF: ${i.ref ?? "—"}\n` +
+    `Outstanding: RM ${i.outstanding}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `\n` +
+    `Do let us know once arranged. Thank you!`
+  );
 }
 
+/** Firmer follow-up. */
+export function buildCustomerChase(i: CustomerChaseInput): string {
+  return (
+    `Hi ${i.salutation},\n` +
+    `Following up on your order — the balance below is still outstanding.\n` +
+    `\n` +
+    `REF: ${i.ref ?? "—"}\n` +
+    `Outstanding: RM ${i.outstanding}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `\n` +
+    `Kindly arrange payment so we can proceed. Thank you!`
+  );
+}
+
+// ── LOGISTIC partner — REF-led (never SO) ────────────────────────────────────
 export interface LogisticChaseInput {
   logistic: string | null;
-  soId: string; // "SO-1153"
   ref: string | null;
   customer: string | null;
   region: string | null;
@@ -29,37 +106,77 @@ export interface LogisticChaseInput {
   overdue: boolean;
 }
 
-/** Locked logistic chase template. */
-export function buildLogisticChase(i: LogisticChaseInput): string {
+/** Gentle first contact — ask for the arrangement. */
+export function buildLogisticReminder(i: LogisticChaseInput): string {
   return (
-    `Hi ${i.logistic ?? "team"}, need delivery arrangement. ` +
-    `${i.soId} · REF ${i.ref ?? "—"} · ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}. ` +
-    `Item: ${chaseItemsLabel(i.lines)}. ` +
-    `Deadline: ${i.deadline}${i.overdue ? " — overdue" : ""}. ` +
-    `Pls confirm delivery date + time slot with customer. TQ`
+    `Hi ${i.logistic ?? "team"},\n` +
+    `Friendly reminder — this delivery still needs an arrangement.\n` +
+    `\n` +
+    `REF: ${i.ref ?? "—"}\n` +
+    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `Deadline: ${i.deadline}\n` +
+    `\n` +
+    `Please confirm the delivery date + time slot with the customer. Thank you!`
   );
 }
 
+/** Firmer follow-up — the deadline is at risk / passed. */
+export function buildLogisticChase(i: LogisticChaseInput): string {
+  return (
+    `Hi ${i.logistic ?? "team"},\n` +
+    `Following up — this delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
+    `\n` +
+    `REF: ${i.ref ?? "—"}\n` +
+    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `Deadline: ${i.deadline}${i.overdue ? " — overdue" : ""}\n` +
+    `\n` +
+    `Please confirm the delivery date + time slot with the customer today. Thank you!`
+  );
+}
+
+// ── SUPPLIER — PO-led (never SO) ─────────────────────────────────────────────
 export interface SupplierChaseInput {
   poNo: string | null;
   ref: string | null;
-  soId: string;
   lines: { sku: string; qty: number }[];
+  /** Display date the stock is needed by. */
   deadline: string;
 }
 
-/** Locked supplier chase template. */
-export function buildSupplierChase(i: SupplierChaseInput): string {
+/** Gentle first contact — ask for the ETA. */
+export function buildSupplierReminder(i: SupplierChaseInput): string {
   return (
-    `Hi, checking stock ETA. ` +
-    `${i.poNo ?? "—"} · our ref ${i.ref ?? "—"} (${i.soId}). ` +
-    `Item: ${chaseItemsLabel(i.lines)}. ` +
-    `Needed by: ${i.deadline}. ` +
-    `Pls advise when stock ready. TQ`
+    `Hi,\n` +
+    `Friendly reminder — checking the stock ETA for this PO.\n` +
+    `\n` +
+    `PO: ${i.poNo ?? "—"}\n` +
+    `Our ref: ${i.ref ?? "—"}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `Needed by: ${i.deadline}\n` +
+    `\n` +
+    `Please advise when the stock will be ready. Thank you!`
   );
 }
 
-/** URL-encoded body, ready for `https://wa.me/<number>?text=` later (1B). */
+/** Firmer follow-up — still no ETA / stock late. */
+export function buildSupplierChase(i: SupplierChaseInput): string {
+  return (
+    `Hi,\n` +
+    `Following up — we still need the stock ETA for this PO.\n` +
+    `\n` +
+    `PO: ${i.poNo ?? "—"}\n` +
+    `Our ref: ${i.ref ?? "—"}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `Needed by: ${i.deadline}\n` +
+    `\n` +
+    `Please confirm the ready date today so we can plan the delivery. Thank you!`
+  );
+}
+
+/** URL-encoded body, ready for `https://wa.me/<number>?text=` — real line
+ *  breaks become %0A. */
 export function waEncode(text: string): string {
   return encodeURIComponent(text);
 }

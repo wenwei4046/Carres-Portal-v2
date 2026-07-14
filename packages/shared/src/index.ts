@@ -583,6 +583,7 @@ export {
   STORAGE_RATES,
   STORAGE_WAIVER_STATUSES,
   computeStorageFee,
+  defaultStorageStart,
   storageCategoryForSku,
   orderStorageScope,
   computeOrderStorage,

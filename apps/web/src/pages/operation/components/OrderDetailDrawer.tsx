@@ -11,28 +11,29 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Copy,
   Download,
   ExternalLink,
   FileText,
   Flag,
-  Lock,
   MoreVertical,
+  Package,
   PackagePlus,
   Pencil,
   Phone,
   RotateCcw,
   Truck,
+  Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  STOCK_LOCATIONS,
   normalizeSkuKey,
   updateOrderInputSchema,
-  type LineStockStatus,
+  type OpsStockListResponse,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderDoPdf, renderReceiptPdf, renderInvoicePdf } from "@/lib/pdf/render";
@@ -60,12 +61,17 @@ import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts, type LineReadiness } from "@/lib/line-readiness";
-import { buildLogisticChase, buildSupplierChase } from "@/lib/wa-templates";
-// The list's NEXT engine — the drawer banner shows the SAME verb the Orders
-// list shows, from the same function (import cycle with the list page is safe:
-// both only call each other's exports at render time, never during module eval).
-import { nextActionOf } from "../OperationOrdersControl";
-import type { operationOrderListRow } from "@/lib/queries";
+import {
+  buildCustomerChase,
+  buildCustomerReminder,
+  buildLogisticChase,
+  buildLogisticReminder,
+  buildSupplierChase,
+  buildSupplierReminder,
+  rmAmount,
+  salutationOf,
+  titleCaseName,
+} from "@/lib/wa-templates";
 import {
   lineCategory,
   lineKind,
@@ -80,9 +86,8 @@ import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import {
   RouteJourneyBar,
-  RouteLegEditor,
-  RouteQuietButton,
-  legsToDisplay,
+  StopsEditor,
+  stopsToDisplay,
 } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
@@ -511,12 +516,13 @@ interface DrawerBodyProps {
 }
 
 /**
- * Panel — the LOCKED design-system Card (Jess 2026-07-01, one-screen order
- * detail): white surface · cool-grey hairline · 12px round · a header with a
- * bottom rule and a SUMMARY badge pinned to the right so the card reads at a
- * glance. NOT collapsible (the page is a fixed one-screen layout). `grow` fills
- * leftover column height so the left + right columns' bottoms line up (Jess: no
- * 高高低低). The caller supplies the body (each panel scrolls / pads its own way).
+ * Panel — ONE SECTION inside the column's shared white card (UI-KIT §3+§5,
+ * 2026-07-13): a cream <SectionBand> title strip + body, stacked inside a
+ * single <SectionCard> per column — the EXACT structure the Orders-list facet
+ * renders (KanbanGroup inside one SectionCard), so list + detail page are 1:1
+ * by construction. The section itself carries NO card chrome — the column's
+ * SectionCard owns the white surface + 1px neutral frame. `grow` fills
+ * leftover column height (Activity). Collapsible; state persists per title.
  */
 function Panel({
   title,
@@ -533,8 +539,9 @@ function Panel({
   /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
   actions?: ReactNode;
   grow?: boolean;
-  /** Initial state when the user hasn't toggled this panel yet (Jess 2026-07-13:
-   *  Balance + Delivery open, Customer + Storage collapsed). */
+  /** Initial state when the user hasn't toggled this panel yet (UI-KIT §5.1:
+   *  Balance + Delivery + Items + Warehouse open; Customer, Storage, Loan
+   *  collapsed). */
   defaultOpen?: boolean;
   className?: string;
   children: ReactNode;
@@ -542,9 +549,9 @@ function Panel({
   // Per-panel hide / expand (Jess 2026-07-11) — every panel header toggles its
   // own body (accordion), so a big order can collapse the cards it doesn't need.
   // State persists across orders via localStorage, keyed by the panel title.
-  // Key bumped v2 (2026-07-13) so the new per-card defaults actually land for
-  // users who toggled panels under the old defaults.
-  const storeKey = `ops-drawer-panel-v2:${title}`;
+  // Key bumped v3 (2026-07-13 UI-KIT rebuild) so the new per-section defaults
+  // actually land for users who toggled panels under the old defaults.
+  const storeKey = `ops-drawer-panel-v3:${title}`;
   const [open, setOpen] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem(storeKey);
@@ -566,10 +573,12 @@ function Panel({
     });
   };
   // THE shared section chrome (components/SectionPanel.tsx) — the SAME
-  // SectionCard + SectionBand the Orders list facet renders, so list + drawer
-  // are 1:1 by construction (Jess 2026-07-13). No bespoke card styling here.
+  // SectionBand the Orders list facet's KanbanGroup renders, stacked the same
+  // way (mb-1 inside the shared SectionCard). No bespoke card styling here.
   return (
-    <SectionCard grow={grow && open} className={className}>
+    <div
+      className={`mb-1 flex flex-col min-h-0 ${grow && open ? "flex-1" : "shrink-0"} ${className ?? ""}`}
+    >
       <SectionBand
         title={title}
         collapsed={!open}
@@ -582,7 +591,7 @@ function Panel({
         }
       />
       {open && children}
-    </SectionCard>
+    </div>
   );
 }
 
@@ -662,6 +671,115 @@ function MiniBadge({
 // (ReadinessBadge removed 2026-07-13 — the Items header now shows
 //  "<ready> ready · <toReserve> to reserve" inline, from the shared lineReadiness.)
 
+/** KpiBox — a header metric card for ONE mission track (UI-KIT §3 + §7.2):
+ *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
+ *  small alert mark when red — no dots), sub-facts side by side when a track
+ *  carries more than one, and the track's chase action(s) INSIDE the box when
+ *  it's red/actionable. Light #F7F4EE fill (the kit's KPI fill), NO border. */
+function KpiBox({
+  icon,
+  label,
+  tone,
+  value,
+  subs,
+  actions,
+}: {
+  icon: ReactNode;
+  label: string;
+  tone: "success" | "warning" | "danger" | "neutral";
+  value: ReactNode;
+  /** Sub-facts, rendered SIDE BY SIDE (§7.2 — a party with >1 issue). */
+  subs?: ReactNode[];
+  /** Chase button(s) when the track is red/actionable. */
+  actions?: ReactNode;
+}) {
+  const VALUE: Record<string, string> = {
+    success: "text-success",
+    warning: "text-warning",
+    danger: "text-danger",
+    neutral: "text-base-900",
+  };
+  return (
+    <div className="rounded-[8px] bg-[#F7F4EE] px-3 py-2 min-w-0 flex flex-col">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="shrink-0 text-base-400" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+          {label}
+        </span>
+        {tone === "danger" && (
+          <AlertCircle
+            size={12}
+            strokeWidth={2.5}
+            className="shrink-0 text-danger"
+            aria-label="needs action"
+          />
+        )}
+      </div>
+      <div
+        className={`mt-0.5 text-[16px] font-semibold tabular-nums truncate ${VALUE[tone]}`}
+      >
+        {value}
+      </div>
+      {subs && subs.length > 0 && (
+        <div className="flex items-center gap-3 min-w-0 text-[11px] text-base-500">
+          {subs.map((s, i) => (
+            <span key={i} className="truncate">
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+      {actions && (
+        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">{actions}</div>
+      )}
+    </div>
+  );
+}
+
+/** Chase actions inside a KpiBox — each actionable track carries a TWO-TONE
+ *  pair (docs/whatsapp-chase-templates.md): [Reminder] gentle first contact
+ *  (outline) + [Chase] firmer follow-up (solid flame). Both copy the template
+ *  AND stamp the chase event (today manual WhatsApp; the future portal
+ *  auto-fires the same event). */
+const CHASE_BTN =
+  "text-[11px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
+const REMIND_BTN =
+  "text-[11px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
+
+/** The [Reminder]+[Chase] pair for one audience. */
+function ChasePair({
+  onReminder,
+  onChase,
+  audience,
+}: {
+  onReminder: () => void;
+  onChase: () => void;
+  audience: string;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onReminder}
+        title={`Copy the gentle ${audience} reminder + log the chase event`}
+        className={REMIND_BTN}
+      >
+        Reminder
+      </button>
+      <button
+        type="button"
+        onClick={onChase}
+        title={`Copy the firmer ${audience} chase + log the chase event`}
+        className={CHASE_BTN}
+      >
+        Chase
+      </button>
+    </>
+  );
+}
+
 function DrawerBody({
   data,
   onClose,
@@ -687,6 +805,10 @@ function DrawerBody({
   // Route "Option D" — which item's journey legs are expanded in-place (one at a
   // time; the heavy detail stays inside the drawer so the list never gets busy).
   const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
+  // §7.6 — the Delivery card's multi-leg "Carriers / route" block is HIDDEN by
+  // default (the Logistic dropdown is the default route); it expands behind
+  // "+ Add stop" and stays open once the order actually has legs.
+  const [showRouteBlock, setShowRouteBlock] = useState(false);
   // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
   const customerEditRef = useRef<(() => void) | null>(null);
@@ -712,6 +834,29 @@ function DrawerBody({
   }
   // reserved_ref written when the operator picks a unit for this order.
   const soRef = `SO-${order.so}`;
+  // Units RESERVED to THIS SO (§7.7 "Reserve does nothing" fix): /reserve-item
+  // stamps ops_stock_items.reserved_ref = the SO ref but never touches
+  // ops_order_control.line_received (and the live control PUT rejects it), so
+  // the detail payload's free-units-only view made a reserve look like a no-op
+  // — the unit just vanished from "free" while the line stayed 0/N. Readiness
+  // now ALSO counts the reserved ledger, fetched from the same live endpoint
+  // the stock page uses.
+  const reservedUnitsQuery = useQuery<OpsStockListResponse>({
+    queryKey: ["operation", "ops-stock", "reserved"],
+    queryFn: () => apiFetch<OpsStockListResponse>("/api/ops/stock/reserved"),
+    staleTime: 10_000,
+  });
+  const reservedToSoByKey = new Map<string, number>();
+  for (const u of reservedUnitsQuery.data?.items ?? []) {
+    if (u.reservedRef !== soRef) continue;
+    const k = stockMatchKey(u.sku);
+    reservedToSoByKey.set(k, (reservedToSoByKey.get(k) ?? 0) + (u.qty ?? 1));
+  }
+  // Reserved-to-this-SO count for a line: the physical reserved ledger, or the
+  // GRN line_received stamp — whichever is ahead (GRN books insert reserved
+  // units too, so max() avoids double counting while surviving either path).
+  const reservedCountOf = (sku: string, lineReceived: number) =>
+    Math.max(lineReceived, reservedToSoByKey.get(stockMatchKey(sku)) ?? 0);
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
@@ -876,7 +1021,7 @@ function DrawerBody({
     lineReadiness({
       sku,
       qty,
-      reservedCount: lineReceivedOf(sku),
+      reservedCount: reservedCountOf(sku, lineReceivedOf(sku)),
       freeCount: (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length,
       hasPo: hasPoForSku(sku),
       override: form.draft.line_stock_status[sku],
@@ -975,69 +1120,28 @@ function DrawerBody({
   const isOwing = balanceOwing;
   const owingAmt = moneyOutstanding;
 
-  // ── Next banner (Jess 2026-07-13) — the SAME verb the Orders list shows, from
-  // the SAME engine (nextActionOf). The detail payload is adapted to the list-row
-  // shape the engine reads: identity/stage fields + the control overlay; the
-  // formal LP name resolves through the partners map like the list does.
+  // The formal LP name resolves through the partners map (like the list does).
   const formalPartnerName =
     (partnersData?.partners ?? []).find((p) => p.id === order.delivery_partner_id)
       ?.name ?? null;
-  const nextRow = {
-    status: order.status,
-    operation_stage: order.operation_stage,
-    source_system: order.source_system,
-    delivery_date: order.delivery_date,
-    delivery_date_tbd: order.delivery_date_tbd,
-    ops_assigned_logistic: order.ops_assigned_logistic,
-    delivery_partners: formalPartnerName
-      ? { id: order.delivery_partner_id, name: formalPartnerName }
-      : null,
-    ops_order_control: form.control ?? undefined,
-  } as unknown as operationOrderListRow;
-  // Per-order stock state for the engine — folded to MIRROR the list's coarser
-  // per-order bucket (free-stock-covered counts as ready there), so the banner
-  // verb always equals the list's NEXT verb. The Items badge stays strict
-  // (ready = reserved-to-this-SO only).
-  const nextStock = {
-    state:
-      nopoN > 0
-        ? ("unknown" as const)
-        : goodsLines.length === 0 || readyN + toReserveN === goodsLines.length
-          ? ("ready" as const)
-          : ("awaiting" as const),
-  };
-  const next = nextActionOf(nextRow, nextStock, orderedLines);
-  const isOverdueNext = next.tone === "danger";
-  const nextReason = (() => {
-    switch (next.label) {
-      case "Order PO":
-        return `${nopoN} of ${goodsLines.length} item${goodsLines.length === 1 ? "" : "s"} has no PO`;
-      case "Chase supplier":
-        return `${rCounts.onPo || goodsLines.length - readyN - toReserveN} item${(rCounts.onPo || 1) === 1 ? "" : "s"} waiting on supplier stock`;
-      case "Book logistic":
-        return "stock ready — no carrier assigned";
-      case "Chase logistic":
-        return daysToDelivery !== null && daysToDelivery < 0
-          ? "past the deadline — no delivery booked"
-          : "carrier hasn't committed a delivery date";
-      case "Confirm":
-        return next.locked
-          ? "money hold — collect the balance / storage first"
-          : "all clear — confirm the delivery";
-      default:
-        return "delivered";
-    }
-  })();
-  // One sparse-save mutation shared by the banner's quick writes: the
-  // customer-confirmed toggle (0220) + the last-chased stamp (0221). Plain
-  // fields, NO alert-engine wiring — the list stays unaffected.
+  // One sparse-save mutation for the customer-confirmed toggle (0220). Plain
+  // field, NO alert-engine wiring — the list stays unaffected.
   const quickSave = useSaveOrderControl(order.id, {
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
   const customerConfirmed = form.control?.customer_confirmed ?? false;
-  // WhatsApp chase (Round 1A = COPY the locked template + stamp last_chased_at;
-  // the stored partner number + wa.me deep link is 1B).
+  // Chase-event stamp (0221, deploy-gated) — SILENT on error so a not-yet-
+  // deployed API never blocks the chase itself (the copy already happened).
+  const chaseStamp = useSaveOrderControl(order.id);
+  // WhatsApp two-tone chase (docs/whatsapp-chase-templates.md): every audience
+  // gets Reminder (gentle first contact) + Chase (firmer). COPY the template +
+  // log the chase event; the stored number + wa.me deep link — and the portal
+  // auto-fire — write the SAME event later.
   const chasePartnerName = assignedLogisticName ?? formalPartnerName ?? null;
+  const receiptMetaOf = () => ({
+    orderCode: `SO-${order.so}`,
+    customerName: order.customer_name ?? "",
+  });
   const firstPoNo =
     [...soPoBySku.values()][0] ?? (pos[0] ? pos[0].id.slice(0, 8) : null);
   const deadlineLabel = order.delivery_date_tbd
@@ -1045,58 +1149,131 @@ function DrawerBody({
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
       : "—";
-  const copyChase = (kind: "logistic" | "supplier") => {
-    const text =
-      kind === "supplier"
-        ? buildSupplierChase({
-            poNo: firstPoNo,
-            ref: (order.source_ref ?? [])[0] ?? null,
-            soId: soRef,
-            lines: orderedLines,
-            deadline: deadlineLabel,
-          })
-        : buildLogisticChase({
-            logistic: chasePartnerName,
-            soId: soRef,
-            ref: (order.source_ref ?? [])[0] ?? null,
-            customer: order.customer_name ?? null,
-            region: loc.label ?? null,
-            lines: orderedLines,
-            deadline: deadlineLabel,
-            overdue: daysToDelivery !== null && daysToDelivery < 0,
-          });
-    void navigator.clipboard.writeText(text);
-    toast.success("Chase message copied — paste into WhatsApp");
-    quickSave.mutate({ last_chased_at: new Date().toISOString() });
-  };
-  // Primary flame action per verb — focuses / opens the relevant card field.
-  const focusField = (id: string) => {
-    const el = document.getElementById(id);
-    el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    (el as HTMLElement | null)?.focus();
-  };
-  const primary = (() => {
-    switch (next.label) {
-      case "Chase logistic":
-        return { label: "Record ETA & slot", run: () => focusField("fld-logistic-eta") };
-      case "Order PO":
-        return { label: "Raise PO", run: () => onIssuePOsClick() };
-      case "Book logistic":
-        return { label: "Book partner", run: () => focusField("fld-logistic") };
-      case "Chase supplier":
-        return { label: "Copy chase", run: () => copyChase("supplier") };
-      case "Confirm":
-        return {
-          label: "Confirm & collect",
-          run: () =>
-            document
-              .getElementById("card-balance")
-              ?.scrollIntoView({ block: "start", behavior: "smooth" }),
-        };
-      default:
-        return null; // Done — nothing to push
+  // Optional preferred-name/title for customer messages — never auto Mr/Ms.
+  // Local-only for now (an ops_order_control column is deploy-gated), keyed by
+  // order so it sticks across sessions on this machine.
+  const salKey = `ops-salutation:${order.id}`;
+  const [salutation, setSalutation] = useState<string>(() => {
+    try {
+      return localStorage.getItem(salKey) ?? "";
+    } catch {
+      return "";
     }
-  })();
+  });
+  const saveSalutation = (v: string) => {
+    setSalutation(v);
+    try {
+      if (v.trim()) localStorage.setItem(salKey, v);
+      else localStorage.removeItem(salKey);
+    } catch {
+      /* private mode — session-only */
+    }
+  };
+  const orderRef = (order.source_ref ?? [])[0] ?? null;
+  const copyChase = (
+    aud: "customer" | "logistic" | "supplier",
+    tone: "reminder" | "chase",
+  ) => {
+    const text =
+      aud === "customer"
+        ? (tone === "reminder" ? buildCustomerReminder : buildCustomerChase)({
+            salutation: salutationOf(salutation, order.customer_name),
+            ref: orderRef,
+            outstanding: rmAmount(moneyOutstanding),
+            lines: orderedLines,
+          })
+        : aud === "supplier"
+          ? (tone === "reminder" ? buildSupplierReminder : buildSupplierChase)({
+              poNo: firstPoNo,
+              ref: orderRef,
+              lines: orderedLines,
+              deadline: deadlineLabel,
+            })
+          : (tone === "reminder" ? buildLogisticReminder : buildLogisticChase)({
+              logistic: chasePartnerName,
+              ref: orderRef,
+              customer: order.customer_name ?? null,
+              region: loc.label ?? null,
+              lines: orderedLines,
+              deadline: deadlineLabel,
+              overdue: daysToDelivery !== null && daysToDelivery < 0,
+            });
+    void navigator.clipboard.writeText(text);
+    toast.success(
+      `${tone === "reminder" ? "Reminder" : "Chase"} copied — paste into WhatsApp`,
+    );
+    // The logged chase event — today a manual WhatsApp copy stamps it; the
+    // future portal auto-fire writes the SAME event.
+    chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
+  };
+
+  // ═══ KPI boxes = the 3 mission tracks (UI-KIT §7.2, thresholds §5.2) ═══
+  // The boxes ARE the action surface now (the standalone Next row is gone):
+  // each reads the same signals (balance gate, shared lineReadiness, delivery
+  // fields) and carries its own chase action(s) when red/actionable.
+  type KpiTone = "success" | "warning" | "danger" | "neutral";
+  // CUSTOMER · money — green paid/0 · amber owing pre-last-call · red owing past
+  // the collect gate (the same balanceGate the Balance card shows).
+  const moneyTone: KpiTone = !totalSet
+    ? "neutral"
+    : !balanceOwing
+      ? "success"
+      : balanceGate === "hold"
+        ? "danger"
+        : "warning";
+  // STOCK — green all reserved · red No PO or an on-PO line with no / passed
+  // ETA · amber otherwise (to-reserve or PO on track).
+  const onPoStalled = goodsLines.some((l) => {
+    if (readinessOf(l.sku, l.qty) !== "on_po") return false;
+    const eta = form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+    return !eta || eta < todayIso;
+  });
+  const stockTone: KpiTone =
+    goodsLines.length === 0
+      ? "neutral"
+      : readyN === goodsLines.length
+        ? "success"
+        : nopoN > 0 || onPoStalled
+          ? "danger"
+          : "warning";
+  // LOGISTIC — green booked or >3 days left · amber ≤3 days & not booked · red
+  // deadline passed & not booked.
+  const bookedEta = form.control?.logistic_eta ?? null;
+  const logisticTone: KpiTone =
+    pipelineStatus === "completed" || bookedEta
+      ? "success"
+      : daysToDelivery === null
+        ? "neutral"
+        : daysToDelivery < 0
+          ? "danger"
+          : daysToDelivery <= 3
+            ? "warning"
+            : "success";
+  // Sub-facts per box — side by side when a party carries more than one (§7.2).
+  const moneySubs: string[] = !totalSet
+    ? ["no total set"]
+    : !balanceOwing
+      ? [`${RM(collected)} collected`]
+      : [
+          `${RM(collected)} of ${RM(orderTotal)} collected`,
+          collectByLabel ? `collect by ${collectByLabel}` : "collect on delivery",
+        ];
+  const stockSubs: string[] =
+    goodsLines.length === 0
+      ? ["no goods lines"]
+      : readyN === goodsLines.length
+        ? ["all reserved"]
+        : ([
+            toReserveN > 0 ? `${toReserveN} to reserve` : null,
+            rCounts.onPo > 0 ? `${rCounts.onPo} on PO` : null,
+            nopoN > 0 ? `${nopoN} no PO` : null,
+          ].filter(Boolean) as string[]);
+  const logisticSubs: string[] = bookedEta
+    ? [
+        `booked ${fmtDate(bookedEta).split(", ")[0]}`,
+        ...(chasePartnerName ? [chasePartnerName] : []),
+      ]
+    : [chasePartnerName ?? "no carrier assigned", "not booked"];
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1142,25 +1319,40 @@ function DrawerBody({
           onClose={() => setLoanTarget(null)}
         />
       )}
-      {/* No separate top bar — the ⋮ actions menu + close moved into the Order
-          section header next to the status chip (Jess: save a row). Backdrop
-          click still closes the drawer. */}
-      {/* ═══ STICKY HEADER BAND (batch 1 #2) ═══ A shrink-0 lining-box that never
-          scrolls — breadcrumb · pill · #id · sticker · deadline · 3-cell status
-          strip · 1–2 stage actions. The body below is the single scroll region.
-          Flex SIBLINGS (not position:sticky — sticky breaks inside nested overflow
-          parents). Lining-box style: pale surface + hairline border, colour only
-          for alerts. */}
-      <header className="shrink-0 bg-white border-b border-base-200/70 px-5 pt-3">
-        {/* Row 1 (Jess Round 1A) — "#<id>" mono 20px/500 + a state pill coloured
-            by ORDER STATE (never danger red — the colour lock reserves red for the
-            banner + inline alert numbers): placed/pre-work grey · on-hold amber ·
-            scheduled blue · delivered green. Right: flag / more / close. */}
-        <div className="flex items-center justify-between gap-3 min-w-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="font-mono text-[20px] font-medium text-base-900 shrink-0">
+      {/* ═══ HEADER PANEL (UI-KIT §5.1) ═══ ONE white Panel, full width, fixed
+          (shrink-0 — the body scrolls under it), floating on the cream page.
+          Row 1: ‹ Orders back · #id (mono) · state pill (amber/blue/green/grey
+          by ORDER STATE — never danger red) · meta · flag / ⋮ (no ✕ — back
+          replaces it). Row 2: the 3 KPI mission-track boxes (§5.2). Row 3,
+          under a hairline: the NEXT summary row (§5.3) — red TEXT when urgent
+          + ONE solid flame button. No coloured borders, no red fill band. */}
+      <header className="shrink-0 px-5 pt-3 bg-background">
+        <SectionCard className="!p-0">
+        <div className="px-4 pt-2.5 flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Back to Orders"
+            className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
+          >
+            <ChevronLeft size={15} aria-hidden="true" />
+            Orders
+          </button>
+          <span className="w-px h-4 bg-base-200 shrink-0" aria-hidden="true" />
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {/* §7.1 — the order's two IDs bold, +2 sizes, ADJACENT. The ref
+                number stands alone (no "REF" word — Jess 2026-07-13). */}
+            <span className="font-mono text-[22px] font-bold text-base-900 shrink-0">
               #{order.so}
             </span>
+            {order.source_ref?.[0] && (
+              <span
+                className="font-mono text-[22px] font-bold text-base-700 shrink-0"
+                title="Customer reference"
+              >
+                {order.source_ref[0]}
+              </span>
+            )}
             {(() => {
               const onHold = balanceOwing || storageOwing;
               const pill =
@@ -1188,6 +1380,17 @@ function DrawerBody({
                 </span>
               );
             })()}
+            {/* Meta (§7.1) — customer · region · ordered <date>, ONE line.
+                The ordered date + customer name live ONLY here. */}
+            <span className="min-w-0 flex-1 truncate text-[13px] text-base-500">
+              <span className={cjkClassName(order.customer_name ?? "")}>
+                {order.customer_name ?? "—"}
+              </span>
+              {loc.label ? ` · ${loc.label}` : ""}
+              {order.placed_at
+                ? ` · ordered ${fmtDate(order.placed_at).split(", ")[0]}`
+                : ""}
+            </span>
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1214,147 +1417,95 @@ function DrawerBody({
               onDispatchClick={onDispatchClick}
               onDOClick={onDOClick}
             />
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close drawer"
-              className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
-            >
-              ×
-            </button>
           </span>
         </div>
 
-        {/* Meta line — customer · region · ref · ordered (13px, secondary). */}
-        <div className="mt-0.5 text-[13px] text-base-500 truncate">
-          {order.customer_name ?? "—"}
-          {loc.label ? ` · ${loc.label}` : ""}
-          {order.source_ref?.[0] ? ` · REF ${order.source_ref[0]}` : ""}
-          {order.placed_at ? ` · ordered ${fmtDate(order.placed_at)}` : ""}
-        </div>
-
-        {/* Stat strip — Outstanding · Deadline · Items (12px, top hairline).
-            Red is INLINE TEXT only (owing amount / overdue date), never a block. */}
-        <div className="mt-2 border-t border-base-100 py-1.5 flex items-center gap-4 text-[12px] text-base-500 flex-wrap">
-          <span className="whitespace-nowrap">
-            Outstanding{" "}
-            <span
-              className={`tabular-nums font-semibold ${moneyOutstanding > 0 ? "text-danger" : "text-base-700"}`}
-            >
-              {RM(moneyOutstanding)}
-            </span>
-          </span>
-          <span className="whitespace-nowrap">
-            Deadline{" "}
-            {order.delivery_date_tbd ? (
-              <span className="font-semibold text-base-700">TBD</span>
-            ) : order.delivery_date ? (
-              <span
-                className={`tabular-nums font-semibold ${
-                  daysToDelivery !== null && daysToDelivery < 0
-                    ? "text-danger"
-                    : "text-base-700"
-                }`}
-              >
-                {fmtDate(order.delivery_date).split(", ")[0]}
-                {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
-              </span>
-            ) : (
-              <span className="font-semibold text-base-700">—</span>
-            )}
-          </span>
-          <span className="whitespace-nowrap">
-            Items{" "}
-            <span className="tabular-nums font-semibold text-base-700">
-              {readyN}/{goodsLines.length} ready
-            </span>
-          </span>
-        </div>
-      </header>
-
-      {/* ═══ NEXT BANNER (fixed bar 2, Round 1A) ═══ Full-width, spans both
-          columns, never scrolls. ONE action — the SAME verb the Orders-list NEXT
-          column shows (one engine, nextActionOf). Skin by urgency: overdue /
-          at-risk = the ONLY red block on screen; on-track = flame tint.
-          Right: customer-confirmed marker · WhatsApp copy-chase · primary push. */}
-      <div
-        className={`shrink-0 flex items-center justify-between gap-3 px-5 py-2 border-l-[3px] ${
-          isOverdueNext
-            ? "bg-danger/10 border-l-danger border-b border-b-danger/20"
-            : "bg-[#FAECE7] border-l-primary border-b border-b-signature-100"
-        }`}
-      >
-        <div className="min-w-0">
-          <span
-            className={`text-[13px] font-medium whitespace-nowrap inline-flex items-center gap-1.5 ${
-              isOverdueNext ? "text-danger" : "text-[#993C1D]"
-            }`}
-          >
-            {isOverdueNext ? (
-              <AlertCircle size={14} strokeWidth={2.5} aria-hidden="true" />
-            ) : next.label === "Order PO" ? (
-              <PackagePlus size={14} strokeWidth={2.25} aria-hidden="true" />
-            ) : next.label === "Confirm" || next.label === "Done" ? (
-              <CheckCircle2 size={14} strokeWidth={2.25} aria-hidden="true" />
-            ) : next.label === "Chase supplier" ? (
-              <Phone size={14} strokeWidth={2.25} aria-hidden="true" />
-            ) : (
-              <Truck size={14} strokeWidth={2.25} aria-hidden="true" />
-            )}
-            <span>
-              Next: {next.label}
-              {next.locked && (
-                <Lock size={12} strokeWidth={2.5} className="inline ml-1 -mt-0.5" aria-hidden="true" />
-              )}
-            </span>
-          </span>
-          <span
-            className={`block text-[12px] truncate ${
-              isOverdueNext ? "text-danger/80" : "text-[#993C1D]/75"
-            }`}
-          >
-            {nextReason}
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5 shrink-0">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={customerConfirmed}
-              disabled={quickSave.isPending}
-              onChange={() =>
-                quickSave.mutate({ customer_confirmed: !customerConfirmed })
-              }
-              className="cursor-pointer accent-primary"
-            />
-            <span className="text-[12px] text-base-700 whitespace-nowrap">
-              Customer confirmed?
-            </span>
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              copyChase(next.label === "Chase supplier" ? "supplier" : "logistic")
+        {/* KPI boxes + actions (§7.2) — the 3 mission tracks: CUSTOMER·money /
+            STOCK / LOGISTIC. Lucide icon + label; value COLOURED by §5.2 status
+            (+ small alert mark when red — no dots); sub-facts side by side;
+            the track's chase action(s) live INSIDE the box when red/actionable.
+            This REPLACES the standalone "Next:" row — multiple red tracks →
+            multiple buttons, each a logged chase event. */}
+        <div className="px-4 pt-2.5 pb-2.5 grid grid-cols-3 gap-2">
+          <KpiBox
+            icon={<Wallet size={13} strokeWidth={2.25} />}
+            label="Customer · Money"
+            tone={moneyTone}
+            value={
+              totalSet
+                ? moneyOutstanding > 0
+                  ? RM(moneyOutstanding)
+                  : "Paid"
+                : "—"
             }
-            title="Copy the chase message to the clipboard (paste into WhatsApp) + stamp last chased"
-            className="text-[12px] font-medium px-2.5 py-1 rounded-md border bg-white border-[#1D9E75] text-[#0F6E56] hover:bg-[#1D9E75]/5 whitespace-nowrap"
-          >
-            WhatsApp{" "}
-            {next.label === "Chase supplier"
-              ? "supplier"
-              : chasePartnerName ?? "logistic"}
-          </button>
-          {primary && (
-            <button
-              type="button"
-              onClick={primary.run}
-              className="text-[12px] font-semibold px-3 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap"
-            >
-              {primary.label}
-            </button>
-          )}
+            subs={moneySubs}
+            actions={
+              /* Owing → the customer pair: Reminder while gentle contact is
+                 right (amber), Chase once firmer follow-up is due — both
+                 always offered; ops picks the tone. */
+              balanceOwing ? (
+                <ChasePair
+                  audience="customer payment"
+                  onReminder={() => copyChase("customer", "reminder")}
+                  onChase={() => copyChase("customer", "chase")}
+                />
+              ) : undefined
+            }
+          />
+          <KpiBox
+            icon={<Package size={13} strokeWidth={2.25} />}
+            label="Stock"
+            tone={stockTone}
+            value={`${readyN}/${goodsLines.length} ready`}
+            subs={stockSubs}
+            actions={
+              stockTone === "danger" || stockTone === "warning" ? (
+                <>
+                  {nopoN > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onIssuePOsClick()}
+                      title="Raise a PO for the no-PO lines"
+                      className={CHASE_BTN}
+                    >
+                      Raise PO
+                    </button>
+                  )}
+                  {(rCounts.onPo > 0 || onPoStalled) && (
+                    <ChasePair
+                      audience="supplier (PO-led)"
+                      onReminder={() => copyChase("supplier", "reminder")}
+                      onChase={() => copyChase("supplier", "chase")}
+                    />
+                  )}
+                </>
+              ) : undefined
+            }
+          />
+          <KpiBox
+            icon={<Truck size={13} strokeWidth={2.25} />}
+            label="Logistic"
+            tone={logisticTone}
+            value={
+              <>
+                {deadlineLabel}
+                {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
+              </>
+            }
+            subs={logisticSubs}
+            actions={
+              logisticTone === "danger" || logisticTone === "warning" ? (
+                <ChasePair
+                  audience="logistic partner (REF-led)"
+                  onReminder={() => copyChase("logistic", "reminder")}
+                  onChase={() => copyChase("logistic", "chase")}
+                />
+              ) : undefined
+            }
+          />
         </div>
-      </div>
+        </SectionCard>
+      </header>
 
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
           each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
@@ -1396,33 +1547,35 @@ function DrawerBody({
           }}
         >
 
-        {/* LEFT column — the two locked listing panels: Items ordered (fixed
-            scroll table, ≤8 rows) on top · Warehouse stock (the reserve grid,
-            grows to fill so the column bottom lines up with the right side). */}
+        {/* RIGHT Panel (UI-KIT §5.1) — ONE white SectionCard holding the work
+            sections: ITEMS ORDERED / WAREHOUSE STOCK / LOAN, each a cream
+            SectionBand — the exact facet structure. The column scrolls
+            independently (overlay scrollbar); the card fills its height. */}
         <div
           style={{ gridArea: "main" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto scroll-overlay"
+          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
+          <SectionCard className="min-h-full">
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
               only the rows scroll (up to ~8, then inside the box). */}
           <Panel
             title="Items ordered"
             summary={
-              /* Header badge (Round 1A): "<ready> ready · <toReserve> to reserve",
-                 both from the SAME shared lineReadiness the row pills use —
-                 ready = reserved-to-this-SO only (strict). No "3/3" ratio. */
+              /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
+                 needs stock", from the SAME shared lineReadiness the row pills
+                 use — ready = reserved-to-this-SO only (strict). */
               goodsLines.length === 0 ? (
                 <MiniBadge tone="muted">no goods</MiniBadge>
               ) : (
-                <>
-                  <MiniBadge tone={readyN > 0 ? "ready" : "muted"}>
-                    {readyN} ready
-                  </MiniBadge>
-                  <MiniBadge tone={toReserveN > 0 ? "waiting" : "muted"}>
-                    {toReserveN} to reserve
-                  </MiniBadge>
-                </>
+                <MiniBadge
+                  tone={readyN === goodsLines.length ? "ready" : "waiting"}
+                >
+                  {readyN} ready
+                  {goodsLines.length - readyN > 0
+                    ? ` · ${goodsLines.length - readyN} needs stock`
+                    : ""}
+                </MiniBadge>
               )
             }
             actions={
@@ -1454,262 +1607,318 @@ function DrawerBody({
               />
             }
           >
-            <div className="overflow-auto min-h-0" style={{ maxHeight: 268 }}>
+            {/* §7.7 — the white table sits APART from the cream band (a gap +
+                a neutral base-50 header row, not another cream strip). */}
+            <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
-                  {/* Order (Jess 2026-07-11): Status · Stock ETA · Item · Qty · PO ·
-                      Route. GRN (received count + book-in) folds INTO the Status
-                      cell — no separate Recv column. */}
-                  <tr className="bg-[#F1EDE6] text-[#8C877D]">
+                  {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
+                      Stock ETA / route / GRN moved into the row's expand
+                      (chevron on Item); Status is AUTO-derived (no dropdown). */}
+                  <tr className="bg-base-50 text-base-500">
+                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-base-200">
+                      Item
+                    </th>
+                    <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
+                      Qty
+                    </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-28 border-r border-[#E5E1D8]"
-                      title="Waiting / Ready / No PO. The count = received / ordered — click to book in received units (GRN)."
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
+                      title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
+                    >
+                      Source
+                    </th>
+                    <th
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
+                      title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
                       Status
                     </th>
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
-                      Stock ETA
-                    </th>
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-[#E5E1D8]">
-                      Item
-                    </th>
-                    <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
-                      Qty
-                    </th>
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
-                      PO
-                    </th>
-                    <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-32"
-                      title="Where this item is received / where it routes to (the transfer destination). Per-item legs come with the transfer feature."
-                    >
-                      Route
+                    <th className="text-center text-[10px] font-semibold px-2 py-1.5 w-[70px]">
+                      Action
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orderedLines.map((l) => {
-                    const isService = lineKind(l.sku) === "service";
-                    // Accessories (pillow / M.P / protector) come from the Klang
-                    // warehouse — no PO, no Stock ETA, no receive step (Jess).
-                    const isAcc = lineKind(l.sku) === "acc";
-                    // Per-item Stock Status (Jess sheet col Z): Received (stock in) ·
-                    // Pending (PO placed, waiting — show Stock ETA) · No PO (nothing
-                    // raised). Derived from same-model+size free stock + PO existence.
-                    const rd = isService ? null : readinessOf(l.sku, l.qty);
-                    const isStatusOverride =
-                      form.draft.line_stock_status[l.sku] !== undefined;
-                    // PO number for the PO column — the AutoCount source_po
-                    // (real PO like "PO/2603-065") wins; else a portal PO id.
-                    const poNo =
-                      soPoBySku.get(normalizeSkuKey(l.sku)) ??
-                      pos
-                        .find((p) =>
-                          p.lines.some(
-                            (pl) =>
-                              normalizeSkuKey(pl.sku) === normalizeSkuKey(l.sku),
-                          ),
-                        )
-                        ?.id.slice(0, 8);
-                    // Per-item stock location (migration 0168) — overridable default.
-                    const savedLoc = form.draft.line_locations[l.sku];
-                    const locValue =
-                      savedLoc !== undefined
-                        ? (savedLoc[0] ?? "")
-                        : (defaultLineLocation(l.sku, assignedLogisticName) ?? "");
-                    // Per-item Stock ETA (migration 0170) — when the item's stock
-                    // arrives; defaults to the linked PO's date, overridable.
-                    const etaValue =
-                      form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                    // Route "Option D" — a SPECIAL transfer is the authored legs
-                    // (line_legs, migration 0216); empty = the standard single hop
-                    // to the default warehouse (locValue).
-                    const savedLegs = form.draft.line_legs[l.sku] ?? [];
-                    const hasSpecialRoute = savedLegs.length > 0;
-                    const displayLegs = legsToDisplay(savedLegs);
-                    const routeOpen = routeOpenSku === l.sku;
-                    // One row per SKU (duplicate lines combined above) → key on SKU.
-                    return (
-                      <Fragment key={l.sku}>
-                      <tr
-                        onClick={() => setPickerSku(l.sku)}
-                        className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
-                      >
-                        {/* Status (+ GRN folded in) — for a PO item the received
-                            count / book-in button sits next to the status pill, so
-                            there's no separate Recv column (Jess 2026-07-11). */}
-                        <td className="border border-base-200 px-1.5 py-1 align-top">
-                          {isService || !rd ? (
-                            <span className="text-base-300 text-[11px]">—</span>
-                          ) : isAcc ? (
-                            <span
-                              title="Accessory — always in the Klang warehouse; deducted from ready stock"
-                              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-soft text-success whitespace-nowrap"
-                            >
-                              Reserved
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <StockStatusCell
-                                sku={l.sku}
-                                status={rd}
-                                isOverride={isStatusOverride}
-                                onSet={(s) => form.setLineStockStatus(l.sku, s)}
-                                onPick={() => setPickerSku(l.sku)}
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReceiveLine({
-                                    sku: l.sku,
-                                    qty: l.qty,
-                                    received: lineReceivedOf(l.sku),
-                                  });
-                                }}
-                                title="Book in received units (GRN)"
-                                className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1 py-0.5 rounded ${
-                                  lineReceivedOf(l.sku) >= l.qty
-                                    ? "text-success font-semibold"
-                                    : "text-primary hover:bg-primary/10"
-                                }`}
-                              >
-                                {lineReceivedOf(l.sku)}/{l.qty}
-                                {lineReceivedOf(l.sku) < l.qty && (
-                                  <PackagePlus size={11} strokeWidth={2} />
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        {/* Stock ETA */}
-                        {isService || isAcc ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            {isAcc ? "—" : "N/A"}
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-top">
-                            <input
-                              type="date"
-                              value={etaValue}
-                              onChange={(e) => form.setLineEta(l.sku, e.target.value)}
-                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                            />
-                          </td>
-                        )}
-                        {/* Item */}
-                        <td className="border border-base-200 px-2 py-1 align-top">
-                          <div
-                            className="font-mono text-[10px] leading-tight break-words"
-                            title={l.sku}
-                          >
-                            {l.sku}
-                          </div>
-                        </td>
-                        {/* Qty */}
-                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                          {l.qty}
-                        </td>
-                        {/* PO */}
-                        <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
-                          {poNo ? (
-                            <span className="text-primary">{poNo}</span>
-                          ) : (
-                            <span className="text-base-300">—</span>
-                          )}
-                        </td>
-                        {/* Route — Option D journey bar: icons = places, colour =
-                            progress. Click expands the legs in-place (below). */}
-                        {isService ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            N/A
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-middle">
-                            {hasSpecialRoute ? (
-                              <RouteJourneyBar
-                                legs={displayLegs}
-                                open={routeOpen}
-                                onClick={() =>
-                                  setRouteOpenSku((cur) =>
-                                    cur === l.sku ? null : l.sku,
-                                  )
+                  {(() => {
+                    // §7.7 — ONE row renderer, grouped into Needs action /
+                    // Ready only past 5 lines (a small order reads flat).
+                    const renderRow = (l: { sku: string; qty: number }) => {
+                      const isService = lineKind(l.sku) === "service";
+                      // Accessories (pillow / M.P / protector) come from the
+                      // Klang warehouse — no PO, no receive step (Jess).
+                      const isAcc = lineKind(l.sku) === "acc";
+                      const rd = isService ? null : readinessOf(l.sku, l.qty);
+                      const received = reservedCountOf(
+                        l.sku,
+                        lineReceivedOf(l.sku),
+                      );
+                      // Source — where the line is fulfilled from: the linked
+                      // PO (AutoCount source_po wins, else a portal PO id),
+                      // else own Klang warehouse stock.
+                      const poNo =
+                        soPoBySku.get(normalizeSkuKey(l.sku)) ??
+                        pos
+                          .find((p) =>
+                            p.lines.some(
+                              (pl) =>
+                                normalizeSkuKey(pl.sku) ===
+                                normalizeSkuKey(l.sku),
+                            ),
+                          )
+                          ?.id.slice(0, 8);
+                      // Per-item route STOPS (rides line_locations — the shape
+                      // the LIVE schema accepts; [0] = the default location).
+                      const savedLoc = form.draft.line_locations[l.sku];
+                      const stops =
+                        savedLoc !== undefined && savedLoc.length > 0
+                          ? savedLoc
+                          : [
+                              defaultLineLocation(l.sku, assignedLogisticName) ??
+                                "Carres Klang",
+                            ];
+                      const locValue = stops[0] ?? "";
+                      const etaValue =
+                        form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+                      const hasSpecialRoute = stops.length > 1;
+                      const routeOpen = routeOpenSku === l.sku;
+                      // AUTO-derived status (§7.7 — the manual dropdown is gone;
+                      // reserving stock is what flips a line green).
+                      const pill =
+                        !rd
+                          ? null
+                          : rd === "reserved"
+                            ? {
+                                t: `Reserved · ${locValue || "Carres Klang"}`,
+                                c: "bg-success-soft text-success",
+                                hint: isAcc
+                                  ? "Accessory — always in the Klang warehouse"
+                                  : "Reserved to this SO",
+                              }
+                            : rd === "to_reserve"
+                              ? {
+                                  t: `To reserve · ${received}/${l.qty}`,
+                                  c: "bg-warning-soft text-warning",
+                                  hint: "Matching free stock exists — reserve it to this SO",
                                 }
-                              />
-                            ) : (
-                              <RouteQuietButton
-                                label={locValue || "Carres Klang"}
-                                open={routeOpen}
-                                onClick={() =>
-                                  setRouteOpenSku((cur) =>
-                                    cur === l.sku ? null : l.sku,
-                                  )
-                                }
-                              />
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                      {!isService && routeOpen && (
-                        <tr className="bg-base-50">
-                          <td
-                            colSpan={6}
-                            className="border border-base-200 px-3 py-2"
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[10px] font-semibold text-[#8C877D]">
-                                  Default location
-                                </span>
-                                <select
-                                  value={locValue}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) =>
-                                    form.setLineLocation(
-                                      l.sku,
-                                      e.target.value ? [e.target.value] : [],
-                                    )
+                              : rd === "on_po"
+                                ? {
+                                    t: "On PO",
+                                    c: "bg-base-100 text-base-500",
+                                    hint: "Waiting on supplier stock (PO raised)",
                                   }
-                                  className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                : {
+                                    t: "No PO",
+                                    c: "bg-base-100 text-base-500",
+                                    hint: "Nothing raised yet",
+                                  };
+                      return (
+                        <Fragment key={l.sku}>
+                          {/* A line that still needs reserving reads as an
+                              AMBER tint (warning, never danger red). */}
+                          <tr
+                            onClick={() => setPickerSku(l.sku)}
+                            className={`cursor-pointer ${
+                              l.sku === activeLineSku
+                                ? "bg-primary/10"
+                                : rd === "to_reserve"
+                                  ? "bg-warning-soft/40 hover:bg-warning-soft/60"
+                                  : "hover:bg-base-50"
+                            }`}
+                          >
+                            {/* Item — chevron expands the detail (stock ETA /
+                                GRN / route-transfer). */}
+                            <td className="border border-base-200 px-2 py-1 align-top">
+                              <div className="flex items-start gap-1">
+                                {!isService && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRouteOpenSku((cur) =>
+                                        cur === l.sku ? null : l.sku,
+                                      );
+                                    }}
+                                    title="Details — stock ETA, receiving (GRN), route / transfer"
+                                    aria-expanded={routeOpen}
+                                    className="shrink-0 mt-0.5 text-base-400 hover:text-base-700"
+                                  >
+                                    {routeOpen ? (
+                                      <ChevronDown size={12} />
+                                    ) : (
+                                      <ChevronRight size={12} />
+                                    )}
+                                  </button>
+                                )}
+                                <span
+                                  className="font-mono text-[10px] leading-tight break-words"
+                                  title={l.sku}
                                 >
-                                  <option value="">—</option>
-                                  {STOCK_LOCATIONS.map((locOpt) => (
-                                    <option key={locOpt} value={locOpt}>
-                                      {locOpt}
-                                    </option>
-                                  ))}
-                                </select>
+                                  {l.sku}
+                                </span>
                               </div>
-                              <div className="border-t border-base-100 pt-2">
-                                <div className="text-[10px] font-semibold text-[#8C877D] mb-1">
-                                  Special transfer
+                            </td>
+                            {/* Qty */}
+                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                              {l.qty}
+                            </td>
+                            {/* Source — PO/#### or own Klang stock. */}
+                            <td className="border border-base-200 px-2 py-1 align-middle">
+                              {isService ? (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              ) : poNo ? (
+                                <span className="font-mono text-[10px] text-primary">
+                                  {poNo}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-base-600">
+                                  Klang stock
+                                </span>
+                              )}
+                            </td>
+                            {/* Status — auto-derived pill. */}
+                            <td className="border border-base-200 px-1.5 py-1 align-middle">
+                              {pill ? (
+                                <span
+                                  title={pill.hint}
+                                  className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                >
+                                  {pill.t}
+                                </span>
+                              ) : (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              )}
+                            </td>
+                            {/* Action — inline Reserve on an unfulfilled line;
+                                opens the warehouse picker filtered to it. */}
+                            <td className="border border-base-200 px-1.5 py-1 text-center align-middle">
+                              {rd && rd !== "reserved" ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPickerSku(l.sku);
+                                    document
+                                      .getElementById("warehouse-stock-panel")
+                                      ?.scrollIntoView({
+                                        block: "start",
+                                        behavior: "smooth",
+                                      });
+                                  }}
+                                  title="Open the warehouse picker filtered to this line"
+                                  className="text-[11px] font-semibold text-primary border border-primary rounded-md px-2 py-0.5 hover:bg-primary/5 whitespace-nowrap"
+                                >
+                                  Reserve
+                                </button>
+                              ) : (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                          {!isService && routeOpen && (
+                            <tr className="bg-base-50">
+                              <td
+                                colSpan={5}
+                                className="border border-base-200 px-3 py-2"
+                              >
+                                <div className="space-y-2">
+                                  {!isAcc && (
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                      <label className="flex items-center gap-1.5 text-[11px] text-base-500">
+                                        Stock ETA
+                                        <input
+                                          type="date"
+                                          value={etaValue}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) =>
+                                            form.setLineEta(l.sku, e.target.value)
+                                          }
+                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                                        />
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setReceiveLine({
+                                            sku: l.sku,
+                                            qty: l.qty,
+                                            received: lineReceivedOf(l.sku),
+                                          });
+                                        }}
+                                        title="Book in received units (GRN)"
+                                        className={`inline-flex items-center gap-1 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
+                                          lineReceivedOf(l.sku) >= l.qty
+                                            ? "text-success font-semibold"
+                                            : "text-primary hover:bg-primary/10"
+                                        }`}
+                                      >
+                                        Received {lineReceivedOf(l.sku)}/{l.qty}
+                                        {lineReceivedOf(l.sku) < l.qty && (
+                                          <>
+                                            <PackagePlus size={11} strokeWidth={2} />
+                                            Book in
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="text-[10px] font-semibold text-base-500 mb-1">
+                                      Route — stop 1 is where the item sits; add
+                                      a stop for a special transfer. Delivery to
+                                      the customer is set in the Delivery panel.
+                                    </div>
+                                    {hasSpecialRoute && (
+                                      <div className="max-w-[280px] mb-1">
+                                        <RouteJourneyBar
+                                          legs={stopsToDisplay(stops)}
+                                        />
+                                      </div>
+                                    )}
+                                    <StopsEditor
+                                      stops={savedLoc ?? (locValue ? [locValue] : [])}
+                                      onChange={(s) =>
+                                        form.setLineLocation(l.sku, s)
+                                      }
+                                    />
+                                  </div>
                                 </div>
-                                {savedLegs.length === 0 && (
-                                  <p className="text-[10px] text-base-400 mb-1.5">
-                                    Standard: sits at{" "}
-                                    {locValue || "Carres Klang"}. Add a leg only
-                                    for a special pickup (supplier → warehouse).
-                                    Delivery to the customer is set in the
-                                    Delivery panel.
-                                  </p>
-                                )}
-                                <RouteLegEditor
-                                  legs={savedLegs}
-                                  partners={(
-                                    partnersData?.partners ?? []
-                                  ).map((p) => p.name)}
-                                  onChange={(legs) =>
-                                    form.setLineLegs(l.sku, legs)
-                                  }
-                                />
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      </Fragment>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    };
+                    // Flat under 6 lines; else grouped Needs action / Ready.
+                    if (orderedLines.length <= 5)
+                      return orderedLines.map(renderRow);
+                    const needs = orderedLines.filter(
+                      (l) =>
+                        lineKind(l.sku) !== "service" &&
+                        readinessOf(l.sku, l.qty) !== "reserved",
                     );
-                  })}
+                    const needSet = new Set(needs.map((l) => l.sku));
+                    const rest = orderedLines.filter((l) => !needSet.has(l.sku));
+                    const subheader = (label: string) => (
+                      <tr key={`sub-${label}`}>
+                        <td
+                          colSpan={5}
+                          className="border border-base-200 bg-base-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-base-500"
+                        >
+                          {label}
+                        </td>
+                      </tr>
+                    );
+                    return (
+                      <>
+                        {needs.length > 0 && subheader("Needs action")}
+                        {needs.map(renderRow)}
+                        {rest.length > 0 && subheader("Ready")}
+                        {rest.map(renderRow)}
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1742,19 +1951,29 @@ function DrawerBody({
               lines up with the right side and the page stays one-screen (P1a had
               capped it to a fixed 340px, which left a big void below). No active
               line → a placeholder that also grows. */}
-          {activeLineSku && stage !== "delivered" ? (
-            /* Natural height (Round 1A) — the column scrolls; the picker caps
-               its own row area instead of growing to fill. */
-            <div className="min-h-0 flex flex-col">
+          {activeLineSku ? (
+            /* ALWAYS viewable (§7.8) — including delivered orders. Natural
+               height; the column scrolls; the picker caps its own row area.
+               `bare` stacks it as a SECTION inside this column's shared card.
+               The id anchors the Items rows' inline Reserve buttons (§7.7). */
+            <div
+              id="warehouse-stock-panel"
+              className="min-h-0 flex flex-col shrink-0"
+            >
               <StockPickerGrid
+                bare
                 sku={activeLineSku}
                 soRef={soRef}
                 need={(() => {
                   // Remaining to reserve = qty − already reserved to this SO,
-                  // same numbers the row pill / badge read (Round 1A parity).
+                  // same numbers the row pill / badge read (one readiness rule).
                   const line = orderedLines.find((l) => l.sku === activeLineSku);
                   if (!line) return 1;
-                  return Math.max(0, line.qty - lineReceivedOf(line.sku));
+                  return Math.max(
+                    0,
+                    line.qty -
+                      reservedCountOf(line.sku, lineReceivedOf(line.sku)),
+                  );
                 })()}
                 units={freeUnits}
                 isSofa={lineCategory(activeLineSku) === "sofa"}
@@ -1776,9 +1995,7 @@ function DrawerBody({
               actions={warehouseMenu}
             >
               <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
-                {stage === "delivered"
-                  ? "Delivered — stock settled."
-                  : "Pick an item above to see its warehouse stock."}
+                Pick an item above to see its warehouse stock.
               </div>
             </Panel>
           )}
@@ -1789,6 +2006,7 @@ function DrawerBody({
               obligation). The lend entry stays even at 0 loans. */}
           <Panel
             title="Loan"
+            defaultOpen={false}
             summary={
               liveLoanCount > 0 ? (
                 <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
@@ -1801,17 +2019,30 @@ function DrawerBody({
               orderId={order.id}
               loans={allLoans}
               suppliers={suppliersData?.suppliers ?? []}
+              freeUnits={freeUnits}
+              orderCategories={[
+                // CORE categories only — a loaner substitutes a mattress /
+                // bedframe / sofa; "acc" would let keyword-missed units leak in.
+                ...new Set(
+                  goodsLines
+                    .map((l) => lineCategory(l.sku))
+                    .filter((c) => c !== "acc"),
+                ),
+              ]}
+              onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
             />
           </Panel>
+          </SectionCard>
         </div>
 
-        {/* LEFT column (after the flip) — the support cards: Customer · Balance ·
-            Storage (conditional) · Delivery. Scrolls INDEPENDENTLY of the items
-            column on the right (Jess 2026-07-11). */}
+        {/* LEFT Panel (UI-KIT §5.1) — ONE white SectionCard holding the view
+            sections: CUSTOMER / BALANCE / STORAGE / DELIVERY (+ Activity &
+            notes). Scrolls INDEPENDENTLY of the work column on the right. */}
         <div
           style={{ gridArea: "side" }}
-          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-y-auto scroll-overlay"
+          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
+          <SectionCard className="min-h-full">
           {/* 1. Customer — a quiet identity card (name / phone / address, with an
               inline Edit on a Place order). No region pill (Jess 2026-07-11): the
               region is a DELIVERY attribute (it shows on the Delivery card), not
@@ -1820,13 +2051,15 @@ function DrawerBody({
             title="Customer"
             defaultOpen={false}
             summary={
-              /* Collapsed row reads "Customer · <name>" (Jess 2026-07-13). */
-              order.customer_name ? (
+              /* §7.3 — the NAME lives in the header only; the band's right slot
+                 reads phone · region instead. */
+              order.customer_phone || loc.label ? (
                 <span
-                  className={`t-tiny text-base-600 truncate max-w-[150px] ${cjkClassName(order.customer_name)}`}
-                  title={order.customer_name}
+                  className="t-tiny text-base-600 truncate max-w-[180px]"
+                  title={`${order.customer_phone ?? ""}${loc.label ? ` · ${loc.label}` : ""}`}
                 >
-                  {order.customer_name}
+                  {order.customer_phone ?? "no phone"}
+                  {loc.label ? ` · ${loc.label}` : ""}
                 </span>
               ) : (
                 <MiniBadge tone="muted">—</MiniBadge>
@@ -1881,6 +2114,25 @@ function DrawerBody({
           >
             <div className="p-3">
               <OrderCustomerCard order={order} startEditRef={customerEditRef} />
+              {/* Optional preferred-name/title for WhatsApp messages — blank
+                  falls back to the Title-Cased customer name; NEVER an
+                  auto-inferred Mr/Ms. Local-only until an API column ships. */}
+              <div className="mt-2 pt-2 border-t border-base-100 flex items-center justify-between gap-2">
+                <span
+                  className="text-[11px] text-base-400 shrink-0"
+                  title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
+                >
+                  Salutation (messages)
+                </span>
+                <input
+                  type="text"
+                  value={salutation}
+                  onChange={(e) => saveSalutation(e.target.value)}
+                  placeholder={titleCaseName(order.customer_name ?? "")}
+                  aria-label="Preferred salutation for messages"
+                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[12px] text-right outline-none hover:border-base-400 focus:border-primary"
+                />
+              </div>
             </div>
           </Panel>
 
@@ -1891,10 +2143,39 @@ function DrawerBody({
           <Panel
             title="Balance"
             actions={
-              /* Round 1A ⋮ discipline: only WIRED actions — invoice / receipt
-                 printing is hidden until 1B (no dead menu entries). */
+              /* §7.4 ⋮ — Generate invoice (server data → client PDF, same path
+                 as DownloadInvoiceButton) + Print receipt (latest payment). */
               <PanelMenu
                 items={[
+                  {
+                    label: "Generate invoice",
+                    icon: <FileText size={14} />,
+                    onClick: () => {
+                      void (async () => {
+                        try {
+                          const dataInv = await apiFetch<InvoiceTemplateData>(
+                            `/api/orders/${order.id}/invoice-pdf-data`,
+                          );
+                          const blob = await renderInvoicePdf(dataInv);
+                          const url = URL.createObjectURL(blob);
+                          window.open(url, "_blank");
+                          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                        } catch (e) {
+                          const msg =
+                            e instanceof ApiError ? e.message : String(e);
+                          toast.error(`Invoice PDF failed — ${msg}`);
+                        }
+                      })();
+                    },
+                  },
+                  {
+                    label: "Print receipt",
+                    icon: <Download size={14} />,
+                    disabled: ledger.length === 0,
+                    onClick: () => {
+                      if (ledger[0]) void openReceipt(ledger[0], receiptMetaOf());
+                    },
+                  },
                   {
                     label: "Copy outstanding",
                     icon: <Copy size={14} />,
@@ -2017,24 +2298,23 @@ function DrawerBody({
               }
             >
               <div className="p-3 space-y-2">
-                {/* Per-day rate FRAME (batch 2 placeholder, Jess 2026-07-09): the
-                    new by-day rates. The actual per-day accrual (delivery window +
-                    public-holiday aware) is deferred — this only states the rates
-                    so the block reads right; the fee below still uses the existing
-                    calc until the by-day logic lands. */}
-                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[11px] text-base-500 flex items-center justify-between gap-2">
-                  <span>
-                    Rate · mattress{" "}
-                    <span className="font-mono text-base-700">RM5</span>/day · sofa{" "}
-                    <span className="font-mono text-base-700">RM14.30</span>/day
-                  </span>
-                  <span className="text-base-400 italic">by-day calc coming</span>
+                {/* §7.5 — the locked rule (replaces the wrong RM/day placeholder):
+                    fee runs START→END; START auto = the next same weekday after
+                    the deadline; MS/BF RM150/month · Sofa 14 days free then RM200. */}
+                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[11px] text-base-500">
+                  Starts the same weekday the week AFTER the deadline · MS/BF{" "}
+                  <span className="font-mono text-base-700">RM150</span>/month ·
+                  sofa free 14 days then{" "}
+                  <span className="font-mono text-base-700">RM200</span>
                 </div>
                 <StorageControlFields
                   form={form}
                   hasMsbf={hasMsbf}
                   hasSof={hasSof}
                   orderId={order.id}
+                  deadline={
+                    !order.delivery_date_tbd ? order.delivery_date : null
+                  }
                   meta={{
                     orderCode: `SO-${order.so}`,
                     customerName: order.customer_name ?? "",
@@ -2112,13 +2392,14 @@ function DrawerBody({
                 <LogisticEtaField form={form} />
                 <DeliveryTimeSlotField form={form} />
               </FieldGrid>
-              {/* Call window — reach the customer N days before the deadline;
-                  a daily cron drops the task on this date. */}
+              {/* Chase window (§7.6 — renamed from "Call customer by"): a MANUAL
+                  reminder to chase the PARTNER N days before the deadline. It
+                  feeds the list's next-action engine, it does NOT auto-message. */}
               {contactByLabel && (
                 <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
                   <span className="flex items-center gap-1 text-[11.5px] font-medium text-info min-w-0">
                     <Phone size={12} strokeWidth={2.25} className="shrink-0" />
-                    <span className="truncate">Call customer by {contactByLabel}</span>
+                    <span className="truncate">Chase partner by {contactByLabel}</span>
                   </span>
                   <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
                     <span>−</span>
@@ -2129,14 +2410,31 @@ function DrawerBody({
                       value={form.draft.contact_by_days}
                       onChange={(e) => form.set("contact_by_days", e.target.value)}
                       placeholder="3"
-                      aria-label="Call window — days before the deadline to call the customer"
-                      title="Days before the deadline to call the customer"
+                      aria-label="Chase window — days before the deadline to chase the partner"
+                      title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
                       className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11px] text-center outline-none focus:border-primary"
                     />
                     <span>d</span>
                   </span>
                 </div>
               )}
+              {/* Customer confirmed (0220) — a FIELD inside Delivery per UI-KIT
+                  §5.1 (moved out of the old header banner). Same quick sparse-
+                  save; the list stays unaffected. */}
+              <label className="flex items-center justify-between gap-2 rounded-md bg-base-50 px-2 py-1 cursor-pointer select-none">
+                <span className="text-[11.5px] text-base-500">
+                  Customer confirmed
+                </span>
+                <input
+                  type="checkbox"
+                  checked={customerConfirmed}
+                  disabled={quickSave.isPending}
+                  onChange={() =>
+                    quickSave.mutate({ customer_confirmed: !customerConfirmed })
+                  }
+                  className="cursor-pointer accent-primary"
+                />
+              </label>
               <div className="border-t border-base-100 pt-2">
                 <FieldGrid>
                   <RemarkControlField
@@ -2147,28 +2445,42 @@ function DrawerBody({
                   />
                 </FieldGrid>
               </div>
-              {/* Carriers / route — always available now (Jess: an order can have
-                  MORE than one carrier). A single trip shows the assigned carrier +
-                  "Add leg"; adding a leg = adding a second carrier (multi-leg rows).
-                  fallbackPartnerId prefers the Logistic select so the single-trip
-                  read-out reflects the carrier picked above. */}
-              <div className="border-t border-base-100 pt-2">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] text-base-400">Carriers / route</span>
-                  <MiniBadge tone="muted">
-                    {order.delivery_stops?.length
-                      ? `${order.delivery_stops.length} legs`
-                      : "single trip"}
-                  </MiniBadge>
+              {/* Carriers / route (§7.6) — HIDDEN by default: the Logistic
+                  dropdown above IS the standard single-carrier route, so the
+                  multi-leg bar only renders when the order actually has legs,
+                  or after "+ Add stop" opens it. */}
+              {(order.delivery_stops?.length ?? 0) > 0 || showRouteBlock ? (
+                <div className="border-t border-base-100 pt-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-base-400">
+                      Carriers / route
+                    </span>
+                    <MiniBadge tone="muted">
+                      {order.delivery_stops?.length
+                        ? `${order.delivery_stops.length} legs`
+                        : "single trip"}
+                    </MiniBadge>
+                  </div>
+                  <DeliveryChain
+                    orderId={order.id}
+                    stops={order.delivery_stops ?? null}
+                    fallbackPartnerId={
+                      order.ops_assigned_logistic ?? order.delivery_partner_id
+                    }
+                  />
                 </div>
-                <DeliveryChain
-                  orderId={order.id}
-                  stops={order.delivery_stops ?? null}
-                  fallbackPartnerId={
-                    order.ops_assigned_logistic ?? order.delivery_partner_id
-                  }
-                />
-              </div>
+              ) : (
+                <div className="border-t border-base-100 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowRouteBlock(true)}
+                    title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    + Add stop (multi-leg)
+                  </button>
+                </div>
+              )}
             </div>
           </Panel>
 
@@ -2185,7 +2497,8 @@ function DrawerBody({
               <AnnotationTimeline orderId={order.id} />
             </div>
           </Panel>
-        </div>{/* /right column */}
+          </SectionCard>
+        </div>{/* /left panel */}
         </div>{/* /main|side grid */}
       </div>{/* /scroll body */}
     </div>
@@ -2815,6 +3128,9 @@ function MoneyCard({
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
   const [adding, setAdding] = useState(false);
+  // §7.4 — a keyed Total READS formatted ("RM 1,749"), click to edit the raw
+  // number. Starts in edit mode only while no total is set yet.
+  const [editingTotal, setEditingTotal] = useState(false);
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
   });
@@ -2824,38 +3140,13 @@ function MoneyCard({
 
   return (
     <div className="space-y-2.5">
-      {/* Three locked rows — Total / Collected / Outstanding. */}
+      {/* §7.4 — Outstanding (= Total − Collected) leads, PROMINENT; Total +
+          Collected follow as small rows. */}
       <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
-        <MoneyRow label="Total">
-          {hasLineTotal ? (
-            <span
-              className="font-mono text-[13px] text-base-800"
-              title="Summed from the order items"
-            >
-              {RM(orderTotal)}
-            </span>
-          ) : (
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.draft.balance}
-              onChange={(e) => form.set("balance", e.target.value)}
-              placeholder="Set total (RM)"
-              aria-label="Order total"
-              className="w-32 text-right font-mono text-[13px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
-            />
-          )}
-        </MoneyRow>
-        <MoneyRow label="Collected">
-          <span className="font-mono text-[13px] font-semibold text-success">
-            {RM(collected)}
-          </span>
-        </MoneyRow>
         <MoneyRow label="Outstanding" strong>
           {totalSet ? (
             <span
-              className={`font-mono text-[17px] font-bold leading-none ${
+              className={`font-mono text-[18px] font-bold leading-none ${
                 outstanding > 0 ? "text-[#991B1B]" : "text-success"
               }`}
             >
@@ -2864,6 +3155,43 @@ function MoneyCard({
           ) : (
             <span className="text-[11px] text-base-400">Total not set</span>
           )}
+        </MoneyRow>
+        <MoneyRow label="Total">
+          {hasLineTotal ? (
+            <span
+              className="font-mono text-[12px] text-base-600"
+              title="Summed from the order items"
+            >
+              {RM(orderTotal)}
+            </span>
+          ) : editingTotal || orderTotal <= 0 ? (
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              autoFocus={editingTotal}
+              value={form.draft.balance}
+              onChange={(e) => form.set("balance", e.target.value)}
+              onBlur={() => setEditingTotal(false)}
+              placeholder="Set total (RM)"
+              aria-label="Order total"
+              className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingTotal(true)}
+              title="Keyed total — click to edit"
+              className="font-mono text-[12px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
+            >
+              {RM(orderTotal)}
+            </button>
+          )}
+        </MoneyRow>
+        <MoneyRow label="Collected">
+          <span className="font-mono text-[12px] text-base-600">
+            {RM(collected)}
+          </span>
         </MoneyRow>
       </div>
 
@@ -3329,101 +3657,3 @@ function PrintDoButton({
   );
 }
 
-/** Readiness pill label + colour by status (locked vocab: No PO red · Waiting
- *  amber · Ready green). */
-/** Row pill per the Round 1A readiness vocab (colour lock: green = reserved to
- *  this SO, amber = free stock to reserve, grey = on PO / nothing raised — red
- *  is reserved for the banner). */
-const STOCK_STATUS_META: Record<LineReadiness, { t: string; c: string }> = {
-  reserved: { t: "Reserved", c: "bg-success-soft text-success" },
-  to_reserve: { t: "To reserve", c: "bg-warning-soft text-warning" },
-  on_po: { t: "On PO", c: "bg-base-100 text-base-600" },
-  no_po: { t: "No PO", c: "bg-base-100 text-base-500" },
-};
-
-/**
- * The Stock cell in the Items panel: shows the readiness pill AND lets the
- * operator set it per line (Jess 2026-07-02 — "update the stock GRN each item").
- * Click → a tiny menu: Ready / Waiting / No PO (a manual override stored in
- * ops_order_control.line_stock_status), "Auto" to clear it back to the derived
- * free-stock value, and "Pick / reserve stock" to open the warehouse picker. A
- * "•" marks a manual override so it's distinct from the auto-derived value.
- */
-function StockStatusCell({
-  sku: _sku,
-  status,
-  isOverride,
-  onSet,
-  onPick,
-}: {
-  sku: string;
-  /** The DERIVED readiness (shared lineReadiness) — the pill face always shows
-   *  this, so row / badge / footer can never contradict (Round 1A). */
-  status: LineReadiness;
-  isOverride: boolean;
-  /** Writes the Master override (line_stock_status) — an INPUT to the derived
-   *  readiness ("stock arrived" hint), not the displayed value itself. */
-  onSet: (s: LineStockStatus | null) => void;
-  onPick: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const meta = STOCK_STATUS_META[status];
-  const stop = (e: MouseEvent) => e.stopPropagation();
-  return (
-    <div className="relative" onClick={stop}>
-      <button
-        type="button"
-        onClick={(e) => {
-          stop(e);
-          setOpen((v) => !v);
-        }}
-        title="Set stock status (Received / Pending / No PO) or pick warehouse stock"
-        data-testid={`stock-status-${_sku}`}
-        className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${meta.c}`}
-      >
-        {meta.t}
-        {isOverride && <span title="Manual override">•</span>}
-        <ChevronDown size={10} strokeWidth={2.5} className="opacity-70" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { stop(e); setOpen(false); }} />
-          <div className="absolute z-50 mt-1 left-0 w-[168px] bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden py-1">
-            {(
-              [
-                { v: "ready", t: "Stock arrived", dot: "bg-success" },
-                { v: "waiting", t: "Waiting (on PO)", dot: "bg-warning" },
-                { v: "nopo", t: "Nothing raised", dot: "bg-base-400" },
-              ] as const
-            ).map((s) => (
-              <button
-                key={s.v}
-                type="button"
-                onClick={(e) => { stop(e); onSet(s.v); setOpen(false); }}
-                className="w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 flex items-center gap-2"
-              >
-                <span className={`inline-block w-2 h-2 rounded-full ${s.dot}`} />
-                {s.t}
-              </button>
-            ))}
-            <div className="border-t border-base-100 my-1" />
-            <button
-              type="button"
-              onClick={(e) => { stop(e); onSet(null); setOpen(false); }}
-              className="w-full text-left px-2.5 py-1 text-[12px] text-base-500 hover:bg-primary/5"
-            >
-              Auto (from stock)
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { stop(e); onPick(); setOpen(false); }}
-              className="w-full text-left px-2.5 py-1 text-[12px] text-primary hover:bg-primary/5"
-            >
-              Pick / reserve stock →
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}

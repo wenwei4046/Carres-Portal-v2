@@ -3,6 +3,7 @@ import { AlertTriangle, Plus, Trash2, ShieldCheck, Receipt } from "lucide-react"
 import { toast } from "sonner";
 import {
   computeStorageFee,
+  defaultStorageStart,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
   PAYMENT_METHODS,
@@ -13,7 +14,6 @@ import {
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type LineStockStatus,
-  type OrderRouteLeg,
   type OrderPaymentRow,
   type OrderPaymentMethod,
   type PaymentKind,
@@ -69,8 +69,11 @@ interface Draft {
   logistic_eta: string;
   paid_amount: string;
   storage_paid: string;
+  /** Per-line route STOPS (bug-0 fix, UI-KIT §7.6): an ORDERED list of real
+   *  locations — [0] = current/default location, further entries = transfer
+   *  hops. This is the shape the LIVE order-control schema accepts (the richer
+   *  line_legs objects are deploy-gated and no longer written). */
   line_locations: Record<string, string[]>;
-  line_legs: Record<string, OrderRouteLeg[]>;
   line_etas: Record<string, string>;
   line_stock_status: Record<string, LineStockStatus>;
   called_customer: boolean;
@@ -95,7 +98,6 @@ const EMPTY: Draft = {
   paid_amount: "",
   storage_paid: "",
   line_locations: {},
-  line_legs: {},
   line_etas: {},
   line_stock_status: {},
   called_customer: false,
@@ -153,11 +155,10 @@ export interface OrderControlForm {
   reset: () => void;
   /** Count of filled remark fields — drives the Notes section summary. */
   remarkCount: number;
-  /** Set the stock location(s) for one order line (per-SKU; migration 0168). */
+  /** Set one line's route STOPS (per-SKU; rides line_locations — [0] = the
+   *  default location, more entries = a multi-hop transfer). Empty array =
+   *  clear back to the standard single hop. */
   setLineLocation: (sku: string, locs: string[]) => void;
-  /** Set the transfer route legs for one order line (per-SKU; migration 0216).
-   *  Empty array = clear back to the standard single hop. */
-  setLineLegs: (sku: string, legs: OrderRouteLeg[]) => void;
   /** Set the stock ETA for one order line (per-SKU; migration 0170 — products
    *  don't all arrive on the same date, Jess). */
   setLineEta: (sku: string, eta: string) => void;
@@ -203,7 +204,6 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
       storage_paid: c.storage_paid ?? "",
       line_locations: c.line_locations ?? {},
-      line_legs: c.line_legs ?? {},
       line_etas: c.line_etas ?? {},
       line_stock_status: c.line_stock_status ?? {},
       called_customer: c.called_customer ?? false,
@@ -250,12 +250,13 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       logistic_eta: draft.logistic_eta.trim() ? draft.logistic_eta.trim() : null,
       paid_amount: draft.paid_amount.trim() ? Number(draft.paid_amount) : null,
       storage_paid: draft.storage_paid.trim() ? draft.storage_paid.trim() : null,
+      // line_legs is deliberately NOT sent (bug-0, 2026-07-13): the deployed
+      // order-control schema .strict()-rejects it ("Unrecognized key"), which
+      // failed the WHOLE save. Routes ride line_locations as ordered stops.
       line_locations:
         Object.keys(draft.line_locations).length > 0
           ? draft.line_locations
           : null,
-      line_legs:
-        Object.keys(draft.line_legs).length > 0 ? draft.line_legs : null,
       line_etas:
         Object.keys(draft.line_etas).length > 0 ? draft.line_etas : null,
       line_stock_status:
@@ -285,16 +286,11 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
     reset: () => setDraft(loaded),
     remarkCount,
     setLineLocation: (sku, locs) =>
-      setDraft((d) => ({
-        ...d,
-        line_locations: { ...d.line_locations, [sku]: locs },
-      })),
-    setLineLegs: (sku, legs) =>
       setDraft((d) => {
-        const next = { ...d.line_legs };
-        if (legs.length === 0) delete next[sku];
-        else next[sku] = legs;
-        return { ...d, line_legs: next };
+        const next = { ...d.line_locations };
+        if (locs.length === 0) delete next[sku];
+        else next[sku] = locs;
+        return { ...d, line_locations: next };
       }),
     setLineEta: (sku, eta) =>
       setDraft((d) => ({
@@ -891,42 +887,42 @@ function AddPaymentForm({
   );
 }
 
-/** Storage block → the RIGHT column of the Payment panel (Jess): accrues from
- *  the ETA per the locked rule; leave the fee blank for the auto amount
- *  (shown as the placeholder) or key a number to override. */
+/** Storage block (§7.5, 2026-07-13): fee = START→END window. START (From) is
+ *  auto-suggested as the next SAME WEEKDAY after the delivery deadline
+ *  (`defaultStorageStart`, deadline + 7 days); END = the actual delivery /
+ *  collection date (else the logistic ETA, else today while accruing). MS/BF
+ *  RM150 per commenced month; sofa free for the window's first 14 days then a
+ *  flat RM200. Leave the fee blank for the auto amount or key an override. */
 export function StorageControlFields({
   form,
   hasMsbf = false,
   hasSof = false,
   orderId,
+  deadline,
   meta,
 }: {
   form: OrderControlForm;
   hasMsbf?: boolean;
   hasSof?: boolean;
   orderId?: string;
+  /** The order's delivery deadline — basis for the auto START (deadline+7d). */
+  deadline?: string | null;
   meta?: { orderCode: string; customerName: string; customerPhone: string };
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
-  // End of the storage window (Jess): explicit storage_to, else the logistic's
-  // committed ETA (when it'll leave), else today (still accruing). Auto-shown but
-  // editable — set it to freeze the fee on the actual collection/delivery date.
+  // End of the storage window: explicit storage_to (the actual delivery /
+  // collection), else the logistic's committed ETA, else today (still
+  // accruing). Auto-shown but editable — set it to freeze the fee.
   const endEff = draft.storage_to.trim() || draft.logistic_eta.trim() || today;
-  // Storage free-window basis: once a one-time extension is recorded, it's the
-  // snapshotted ORIGINAL delivery date (migration 0196) so the free window holds
-  // even after the target date moves; otherwise the operator's manual From date.
-  const storageBasis = form.control?.extension_original_date ?? form.storageFrom;
   const storage = computeStorageFee({
-    startDate: storageBasis,
+    startDate: form.storageFrom,
     asOf: endEff,
     hasMsbf,
     hasSof,
   });
-  // Each category is free for a working-day window from the basis (original
-  // delivery) date; the fee accrues only after it (Jess 2026-06-30). Shown so
-  // the operator sees WHY the auto fee is what it is — "free until X" or the
-  // chargeable months / flat sofa fee.
+  // Shown so the operator sees WHY the auto fee is what it is — the chargeable
+  // months / the sofa free-window / the flat fee.
   const fmtShort = (iso: string | null) =>
     iso
       ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
@@ -977,7 +973,13 @@ export function StorageControlFields({
           value={incurred ? "yes" : "no"}
           onChange={(e) => {
             if (e.target.value === "yes") {
-              if (!draft.storage_from.trim()) set("storage_from", today);
+              // §7.5 auto START — the next same weekday AFTER the deadline
+              // (deadline + 7d); today only when there's no deadline to anchor.
+              if (!draft.storage_from.trim())
+                set(
+                  "storage_from",
+                  defaultStorageStart(deadline ?? null) ?? today,
+                );
             } else {
               set("storage_from", "");
               set("storage_fee_override", "");
@@ -991,21 +993,28 @@ export function StorageControlFields({
       </FieldRow>
       {incurred && (
         <>
-          <FieldRow label="From">
-            <input
-              type="date"
-              value={draft.storage_from}
-              onChange={(e) => set("storage_from", e.target.value)}
-              className={CELL}
-            />
-          </FieldRow>
-          <FieldRow label="To (end)">
-            <input
-              type="date"
-              value={endEff}
-              onChange={(e) => set("storage_to", e.target.value)}
-              className={CELL}
-            />
+          {/* From – End on ONE row (§7.5). From auto = deadline+7d, editable;
+              End = the actual delivery / collection date. */}
+          <FieldRow label="From – End">
+            <div className="flex items-center gap-1 w-full min-w-0">
+              <input
+                type="date"
+                value={draft.storage_from}
+                onChange={(e) => set("storage_from", e.target.value)}
+                aria-label="Storage from"
+                title="Storage START — auto: the next same weekday after the deadline"
+                className={`${CELL} flex-1 min-w-0`}
+              />
+              <span className="text-base-300 shrink-0">–</span>
+              <input
+                type="date"
+                value={endEff}
+                onChange={(e) => set("storage_to", e.target.value)}
+                aria-label="Storage end"
+                title="Storage END — the actual delivery / collection date"
+                className={`${CELL} flex-1 min-w-0`}
+              />
+            </div>
           </FieldRow>
           {storageAlert && (
             <FieldRow label="Alert">
@@ -1049,7 +1058,7 @@ export function StorageControlFields({
                     ? "imported fee"
                     : storage.msbf > 0
                       ? `${storage.msbfMonths} mth × RM150`
-                      : `free until ${fmtShort(storage.freeUntilMsbf)}`}
+                      : `runs from ${fmtShort(storage.freeUntilMsbf)}`}
                 </div>
               </div>
             )}
@@ -1148,22 +1157,23 @@ function StorageExtensionRow({
   const extended = count >= 1;
 
   // Open the one-time extension agreement (the Google-Form replacement) as a PDF.
-  // Policy lines are category-specific (the two forms): MS/BF 24 working days
-  // free → RM150/month; Sofa 14 working days free → flat RM200/order.
+  // Policy lines follow the §7.5 rule: storage starts the same weekday the week
+  // after the requested delivery date; MS/BF RM150/month; sofa 14 days free
+  // then a one-time RM200.
   const exportAgreement = async () => {
     try {
       const policy: string[] = [];
       if (hasMsbf)
         policy.push(
-          "Mattress / bed frame: up to 24 working days of free storage from the original requested delivery date; a storage fee of RM150 per month applies thereafter.",
+          "Mattress / bed frame: storage starts the same weekday the week after the requested delivery date; a storage fee of RM150 per month applies over the storage period.",
         );
       if (hasSof)
         policy.push(
-          "Sofa: up to 14 working days of free storage from the original requested delivery date; a one-time storage fee of RM200 per order applies thereafter.",
+          "Sofa: storage starts the same weekday the week after the requested delivery date; the first 14 days are free, after which a one-time storage fee of RM200 per order applies.",
         );
       if (policy.length === 0)
         policy.push(
-          "Storage fees, where applicable, apply after the free storage window from the original requested delivery date.",
+          "Storage fees, where applicable, run from the week after the requested delivery date until actual delivery or collection.",
         );
       const reasonText =
         control?.extension_reason === "Others" && control?.extension_note
