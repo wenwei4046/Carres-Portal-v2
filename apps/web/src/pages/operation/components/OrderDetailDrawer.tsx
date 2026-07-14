@@ -1,6 +1,5 @@
 import {
   type ReactNode,
-  type MouseEvent,
   type MutableRefObject,
   Fragment,
   useEffect,
@@ -60,7 +59,7 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
-import { lineReadiness, readinessCounts, type LineReadiness } from "@/lib/line-readiness";
+import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
 import {
   buildCustomerChase,
   buildCustomerReminder,
