@@ -33,7 +33,6 @@ import { toast } from "sonner";
 import {
   normalizeSkuKey,
   updateOrderInputSchema,
-  type LineStockStatus,
   type OpsStockListResponse,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -87,7 +86,6 @@ import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import {
   RouteJourneyBar,
-  RouteQuietButton,
   StopsEditor,
   stopsToDisplay,
 } from "./RouteJourneyBar";
@@ -1612,241 +1610,313 @@ function DrawerBody({
             <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
-                  {/* Order (Jess 2026-07-11): Status · Stock ETA · Item · Qty · PO ·
-                      Route. GRN (received count + book-in) folds INTO the Status
-                      cell — no separate Recv column. */}
+                  {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
+                      Stock ETA / route / GRN moved into the row's expand
+                      (chevron on Item); Status is AUTO-derived (no dropdown). */}
                   <tr className="bg-base-50 text-base-500">
-                    <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-28 border-r border-base-200"
-                      title="Waiting / Ready / No PO. The count = received / ordered — click to book in received units (GRN)."
-                    >
-                      Status
-                    </th>
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200">
-                      Stock ETA
-                    </th>
                     <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-base-200">
                       Item
                     </th>
                     <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
                       Qty
                     </th>
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200">
-                      PO
+                    <th
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
+                      title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
+                    >
+                      Source
                     </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-32"
-                      title="Where this item is received / where it routes to (the transfer destination). Per-item legs come with the transfer feature."
+                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
+                      title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
-                      Route
+                      Status
+                    </th>
+                    <th className="text-center text-[10px] font-semibold px-2 py-1.5 w-[70px]">
+                      Action
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orderedLines.map((l) => {
-                    const isService = lineKind(l.sku) === "service";
-                    // Accessories (pillow / M.P / protector) come from the Klang
-                    // warehouse — no PO, no Stock ETA, no receive step (Jess).
-                    const isAcc = lineKind(l.sku) === "acc";
-                    // Per-item Stock Status (Jess sheet col Z): Received (stock in) ·
-                    // Pending (PO placed, waiting — show Stock ETA) · No PO (nothing
-                    // raised). Derived from same-model+size free stock + PO existence.
-                    const rd = isService ? null : readinessOf(l.sku, l.qty);
-                    const isStatusOverride =
-                      form.draft.line_stock_status[l.sku] !== undefined;
-                    // PO number for the PO column — the AutoCount source_po
-                    // (real PO like "PO/2603-065") wins; else a portal PO id.
-                    const poNo =
-                      soPoBySku.get(normalizeSkuKey(l.sku)) ??
-                      pos
-                        .find((p) =>
-                          p.lines.some(
-                            (pl) =>
-                              normalizeSkuKey(pl.sku) === normalizeSkuKey(l.sku),
-                          ),
-                        )
-                        ?.id.slice(0, 8);
-                    // Per-item route STOPS (bug-0 fix: rides line_locations —
-                    // the shape the LIVE schema accepts; [0] = the default
-                    // location, more entries = a multi-hop transfer).
-                    const savedLoc = form.draft.line_locations[l.sku];
-                    const stops =
-                      savedLoc !== undefined && savedLoc.length > 0
-                        ? savedLoc
-                        : [
-                            defaultLineLocation(l.sku, assignedLogisticName) ??
-                              "Carres Klang",
-                          ];
-                    const locValue = stops[0] ?? "";
-                    // Per-item Stock ETA (migration 0170) — when the item's stock
-                    // arrives; defaults to the linked PO's date, overridable.
-                    const etaValue =
-                      form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                    // A SPECIAL transfer = more than one stop; a single stop is
-                    // the standard hop to the default warehouse (locValue).
-                    const hasSpecialRoute = stops.length > 1;
-                    const displayLegs = stopsToDisplay(stops);
-                    const routeOpen = routeOpenSku === l.sku;
-                    // One row per SKU (duplicate lines combined above) → key on SKU.
-                    return (
-                      <Fragment key={l.sku}>
-                      {/* UI-KIT §5.1: a line that still needs reserving reads as
-                          an AMBER tint (warning, not danger red). */}
-                      <tr
-                        onClick={() => setPickerSku(l.sku)}
-                        className={`cursor-pointer ${
-                          l.sku === activeLineSku
-                            ? "bg-primary/10"
+                  {(() => {
+                    // §7.7 — ONE row renderer, grouped into Needs action /
+                    // Ready only past 5 lines (a small order reads flat).
+                    const renderRow = (l: { sku: string; qty: number }) => {
+                      const isService = lineKind(l.sku) === "service";
+                      // Accessories (pillow / M.P / protector) come from the
+                      // Klang warehouse — no PO, no receive step (Jess).
+                      const isAcc = lineKind(l.sku) === "acc";
+                      const rd = isService ? null : readinessOf(l.sku, l.qty);
+                      const received = reservedCountOf(
+                        l.sku,
+                        lineReceivedOf(l.sku),
+                      );
+                      // Source — where the line is fulfilled from: the linked
+                      // PO (AutoCount source_po wins, else a portal PO id),
+                      // else own Klang warehouse stock.
+                      const poNo =
+                        soPoBySku.get(normalizeSkuKey(l.sku)) ??
+                        pos
+                          .find((p) =>
+                            p.lines.some(
+                              (pl) =>
+                                normalizeSkuKey(pl.sku) ===
+                                normalizeSkuKey(l.sku),
+                            ),
+                          )
+                          ?.id.slice(0, 8);
+                      // Per-item route STOPS (rides line_locations — the shape
+                      // the LIVE schema accepts; [0] = the default location).
+                      const savedLoc = form.draft.line_locations[l.sku];
+                      const stops =
+                        savedLoc !== undefined && savedLoc.length > 0
+                          ? savedLoc
+                          : [
+                              defaultLineLocation(l.sku, assignedLogisticName) ??
+                                "Carres Klang",
+                            ];
+                      const locValue = stops[0] ?? "";
+                      const etaValue =
+                        form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+                      const hasSpecialRoute = stops.length > 1;
+                      const routeOpen = routeOpenSku === l.sku;
+                      // AUTO-derived status (§7.7 — the manual dropdown is gone;
+                      // reserving stock is what flips a line green).
+                      const pill =
+                        !rd
+                          ? null
+                          : rd === "reserved"
+                            ? {
+                                t: `Reserved · ${locValue || "Carres Klang"}`,
+                                c: "bg-success-soft text-success",
+                                hint: isAcc
+                                  ? "Accessory — always in the Klang warehouse"
+                                  : "Reserved to this SO",
+                              }
                             : rd === "to_reserve"
-                              ? "bg-warning-soft/40 hover:bg-warning-soft/60"
-                              : "hover:bg-base-50"
-                        }`}
-                      >
-                        {/* Status (+ GRN folded in) — for a PO item the received
-                            count / book-in button sits next to the status pill, so
-                            there's no separate Recv column (Jess 2026-07-11). */}
-                        <td className="border border-base-200 px-1.5 py-1 align-top">
-                          {isService || !rd ? (
-                            <span className="text-base-300 text-[11px]">—</span>
-                          ) : isAcc ? (
-                            <span
-                              title="Accessory — always in the Klang warehouse; deducted from ready stock"
-                              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-soft text-success whitespace-nowrap"
-                            >
-                              Reserved
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <StockStatusCell
-                                sku={l.sku}
-                                status={rd}
-                                isOverride={isStatusOverride}
-                                onSet={(s) => form.setLineStockStatus(l.sku, s)}
-                                onPick={() => setPickerSku(l.sku)}
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReceiveLine({
-                                    sku: l.sku,
-                                    qty: l.qty,
-                                    received: lineReceivedOf(l.sku),
-                                  });
-                                }}
-                                title="Book in received units (GRN)"
-                                className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1 py-0.5 rounded ${
-                                  lineReceivedOf(l.sku) >= l.qty
-                                    ? "text-success font-semibold"
-                                    : "text-primary hover:bg-primary/10"
-                                }`}
-                              >
-                                {lineReceivedOf(l.sku)}/{l.qty}
-                                {lineReceivedOf(l.sku) < l.qty && (
-                                  <PackagePlus size={11} strokeWidth={2} />
+                              ? {
+                                  t: `To reserve · ${received}/${l.qty}`,
+                                  c: "bg-warning-soft text-warning",
+                                  hint: "Matching free stock exists — reserve it to this SO",
+                                }
+                              : rd === "on_po"
+                                ? {
+                                    t: "On PO",
+                                    c: "bg-base-100 text-base-500",
+                                    hint: "Waiting on supplier stock (PO raised)",
+                                  }
+                                : {
+                                    t: "No PO",
+                                    c: "bg-base-100 text-base-500",
+                                    hint: "Nothing raised yet",
+                                  };
+                      return (
+                        <Fragment key={l.sku}>
+                          {/* A line that still needs reserving reads as an
+                              AMBER tint (warning, never danger red). */}
+                          <tr
+                            onClick={() => setPickerSku(l.sku)}
+                            className={`cursor-pointer ${
+                              l.sku === activeLineSku
+                                ? "bg-primary/10"
+                                : rd === "to_reserve"
+                                  ? "bg-warning-soft/40 hover:bg-warning-soft/60"
+                                  : "hover:bg-base-50"
+                            }`}
+                          >
+                            {/* Item — chevron expands the detail (stock ETA /
+                                GRN / route-transfer). */}
+                            <td className="border border-base-200 px-2 py-1 align-top">
+                              <div className="flex items-start gap-1">
+                                {!isService && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRouteOpenSku((cur) =>
+                                        cur === l.sku ? null : l.sku,
+                                      );
+                                    }}
+                                    title="Details — stock ETA, receiving (GRN), route / transfer"
+                                    aria-expanded={routeOpen}
+                                    className="shrink-0 mt-0.5 text-base-400 hover:text-base-700"
+                                  >
+                                    {routeOpen ? (
+                                      <ChevronDown size={12} />
+                                    ) : (
+                                      <ChevronRight size={12} />
+                                    )}
+                                  </button>
                                 )}
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        {/* Stock ETA */}
-                        {isService || isAcc ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            {isAcc ? "—" : "N/A"}
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-top">
-                            <input
-                              type="date"
-                              value={etaValue}
-                              onChange={(e) => form.setLineEta(l.sku, e.target.value)}
-                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                            />
-                          </td>
-                        )}
-                        {/* Item */}
-                        <td className="border border-base-200 px-2 py-1 align-top">
-                          <div
-                            className="font-mono text-[10px] leading-tight break-words"
-                            title={l.sku}
-                          >
-                            {l.sku}
-                          </div>
-                        </td>
-                        {/* Qty */}
-                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                          {l.qty}
-                        </td>
-                        {/* PO */}
-                        <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
-                          {poNo ? (
-                            <span className="text-primary">{poNo}</span>
-                          ) : (
-                            <span className="text-base-300">—</span>
-                          )}
-                        </td>
-                        {/* Route — Option D journey bar: icons = places, colour =
-                            progress. Click expands the legs in-place (below). */}
-                        {isService ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            N/A
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-middle">
-                            {hasSpecialRoute ? (
-                              <RouteJourneyBar
-                                legs={displayLegs}
-                                open={routeOpen}
-                                onClick={() =>
-                                  setRouteOpenSku((cur) =>
-                                    cur === l.sku ? null : l.sku,
-                                  )
-                                }
-                              />
-                            ) : (
-                              <RouteQuietButton
-                                label={locValue || "Carres Klang"}
-                                open={routeOpen}
-                                onClick={() =>
-                                  setRouteOpenSku((cur) =>
-                                    cur === l.sku ? null : l.sku,
-                                  )
-                                }
-                              />
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                      {!isService && routeOpen && (
-                        <tr className="bg-base-50">
-                          <td
-                            colSpan={6}
-                            className="border border-base-200 px-3 py-2"
-                          >
-                            <div className="space-y-1.5">
-                              <div className="text-[10px] font-semibold text-[#8C877D]">
-                                Route — stop 1 is where the item sits; add a
-                                stop for a special transfer
+                                <span
+                                  className="font-mono text-[10px] leading-tight break-words"
+                                  title={l.sku}
+                                >
+                                  {l.sku}
+                                </span>
                               </div>
-                              {stops.length <= 1 && (
-                                <p className="text-[10px] text-base-400">
-                                  Standard: sits at {locValue || "Carres Klang"}.
-                                  Add a stop only for a special pickup (supplier
-                                  → warehouse). Delivery to the customer is set
-                                  in the Delivery panel.
-                                </p>
+                            </td>
+                            {/* Qty */}
+                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                              {l.qty}
+                            </td>
+                            {/* Source — PO/#### or own Klang stock. */}
+                            <td className="border border-base-200 px-2 py-1 align-middle">
+                              {isService ? (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              ) : poNo ? (
+                                <span className="font-mono text-[10px] text-primary">
+                                  {poNo}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-base-600">
+                                  Klang stock
+                                </span>
                               )}
-                              <StopsEditor
-                                stops={savedLoc ?? (locValue ? [locValue] : [])}
-                                onChange={(s) => form.setLineLocation(l.sku, s)}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      </Fragment>
+                            </td>
+                            {/* Status — auto-derived pill. */}
+                            <td className="border border-base-200 px-1.5 py-1 align-middle">
+                              {pill ? (
+                                <span
+                                  title={pill.hint}
+                                  className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                >
+                                  {pill.t}
+                                </span>
+                              ) : (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              )}
+                            </td>
+                            {/* Action — inline Reserve on an unfulfilled line;
+                                opens the warehouse picker filtered to it. */}
+                            <td className="border border-base-200 px-1.5 py-1 text-center align-middle">
+                              {rd && rd !== "reserved" ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPickerSku(l.sku);
+                                    document
+                                      .getElementById("warehouse-stock-panel")
+                                      ?.scrollIntoView({
+                                        block: "start",
+                                        behavior: "smooth",
+                                      });
+                                  }}
+                                  title="Open the warehouse picker filtered to this line"
+                                  className="text-[11px] font-semibold text-primary border border-primary rounded-md px-2 py-0.5 hover:bg-primary/5 whitespace-nowrap"
+                                >
+                                  Reserve
+                                </button>
+                              ) : (
+                                <span className="text-base-300 text-[11px]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                          {!isService && routeOpen && (
+                            <tr className="bg-base-50">
+                              <td
+                                colSpan={5}
+                                className="border border-base-200 px-3 py-2"
+                              >
+                                <div className="space-y-2">
+                                  {!isAcc && (
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                      <label className="flex items-center gap-1.5 text-[11px] text-base-500">
+                                        Stock ETA
+                                        <input
+                                          type="date"
+                                          value={etaValue}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) =>
+                                            form.setLineEta(l.sku, e.target.value)
+                                          }
+                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                                        />
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setReceiveLine({
+                                            sku: l.sku,
+                                            qty: l.qty,
+                                            received: lineReceivedOf(l.sku),
+                                          });
+                                        }}
+                                        title="Book in received units (GRN)"
+                                        className={`inline-flex items-center gap-1 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
+                                          lineReceivedOf(l.sku) >= l.qty
+                                            ? "text-success font-semibold"
+                                            : "text-primary hover:bg-primary/10"
+                                        }`}
+                                      >
+                                        Received {lineReceivedOf(l.sku)}/{l.qty}
+                                        {lineReceivedOf(l.sku) < l.qty && (
+                                          <>
+                                            <PackagePlus size={11} strokeWidth={2} />
+                                            Book in
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="text-[10px] font-semibold text-base-500 mb-1">
+                                      Route — stop 1 is where the item sits; add
+                                      a stop for a special transfer. Delivery to
+                                      the customer is set in the Delivery panel.
+                                    </div>
+                                    {hasSpecialRoute && (
+                                      <div className="max-w-[280px] mb-1">
+                                        <RouteJourneyBar
+                                          legs={stopsToDisplay(stops)}
+                                        />
+                                      </div>
+                                    )}
+                                    <StopsEditor
+                                      stops={savedLoc ?? (locValue ? [locValue] : [])}
+                                      onChange={(s) =>
+                                        form.setLineLocation(l.sku, s)
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    };
+                    // Flat under 6 lines; else grouped Needs action / Ready.
+                    if (orderedLines.length <= 5)
+                      return orderedLines.map(renderRow);
+                    const needs = orderedLines.filter(
+                      (l) =>
+                        lineKind(l.sku) !== "service" &&
+                        readinessOf(l.sku, l.qty) !== "reserved",
                     );
-                  })}
+                    const needSet = new Set(needs.map((l) => l.sku));
+                    const rest = orderedLines.filter((l) => !needSet.has(l.sku));
+                    const subheader = (label: string) => (
+                      <tr key={`sub-${label}`}>
+                        <td
+                          colSpan={5}
+                          className="border border-base-200 bg-base-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-base-500"
+                        >
+                          {label}
+                        </td>
+                      </tr>
+                    );
+                    return (
+                      <>
+                        {needs.length > 0 && subheader("Needs action")}
+                        {needs.map(renderRow)}
+                        {rest.length > 0 && subheader("Ready")}
+                        {rest.map(renderRow)}
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1882,8 +1952,12 @@ function DrawerBody({
           {activeLineSku ? (
             /* ALWAYS viewable (§7.8) — including delivered orders. Natural
                height; the column scrolls; the picker caps its own row area.
-               `bare` stacks it as a SECTION inside this column's shared card. */
-            <div className="min-h-0 flex flex-col shrink-0">
+               `bare` stacks it as a SECTION inside this column's shared card.
+               The id anchors the Items rows' inline Reserve buttons (§7.7). */
+            <div
+              id="warehouse-stock-panel"
+              className="min-h-0 flex flex-col shrink-0"
+            >
               <StockPickerGrid
                 bare
                 sku={activeLineSku}
@@ -3577,101 +3651,3 @@ function PrintDoButton({
   );
 }
 
-/** Readiness pill label + colour by status (locked vocab: No PO red · Waiting
- *  amber · Ready green). */
-/** Row pill per the Round 1A readiness vocab (colour lock: green = reserved to
- *  this SO, amber = free stock to reserve, grey = on PO / nothing raised — red
- *  is reserved for the banner). */
-const STOCK_STATUS_META: Record<LineReadiness, { t: string; c: string }> = {
-  reserved: { t: "Reserved", c: "bg-success-soft text-success" },
-  to_reserve: { t: "To reserve", c: "bg-warning-soft text-warning" },
-  on_po: { t: "On PO", c: "bg-base-100 text-base-600" },
-  no_po: { t: "No PO", c: "bg-base-100 text-base-500" },
-};
-
-/**
- * The Stock cell in the Items panel: shows the readiness pill AND lets the
- * operator set it per line (Jess 2026-07-02 — "update the stock GRN each item").
- * Click → a tiny menu: Ready / Waiting / No PO (a manual override stored in
- * ops_order_control.line_stock_status), "Auto" to clear it back to the derived
- * free-stock value, and "Pick / reserve stock" to open the warehouse picker. A
- * "•" marks a manual override so it's distinct from the auto-derived value.
- */
-function StockStatusCell({
-  sku: _sku,
-  status,
-  isOverride,
-  onSet,
-  onPick,
-}: {
-  sku: string;
-  /** The DERIVED readiness (shared lineReadiness) — the pill face always shows
-   *  this, so row / badge / footer can never contradict (Round 1A). */
-  status: LineReadiness;
-  isOverride: boolean;
-  /** Writes the Master override (line_stock_status) — an INPUT to the derived
-   *  readiness ("stock arrived" hint), not the displayed value itself. */
-  onSet: (s: LineStockStatus | null) => void;
-  onPick: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const meta = STOCK_STATUS_META[status];
-  const stop = (e: MouseEvent) => e.stopPropagation();
-  return (
-    <div className="relative" onClick={stop}>
-      <button
-        type="button"
-        onClick={(e) => {
-          stop(e);
-          setOpen((v) => !v);
-        }}
-        title="Set stock status (Received / Pending / No PO) or pick warehouse stock"
-        data-testid={`stock-status-${_sku}`}
-        className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${meta.c}`}
-      >
-        {meta.t}
-        {isOverride && <span title="Manual override">•</span>}
-        <ChevronDown size={10} strokeWidth={2.5} className="opacity-70" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { stop(e); setOpen(false); }} />
-          <div className="absolute z-50 mt-1 left-0 w-[168px] bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden py-1">
-            {(
-              [
-                { v: "ready", t: "Stock arrived", dot: "bg-success" },
-                { v: "waiting", t: "Waiting (on PO)", dot: "bg-warning" },
-                { v: "nopo", t: "Nothing raised", dot: "bg-base-400" },
-              ] as const
-            ).map((s) => (
-              <button
-                key={s.v}
-                type="button"
-                onClick={(e) => { stop(e); onSet(s.v); setOpen(false); }}
-                className="w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 flex items-center gap-2"
-              >
-                <span className={`inline-block w-2 h-2 rounded-full ${s.dot}`} />
-                {s.t}
-              </button>
-            ))}
-            <div className="border-t border-base-100 my-1" />
-            <button
-              type="button"
-              onClick={(e) => { stop(e); onSet(null); setOpen(false); }}
-              className="w-full text-left px-2.5 py-1 text-[12px] text-base-500 hover:bg-primary/5"
-            >
-              Auto (from stock)
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { stop(e); onPick(); setOpen(false); }}
-              className="w-full text-left px-2.5 py-1 text-[12px] text-primary hover:bg-primary/5"
-            >
-              Pick / reserve stock →
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
