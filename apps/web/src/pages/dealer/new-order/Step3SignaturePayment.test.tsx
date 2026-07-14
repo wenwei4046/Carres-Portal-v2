@@ -103,6 +103,42 @@ describe("Step3SignaturePayment — 0219 config-driven methods", () => {
   });
 });
 
+describe("Step3SignaturePayment — Order recap free-gift parity", () => {
+  it("lists the default free gift as a FREE row (same items as the OrderSummaryRail)", () => {
+    const MATT = "22222222-2222-2222-2222-222222222222";
+    const ACC = "44444444-4444-4444-4444-444444444444";
+    const cat = catalog({
+      models: [
+        { id: MATT, category: "mattress", modelKey: "matt-x", name: "Matt X", blurb: null, colors: null, gaps: null, sofaMode: null },
+        { id: ACC, category: "accessory", modelKey: "acc-x", name: "Acc X", blurb: null, colors: null, gaps: null, sofaMode: null },
+      ],
+      skus: [
+        { id: "id-1", sku: "MATT-A", modelId: MATT, variant: "Queen", variantKind: "size", price: 1200, cost: null, supplierId: null, posActive: true, description: "Matt A" },
+        { id: "id-2", sku: "PILLOW", modelId: ACC, variant: "Queen", variantKind: "size", price: 100, cost: null, supplierId: null, posActive: true, description: "Memory Pillow" },
+      ],
+      modelDefaultFreeGifts: [{ modelId: MATT, gifts: [{ giftSku: "PILLOW", qty: 2 }] }],
+    } as unknown as Partial<CatalogResponse>);
+    const d = emptyDraft();
+    renderStep(
+      { ...d, lines: [{ localId: "L1", sku: "MATT-A", qty: 1, attrs: null, unitPrice: 1200, label: "Matt X · Queen" }] },
+      cat,
+    );
+    const gift = screen.getByTestId("step3-gift-PILLOW");
+    expect(gift.textContent).toContain("Acc X");
+    expect(gift.textContent).toContain("×2 · GWP");
+    expect(gift.textContent).toContain("FREE");
+  });
+
+  it("DORMANT: no gift configured → no gift row", () => {
+    const d = emptyDraft();
+    renderStep(
+      { ...d, lines: [{ localId: "L1", sku: "MATT-A", qty: 1, attrs: null, unitPrice: 1200, label: "Matt X · Queen" }] },
+      catalog(),
+    );
+    expect(screen.queryByTestId("step3-gift-PILLOW")).toBeNull();
+  });
+});
+
 describe("step4Valid — 0219 method rules", () => {
   function submittable(payment: Partial<WizardDraft["payment"]>): WizardDraft {
     const d = draftWith(payment);

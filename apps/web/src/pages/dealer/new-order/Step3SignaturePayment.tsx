@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { resolvePaymentMethods, type CatalogResponse } from "@carres/shared";
 import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
+import { previewDefaultGifts } from "../pos/free-line";
 import {
   composeEmergency,
   type DraftPayment,
@@ -103,6 +104,10 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   const totals = useMemo(() => draftTotals(draft, catalog), [draft, catalog]);
   const { lineSub, addonSub, stair, deliveryTotal } = totals;
   const deliveryPreview = totals.delivery;
+
+  // Default free gifts the server WILL append at submit — the same RM0 preview
+  // rows the OrderSummaryRail shows, so the two panes list identical items.
+  const giftRows = useMemo(() => previewDefaultGifts(draft.lines, catalog), [draft.lines, catalog]);
 
   const total = totals.grand;
   const minDeposit = useMemo(() => Math.round(total * 0.5), [total]);
@@ -209,6 +214,19 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <span className="font-mono text-[13px]">
                 RM {(l.unitPrice * l.qty).toLocaleString()}
               </span>
+            </div>
+          ))}
+          {giftRows.map((g) => (
+            <div
+              key={`gift-${g.sourceModelId}-${g.giftSku}`}
+              className="flex justify-between px-3.5 py-2.5 border-t border-base-100"
+              data-testid={`step3-gift-${g.giftSku}`}
+            >
+              <span className="text-[13px]">
+                {g.name} <span className="text-base-500">×{g.qty} · GWP</span>
+                {g.campaign && <span className="text-base-500"> · {g.campaign}</span>}
+              </span>
+              <span className="font-mono text-[13px] text-success">FREE</span>
             </div>
           ))}
           {draft.addons.map((a) => (

@@ -175,11 +175,11 @@ export default function CatalogStep({
 
   function addLine(line: DraftLine) {
     onChange({ ...draft, lines: mergeLine(draft.lines, line) });
-    // Trigger the one-shot FAB pulse (class applied by FloatingCartButton when
-    // pulse=true; cleared after 220ms).
+    // The one-shot FAB pulse (class applied by FloatingCartButton when
+    // pulse=true; cleared after 220ms) is the ONLY add feedback — no toast,
+    // per Loo 2026-07-14: no notification pop-ups on cart mutations.
     setPulse(true);
     window.setTimeout(() => setPulse(false), 220);
-    toast.success("Added to cart");
   }
 
   /** Cart-line EDIT save — swap the edited line IN PLACE (same localId, so the
@@ -198,7 +198,8 @@ export default function CatalogStep({
       ...draft,
       lines: draft.lines.map((l) => (l.localId === old.localId ? merged : l)),
     });
-    toast.success("Item updated");
+    // No success toast (same no-pop-up rule as addLine); the dropped-claim
+    // info below stays — it's actionable, not confirmation noise.
     const hadClaim = Boolean(oldAttrs?.pwp || oldAttrs?.free_item);
     const hasClaim = Boolean(nextAttrs?.pwp || nextAttrs?.free_item);
     if (hadClaim && !hasClaim) {

@@ -67,13 +67,40 @@ type SalesOrderData = {
   delivery: { date: string; floor: number; has_lift: boolean };
   lines: Array<{
     sku: string;
+    /** Human product name — `product_models.name (variant)` resolved from the
+     *  sku (Loo 2026-07-14, 2990s SO parity). Falls back to the sku code when
+     *  the catalog lookup misses (deleted sku, compartment sku, mock DB). */
     description: string;
     qty: number;
     unit_price: number;
     line_total: number;
     attrs: Record<string, unknown> | null;
   }>;
-  addons: Array<{ label: string; qty: number; unit_price: number; line_total: number }>;
+  addons: Array<{
+    label: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+    /** order_addons.attrs — disposal size tag / delivery follow-up source SO.
+     *  The template prints these as muted "Remark:" sub-lines. */
+    attrs: Record<string, unknown> | null;
+  }>;
+  /** 2026-07-14 (Loo, 2990s SO parity) — "PAYMENTS RECEIVED" rows. Internal
+   *  callers see the order_payments ledger; dealers (ledger is internal-only
+   *  RLS) + ledger-less orders fall back to ONE row synthesized from
+   *  orders.paid + payment_method + approval_code. Empty when nothing paid. */
+  payments: Array<{ label: string; reference: string | null; amount: number }>;
+  /** PWP/promo voucher codes EARNED on this order (pwp_codes carry-forward,
+   *  source_order_id = this order) — printed under their trigger line like the
+   *  2990s SO ("PWP voucher issued: … · not redeemed yet"). RLS-scoped read;
+   *  roles that can't see pwp_codes just get []. */
+  vouchers: Array<{
+    code: string;
+    redeemed: boolean;
+    type: "pwp" | "promo";
+    reward_category: string | null;
+    trigger_sku: string | null;
+  }>;
   subtotal: number;
   total: number;
   paid: number;
@@ -1663,6 +1690,67 @@ ordersRouter.post("/:id/proceed", async (c) => {
 });
 
 /**
+ * POST /api/orders/:id/unproceed — 0220 POS proceed-lane edits. Reverses the
+ * sales-side Proceed marker via the `unproceed_order(uuid)` RPC: only while
+ * status='proceed_order' AND operation_stage is still 'confirmed' (what
+ * proceed_order stamps) AND the proceed date hasn't passed (MYT). Flips the
+ * order back to Place with operation_stage=NULL so the POS board restores it
+ * to lane 01.
+ *
+ * Error contract (matches RPC's RAISE EXCEPTION codes):
+ *   • 42501 (forbidden)                  → 403
+ *   • 42P01 (order_not_found)            → 404
+ *   • 22023 (wrong_status / wrong_stage /
+ *            proceed_date_passed)        → 422 { error: "unproceed_blocked", code }
+ *   • anything else                      → 500
+ */
+ordersRouter.post("/:id/unproceed", async (c) => {
+  const auth = c.var.auth;
+  const id = c.req.param("id");
+  const idCheck = z.string().uuid().safeParse(id);
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  if (
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
+    auth.role !== "finance" && auth.role !== "bd"
+  ) {
+    throw new HTTPException(403, { message: "Role cannot unproceed orders" });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { error: rpcError } = await sb.rpc("unproceed_order", { p_order_id: id });
+
+  if (rpcError) {
+    const sqlstate = rpcError.code;
+    if (sqlstate === "42501") {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (sqlstate === "42P01") {
+      throw new HTTPException(404, { message: "Order not found" });
+    }
+    if (sqlstate === "P0001" || sqlstate === "22023") {
+      // 422 — business precondition failed. `code` carries the RPC's DETAIL
+      // (wrong_status / wrong_stage / proceed_date_passed) so the drawer can
+      // show the matching friendly copy without parsing strings.
+      return c.json(
+        {
+          error: "unproceed_blocked",
+          code: rpcError.details ?? null,
+          message: rpcError.message,
+        },
+        422,
+      );
+    }
+    throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  // Re-fetch with relations — same shape as GET /:id so the client can
+  // setQueryData(qk.order(id), …) and skip a follow-up round-trip.
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
+/**
  * Shared body parser + RPC dispatcher for the three blocker-resolution
  * mutations (top-up / address / date). Keeps the route handlers small and
  * uniform: parse → validate → call RPC → map errors → re-fetch + return.
@@ -1910,6 +1998,9 @@ ordersRouter.patch("/:id", async (c) => {
   if (cust) {
     if ("name" in cust) flat.customer_name = cust.name;
     if ("phone" in cust) flat.customer_phone = cust.phone ?? "";
+    // 0220 — proceed-lane edits: email editable (null → "" so the RPC's
+    // nullif(trim(…), '') clears the column, same treatment as phone).
+    if ("email" in cust) flat.customer_email = cust.email ?? "";
     if ("address" in cust) flat.customer_address = cust.address ?? "";
     if ("addressUnknown" in cust) flat.customer_address_unknown = cust.addressUnknown;
     if ("billing" in cust) flat.customer_billing = cust.billing ?? "";
@@ -2026,6 +2117,29 @@ ordersRouter.get("/:id", async (c) => {
 // / Principal / BD can pull; Partner / Supplier are denied at the route gate
 // (Partner has POD, Supplier has PO — they shouldn't be handing out the
 // customer SO). RLS on `orders` narrows further to rows each role can read.
+/** Pretty label for a payment-method key. 0219 made methods config-driven
+ *  free keys, so unknown keys just capitalize ("tng_qr" → "Tng_qr" is still
+ *  better on a customer doc than the raw key). */
+function paymentMethodLabel(key: string | null): string {
+  if (!key || key.trim().length === 0) return "Payment";
+  const known: Record<string, string> = {
+    cash: "Cash",
+    credit: "Card",
+    card: "Card",
+    bank: "Bank transfer",
+    transfer: "Bank transfer",
+    online: "Online",
+    cheque: "Cheque",
+    ewallet: "eWallet",
+    installment: "Installment",
+  };
+  return known[key] ?? capitalize(key);
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 ordersRouter.get("/:id/sales-order-data", async (c) => {
   const auth = c.var.auth;
   const role = auth.role;
@@ -2048,9 +2162,9 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     .select(
       "id, so, status, channel, customer_name, customer_phone, customer_address, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
-        "paid, signature_url, placed_at, " +
+        "paid, payment_method, approval_code, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
-        "order_addons(addon_key, qty, unit_price), " +
+        "order_addons(addon_key, qty, unit_price, attrs), " +
         "dealers(name, contact, address), " +
         "outlets(name, address), " +
         "salespersons(name, phone)",
@@ -2070,15 +2184,68 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     unit_price: number | string;
     attrs: Record<string, unknown> | null;
   }> = o.order_lines ?? [];
-  const addons: Array<{ addon_key: string; qty: number; unit_price: number | string }> =
-    o.order_addons ?? [];
+  const addons: Array<{
+    addon_key: string;
+    qty: number;
+    unit_price: number | string;
+    attrs?: Record<string, unknown> | null;
+  }> = o.order_addons ?? [];
+
+  // ── Doc enrichment (Loo 2026-07-14, 2990s SO parity) — every lookup below
+  // is FAIL-SOFT: the customer-facing doc must render even when a lookup
+  // misses (deleted sku, RLS-hidden table, mock DB), so a miss falls back to
+  // the raw sku/key and the orders.paid summary row instead of a 500.
+
+  // Line description = product name off the catalog: `Model name (Variant)`.
+  // product_skus.description is a free-text REMARK ("waterproof protector"),
+  // NOT the product name — the name lives on product_models.name + variant.
+  const nameBySku = new Map<string, string>();
+  try {
+    const skuList = [...new Set(lines.map((l) => String(l.sku)))];
+    if (skuList.length > 0) {
+      const { data: skuRows } = await sb
+        .from("product_skus")
+        .select("sku, variant, product_models(name)")
+        .in("sku", skuList);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const r of (skuRows ?? []) as any[]) {
+        const modelName =
+          typeof r.product_models?.name === "string" && r.product_models.name.trim().length > 0
+            ? r.product_models.name.trim()
+            : null;
+        if (!modelName) continue;
+        const variant =
+          typeof r.variant === "string" && r.variant.trim().length > 0 ? r.variant.trim() : null;
+        nameBySku.set(String(r.sku), variant ? `${modelName} (${variant})` : modelName);
+      }
+    }
+  } catch {
+    /* fall back to sku codes */
+  }
+
+  // Add-on labels: human `addons.name` over the raw key ("dispose-mattress").
+  const addonNameByKey = new Map<string, string>();
+  try {
+    const addonKeys = [...new Set(addons.map((a) => String(a.addon_key)))];
+    if (addonKeys.length > 0) {
+      const { data: addonDefs } = await sb.from("addons").select("key, name").in("key", addonKeys);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const r of (addonDefs ?? []) as any[]) {
+        if (typeof r.name === "string" && r.name.trim().length > 0) {
+          addonNameByKey.set(String(r.key), r.name.trim());
+        }
+      }
+    }
+  } catch {
+    /* fall back to addon keys */
+  }
 
   const lineRows = lines.map((l) => {
     const qty = Number(l.qty);
     const unitPrice = Number(l.unit_price);
     return {
       sku: String(l.sku),
-      description: String(l.sku),
+      description: nameBySku.get(String(l.sku)) ?? String(l.sku),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,
@@ -2089,10 +2256,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     const qty = Number(a.qty);
     const unitPrice = Number(a.unit_price);
     return {
-      label: String(a.addon_key),
+      label: addonNameByKey.get(String(a.addon_key)) ?? String(a.addon_key),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,
+      attrs: a.attrs ?? null,
     };
   });
 
@@ -2102,6 +2270,60 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const total = subtotal;
   const paid = Number(o.paid ?? 0);
   const balance_due = total - paid;
+
+  // "PAYMENTS RECEIVED" rows — the order_payments ledger when readable
+  // (internal-only RLS: dealers silently get 0 rows), else ONE row from the
+  // at-sale capture on orders (paid + payment_method + approval_code).
+  let payments: SalesOrderData["payments"] = [];
+  try {
+    const { data: payRows } = await sb
+      .from("order_payments")
+      .select("amount, paid_on, method, kind, reference, receipt_no")
+      .eq("order_id", id)
+      .order("paid_on", { ascending: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    payments = ((payRows ?? []) as any[]).map((p) => {
+      const method = paymentMethodLabel(p.method == null ? null : String(p.method));
+      const kind = typeof p.kind === "string" && p.kind !== "payment" ? capitalize(p.kind) : null;
+      return {
+        label: kind ? `${kind} · ${method}` : method,
+        reference: (p.reference ?? p.receipt_no ?? null) as string | null,
+        amount: Number(p.amount ?? 0),
+      };
+    });
+  } catch {
+    /* fall through to the orders-row summary */
+  }
+  if (payments.length === 0 && paid > 0) {
+    payments = [
+      {
+        label: paymentMethodLabel(o.payment_method == null ? null : String(o.payment_method)),
+        reference: o.approval_code == null ? null : String(o.approval_code),
+        amount: paid,
+      },
+    ];
+  }
+
+  // Voucher codes EARNED on this order (P8d carry-forward) — printed under
+  // their trigger line like the 2990s SO. RLS-scoped; unreadable → [].
+  let vouchers: SalesOrderData["vouchers"] = [];
+  try {
+    const { data: vRows } = await sb
+      .from("pwp_codes")
+      .select("code, status, type, reward_category, trigger_item_code")
+      .eq("source_order_id", id)
+      .in("status", ["AVAILABLE", "USED"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vouchers = ((vRows ?? []) as any[]).map((v) => ({
+      code: String(v.code),
+      redeemed: v.status === "USED",
+      type: v.type === "promo" ? ("promo" as const) : ("pwp" as const),
+      reward_category: v.reward_category == null ? null : String(v.reward_category),
+      trigger_sku: v.trigger_item_code == null ? null : String(v.trigger_item_code),
+    }));
+  } catch {
+    /* vouchers stay [] */
+  }
 
   // proto `soNumber` → "SO-001001" (6-digit zero-padded so).
   const so_number = `SO-${String(o.so).padStart(6, "0")}`;
@@ -2153,6 +2375,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     },
     lines: lineRows,
     addons: addonRows,
+    payments,
+    vouchers,
     subtotal,
     total,
     paid,
