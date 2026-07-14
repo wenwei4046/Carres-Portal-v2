@@ -1164,7 +1164,7 @@ function DrawerBody({
               const pill =
                 pipelineStatus === "completed"
                   ? { cls: "pill-confirmed", label: "Delivered", hint: PIPELINE_HINT.completed }
-                  : onHold && pipelineStatus !== "completed"
+                  : onHold
                     ? {
                         cls: "pill-warning",
                         label: "On hold",
@@ -2693,6 +2693,10 @@ async function openDoPdf(orderId: string) {
     toast.error(`Print delivery order failed — ${msg}`);
   }
 }
+
+// Not wired yet — reserved for the Drawer 1B ⋮ menu (invoice / DO print).
+void openInvoicePdf;
+void openDoPdf;
 
 /** One row of the Total / Collected / Outstanding stack. */
 function MoneyRow({
