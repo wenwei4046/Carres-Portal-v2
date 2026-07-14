@@ -8,7 +8,7 @@
  *   · the fabric + seat-height pickers drive computeSofaPrice
  *   · the Add gate is disabled (with the blocking reason) for a non-closed build
  *     and enabled for a self-closing single-piece sofa (1S = both arms)
- *   · the matched-combo badge + "saves RM N" show when a combo applies
+ *   · the matched-combo marker (eyebrow "· Combo" suffix, savings in its title)
  *   · onAddBuild fires with the expected payload (cells + height + fabric + total)
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
@@ -487,7 +487,7 @@ describe("SofaBuildCanvas", () => {
     expect(labels.some((l) => /BF-001/.test(l))).toBe(false); // only the EZ series
   });
 
-  it("shows the matched-combo badge + savings when a combo applies", () => {
+  it("shows the matched-combo marker + savings tooltip when a combo applies", () => {
     // A combo covering one 1S at RM 1,000 (cheaper than the 1,500 à-la-carte).
     const combos: SofaComboDto[] = [
       {
@@ -508,9 +508,12 @@ describe("SofaBuildCanvas", () => {
     addModule("1S");
     // total = combo price 1000 (basis combo)
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,000.00");
+    // The marker is a SHORT eyebrow suffix — never a wide pill, which would
+    // wrap the footer's right cluster and change the bar height (Loo
+    // 2026-07-14). Savings ride in the title tooltip instead.
     const badge = screen.getByTestId("sofa-build-combo-badge");
-    expect(badge).toHaveTextContent("Combo applied");
-    expect(badge).toHaveTextContent("saves RM 500.00"); // 1500 subset − 1000 combo
+    expect(badge).toHaveTextContent("· Combo");
+    expect(badge).toHaveAttribute("title", "Combo applied · saves RM 500.00"); // 1500 subset − 1000 combo
     // the matched cell is highlighted (data-matched) but carries NO "Combo" logo
     expect(screen.queryByTestId("sofa-cell-combo-badge")).toBeNull();
   });
