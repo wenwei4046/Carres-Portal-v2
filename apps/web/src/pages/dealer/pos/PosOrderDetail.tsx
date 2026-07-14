@@ -10,6 +10,7 @@ import {
   Info,
   PackageCheck,
   Paperclip,
+  QrCode,
   Save,
   X,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import {
 import { groupSofaBuildLines } from "@/lib/sofa-build-display";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
+import StripeCollectModal from "./StripeCollectModal";
 
 /**
  * PosOrderDetail — the POS-native order detail drawer for the My-orders board
@@ -179,6 +181,8 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   // ── record-payment form state ─────────────────────────────────────────────
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<TopUpOrderInput["method"]>("cash");
+  // 0223 — Stripe collect-online modal (QR / WhatsApp link).
+  const [stripeOpen, setStripeOpen] = useState(false);
   const [approvalCode, setApprovalCode] = useState("");
   const [slip, setSlip] = useState<SlipSlot | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -718,6 +722,18 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                   style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}
                   data-testid="pos-od-payform"
                 >
+                  <div className="os-detail__cta">
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => setStripeOpen(true)}
+                      data-testid="pos-od-collect-online"
+                    >
+                      <QrCode size={16} />
+                      Collect online — QR / link
+                    </button>
+                  </div>
+                  <div className="os-stripe__divider">or record a manual payment</div>
                   <div className="os-field">
                     <span>Payment method</span>
                     <div className="os-paychips">
@@ -915,6 +931,18 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             <PackageCheck size={16} strokeWidth={1.75} />
             Delivered · managed in backend portal.
           </div>
+        )}
+
+        {stripeOpen && (
+          <StripeCollectModal
+            orderId={order.id}
+            so={order.so}
+            total={total}
+            paid={paid}
+            customerName={order.customer.name}
+            customerPhone={order.customer.phone ?? null}
+            onClose={() => setStripeOpen(false)}
+          />
         )}
       </aside>
     </div>

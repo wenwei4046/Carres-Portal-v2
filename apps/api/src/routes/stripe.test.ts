@@ -1,0 +1,425 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import {
+  SignJWT,
+  createLocalJWKSet,
+  exportJWK,
+  generateKeyPair,
+  type JWK,
+  type KeyLike,
+} from "jose";
+import app from "../index";
+import { _setJwksForTesting } from "../middleware/auth";
+
+vi.mock("../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+import { adminClient, userClient } from "../lib/supabase";
+
+// The Stripe SDK itself is not under test — the client factory is mocked so
+// each test scripts what "Stripe" answers (create / retrieve / signature).
+vi.mock("../lib/stripe", () => ({
+  stripeConfigured: (env: { STRIPE_SECRET_KEY?: string }) => !!env.STRIPE_SECRET_KEY,
+  stripeClient: vi.fn(),
+  webCryptoProvider: {},
+  describePaymentMethod: () => "fpx (maybank2u)",
+}));
+import { stripeClient } from "../lib/stripe";
+
+const baseEnv = {
+  SUPABASE_URL: "https://t.x",
+  SUPABASE_ANON_KEY: "a",
+  SUPABASE_SERVICE_ROLE_KEY: "s",
+  SUPABASE_JWT_SECRET: "",
+};
+const env = {
+  ...baseEnv,
+  STRIPE_SECRET_KEY: "sk_test_x",
+  STRIPE_WEBHOOK_SECRET: "whsec_x",
+  PUBLIC_WEB_URL: "https://web.test",
+};
+
+const KID = "k1";
+let signKey: KeyLike;
+let publicJwk: JWK;
+
+async function makeJwt(role: string) {
+  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
+    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
+    .setSubject("u1")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(signKey);
+}
+
+interface TableCfg {
+  list?: { data: unknown; error: unknown };
+  single?: { data: unknown; error: unknown };
+  maybeSingle?: { data: unknown; error: unknown };
+}
+
+function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error: unknown }) {
+  const calls = { inserts: [] as unknown[], updates: [] as unknown[], rpc: [] as { name: string; args: unknown }[] };
+  const from = vi.fn((table: string) => {
+    const cfg = byTable[table] ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const builder: any = {
+      select: vi.fn(() => builder),
+      insert: vi.fn((payload: unknown) => {
+        calls.inserts.push(payload);
+        return builder;
+      }),
+      update: vi.fn((payload: unknown) => {
+        calls.updates.push(payload);
+        return builder;
+      }),
+      eq: vi.fn(() => builder),
+      single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
+      maybeSingle: vi.fn(() => Promise.resolve(cfg.maybeSingle ?? { data: null, error: null })),
+      then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+        Promise.resolve(cfg.list ?? { data: [], error: null }).then(resolve, reject),
+    };
+    return builder;
+  });
+  const rpcFn = vi.fn((name: string, args: unknown) => {
+    calls.rpc.push({ name, args });
+    return Promise.resolve(rpc ?? { data: null, error: null });
+  });
+  return { from, rpc: rpcFn, calls };
+}
+
+/** Scriptable stand-in for the Stripe SDK client. */
+function makeStripe(overrides: Record<string, unknown> = {}) {
+  return {
+    webhooks: { constructEventAsync: vi.fn() },
+    paymentIntents: { retrieve: vi.fn().mockResolvedValue({ id: "pi_1", latest_charge: null }) },
+    checkout: {
+      sessions: {
+        create: vi.fn().mockResolvedValue({ id: "cs_test_abc", url: "https://checkout.stripe.com/c/cs_test_abc" }),
+        retrieve: vi.fn(),
+        expire: vi.fn().mockResolvedValue({}),
+      },
+    },
+    ...overrides,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+}
+
+beforeAll(async () => {
+  const kp = await generateKeyPair("ES256", { extractable: true });
+  signKey = kp.privateKey;
+  publicJwk = await exportJWK(kp.publicKey);
+  publicJwk.kid = KID;
+  publicJwk.alg = "ES256";
+  publicJwk.use = "sig";
+});
+
+beforeEach(() => {
+  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockReset();
+  vi.mocked(stripeClient).mockReset();
+});
+
+afterAll(() => _setJwksForTesting(null));
+
+const ORDER_ID = "00000000-0000-0000-0000-00000000010a";
+const ORDER = {
+  id: ORDER_ID,
+  so: 1174,
+  dl: 42,
+  dealer_id: "00000000-0000-0000-0000-0000000000dd",
+  status: "place",
+  paid: 500,
+  customer_name: "Tan",
+  customer_email: "tan@x.my",
+  order_lines: [{ unit_price: 1000, qty: 2 }],
+  order_addons: [{ unit_price: 100, qty: 1 }],
+}; // total 2100, outstanding 1600
+
+const SESSION_ROW = {
+  id: "row-1",
+  order_id: ORDER_ID,
+  session_id: "cs_test_abc",
+  payment_intent_id: null,
+  amount: 1600,
+  purpose: "order_balance",
+  url: "https://checkout.stripe.com/c/cs_test_abc",
+  status: "open",
+  payment_method_detail: null,
+  created_at: "2026-07-14T00:00:00Z",
+  expires_at: "2026-07-15T00:00:00Z",
+  paid_at: null,
+};
+
+// =====================================================================
+// POST /api/orders/:id/stripe/checkout
+// =====================================================================
+describe("POST /:id/stripe/checkout", () => {
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        body: JSON.stringify({ amount: 100 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("503 when Stripe keys are not configured", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 100 }),
+      }),
+      baseEnv,
+    );
+    expect(res.status).toBe(503);
+  });
+
+  it("403 for a partner role", async () => {
+    const jwt = await makeJwt("partner");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 100 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422 amount_exceeds_outstanding, with maxAmount in the body", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1600.5 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; maxAmount: number };
+    expect(body.code).toBe("amount_exceeds_outstanding");
+    expect(body.maxAmount).toBe(1600);
+  });
+
+  it("201 mints a session (sen amount, dashboard-controlled methods) and tracks it", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({
+      stripe_checkout_sessions: { single: { data: SESSION_ROW, error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1600 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { session: { sessionId: string; url: string; amount: number } };
+    expect(body.session.sessionId).toBe("cs_test_abc");
+    expect(body.session.url).toContain("checkout.stripe.com");
+    expect(body.session.amount).toBe(1600);
+
+    const createArgs = stripe.checkout.sessions.create.mock.calls[0][0];
+    expect(createArgs.line_items[0].price_data.unit_amount).toBe(160000); // RM → sen
+    expect(createArgs.payment_method_types).toBeUndefined(); // dashboard controls methods
+    expect(createArgs.success_url).toContain("https://web.test/pay/success");
+    expect(createArgs.metadata.order_id).toBe(ORDER_ID);
+    expect(admin.calls.inserts).toHaveLength(1);
+  });
+
+  it("expires the Stripe session when the tracker insert fails (no untracked payable link)", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({
+      stripe_checkout_sessions: { single: { data: null, error: { code: "XX000", message: "boom" } } },
+    });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 100 }),
+      }),
+      env,
+    );
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith("cs_test_abc");
+  });
+});
+
+// =====================================================================
+// GET /api/orders/:id/stripe/checkout/:sid — poll + live reconcile
+// =====================================================================
+describe("GET /:id/stripe/checkout/:sid", () => {
+  it("records via the RPC when Stripe says paid while the row is still open", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({
+      stripe_checkout_sessions: {
+        maybeSingle: { data: { ...SESSION_ROW }, error: null },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.checkout.sessions.retrieve.mockResolvedValue({
+      id: "cs_test_abc",
+      status: "complete",
+      payment_status: "paid",
+      payment_intent: { id: "pi_1", latest_charge: null },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout/cs_test_abc`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(admin.calls.rpc).toHaveLength(1);
+    expect(admin.calls.rpc[0].name).toBe("record_stripe_checkout_payment");
+    expect((admin.calls.rpc[0].args as { p_session_id: string }).p_session_id).toBe("cs_test_abc");
+  });
+
+  it("404 for a session id that is not ours", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({ stripe_checkout_sessions: { maybeSingle: { data: null, error: null } } });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout/cs_test_nope`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+// =====================================================================
+// POST /stripe/webhook — signature is the trust boundary
+// =====================================================================
+describe("POST /stripe/webhook", () => {
+  function hook(body: unknown, sig?: string) {
+    return new Request("http://t/stripe/webhook", {
+      method: "POST",
+      headers: sig ? { "stripe-signature": sig } : {},
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("503 when not configured", async () => {
+    const res = await app.fetch(hook({}, "sig"), baseEnv);
+    expect(res.status).toBe(503);
+  });
+
+  it("400 without a signature header", async () => {
+    const res = await app.fetch(hook({}), env);
+    expect(res.status).toBe(400);
+  });
+
+  it("400 on an invalid signature", async () => {
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockRejectedValue(new Error("bad sig"));
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+    const res = await app.fetch(hook({}, "bad"), env);
+    expect(res.status).toBe(400);
+  });
+
+  it("records a paid checkout.session.completed via the RPC", async () => {
+    const admin = makeSb({}, { data: { already: false }, error: null });
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_test_abc", payment_status: "paid", payment_intent: "pi_1" } },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const res = await app.fetch(hook({}, "good"), env);
+    expect(res.status).toBe(200);
+    expect(admin.calls.rpc).toHaveLength(1);
+    expect(admin.calls.rpc[0].name).toBe("record_stripe_checkout_payment");
+  });
+
+  it("does NOT record while an async payment is still pending", async () => {
+    const admin = makeSb({});
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_test_abc", payment_status: "unpaid", payment_intent: "pi_1" } },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const res = await app.fetch(hook({}, "good"), env);
+    expect(res.status).toBe(200);
+    expect(admin.calls.rpc).toHaveLength(0);
+  });
+
+  it("acknowledges (200) an unknown session so Stripe stops retrying it", async () => {
+    const admin = makeSb({}, { data: null, error: { message: "Unknown checkout session", details: "session_not_found" } });
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_live_foreign", payment_status: "paid", payment_intent: null } },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const res = await app.fetch(hook({}, "good"), env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ignored?: string };
+    expect(body.ignored).toBe("unknown_session");
+  });
+
+  it("500s on a real recording failure so Stripe retries", async () => {
+    const admin = makeSb({}, { data: null, error: { message: "db down", details: null } });
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_test_abc", payment_status: "paid", payment_intent: null } },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const res = await app.fetch(hook({}, "good"), env);
+    expect(res.status).toBe(500);
+  });
+
+  it("marks the tracker row expired on checkout.session.expired", async () => {
+    const admin = makeSb({ stripe_checkout_sessions: { list: { data: null, error: null } } });
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "checkout.session.expired",
+      data: { object: { id: "cs_test_abc" } },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+
+    const res = await app.fetch(hook({}, "good"), env);
+    expect(res.status).toBe(200);
+    expect(admin.calls.updates).toHaveLength(1);
+    expect(admin.calls.updates[0]).toEqual({ status: "expired" });
+  });
+});
