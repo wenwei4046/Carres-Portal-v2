@@ -762,19 +762,24 @@ export default function SofaBuildCanvas({
 
       {/* Body: palette | room */}
       <div className="flex min-h-0 flex-1">
-        {/* Left palette */}
+        {/* Left palette — prototype/pos-sofa-config.jsx structure: head strip,
+            then a scrolling list of groups with sticky burnt group heads. */}
         <aside
-          className="hidden w-64 shrink-0 flex-col overflow-y-auto p-3 md:flex"
+          className="hidden w-[280px] shrink-0 flex-col overflow-hidden md:flex"
           style={{ borderRight: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
           data-testid="sofa-build-palette"
         >
-          {palette.length === 0 && (
-            <p className="t-small text-base-500">This model has no offered compartments.</p>
-          )}
-          {palette.map(({ group, rows }) => (
-            <div key={group} className="mb-4">
-              <div className="pos-eyebrow mb-1.5" style={{ fontSize: 10 }}>{group}</div>
-              <div className="flex flex-col gap-2">
+          <div className="sof-cust__paletteHead">
+            <span className="pos-eyebrow">Modules</span>
+            <span className="sof-cust__paletteHint">Tap to add</span>
+          </div>
+          <div className="sof-cust__paletteList">
+            {palette.length === 0 && (
+              <p className="t-small text-base-500">This model has no offered compartments.</p>
+            )}
+            {palette.map(({ group, rows }) => (
+              <div key={group} className="sof-cust__paletteGroup">
+                <div className="sof-cust__paletteGroupHead">{group}</div>
                 {rows.map(({ pool, offered }) => (
                   <ModulePaletteItem
                     key={pool.id}
@@ -785,8 +790,8 @@ export default function SofaBuildCanvas({
                   />
                 ))}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </aside>
 
         {/* Center room */}
