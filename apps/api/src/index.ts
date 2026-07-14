@@ -75,6 +75,9 @@ import opsTasksRouter from "./routes/ops/tasks";
 import annotationsRouter, { escalationsRouter } from "./routes/operation/annotations";
 // Order activity history (P1) — the global cross-order activity feed.
 import activityRouter from "./routes/operation/activity";
+// Migration 0223 — Stripe online collection (POS checkout links + webhook).
+import stripeCheckoutRouter from "./routes/stripe-checkout";
+import stripeWebhookRouter from "./routes/stripe-webhook";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import type { AppEnv, Bindings } from "./types";
 
@@ -96,6 +99,10 @@ app.onError((err, c) => {
 });
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+// Stripe webhook — OUTSIDE the auth'd /api group (Stripe signs the request;
+// there is no Supabase JWT). Signature verification is the trust boundary.
+app.route("/stripe", stripeWebhookRouter);
 
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
@@ -125,6 +132,8 @@ api.route("/operation/orders", deliveryChainRouter);
 api.route("/operation/orders", orderControlRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate
 api.route("/operation/orders", orderPaymentsRouter);
+// 0223 Stripe online collection — POST/GET /orders/:id/stripe/checkout[/:sid]
+api.route("/orders", stripeCheckoutRouter);
 // 0166 bulk Mark-completed (AutoCount legacy cleanup) — POST /bulk-complete
 api.route("/operation/orders", bulkCompleteRouter);
 // 0165 Payments panel (Master Sheet "Balance" tab) — GET list

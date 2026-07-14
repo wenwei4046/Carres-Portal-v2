@@ -120,6 +120,8 @@ import {
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
+  type CreateStripeCheckoutInput,
+  type StripeCheckoutSessionInfo,
   type TransferReadyInput,
   type UpdateOrderInput,
   type WarehousePickInput,
@@ -149,6 +151,9 @@ export const qk = {
   dealerSelf:   () => ["dealers", "me"] as const,
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
   order:        (id: string) => ["orders", id] as const,
+  /** 0223 — one Stripe Checkout link's status poll (collect-online modal). */
+  stripeSession: (orderId: string, sessionId: string) =>
+    ["orders", orderId, "stripe-session", sessionId] as const,
   catalog:      () => ["catalog"] as const,
   /** 0201 — per-pool config-history snapshots. Nested under 'catalog' so every
    *  catalog mutation's ["catalog"] prefix-invalidation refreshes it too. */
@@ -882,6 +887,52 @@ export function useTopUpOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+/**
+ * useCreateStripeCheckout — POST /api/orders/:id/stripe/checkout (0223).
+ * Mints a Stripe Checkout link (QR at the counter / WhatsApp) for RM<amount>.
+ * The server re-validates amount ≤ outstanding; 422 codes:
+ * amount_exceeds_outstanding (body carries maxAmount) / already_paid /
+ * wrong_status. 503 = Stripe keys not configured yet.
+ */
+export function useCreateStripeCheckout(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ session: StripeCheckoutSessionInfo }, ApiError, CreateStripeCheckoutInput>>,
+) {
+  return useMutation<{ session: StripeCheckoutSessionInfo }, ApiError, CreateStripeCheckoutInput>({
+    mutationFn: (input) =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(`/api/orders/${orderId}/stripe/checkout`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+  });
+}
+
+/**
+ * useStripeCheckoutStatus — GET /api/orders/:id/stripe/checkout/:sid (0223).
+ * Polls one checkout link while the collect modal is open. While the session
+ * is 'open' the SERVER also live-reconciles against Stripe, so a counter
+ * payment lands within one poll even before the webhook endpoint exists.
+ * Callers watch data.session.status flip to 'paid' and then invalidate
+ * qk.order(orderId) + ["orders"] (the RPC moved orders.paid server-side).
+ */
+export function useStripeCheckoutStatus(
+  orderId: string,
+  sessionId: string | null,
+  opts?: { enabled?: boolean; refetchInterval?: number },
+) {
+  return useQuery<{ session: StripeCheckoutSessionInfo }, ApiError>({
+    queryKey: qk.stripeSession(orderId, sessionId ?? ""),
+    queryFn: () =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(
+        `/api/orders/${orderId}/stripe/checkout/${sessionId}`,
+      ),
+    enabled: !!sessionId && (opts?.enabled ?? true),
+    refetchInterval: opts?.refetchInterval ?? 4000,
+    refetchIntervalInBackground: false,
   });
 }
 
