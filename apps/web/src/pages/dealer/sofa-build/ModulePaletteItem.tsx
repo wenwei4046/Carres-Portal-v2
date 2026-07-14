@@ -12,7 +12,10 @@ import CompartmentSilhouette from "./CompartmentSilhouette";
  * the canvas (`onAdd(code)`).
  *
  * Purely presentational + a single callback — the canvas owns placement.
- * v17 card/button styling, Lucide Plus, no emoji.
+ * Skin = the pos-proto design contract (`.sof-cust__paletteItem`,
+ * prototype/pos-sofa-config.jsx): a paper card sitting ON the white rail so the
+ * card reads as a layer, orange hover ring, burnt price, orange `+` chip.
+ * Lucide Plus, no emoji.
  */
 
 function fmtRM(n: number): string {
@@ -35,33 +38,33 @@ export default function ModulePaletteItem({
   onAdd: (code: string) => void;
 }) {
   const price = resolveCompartmentPrice(offered, compartment, size);
+  // The prototype's sub line = the description minus its "CODE · " prefix.
+  const sub = compartment.description?.replace(`${compartment.code} · `, "");
 
   return (
     <button
       type="button"
       onClick={() => onAdd(compartment.code)}
       title={compartment.description ?? compartment.code}
-      className="group flex w-full items-center gap-3 rounded-[6px] border border-base-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-primary/60 hover:bg-base-50"
+      className="sof-cust__paletteItem"
       data-testid={`module-palette-item-${compartment.code}`}
     >
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center">
+      <span className="sof-cust__paletteArt">
         <CompartmentSilhouette
           code={compartment.code}
           iconUrl={compartment.iconUrl}
-          className="max-h-12 max-w-12"
+          className="max-h-full max-w-full"
         />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block t-small font-semibold font-mono text-base-900 truncate">
-          {compartment.code}
-        </span>
-        <span className="block t-tiny font-mono text-base-500">RM {fmtRM(price)}</span>
+      <span className="sof-cust__paletteInfo">
+        <span className="sof-cust__paletteLabel">{compartment.code}</span>
+        {sub && sub !== compartment.code && (
+          <span className="sof-cust__paletteSub">{sub}</span>
+        )}
+        <span className="sof-cust__palettePrice">RM {fmtRM(price)}</span>
       </span>
-      <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-base-900 text-white transition-colors group-hover:bg-primary"
-        aria-hidden="true"
-      >
-        <Plus size={15} strokeWidth={2.4} />
+      <span className="sof-cust__paletteAdd" aria-hidden="true">
+        <Plus size={14} strokeWidth={2.4} />
       </span>
     </button>
   );
