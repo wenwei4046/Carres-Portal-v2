@@ -1028,3 +1028,13 @@ export {
   type SoGridRow,
   type SoGridResponse,
 } from "./schemas/sales-order-maintenance";
+
+// Stripe online collection — POS checkout links (QR / WhatsApp) + webhook
+// auto-record (2026-07-14). See supabase/migrations/0223_stripe_checkout.sql.
+export {
+  createStripeCheckoutInputSchema,
+  STRIPE_SESSION_STATUSES,
+  type CreateStripeCheckoutInput,
+  type StripeSessionStatus,
+  type StripeCheckoutSessionInfo,
+} from "./schemas/stripe-checkout";

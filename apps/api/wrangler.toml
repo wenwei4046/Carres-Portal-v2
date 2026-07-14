@@ -19,11 +19,19 @@ crons = ["0 1 * * *"]
 [observability]
 enabled = true
 
+# Stripe Checkout success/cancel landing (0223). Secrets STRIPE_SECRET_KEY +
+# STRIPE_WEBHOOK_SECRET are set via `wrangler secret put <KEY> --env production`.
+[vars]
+PUBLIC_WEB_URL = "http://localhost:5173"
+
 # Production environment — deployed via `wrangler deploy --env production`.
 # Secrets are set per-env via `wrangler secret put <KEY> --env production`.
 # Custom routes (api.your-domain.com) deferred — using *.workers.dev for now.
 [env.production]
 name = "carres-portal-v2-api"
+
+[env.production.vars]
+PUBLIC_WEB_URL = "https://carres-portal.pages.dev"
 
 [env.production.observability]
 enabled = true

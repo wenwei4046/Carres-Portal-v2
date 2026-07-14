@@ -4201,4 +4201,56 @@
 .os-sumrow__val sup, .os-stat__num sup, .os-card__total-num sup,
 .os-item__price sup, .os-items__total sup, .os-pay__row sup { margin-right: 3px; }
 
-
+
+/* ---------- Stripe collect-online modal (0223, Loo 2026-07-14) ---------- */
+.os-stripe__overlay {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(34, 31, 32, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.os-stripe {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--pos-panel, #fff);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-3);
+  padding: 26px 28px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.os-stripe__close { position: absolute; top: 14px; right: 14px; }
+.os-stripe__eyebrow {
+  font-family: var(--font-button); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-burnt);
+}
+.os-stripe__title {
+  font-family: var(--font-title); font-weight: 700; font-size: 21px;
+  letter-spacing: -0.01em; line-height: 1.15; margin: 0;
+}
+.os-stripe__title sup { font-family: var(--font-button); font-size: 12px; font-weight: 700; color: var(--fg-muted); margin-right: 2px; }
+.os-stripe__sub { font-size: 13px; line-height: 1.5; color: var(--fg-muted); margin: 0; }
+.os-stripe__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.os-stripe__qr {
+  align-self: center;
+  padding: 14px;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  line-height: 0;
+}
+.os-stripe__waiting { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.os-stripe__spin { animation: os-stripe-spin 1.6s linear infinite; }
+@keyframes os-stripe-spin { to { transform: rotate(360deg); } }
+.os-stripe__actions { display: flex; gap: 10px; justify-content: center; }
+.os-stripe__hint { font-size: 11.5px; line-height: 1.45; color: var(--fg-soft); text-align: center; margin: 0; }
+.os-stripe__done { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 8px 0 2px; }
+.os-stripe__done svg { color: #2F8F4F; }
+.os-stripe__divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: var(--fg-soft);
+  letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+}
+.os-stripe__divider::before, .os-stripe__divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
