@@ -29,6 +29,9 @@ export interface ReserveFreeUnit {
   poNo: string | null;
   sourceRef: string | null;
   dateIn: string | null;
+  /** Warehouse location (§7.8 Location column) — optional: older API builds
+   *  don't return it; the grid shows "—" until they do. */
+  location?: string | null;
 }
 
 interface Props {

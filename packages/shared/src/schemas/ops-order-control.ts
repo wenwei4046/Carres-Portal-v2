@@ -201,13 +201,16 @@ export const opsOrderControlSchema = z.object({
 export type OpsOrderControl = z.infer<typeof opsOrderControlSchema>;
 
 // ── Storage fees ───────────────────────────────────────────────────────────
-/** Storage-fee rates (Jess 2026-06-12): mattress/bed frame RM150 per month,
- *  sofa a flat RM200 per order. Each category gets a FREE window of WORKING DAYS
- *  from the ORIGINAL delivery date (MS/BF 24, Sofa 14); the fee accrues only
- *  after that window (Jess 2026-06-30, the two Delivery-Extension forms). */
+/** Storage-fee rates (Jess 2026-07-13, UI-KIT §7.5 — supersedes the 2026-06-30
+ *  working-day-window framing): the fee runs over an explicit START→END window.
+ *  START = the operator's From date (auto-suggested as the next SAME WEEKDAY
+ *  after the delivery deadline, i.e. deadline + 7 days — see
+ *  `defaultStorageStart`); END = the actual delivery / collection date.
+ *  MS/BF = RM150 per commenced 30-day month over the window. Sofa = the first
+ *  14 days of the window free, then a flat one-time RM200. */
 export const STORAGE_RATES = {
-  msbf: { amount: 150, periodDays: 30, freeWorkingDays: 24, label: "RM150 / month" },
-  sof: { amount: 200, freeWorkingDays: 14, label: "RM200 / order" },
+  msbf: { amount: 150, periodDays: 30, label: "RM150 / month" },
+  sof: { amount: 200, freeDays: 14, label: "free 14 days, then RM200" },
 } as const;
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -217,39 +220,38 @@ function daysBetween(fromIso: string, toIso: string): number {
   return Math.floor((b - a) / 86_400_000);
 }
 
-/** The date `n` working days (Mon–Fri; weekends skipped, public holidays NOT
- *  excluded in v1) after `fromIso`. The basis date itself is day 0, so the
- *  returned date is the LAST free day — storage is free through it and accrues
- *  the day after. */
-function addWorkingDays(fromIso: string, n: number): string {
+function addDays(fromIso: string, n: number): string {
   const s = fromIso.slice(0, 10);
   const [y, m, dd] = s.split("-").map(Number);
   // UTC throughout so toISOString() doesn't shift the date across the local
   // (MYT, UTC+8) offset.
   const d = new Date(Date.UTC(y, (m ?? 1) - 1, dd ?? 1));
   if (Number.isNaN(d.getTime())) return s;
-  let added = 0;
-  while (added < n) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const dow = d.getUTCDay();
-    if (dow !== 0 && dow !== 6) added++;
-  }
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 
+/** The default storage START for a delivery deadline (UI-KIT §7.5): the next
+ *  SAME WEEKDAY after the deadline — deadline Mon 1 Jan → start Mon 8 Jan.
+ *  Exactly deadline + 7 days. null in → null out. */
+export function defaultStorageStart(deadlineIso: string | null): string | null {
+  if (!deadlineIso || !/^\d{4}-\d{2}-\d{2}/.test(deadlineIso)) return null;
+  return addDays(deadlineIso, 7);
+}
+
 /**
- * Storage fee owed as of `asOf`, given `startDate` = the order's ORIGINAL
- * delivery date (basis), per the two Delivery-Extension forms (Jess 2026-06-30):
+ * Storage fee owed over the window START (`startDate`) → END (`asOf` — pass the
+ * actual delivery/collection date when known, else today while still accruing),
+ * per UI-KIT §7.5 (Jess 2026-07-13):
  *
- *  - Each category is FREE for a window of WORKING DAYS from `startDate`
- *    (MS/BF 24, Sofa 14) — `freeUntilMsbf` / `freeUntilSof` are the last free day.
- *  - After the window, MS/BF bills RM150 per commenced 30-day month counted from
- *    the free-until date (`msbfMonths` = how many).
- *  - After the window, Sofa bills a flat ONE-TIME RM200 per order (never recurs;
- *    `sofCharged` flags it).
+ *  - MS/BF bills RM150 per commenced 30-day month over the window
+ *    (`msbfMonths` = how many). Any window > 0 days commences the first month.
+ *  - Sofa is FREE for the window's first 14 days (`freeUntilSof` = last free
+ *    day), then bills a flat ONE-TIME RM200 (never recurs; `sofCharged`).
  *
  * An order can carry both (separate MS/BF + SOF columns on the Master Sheet), so
- * they sum. 0 before the basis date or while still inside a free window.
+ * they sum. 0 with no START or while END ≤ START. `freeUntilMsbf` is the START
+ * itself (MS/BF has no free window — the grace week lives in the START rule).
  */
 export function computeStorageFee(opts: {
   startDate: string | null;
@@ -278,16 +280,15 @@ export function computeStorageFee(opts: {
     sofCharged: false,
   };
   if (!startDate) return empty;
-  const days = daysBetween(startDate, asOf);
+  const days = Math.max(0, daysBetween(startDate, asOf));
 
   let msbf = 0;
   let msbfMonths = 0;
   let freeUntilMsbf: string | null = null;
   if (hasMsbf) {
-    freeUntilMsbf = addWorkingDays(startDate, STORAGE_RATES.msbf.freeWorkingDays);
-    const overdueDays = daysBetween(freeUntilMsbf, asOf);
-    if (overdueDays > 0) {
-      msbfMonths = Math.ceil(overdueDays / STORAGE_RATES.msbf.periodDays);
+    freeUntilMsbf = startDate.slice(0, 10);
+    if (days > 0) {
+      msbfMonths = Math.ceil(days / STORAGE_RATES.msbf.periodDays);
       msbf = msbfMonths * STORAGE_RATES.msbf.amount;
     }
   }
@@ -296,7 +297,7 @@ export function computeStorageFee(opts: {
   let sofCharged = false;
   let freeUntilSof: string | null = null;
   if (hasSof) {
-    freeUntilSof = addWorkingDays(startDate, STORAGE_RATES.sof.freeWorkingDays);
+    freeUntilSof = addDays(startDate, STORAGE_RATES.sof.freeDays);
     if (daysBetween(freeUntilSof, asOf) > 0) {
       sof = STORAGE_RATES.sof.amount;
       sofCharged = true;

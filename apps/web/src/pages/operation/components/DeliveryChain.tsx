@@ -6,7 +6,14 @@ import {
   useSetDeliveryChain,
   usePatchDeliveryStop,
 } from "@/lib/queries";
-import type { DeliveryStop, DeliveryStopStatus } from "@carres/shared";
+import {
+  STOCK_LOCATIONS,
+  type DeliveryStop,
+  type DeliveryStopStatus,
+} from "@carres/shared";
+
+/** Real leg places (§7.6): the known warehouses/suppliers + the customer. */
+const LEG_LOCATIONS = [...STOCK_LOCATIONS, "Customer"] as const;
 
 /**
  * DeliveryChain — multi-leg delivery timeline for the Order detail drawer.
@@ -458,21 +465,39 @@ function AddLegForm({
           </option>
         ))}
       </select>
+      {/* §7.6 — legs use REAL locations (warehouse / supplier / customer),
+          not free text. A previous leg's custom destination stays pickable. */}
       <div className="grid grid-cols-2 gap-2">
-        <input
-          type="text"
-          className="rounded border border-base-300 px-2 py-1 text-xs"
-          placeholder="From (e.g. JB transit)"
+        <select
+          className="rounded border border-base-300 px-2 py-1 text-xs bg-white"
+          aria-label="Leg from"
           value={fromLoc}
           onChange={(e) => setFromLoc(e.target.value)}
-        />
-        <input
-          type="text"
-          className="rounded border border-base-300 px-2 py-1 text-xs"
-          placeholder="To (e.g. Customer @ SG)"
+        >
+          <option value="">From…</option>
+          {!!fromLoc &&
+            !LEG_LOCATIONS.includes(fromLoc as (typeof LEG_LOCATIONS)[number]) && (
+              <option value={fromLoc}>{fromLoc}</option>
+            )}
+          {LEG_LOCATIONS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <select
+          className="rounded border border-base-300 px-2 py-1 text-xs bg-white"
+          aria-label="Leg to"
           value={toLoc}
           onChange={(e) => setToLoc(e.target.value)}
-        />
+        >
+          <option value="">To…</option>
+          {LEG_LOCATIONS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex justify-end gap-2">
         <button

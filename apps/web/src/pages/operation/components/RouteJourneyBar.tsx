@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   Building2,
-  Check,
   Factory,
   MapPin,
   Plus,
@@ -9,7 +8,7 @@ import {
   Trash2,
   Warehouse,
 } from "lucide-react";
-import { STOCK_LOCATIONS, type OrderRouteLeg } from "@carres/shared";
+import { STOCK_LOCATIONS } from "@carres/shared";
 
 /**
  * RouteJourneyBar — the per-item transfer "Option D" design (Jess 2026-07-11,
@@ -191,79 +190,59 @@ export function RouteQuietButton({
 }
 
 /**
- * Map STORED legs (migration 0216 `line_legs`, {from,to,carrier,done}) to DISPLAY
- * legs for the bar: done → green, the first not-done → blue (moving), rest → grey.
+ * Map STORED route STOPS to DISPLAY legs for the bar. A route is an ORDERED
+ * list of real locations riding `ops_order_control.line_locations[sku]`
+ * (UI-KIT §7.6 / bug-0 fix 2026-07-13: the deployed order-control schema
+ * accepts `line_locations: Record<sku, string[]>`; the richer `line_legs`
+ * {from,to,carrier,done} shape is deploy-gated, so routes are modelled as
+ * stops — stop[0] = the item's current/default location, each further stop =
+ * the next transfer hop). Consecutive stops become legs; all read "pending"
+ * (no per-leg done tracking in the stop shape).
  */
-export function legsToDisplay(legs: OrderRouteLeg[]): RouteLeg[] {
-  let firstOpen = true;
-  return legs.map((l) => {
-    let status: JourneyStatus;
-    if (l.done) status = "done";
-    else if (firstOpen) {
-      status = "moving";
-      firstOpen = false;
-    } else status = "pending";
-    return { from: l.from, to: l.to, carrier: l.carrier, status };
-  });
+export function stopsToDisplay(stops: string[]): RouteLeg[] {
+  const legs: RouteLeg[] = [];
+  for (let i = 0; i + 1 < stops.length; i++) {
+    legs.push({ from: stops[i], to: stops[i + 1], carrier: null, status: "pending" });
+  }
+  return legs;
 }
 
-// Route = INBOUND pickup legs only (Jess 2026-07-11) — getting an item INTO the
+// Route = INBOUND pickup stops only (Jess 2026-07-11) — getting an item INTO the
 // consolidation warehouse. The final delivery to the customer is the Delivery
-// panel's job, so "Customer" is deliberately NOT a leg destination here.
+// panel's job, so "Customer" is deliberately NOT a stop here.
 const LEG_PLACES = [...STOCK_LOCATIONS] as const;
 
 /**
- * The in-place transfer-leg editor (Jess 2026-07-11 Route "Option D" — the real
- * Add-leg). Each row = from → to · partner · done, with remove; "Add leg" appends
- * a hop ending at the consolidation warehouse. The carrier of a leg is a real
- * delivery PARTNER (same list the Delivery panel uses — so AL is pickable), not a
- * separate invented set. Persisted to line_legs via the form.
+ * The in-place route STOPS editor (UI-KIT §7.6 — replaces the leg-object
+ * editor so routes SAVE against the live order-control schema). Each row is a
+ * real location; "+ Add stop" appends the consolidation warehouse. One stop =
+ * the standard single location; more = a multi-hop transfer.
  */
-export function RouteLegEditor({
-  legs,
+export function StopsEditor({
+  stops,
   onChange,
-  partners,
 }: {
-  legs: OrderRouteLeg[];
-  onChange: (legs: OrderRouteLeg[]) => void;
-  /** Delivery-partner names (NETS / AL / HOUZS / …) — the leg's carrier options. */
-  partners: string[];
+  stops: string[];
+  onChange: (stops: string[]) => void;
 }) {
-  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
-  const update = (i: number, patch: Partial<OrderRouteLeg>) =>
-    onChange(legs.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const add = () => {
-    const from = legs.length ? legs[legs.length - 1].to : "at-supplier";
-    onChange([
-      ...legs,
-      { from, to: "Carres Klang", carrier: null, done: false },
-    ]);
-  };
+  const halt = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const shown = stops.length > 0 ? stops : ["Carres Klang"];
+  const update = (i: number, v: string) =>
+    onChange(shown.map((s, j) => (j === i ? v : s)));
   const sel =
     "border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[11px] focus:border-primary focus:outline-none";
   return (
     <div className="space-y-1.5">
-      {legs.map((leg, i) => (
-        <div key={i} className="flex items-center gap-1 flex-wrap text-[11px]">
-          <button
-            type="button"
-            onClick={(e) => {
-              stop(e);
-              update(i, { done: !leg.done });
-            }}
-            title={leg.done ? "Done" : "Mark done"}
-            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-              leg.done
-                ? "bg-[#16A34A] border-[#16A34A] text-white"
-                : "border-base-300 text-transparent"
-            }`}
-          >
-            <Check className="w-3 h-3" strokeWidth={3} />
-          </button>
+      {shown.map((s, i) => (
+        <div key={i} className="flex items-center gap-1.5 text-[11px]">
+          <span className="w-4 text-right text-base-300 tabular-nums shrink-0">
+            {i + 1}.
+          </span>
+          <PlaceIcon loc={s} className="w-3.5 h-3.5 shrink-0 text-base-400" />
           <select
-            value={leg.from}
-            onClick={stop}
-            onChange={(e) => update(i, { from: e.target.value })}
+            value={s}
+            onClick={halt}
+            onChange={(e) => update(i, e.target.value)}
             className={sel}
           >
             {LEG_PLACES.map((p) => (
@@ -271,55 +250,35 @@ export function RouteLegEditor({
                 {p}
               </option>
             ))}
+            {!LEG_PLACES.includes(s as (typeof LEG_PLACES)[number]) && (
+              <option value={s}>{s}</option>
+            )}
           </select>
-          <span className="text-base-300">→</span>
-          <select
-            value={leg.to}
-            onClick={stop}
-            onChange={(e) => update(i, { to: e.target.value })}
-            className={sel}
-          >
-            {LEG_PLACES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            value={leg.carrier ?? ""}
-            onClick={stop}
-            onChange={(e) => update(i, { carrier: e.target.value || null })}
-            className={sel}
-          >
-            <option value="">partner…</option>
-            {partners.map((carr) => (
-              <option key={carr} value={carr}>
-                {carr}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={(e) => {
-              stop(e);
-              onChange(legs.filter((_, j) => j !== i));
-            }}
-            title="Remove leg"
-            className="text-base-300 hover:text-danger shrink-0 ml-auto"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {i < shown.length - 1 && <span className="text-base-300">↓</span>}
+          {shown.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                halt(e);
+                onChange(shown.filter((_, j) => j !== i));
+              }}
+              title="Remove stop"
+              className="text-base-300 hover:text-danger shrink-0 ml-auto"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       ))}
       <button
         type="button"
         onClick={(e) => {
-          stop(e);
-          add();
+          halt(e);
+          onChange([...shown, "Carres Klang"]);
         }}
         className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
       >
-        <Plus className="w-3 h-3" /> Add leg
+        <Plus className="w-3 h-3" /> Add stop
       </button>
     </div>
   );

@@ -3,7 +3,6 @@ import {
   CornerUpLeft,
   Factory,
   Home,
-  Plus,
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +13,9 @@ import {
   useReturnLoanSupplier,
   type SupplierRow,
 } from "@/lib/queries";
+import { lineCategory } from "@/lib/line-category";
+import { fmtDate } from "@/lib/fmt-date";
+import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
 /**
  * LoanPanel — the "Option B" loaner panel (Jess 2026-07-11), the SAME wordless
@@ -111,10 +113,21 @@ export default function LoanPanel({
   orderId,
   loans,
   suppliers,
+  freeUnits = [],
+  orderCategories = [],
+  onLend,
 }: {
   orderId: string;
   loans: SofaLoanDto[];
   suppliers: SupplierRow[];
+  /** ALL free warehouse units (the panel scopes them to the order's
+   *  categories) — the "my warehouse free stock" lend source (§7.9). */
+  freeUnits?: ReserveFreeUnit[];
+  /** The order's core categories (mattress/bedframe/sofa) — the same-category
+   *  filter for the warehouse lend list. */
+  orderCategories?: string[];
+  /** Lend a picked warehouse unit (opens the loan-DO prompt in the parent). */
+  onLend?: (itemId: string, sku: string) => void;
 }) {
   const active = loans.filter((l) => l.status === "on_loan");
   // Supplier loans still owed back even after the customer swap.
@@ -125,12 +138,19 @@ export default function LoanPanel({
   const returnSupplier = useReturnLoanSupplier(orderId);
   const borrow = useBorrowLoan(orderId);
 
-  const [showBorrow, setShowBorrow] = useState(false);
+  // §7.9 — From ▾ source selector: warehouse free stock | borrow from supplier.
+  const [source, setSource] = useState<"" | "warehouse" | "supplier">("");
   const [supplierId, setSupplierId] = useState("");
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState("");
+  const [expectedReturn, setExpectedReturn] = useState("");
 
   const visible = [...active, ...owed.filter((l) => l.status === "returned")];
+
+  // Same-CATEGORY free units for the warehouse path — any free piece in one of
+  // the order's core categories can stand in as a loaner.
+  const catSet = new Set(orderCategories);
+  const lendable = freeUnits.filter((u) => catSet.has(lineCategory(u.sku)));
 
   function submitBorrow() {
     if (!supplierId || !label.trim()) {
@@ -142,14 +162,17 @@ export default function LoanPanel({
         supplierId,
         borrowedLabel: label.trim(),
         category: category.trim() || undefined,
+        // Expected return rides notes until it gets a real column (deploy-gated).
+        notes: expectedReturn ? `expected return ${expectedReturn}` : undefined,
       },
       {
         onSuccess: () => {
           toast.success("Borrowed — loaner out, owe the supplier a piece");
-          setShowBorrow(false);
+          setSource("");
           setSupplierId("");
           setLabel("");
           setCategory("");
+          setExpectedReturn("");
         },
         onError: (e) => toast.error(e.message),
       },
@@ -161,7 +184,7 @@ export default function LoanPanel({
 
   return (
     <div className="p-3 space-y-2">
-      {visible.length === 0 && !showBorrow && (
+      {visible.length === 0 && source === "" && (
         <p className="text-[11px] text-base-400">
           No loaner out. Lend a substitute if the real piece isn't ready and the
           customer can't wait.
@@ -215,7 +238,64 @@ export default function LoanPanel({
         </div>
       ))}
 
-      {showBorrow ? (
+      {/* §7.9 — From ▾ source selector. */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-base-500 shrink-0">From</span>
+        <select
+          value={source}
+          onChange={(e) =>
+            setSource(e.target.value as "" | "warehouse" | "supplier")
+          }
+          aria-label="Loaner source"
+          className={`${field} flex-1`}
+        >
+          <option value="">— pick a loan source —</option>
+          <option value="warehouse">
+            My warehouse free stock ({lendable.length})
+          </option>
+          <option value="supplier">Borrow from supplier</option>
+        </select>
+      </div>
+
+      {/* Warehouse path: same-category free units → pick → Lend out. */}
+      {source === "warehouse" && (
+        <div className="rounded-md border border-base-200 p-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-base-500">
+            Free stock · same category
+          </div>
+          {lendable.length === 0 && (
+            <p className="text-[11px] text-base-400">
+              No free unit in this order&rsquo;s categories — borrow from a
+              supplier instead.
+            </p>
+          )}
+          {lendable.map((u) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-2 text-[11px] border-b border-base-100 last:border-b-0 py-1"
+            >
+              <span className="font-mono text-base-900 truncate flex-1" title={u.sku}>
+                {u.sku}
+              </span>
+              <span className="text-base-400 shrink-0">
+                {u.dateIn ? `in ${fmtDate(u.dateIn).split(", ")[0]}` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => onLend?.(u.id, u.sku)}
+                disabled={!onLend}
+                title="Issue a loan DO + mark this unit on-loan to the order"
+                className="btn-secondary text-[10px] py-0.5 px-2 shrink-0"
+              >
+                Lend out
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Supplier path: supplier + piece + category → Borrow + loan out. */}
+      {source === "supplier" && (
         <div className="rounded-md border border-base-200 p-2 space-y-1.5">
           <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
             Borrow from supplier
@@ -244,10 +324,20 @@ export default function LoanPanel({
             placeholder="Category (optional) — mattress / sofa / bedframe"
             className={`${field} w-full`}
           />
+          <label className="flex items-center gap-2 text-[11px] text-base-500">
+            <span className="shrink-0">Expected return</span>
+            <input
+              type="date"
+              value={expectedReturn}
+              onChange={(e) => setExpectedReturn(e.target.value)}
+              aria-label="Expected return to supplier"
+              className={`${field} flex-1`}
+            />
+          </label>
           <div className="flex items-center justify-end gap-2 pt-0.5">
             <button
               type="button"
-              onClick={() => setShowBorrow(false)}
+              onClick={() => setSource("")}
               className="btn-ghost text-[11px]"
             >
               Cancel
@@ -262,14 +352,6 @@ export default function LoanPanel({
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowBorrow(true)}
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="w-3 h-3" /> Borrow from supplier
-        </button>
       )}
     </div>
   );

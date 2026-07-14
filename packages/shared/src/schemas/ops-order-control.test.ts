@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeStorageFee,
+  defaultStorageStart,
   STORAGE_RATES,
   storageCategoryForSku,
   orderStorageScope,
@@ -11,23 +12,34 @@ import {
 } from "./ops-order-control";
 
 /**
- * Storage-fee rules (Jess 2026-06-30, the two Delivery-Extension Google Forms —
- * supersedes the old "from ETA, per commenced period" framing): a FREE window of
- * WORKING DAYS from the ORIGINAL delivery date, then a fee. MS/BF = 24 working
- * days free → then RM150 per commenced 30-day month. Sofa = 14 working days free
- * → then a flat one-time RM200 per order (does NOT recur).
- *
- * Reference dates below anchor on Mon 2026-06-01 (a Monday) so the working-day
- * counts are easy to verify: from Mon Jun 1, +24 working days = Fri 2026-07-03,
- * +14 working days = Fri 2026-06-19 (weekends skipped, public holidays NOT
- * excluded in v1).
+ * Storage-fee rules (Jess 2026-07-13, UI-KIT §7.5 — supersedes the 2026-06-30
+ * working-day-window framing): the fee runs over an explicit START→END window.
+ * START = the operator's From (auto-suggested = the next SAME WEEKDAY after the
+ * delivery deadline, i.e. deadline + 7 days); END = the actual delivery /
+ * collection date. MS/BF = RM150 per commenced 30-day month over the window.
+ * Sofa = the window's first 14 days free, then a flat one-time RM200.
  */
+describe("defaultStorageStart", () => {
+  it("is the next same weekday AFTER the deadline (deadline + 7 days)", () => {
+    // Thu 2026-01-01 → Thu 2026-01-08 (the kit's example shape: Mon → next Mon).
+    expect(defaultStorageStart("2026-01-01")).toBe("2026-01-08");
+    // Mon 2026-06-01 → Mon 2026-06-08.
+    expect(defaultStorageStart("2026-06-01")).toBe("2026-06-08");
+    // Month/year rollover.
+    expect(defaultStorageStart("2026-12-28")).toBe("2027-01-04");
+  });
+  it("null / malformed in → null out", () => {
+    expect(defaultStorageStart(null)).toBeNull();
+    expect(defaultStorageStart("01/06/2026")).toBeNull();
+  });
+});
+
 describe("computeStorageFee", () => {
   it("is zero with no start date", () => {
     expect(computeStorageFee({ startDate: null, asOf: "2026-06-10", hasMsbf: true, hasSof: true }).total).toBe(0);
   });
 
-  it("is zero on / before the basis date", () => {
+  it("is zero while END ≤ START (charge only START→END)", () => {
     expect(
       computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-01", hasMsbf: true, hasSof: true }).total,
     ).toBe(0);
@@ -36,41 +48,32 @@ describe("computeStorageFee", () => {
     ).toBe(0);
   });
 
-  it("is zero throughout each category's free working-day window", () => {
-    // MS/BF: free through Fri 2026-07-03 (24 working days from Mon Jun 1).
-    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-07-03", hasMsbf: true, hasSof: false }).msbf).toBe(0);
-    // Sofa: free through Fri 2026-06-19 (14 working days).
-    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-19", hasMsbf: false, hasSof: true }).sof).toBe(0);
-  });
-
-  it("exposes the free-until date per category", () => {
-    const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-10", hasMsbf: true, hasSof: true });
-    expect(r.freeUntilMsbf).toBe("2026-07-03");
-    expect(r.freeUntilSof).toBe("2026-06-19");
-  });
-
-  it("charges MS/BF RM150 per commenced month AFTER the free window", () => {
-    // 1 day past the free-until (2026-07-04) → first month started → RM150
-    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-07-04", hasMsbf: true, hasSof: false }).msbf).toBe(150);
-    // exactly 30 days past free-until (2026-08-02) → still 1 month
-    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-08-02", hasMsbf: true, hasSof: false }).msbf).toBe(150);
-    // 31 days past free-until (2026-08-03) → 2nd month started → RM300
-    const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-08-03", hasMsbf: true, hasSof: false });
+  it("charges MS/BF RM150 per commenced month over the window", () => {
+    // Any window > 0 days commences the first month.
+    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-02", hasMsbf: true, hasSof: false }).msbf).toBe(150);
+    // Exactly 30 days → still the first month.
+    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-07-01", hasMsbf: true, hasSof: false }).msbf).toBe(150);
+    // 31 days → 2nd month commenced → RM300.
+    const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-07-02", hasMsbf: true, hasSof: false });
     expect(r.msbf).toBe(300);
     expect(r.msbfMonths).toBe(2);
   });
 
-  it("charges sofa a flat one-time RM200 after its free window (never recurs)", () => {
-    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-20", hasMsbf: false, hasSof: true }).sof).toBe(200);
-    // months later → STILL just RM200 (flat per order, not per period)
+  it("sofa is free for the window's first 14 days, then a flat one-time RM200", () => {
+    // Day 14 of the window (2026-06-15) → still free.
+    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-15", hasMsbf: false, hasSof: true }).sof).toBe(0);
+    // Day 15 → charged.
+    expect(computeStorageFee({ startDate: "2026-06-01", asOf: "2026-06-16", hasMsbf: false, hasSof: true }).sof).toBe(200);
+    // Months later → STILL just RM200 (flat per order, never recurs).
     const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-12-01", hasMsbf: false, hasSof: true });
     expect(r.sof).toBe(200);
     expect(r.sofCharged).toBe(true);
+    expect(r.freeUntilSof).toBe("2026-06-15");
   });
 
-  it("sums both categories once both are past their free windows", () => {
-    // 2026-08-03: MS/BF 2 months (RM300) + Sofa flat (RM200)
-    const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-08-03", hasMsbf: true, hasSof: true });
+  it("sums both categories", () => {
+    // 2026-07-02: MS/BF 2 months (RM300) + Sofa past its 14 free days (RM200).
+    const r = computeStorageFee({ startDate: "2026-06-01", asOf: "2026-07-02", hasMsbf: true, hasSof: true });
     expect(r.msbf).toBe(300);
     expect(r.sof).toBe(200);
     expect(r.total).toBe(500);
@@ -81,12 +84,11 @@ describe("computeStorageFee", () => {
     expect(r.total).toBe(0);
   });
 
-  it("exposes the agreed rates + free windows", () => {
+  it("exposes the agreed rates", () => {
     expect(STORAGE_RATES.msbf.amount).toBe(150);
     expect(STORAGE_RATES.msbf.periodDays).toBe(30);
-    expect(STORAGE_RATES.msbf.freeWorkingDays).toBe(24);
     expect(STORAGE_RATES.sof.amount).toBe(200);
-    expect(STORAGE_RATES.sof.freeWorkingDays).toBe(14);
+    expect(STORAGE_RATES.sof.freeDays).toBe(14);
   });
 });
 
