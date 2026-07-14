@@ -29,9 +29,17 @@ PUBLIC_WEB_URL = "http://localhost:5173"
 # Custom routes (api.your-domain.com) deferred — using *.workers.dev for now.
 [env.production]
 name = "carres-portal-v2-api"
+# Custom domain cutover (Loo 2026-07-14, carresofficial.com on Cloudflare).
+# workers_dev pinned ON so the old *.workers.dev URL keeps serving the already-
+# deployed web bundle during/after the cutover (2990s 2026-06-15 lesson: adding
+# a domain silently disables workers.dev otherwise).
+workers_dev = true
+routes = [
+  { pattern = "api.carresofficial.com", custom_domain = true }
+]
 
 [env.production.vars]
-PUBLIC_WEB_URL = "https://carres-portal.pages.dev"
+PUBLIC_WEB_URL = "https://pos.carresofficial.com"
 
 [env.production.observability]
 enabled = true
