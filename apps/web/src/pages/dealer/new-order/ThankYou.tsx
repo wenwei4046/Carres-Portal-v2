@@ -110,13 +110,21 @@ export default function ThankYou({
             . The order sits in <strong>Place</strong> until it's proceeded; operation takes it
             from there.
           </p>
+          {collected > 0 && (
+            <div className="confirm__paidbar" data-testid="thankyou-stripe-collected">
+              <CheckCircle2 size={26} strokeWidth={2} />
+              <div>
+                <div className="confirm__paidbar-amt">
+                  RM {collected.toLocaleString("en-MY")} collected online
+                </div>
+                <div className="confirm__paidbar-sub">
+                  Recorded automatically · Stripe receipt saved for finance
+                </div>
+              </div>
+            </div>
+          )}
           <div className="confirm__cta-row">
-            {collected > 0 ? (
-              <span className="confirm__collected" data-testid="thankyou-stripe-collected">
-                <CheckCircle2 size={16} strokeWidth={2} />
-                RM {collected.toLocaleString("en-MY")} collected online
-              </span>
-            ) : (stripeCollectAmount ?? 0) > 0 ? (
+            {collected === 0 && (stripeCollectAmount ?? 0) > 0 && (
               <button
                 type="button"
                 className="btn btn--primary btn--lg"
@@ -126,7 +134,7 @@ export default function ThankYou({
                 <QrCode size={16} strokeWidth={2} />
                 Collect RM {stripeCollectAmount!.toLocaleString("en-MY")} online
               </button>
-            ) : null}
+            )}
             <button type="button" className="btn btn--primary btn--lg" onClick={onNewOrder}>
               <Plus size={16} strokeWidth={2} />
               New order
