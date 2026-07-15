@@ -4,19 +4,13 @@
 
 @layer base {
   :root {
-    /* ===== Carres UI v17 (locked 2026-06-09) — clean modern SaaS + Carres warmth.
-     * Token NAMES are unchanged from the warm-linen system, so every component
-     * (bg-base-*, text-primary, bg-card, status badges…) re-themes with ZERO
-     * churn — only the VALUES flip:
-     *   • neutrals  → Tailwind cool gray
-     *   • brand     → flame (#C44D2B)
-     *   • status    → bright semantic
-     *   • page bg   → kept CREAM for Carres warmth (v17 page-bg option B)
-     *   • cards     → white (hierarchy now from borders + subtle shadow, not
-     *                 stacked cream layers)
-     * Approved by Loo via side-by-side preview 2026-06-09. */
-    --background: 38 33% 94%;          /* #F5F1EA — Carres cream page */
-    --foreground: 221 39% 11%;         /* gray-900 ink */
+    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/CARRES_UI_KIT_V4.md) — overwrites
+     * all prior baselines (v17 cream et al). White content base; brand colour
+     * only in the left nav; colour = action/selection/status/alert ONLY.
+     * Token NAMES unchanged (zero component churn) — VALUES follow v4.
+     * design-standard.ts is the machine-readable mirror. */
+    --background: 51.4 18.9% 92.7%;    /* #F0EFE9 — v4 canvas grey (was cream) */
+    --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */
     --card-foreground: 221 39% 11%;
@@ -89,6 +83,15 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+  /* UI-KIT v4 §3 — numbers / codes / money / phone never confuse 0 and o:
+   * every monospace surface renders the SLASHED zero (JetBrains Mono `zero`
+   * feature) + tabular figures. */
+  code,
+  kbd,
+  .font-mono {
+    font-feature-settings: "zero" 1;
+    font-variant-numeric: slashed-zero tabular-nums;
+  }
 }
 
 @layer components {
@@ -98,8 +101,23 @@
    * CODES (SKU, model key, compartment, dimensions) stay `font-mono`. */
   .t-num {
     @apply font-medium;
-    font-variant-numeric: lining-nums tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums slashed-zero;
+    font-feature-settings: "zero" 1;
   }
+
+  /* ===== ⭐ UI-KIT v4 type ramp (§3) — Inter, layer by WEIGHT not size.
+   * Most content sits at 14–15; ONLY page title (24) + hero number (20)
+   * rise above. REF and SO same size — distinguish by weight/colour.
+   * The old `.t-h*` ramp below is DEPRECATED (v4 supersedes it) — swap each
+   * page onto `.t4-*` during the page-by-page alignment; do not use `.t-h*`
+   * in NEW code. */
+  .t4-page-title { @apply text-[24px] font-semibold text-foreground; }         /* largest — nothing exceeds */
+  .t4-hero-num   { @apply text-[20px] font-bold text-foreground; }             /* e.g. Outstanding */
+  .t4-section    { @apply text-[16px] font-semibold text-foreground; }         /* ITEMS ORDERED … */
+  .t4-content    { @apply text-[15px] font-medium text-foreground; }           /* REF / customer / date / amount */
+  .t4-secondary  { @apply text-[14px] font-normal text-base-500; }             /* secondary info */
+  .t4-label      { @apply text-[12px] font-medium uppercase text-[#A8A8A8]; }  /* panel label / table header */
+  .t4-caption    { @apply text-[12px] font-normal text-[#A8A8A8]; }            /* meta */
 
   /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
    * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
@@ -186,6 +204,8 @@
   /* v17 type scale (spec NOTES v17 §TYPOGRAPHY SIZES) — one class per role so
    * pages stop hand-rolling `text-[Npx] font-* tracking-*`. Colour stays on the
    * element (these set size/weight/tracking only). */
+  /* DEPRECATED ramp (pre-v4) — kept alive so unaligned pages don't break;
+   * every page moves to the `.t4-*` ramp above during v4 alignment. */
   .t-h1    { @apply text-[32px] font-bold tracking-[-0.02em] leading-[1.05]; }
   .t-h2    { @apply text-[24px] font-bold tracking-[-0.01em]; }
   .t-h3    { @apply text-[18px] font-semibold; }
@@ -204,14 +224,15 @@
    * same box geometry (no height jump when they sit side by side). */
   .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
-  .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue */
-  .pill-confirmed { background:#D6EFD9; border-color:#A9D8B0; color:#166534; } /* ready — green */
+  .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue (LEGACY: v4 blue = selection; realign per page) */
+  /* ⭐ UI-KIT v4 §6 — the three semantic pills: soft tint + dark same-hue text. */
+  .pill-confirmed { background:#EAF3DE; color:#3B6D11; } /* ready / paid / on-time */
   .pill-collected { background:#E0E7FF; color:#3730A3; }
-  .pill-overdue   { background:#FCE4E4; border-color:#F3B4B4; color:#991B1B; } /* overdue / no-PO — red */
+  .pill-overdue   { background:#FCEBEB; color:#A32D2D; } /* problem / No PO / overdue */
   /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
    * warning/low/pending/in-production states read as pills too. Added 2026-06-12
    * per Jess; fill warmed to the Orders-list amber 2026-07-12. */
-  .pill-warning   { background:#FBE8C6; border-color:#F0D08A; color:#92400E; } /* waiting — amber */
+  .pill-warning   { background:#FAEEDA; color:#854F0B; } /* waiting / chasing — amber (v4 §6) */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 
   /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the
