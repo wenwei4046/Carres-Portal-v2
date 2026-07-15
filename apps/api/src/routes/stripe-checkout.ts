@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dl, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -102,7 +102,6 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   return data as {
     id: string;
     so: number;
-    dl: number;
     dealer_id: string;
     status: string;
     paid: number | string;
