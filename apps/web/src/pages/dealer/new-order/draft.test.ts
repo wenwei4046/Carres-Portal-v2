@@ -501,6 +501,35 @@ describe("step3Valid — Submit gate", () => {
     expect(step3Valid(d)).toBe(true);
   });
 
+  // 0224 — Stripe online collection: proof is system-generated (PaymentIntent
+  // ref + hosted receipt), so no slip / approval code; the only payment
+  // requirement is an amount > 0 to mint the Checkout link with.
+  it("stripe method passes WITHOUT slip or approval code when paid > 0", () => {
+    const d = step3FilledDraft();
+    d.payment.method = "stripe";
+    d.payment.slip = null;
+    d.payment.approvalCode = "";
+    d.paid = 500;
+    expect(step3Valid(d)).toBe(true);
+  });
+
+  it("stripe method rejects when the collect amount is 0", () => {
+    const d = step3FilledDraft();
+    d.payment.method = "stripe";
+    d.payment.slip = null;
+    d.paid = 0;
+    expect(step3Valid(d)).toBe(false);
+  });
+
+  it("stripe method still requires signature + terms", () => {
+    const d = step3FilledDraft();
+    d.payment.method = "stripe";
+    d.payment.slip = null;
+    d.paid = 500;
+    d.termsAccepted = false;
+    expect(step3Valid(d)).toBe(false);
+  });
+
   it("rejects installment with bogus months value", () => {
     const d = step3FilledDraft();
     d.payment.method = "installment";

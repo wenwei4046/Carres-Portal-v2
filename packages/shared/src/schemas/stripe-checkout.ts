@@ -35,4 +35,8 @@ export interface StripeCheckoutSessionInfo {
   expiresAt: string | null;
   /** e.g. 'fpx (maybank2u)' / 'card (visa **** 4242)' — display only. */
   paymentMethodDetail: string | null;
+  /** Stripe's hosted receipt for the captured charge (0224) — the payment's
+   *  "slip": permanent, customer-shareable, and what finance opens to verify.
+   *  Null until paid (and for pre-0224 rows). */
+  receiptUrl: string | null;
 }

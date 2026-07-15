@@ -1,9 +1,10 @@
-import { useMemo } from "react";
-import { Check, Gift, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, CheckCircle2, Gift, Plus, QrCode } from "lucide-react";
 import type { CatalogResponse, Order } from "@carres/shared";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { useAuth } from "@/lib/auth";
 import { usePwpCodesByOrder } from "@/lib/queries";
+import StripeCollectModal from "../pos/StripeCollectModal";
 
 interface Props {
   order: Order;
@@ -11,6 +12,9 @@ interface Props {
    *  (order_lines only carry the sku). Absent/unknown sku falls back to the
    *  bare sku code + beige placeholder tile (pre-photo behaviour). */
   catalog?: CatalogResponse | null;
+  /** 0224 — the order was submitted with the Stripe method: auto-open the
+   *  collect-online QR / link modal for this amount. Null for other methods. */
+  stripeCollectAmount?: number | null;
   /** Reset the flow back to a fresh draft + the CATALOG step (no navigation). */
   onNewOrder: () => void;
   /** Leave the POS — caller clears the draft and navigates to the orders list. */
@@ -42,9 +46,21 @@ function skuInfoMap(catalog: CatalogResponse | null | undefined) {
  * order). Order ID format stays `CO-{so}` (dealer-local sequence from the
  * create_order RPC — same string the kanban card shows).
  */
-export default function ThankYou({ order, catalog, onNewOrder, onClose }: Props) {
+export default function ThankYou({
+  order,
+  catalog,
+  stripeCollectAmount,
+  onNewOrder,
+  onClose,
+}: Props) {
   const role = useAuth((s) => s.role);
   const firstName = order.customer.name?.trim().split(/\s+/)[0] || "friend";
+  // 0224 — Stripe collect-at-handover: the QR / link modal opens by itself
+  // right after submit; the customer pays before walking away. `collected`
+  // folds the recorded amount into the receipt panel (the `order` prop is a
+  // point-in-time snapshot — orders.paid moved server-side).
+  const [collectOpen, setCollectOpen] = useState(() => (stripeCollectAmount ?? 0) > 0);
+  const [collected, setCollected] = useState(0);
   // Item photo + product name off the catalog (Loo 2026-07-14 — the receipt
   // showed a bare beige tile + the raw sku code; it should read like the
   // pre-submit OrderSummaryRail: model photo, product name, variant meta).
@@ -90,6 +106,23 @@ export default function ThankYou({ order, catalog, onNewOrder, onClose }: Props)
             from there.
           </p>
           <div className="confirm__cta-row">
+            {(stripeCollectAmount ?? 0) > 0 &&
+              (collected > 0 ? (
+                <span className="confirm__collected" data-testid="thankyou-stripe-collected">
+                  <CheckCircle2 size={16} strokeWidth={2} />
+                  RM {collected.toLocaleString("en-MY")} collected online
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--primary btn--lg"
+                  onClick={() => setCollectOpen(true)}
+                  data-testid="thankyou-stripe-collect"
+                >
+                  <QrCode size={16} strokeWidth={2} />
+                  Collect RM {stripeCollectAmount!.toLocaleString("en-MY")} online
+                </button>
+              ))}
             <button type="button" className="btn btn--primary btn--lg" onClick={onNewOrder}>
               <Plus size={16} strokeWidth={2} />
               New order
@@ -208,12 +241,14 @@ export default function ThankYou({ order, catalog, onNewOrder, onClose }: Props)
             <div className="summary__section-label">Payment</div>
             <div className="summary__row">
               <span className="key">Received</span>
-              <span className="val">RM{order.paid.toLocaleString("en-MY")}</span>
+              <span className="val">RM{(order.paid + collected).toLocaleString("en-MY")}</span>
             </div>
-            {total - order.paid > 0 && (
+            {total - order.paid - collected > 0 && (
               <div className="summary__row">
                 <span className="key">Balance due</span>
-                <span className="val">RM{(total - order.paid).toLocaleString("en-MY")}</span>
+                <span className="val">
+                  RM{(total - order.paid - collected).toLocaleString("en-MY")}
+                </span>
               </div>
             )}
           </div>
@@ -228,6 +263,20 @@ export default function ThankYou({ order, catalog, onNewOrder, onClose }: Props)
           </div>
         </div>
       </aside>
+
+      {collectOpen && (
+        <StripeCollectModal
+          orderId={order.id}
+          so={order.so}
+          total={total}
+          paid={order.paid + collected}
+          initialAmount={stripeCollectAmount ?? undefined}
+          customerName={order.customer.name}
+          customerPhone={order.customer.phone ?? null}
+          onPaid={(amount) => setCollected((c) => c + amount)}
+          onClose={() => setCollectOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
-import { describePaymentMethod, stripeClient, stripeConfigured } from "../lib/stripe";
+import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -37,7 +37,7 @@ const ORDER_ID = z.string().uuid();
 const SESSION_ID = z.string().regex(/^cs_[A-Za-z0-9_]+$/);
 
 const SESSION_COLS =
-  "id, order_id, session_id, payment_intent_id, amount, purpose, url, status, payment_method_detail, created_at, expires_at, paid_at";
+  "id, order_id, session_id, payment_intent_id, amount, purpose, url, status, payment_method_detail, receipt_url, created_at, expires_at, paid_at";
 
 /** Checkout links live ~24h — long enough for a WhatsApp'd link to be paid
  *  the same day, short enough that a stale amount can't linger for a week.
@@ -52,6 +52,7 @@ type SessionRow = {
   status: "open" | "paid" | "expired";
   url: string;
   payment_method_detail: string | null;
+  receipt_url: string | null;
   paid_at: string | null;
   expires_at: string | null;
 };
@@ -65,6 +66,7 @@ function shape(row: SessionRow) {
     paidAt: row.paid_at,
     expiresAt: row.expires_at,
     paymentMethodDetail: row.payment_method_detail,
+    receiptUrl: row.receipt_url,
   };
 }
 
@@ -268,6 +270,7 @@ stripeCheckoutRouter.get("/:id/stripe/checkout/:sid", async (c) => {
         p_session_id: current.session_id,
         p_payment_intent_id: pi?.id ?? (typeof live.payment_intent === "string" ? live.payment_intent : null),
         p_payment_method_detail: describePaymentMethod(pi),
+        p_receipt_url: receiptUrlOf(pi),
       });
       if (rpcErr) throw new HTTPException(500, { message: rpcErr.message });
     } else if (live.status === "expired") {

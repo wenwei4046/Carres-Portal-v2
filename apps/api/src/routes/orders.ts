@@ -15,6 +15,8 @@ import {
   orderStatusSchema,
   parseOrderEntryConfigRow,
   resolvePaymentMethods,
+  STRIPE_METHOD_KEY,
+  STRIPE_PAYMENT_METHOD,
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -382,7 +384,13 @@ ordersRouter.post("/", async (c) => {
       .maybeSingle();
     const entryCfg = parseOrderEntryConfigRow(cfgR && !cfgR.error ? cfgR.data : null);
     const methods = resolvePaymentMethods(entryCfg);
-    const method = methods.find((m) => m.key === parsed.data.paymentMethod);
+    // 0224 — Stripe online collection is a first-class built-in (not part of
+    // the operator-editable config): no approval code / follow-ups (proof is
+    // system-generated), and the POS submits it with paid 0 — money only
+    // moves when the 0223/0224 RPC records the captured Checkout payment.
+    const method =
+      methods.find((m) => m.key === parsed.data.paymentMethod) ??
+      (parsed.data.paymentMethod === STRIPE_METHOD_KEY ? STRIPE_PAYMENT_METHOD : undefined);
     if (!method) {
       return c.json(
         {
@@ -2132,6 +2140,7 @@ function paymentMethodLabel(key: string | null): string {
     cheque: "Cheque",
     ewallet: "eWallet",
     installment: "Installment",
+    stripe: "Stripe (online)",
   };
   return known[key] ?? capitalize(key);
 }

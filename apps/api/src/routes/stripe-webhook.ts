@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import type Stripe from "stripe";
-import { describePaymentMethod, stripeClient, stripeConfigured, webCryptoProvider } from "../lib/stripe";
+import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured, webCryptoProvider } from "../lib/stripe";
 import { adminClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -77,14 +77,16 @@ stripeWebhookRouter.post("/webhook", async (c) => {
 });
 
 async function recordSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe.Checkout.Session) {
-  // Payment-method detail is display sugar — never let its lookup block the
-  // money from being recorded.
+  // Payment-method detail + receipt link are display/reconciliation sugar —
+  // never let their lookup block the money from being recorded.
   let detail: string | null = null;
+  let receiptUrl: string | null = null;
   const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
   if (piId) {
     try {
       const pi = await stripe.paymentIntents.retrieve(piId, { expand: ["latest_charge"] });
       detail = describePaymentMethod(pi);
+      receiptUrl = receiptUrlOf(pi);
     } catch {
       detail = null;
     }
@@ -94,6 +96,7 @@ async function recordSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe
     p_session_id: session.id,
     p_payment_intent_id: piId,
     p_payment_method_detail: detail,
+    p_receipt_url: receiptUrl,
   });
   if (error) {
     // Foreign session (not minted by us) — acknowledge, don't retry forever.

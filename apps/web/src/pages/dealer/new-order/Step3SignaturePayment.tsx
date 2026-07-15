@@ -1,5 +1,10 @@
 import { useEffect, useMemo } from "react";
-import { resolvePaymentMethods, type CatalogResponse } from "@carres/shared";
+import {
+  resolvePaymentMethods,
+  STRIPE_METHOD_KEY,
+  STRIPE_PAYMENT_METHOD,
+  type CatalogResponse,
+} from "@carres/shared";
 import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
 import { previewDefaultGifts } from "../pos/free-line";
@@ -120,11 +125,15 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   // ---------- Payment methods (0219 — config-driven) ----------
   // The list renders from order_entry_config (the Order Entry page edits it);
   // empty/absent config → code defaults = the historical trio + Cash.
+  // 0224 — "Pay online (Stripe)" is appended as a first-class BUILT-IN (not
+  // operator-editable): its proof is system-generated, so a config edit can
+  // never break or hide it.
   const methods = useMemo(
-    () => resolvePaymentMethods(catalog.orderEntryConfig),
+    () => [...resolvePaymentMethods(catalog.orderEntryConfig), STRIPE_PAYMENT_METHOD],
     [catalog.orderEntryConfig],
   );
   const selectedMethod = methods.find((m) => m.key === draft.payment.method);
+  const isStripe = draft.payment.method === STRIPE_METHOD_KEY;
 
   // ---------- Submit-eligibility helpers (proto parity) ----------
   const hasSlip = !!draft.payment.slip;
@@ -132,12 +141,18 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   const missingFollowUp = selectedMethod?.followUps.find(
     (fu) => fu.required && !(draft.payment.followUps?.[fu.key] ?? "").trim(),
   );
-  const paymentMethodOk =
-    !!selectedMethod &&
-    hasSlip &&
-    (!selectedMethod.approvalCodeRequired || hasApproval) &&
-    !missingFollowUp;
+  // Stripe: no manual proof — the only requirement is an amount to collect
+  // (mirrors step4Valid). Everything else keeps the 0219 config gates.
+  const paymentMethodOk = isStripe
+    ? draft.paid > 0
+    : !!selectedMethod &&
+      hasSlip &&
+      (!selectedMethod.approvalCodeRequired || hasApproval) &&
+      !missingFollowUp;
+  // Stripe submits the order with paid 0 (money moves only when the customer
+  // completes Checkout), so it can never auto-qualify for Proceed at submit.
   const willProceed =
+    !isStripe &&
     paidPct >= 50 &&
     !draft.customer.addressUnknown &&
     !draft.delivery.dateTbd &&
@@ -146,6 +161,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   function paymentBlockerLabel(): string | null {
     if (paymentMethodOk) return null;
     if (!selectedMethod) return "a payment method is picked";
+    if (isStripe) return "the amount to collect is entered";
     const needApproval = selectedMethod.approvalCodeRequired && !hasApproval;
     if (needApproval && !hasSlip) return "approval / reference code & slip are added";
     if (needApproval) return "approval / reference code is entered";
@@ -395,7 +411,14 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
             {paidPct}% of total
           </span>
         </div>
-        {draft.paid > 0 && (
+        {draft.paid > 0 && isStripe && (
+          <div className="mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border border-success bg-success-soft">
+            ✓ After you complete the order, a <strong>QR / payment link</strong> for RM{" "}
+            {draft.paid.toLocaleString()} opens — the customer pays there and the payment
+            records itself. The order sits in <strong>Place</strong> until the payment lands.
+          </div>
+        )}
+        {draft.paid > 0 && !isStripe && (
           <div
             className={`mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border ${
               willProceed
@@ -456,7 +479,25 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
           })}
         </div>
 
-        {selectedMethod && (
+        {/* 0224 — Stripe: no manual proof fields. The reference (PaymentIntent
+            id) + receipt (Stripe hosted receipt) are captured automatically
+            when the payment lands, so finance reconciles without a slip. */}
+        {isStripe && (
+          <div
+            className="rounded border border-base-200 bg-white p-4 text-xs leading-relaxed text-base-700"
+            data-testid="pay-stripe-info"
+          >
+            <div className="text-sm font-semibold text-base-900 mb-1">
+              No slip or reference code needed
+            </div>
+            The customer pays by FPX / card on Stripe&rsquo;s secure page (QR at the counter, or
+            a WhatsApp link). The payment records itself with a <strong>payment code</strong> and
+            an official <strong>Stripe receipt</strong> attached for finance — nothing to key in
+            or photograph.
+          </div>
+        )}
+
+        {selectedMethod && !isStripe && (
           <div className="flex flex-col gap-3.5">
             {/* Installment keeps its months picker (builtin behavior). */}
             {selectedMethod.key === "installment" && (

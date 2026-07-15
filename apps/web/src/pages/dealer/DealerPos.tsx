@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
-import { maxLeadDaysFor, resolvePaymentMethods } from "@carres/shared";
+import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { draftTotals } from "@/lib/order-totals";
@@ -132,6 +132,9 @@ export default function DealerPos({
   });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // 0224 — set when the order was submitted with the Stripe method: the amount
+  // the ThankYou screen's collect-online modal opens with. Null otherwise.
+  const [stripeCollectAmount, setStripeCollectAmount] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -442,10 +445,17 @@ export default function DealerPos({
       }
       setUploading(false);
 
+      // 0224 — Stripe online collection: the order is created with paid 0
+      // (the customer hasn't paid yet — draft.paid is the amount the ThankYou
+      // screen's QR / link will collect; the 0223 RPC moves orders.paid only
+      // when Stripe confirms the money).
+      const isStripe = draft.payment.method === STRIPE_METHOD_KEY;
+      const paidAtCreate = isStripe ? 0 : draft.paid;
+
       const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
       const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
       const totalForPct = lineSub + addonSub; // Stair excluded — matches preview math.
-      const depositPct = totalForPct > 0 ? Math.round((draft.paid / totalForPct) * 100) : 0;
+      const depositPct = totalForPct > 0 ? Math.round((paidAtCreate / totalForPct) * 100) : 0;
 
       const composedAddress = composeAddress({
         line1: draft.customer.addressLine1,
@@ -495,7 +505,7 @@ export default function DealerPos({
           unitPrice: a.unitPrice,
           attrs: a.attrs ?? null,
         })),
-        paid: draft.paid,
+        paid: paidAtCreate,
         signaturePath,
         paymentSlipPath,
         termsAccepted: true,
@@ -553,15 +563,24 @@ export default function DealerPos({
 
       const created = await createOrder.mutateAsync(input);
       clearDraft();
+      // Hand the chosen collect-amount to the ThankYou screen BEFORE the draft
+      // resets — it opens the Stripe QR / link modal for exactly this figure.
+      setStripeCollectAmount(isStripe ? draft.paid : null);
       setSubmitted(created);
 
       if (draft.delivery.asap) {
-        try {
-          await proceedOrder.mutateAsync(created.id);
-          toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Auto-proceed failed";
-          toast.warning(`Order created, but auto-proceed failed: ${msg}`);
+        if (isStripe) {
+          // Payment hasn't landed yet — proceed_order would bounce on the 50%
+          // gate. Collect first; Proceed from My orders once it records.
+          toast.info("ASAP: collect the payment on the next screen, then Proceed from My orders.");
+        } else {
+          try {
+            await proceedOrder.mutateAsync(created.id);
+            toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Auto-proceed failed";
+            toast.warning(`Order created, but auto-proceed failed: ${msg}`);
+          }
         }
       }
     } catch (err) {
@@ -583,6 +602,7 @@ export default function DealerPos({
   function startAnotherOrder() {
     setSubmitted(null);
     setSubmitError(null);
+    setStripeCollectAmount(null);
     setDraft(emptyDraft());
     setStep(1);
     resetPwpReconciler();
@@ -769,6 +789,7 @@ export default function DealerPos({
             <ThankYou
               order={submitted}
               catalog={catalogQ.data ?? null}
+              stripeCollectAmount={stripeCollectAmount}
               onNewOrder={startAnotherOrder}
               onClose={() => {
                 clearDraft();

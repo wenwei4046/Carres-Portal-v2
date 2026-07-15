@@ -2,6 +2,7 @@ import {
   ORDER_ENTRY_TABS,
   resolveFormTab,
   resolvePaymentMethods,
+  STRIPE_METHOD_KEY,
   type FormFieldsConfig,
   type PaymentMethodConfig,
 } from "@carres/shared";
@@ -490,6 +491,13 @@ export function step3DateFirstIssue(
 export function step4Valid(d: WizardDraft, methods?: PaymentMethodConfig[]): boolean {
   if (!d.signature || !d.signature.startsWith("data:image/")) return false;
   if (!d.termsAccepted) return false;
+  // 0224 — Stripe online collection: proof is system-generated (PaymentIntent
+  // reference + Stripe hosted receipt), so no slip / approval code / follow-ups.
+  // The amount to collect must be > 0 — it becomes the Checkout link the
+  // ThankYou screen opens; the order itself submits with paid 0.
+  if (d.payment.method === STRIPE_METHOD_KEY) {
+    return Number.isFinite(d.paid) && d.paid > 0;
+  }
   if (!d.payment.slip) return false;
   // 0219 — payment gates are CONFIG-DRIVEN. The method must be one of the
   // resolved ACTIVE methods (caller passes the catalog's list; absent →

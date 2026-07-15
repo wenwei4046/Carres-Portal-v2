@@ -20,6 +20,7 @@ vi.mock("../lib/stripe", () => ({
   stripeClient: vi.fn(),
   webCryptoProvider: {},
   describePaymentMethod: () => "fpx (maybank2u)",
+  receiptUrlOf: () => "https://pay.stripe.com/receipts/test",
 }));
 import { stripeClient } from "../lib/stripe";
 

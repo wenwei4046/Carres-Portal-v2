@@ -281,6 +281,8 @@ export {
   setOrderEntryConfigInput,
   MY_BANKS,
   DEFAULT_PAYMENT_METHODS,
+  STRIPE_METHOD_KEY,
+  STRIPE_PAYMENT_METHOD,
   ORDER_ENTRY_TABS,
   POS_FORM_BUILTINS,
   resolvePaymentMethods,
