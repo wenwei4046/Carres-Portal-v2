@@ -10,10 +10,12 @@ import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import {
+  useCancelOrder,
   useCatalog,
   useCreateOrder,
   useDealerSelf,
   useFreePwpCode,
+  useOrder,
   useOutlets,
   usePrincipalDealers,
   useProceedOrder,
@@ -38,6 +40,7 @@ import {
 } from "./new-order/draft";
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
+import StripeCollectModal from "./pos/StripeCollectModal";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
 import OrderStatusPage from "./pos/OrderStatusPage";
@@ -132,9 +135,22 @@ export default function DealerPos({
   });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // 0224 — set when the order was submitted with the Stripe method: the amount
-  // the ThankYou screen's collect-online modal opens with. Null otherwise.
+  // 0224 — Stripe pay-BEFORE-create (Loo 2026-07-15: "没有给完钱不可以开单"):
+  // "Complete order" mints a pending order + immediately shows the QR; the
+  // wizard only reaches ThankYou once the payment records (or the dealer
+  // explicitly keeps the order for a WhatsApp'd link). The pending pointer
+  // lives on the DRAFT so a refresh resumes the same order's QR instead of
+  // minting a duplicate SO.
   const [stripeCollectAmount, setStripeCollectAmount] = useState<number | null>(null);
+  const [stripeCollected, setStripeCollected] = useState(0);
+  const [stripePaidPending, setStripePaidPending] = useState(0);
+  const stripePendingOrderRef = useRef<Order | null>(null);
+  const stripePending = draft.stripePending ?? null;
+  // Resume-after-refresh fallback: the created Order object is gone, refetch it.
+  const stripePendingOrderQ = useOrder(stripePending?.orderId ?? "", {
+    enabled: !!stripePending && !stripePendingOrderRef.current,
+  });
+  const cancelPendingOrder = useCancelOrder(stripePending?.orderId ?? "");
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -562,31 +578,93 @@ export default function DealerPos({
       };
 
       const created = await createOrder.mutateAsync(input);
+
+      if (isStripe) {
+        // Pay-BEFORE-create: hold on the CONFIRM step with the QR up; the
+        // wizard reaches ThankYou only when the payment records (or the
+        // dealer explicitly keeps the order for a WhatsApp'd link). The
+        // pending pointer persists on the draft so a refresh resumes THIS
+        // order's QR instead of minting a duplicate SO.
+        stripePendingOrderRef.current = created;
+        setDraft((d) => ({
+          ...d,
+          stripePending: { orderId: created.id, so: created.so, amount: draft.paid },
+        }));
+        return;
+      }
+
       clearDraft();
-      // Hand the chosen collect-amount to the ThankYou screen BEFORE the draft
-      // resets — it opens the Stripe QR / link modal for exactly this figure.
-      setStripeCollectAmount(isStripe ? draft.paid : null);
       setSubmitted(created);
 
       if (draft.delivery.asap) {
-        if (isStripe) {
-          // Payment hasn't landed yet — proceed_order would bounce on the 50%
-          // gate. Collect first; Proceed from My orders once it records.
-          toast.info("ASAP: collect the payment on the next screen, then Proceed from My orders.");
-        } else {
-          try {
-            await proceedOrder.mutateAsync(created.id);
-            toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : "Auto-proceed failed";
-            toast.warning(`Order created, but auto-proceed failed: ${msg}`);
-          }
+        try {
+          await proceedOrder.mutateAsync(created.id);
+          toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Auto-proceed failed";
+          toast.warning(`Order created, but auto-proceed failed: ${msg}`);
         }
       }
     } catch (err) {
       setUploading(false);
       const msg = err instanceof Error ? err.message : "Submit failed";
       setSubmitError(msg);
+    }
+  }
+
+  // ── 0224 Stripe pay-before-create handlers ──────────────────────────────
+  const stripePendingOrder = stripePendingOrderRef.current ?? stripePendingOrderQ.data ?? null;
+
+  /** Leave the pending state for ThankYou — 'paid' (money recorded) or 'keep'
+   *  (dealer keeps the order + the 24h link for a remote customer). */
+  function stripeFinalize(kind: "paid" | "keep") {
+    const sp = stripePending;
+    const order = stripePendingOrder;
+    if (!sp || !order) return;
+    clearDraft();
+    setDraft((d) => ({ ...d, stripePending: null }));
+    stripePendingOrderRef.current = null;
+    if (kind === "paid") {
+      setStripeCollected(stripePaidPending || sp.amount);
+      setStripeCollectAmount(null);
+    } else {
+      setStripeCollected(0);
+      setStripeCollectAmount(sp.amount); // ThankYou keeps a "Collect online" button
+    }
+    setStripePaidPending(0);
+    setSubmitted(order);
+  }
+
+  /** The strict path (Loo: no unpaid orders) — void the pending order and
+   *  return to editing; the draft is untouched so a retry re-submits. */
+  async function stripeVoidPending() {
+    const sp = stripePending;
+    if (!sp) return;
+    if (
+      !window.confirm(
+        `Void order CO-${sp.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+      )
+    )
+      return;
+    try {
+      await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at handover" });
+      toast.info(`Order CO-${sp.so} voided — nothing was charged.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not void the order");
+      return;
+    }
+    stripePendingOrderRef.current = null;
+    setDraft((d) => ({ ...d, stripePending: null }));
+  }
+
+  function handleStripeModalClose() {
+    if (stripePaidPending > 0) return stripeFinalize("paid");
+    if (
+      window.confirm(
+        "Customer hasn't paid yet.\n\nOK — keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel — stay on the QR.",
+      )
+    ) {
+      stripeFinalize("keep");
     }
   }
 
@@ -603,6 +681,8 @@ export default function DealerPos({
     setSubmitted(null);
     setSubmitError(null);
     setStripeCollectAmount(null);
+    setStripeCollected(0);
+    setStripePaidPending(0);
     setDraft(emptyDraft());
     setStep(1);
     resetPwpReconciler();
@@ -790,6 +870,7 @@ export default function DealerPos({
               order={submitted}
               catalog={catalogQ.data ?? null}
               stripeCollectAmount={stripeCollectAmount}
+              stripeCollectedAmount={stripeCollected}
               onNewOrder={startAnotherOrder}
               onClose={() => {
                 clearDraft();
@@ -959,12 +1040,38 @@ export default function DealerPos({
                 onClick={handleSubmit}
                 disabled={submitDisabled}
                 className="btn btn--primary btn--lg"
+                data-testid="pos-complete-order"
               >
-                {uploading ? "Uploading…" : createOrder.isPending ? "Submitting…" : "Complete order"}
+                {uploading
+                  ? "Uploading…"
+                  : createOrder.isPending
+                    ? "Submitting…"
+                    : draft.payment.method === STRIPE_METHOD_KEY
+                      ? `Collect RM ${draft.paid.toLocaleString()} & complete`
+                      : "Complete order"}
               </button>
             </div>
           </div>
         </footer>
+      )}
+
+      {/* 0224 — Stripe pay-before-create: the QR holds the wizard on CONFIRM
+          until the payment records (or the dealer keeps / voids the pending
+          order). Survives refresh via draft.stripePending. */}
+      {stripePending && !submitted && (
+        <StripeCollectModal
+          orderId={stripePending.orderId}
+          so={stripePending.so}
+          total={stripePending.amount}
+          paid={0}
+          initialAmount={stripePending.amount}
+          lockAmount
+          customerName={draft.customer.name}
+          customerPhone={draft.customer.phone || null}
+          onPaid={(amt) => setStripePaidPending(amt)}
+          onVoidOrder={stripeVoidPending}
+          onClose={handleStripeModalClose}
+        />
       )}
     </div>
   );

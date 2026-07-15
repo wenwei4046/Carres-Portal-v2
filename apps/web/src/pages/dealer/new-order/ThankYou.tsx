@@ -12,9 +12,13 @@ interface Props {
    *  (order_lines only carry the sku). Absent/unknown sku falls back to the
    *  bare sku code + beige placeholder tile (pre-photo behaviour). */
   catalog?: CatalogResponse | null;
-  /** 0224 — the order was submitted with the Stripe method: auto-open the
-   *  collect-online QR / link modal for this amount. Null for other methods. */
+  /** 0224 — the order was submitted with the Stripe method but is STILL
+   *  unpaid (dealer kept it for a WhatsApp'd link): shows a "Collect online"
+   *  button for this amount. Null for paid / non-Stripe orders. */
   stripeCollectAmount?: number | null;
+  /** 0224 pay-before-create — the amount ALREADY collected via Stripe before
+   *  this screen mounted (the wizard's QR flow). Seeds the receipt panel. */
+  stripeCollectedAmount?: number;
   /** Reset the flow back to a fresh draft + the CATALOG step (no navigation). */
   onNewOrder: () => void;
   /** Leave the POS — caller clears the draft and navigates to the orders list. */
@@ -50,6 +54,7 @@ export default function ThankYou({
   order,
   catalog,
   stripeCollectAmount,
+  stripeCollectedAmount,
   onNewOrder,
   onClose,
 }: Props) {
@@ -60,7 +65,7 @@ export default function ThankYou({
   // folds the recorded amount into the receipt panel (the `order` prop is a
   // point-in-time snapshot — orders.paid moved server-side).
   const [collectOpen, setCollectOpen] = useState(() => (stripeCollectAmount ?? 0) > 0);
-  const [collected, setCollected] = useState(0);
+  const [collected, setCollected] = useState(stripeCollectedAmount ?? 0);
   // Item photo + product name off the catalog (Loo 2026-07-14 — the receipt
   // showed a bare beige tile + the raw sku code; it should read like the
   // pre-submit OrderSummaryRail: model photo, product name, variant meta).
@@ -106,23 +111,22 @@ export default function ThankYou({
             from there.
           </p>
           <div className="confirm__cta-row">
-            {(stripeCollectAmount ?? 0) > 0 &&
-              (collected > 0 ? (
-                <span className="confirm__collected" data-testid="thankyou-stripe-collected">
-                  <CheckCircle2 size={16} strokeWidth={2} />
-                  RM {collected.toLocaleString("en-MY")} collected online
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--primary btn--lg"
-                  onClick={() => setCollectOpen(true)}
-                  data-testid="thankyou-stripe-collect"
-                >
-                  <QrCode size={16} strokeWidth={2} />
-                  Collect RM {stripeCollectAmount!.toLocaleString("en-MY")} online
-                </button>
-              ))}
+            {collected > 0 ? (
+              <span className="confirm__collected" data-testid="thankyou-stripe-collected">
+                <CheckCircle2 size={16} strokeWidth={2} />
+                RM {collected.toLocaleString("en-MY")} collected online
+              </span>
+            ) : (stripeCollectAmount ?? 0) > 0 ? (
+              <button
+                type="button"
+                className="btn btn--primary btn--lg"
+                onClick={() => setCollectOpen(true)}
+                data-testid="thankyou-stripe-collect"
+              >
+                <QrCode size={16} strokeWidth={2} />
+                Collect RM {stripeCollectAmount!.toLocaleString("en-MY")} online
+              </button>
+            ) : null}
             <button type="button" className="btn btn--primary btn--lg" onClick={onNewOrder}>
               <Plus size={16} strokeWidth={2} />
               New order
