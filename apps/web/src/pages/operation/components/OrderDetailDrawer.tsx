@@ -1318,16 +1318,16 @@ function DrawerBody({
           onClose={() => setLoanTarget(null)}
         />
       )}
-      {/* ═══ HEADER PANEL (UI-KIT §5.1) ═══ ONE white Panel, full width, fixed
-          (shrink-0 — the body scrolls under it), floating on the cream page.
-          Row 1: ‹ Orders back · #id (mono) · state pill (amber/blue/green/grey
-          by ORDER STATE — never danger red) · meta · flag / ⋮ (no ✕ — back
-          replaces it). Row 2: the 3 KPI mission-track boxes (§5.2). Row 3,
-          under a hairline: the NEXT summary row (§5.3) — red TEXT when urgent
-          + ONE solid flame button. No coloured borders, no red fill band. */}
+      {/* ═══ IDENTITY STRIP ═══ ONE slim white Panel, full width, fixed
+          (shrink-0 — the body scrolls under it), floating on the cream page:
+          ‹ Orders back · #id (mono) · state pill (amber/blue/green/grey by
+          ORDER STATE — never danger red) · meta · flag / ⋮ (no ✕ — back
+          replaces it). The KPI mission-track boxes moved INTO the right body
+          column (page-rebuild §4 — KPI + Alert is a body panel now, so the
+          page is two columns with no separate header band). */}
       <header className="shrink-0 px-5 pt-3 bg-background">
         <SectionCard className="!p-0">
-        <div className="px-4 pt-2.5 flex items-center gap-2.5 min-w-0">
+        <div className="px-4 py-2.5 flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={onClose}
@@ -1419,93 +1419,8 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* KPI boxes + actions (§7.2) — the 3 mission tracks: CUSTOMER·money /
-            STOCK / LOGISTIC. Lucide icon + label; value COLOURED by §5.2 status
-            (+ small alert mark when red — no dots); sub-facts side by side;
-            the track's chase action(s) live INSIDE the box when red/actionable.
-            This REPLACES the standalone "Next:" row — multiple red tracks →
-            multiple buttons, each a logged chase event. */}
-        <div className="px-4 pt-2.5 pb-2.5 grid grid-cols-3 gap-2">
-          <KpiBox
-            icon={<Wallet size={13} strokeWidth={2.25} />}
-            label="Customer · Money"
-            tone={moneyTone}
-            value={
-              totalSet
-                ? moneyOutstanding > 0
-                  ? RM(moneyOutstanding)
-                  : "Paid"
-                : "—"
-            }
-            subs={moneySubs}
-            actions={
-              /* Owing → the customer pair: Reminder while gentle contact is
-                 right (amber), Chase once firmer follow-up is due — both
-                 always offered; ops picks the tone. */
-              balanceOwing ? (
-                <ChasePair
-                  audience="customer payment"
-                  onReminder={() => copyChase("customer", "reminder")}
-                  onChase={() => copyChase("customer", "chase")}
-                />
-              ) : undefined
-            }
-          />
-          <KpiBox
-            icon={<Package size={13} strokeWidth={2.25} />}
-            label="Stock"
-            tone={stockTone}
-            value={`${readyN}/${goodsLines.length} ready`}
-            subs={stockSubs}
-            actions={
-              stockTone === "danger" || stockTone === "warning" ? (
-                <>
-                  {nopoN > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onIssuePOsClick()}
-                      title="Raise a PO for the no-PO lines"
-                      className={CHASE_BTN}
-                    >
-                      Raise PO
-                    </button>
-                  )}
-                  {(rCounts.onPo > 0 || onPoStalled) && (
-                    <ChasePair
-                      audience="supplier (PO-led)"
-                      onReminder={() => copyChase("supplier", "reminder")}
-                      onChase={() => copyChase("supplier", "chase")}
-                    />
-                  )}
-                </>
-              ) : undefined
-            }
-          />
-          <KpiBox
-            icon={<Truck size={13} strokeWidth={2.25} />}
-            label="Logistic"
-            tone={logisticTone}
-            value={
-              <>
-                {deadlineLabel}
-                {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
-              </>
-            }
-            subs={logisticSubs}
-            actions={
-              logisticTone === "danger" || logisticTone === "warning" ? (
-                <ChasePair
-                  audience="logistic partner (REF-led)"
-                  onReminder={() => copyChase("logistic", "reminder")}
-                  onChase={() => copyChase("logistic", "chase")}
-                />
-              ) : undefined
-            }
-          />
-        </div>
         </SectionCard>
       </header>
-
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
           each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
           scroll — it clips, and each column owns its own overflow-y. */}
@@ -1537,11 +1452,12 @@ function DrawerBody({
             column (gridArea:side) first and the items column (gridArea:main)
             second — no panel code moves. Cards get a fixed ~300px; items fill. */}
         <div
-          className="grid gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden"
+          className="grid gap-3 items-stretch flex-1 min-h-0 overflow-hidden"
           style={{
-            // Round 1A: left view column 340px (was 300 — Delivery inputs were
-            // truncating), right work column fills.
-            gridTemplateColumns: "340px minmax(0, 1fr)",
+            // Page rebuild §1 (locked): left 40% (customer + money) | right 60%
+            // (goods + chase) | 12px gap. fr units keep the ratio exact after
+            // the gap is taken out.
+            gridTemplateColumns: "minmax(0, 2fr) minmax(0, 3fr)",
             gridTemplateAreas: '"side main"',
           }}
         >
@@ -1554,7 +1470,93 @@ function DrawerBody({
           style={{ gridArea: "main" }}
           className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
-          <SectionCard className="min-h-full">
+          <div className="min-h-full flex flex-col gap-3">
+          {/* Panel 0 — KPI + Alert (page-rebuild §4): ONE white panel holding
+              the 3 mission-track tiles and (step 3) the stacked alert rows.
+              Step-1 shell: the existing KpiBoxes moved here from the old
+              header band; the 1.5fr/1fr/1fr tile split + hairline dividers +
+              alert stack land in the step-3 build. */}
+          <SectionCard className="shrink-0">
+            <div className="p-1 grid grid-cols-3 gap-2">
+              <KpiBox
+                icon={<Wallet size={13} strokeWidth={2.25} />}
+                label="Customer · Money"
+                tone={moneyTone}
+                value={
+                  totalSet
+                    ? moneyOutstanding > 0
+                      ? RM(moneyOutstanding)
+                      : "Paid"
+                    : "—"
+                }
+                subs={moneySubs}
+                actions={
+                  /* Owing → the customer pair: Reminder while gentle contact is
+                     right (amber), Chase once firmer follow-up is due — both
+                     always offered; ops picks the tone. */
+                  balanceOwing ? (
+                    <ChasePair
+                      audience="customer payment"
+                      onReminder={() => copyChase("customer", "reminder")}
+                      onChase={() => copyChase("customer", "chase")}
+                    />
+                  ) : undefined
+                }
+              />
+              <KpiBox
+                icon={<Package size={13} strokeWidth={2.25} />}
+                label="Stock"
+                tone={stockTone}
+                value={`${readyN}/${goodsLines.length} ready`}
+                subs={stockSubs}
+                actions={
+                  stockTone === "danger" || stockTone === "warning" ? (
+                    <>
+                      {nopoN > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onIssuePOsClick()}
+                          title="Raise a PO for the no-PO lines"
+                          className={CHASE_BTN}
+                        >
+                          Raise PO
+                        </button>
+                      )}
+                      {(rCounts.onPo > 0 || onPoStalled) && (
+                        <ChasePair
+                          audience="supplier (PO-led)"
+                          onReminder={() => copyChase("supplier", "reminder")}
+                          onChase={() => copyChase("supplier", "chase")}
+                        />
+                      )}
+                    </>
+                  ) : undefined
+                }
+              />
+              <KpiBox
+                icon={<Truck size={13} strokeWidth={2.25} />}
+                label="Logistic"
+                tone={logisticTone}
+                value={
+                  <>
+                    {deadlineLabel}
+                    {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
+                  </>
+                }
+                subs={logisticSubs}
+                actions={
+                  logisticTone === "danger" || logisticTone === "warning" ? (
+                    <ChasePair
+                      audience="logistic partner (REF-led)"
+                      onReminder={() => copyChase("logistic", "reminder")}
+                      onChase={() => copyChase("logistic", "chase")}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+          </SectionCard>
+          <SectionCard className="flex-1">
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
               only the rows scroll (up to ~8, then inside the box). */}
@@ -2032,6 +2034,7 @@ function DrawerBody({
             />
           </Panel>
           </SectionCard>
+          </div>
         </div>
 
         {/* LEFT Panel (UI-KIT §5.1) — ONE white SectionCard holding the view
