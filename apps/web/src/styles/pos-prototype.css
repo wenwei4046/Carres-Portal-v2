@@ -1029,20 +1029,31 @@
   grid-template-columns: 1fr 460px;
   overflow: hidden;
 }
+/* 2026-07-15 (Loo) — the prototype's lifestyle photo never shipped with the
+   repo, so the hero rendered as a dead grey wash. Redesigned as a pure-CSS
+   brand hero: cream base, a terracotta glow, and an oversized Bodoni "C"
+   watermark — no imagery dependency, reads warm at every viewport. */
 .confirm__hero {
   position: relative;
-  background-image: url('assets/imagery/carres-lifestyle-couple.png');
-  background-size: cover; background-position: center;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  padding: 56px 64px;
-  color: var(--c-cream);
+  background:
+    radial-gradient(1000px 700px at 88% -12%, color-mix(in oklab, var(--c-orange) 15%, transparent) 0%, transparent 62%),
+    radial-gradient(820px 620px at -18% 112%, color-mix(in oklab, var(--c-beige) 75%, transparent) 0%, transparent 58%),
+    var(--c-cream);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 56px 72px;
+  color: var(--c-ink);
   overflow: hidden;
 }
 .confirm__hero::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(34,31,32,0.25) 0%, rgba(34,31,32,0) 30%, rgba(34,31,32,0) 50%, rgba(34,31,32,0.7) 100%);
+  /* Ghost monogram — the CARRES Bodoni "C", cropped off the right edge. */
+  content: 'C';
+  position: absolute; right: -70px; top: 50%; transform: translateY(-53%);
+  font-family: var(--font-mark);
+  font-size: 640px; line-height: 1; font-weight: 500;
+  color: color-mix(in oklab, var(--c-orange) 8%, transparent);
+  pointer-events: none;
 }
-.confirm__hero-inner { position: relative; max-width: 600px; display: flex; flex-direction: column; gap: 16px; }
+.confirm__hero-inner { position: relative; max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
 .confirm__check {
   width: 64px; height: 64px; border-radius: 999px;
   background: var(--c-orange); display: inline-flex; align-items: center; justify-content: center;
@@ -1050,11 +1061,28 @@
   box-shadow: 0 8px 24px rgba(232,107,58,0.4);
 }
 .confirm__check svg { width: 32px; height: 32px; stroke-width: 2.5; color: var(--c-cream); }
-.confirm__eyebrow { font-family: var(--font-button); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+.confirm__eyebrow { font-family: var(--font-button); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt); }
 .confirm__head { font-family: var(--font-title); font-weight: 900; font-size: 48px; line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance; }
 .confirm__head .accent { font-family: var(--font-script); color: var(--c-orange); font-weight: 500; font-size: 56px; }
-.confirm__sub { font-family: var(--font-sans); font-size: 16px; line-height: 1.55; max-width: 44ch; opacity: 0.92; font-weight: 300; }
-.confirm__cta-row { display: flex; gap: 10px; margin-top: 18px; }
+.confirm__sub { font-family: var(--font-sans); font-size: 16px; line-height: 1.55; max-width: 44ch; color: var(--fg-muted); font-weight: 400; }
+.confirm__cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
+.confirm__cta-row .btn { white-space: nowrap; }
+/* 0224 — "collected online" confirmation bar (its own row above the CTAs —
+   a payment fact reads as a statement, not another button). */
+.confirm__paidbar {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 4px;
+  padding: 14px 18px;
+  max-width: 480px;
+  border-radius: 16px;
+  background: color-mix(in oklab, #2F8F4F 9%, #fff);
+  border: 1.5px solid color-mix(in oklab, #2F8F4F 40%, transparent);
+}
+.confirm__paidbar svg { flex: 0 0 auto; color: #2F8F4F; }
+.confirm__paidbar-amt {
+  font-family: var(--font-button); font-size: 15px; font-weight: 700; color: #1F6B3A;
+}
+.confirm__paidbar-sub { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 .confirm__panel { background: var(--pos-panel, #fff); display: flex; flex-direction: column; overflow: hidden; }
 
 /* ========= Add-on cards ========= */
@@ -4255,15 +4283,8 @@
   content: ""; flex: 1; height: 1px; background: var(--line);
 }
 
-/* 0224 — ThankYou "collected online" chip (Stripe collect-at-handover). */
-.confirm__collected {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 48px; padding: 0 20px; border-radius: 999px;
-  background: color-mix(in oklab, #2F8F4F 12%, var(--pos-panel, #fff));
-  border: 1.5px solid #2F8F4F;
-  font-family: var(--font-button); font-size: 14px; font-weight: 600; color: #1F6B3A;
-}
-.confirm__collected svg { color: #2F8F4F; }
+/* 0224 — the ThankYou "collected online" pill was replaced by the
+   .confirm__paidbar row (see the confirm section above). */
 
 /* 0224 — pay-before-create void escape hatch on the QR stage. */
 .os-stripe__void {
