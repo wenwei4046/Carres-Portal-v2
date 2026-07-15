@@ -8,15 +8,19 @@ import {
 } from "react";
 import {
   AlertCircle,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Copy,
+  Home,
   Download,
   ExternalLink,
   FileText,
   Flag,
+  MapPin,
   MoreVertical,
   Package,
   PackagePlus,
@@ -811,7 +815,9 @@ function DrawerBody({
   const [showRouteBlock, setShowRouteBlock] = useState(false);
   // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
-  const customerEditRef = useRef<(() => void) | null>(null);
+  // Customer identity lives in the header strip now (Jess 2026-07-15): the
+  // name is the anchor; ▾ expands the full-width customer block inline.
+  const [customerOpen, setCustomerOpen] = useState(false);
   // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
   // Outstanding-only state carries no Total row, so ⋮ is the way back in).
   const balanceEditTotalRef = useRef<(() => void) | null>(null);
@@ -1401,17 +1407,29 @@ function DrawerBody({
                 </span>
               );
             })()}
-            {/* Meta (§7.1) — customer · region · ordered <date>, ONE line.
-                The ordered date + customer name live ONLY here. */}
-            <span className="min-w-0 flex-1 truncate text-[13px] text-base-500">
-              <span className={cjkClassName(order.customer_name ?? "")}>
+            {/* Customer anchor (Jess 2026-07-15) — the NAME stays on the strip;
+                click it (or ▾) to slide the full-width customer block open.
+                Region + ordered date fold INTO that block; the deadline is the
+                KPI Logistic tile's job, never repeated here. */}
+            <button
+              type="button"
+              onClick={() => setCustomerOpen((o) => !o)}
+              aria-expanded={customerOpen}
+              title={customerOpen ? "Hide customer details" : "Show customer details"}
+              data-testid="customer-strip-toggle"
+              className="min-w-0 flex-1 flex items-center gap-1 text-left text-[13px] text-base-600 hover:text-base-900"
+            >
+              <span
+                className={`truncate font-medium ${cjkClassName(order.customer_name ?? "")}`}
+              >
                 {order.customer_name ?? "—"}
               </span>
-              {loc.label ? ` · ${loc.label}` : ""}
-              {order.placed_at
-                ? ` · ordered ${fmtDate(order.placed_at).split(", ")[0]}`
-                : ""}
-            </span>
+              {customerOpen ? (
+                <ChevronUp size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+              ) : (
+                <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+              )}
+            </button>
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1440,7 +1458,20 @@ function DrawerBody({
             />
           </span>
         </div>
-
+        {/* Customer expand (Jess 2026-07-15) — inline, FULL page width (not
+            bound by the 32% left column): one icon-led read line of copy-chips
+            + WhatsApp + ⋮. Salutation + field edits live in the ⋮ Edit form. */}
+        {customerOpen && (
+          <CustomerExpand
+            order={order}
+            regionLabel={loc.label ?? null}
+            orderedLabel={
+              order.placed_at ? fmtDate(order.placed_at).split(", ")[0] : null
+            }
+            salutation={salutation}
+            onSalutation={saveSalutation}
+          />
+        )}
         </SectionCard>
       </header>
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
@@ -1476,10 +1507,10 @@ function DrawerBody({
         <div
           className="grid gap-3 items-stretch flex-1 min-h-0 overflow-hidden"
           style={{
-            // Page rebuild §1 (locked): left 40% (customer + money) | right 60%
-            // (goods + chase) | 12px gap. fr units keep the ratio exact after
-            // the gap is taken out.
-            gridTemplateColumns: "minmax(0, 2fr) minmax(0, 3fr)",
+            // Page rebuild (Jess 2026-07-15 revision): left 32% (money summary)
+            // | right 68% (goods + chase — the Items table is the hero) | 12px
+            // gap. fr units keep the ratio exact after the gap is taken out.
+            gridTemplateColumns: "minmax(0, 32fr) minmax(0, 68fr)",
             gridTemplateAreas: '"side main"',
           }}
         >
@@ -2072,108 +2103,16 @@ function DrawerBody({
           </div>
         </div>
 
-        {/* LEFT Panel (UI-KIT §5.1) — ONE white SectionCard holding the view
-            sections: CUSTOMER / BALANCE / STORAGE / DELIVERY (+ Activity &
-            notes). Scrolls INDEPENDENTLY of the work column on the right. */}
+        {/* LEFT Panel (UI-KIT §5.1) — ONE white SectionCard holding the money
+            summary sections: BALANCE / STORAGE / DELIVERY. The Customer panel
+            moved into the header strip's expandable block (Jess 2026-07-15).
+            Scrolls INDEPENDENTLY of the work column on the right. */}
         <div
           style={{ gridArea: "side" }}
           className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
           <SectionCard className="min-h-full">
-          {/* 1. Customer — a quiet identity card (name / phone / address, with an
-              inline Edit on a Place order). No region pill (Jess 2026-07-11): the
-              region is a DELIVERY attribute (it shows on the Delivery card), not
-              customer identity. */}
-          <Panel
-            title="Customer"
-            defaultOpen={false}
-            summary={
-              /* §7.3 — the NAME lives in the header only; the band's right slot
-                 reads phone · region instead. */
-              order.customer_phone || loc.label ? (
-                <span
-                  className="t-tiny text-base-600 truncate max-w-[180px]"
-                  title={`${order.customer_phone ?? ""}${loc.label ? ` · ${loc.label}` : ""}`}
-                >
-                  {order.customer_phone ?? "no phone"}
-                  {loc.label ? ` · ${loc.label}` : ""}
-                </span>
-              ) : (
-                <MiniBadge tone="muted">—</MiniBadge>
-              )
-            }
-            actions={
-              <PanelMenu
-                items={[
-                  ...(order.status === "place"
-                    ? [
-                        {
-                          label: "Edit details",
-                          icon: <Pencil size={14} />,
-                          onClick: () => customerEditRef.current?.(),
-                        },
-                      ]
-                    : []),
-                  {
-                    label: "Copy address",
-                    icon: <Copy size={14} />,
-                    disabled: !order.customer_address,
-                    onClick: () => {
-                      void navigator.clipboard.writeText(
-                        order.customer_address ?? "",
-                      );
-                      toast.success("Address copied");
-                    },
-                  },
-                  {
-                    label: "Copy phone",
-                    icon: <Copy size={14} />,
-                    disabled: !order.customer_phone,
-                    onClick: () => {
-                      void navigator.clipboard.writeText(
-                        order.customer_phone ?? "",
-                      );
-                      toast.success("Phone copied");
-                    },
-                  },
-                  {
-                    label: "WhatsApp customer",
-                    icon: <Phone size={14} />,
-                    disabled: !order.customer_phone,
-                    onClick: () => {
-                      const wa = waLink(order.customer_phone);
-                      if (wa) window.open(wa, "_blank", "noopener");
-                    },
-                  },
-                ]}
-              />
-            }
-          >
-            <div className="p-3">
-              <OrderCustomerCard order={order} startEditRef={customerEditRef} />
-              {/* Optional preferred-name/title for WhatsApp messages — blank
-                  falls back to the Title-Cased customer name; NEVER an
-                  auto-inferred Mr/Ms. Local-only until an API column ships. */}
-              <div className="mt-2 pt-2 border-t border-base-100 flex items-center justify-between gap-2">
-                <span
-                  className="text-[11px] text-base-400 shrink-0"
-                  title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
-                >
-                  Salutation (messages)
-                </span>
-                <input
-                  type="text"
-                  value={salutation}
-                  onChange={(e) => saveSalutation(e.target.value)}
-                  placeholder={titleCaseName(order.customer_name ?? "")}
-                  aria-label="Preferred salutation for messages"
-                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[12px] text-right outline-none hover:border-base-400 focus:border-primary"
-                />
-              </div>
-            </div>
-          </Panel>
-
-          {/* 2. Balance — its OWN card (Jess: split from Storage). Chip = the
+          {/* 1. Balance — its OWN card (Jess: split from Storage). Chip = the
               owing amount as danger TEXT (colour lock). The id anchors the
               banner's "Confirm & collect" push. */}
           <div id="card-balance" className="min-w-0 flex flex-col min-h-0">
@@ -2772,6 +2711,251 @@ function LoanSofaModal({
  * is every real AutoCount order). Validates with the SAME shared zod schema the
  * API uses. (Jess 2026-06-25, #4 drawer edit.)
  */
+/** Header-strip customer block (Jess 2026-07-15 — the left-column Customer
+ *  panel folded into the identity strip). Read = ONE full-width line of
+ *  icon-led copy-chips (phone accent / region / address / ordered), 0.5px
+ *  hairline verticals between them, + [WhatsApp] + [⋮]. Click a chip = copy
+ *  that field. ⋮ Edit details flips the line into the edit form (name /
+ *  phone / address + the messages salutation). Save logic mirrors
+ *  OrderCustomerCard (updateOrderInputSchema, presence-only fields). */
+function CustomerExpand({
+  order,
+  regionLabel,
+  orderedLabel,
+  salutation,
+  onSalutation,
+}: {
+  order: {
+    id: string;
+    status: string;
+    customer_name: string | null;
+    customer_phone: string | null;
+    customer_address: string | null;
+  };
+  regionLabel: string | null;
+  orderedLabel: string | null;
+  /** Preferred greeting for WhatsApp messages (local-only store). */
+  salutation: string;
+  onSalutation: (v: string) => void;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const update = useUpdateOrder(order.id, {
+    onSuccess: () => {
+      setEditing(false);
+      toast.success("Customer details updated");
+      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+    },
+    onError: (e) => setErr(e.message),
+  });
+  const startEdit = () => {
+    setName(order.customer_name ?? "");
+    setPhone(order.customer_phone ?? "");
+    setAddress(order.customer_address ?? "");
+    setErr(null);
+    setEditing(true);
+  };
+  const save = () => {
+    setErr(null);
+    // Only send fields the user actually changed — the RPC updates by presence.
+    const customer: Record<string, unknown> = {};
+    if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
+    if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
+    if (address.trim() !== (order.customer_address ?? ""))
+      customer.address = address.trim() || null;
+    if (Object.keys(customer).length === 0) {
+      setEditing(false);
+      return;
+    }
+    const parsed = updateOrderInputSchema.safeParse({ customer });
+    if (!parsed.success) {
+      setErr(parsed.error.issues[0]?.message ?? "Invalid input");
+      return;
+    }
+    update.mutate(parsed.data);
+  };
+  const copy = (label: string, v: string | null) => {
+    if (!v) return;
+    void navigator.clipboard.writeText(v);
+    toast.success(`${label} copied`);
+  };
+  const wa = waLink(order.customer_phone);
+  const field =
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  // One chip per field: muted icon first, value in normal ink (phone accent);
+  // click = copy. Hairline border-l separates chips (the first has none).
+  const chipCls =
+    "min-w-0 flex items-center gap-1.5 text-[12.5px] text-base-800 hover:text-base-900 px-3 first:pl-0 border-l border-base-200 first:border-l-0";
+
+  if (editing) {
+    return (
+      <div className="px-4 pb-3 pt-2.5 border-t border-base-100">
+        <div className="grid grid-cols-3 gap-2">
+          <label className="block">
+            <span className="t-tiny text-base-500">Customer name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={field}
+            />
+          </label>
+          <label className="block">
+            <span className="t-tiny text-base-500">Phone</span>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              className={field}
+            />
+          </label>
+          <label className="block">
+            <span
+              className="t-tiny text-base-500"
+              title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
+            >
+              Salutation (messages)
+            </span>
+            <input
+              value={salutation}
+              onChange={(e) => onSalutation(e.target.value)}
+              placeholder={titleCaseName(order.customer_name ?? "")}
+              className={field}
+            />
+          </label>
+          <label className="block col-span-3">
+            <span className="t-tiny text-base-500">Address</span>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              rows={2}
+              className={`${field} resize-none`}
+            />
+          </label>
+        </div>
+        {err && <p className="t-tiny text-danger mt-1.5">{err}</p>}
+        <div className="mt-2 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={update.isPending}
+            className="btn-ghost text-[12px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={update.isPending}
+            className="btn-primary text-[12px]"
+          >
+            {update.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="px-4 py-2 border-t border-base-100 flex items-center gap-2 min-w-0"
+      data-testid="customer-expand"
+    >
+      <div className="min-w-0 flex-1 flex items-center">
+        <button
+          type="button"
+          onClick={() => copy("Phone", order.customer_phone)}
+          disabled={!order.customer_phone}
+          title="Copy phone"
+          className={chipCls}
+        >
+          <Phone size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <span className="truncate font-medium text-primary">
+            {order.customer_phone ?? "—"}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => copy("Region", regionLabel)}
+          disabled={!regionLabel}
+          title="Copy region"
+          className={chipCls}
+        >
+          <MapPin size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <span className="truncate">{regionLabel ?? "—"}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => copy("Address", order.customer_address)}
+          disabled={!order.customer_address}
+          title="Copy address"
+          className={`${chipCls} flex-1`}
+        >
+          <Home size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <span className="truncate text-left">
+            {order.customer_address ?? "—"}
+          </span>
+        </button>
+        {orderedLabel && (
+          <span className={`${chipCls} shrink-0 text-base-500`}>
+            <Calendar size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+            ordered {orderedLabel}
+          </span>
+        )}
+      </div>
+      <span className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            if (wa) window.open(wa, "_blank", "noopener");
+          }}
+          disabled={!wa}
+          title="Open WhatsApp chat with the customer"
+          className="btn-secondary text-[12px] disabled:opacity-40"
+        >
+          WhatsApp
+        </button>
+        <PanelMenu
+          items={[
+            ...(order.status === "place"
+              ? [
+                  {
+                    label: "Edit details",
+                    icon: <Pencil size={14} />,
+                    onClick: startEdit,
+                  },
+                ]
+              : []),
+            {
+              label: "Copy address",
+              icon: <Copy size={14} />,
+              disabled: !order.customer_address,
+              onClick: () => copy("Address", order.customer_address),
+            },
+            {
+              label: "Copy phone",
+              icon: <Copy size={14} />,
+              disabled: !order.customer_phone,
+              onClick: () => copy("Phone", order.customer_phone),
+            },
+            {
+              label: "WhatsApp customer",
+              icon: <Phone size={14} />,
+              disabled: !wa,
+              onClick: () => {
+                if (wa) window.open(wa, "_blank", "noopener");
+              },
+            },
+          ]}
+        />
+      </span>
+    </div>
+  );
+}
+
 export function OrderCustomerCard({
   order,
   startEditRef,
