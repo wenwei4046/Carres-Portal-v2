@@ -20,6 +20,11 @@ interface Props {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
   catalog: CatalogResponse;
+  /** 0224 (Loo 2026-07-15) — tapping the "Pay online" card should surface the
+   *  QR immediately, not wait for the footer button. Fired AFTER the method is
+   *  written to the draft; the parent auto-submits when the draft is ready
+   *  (or explains what's still missing). */
+  onStripeTap?: () => void;
 }
 
 /** Per-method copy for the approval-code field. Known builtin keys keep their
@@ -89,7 +94,7 @@ const SLIP_COPY_GENERIC = {
  * Submit lives in the parent footer. This component is purely presentational
  * + drives the draft mutations that step3Valid() reads.
  */
-export default function Step3SignaturePayment({ draft, onChange, catalog }: Props) {
+export default function Step3SignaturePayment({ draft, onChange, catalog, onStripeTap }: Props) {
   // Lazily mint a wizard session id the first time Step 3 mounts. Stays stable
   // across re-renders so the dealer can edit fields without resetting the
   // Storage folder each keystroke.
@@ -464,11 +469,13 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                 key={m.key}
                 type="button"
                 aria-pressed={active}
-                onClick={() =>
+                onClick={() => {
                   // Switching methods clears the follow-up answers — a bank
                   // picked for credit must not silently ride along to cash.
-                  setPay({ method: m.key, followUps: {} })
-                }
+                  setPay({ method: m.key, followUps: {} });
+                  // Stripe: the tap itself should pop the QR (Loo 2026-07-15).
+                  if (m.key === STRIPE_METHOD_KEY) onStripeTap?.();
+                }}
                 className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
                 data-testid={`pay-method-${m.key}`}
               >
