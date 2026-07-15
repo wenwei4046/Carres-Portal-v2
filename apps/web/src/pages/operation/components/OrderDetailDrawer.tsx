@@ -1432,6 +1432,17 @@ function DrawerBody({
             </button>
           </div>
           <span className="flex items-center gap-1 shrink-0">
+            {/* Ordered date lives HERE on the collapsed strip (Jess 2026-07-15
+                rev 2) — muted meta, right side, before flag/⋮. */}
+            {order.placed_at && (
+              <span
+                className="flex items-center gap-1 text-[12px] text-base-400 mr-1 whitespace-nowrap"
+                title="Order placed"
+              >
+                <Calendar size={12} className="shrink-0" aria-hidden="true" />
+                ordered {fmtDate(order.placed_at).split(", ")[0]}
+              </span>
+            )}
             <button
               type="button"
               onClick={onFollowUpClick}
@@ -1465,9 +1476,6 @@ function DrawerBody({
           <CustomerExpand
             order={order}
             regionLabel={loc.label ?? null}
-            orderedLabel={
-              order.placed_at ? fmtDate(order.placed_at).split(", ")[0] : null
-            }
             salutation={salutation}
             onSalutation={saveSalutation}
           />
@@ -2712,16 +2720,16 @@ function LoanSofaModal({
  * API uses. (Jess 2026-06-25, #4 drawer edit.)
  */
 /** Header-strip customer block (Jess 2026-07-15 — the left-column Customer
- *  panel folded into the identity strip). Read = ONE full-width line of
- *  icon-led copy-chips (phone accent / region / address / ordered), 0.5px
- *  hairline verticals between them, + [WhatsApp] + [⋮]. Click a chip = copy
- *  that field. ⋮ Edit details flips the line into the edit form (name /
- *  phone / address + the messages salutation). Save logic mirrors
- *  OrderCustomerCard (updateOrderInputSchema, presence-only fields). */
+ *  panel folded into the identity strip; rev 2 = cream pills). Read = ONE
+ *  full-width line of cream copy-PILLS (icon + value; phone accent), 8px gap
+ *  — white panel + cream blocks per UI-KIT, no verticals — + the round green
+ *  WhatsApp button + [⋮]. Click a pill = copy that field. Ordered date lives
+ *  on the collapsed strip, not here. ⋮ Edit details flips the line into the
+ *  edit form (name / phone / address + the messages salutation). Save logic
+ *  mirrors OrderCustomerCard (updateOrderInputSchema, presence-only). */
 function CustomerExpand({
   order,
   regionLabel,
-  orderedLabel,
   salutation,
   onSalutation,
 }: {
@@ -2733,7 +2741,6 @@ function CustomerExpand({
     customer_address: string | null;
   };
   regionLabel: string | null;
-  orderedLabel: string | null;
   /** Preferred greeting for WhatsApp messages (local-only store). */
   salutation: string;
   onSalutation: (v: string) => void;
@@ -2786,10 +2793,11 @@ function CustomerExpand({
   const wa = waLink(order.customer_phone);
   const field =
     "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
-  // One chip per field: muted icon first, value in normal ink (phone accent);
-  // click = copy. Hairline border-l separates chips (the first has none).
-  const chipCls =
-    "min-w-0 flex items-center gap-1.5 text-[12.5px] text-base-800 hover:text-base-900 px-3 first:pl-0 border-l border-base-200 first:border-l-0";
+  // One cream PILL per field (rev 2): cream token bg + hairline + --radius on
+  // the white panel; muted icon + value in normal ink (phone accent); click =
+  // copy. 8px gap separates pills — no verticals.
+  const pillCls =
+    "min-w-0 flex items-center gap-1.5 text-[12.5px] text-base-800 hover:text-base-900 bg-background border border-base-200 rounded-[8px] px-2.5 py-1 hover:brightness-[0.98] disabled:opacity-50";
 
   if (editing) {
     return (
@@ -2864,13 +2872,13 @@ function CustomerExpand({
       className="px-4 py-2 border-t border-base-100 flex items-center gap-2 min-w-0"
       data-testid="customer-expand"
     >
-      <div className="min-w-0 flex-1 flex items-center">
+      <div className="min-w-0 flex-1 flex items-center gap-2">
         <button
           type="button"
           onClick={() => copy("Phone", order.customer_phone)}
           disabled={!order.customer_phone}
           title="Copy phone"
-          className={chipCls}
+          className={`${pillCls} shrink-0`}
         >
           <Phone size={13} className="shrink-0 text-base-400" aria-hidden="true" />
           <span className="truncate font-medium text-primary">
@@ -2882,7 +2890,7 @@ function CustomerExpand({
           onClick={() => copy("Region", regionLabel)}
           disabled={!regionLabel}
           title="Copy region"
-          className={chipCls}
+          className={`${pillCls} shrink-0`}
         >
           <MapPin size={13} className="shrink-0 text-base-400" aria-hidden="true" />
           <span className="truncate">{regionLabel ?? "—"}</span>
@@ -2892,21 +2900,18 @@ function CustomerExpand({
           onClick={() => copy("Address", order.customer_address)}
           disabled={!order.customer_address}
           title="Copy address"
-          className={`${chipCls} flex-1`}
+          className={pillCls}
         >
           <Home size={13} className="shrink-0 text-base-400" aria-hidden="true" />
           <span className="truncate text-left">
             {order.customer_address ?? "—"}
           </span>
         </button>
-        {orderedLabel && (
-          <span className={`${chipCls} shrink-0 text-base-500`}>
-            <Calendar size={13} className="shrink-0 text-base-400" aria-hidden="true" />
-            ordered {orderedLabel}
-          </span>
-        )}
       </div>
       <span className="flex items-center gap-1.5 shrink-0">
+        {/* WhatsApp — round cream button (same cream/hairline as the pills, no
+            brand colour) with the outline whatsapp glyph in muted grey; opens
+            wa.me directly, no confirm. */}
         <button
           type="button"
           onClick={() => {
@@ -2914,9 +2919,23 @@ function CustomerExpand({
           }}
           disabled={!wa}
           title="Open WhatsApp chat with the customer"
-          className="btn-secondary text-[12px] disabled:opacity-40"
+          aria-label="WhatsApp the customer"
+          className="w-8 h-8 rounded-full bg-background border border-base-200 hover:brightness-[0.98] disabled:opacity-50 flex items-center justify-center shrink-0 text-base-500 hover:text-base-800"
         >
-          WhatsApp
+          <svg
+            viewBox="0 0 24 24"
+            width={16}
+            height={16}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9" />
+            <path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1" />
+          </svg>
         </button>
         <PanelMenu
           items={[
