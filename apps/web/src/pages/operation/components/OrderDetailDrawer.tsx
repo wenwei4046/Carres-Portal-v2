@@ -812,6 +812,9 @@ function DrawerBody({
   // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
   const customerEditRef = useRef<(() => void) | null>(null);
+  // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
+  // Outstanding-only state carries no Total row, so ⋮ is the way back in).
+  const balanceEditTotalRef = useRef<(() => void) | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
@@ -2219,6 +2222,17 @@ function DrawerBody({
                       toast.success("Outstanding copied");
                     },
                   },
+                  // Keyed totals only — a line-priced (native) total is summed
+                  // from the items and can't be hand-edited.
+                  ...(!hasLineTotal
+                    ? [
+                        {
+                          label: "Edit total",
+                          icon: <Pencil size={14} />,
+                          onClick: () => balanceEditTotalRef.current?.(),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             }
@@ -2272,6 +2286,7 @@ function DrawerBody({
                 }
                 onChase={() => copyChase("customer", "chase")}
                 lastChasedAt={form.control?.last_chased_at ?? null}
+                startEditTotalRef={balanceEditTotalRef}
               />
             </div>
           </Panel>
@@ -3132,6 +3147,7 @@ function MoneyCard({
   onRemind,
   onChase,
   lastChasedAt,
+  startEditTotalRef,
 }: {
   orderId: string;
   form: ReturnType<typeof useOrderControlForm>;
@@ -3151,6 +3167,9 @@ function MoneyCard({
   onChase: () => void;
   /** Shared chase log — the same last_chased_at every chase button stamps. */
   lastChasedAt: string | null;
+  /** Lets the panel ⋮ re-open the total entry once the stack has collapsed to
+   *  the Outstanding-only state (same pattern as the Customer card's edit). */
+  startEditTotalRef?: MutableRefObject<(() => void) | null>;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
@@ -3169,6 +3188,8 @@ function MoneyCard({
   // implies outstanding = the full total, so the four cover everything.)
   const paidInFull = totalSet && outstanding <= 0;
   const partial = totalSet && collected > 0 && outstanding > 0;
+  // Outside entry point (panel ⋮ "Edit total") into the total editor.
+  if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
   // Colour = problem only: Outstanding reads plain ink; danger ONLY on
   // delivery-eve (the step-3 alert row owns the on-hold red).
   const outstandingBig = (
@@ -3197,6 +3218,9 @@ function MoneyCard({
       autoFocus={editingTotal}
       value={form.draft.balance}
       onChange={(e) => form.set("balance", e.target.value)}
+      /* Pin the input while focused: the first digit typed flips totalSet and
+         re-shapes the stack — without this the entry unmounts mid-typing. */
+      onFocus={() => setEditingTotal(true)}
       onBlur={() => setEditingTotal(false)}
       placeholder="Set total (RM)"
       aria-label="Order total"
@@ -3227,24 +3251,33 @@ function MoneyCard({
         </div>
       )}
 
-      {/* §3.2 state-adaptive stack — SectionBand style, values right-aligned. */}
+      {/* §3.2 state-adaptive stack — SectionBand style, values right-aligned.
+          Row FLAGS (not exclusive branches) so the Total entry can stay
+          mounted while it is being typed into, whatever state the keystrokes
+          flip the stack through:
+            · Total row      — total not yet set · partial · while editing
+            · Collected row  — partial only (spec: don't repeat it elsewhere;
+                               the ledger list below shows any stray money)
+            · Outstanding    — owing (big; plain ink unless delivery-eve)
+            · Paid ✓         — settled in full
+            · hint lines     — "Set total…" (no total) / "Collect by" (0 in) */}
       <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
+        {(!totalSet || partial || editingTotal) && (
+          <MoneyRow label="Total">{totalNode}</MoneyRow>
+        )}
+        {partial && (
+          <MoneyRow label="Collected">
+            <span className="font-mono text-[12px] text-success">
+              {RM(collected)}
+            </span>
+          </MoneyRow>
+        )}
         {!totalSet ? (
-          /* Total not set → neutral hint + the set-total entry. NEVER an
+          /* Total not set → neutral hint + the set-total entry ONLY. NEVER an
              error-red Outstanding in this state. */
-          <>
-            <MoneyRow label="Total">{totalNode}</MoneyRow>
-            {collected > 0 && (
-              <MoneyRow label="Collected">
-                <span className="font-mono text-[12px] text-success">
-                  {RM(collected)}
-                </span>
-              </MoneyRow>
-            )}
-            <div className="px-3 py-1.5 text-[11px] text-base-400">
-              Set total to calculate balance
-            </div>
-          </>
+          <div className="px-3 py-1.5 text-[11px] text-base-400">
+            Set total to calculate balance
+          </div>
         ) : paidInFull ? (
           /* Paid in full → Paid ✓ green, no Outstanding. */
           <MoneyRow label="Balance" strong>
@@ -3252,27 +3285,14 @@ function MoneyCard({
               Paid ✓
             </span>
           </MoneyRow>
-        ) : partial ? (
-          /* Partial → Total / Collected (green) / Outstanding (big). */
-          <>
-            <MoneyRow label="Total">{totalNode}</MoneyRow>
-            <MoneyRow label="Collected">
-              <span className="font-mono text-[12px] text-success">
-                {RM(collected)}
-              </span>
-            </MoneyRow>
-            <MoneyRow label="Outstanding" strong>
-              {outstandingBig}
-            </MoneyRow>
-          </>
         ) : (
-          /* Nothing collected → ONLY Outstanding big (don't repeat Total /
-             Collected) + the collect-by line under it. */
+          /* Owing → Outstanding big; when NOTHING is collected yet, only this
+             plus the collect-by line (no Total/Collected repeat). */
           <>
             <MoneyRow label="Outstanding" strong>
               {outstandingBig}
             </MoneyRow>
-            {collectByLabel && (
+            {collected === 0 && collectByLabel && (
               <div className="px-3 py-1.5 text-[11px] text-base-400">
                 Collect by {collectByLabel}
               </div>
