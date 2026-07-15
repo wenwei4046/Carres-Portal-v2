@@ -29,11 +29,18 @@ interface Props {
   /** 0224 — prefill the amount (wizard hand-off: the deposit picked on the
    *  CONFIRM step). Clamped to outstanding; absent → full outstanding. */
   initialAmount?: number;
+  /** 0224 — pay-before-create: the amount was already picked on the CONFIRM
+   *  step, so skip the amount stage and mint the link immediately (the QR is
+   *  the first thing the salesperson sees). */
+  lockAmount?: boolean;
   customerName: string;
   customerPhone: string | null;
   /** 0224 — fired ONCE when the poll reports the session paid (the money is
    *  already recorded server-side by then). */
   onPaid?: (amount: number) => void;
+  /** 0224 pay-before-create — renders a "void this order" escape hatch on the
+   *  QR stage (wizard flow only; the My-orders drawer never voids). */
+  onVoidOrder?: () => void;
   onClose: () => void;
 }
 
@@ -55,9 +62,11 @@ export default function StripeCollectModal({
   total,
   paid,
   initialAmount,
+  lockAmount,
   customerName,
   customerPhone,
   onPaid,
+  onVoidOrder,
   onClose,
 }: Props) {
   const qc = useQueryClient();
@@ -101,6 +110,19 @@ export default function StripeCollectModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // lockAmount (pay-before-create): the CONFIRM step already picked the
+  // amount — mint the link the moment the modal opens so the QR is the first
+  // thing on screen. One-shot; a create failure falls through to the visible
+  // error + retry button below.
+  const autoFired = useRef(false);
+  useEffect(() => {
+    if (lockAmount && !autoFired.current && !session && amount > 0) {
+      autoFired.current = true;
+      void handleCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockAmount]);
 
   const canCreate = amount > 0 && amount <= outstanding + 0.005 && !createMut.isPending;
 
@@ -160,7 +182,37 @@ export default function StripeCollectModal({
 
         <div className="os-stripe__eyebrow">Collect online · order #{so}</div>
 
-        {stage === "amount" && (
+        {stage === "amount" && lockAmount && (
+          <>
+            <h3 className="os-stripe__title">
+              Collect <sup>RM</sup>
+              {rm2(amount)}
+            </h3>
+            {err ? (
+              <>
+                <div className="os-detail__err">{err}</div>
+                <div className="os-detail__cta">
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={createMut.isPending}
+                    onClick={handleCreate}
+                    data-testid="pos-stripe-retry"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="os-stripe__sub os-stripe__waiting">
+                <RefreshCw size={13} strokeWidth={2} className="os-stripe__spin" />
+                Preparing the QR…
+              </p>
+            )}
+          </>
+        )}
+
+        {stage === "amount" && !lockAmount && (
           <>
             <h3 className="os-stripe__title">How much to collect?</h3>
             <p className="os-stripe__sub">
@@ -247,6 +299,16 @@ export default function StripeCollectModal({
               Link stays valid for 24 hours — you can close this and the payment still records
               automatically.
             </p>
+            {onVoidOrder && (
+              <button
+                type="button"
+                className="os-stripe__void"
+                onClick={onVoidOrder}
+                data-testid="pos-stripe-void"
+              >
+                Customer isn&rsquo;t paying — void this order
+              </button>
+            )}
           </>
         )}
 

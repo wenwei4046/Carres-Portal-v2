@@ -4264,3 +4264,14 @@
   font-family: var(--font-button); font-size: 14px; font-weight: 600; color: #1F6B3A;
 }
 .confirm__collected svg { color: #2F8F4F; }
+
+/* 0224 — pay-before-create void escape hatch on the QR stage. */
+.os-stripe__void {
+  align-self: center;
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  color: var(--c-burnt);
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 4px 8px;
+  transition: 120ms ease;
+}
+.os-stripe__void:hover { color: var(--c-orange); }
