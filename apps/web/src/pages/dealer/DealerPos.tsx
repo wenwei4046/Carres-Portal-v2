@@ -615,6 +615,36 @@ export default function DealerPos({
   // ── 0224 Stripe pay-before-create handlers ──────────────────────────────
   const stripePendingOrder = stripePendingOrderRef.current ?? stripePendingOrderQ.data ?? null;
 
+  // Tap-to-QR (Loo 2026-07-15): tapping the "Pay online" card auto-submits the
+  // moment the draft state (method write included) has committed — the QR is
+  // the very next thing on screen. Not ready → say exactly what's missing and
+  // leave the method selected (the footer button finishes the job).
+  const [stripeAutoFire, setStripeAutoFire] = useState(false);
+  useEffect(() => {
+    if (!stripeAutoFire) return;
+    if (draft.payment.method !== STRIPE_METHOD_KEY) return;
+    setStripeAutoFire(false);
+    if (stripePending || uploading || createOrder.isPending) return;
+    if (draft.paid <= 0) {
+      toast.info("Pick the amount to collect first — 50% / Full / Custom above.");
+      return;
+    }
+    if (!draft.signature || !draft.signature.startsWith("data:image/")) {
+      toast.info("Customer signs first, then the QR opens.");
+      return;
+    }
+    if (!draft.termsAccepted) {
+      toast.info("Tick the T&C box, then the QR opens.");
+      return;
+    }
+    if (!confirmReady || !step3DateValid(draft, minLeadDays) || !effectiveDealerId) {
+      toast.info("Complete the remaining fields, then tap Collect & complete.");
+      return;
+    }
+    void handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeAutoFire, draft, confirmReady, stripePending, uploading, minLeadDays, effectiveDealerId]);
+
   /** Leave the pending state for ThankYou — 'paid' (money recorded) or 'keep'
    *  (dealer keeps the order + the 24h link for a remote customer). */
   function stripeFinalize(kind: "paid" | "keep") {
@@ -958,7 +988,12 @@ export default function DealerPos({
                 <p className="handover__sub">
                   Record payment, then capture the customer signature to complete the order.
                 </p>
-                <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+                <Step3SignaturePayment
+                  draft={draft}
+                  onChange={setDraft}
+                  catalog={catalogQ.data}
+                  onStripeTap={() => setStripeAutoFire(true)}
+                />
               </div>
               <OrderSummaryRail draft={draft} catalog={catalogQ.data} />
             </div>
