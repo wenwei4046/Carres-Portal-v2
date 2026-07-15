@@ -2793,15 +2793,16 @@ function CustomerExpand({
   const wa = waLink(order.customer_phone);
   const field =
     "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
-  // One cream PILL per field (rev 2): cream token bg + hairline + --radius on
-  // the white panel; muted icon + value in normal ink (phone accent); click =
-  // copy. 8px gap separates pills — no verticals.
+  // One WHITE pill per field (rev 3 colour fix): content brighter than its
+  // container — white pill + hairline floating on the light-grey (base-50)
+  // expand strip. Never cream-on-cream: cream is the PAGE background only.
+  // Muted icon + value in normal ink (phone accent); click = copy; 8px gap.
   const pillCls =
-    "min-w-0 flex items-center gap-1.5 text-[12.5px] text-base-800 hover:text-base-900 bg-background border border-base-200 rounded-[8px] px-2.5 py-1 hover:brightness-[0.98] disabled:opacity-50";
+    "min-w-0 flex items-center gap-1.5 text-[12.5px] text-base-800 hover:text-base-900 bg-white border border-base-200 rounded-[8px] px-2.5 py-1 hover:brightness-[0.98] disabled:opacity-50";
 
   if (editing) {
     return (
-      <div className="px-4 pb-3 pt-2.5 border-t border-base-100">
+      <div className="px-4 pb-3 pt-2.5 rounded-[8px] bg-base-50">
         <div className="grid grid-cols-3 gap-2">
           <label className="block">
             <span className="t-tiny text-base-500">Customer name</span>
@@ -2868,8 +2869,10 @@ function CustomerExpand({
   }
 
   return (
+    /* Light-grey container (base-50, one step under white) — the white pills
+       float on it. Rounded to sit inside the white card's inset. */
     <div
-      className="px-4 py-2 border-t border-base-100 flex items-center gap-2 min-w-0"
+      className="px-4 py-2 rounded-[8px] bg-base-50 flex items-center gap-2 min-w-0"
       data-testid="customer-expand"
     >
       <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -2909,9 +2912,9 @@ function CustomerExpand({
         </button>
       </div>
       <span className="flex items-center gap-1.5 shrink-0">
-        {/* WhatsApp — round cream button (same cream/hairline as the pills, no
-            brand colour) with the outline whatsapp glyph in muted grey; opens
-            wa.me directly, no confirm. */}
+        {/* WhatsApp — round WHITE button (same family as the pills, no brand
+            colour) with the outline whatsapp glyph in muted grey; opens wa.me
+            directly, no confirm. */}
         <button
           type="button"
           onClick={() => {
@@ -2920,7 +2923,7 @@ function CustomerExpand({
           disabled={!wa}
           title="Open WhatsApp chat with the customer"
           aria-label="WhatsApp the customer"
-          className="w-8 h-8 rounded-full bg-background border border-base-200 hover:brightness-[0.98] disabled:opacity-50 flex items-center justify-center shrink-0 text-base-500 hover:text-base-800"
+          className="w-8 h-8 rounded-full bg-white border border-base-200 hover:brightness-[0.98] disabled:opacity-50 flex items-center justify-center shrink-0 text-base-500 hover:text-base-800"
         >
           <svg
             viewBox="0 0 24 24"
