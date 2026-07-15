@@ -62,6 +62,7 @@ import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
 import {
   buildCustomerChase,
+  buildCustomerFinalReminder,
   buildCustomerReminder,
   buildLogisticChase,
   buildLogisticReminder,
@@ -983,10 +984,8 @@ function DrawerBody({
     deliveryMs !== null
       ? fmtDate(new Date(deliveryMs - 7 * 86_400_000).toISOString().slice(0, 10))
       : null;
-  const lastCallLabel =
-    deliveryMs !== null
-      ? fmtDate(new Date(deliveryMs - 1 * 86_400_000).toISOString().slice(0, 10))
-      : null;
+  // (lastCallLabel dropped with the old hold/warn strip — the §3.2 delivery-eve
+  //  flag + the step-3 On-hold alert row carry the last-call signal now.)
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
   // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
   // stock, so they're excluded from the count. The panel header badge tallies
@@ -1118,6 +1117,15 @@ function DrawerBody({
   // Outstanding drives them all, so pill / strip / header sticker never disagree.
   const isOwing = balanceOwing;
   const owingAmt = moneyOutstanding;
+  // Delivery-eve (page-rebuild §3.2): owing AND delivery is today/tomorrow →
+  // the Balance panel shows the red flag, Outstanding reads danger, and Remind
+  // switches to the final-reminder tone.
+  const deliveryEveLabel: "today" | "tomorrow" | null =
+    balanceOwing && daysToDelivery !== null && daysToDelivery >= 0 && daysToDelivery <= 1
+      ? daysToDelivery === 0
+        ? "today"
+        : "tomorrow"
+      : null;
 
   // The formal LP name resolves through the partners map (like the list does).
   const formalPartnerName =
@@ -1171,16 +1179,25 @@ function DrawerBody({
   const orderRef = (order.source_ref ?? [])[0] ?? null;
   const copyChase = (
     aud: "customer" | "logistic" | "supplier",
-    tone: "reminder" | "chase",
+    tone: "reminder" | "chase" | "final",
   ) => {
+    const customerInput = {
+      salutation: salutationOf(salutation, order.customer_name),
+      ref: orderRef,
+      outstanding: rmAmount(moneyOutstanding),
+      lines: orderedLines,
+    };
     const text =
       aud === "customer"
-        ? (tone === "reminder" ? buildCustomerReminder : buildCustomerChase)({
-            salutation: salutationOf(salutation, order.customer_name),
-            ref: orderRef,
-            outstanding: rmAmount(moneyOutstanding),
-            lines: orderedLines,
-          })
+        ? tone === "final"
+          ? /* Delivery-eve final reminder (§3.2) — customer-only tone. */
+            buildCustomerFinalReminder({
+              ...customerInput,
+              when: deliveryEveLabel ?? "tomorrow",
+            })
+          : (tone === "reminder" ? buildCustomerReminder : buildCustomerChase)(
+              customerInput,
+            )
         : aud === "supplier"
           ? (tone === "reminder" ? buildSupplierReminder : buildSupplierChase)({
               poNo: firstPoNo,
@@ -1199,7 +1216,9 @@ function DrawerBody({
             });
     void navigator.clipboard.writeText(text);
     toast.success(
-      `${tone === "reminder" ? "Reminder" : "Chase"} copied — paste into WhatsApp`,
+      `${
+        tone === "chase" ? "Chase" : tone === "final" ? "Final reminder" : "Reminder"
+      } copied — paste into WhatsApp`,
     );
     // The logged chase event — today a manual WhatsApp copy stamps it; the
     // future portal auto-fire writes the SAME event.
@@ -2033,6 +2052,19 @@ function DrawerBody({
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
             />
           </Panel>
+
+          {/* Card C — Activity & notes (Jess 2026-07-11 Option 1; moved to the
+              right column BOTTOM 2026-07-15 — page-rebuild step 2). THE single
+              place for all hand-written follow-up on this order: the compose box
+              lives here, so a note auto-attaches to THIS order (no order-picker),
+              and every entry stacks with author + timestamp + tag. Also merges
+              the system activity (imports, stock moves). Carries `grow` to fill
+              the column; scrolls its own body. Reuses AnnotationTimeline. */}
+          <Panel title="Activity & notes" grow>
+            <div className="p-3 overflow-auto min-h-0">
+              <AnnotationTimeline orderId={order.id} />
+            </div>
+          </Panel>
           </SectionCard>
           </div>
         </div>
@@ -2217,24 +2249,9 @@ function DrawerBody({
             }
           >
             <div className="p-3">
-              {balanceOwing && collectByLabel && (
-                /* Colour lock: no red block here — hold/warn read as coloured
-                   TEXT on the neutral surface (the banner owns the red block). */
-                <div
-                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] bg-base-50 ${
-                    balanceGate === "hold"
-                      ? "text-danger"
-                      : balanceGate === "warn"
-                        ? "text-warning"
-                        : "text-base-500"
-                  }`}
-                >
-                  <span>Collect by {collectByLabel}</span>
-                  <span className="font-medium whitespace-nowrap">
-                    last call {lastCallLabel}
-                  </span>
-                </div>
-              )}
+              {/* Page-rebuild §3.2 — the state-adaptive money stack owns the
+                  collect-by line + the delivery-eve red flag now (the old
+                  hold/warn strip folded into it). */}
               <MoneyCard
                 orderId={order.id}
                 form={form}
@@ -2248,6 +2265,13 @@ function DrawerBody({
                   orderCode: `SO-${order.so}`,
                   customerName: order.customer_name ?? "",
                 }}
+                collectByLabel={collectByLabel}
+                deliveryEve={deliveryEveLabel}
+                onRemind={() =>
+                  copyChase("customer", deliveryEveLabel ? "final" : "reminder")
+                }
+                onChase={() => copyChase("customer", "chase")}
+                lastChasedAt={form.control?.last_chased_at ?? null}
               />
             </div>
           </Panel>
@@ -2486,19 +2510,6 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* Card C — Activity & notes (Jess 2026-07-11, Option 1). THE single
-              place for all hand-written follow-up on this order: the compose box
-              lives here, so a note auto-attaches to THIS order (no order-picker),
-              and every entry stacks with author + timestamp + tag — replacing the
-              old overwrite-one-box "Carrier's remark". Also merges the system
-              activity (imports, stock moves) so a new joiner reads the whole
-              in-flight order at a glance. Carries `grow` to fill the column;
-              scrolls its own body. Reuses the already-live AnnotationTimeline. */}
-          <Panel title="Activity & notes" grow>
-            <div className="p-3 overflow-auto min-h-0">
-              <AnnotationTimeline orderId={order.id} />
-            </div>
-          </Panel>
           </SectionCard>
         </div>{/* /left panel */}
         </div>{/* /main|side grid */}
@@ -3116,6 +3127,11 @@ function MoneyCard({
   outstanding,
   ledger,
   receiptMeta,
+  collectByLabel,
+  deliveryEve,
+  onRemind,
+  onChase,
+  lastChasedAt,
 }: {
   orderId: string;
   form: ReturnType<typeof useOrderControlForm>;
@@ -3126,6 +3142,15 @@ function MoneyCard({
   outstanding: number;
   ledger: OrderPaymentRow[];
   receiptMeta: { orderCode: string; customerName: string };
+  /** "Collect by <date>" under Outstanding when nothing is collected yet. */
+  collectByLabel: string | null;
+  /** Owing + delivery today/tomorrow → red flag + danger Outstanding +
+   *  final-reminder Remind tone (page-rebuild §3.2). */
+  deliveryEve: "today" | "tomorrow" | null;
+  onRemind: () => void;
+  onChase: () => void;
+  /** Shared chase log — the same last_chased_at every chase button stamps. */
+  lastChasedAt: string | null;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
@@ -3140,61 +3165,120 @@ function MoneyCard({
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
   });
 
+  // Page-rebuild §3.2 — the four adaptive states. (totalSet && collected===0
+  // implies outstanding = the full total, so the four cover everything.)
+  const paidInFull = totalSet && outstanding <= 0;
+  const partial = totalSet && collected > 0 && outstanding > 0;
+  // Colour = problem only: Outstanding reads plain ink; danger ONLY on
+  // delivery-eve (the step-3 alert row owns the on-hold red).
+  const outstandingBig = (
+    <span
+      className={`font-mono text-[18px] font-bold leading-none ${
+        deliveryEve ? "text-danger" : "text-base-900"
+      }`}
+    >
+      {RM(outstanding)}
+    </span>
+  );
+  // The set-total entry — reused by the partial Total row AND the no-total
+  // hint state. Reads formatted once keyed; click to edit.
+  const totalNode = hasLineTotal ? (
+    <span
+      className="font-mono text-[12px] text-base-600"
+      title="Summed from the order items"
+    >
+      {RM(orderTotal)}
+    </span>
+  ) : editingTotal || orderTotal <= 0 ? (
+    <input
+      type="number"
+      min={0}
+      step="0.01"
+      autoFocus={editingTotal}
+      value={form.draft.balance}
+      onChange={(e) => form.set("balance", e.target.value)}
+      onBlur={() => setEditingTotal(false)}
+      placeholder="Set total (RM)"
+      aria-label="Order total"
+      className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+    />
+  ) : (
+    <button
+      type="button"
+      onClick={() => setEditingTotal(true)}
+      title="Keyed total — click to edit"
+      className="font-mono text-[12px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
+    >
+      {RM(orderTotal)}
+    </button>
+  );
+
   return (
     <div className="space-y-2.5">
-      {/* §7.4 — Outstanding (= Total − Collected) leads, PROMINENT; Total +
-          Collected follow as small rows. */}
+      {/* Delivery-eve red flag (§3.2) — danger TEXT on the neutral surface
+          (no red block; the alert stripe belongs to the step-3 alert rows). */}
+      {deliveryEve && (
+        <div
+          className="flex items-center gap-1.5 rounded-md bg-base-50 px-2 py-1.5 text-[11.5px] font-medium text-danger"
+          data-testid="balance-delivery-eve"
+        >
+          <AlertCircle size={12} strokeWidth={2.5} className="shrink-0" />
+          Delivery {deliveryEve}, still owing {RM(outstanding)}
+        </div>
+      )}
+
+      {/* §3.2 state-adaptive stack — SectionBand style, values right-aligned. */}
       <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
-        <MoneyRow label="Outstanding" strong>
-          {totalSet ? (
-            <span
-              className={`font-mono text-[18px] font-bold leading-none ${
-                outstanding > 0 ? "text-[#991B1B]" : "text-success"
-              }`}
-            >
-              {outstanding > 0 ? RM(outstanding) : "Settled"}
+        {!totalSet ? (
+          /* Total not set → neutral hint + the set-total entry. NEVER an
+             error-red Outstanding in this state. */
+          <>
+            <MoneyRow label="Total">{totalNode}</MoneyRow>
+            {collected > 0 && (
+              <MoneyRow label="Collected">
+                <span className="font-mono text-[12px] text-success">
+                  {RM(collected)}
+                </span>
+              </MoneyRow>
+            )}
+            <div className="px-3 py-1.5 text-[11px] text-base-400">
+              Set total to calculate balance
+            </div>
+          </>
+        ) : paidInFull ? (
+          /* Paid in full → Paid ✓ green, no Outstanding. */
+          <MoneyRow label="Balance" strong>
+            <span className="font-mono text-[18px] font-bold leading-none text-success">
+              Paid ✓
             </span>
-          ) : (
-            <span className="text-[11px] text-base-400">Total not set</span>
-          )}
-        </MoneyRow>
-        <MoneyRow label="Total">
-          {hasLineTotal ? (
-            <span
-              className="font-mono text-[12px] text-base-600"
-              title="Summed from the order items"
-            >
-              {RM(orderTotal)}
-            </span>
-          ) : editingTotal || orderTotal <= 0 ? (
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              autoFocus={editingTotal}
-              value={form.draft.balance}
-              onChange={(e) => form.set("balance", e.target.value)}
-              onBlur={() => setEditingTotal(false)}
-              placeholder="Set total (RM)"
-              aria-label="Order total"
-              className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditingTotal(true)}
-              title="Keyed total — click to edit"
-              className="font-mono text-[12px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
-            >
-              {RM(orderTotal)}
-            </button>
-          )}
-        </MoneyRow>
-        <MoneyRow label="Collected">
-          <span className="font-mono text-[12px] text-base-600">
-            {RM(collected)}
-          </span>
-        </MoneyRow>
+          </MoneyRow>
+        ) : partial ? (
+          /* Partial → Total / Collected (green) / Outstanding (big). */
+          <>
+            <MoneyRow label="Total">{totalNode}</MoneyRow>
+            <MoneyRow label="Collected">
+              <span className="font-mono text-[12px] text-success">
+                {RM(collected)}
+              </span>
+            </MoneyRow>
+            <MoneyRow label="Outstanding" strong>
+              {outstandingBig}
+            </MoneyRow>
+          </>
+        ) : (
+          /* Nothing collected → ONLY Outstanding big (don't repeat Total /
+             Collected) + the collect-by line under it. */
+          <>
+            <MoneyRow label="Outstanding" strong>
+              {outstandingBig}
+            </MoneyRow>
+            {collectByLabel && (
+              <div className="px-3 py-1.5 text-[11px] text-base-400">
+                Collect by {collectByLabel}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Payment history — one line per payment: label · date · amount · receipt. */}
@@ -3244,22 +3328,65 @@ function MoneyCard({
         </div>
       )}
 
-      {/* Record payment — the ONE flame CTA (Jess). Opens the 3-field form. */}
-      {adding ? (
-        <RecordPaymentForm
-          pending={record.isPending}
-          onCancel={() => setAdding(false)}
-          onSubmit={(input) =>
-            record.mutate(
-              { ...input, method: "cash", kind: "payment" },
-              { onSuccess: () => setAdding(false) },
-            )
-          }
-        />
-      ) : (
-        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[12px]">
-          Record payment
+      {/* §3.2 bottom actions — + Add payment (the ONE flame CTA; opens the
+          3-field popup) · Remind + Chase to the CUSTOMER (both stamp the ONE
+          shared chase log). On delivery-eve the Remind flips to the firmer
+          final-reminder tone. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="btn-hero text-[12px]"
+        >
+          + Add payment
         </button>
+        {totalSet && outstanding > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={onRemind}
+              title={
+                deliveryEve
+                  ? "Copy the delivery-eve FINAL reminder + log the chase event"
+                  : "Copy the gentle payment reminder + log the chase event"
+              }
+              className={REMIND_BTN}
+            >
+              {deliveryEve ? "Final reminder" : "Remind"}
+            </button>
+            <button
+              type="button"
+              onClick={onChase}
+              title="Copy the firmer payment chase + log the chase event"
+              className={CHASE_BTN}
+            >
+              Chase
+            </button>
+          </>
+        )}
+      </div>
+      {lastChasedAt && (
+        <div className="text-[11px] text-base-400">
+          Last chased {fmtDate(lastChasedAt)}
+        </div>
+      )}
+
+      {/* + Add payment popup (§3.2): amount + date received (default today) +
+          note ONLY. Collected/Outstanding recompute from the ledger on save;
+          payments can be VOIDED (reversed), never deleted. */}
+      {adding && (
+        <Modal title="Add payment" onClose={() => setAdding(false)}>
+          <RecordPaymentForm
+            pending={record.isPending}
+            onCancel={() => setAdding(false)}
+            onSubmit={(input) =>
+              record.mutate(
+                { ...input, method: "cash", kind: "payment" },
+                { onSuccess: () => setAdding(false) },
+              )
+            }
+          />
+        </Modal>
       )}
     </div>
   );

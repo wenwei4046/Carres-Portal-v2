@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildCustomerReminder,
   buildCustomerChase,
+  buildCustomerFinalReminder,
   buildLogisticReminder,
   buildLogisticChase,
   buildSupplierReminder,
@@ -85,6 +86,34 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
       expect(msg).not.toMatch(/deadline|deliver on time|settle by/i);
       expect(msg).not.toMatch(/SO-\d+/);
     }
+  });
+
+  it("customer FINAL reminder (delivery-eve, page-rebuild §3.2) — carries the when, still REF-led", () => {
+    const t = buildCustomerFinalReminder({
+      salutation: "Lee Wei Yang",
+      ref: "CR0902",
+      outstanding: "1,749",
+      lines: oneLine,
+      when: "tomorrow",
+    });
+    expect(t).toContain(
+      "Final reminder — your delivery is arranged for tomorrow and the balance below is still outstanding.",
+    );
+    expect(t).toContain("REF: CR0902\nOutstanding: RM 1,749");
+    expect(t).toContain(
+      "Kindly settle before delivery so everything can proceed as planned. Thank you!",
+    );
+    expect(t).not.toMatch(/SO-\d+/);
+    // "today" variant reads through verbatim.
+    expect(
+      buildCustomerFinalReminder({
+        salutation: "X",
+        ref: null,
+        outstanding: "0",
+        lines: oneLine,
+        when: "today",
+      }),
+    ).toContain("arranged for today");
   });
 
   it("logistic Reminder + Chase — REF-led, never SO; Chase carries overdue", () => {
