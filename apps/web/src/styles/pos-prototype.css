@@ -4254,3 +4254,13 @@
 .os-stripe__divider::before, .os-stripe__divider::after {
   content: ""; flex: 1; height: 1px; background: var(--line);
 }
+
+/* 0224 — ThankYou "collected online" chip (Stripe collect-at-handover). */
+.confirm__collected {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 48px; padding: 0 20px; border-radius: 999px;
+  background: color-mix(in oklab, #2F8F4F 12%, var(--pos-panel, #fff));
+  border: 1.5px solid #2F8F4F;
+  font-family: var(--font-button); font-size: 14px; font-weight: 600; color: #1F6B3A;
+}
+.confirm__collected svg { color: #2F8F4F; }

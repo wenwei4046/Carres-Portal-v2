@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
-import { CheckCircle2, Copy, Link2, MessageCircle, RefreshCw, X } from "lucide-react";
+import { CheckCircle2, Copy, Link2, MessageCircle, ReceiptText, RefreshCw, X } from "lucide-react";
 import type { StripeCheckoutSessionInfo } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { qk, useCreateStripeCheckout, useStripeCheckoutStatus } from "@/lib/queries";
@@ -26,8 +26,14 @@ interface Props {
   /** Live balance figures from the drawer (server re-validates on create). */
   total: number;
   paid: number;
+  /** 0224 — prefill the amount (wizard hand-off: the deposit picked on the
+   *  CONFIRM step). Clamped to outstanding; absent → full outstanding. */
+  initialAmount?: number;
   customerName: string;
   customerPhone: string | null;
+  /** 0224 — fired ONCE when the poll reports the session paid (the money is
+   *  already recorded server-side by then). */
+  onPaid?: (amount: number) => void;
   onClose: () => void;
 }
 
@@ -48,15 +54,19 @@ export default function StripeCollectModal({
   so,
   total,
   paid,
+  initialAmount,
   customerName,
   customerPhone,
+  onPaid,
   onClose,
 }: Props) {
   const qc = useQueryClient();
   const outstanding = Math.max(0, total - paid);
   const toHalf = Math.max(0, total / 2 - paid);
 
-  const [amount, setAmount] = useState(() => Number(outstanding.toFixed(2)));
+  const [amount, setAmount] = useState(() =>
+    Number(Math.min(initialAmount ?? outstanding, outstanding).toFixed(2)),
+  );
   const [session, setSession] = useState<StripeCheckoutSessionInfo | null>(null);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -67,16 +77,22 @@ export default function StripeCollectModal({
   });
 
   // Fold poll results back into the local session; on 'paid' the money is
-  // already recorded server-side — refresh the drawer + board.
+  // already recorded server-side — refresh the drawer + board and tell the
+  // caller once (ThankYou folds the amount into its receipt panel).
   const live = statusQ.data?.session;
+  const paidNotified = useRef(false);
   useEffect(() => {
     if (!live) return;
     setSession(live);
     if (live.status === "paid") {
       void qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      if (!paidNotified.current) {
+        paidNotified.current = true;
+        onPaid?.(live.amount);
+      }
     }
-  }, [live, orderId, qc]);
+  }, [live, orderId, qc, onPaid]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -243,6 +259,18 @@ export default function StripeCollectModal({
             <p className="os-stripe__sub">
               Recorded automatically{session.paymentMethodDetail ? ` · ${session.paymentMethodDetail}` : ""}.
             </p>
+            {session.receiptUrl && (
+              <a
+                className="btn btn--ghost"
+                href={session.receiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                data-testid="pos-stripe-receipt"
+              >
+                <ReceiptText size={15} />
+                View Stripe receipt
+              </a>
+            )}
             <div className="os-detail__cta">
               <button type="button" className="btn btn--primary" onClick={onClose}>
                 Done

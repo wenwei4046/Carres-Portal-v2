@@ -44,3 +44,11 @@ export function describePaymentMethod(pi: Stripe.PaymentIntent | null): string |
   }
   return d.type;
 }
+
+/** Stripe's hosted receipt for the captured charge (0224) — the payment's
+ *  "slip" for finance reconciliation. Needs latest_charge expanded. */
+export function receiptUrlOf(pi: Stripe.PaymentIntent | null): string | null {
+  const charge = pi?.latest_charge;
+  if (!charge || typeof charge === "string") return null;
+  return charge.receipt_url ?? null;
+}

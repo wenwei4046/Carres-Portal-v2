@@ -32,6 +32,7 @@ const SESSION: StripeCheckoutSessionInfo = {
   paidAt: null,
   expiresAt: "2026-07-15T00:00:00Z",
   paymentMethodDetail: null,
+  receiptUrl: null,
 };
 
 function mount() {
@@ -79,11 +80,22 @@ describe("StripeCollectModal", () => {
     // The mocked poll hook reports 'paid' immediately — the effect folds it in
     // regardless of which stage the modal is on (mirrors a WhatsApp'd link
     // being paid while the salesperson reopened the modal).
-    statusData = { session: { ...SESSION, status: "paid", paymentMethodDetail: "fpx (maybank2u)" } };
+    statusData = {
+      session: {
+        ...SESSION,
+        status: "paid",
+        paymentMethodDetail: "fpx (maybank2u)",
+        receiptUrl: "https://pay.stripe.com/receipts/abc",
+      },
+    };
     mount();
     await waitFor(() => expect(screen.getByTestId("pos-stripe-paid")).toBeInTheDocument());
     expect(screen.getByTestId("pos-stripe-paid").textContent).toContain("1,600.00");
     expect(screen.getByTestId("pos-stripe-paid").textContent).toContain("fpx (maybank2u)");
+    // 0224 — the Stripe hosted receipt IS the slip finance opens.
+    expect(screen.getByTestId("pos-stripe-receipt").getAttribute("href")).toBe(
+      "https://pay.stripe.com/receipts/abc",
+    );
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["orders", "o-1"], exact: true });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["orders"] });
   });
