@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   Bell,
@@ -31,9 +32,12 @@ import {
   Pencil,
   Phone,
   RotateCcw,
+  ScrollText,
   Truck,
   Undo2,
+  User,
   Wallet,
+  Warehouse,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -687,6 +691,82 @@ function MiniBadge({
 // (ReadinessBadge removed 2026-07-13 — the Items header now shows
 //  "<ready> ready · <toReserve> to reserve" inline, from the shared lineReadiness.)
 
+
+/** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
+ *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
+type DrawerTab = "items" | "delivery" | "balance" | "storage" | "activity";
+
+type TrackStepState = "done" | "current" | "todo";
+type TrackStep = { label: string; state: TrackStepState; meta?: string };
+
+/** ProgressTrack — one party's journey as a step line (UI-KIT §8c/§8d: read
+ *  by shape — pick-state circles; done=green ✓ · current=flame ring · todo=
+ *  grey). Read-only triage; actions live in the KPI cards / tabs. */
+function ProgressTrack({
+  icon,
+  label,
+  steps,
+}: {
+  icon: ReactNode;
+  label: string;
+  steps: TrackStep[];
+}) {
+  return (
+    <div className="px-3 py-3 border-b border-base-100 last:border-b-0">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <span className="text-base-400">{icon}</span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
+          {label}
+        </span>
+      </div>
+      <ol className="flex items-start">
+        {steps.map((st, i) => (
+          <li key={st.label} className="flex-1 min-w-0">
+            <div className="flex items-center">
+              <span
+                className={`shrink-0 w-5 h-5 rounded-full inline-grid place-items-center border-[1.5px] ${
+                  st.state === "done"
+                    ? "bg-success-soft border-success text-success"
+                    : st.state === "current"
+                      ? "bg-white border-primary"
+                      : "bg-white border-base-300"
+                }`}
+                aria-label={`${st.label}: ${st.state}`}
+              >
+                {st.state === "done" ? (
+                  <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                ) : st.state === "current" ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                ) : null}
+              </span>
+              {i < steps.length - 1 && (
+                <span
+                  className={`flex-1 h-0.5 mx-1 rounded-full ${
+                    st.state === "done" ? "bg-success/50" : "bg-base-200"
+                  }`}
+                  aria-hidden="true"
+                />
+              )}
+            </div>
+            <div
+              className={`mt-1.5 pr-1 text-[12px] leading-tight ${
+                st.state === "todo" ? "text-base-400" : "text-base-900 font-medium"
+              }`}
+            >
+              {st.label}
+            </div>
+            {st.meta && (
+              <div className="text-[12px] text-base-400 leading-tight truncate" title={st.meta}>
+                {st.meta}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** KpiBox — a header metric card for ONE mission track (UI-KIT §3 + §7.2):
  *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
  *  small alert mark when red — no dots), sub-facts side by side when a track
@@ -699,6 +779,7 @@ function KpiBox({
   value,
   subs,
   actions,
+  onOpen,
 }: {
   icon: ReactNode;
   label: string;
@@ -708,6 +789,8 @@ function KpiBox({
   subs?: ReactNode[];
   /** Chase button(s) when the track is red/actionable. */
   actions?: ReactNode;
+  /** Click-through — the whole card jumps to its detail tab. */
+  onOpen?: () => void;
 }) {
   /* v4 §2/§4 — number VALUES are never tinted: the headline reads dark in
      every tone; the small danger icon (below) is the alert signal. */
@@ -718,7 +801,11 @@ function KpiBox({
     neutral: "text-base-900",
   };
   return (
-    <div className="kpi-box">
+    <div
+      className={`kpi-box ${onOpen ? "cursor-pointer transition-colors hover:border-base-300" : ""}`}
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+    >
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="shrink-0 text-base-400" aria-hidden="true">
           {icon}
@@ -750,7 +837,12 @@ function KpiBox({
         </div>
       )}
       {actions && (
-        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">{actions}</div>
+        <div
+          className="mt-1.5 flex items-center gap-1.5 flex-wrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {actions}
+        </div>
       )}
     </div>
   );
@@ -1277,6 +1369,74 @@ function DrawerBody({
   // LOGISTIC — green booked or >3 days left · amber ≤3 days & not booked · red
   // deadline passed & not booked.
   const bookedEta = form.control?.logistic_eta ?? null;
+
+  // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
+  const [tab, setTab] = useState<DrawerTab>("items");
+
+  // ═══ The 3-line PROGRESS panel (Jess 2026-07-17) — each party's journey,
+  // derived ONLY from signals the book actually has (no fictional stages). ═══
+  const deliveredDone = pipelineStatus === "completed";
+  const placedDate = order.placed_at ? fmtDate(order.placed_at).split(",")[0] : undefined;
+  const paidDone = totalSet && moneyOutstanding <= 0;
+  const customerSteps: TrackStep[] = [
+    { label: "Placed", state: "done", meta: placedDate },
+    {
+      label: "Confirmed",
+      state: customerConfirmed ? "done" : deliveredDone ? "done" : "current",
+    },
+    {
+      label: "Paid",
+      state: paidDone ? "done" : collected > 0 ? "current" : "todo",
+      meta: totalSet && !paidDone ? `${RM(moneyOutstanding)} due` : undefined,
+    },
+    { label: "Delivered", state: deliveredDone ? "done" : "todo" },
+  ];
+  const anyEta =
+    Object.values(form.draft.line_etas ?? {}).some((v) => !!v) ||
+    pos.some((p) => !!p.eta_date);
+  const goodsN = goodsLines.length;
+  const supplierSteps: TrackStep[] = [
+    {
+      label: "PO raised",
+      state: goodsN > 0 && nopoN === 0 ? "done" : pos.length > 0 ? "current" : "todo",
+      meta: nopoN > 0 ? `${nopoN} no PO` : undefined,
+    },
+    {
+      label: "ETA set",
+      state: anyEta ? "done" : goodsN > 0 && nopoN === 0 ? "current" : "todo",
+    },
+    {
+      label: "Goods ready",
+      state:
+        goodsN > 0 && readyN === goodsN ? "done" : readyN > 0 ? "current" : "todo",
+      meta: goodsN > 0 ? `${readyN}/${goodsN}` : undefined,
+    },
+  ];
+  /** A later DONE implies the earlier steps happened — clamp so a track never
+   *  reads "todo → done" left to right (data-honest but readable). */
+  const clampTrack = (steps: TrackStep[]): TrackStep[] => {
+    let seenDone = false;
+    const out = [...steps];
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (out[i].state === "done") seenDone = true;
+      else if (seenDone) out[i] = { ...out[i], state: "done" };
+    }
+    return out;
+  };
+
+  const logisticSteps: TrackStep[] = [
+    {
+      label: "Assigned",
+      state: assignedLogisticName ? "done" : "todo",
+      meta: assignedLogisticName ?? undefined,
+    },
+    {
+      label: "Booked",
+      state: bookedEta ? "done" : assignedLogisticName ? "current" : "todo",
+      meta: bookedEta ? fmtDate(bookedEta).split(",")[0] : undefined,
+    },
+    { label: "Delivered", state: deliveredDone ? "done" : "todo" },
+  ];
   const logisticTone: KpiTone =
     pipelineStatus === "completed" || bookedEta
       ? "success"
@@ -1531,39 +1691,12 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* side | main — support cards on the LEFT, items + warehouse on the RIGHT
-            (Jess 2026-07-11). Grid AREAS do the flip: "side main" puts the cards
-            column (gridArea:side) first and the items column (gridArea:main)
-            second — no panel code moves. Cards get a fixed ~300px; items fill. */}
-        <div
-          className="grid gap-3 items-stretch flex-1 min-h-0 overflow-hidden"
-          style={{
-            // Page rebuild (Jess 2026-07-15 revision): left 32% (money summary)
-            // | right 68% (goods + chase — the Items table is the hero) | 12px
-            // gap. fr units keep the ratio exact after the gap is taken out.
-            gridTemplateColumns: "minmax(0, 32fr) minmax(0, 68fr)",
-            gridTemplateAreas: '"side main"',
-          }}
-        >
+        {/* KPI tracks (Jess 2026-07-17): SEPARATE white cards, full width,
+            one per mission track — each card jumps to its tab. */}
+        <div className={`shrink-0 grid gap-2.5 ${hasMsbf || hasSof ? "grid-cols-4" : "grid-cols-3"}`}>
 
-        {/* RIGHT Panel (UI-KIT §5.1) — ONE white SectionCard holding the work
-            sections: ITEMS ORDERED / WAREHOUSE STOCK / LOAN, each a cream
-            SectionBand — the exact facet structure. The column scrolls
-            independently (overlay scrollbar); the card fills its height. */}
-        <div
-          style={{ gridArea: "main" }}
-          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
-        >
-          <div className="min-h-full flex flex-col gap-3">
-          {/* Panel 0 — KPI + Alert (page-rebuild §4): ONE white panel holding
-              the 3 mission-track tiles and (step 3) the stacked alert rows.
-              Step-1 shell: the existing KpiBoxes moved here from the old
-              header band; the 1.5fr/1fr/1fr tile split + hairline dividers +
-              alert stack land in the step-3 build. */}
-          {/* KPI tracks (Jess gripe #2, 2026-07-17): THREE SEPARATE white
-              cards — no wrapping panel; each .kpi-box is its own card. */}
-          <div className="shrink-0 grid grid-cols-3 gap-2.5">
               <KpiBox
+                onOpen={() => setTab("balance")}
                 icon={<Wallet size={14} strokeWidth={2.25} />}
                 label="Customer · Money"
                 tone={moneyTone}
@@ -1594,6 +1727,7 @@ function DrawerBody({
                 }
               />
               <KpiBox
+                onOpen={() => setTab("items")}
                 icon={<Package size={14} strokeWidth={2.25} />}
                 label="Stock"
                 tone={stockTone}
@@ -1624,6 +1758,7 @@ function DrawerBody({
                 }
               />
               <KpiBox
+                onOpen={() => setTab("delivery")}
                 icon={<Truck size={14} strokeWidth={2.25} />}
                 label="Logistic"
                 tone={logisticTone}
@@ -1644,7 +1779,85 @@ function DrawerBody({
                   ) : undefined
                 }
               />
-          </div>
+              {(hasMsbf || hasSof) && (
+                <KpiBox
+                  onOpen={() => setTab("storage")}
+                  icon={<Warehouse size={16} strokeWidth={2} />}
+                  label="Storage"
+                  tone={
+                    storageGate === "hold"
+                      ? "danger"
+                      : storageGate === "warn"
+                        ? "warning"
+                        : "neutral"
+                  }
+                  value={
+                    storageOwing
+                      ? storageFee > 0
+                        ? RM(storageFee)
+                        : "Accruing"
+                      : "Not accruing"
+                  }
+                  subs={
+                    storageOwing && storageGate === "hold"
+                      ? ["delivery on hold"]
+                      : undefined
+                  }
+                />
+              )}
+        </div>
+        {/* Tab bar (Jess 2026-07-17 + UI-KIT §9 type-2): the detail surfaces
+            live behind tabs; Items + Warehouse share ONE tab (one workflow).
+            Contents stay MOUNTED (hidden) so edits survive tab switches. */}
+        <div className="shrink-0 bg-white border border-base-200 rounded-[12px] px-2 flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {(
+            [
+              { key: "items", label: "Items & stock", icon: Package, alert: stockTone === "danger" },
+              { key: "delivery", label: "Delivery", icon: Truck, alert: logisticTone === "danger" },
+              { key: "balance", label: "Balance", icon: Wallet, alert: moneyTone === "danger" },
+              ...(hasMsbf || hasSof
+                ? [{ key: "storage", label: "Storage", icon: Warehouse, alert: storageGate === "hold" }]
+                : []),
+              { key: "activity", label: "Activity", icon: ScrollText, alert: false },
+            ] as { key: DrawerTab; label: string; icon: LucideIcon; alert: boolean }[]
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              aria-selected={tab === t.key}
+              className={`inline-flex items-center gap-1.5 h-10 px-3 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                tab === t.key
+                  ? "text-base-900 border-base-900"
+                  : "text-base-500 border-transparent hover:text-base-800"
+              }`}
+            >
+              <t.icon size={16} strokeWidth={2} aria-hidden="true" />
+              {t.label}
+              {t.alert && (
+                <span className="w-1.5 h-1.5 rounded-full bg-danger" aria-label="needs action" />
+              )}
+            </button>
+          ))}
+        </div>
+        {/* Body split (Jess 2026-07-17): LEFT 32% = the 3-line PROGRESS panel
+            (Customer / Supplier / Logistic journeys); RIGHT 68% = the tabbed
+            work surfaces. */}
+        <div
+          className="grid gap-3 items-stretch flex-1 min-h-0 overflow-hidden"
+          style={{
+            gridTemplateColumns: "minmax(0, 32fr) minmax(0, 68fr)",
+            gridTemplateAreas: '"side main"',
+          }}
+        >
+
+        {/* RIGHT — the tab contents. All tabs stay mounted; only the active
+            one is visible, so form edits survive switching. */}
+        <div
+          style={{ gridArea: "main" }}
+          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
+        >
+          <div className={tab === "items" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           {/* v4 §10 SPLIT (Jess 2026-07-16): every panel is its OWN white card
               on the grey canvas, 12px apart — boundaries read from the gaps,
               never from bands inside one lump. */}
@@ -2161,7 +2374,10 @@ function DrawerBody({
           </Panel>
           </SectionCard>
 
-          <SectionCard className="flex-1">
+          </div>
+
+          <div className={tab === "activity" ? "min-h-full flex flex-col gap-3" : "hidden"}>
+          <SectionCard className="shrink-0">
           {/* Card C — Activity & notes (Jess 2026-07-11 Option 1; moved to the
               right column BOTTOM 2026-07-15 — page-rebuild step 2). THE single
               place for all hand-written follow-up on this order: the compose box
@@ -2169,26 +2385,16 @@ function DrawerBody({
               and every entry stacks with author + timestamp + tag. Also merges
               the system activity (imports, stock moves). Carries `grow` to fill
               the column; scrolls its own body. Reuses AnnotationTimeline. */}
-          <Panel title="Activity & notes" grow>
+          <Panel title="Activity & notes">
             <div className="p-3 overflow-auto min-h-0">
               <AnnotationTimeline orderId={order.id} />
             </div>
           </Panel>
           </SectionCard>
           </div>
-        </div>
 
-        {/* LEFT Panel (UI-KIT §5.1) — ONE white SectionCard holding the money
-            summary sections: BALANCE / STORAGE / DELIVERY. The Customer panel
-            moved into the header strip's expandable block (Jess 2026-07-15).
-            Scrolls INDEPENDENTLY of the work column on the right. */}
-        <div
-          style={{ gridArea: "side" }}
-          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
-        >
-          {/* v4 §10 SPLIT (Jess 2026-07-16): one WHITE CARD per panel, 12px
-              apart on the grey canvas — boundaries read from the gaps. */}
-          <div className="min-h-full flex flex-col gap-3">
+
+          <div className={tab === "balance" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           {/* 1. Balance — its OWN card (Jess: split from Storage). Chip = the
               owing amount as danger TEXT (colour lock). The id anchors the
               banner's "Confirm & collect" push. */}
@@ -2350,7 +2556,9 @@ function DrawerBody({
             />
           )}
           </div>
+          </div>
 
+          <div className={tab === "storage" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           {/* 3. Storage — its OWN card (Jess: split from Balance). Chip (Round
               1A): "held <n>d" while a fee is accruing (danger TEXT on hold —
               never a red block) · "not accruing" otherwise. ⋮ hidden until 1B
@@ -2429,10 +2637,9 @@ function DrawerBody({
             </Panel>
             </SectionCard>
           )}
+          </div>
 
-          {/* Loan moved to the RIGHT (work) column, after Warehouse stock
-              (Jess 2026-07-13) — lending is a stock action, not a view card. */}
-
+          <div className={tab === "delivery" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 2 remark rows; then a Route section only
               for a cross-border / multi-leg order. (Natural height now — the
@@ -2591,9 +2798,40 @@ function DrawerBody({
             </div>
           </Panel>
           </SectionCard>
-
           </div>
-        </div>{/* /left panel */}
+        </div>{/* /tab contents */}
+
+        {/* LEFT — the 3-line PROGRESS panel (Jess 2026-07-17): where each
+            party's journey stands — Customer / Supplier / Logistic. Read-only
+            triage; the KPI cards above carry the numbers + chase actions. */}
+        <div
+          style={{ gridArea: "side" }}
+          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
+        >
+          <SectionCard className="min-h-full">
+            <SectionBand
+              title="Progress"
+              collapsed={false}
+              onToggle={() => {}}
+            />
+            <ProgressTrack
+              icon={<User size={16} strokeWidth={2} aria-hidden="true" />}
+              label="Customer"
+              steps={clampTrack(customerSteps)}
+            />
+            <ProgressTrack
+              icon={<Package size={16} strokeWidth={2} aria-hidden="true" />}
+              label="Supplier"
+              steps={clampTrack(supplierSteps)}
+            />
+            <ProgressTrack
+              icon={<Truck size={16} strokeWidth={2} aria-hidden="true" />}
+              label="Logistic"
+              steps={clampTrack(logisticSteps)}
+            />
+          </SectionCard>
+        </div>
+
         </div>{/* /main|side grid */}
       </div>{/* /scroll body */}
     </div>
