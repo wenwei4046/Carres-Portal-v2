@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   Wallet,
   BookOpen,
+  Calculator,
   Truck,
   LifeBuoy,
   ArrowDownLeft,
@@ -117,6 +118,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
       { key: "payments", label: "Payments", icon: Wallet },
       { key: "catalog", label: "Product & Maintenance", icon: BookOpen },
+      // 0226 — the operation-facing COSTING catalog (SKU Master / Modular /
+      // Fabric; prices there are buying costs, isolated from POS selling).
+      { key: "op-catalog", label: "Operation Catalog", icon: Calculator },
       { key: "suppliers", label: "Suppliers", icon: Truck },
       {
         key: "service-notes",
