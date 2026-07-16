@@ -202,6 +202,10 @@
    * chips (soft warm fill + 1px border); INK text colours are unchanged. The base
    * `.pill` carries a transparent border so bordered + border-less pills share the
    * same box geometry (no height jump when they sit side by side). */
+  /* KPI mission-track box (UI-KIT §A8) — the drawer-header metric card. The
+   * ONE home of the #F7F4EE fill; inline use of that hex fails lint RULE E. */
+  .kpi-box { background: #F7F4EE; @apply rounded-[8px] px-3 py-2 min-w-0 flex flex-col; }
+
   .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
   .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue */

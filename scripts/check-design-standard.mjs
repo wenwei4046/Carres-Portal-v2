@@ -21,6 +21,21 @@
  *     importing the shell fails — annotate `// design-standard: not-a-list-page`
  *     with a reason to opt out.
  *
+ *   UI-KIT hard rules (docs/UI-KIT.md §E) — NOT ratcheted; any violation fails.
+ *   Kit scope = KIT_FILES below (the order-drawer family + shared section
+ *   chrome; ADD each file here as it is migrated to the kit). POS
+ *   (pages/dealer/**) has its own contract and is never in scope.
+ *
+ *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 17}. (kit scope)
+ *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {11, 13} body /
+ *     {16, 22} money. Headings use `.t-*` classes. (kit scope)
+ *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
+ *     index.css. (all web src)
+ *   RULE F — drawer panel row heights: `h-[Npx]` with N ≠ 36 — rows are `h-9`;
+ *     the List page's 40px rows live outside this scope. (kit scope)
+ *   RULE G — hand-rolled section chrome: a literal `section-band` class in JSX
+ *     outside components/SectionPanel.tsx — render <SectionBand>. (all web src)
+ *
  * Usage:
  *   node scripts/check-design-standard.mjs                # check (CI/local)
  *   node scripts/check-design-standard.mjs --update-baseline   # re-freeze debt
@@ -124,6 +139,93 @@ for (const f of files) {
         `ListPageShell/PageHeader. Adopt the shell (docs/UI-KIT.md §A9) or add ` +
         `\`// design-standard: not-a-list-page\` with a reason.`,
     );
+  }
+}
+
+// ---- UI-KIT hard rules C–G (docs/UI-KIT.md §E) ---------------------------------
+// Kit-governed files — hard rules C/D/F apply here. ADD a file when you
+// migrate it to the kit; never remove one.
+const KIT_FILES = new Set([
+  "apps/web/src/components/SectionPanel.tsx",
+  "apps/web/src/pages/operation/components/OrderDetailDrawer.tsx",
+  "apps/web/src/pages/operation/components/StockPickerGrid.tsx",
+  "apps/web/src/pages/operation/components/RouteJourneyBar.tsx",
+  "apps/web/src/pages/operation/components/OrderControlPanel.tsx",
+]);
+const ICON_SIZES = new Set([14, 16, 17]);
+const TEXT_SIZES = new Set([11, 13, 16, 22]); // 11/13 body · 16/22 money (headings use .t-*)
+// A `section-band` class inside a string literal (comments don't count).
+const BAND_CLASS_RE = /["'`][^"'`\n]*\bsection-band\b[^"'`\n]*["'`]/g;
+
+const lineOf = (src, index) => src.slice(0, index).split("\n").length;
+
+for (const f of files) {
+  const src = readFileSync(join(ROOT, f), "utf8");
+
+  // RULE E — inline #F7F4EE anywhere in web src (the fill lives in .kpi-box only).
+  if (!/(^|\/)index\.css$/.test(f) && !/design-standard/.test(f)) {
+    let m;
+    const kpiRe = /#F7F4EE/gi;
+    while ((m = kpiRe.exec(src))) {
+      errors.push(
+        `RULE E · inline KPI fill — ${f}:${lineOf(src, m.index)} uses #F7F4EE; use the \`.kpi-box\` token (docs/UI-KIT.md §A8).`,
+      );
+    }
+  }
+
+  // RULE G — hand-rolled section chrome anywhere in web src (JSX/TSX only).
+  if (f.endsWith(".tsx") && !f.endsWith("components/SectionPanel.tsx")) {
+    let m;
+    BAND_CLASS_RE.lastIndex = 0;
+    while ((m = BAND_CLASS_RE.exec(src))) {
+      errors.push(
+        `RULE G · hand-rolled section chrome — ${f}:${lineOf(src, m.index)} uses the \`section-band\` class directly; render <SectionBand>/<SectionCard> from components/SectionPanel.tsx (docs/UI-KIT.md §A8).`,
+      );
+    }
+  }
+
+  if (!KIT_FILES.has(f)) continue;
+
+  // RULE C — Lucide icon sizes.
+  {
+    let m;
+    const sizeRe = /\bsize=\{(\d+)\}/g;
+    while ((m = sizeRe.exec(src))) {
+      const n = Number(m[1]);
+      if (!ICON_SIZES.has(n)) {
+        errors.push(
+          `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (inline) / 16 (panel action) / 17 (top bar) only (docs/UI-KIT.md §A4).`,
+        );
+      }
+    }
+  }
+
+  // RULE D — inline text sizes.
+  {
+    let m;
+    const txtRe = /text-\[(\d+(?:\.\d+)?)px\]/g;
+    while ((m = txtRe.exec(src))) {
+      const n = Number(m[1]);
+      if (!TEXT_SIZES.has(n)) {
+        errors.push(
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11/13 (body) and 16/22 (money) — headings via .t-* (docs/UI-KIT.md §A3).`,
+        );
+      }
+    }
+  }
+
+  // RULE F — drawer panel row heights: any arbitrary px height must be 36.
+  {
+    let m;
+    const hRe = /\bh-\[(\d+)px\]/g;
+    while ((m = hRe.exec(src))) {
+      const n = Number(m[1]);
+      if (n !== 36) {
+        errors.push(
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; drawer panel rows are 36px (h-9) (docs/UI-KIT.md §A7).`,
+        );
+      }
+    }
   }
 }
 

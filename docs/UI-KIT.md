@@ -276,10 +276,12 @@ below fail HARD on kit-governed files.
 | F | drawer components | `h-[Npx]` with N ≠ 36 (rows are `h-9`; the list's 40px lives outside this scope) |
 | G | all `apps/web/src` except `SectionPanel.tsx` | literal `section-band` class in JSX (render `<SectionBand>`) |
 
-**Kit scope** (grows as pages migrate) =
-`pages/operation/components/**` + `components/SectionPanel.tsx`.
-POS (`pages/dealer/**`) and print/PDF are exempt from C/D/F (separate
-contract / non-Tailwind).
+**Kit scope** = the `KIT_FILES` list in the script (today: `SectionPanel.tsx`,
+`OrderDetailDrawer.tsx`, `StockPickerGrid.tsx`, `RouteJourneyBar.tsx`,
+`OrderControlPanel.tsx`). **Add each file to `KIT_FILES` as you migrate it;
+never remove one.** POS (`pages/dealer/**`) and print/PDF are exempt from
+C/D/F (separate contract / non-Tailwind). Legacy operation modals join the
+scope as they're touched.
 
 PR checklist: right archetype shell · no new hex · `.t-*`/`.btn-*` classes ·
 one `.btn-hero` · icons 14/16/17 · drawer rows 36 · lint green.
