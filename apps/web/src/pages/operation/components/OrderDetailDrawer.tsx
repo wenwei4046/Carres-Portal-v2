@@ -620,7 +620,8 @@ function PanelMenu({
         type="button"
         aria-label="Panel actions"
         onClick={() => setOpen((o) => !o)}
-        className="p-0.5 text-base-400 hover:text-base-800 leading-none"
+        /* v4 §11d — action icons rest at mid-grey, never invisible. */
+        className="p-0.5 text-base-500 hover:text-base-800 leading-none"
       >
         <MoreVertical size={16} />
       </button>
@@ -671,8 +672,9 @@ function MiniBadge({
     muted: "bg-base-100 text-base-500",
   };
   return (
+    /* v4 §11e — the ONE pill spec: 11/600, px-2 py-0.5, rounded-full. */
     <span
-      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
+      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
     >
       {children}
     </span>
@@ -1704,27 +1706,27 @@ function DrawerBody({
                   {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
                       Stock ETA / route / GRN moved into the row's expand
                       (chevron on Item); Status is AUTO-derived (no dropdown). */}
-                  {/* v4 §3 — table header = 12px Medium uppercase MUTED. */}
-                  <tr className="bg-base-50 text-[#A8A8A8]">
-                    <th className="text-left text-[12px] font-medium uppercase px-2 py-1.5 border-r border-base-200">
+                  {/* v4 §11c — table header = 12px SemiBold uppercase DARK. */}
+                  <tr className="bg-base-50 text-[#374151]">
+                    <th className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 border-r border-base-200">
                       Item
                     </th>
-                    <th className="text-right text-[12px] font-medium uppercase px-2 py-1.5 w-10 border-r border-base-200">
+                    <th className="text-right text-[12px] font-semibold uppercase px-2 py-1.5 w-10 border-r border-base-200">
                       Qty
                     </th>
                     <th
-                      className="text-left text-[12px] font-medium uppercase px-2 py-1.5 w-24 border-r border-base-200"
+                      className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 w-24 border-r border-base-200"
                       title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
                     >
                       Source
                     </th>
                     <th
-                      className="text-left text-[12px] font-medium uppercase px-2 py-1.5 w-40 border-r border-base-200"
+                      className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 w-40 border-r border-base-200"
                       title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
                       Status
                     </th>
-                    <th className="text-center text-[12px] font-medium uppercase px-2 py-1.5 w-[70px]">
+                    <th className="text-center text-[12px] font-semibold uppercase px-2 py-1.5 w-[70px]">
                       Action
                     </th>
                   </tr>
@@ -1833,7 +1835,7 @@ function DrawerBody({
                                     }}
                                     title="Details — stock ETA, receiving (GRN), route / transfer"
                                     aria-expanded={routeOpen}
-                                    className="shrink-0 mt-0.5 text-base-400 hover:text-base-700"
+                                    className="shrink-0 mt-0.5 text-base-500 hover:text-base-800"
                                   >
                                     {routeOpen ? (
                                       <ChevronDown size={12} />
@@ -1843,11 +1845,11 @@ function DrawerBody({
                                   </button>
                                 )}
                                 {/* Closed set: the ITEM NAME is the hero
-                                    table's key content — 12px EMPHASIS ink
-                                    (was a pale 10px whisper). Truncates; the
-                                    row stays 44px; full name in the tooltip. */}
+                                    table's key content — 12px EMPHASIS ink.
+                                    §11b: it is a product NAME → Inter, never
+                                    mono (mono = digits/codes only). */}
                                 <span
-                                  className="font-mono text-[12px] font-semibold text-[#1A1A1A] leading-tight truncate min-w-0"
+                                  className="text-[12px] font-semibold text-[#1A1A1A] leading-tight truncate min-w-0"
                                   title={l.sku}
                                 >
                                   {l.sku}
@@ -2228,10 +2230,15 @@ function DrawerBody({
                  total" chip beside collected money — money-in-no-total reads
                  "Collected RMx · set total", neutral (no red). Amounts in the
                  slashed-zero mono; "Paid" is a status → pill. */
+              /* v4 §11b — mono wraps the AMOUNT token only; words stay Inter. */
               !totalSet ? (
-                <span className="text-[11px] text-base-500 font-mono whitespace-nowrap">
-                  {collected > 0 ? `Collected ${RM(collected)} · ` : ""}
-                  <span className="font-sans text-base-400">set total</span>
+                <span className="text-[11px] text-base-500 whitespace-nowrap">
+                  {collected > 0 ? (
+                    <>
+                      Collected <span className="font-mono">{RM(collected)}</span> ·{" "}
+                    </>
+                  ) : null}
+                  <span className="text-base-400">set total</span>
                 </span>
               ) : isOwing ? (
                 <span
@@ -2240,15 +2247,15 @@ function DrawerBody({
                       ? "Delivery on hold — collect before dispatch"
                       : "Outstanding balance"
                   }
-                  className={`text-[11px] font-mono font-semibold whitespace-nowrap ${
+                  className={`text-[11px] font-semibold whitespace-nowrap ${
                     deliveryEveLabel ? "text-danger" : "text-base-800"
                   }`}
                 >
-                  Outstanding {RM(owingAmt)}
+                  Outstanding <span className="font-mono">{RM(owingAmt)}</span>
                   {collected > 0 ? (
                     <span className="font-normal text-base-500">
                       {" "}
-                      · {RM(collected)} in
+                      · <span className="font-mono">{RM(collected)}</span> in
                     </span>
                   ) : null}
                 </span>
@@ -2332,7 +2339,7 @@ function DrawerBody({
                           ? "Collect storage before delivery"
                           : "Storage fee running"
                     }
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
                       /* v4 §6 — status pill: soft tint + dark same-hue. */
                       storageGate === "hold"
                         ? "bg-[#FCEBEB] text-[#A32D2D]"
@@ -2432,7 +2439,7 @@ function DrawerBody({
                   );
                 if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
                       overdue
                     </span>
                   );
@@ -2962,7 +2969,7 @@ function CustomerExpand({
           title="Copy phone"
           className={`${pillCls} shrink-0`}
         >
-          <Phone size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <Phone size={13} className="shrink-0 text-base-500" aria-hidden="true" />
           {/* v4 — phone is CONTENT: dark, slashed-zero mono (never accent). */}
           <span className="truncate font-medium font-mono text-base-900">
             {order.customer_phone ?? "—"}
@@ -2975,7 +2982,7 @@ function CustomerExpand({
           title="Copy region"
           className={`${pillCls} shrink-0`}
         >
-          <MapPin size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <MapPin size={13} className="shrink-0 text-base-500" aria-hidden="true" />
           <span className="truncate">{regionLabel ?? "—"}</span>
         </button>
         <button
@@ -2985,7 +2992,7 @@ function CustomerExpand({
           title="Copy address"
           className={pillCls}
         >
-          <Home size={13} className="shrink-0 text-base-400" aria-hidden="true" />
+          <Home size={13} className="shrink-0 text-base-500" aria-hidden="true" />
           <span className="truncate text-left">
             {order.customer_address ?? "—"}
           </span>
@@ -3728,7 +3735,7 @@ function MoneyCard({
                   onClick={() => void openReceipt(p, receiptMeta)}
                   title={`Receipt ${p.receipt_no ?? ""}`}
                   aria-label={`Receipt ${p.receipt_no ?? p.id}`}
-                  className="text-base-400 hover:text-base-800"
+                  className="text-base-500 hover:text-base-800"
                 >
                   <FileText size={13} />
                 </button>
@@ -3739,8 +3746,8 @@ function MoneyCard({
                     disabled={voidPay.isPending}
                     title="Void this payment (reversible — payments are never deleted)"
                     aria-label={`Void payment ${p.receipt_no ?? p.id}`}
-                    /* v4 §7 — row action = outline icon, not a text link. */
-                    className="text-base-400 hover:text-danger"
+                    /* v4 §7/§11d — row action = outline icon, mid-grey. */
+                    className="text-base-500 hover:text-danger"
                   >
                     <Undo2 size={13} />
                   </button>
@@ -4113,7 +4120,7 @@ function PoRow({
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <span
-          className={`text-[10px] font-semibold py-[3px] px-[7px] rounded-full ${stColor}`}
+          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${stColor}`}
         >
           {po.status}
         </span>

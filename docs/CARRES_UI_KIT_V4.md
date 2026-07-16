@@ -156,3 +156,40 @@ Users should tell rows/elements apart by shape and colour BEFORE reading text:
   a slashed-zero monospace for numbers/codes — and replace the old design-standard
   tokens with the palette and type scale above. Do this as its own step; show Jess;
   do not deploy.
+
+## 11. Decision table (LOCKED 2026-07-16 — closes every ambiguity that caused drift)
+
+Every restart used to re-guess these four. No more guessing — the answer is here.
+The **Orders list table is THE template**: every listing/table surface copies its
+row anatomy exactly (44px row · 17px checkbox · pills · icon actions · header).
+
+**11a. Canvas (v4 §1 amended):** the page canvas is the COOL neutral grey
+`#F3F4F6` (`base-100`) — the warm `#F0EFE9` is retired (warm/cream tints don't
+match a neutral kit; the reference samples are all cool-neutral). White panels
+on cool grey. No warm hex anywhere.
+
+**11b. Mono scope — mono is for GLYPH-CONFUSABLE strings only:**
+| String | Font |
+|---|---|
+| Amounts (`RM 200`), qty ratios (`0/1`), phone, SO/REF/PO codes, unit codes, dates inside tables | JetBrains Mono (slashed zero) |
+| Product/item NAMES, customer names, addresses, sentences, words like "Collected" | Inter — NEVER mono |
+Mono wraps the number/code TOKEN only, never the words around it.
+
+**11c. Headers are DARK, not muted** (the samples' table headers are dark):
+| Element | Spec |
+|---|---|
+| Panel band title (BALANCE, ITEMS ORDERED) | 12px · 600 · uppercase · `#374151` |
+| Table column header | 12px · 600 · uppercase · `#374151` |
+| True meta words ("ordered", "+N more", "PHONE") | 12px · 400–500 · `#A8A8A8` |
+Muted `#A8A8A8` is ONLY for meta — never for the header that names a block.
+
+**11d. Action icons:** `#6B7280` mid-grey at rest (17px in tables), darken to
+`#1F2937` on hover. Never `#A8A8A8` (invisible), never flame.
+
+**11e. Status pill — ONE spec everywhere:** 11px · 600 · `px-2 py-0.5` ·
+`rounded-full` · the §6 tint/ink pairs · no border. Any status chip that isn't
+this spec is wrong (MiniBadge/StockPill/NextPill all conform).
+
+**11f. Enforcement:** `pnpm --filter @carres/web run check:v4` runs INSIDE the
+build — a violation fails the build. Claude Code must read this file + run the
+guard before committing any UI change (also stated in root CLAUDE.md §10).

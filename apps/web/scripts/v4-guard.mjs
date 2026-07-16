@@ -24,7 +24,7 @@ const FILES = [
 
 // Banned: the pre-v4 palette that kept creeping back.
 const BANNED = [
-  [/#F1EFE8|#F7F4EE|#F5F0E7|#EAE7DF|#E5E1D8|#9B9389|#9A7B3F/i, "warm/cream hex — cream is VOID in content (v4 §1)"],
+  [/#F1EFE8|#F7F4EE|#F5F0E7|#EAE7DF|#E5E1D8|#9B9389|#9A7B3F|#F0EFE9|#F5F1EA/i, "warm/cream hex — warm tints are VOID (v4 §11a: cool neutral canvas)"],
   [/color:\s*"#(111827|1F2937|4B5563|9CA3AF)"/, "old grey ink hex — use #1A1A1A (content) or #A8A8A8 (muted)"],
   [/text-(success|warning|danger)(?![-\w])(?=[^{]*(RM\(|amount|Collected))/, "tinted amount — numbers are never coloured (v4 §2)"],
   [/#(166534|92400E|991B1B|DCFCE7|FEF3C7|FCE4E4|D6EFD9|FBE8C6)/, "v17 status hex — use the v4 pill pairs (§6)"],

@@ -2379,7 +2379,7 @@ function OrderRow({
                   <span
                     className="tabular-nums shrink-0 text-center"
                     style={{
-                      fontSize: "11.5px",
+                      fontSize: "11px",
                       color: heat.fg,
                       background: heat.bg,
                       padding: "0 4px",
@@ -2599,7 +2599,7 @@ function StockDot({
       <span
         className="inline-flex items-center rounded-full whitespace-nowrap"
         style={{
-          fontSize: "11.5px",
+          fontSize: "11px",
           fontWeight: 600,
           padding: "1px 9px",
           color: S.text,

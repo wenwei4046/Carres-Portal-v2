@@ -79,8 +79,9 @@ export function SectionBand({
           <ChevronDown size={12} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
         <span
-          /* v4 §3 — panel header = LABEL: 12px Medium uppercase muted. */
-          className={`uppercase flex-1 truncate text-[12px] font-medium tracking-[0.04em] ${
+          /* v4 §11c — panel header is DARK 12/600 (muted headers were
+             unreadable; muted is for meta only). */
+          className={`uppercase flex-1 truncate text-[12px] font-semibold tracking-[0.04em] ${
             danger ? "section-band-title-danger" : "section-band-title"
           }`}
         >

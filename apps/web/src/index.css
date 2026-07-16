@@ -9,7 +9,7 @@
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
      * design-standard.ts is the machine-readable mirror. */
-    --background: 51.4 18.9% 92.7%;    /* #F0EFE9 — v4 canvas grey (was cream) */
+    --background: 220 14% 96%;         /* #F3F4F6 — v4 §11a COOL neutral canvas (warm retired) */
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */
@@ -319,10 +319,12 @@
      bands are the light NEUTRAL grey on white; the title is a v4 LABEL
      (muted); danger keeps the v4 alert red. (Shared by the Orders list
      facet groups AND every order-drawer panel header.) */
+  /* v4 §11c — headers are DARK (the reference tables' headers are dark);
+     muted is for meta only. */
   .section-band { background: #F9FAFB; }
-  .section-band-title { color: #A8A8A8; }
+  .section-band-title { color: #374151; }
   .section-band-title-danger { color: #A32D2D; }
-  .section-band-total { color: #A8A8A8; }
+  .section-band-total { color: #6B7280; }
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }

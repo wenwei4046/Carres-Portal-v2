@@ -184,7 +184,19 @@ Do not write inline `useQuery({ queryKey: ['orders'] })` anywhere else.
 
 ## 10. Visual fidelity
 
-**Visual design source of truth = v17 (locked 2026-06-09), NOT the warm-linen prototype.** The `reference/proto/*.jsx` files remain the source of truth for **layout + behaviour** (what goes where, which buttons / modals / columns exist), but the **visual tokens are v17**: clean modern SaaS + Carres warmth. Token NAMES are unchanged (`base-*`, `primary`, `accent`…) so components re-theme with zero churn — only the values flipped.
+> ## ⭐ SUPERSEDED (2026-07-16): UI-KIT v4 is the single visual baseline
+>
+> **Before ANY UI work, read [`docs/CARRES_UI_KIT_V4.md`](docs/CARRES_UI_KIT_V4.md)**
+> (white base · colour = action/selection/status/alert only · Inter weight-layered
+> 24/20/16/15/14/12 · slashed-zero mono for numbers/codes ONLY, never words ·
+> 44px fixed rows · §11 decision table closes every ambiguity: cool-neutral canvas
+> `#F3F4F6`, DARK 12/600 headers, `#6B7280` icons, ONE 11px pill spec).
+> The Orders list table is THE template — copy its row anatomy for every listing.
+> **Before committing UI changes run `pnpm --filter @carres/web run check:v4`**
+> (it also gates the build). Machine mirror = `apps/web/src/lib/design-standard.ts`.
+> Everything below (v17) is the historical record — v4 wins on any conflict.
+
+**~~Visual design source of truth = v17 (locked 2026-06-09), NOT the warm-linen prototype.~~** The `reference/proto/*.jsx` files remain the source of truth for **layout + behaviour** (what goes where, which buttons / modals / columns exist), but the **visual tokens are v17**: clean modern SaaS + Carres warmth. Token NAMES are unchanged (`base-*`, `primary`, `accent`…) so components re-theme with zero churn — only the values flipped.
 
 - **Brand color**: `#C44D2B` (flame) — supersedes the old `#D64F20` terracotta
 - **Neutrals**: Tailwind cool gray (`--base-50 … --base-900`)
