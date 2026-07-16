@@ -1,0 +1,29 @@
+/* ============================================================================
+ * CARRES UI-KIT v4 — TYPOGRAPHY TOKENS
+ * Source: index.css `.t4-*` ramp + lib/design-standard.ts TYPE/FONT.
+ *
+ * PRINCIPLE (v4 §3): Inter for everything. LAYER BY WEIGHT, NOT BY SIZE.
+ * Most content sits at 14–15px. ONLY the page title (24) and the hero number
+ * (20) rise above. REF and SO ids are the SAME size — you tell them apart by
+ * weight + colour, never by making one bigger. This is what stops the
+ * "fonts are random big and small" problem.
+ * ==========================================================================*/
+:root {
+  --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace; /* numbers / codes / money / phone */
+
+  /* Restrained scale — these are the ONLY sizes allowed. Do not invent others. */
+  --fs-page-title: 24px;  --fw-page-title: 600;  /* largest — NOTHING exceeds this */
+  --fs-hero-num:   20px;  --fw-hero-num:   700;  /* e.g. Outstanding total */
+  --fs-section:    16px;  --fw-section:    600;  /* section titles: ITEMS ORDERED … */
+  --fs-content:    15px;  --fw-content:    500;  /* REF / customer / date / amount */
+  --fs-secondary:  14px;  --fw-secondary:  400;  /* secondary info */
+  --fs-label:      12px;  --fw-label:      500;  /* panel labels / table headers (uppercase, muted) */
+  --fs-caption:    12px;  --fw-caption:    400;  /* meta */
+
+  /* Dense list rows shrink one notch (v4 §8b) — room comes from a smaller font,
+   * not a taller row. */
+  --fs-row:        12px;
+  --fs-row-ref:    13px;  --fw-row-ref: 600;     /* row REF — bold */
+  --fs-row-sub:    10px;                          /* SO id under the REF — muted */
+}

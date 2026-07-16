@@ -1,0 +1,42 @@
+/* ============================================================================
+ * CARRES UI-KIT v4 — LAYOUT, RADIUS & SPACING TOKENS
+ * Source: lib/design-standard.ts LAYOUT / RADIUS / SPACE + ListPageShell.tsx.
+ * Never eyeball a magic px — use these.
+ * ==========================================================================*/
+:root {
+  /* ---- Shell geometry (fixed; a page never touches the nav) ---- */
+  --sidebar-w:        232px;  /* left nav expanded */
+  --sidebar-collapsed: 60px;  /* left nav icon rail */
+  --sidebar-active-bar: 3px;  /* flame active indicator */
+  --rightrail-panel:  320px;  /* operation right rail expanded */
+  --rightrail-strip:   52px;  /* operation right rail icon strip */
+  --header-h:          56px;  /* page header bar — ONE t4-page-title */
+  --facet-w:          240px;  /* left filter panel */
+  --row-h:             44px;  /* LIST ROW — FIXED, not min-height. Content adapts
+                               * to the row; the row NEVER grows to the content.
+                               * Target 18–20 rows on screen. */
+
+  /* Order-detail split (v4 §9): left = summaries, right = the Items table hero */
+  --detail-left:  32%;
+  --detail-right: 68%;
+
+  /* ---- Radius ---- */
+  --radius-panel:  18px;  /* big surface panels (unified 18 — was 16/18/20 across files) */
+  --radius-card:   12px;  /* white panels / cards (v4 §9) */
+  --radius-btn:     8px;  /* buttons (POS-softened from 6) */
+  --radius-chip:    4px;  /* small chips / table cells */
+  --radius-pill:  9999px; /* status pills — fully round */
+
+  /* ---- Spacing ---- */
+  --space-hairline:  1px;
+  --space-card-pad: 16px;   /* padding inside a card */
+  --space-page:     24px;   /* page gutter */
+  --space-gap:       8px;   /* default gap */
+  --space-gap-row:  12px;   /* row gap */
+
+  /* ---- Elevation — barely-there double drop shadow on white cards ---- */
+  --shadow-card: 0 1px 2px rgba(17,24,39,0.04), 0 1px 1px rgba(17,24,39,0.03);
+  --shadow-soft: 0 1px 2px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.05); /* POS resting card */
+  --shadow-lift: 0 12px 24px rgba(17,24,39,0.10);  /* POS hover lift */
+  --shadow-pop:  0 8px 24px rgba(17,24,39,0.12);
+}

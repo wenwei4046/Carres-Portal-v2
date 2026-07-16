@@ -1,0 +1,51 @@
+<!-- @dsCard group="Components" viewport="700x430" name="Core primitives" subtitle="Button · StatusPill · Checkbox · TextInput · SectionCard" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{margin:0;padding:20px 22px;background:var(--canvas);font-family:var(--font-sans);display:flex;flex-direction:column;gap:18px}
+.grp{display:flex;flex-direction:column;gap:8px}
+.cap{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.rowx{display:flex;gap:10px;align-items:center;flex-wrap:wrap}</style></head>
+<body>
+<div class="grp"><span class="cap">Buttons — one flame per block</span>
+<div class="rowx">
+<button class="btn-hero">+ AutoCount</button>
+<button class="btn-primary">Record payment</button>
+<button class="btn-secondary">+ Master</button>
+<button class="btn-ghost">Cancel</button>
+<button class="btn-danger">Delete order</button>
+</div></div>
+
+<div class="grp"><span class="cap">Status pills</span>
+<div class="rowx">
+<span class="pill pill-ready"><span class="dot"></span>Ready 1/1</span>
+<span class="pill pill-waiting"><span class="dot"></span>Waiting 0/3</span>
+<span class="pill pill-overdue">No PO</span>
+<span class="pill pill-overdue">Chase logistic</span>
+<span class="pill pill-neutral">Delivered</span>
+</div></div>
+
+<div class="grp"><span class="cap">Checkbox — flame choice · blue select</span>
+<div class="rowx">
+<input type="checkbox" class="checkbox" checked>
+<input type="checkbox" class="checkbox">
+<input type="checkbox" class="checkbox is-select" checked>
+</div></div>
+
+<div class="grp"><span class="cap">Text field</span>
+<div class="rowx" style="max-width:340px">
+<label style="display:flex;flex-direction:column;gap:5px;width:100%">
+<span class="t4-label">PO number</span>
+<input class="input mono" value="PO/2606-079">
+</label>
+</div></div>
+
+<div class="grp"><span class="cap">Section card</span>
+<div class="card" style="max-width:360px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:12px 16px">
+<span class="t4-section" style="flex:1">Balance</span><span class="t4-caption">No balance</span>
+</div>
+<div style="padding:12px 16px;border-top:1px solid var(--hairline);display:flex;justify-content:space-between">
+<span class="t4-label">Collected</span><span class="t-num" style="font-size:15px;color:#3B6D11">RM 200</span>
+</div>
+</div>
+</div>
+</body></html>

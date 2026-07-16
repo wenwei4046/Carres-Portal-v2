@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   AlertCircle,
+  Bell,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -18,11 +19,11 @@ import {
   ExternalLink,
   FileText,
   Flag,
+  MessageCircle,
   MoreVertical,
   Package,
   PackagePlus,
   Pencil,
-  Phone,
   RotateCcw,
   Truck,
   Wallet,
@@ -735,9 +736,9 @@ function KpiBox({
  *  AND stamp the chase event (today manual WhatsApp; the future portal
  *  auto-fires the same event). */
 const CHASE_BTN =
-  "text-[12px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
+  "inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
 const REMIND_BTN =
-  "text-[12px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
+  "inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
 
 /** The [Reminder]+[Chase] pair for one audience. */
 function ChasePair({
@@ -757,6 +758,7 @@ function ChasePair({
         title={`Copy the gentle ${audience} reminder + log the chase event`}
         className={REMIND_BTN}
       >
+        <Bell size={14} aria-hidden="true" />
         Reminder
       </button>
       <button
@@ -765,6 +767,7 @@ function ChasePair({
         title={`Copy the firmer ${audience} chase + log the chase event`}
         className={CHASE_BTN}
       >
+        <MessageCircle size={14} aria-hidden="true" />
         Chase
       </button>
     </>
@@ -2095,7 +2098,7 @@ function DrawerBody({
                   },
                   {
                     label: "WhatsApp customer",
-                    icon: <Phone size={14} />,
+                    icon: <MessageCircle size={14} />,
                     disabled: !order.customer_phone,
                     onClick: () => {
                       const wa = waLink(order.customer_phone);
@@ -2392,7 +2395,7 @@ function DrawerBody({
               {contactByLabel && (
                 <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
                   <span className="flex items-center gap-1 text-[12px] font-medium text-info min-w-0">
-                    <Phone size={14} strokeWidth={2.25} className="shrink-0" />
+                    <MessageCircle size={14} strokeWidth={2.25} className="shrink-0" />
                     <span className="truncate">Chase partner by {contactByLabel}</span>
                   </span>
                   <span className="flex items-center gap-0.5 text-[12px] text-info/70 whitespace-nowrap shrink-0">

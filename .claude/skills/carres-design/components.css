@@ -1,0 +1,90 @@
+/* ============================================================================
+ * CARRES UI-KIT v4 — COMPONENT CLASSES (plain CSS, framework-free)
+ * Mirrors index.css utilities so specimen cards and prototypes render without
+ * Tailwind. Values are identical to the live repo.
+ * ==========================================================================*/
+
+/* ---- Type ramp (v4 §3) ---------------------------------------------------*/
+.t4-page-title { font-family:var(--font-sans); font-size:var(--fs-page-title); font-weight:var(--fw-page-title); color:var(--text-primary); letter-spacing:-0.01em; }
+.t4-hero-num   { font-family:var(--font-sans); font-size:var(--fs-hero-num);   font-weight:var(--fw-hero-num);   color:var(--text-primary); font-variant-numeric:tabular-nums slashed-zero; }
+.t4-section    { font-family:var(--font-sans); font-size:var(--fs-section);    font-weight:var(--fw-section);    color:var(--text-primary); }
+.t4-content    { font-family:var(--font-sans); font-size:var(--fs-content);    font-weight:var(--fw-content);    color:var(--text-primary); }
+.t4-secondary  { font-family:var(--font-sans); font-size:var(--fs-secondary);  font-weight:var(--fw-secondary);  color:var(--text-secondary); }
+.t4-label      { font-family:var(--font-sans); font-size:var(--fs-label);      font-weight:var(--fw-label);      color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+.t4-caption    { font-family:var(--font-sans); font-size:var(--fs-caption);    font-weight:var(--fw-caption);    color:var(--text-muted); }
+
+/* Numbers / money / qty — Inter with lining + tabular figures. */
+.t-num  { font-family:var(--font-sans); font-weight:500; font-variant-numeric:lining-nums tabular-nums slashed-zero; font-feature-settings:"zero" 1; }
+/* Codes / SKU / PO / dimensions / phone — mono, slashed zero. */
+.mono   { font-family:var(--font-mono); font-variant-numeric:slashed-zero tabular-nums; font-feature-settings:"zero" 1; }
+
+/* Small-caps overlines. */
+.kicker { font-family:var(--font-sans); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.22em; color:var(--flame); }
+.label  { font-family:var(--font-sans); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em;  color:var(--base-700); }
+
+/* ---- Buttons (v4) — exactly ONE .btn-hero (flame) per page/block ---------*/
+.btn-hero, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  font-family:var(--font-sans); font-size:13px; font-weight:600;
+  border-radius:var(--radius-btn); border:1px solid transparent;
+  padding:10px 18px; cursor:pointer; transition:background-color .15s, border-color .15s, color .15s;
+  white-space:nowrap;
+}
+.btn-hero      { background:var(--flame); color:#fff; }
+.btn-hero:hover{ background:var(--flame-dark); }
+.btn-primary       { background:#F1F0EC; color:var(--base-900); }        /* GREY-SOFT workhorse (v4: black retired) — same recipe as .btn-soft */
+.btn-primary:hover { background:#E7E6E0; }
+.btn-secondary       { background:#fff; color:var(--base-900); border-color:var(--base-300); }  /* white box — light/tertiary actions */
+.btn-secondary:hover { background:#F7F6F2; border-color:var(--base-400); }
+.btn-soft         { background:#F1F0EC; color:var(--base-900); }  /* grey base — the normal workhorse action (soft, not heavy) */
+.btn-soft:hover   { background:#E7E6E0; }
+.icon-btn         { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:9px; background:#fff; border:1px solid var(--hairline); color:var(--base-500); cursor:pointer; }  /* boxed icon button — ⋮ / expand / bell / etc */
+.icon-btn:hover   { background:var(--base-50); color:var(--base-800); }
+.btn-ghost       { background:transparent; color:var(--base-700); padding:8px 14px; }
+.btn-ghost:hover { background:var(--base-100); color:var(--base-900); }
+.btn-danger       { background:#fff; color:var(--alert-red); border-color:var(--alert-red); }  /* destructive — red text, NEVER red-filled */
+.btn-danger:hover { background:var(--overdue-fill); }
+.btn-hero:disabled, .btn-primary:disabled, .btn-secondary:disabled, .btn-ghost:disabled, .btn-danger:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ---- Status pills (v4 §6) — soft tint + dark same-hue text, fully round ---*/
+.pill {
+  display:inline-flex; align-items:center; gap:5px;
+  font-family:var(--font-sans); font-size:11.5px; font-weight:600; line-height:1;
+  padding:4px 10px; border-radius:var(--radius-pill); border:1px solid transparent;
+}
+.pill-ready    { background:var(--ready-fill);   color:var(--ready-ink);   border-color:#A9D8B0; }
+.pill-waiting  { background:var(--waiting-fill); color:var(--waiting-ink); border-color:#F0D08A; }
+.pill-overdue  { background:var(--overdue-fill); color:var(--overdue-ink); border-color:#F3B4B4; }
+.pill-neutral  { background:var(--base-100);     color:var(--base-700); }
+.pill i, .pill svg { width:14px; height:14px; }  /* icon+word pills — icon bold enough to read */
+/* dot before the word (optional) */
+.pill .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+/* ---- Card — white surface, hairline, 12px radius, whisper shadow ---------*/
+.card {
+  background:var(--surface); border:1px solid var(--hairline);
+  border-radius:var(--radius-card); box-shadow:var(--shadow-card);
+}
+
+/* ---- Input — white, hairline, flame focus ring --------------------------*/
+.input {
+  font-family:var(--font-sans); font-size:14px; color:var(--text-primary);
+  background:#fff; border:1px solid var(--base-300); border-radius:var(--radius-btn);
+  padding:8px 12px; width:100%; box-sizing:border-box; transition:border-color .15s, box-shadow .15s;
+}
+.input::placeholder { color:var(--text-muted); }
+.input:focus { outline:none; border-color:var(--flame); box-shadow:0 0 0 3px rgba(196,77,43,0.15); }
+
+/* ---- Checkbox — 17px, clearly visible; flame fill + white tick when on ---*/
+.checkbox {
+  appearance:none; -webkit-appearance:none; width:17px; height:17px; flex:0 0 17px;
+  border:1.5px solid var(--base-400); border-radius:4px; background:#fff; cursor:pointer;
+  display:inline-grid; place-content:center; transition:background-color .12s, border-color .12s;
+}
+.checkbox::after { content:""; width:9px; height:9px; transform:scale(0);
+  clip-path:polygon(14% 44%,0 65%,50% 100%,100% 16%,80% 0,43% 62%);
+  background:#fff; transition:transform .12s; }
+.checkbox:checked { background:var(--flame); border-color:var(--flame); }
+.checkbox:checked::after { transform:scale(1); }
+/* selection variant — blue (used only for row multi-select) */
+.checkbox.is-select:checked { background:var(--select-blue); border-color:var(--select-blue); }

@@ -1,0 +1,16 @@
+<!-- @dsCard group="Layout" viewport="700x210" name="List row — 44px FIXED" subtitle="Row never grows to content. Multi-REF truncates. Target 18–20 rows/screen." -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>body{margin:0;padding:16px 20px;background:var(--canvas);font-family:var(--font-sans)}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--hairline);border-radius:10px;overflow:hidden}
+th{height:30px;background:#221F20;color:#C9C5BB;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:0 12px}
+td{height:44px;padding:0 12px;border-top:1px solid rgba(17,24,39,.06);font-size:12px;color:#1F2937}
+.ref{font-size:13px;font-weight:600;color:#111827}.sub{font-size:10px;color:#9CA3AF}
+.date{font-size:12.5px;font-weight:600;color:#111827}.wk{font-size:10px;color:#9CA3AF}
+tr.sel td{background:#E6F1FB}</style></head>
+<body>
+<table>
+<tr><th style="width:34px"></th><th>Ref</th><th>Customer</th><th>Deadline</th><th>Stock</th><th>Next</th></tr>
+<tr><td><input type="checkbox" class="checkbox"></td><td><div class="ref">CR1196</div><div class="sub">SO-1152</div></td><td>Chuah Jie Hong</td><td><span class="date">6 Jul 26</span> <span class="wk">Sun</span></td><td><span class="pill pill-ready"><span class="dot"></span>Ready 1/1</span></td><td><span class="pill pill-overdue">Chase logistic</span></td></tr>
+<tr class="sel"><td><input type="checkbox" class="checkbox is-select" checked></td><td><div class="ref">TCF0475 <span class="sub">+2</span></div><div class="sub">SO-1112</div></td><td>Wong Young Huu</td><td><span class="date">13 Jul 26</span> <span class="wk">Mon</span></td><td><span class="pill pill-waiting"><span class="dot"></span>Waiting 0/3</span></td><td><span class="pill pill-overdue">Chase logistic</span></td></tr>
+</table>
+</body></html>

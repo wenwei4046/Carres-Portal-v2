@@ -1,0 +1,5 @@
+/* Carres fonts — UI-KIT v4 §3.
+ * Inter = all text/UI (weights 400/500/600/700).
+ * JetBrains Mono = numbers / codes / money / phone, with the SLASHED zero so
+ * 0 and o are never confused. Loaded from Google Fonts CDN. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');

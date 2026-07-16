@@ -116,6 +116,20 @@ page. On kit-governed surfaces every icon is one of:
 | **16** | default UI: KPI track icons, ⋮ menus, back, close, buttons |
 | **18** | top-bar / page-level actions: Bell / Help / Settings / Flag |
 
+**Canonical glyph mapping (same as Carres POS — same meaning ⇒ same glyph):**
+add `plus` · edit `pencil` · delete `trash-2` · view `eye` · overflow
+`more-vertical` · close `x` · search `search` · filter `sliders-horizontal` ·
+refresh `refresh-cw` · expand `chevron-down` · back `chevron-left` ·
+**reminder (nudge) `bell`** · **chase / WhatsApp message `message-circle`**
+(never the WhatsApp brand mark, never `phone` for messaging) · call `phone` ·
+record payment `plus-circle` · confirm `check` · book logistic
+`calendar-check` · print `printer` · export `download` · flag `flag` ·
+settings `settings` · help `circle-help`. Entities: orders `clipboard-list` ·
+stock `package`/`boxes` · warehouse `warehouse` · logistic `truck` · money
+`wallet` · customer `user` · calendar `calendar-days` · notes `lightbulb` ·
+activity `scroll-text`. Status inside pills: ready `check` · waiting `clock` ·
+overdue `alert-circle` · on hold `pause-circle`.
+
 ## A5. Buttons (sentence case, 13px semibold, 8px radius — v4: NO solid black)
 
 | Class | Look | Use |

@@ -1,0 +1,39 @@
+<!-- @dsCard group="Layout" viewport="700x300" name="Shell anatomy" subtitle="ListPageShell — the ONE frame every list page renders through" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>body{margin:0;padding:14px;background:var(--canvas);font-family:var(--font-sans)}
+.shell{display:grid;grid-template-columns:44px 1fr;gap:0;border:1px solid var(--hairline);border-radius:10px;overflow:hidden;background:var(--canvas)}
+.side{background:#fff;border-right:1px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:10px}
+.side .lg{width:22px;height:22px}
+.side .ic{width:18px;height:18px;border-radius:5px;background:var(--base-200)}
+.side .ic.on{background:var(--flame-light);position:relative}
+.side .ic.on::before{content:"";position:absolute;left:-7px;top:2px;bottom:2px;width:3px;background:var(--flame);border-radius:2px}
+.main{display:flex;flex-direction:column}
+.hd{background:#fff;border-bottom:1px solid var(--hairline);padding:10px 14px}
+.crumb{font-size:10px;color:var(--text-muted)}
+.title{font-size:20px;font-weight:600;color:#1A1A1A}
+.body{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:12px 14px}
+.facet{background:#fff;border:1px solid var(--hairline);border-radius:8px;padding:8px;font-size:9px;color:var(--text-secondary)}
+.facet .b{background:#F1EFE8;font-size:8px;font-weight:700;text-transform:uppercase;color:#6F6960;padding:3px 6px;border-radius:4px;margin-bottom:5px}
+.rt{display:flex;flex-direction:column;gap:8px}
+.tool{background:#fff;border:1px solid var(--hairline);border-radius:8px;padding:8px;display:flex;gap:6px}
+.tab{font-size:10px;padding:3px 9px;border-radius:99px;background:var(--base-100);color:var(--base-600)}
+.tab.on{background:#1A1A1A;color:#fff}
+.tbl{background:#fff;border:1px solid var(--hairline);border-radius:8px;min-height:96px}
+.tbl .h{height:22px;background:#221F20;border-radius:8px 8px 0 0}
+.tbl .r{height:22px;border-top:1px solid rgba(17,24,39,.06)}
+.tag{position:absolute;font-size:8px;color:var(--flame);font-weight:700}</style></head>
+<body>
+<div class="shell">
+<div class="side"><img src="../assets/carres-logo.png" class="lg" alt=""><div class="ic on"></div><div class="ic"></div><div class="ic"></div><div class="ic"></div></div>
+<div class="main">
+<div class="hd"><div class="crumb">Operations › Orders</div><div class="title">Orders</div></div>
+<div class="body">
+<div class="facet"><div class="b">Summary</div><div class="b">Chase now</div><div class="b">Stock</div></div>
+<div class="rt">
+<div class="tool"><span class="tab on">All 176</span><span class="tab">Placed 7</span><span class="tab">Proceed 65</span></div>
+<div class="tbl"><div class="h"></div><div class="r"></div><div class="r"></div><div class="r"></div></div>
+</div>
+</div>
+</div>
+</div>
+</body></html>
