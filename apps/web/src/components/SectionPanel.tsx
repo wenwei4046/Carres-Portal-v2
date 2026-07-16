@@ -79,7 +79,7 @@ export function SectionBand({
           <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
         <span
-          className={`uppercase flex-1 truncate text-[11px] font-bold tracking-[0.04em] ${
+          className={`uppercase flex-1 truncate text-[12px] font-bold tracking-[0.04em] ${
             danger ? "section-band-title-danger" : "section-band-title"
           }`}
         >
@@ -87,7 +87,7 @@ export function SectionBand({
         </span>
       </button>
       {total !== undefined && (
-        <span className="tabular-nums shrink-0 text-[11px] font-semibold section-band-total">
+        <span className="tabular-nums shrink-0 text-[12px] font-semibold section-band-total">
           {total}
         </span>
       )}

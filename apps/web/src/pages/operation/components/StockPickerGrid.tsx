@@ -273,7 +273,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         collapsed={collapsedCard}
         onToggle={() => setCollapsedCard((v) => !v)}
         right={
-          <span className="shrink-0 flex items-center gap-1.5 text-[11px] text-base-500">
+          <span className="shrink-0 flex items-center gap-1.5 text-[12px] text-base-500">
             <span className="whitespace-nowrap">
               {rows.length} free · {checked.size} picked
               {q.trim() ? ` · ${view.length} shown` : ""}
@@ -329,7 +329,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search model / size / PO / old ref…"
-          className="w-full pl-7 pr-2 py-1 text-[13px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
+          className="w-full pl-7 pr-2 py-1 text-[14px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
         />
       </div>
 
@@ -337,7 +337,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         <div className="min-w-[560px]">
           {/* header — §7.8 columns; neutral base-50 (the cream is the band's). */}
           <div
-            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[11px] font-bold"
+            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[12px] font-bold"
             style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
@@ -355,7 +355,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center h-9 border-b border-base-100 cursor-pointer text-[11px] ${
+                className={`grid items-center h-11 border-b border-base-100 cursor-pointer text-[12px] ${
                   on
                     ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
                     : i % 2
@@ -406,7 +406,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         onLoan?.(r.id, r.sku);
                       }}
                       title="Issue a loan DO + mark this unit on-loan to the order"
-                      className="text-[11px] font-semibold text-primary hover:underline whitespace-nowrap"
+                      className="text-[12px] font-semibold text-primary hover:underline whitespace-nowrap"
                     >
                       Lend
                     </button>
@@ -419,7 +419,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         void reserveIds([r.id]);
                       }}
                       title={`Reserve this unit to ${soRef}`}
-                      className="text-[11px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
+                      className="text-[12px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
                     >
                       Reserve
                     </button>

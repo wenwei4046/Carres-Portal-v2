@@ -404,10 +404,10 @@ export interface NextAction {
 // five DISTINCT colours, not one washed-out red. Each = soft fill + strong
 // ink + a matching border; carried inline so the shared global `.pill` stays put.
 const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
-  danger: { text: "#991B1B", bg: "#FCE4E4", border: "#F3B4B4" }, // chase / overdue — red
-  warning: { text: "#92400E", bg: "#FBE8C6", border: "#F0D08A" }, // waiting stock — amber
+  danger: { text: "#A32D2D", bg: "#FCEBEB", border: "#F3B4B4" }, // chase / overdue — red
+  warning: { text: "#854F0B", bg: "#FAEEDA", border: "#F0D08A" }, // waiting stock — amber
   info: { text: "#1E40AF", bg: "#D3E4FB", border: "#A9C8F2" }, // call / assign — blue
-  success: { text: "#166534", bg: "#D6EFD9", border: "#A9D8B0" }, // schedule delivery — green
+  success: { text: "#3B6D11", bg: "#EAF3DE", border: "#A9D8B0" }, // schedule delivery — green
   neutral: { text: "#4B5563", bg: "#EAE7DF", border: "#D6D2C6" }, // done — grey
 };
 
@@ -1757,7 +1757,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden"
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
@@ -2309,18 +2309,18 @@ function OrderRow({
             </span>
             <div style={{ marginTop: 1 }}>
               {logi.key === "delivered" ? (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
                   Delivered ✓
                 </span>
               ) : logi.key === "scheduled" && logi.date ? (
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}
+                  style={{ fontSize: "12px", fontWeight: 600, color: "#3B6D11" }}
                 >
                   Deliver {fmtDate(logi.date).split(", ")[0]}
                 </span>
               ) : logi.key === "call_now" ? (
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#991B1B" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#A32D2D" }}>
                   call now
                 </span>
               ) : (
@@ -2355,7 +2355,7 @@ function OrderRow({
             // stays clear black — only this pill carries the heat.
             const heat =
               dd == null || dd <= 1
-                ? { bg: "#FCE4E4", fg: "#991B1B" } // overdue / today / 1d — red
+                ? { bg: "#FCEBEB", fg: "#A32D2D" } // overdue / today / 1d — red
                 : dd <= 3
                   ? { bg: "#FDEBD8", fg: "#B45309" } // 2–3d — orange
                   : dd <= 6
@@ -2519,9 +2519,9 @@ const STOCK_PILL: Record<
   "ready" | "waiting" | "no_po",
   { label: string; text: string; bg: string; border: string }
 > = {
-  ready: { label: "Ready", text: "#166534", bg: "#D6EFD9", border: "#A9D8B0" },
-  waiting: { label: "Waiting", text: "#92400E", bg: "#FBE8C6", border: "#F0D08A" },
-  no_po: { label: "No PO", text: "#991B1B", bg: "#FCE4E4", border: "#F3B4B4" },
+  ready: { label: "Ready", text: "#3B6D11", bg: "#EAF3DE", border: "#A9D8B0" },
+  waiting: { label: "Waiting", text: "#854F0B", bg: "#FAEEDA", border: "#F0D08A" },
+  no_po: { label: "No PO", text: "#A32D2D", bg: "#FCEBEB", border: "#F3B4B4" },
 };
 
 /** Stock cell — a status pill (Ready / Waiting / No PO, Partial folded into
@@ -2580,7 +2580,7 @@ function StockDot({
     if (!se.etaIso) return null;
     const d = fmtDate(se.etaIso).split(", ")[0];
     if (se.state === "overdue")
-      return { text: `ETA ${d}`, color: "#991B1B", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
+      return { text: `ETA ${d}`, color: "#A32D2D", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
       return { text: `ETA ${d}`, color: "#B45309", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
     return { text: `ETA ${d}`, color: "#6B7280", tip: "Supplier arrival ETA — on track" };

@@ -483,15 +483,15 @@ function DrawerError({
           <X size={16} aria-hidden="true" />
         </button>
       </div>
-      <div className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-[13px]">
+      <div className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-[14px]">
         <div className="text-destructive font-semibold mb-2">
           Couldn&rsquo;t load order
         </div>
-        <div className="text-[13px] text-base-700 mb-3">{message}</div>
+        <div className="text-[14px] text-base-700 mb-3">{message}</div>
         <button
           type="button"
           onClick={onRetry}
-          className="btn-secondary text-[11px] py-1.5 px-3"
+          className="btn-secondary text-[12px] py-1.5 px-3"
         >
           Retry
         </button>
@@ -626,7 +626,7 @@ function PanelMenu({
                   setOpen(false);
                   it.onClick();
                 }}
-                className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
+                className="w-full text-left px-3 py-1.5 text-[14px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
               >
                 {it.icon}
                 {it.label}
@@ -660,7 +660,7 @@ function MiniBadge({
   };
   return (
     <span
-      className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
+      className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
     >
       {children}
     </span>
@@ -670,11 +670,11 @@ function MiniBadge({
 // (ReadinessBadge removed 2026-07-13 — the Items header now shows
 //  "<ready> ready · <toReserve> to reserve" inline, from the shared lineReadiness.)
 
-/** KpiBox — a header metric card for ONE mission track (UI-KIT §3 + §7.2):
- *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
- *  small alert mark when red — no dots), sub-facts side by side when a track
- *  carries more than one, and the track's chase action(s) INSIDE the box when
- *  it's red/actionable. `.kpi-box` token fill (UI-KIT §A8), NO border. */
+/** KpiBox — ONE mission track as an INDEPENDENT white card (UI-KIT v4 §A8):
+ *  Lucide track icon + label; the headline value stays INK ("restrained: ink
+ *  number, colour only in a small signal") — colour appears only as the alert
+ *  mark when red; sub-facts side by side; the track's chase action(s) INSIDE
+ *  the card when it's red/actionable. `.kpi-box` = white card + hairline. */
 function KpiBox({
   icon,
   label,
@@ -692,19 +692,13 @@ function KpiBox({
   /** Chase button(s) when the track is red/actionable. */
   actions?: ReactNode;
 }) {
-  const VALUE: Record<string, string> = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
-    neutral: "text-base-900",
-  };
   return (
     <div className="kpi-box">
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="shrink-0 text-base-400" aria-hidden="true">
           {icon}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
           {label}
         </span>
         {tone === "danger" && (
@@ -716,13 +710,11 @@ function KpiBox({
           />
         )}
       </div>
-      <div
-        className={`mt-0.5 text-[16px] font-semibold tabular-nums truncate ${VALUE[tone]}`}
-      >
+      <div className="mt-0.5 text-[20px] font-bold t-num text-base-900 truncate">
         {value}
       </div>
       {subs && subs.length > 0 && (
-        <div className="flex items-center gap-3 min-w-0 text-[11px] text-base-500">
+        <div className="flex items-center gap-3 min-w-0 text-[12px] text-base-500">
           {subs.map((s, i) => (
             <span key={i} className="truncate">
               {s}
@@ -743,9 +735,9 @@ function KpiBox({
  *  AND stamp the chase event (today manual WhatsApp; the future portal
  *  auto-fires the same event). */
 const CHASE_BTN =
-  "text-[11px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
+  "text-[12px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
 const REMIND_BTN =
-  "text-[11px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
+  "text-[12px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
 
 /** The [Reminder]+[Chase] pair for one audience. */
 function ChasePair({
@@ -1327,12 +1319,12 @@ function DrawerBody({
           + ONE solid flame button. No coloured borders, no red fill band. */}
       <header className="shrink-0 px-5 pt-3 bg-background">
         <SectionCard className="!p-0">
-        <div className="px-4 pt-2.5 flex items-center gap-2.5 min-w-0">
+        <div className="px-4 py-2.5 flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={onClose}
             aria-label="Back to Orders"
-            className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
+            className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[14px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
           >
             <ChevronLeft size={16} aria-hidden="true" />
             Orders
@@ -1341,12 +1333,12 @@ function DrawerBody({
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {/* §7.1 — the order's two IDs bold, +2 sizes, ADJACENT. The ref
                 number stands alone (no "REF" word — Jess 2026-07-13). */}
-            <span className="font-mono text-[22px] font-bold text-base-900 shrink-0">
+            <span className="font-mono text-[20px] font-bold text-base-900 shrink-0">
               #{order.so}
             </span>
             {order.source_ref?.[0] && (
               <span
-                className="font-mono text-[22px] font-bold text-base-700 shrink-0"
+                className="font-mono text-[20px] font-bold text-base-700 shrink-0"
                 title="Customer reference"
               >
                 {order.source_ref[0]}
@@ -1381,7 +1373,7 @@ function DrawerBody({
             })()}
             {/* Meta (§7.1) — customer · region · ordered <date>, ONE line.
                 The ordered date + customer name live ONLY here. */}
-            <span className="min-w-0 flex-1 truncate text-[13px] text-base-500">
+            <span className="min-w-0 flex-1 truncate text-[14px] text-base-500">
               <span className={cjkClassName(order.customer_name ?? "")}>
                 {order.customer_name ?? "—"}
               </span>
@@ -1399,7 +1391,7 @@ function DrawerBody({
               title="Add a follow-up (write the issue + assign)"
               className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary"
             >
-              <Flag size={17} />
+              <Flag size={18} />
             </button>
             <ActionsMenu
               order={order}
@@ -1419,15 +1411,17 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* KPI boxes + actions (§7.2) — the 3 mission tracks: CUSTOMER·money /
-            STOCK / LOGISTIC. Lucide icon + label; value COLOURED by §5.2 status
-            (+ small alert mark when red — no dots); sub-facts side by side;
-            the track's chase action(s) live INSIDE the box when red/actionable.
-            This REPLACES the standalone "Next:" row — multiple red tracks →
-            multiple buttons, each a logged chase event. */}
-        <div className="px-4 pt-2.5 pb-2.5 grid grid-cols-3 gap-2">
+        </SectionCard>
+
+        {/* KPI cards (UI-KIT v4 §A8/§A10) — the 3 mission tracks as THREE
+            INDEPENDENT WHITE CARDS on the canvas (moved OUT of the header
+            card, Jess's workorder #2): CUSTOMER·money / STOCK / LOGISTIC.
+            Ink number; colour only as the alert signal; the track's chase
+            action(s) live INSIDE the card when red/actionable. This REPLACES
+            the standalone "Next:" row. */}
+        <div className="pt-2.5 grid grid-cols-3 gap-2.5">
           <KpiBox
-            icon={<Wallet size={14} strokeWidth={2.25} />}
+            icon={<Wallet size={16} strokeWidth={2} />}
             label="Customer · Money"
             tone={moneyTone}
             value={
@@ -1452,7 +1446,7 @@ function DrawerBody({
             }
           />
           <KpiBox
-            icon={<Package size={14} strokeWidth={2.25} />}
+            icon={<Package size={16} strokeWidth={2} />}
             label="Stock"
             tone={stockTone}
             value={`${readyN}/${goodsLines.length} ready`}
@@ -1482,7 +1476,7 @@ function DrawerBody({
             }
           />
           <KpiBox
-            icon={<Truck size={14} strokeWidth={2.25} />}
+            icon={<Truck size={16} strokeWidth={2} />}
             label="Logistic"
             tone={logisticTone}
             value={
@@ -1503,7 +1497,6 @@ function DrawerBody({
             }
           />
         </div>
-        </SectionCard>
       </header>
 
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
@@ -1519,13 +1512,13 @@ function DrawerBody({
         </div>
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
-          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[13px]">
+          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[14px]">
             <AlertCircle
               className="w-4 h-4 shrink-0 mt-0.5 text-warning"
               aria-hidden="true"
             />
             <span className="text-base-900">
-              <span className="block text-[11px] font-semibold text-warning">
+              <span className="block text-[12px] font-semibold text-warning">
                 Action needed
               </span>
               {form.draft.action_for_logistic}
@@ -1611,31 +1604,31 @@ function DrawerBody({
             <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
               {/* 36px locked rows (UI-KIT §A7) — td height acts as min-height,
                   so a wrapping SKU can still grow the row. */}
-              <table className="w-full border-collapse [&_tbody_td]:h-9">
+              <table className="w-full border-collapse [&_tbody_td]:h-11">
                 <thead className="sticky top-0 z-10">
                   {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
                       Stock ETA / route / GRN moved into the row's expand
                       (chevron on Item); Status is AUTO-derived (no dropdown). */}
                   <tr className="bg-base-50 text-base-500">
-                    <th className="text-left text-[11px] font-semibold px-2 py-1.5 border-r border-base-200">
+                    <th className="text-left text-[12px] font-semibold px-2 py-1.5 border-r border-base-200">
                       Item
                     </th>
-                    <th className="text-right text-[11px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
+                    <th className="text-right text-[12px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
                       Qty
                     </th>
                     <th
-                      className="text-left text-[11px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
+                      className="text-left text-[12px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
                       title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
                     >
                       Source
                     </th>
                     <th
-                      className="text-left text-[11px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
+                      className="text-left text-[12px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
                       title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
                       Status
                     </th>
-                    <th className="text-center text-[11px] font-semibold px-2 py-1.5 w-[70px]">
+                    <th className="text-center text-[12px] font-semibold px-2 py-1.5 w-[70px]">
                       Action
                     </th>
                   </tr>
@@ -1752,7 +1745,7 @@ function DrawerBody({
                                   </button>
                                 )}
                                 <span
-                                  className="font-mono text-[11px] leading-tight break-words"
+                                  className="font-mono text-[12px] leading-tight break-words"
                                   title={l.sku}
                                 >
                                   {l.sku}
@@ -1760,19 +1753,19 @@ function DrawerBody({
                               </div>
                             </td>
                             {/* Qty */}
-                            <td className="border border-base-200 px-2 py-1 text-right text-[13px] tabular-nums align-top">
+                            <td className="border border-base-200 px-2 py-1 text-right text-[14px] tabular-nums align-top">
                               {l.qty}
                             </td>
                             {/* Source — PO/#### or own Klang stock. */}
                             <td className="border border-base-200 px-2 py-1 align-middle">
                               {isService ? (
-                                <span className="text-base-300 text-[11px]">—</span>
+                                <span className="text-base-300 text-[12px]">—</span>
                               ) : poNo ? (
-                                <span className="font-mono text-[11px] text-primary">
+                                <span className="font-mono text-[12px] text-primary">
                                   {poNo}
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-base-600">
+                                <span className="text-[12px] text-base-600">
                                   Klang stock
                                 </span>
                               )}
@@ -1782,12 +1775,12 @@ function DrawerBody({
                               {pill ? (
                                 <span
                                   title={pill.hint}
-                                  className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                  className={`inline-flex items-center text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
                                 >
                                   {pill.t}
                                 </span>
                               ) : (
-                                <span className="text-base-300 text-[11px]">—</span>
+                                <span className="text-base-300 text-[12px]">—</span>
                               )}
                             </td>
                             {/* Action — inline Reserve on an unfulfilled line;
@@ -1807,12 +1800,12 @@ function DrawerBody({
                                       });
                                   }}
                                   title="Open the warehouse picker filtered to this line"
-                                  className="text-[11px] font-semibold text-primary border border-primary rounded-md px-2 py-0.5 hover:bg-primary/5 whitespace-nowrap"
+                                  className="text-[12px] font-semibold text-primary border border-primary rounded-md px-2 py-0.5 hover:bg-primary/5 whitespace-nowrap"
                                 >
                                   Reserve
                                 </button>
                               ) : (
-                                <span className="text-base-300 text-[11px]">—</span>
+                                <span className="text-base-300 text-[12px]">—</span>
                               )}
                             </td>
                           </tr>
@@ -1825,7 +1818,7 @@ function DrawerBody({
                                 <div className="space-y-2">
                                   {!isAcc && (
                                     <div className="flex items-center gap-4 flex-wrap">
-                                      <label className="flex items-center gap-1.5 text-[11px] text-base-500">
+                                      <label className="flex items-center gap-1.5 text-[12px] text-base-500">
                                         Stock ETA
                                         <input
                                           type="date"
@@ -1834,7 +1827,7 @@ function DrawerBody({
                                           onChange={(e) =>
                                             form.setLineEta(l.sku, e.target.value)
                                           }
-                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[12px] focus:border-primary focus:outline-none"
                                         />
                                       </label>
                                       <button
@@ -1848,7 +1841,7 @@ function DrawerBody({
                                           });
                                         }}
                                         title="Book in received units (GRN)"
-                                        className={`inline-flex items-center gap-1 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
+                                        className={`inline-flex items-center gap-1 text-[12px] tabular-nums px-1.5 py-0.5 rounded ${
                                           lineReceivedOf(l.sku) >= l.qty
                                             ? "text-success font-semibold"
                                             : "text-primary hover:bg-primary/10"
@@ -1865,7 +1858,7 @@ function DrawerBody({
                                     </div>
                                   )}
                                   <div>
-                                    <div className="text-[11px] font-semibold text-base-500 mb-1">
+                                    <div className="text-[12px] font-semibold text-base-500 mb-1">
                                       Route — stop 1 is where the item sits; add
                                       a stop for a special transfer. Delivery to
                                       the customer is set in the Delivery panel.
@@ -1905,7 +1898,7 @@ function DrawerBody({
                       <tr key={`sub-${label}`}>
                         <td
                           colSpan={5}
-                          className="border border-base-200 bg-base-50 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.04em] text-base-500"
+                          className="border border-base-200 bg-base-50 px-2 py-1 text-[12px] font-bold uppercase tracking-[0.04em] text-base-500"
                         >
                           {label}
                         </td>
@@ -2118,9 +2111,9 @@ function DrawerBody({
               {/* Optional preferred-name/title for WhatsApp messages — blank
                   falls back to the Title-Cased customer name; NEVER an
                   auto-inferred Mr/Ms. Local-only until an API column ships. */}
-              <div className="mt-2 border-t border-base-100 h-9 flex items-center justify-between gap-2">
+              <div className="mt-2 border-t border-base-100 h-11 flex items-center justify-between gap-2">
                 <span
-                  className="text-[11px] text-base-400 shrink-0"
+                  className="text-[12px] text-base-400 shrink-0"
                   title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
                 >
                   Salutation (messages)
@@ -2131,7 +2124,7 @@ function DrawerBody({
                   onChange={(e) => saveSalutation(e.target.value)}
                   placeholder={titleCaseName(order.customer_name ?? "")}
                   aria-label="Preferred salutation for messages"
-                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-right outline-none hover:border-base-400 focus:border-primary"
+                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[14px] text-right outline-none hover:border-base-400 focus:border-primary"
                 />
               </div>
             </div>
@@ -2201,7 +2194,7 @@ function DrawerBody({
                         ? "Collect before delivery"
                         : "Outstanding balance"
                   }
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
                 >
                   {balanceGate === "hold" && (
                     <AlertCircle size={14} strokeWidth={2.5} />
@@ -2220,7 +2213,7 @@ function DrawerBody({
                 /* Colour lock: no red block here — hold/warn read as coloured
                    TEXT on the neutral surface (the banner owns the red block). */
                 <div
-                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] bg-base-50 ${
+                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[12px] bg-base-50 ${
                     balanceGate === "hold"
                       ? "text-danger"
                       : balanceGate === "warn"
@@ -2270,7 +2263,7 @@ function DrawerBody({
                           ? "Collect storage before delivery"
                           : "Storage fee running"
                     }
-                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
+                    className={`inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
                       storageGate === "hold" ? "text-danger" : "text-warning"
                     }`}
                   >
@@ -2302,7 +2295,7 @@ function DrawerBody({
                 {/* §7.5 — the locked rule (replaces the wrong RM/day placeholder):
                     fee runs START→END; START auto = the next same weekday after
                     the deadline; MS/BF RM150/month · Sofa 14 days free then RM200. */}
-                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[11px] text-base-500">
+                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[12px] text-base-500">
                   Starts the same weekday the week AFTER the deadline · MS/BF{" "}
                   <span className="font-mono text-base-700">RM150</span>/month ·
                   sofa free 14 days then{" "}
@@ -2367,7 +2360,7 @@ function DrawerBody({
                   );
                 if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
+                    <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
                       overdue
                     </span>
                   );
@@ -2398,11 +2391,11 @@ function DrawerBody({
                   feeds the list's next-action engine, it does NOT auto-message. */}
               {contactByLabel && (
                 <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-info min-w-0">
+                  <span className="flex items-center gap-1 text-[12px] font-medium text-info min-w-0">
                     <Phone size={14} strokeWidth={2.25} className="shrink-0" />
                     <span className="truncate">Chase partner by {contactByLabel}</span>
                   </span>
-                  <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
+                  <span className="flex items-center gap-0.5 text-[12px] text-info/70 whitespace-nowrap shrink-0">
                     <span>−</span>
                     <input
                       type="number"
@@ -2413,7 +2406,7 @@ function DrawerBody({
                       placeholder="3"
                       aria-label="Chase window — days before the deadline to chase the partner"
                       title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
-                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11px] text-center outline-none focus:border-primary"
+                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
                     />
                     <span>d</span>
                   </span>
@@ -2423,7 +2416,7 @@ function DrawerBody({
                   §5.1 (moved out of the old header banner). Same quick sparse-
                   save; the list stays unaffected. */}
               <label className="flex items-center justify-between gap-2 rounded-md bg-base-50 px-2 py-1 cursor-pointer select-none">
-                <span className="text-[11px] text-base-500">
+                <span className="text-[12px] text-base-500">
                   Customer confirmed
                 </span>
                 <input
@@ -2453,7 +2446,7 @@ function DrawerBody({
               {(order.delivery_stops?.length ?? 0) > 0 || showRouteBlock ? (
                 <div className="border-t border-base-100 pt-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] text-base-400">
+                    <span className="text-[12px] text-base-400">
                       Carriers / route
                     </span>
                     <MiniBadge tone="muted">
@@ -2476,7 +2469,7 @@ function DrawerBody({
                     type="button"
                     onClick={() => setShowRouteBlock(true)}
                     title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
-                    className="text-[11px] font-medium text-primary hover:underline"
+                    className="text-[12px] font-medium text-primary hover:underline"
                   >
                     + Add stop (multi-leg)
                   </button>
@@ -2540,7 +2533,7 @@ function ReceiveLineModal({
   const n = Number(qty);
   const valid = Number.isFinite(n) && n >= 1 && n <= 999;
   const field =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-primary";
 
   function submit() {
     if (!valid) return;
@@ -2567,8 +2560,8 @@ function ReceiveLineModal({
   return (
     <Modal title="Book in received stock" onClose={onClose}>
       <div className="space-y-3">
-        <div className="text-[13px] text-base-600">
-          <span className="font-mono text-[11px]">{sku}</span>
+        <div className="text-[14px] text-base-600">
+          <span className="font-mono text-[12px]">{sku}</span>
           <span className="ml-2 text-base-400">
             received {alreadyReceived}/{lineQty}
           </span>
@@ -2624,7 +2617,7 @@ function ReceiveLineModal({
             type="button"
             onClick={onClose}
             disabled={receive.isPending}
-            className="btn-ghost text-[13px]"
+            className="btn-ghost text-[14px]"
           >
             Cancel
           </button>
@@ -2632,7 +2625,7 @@ function ReceiveLineModal({
             type="button"
             onClick={submit}
             disabled={!valid || receive.isPending}
-            className="btn-primary text-[13px] disabled:opacity-40"
+            className="btn-primary text-[14px] disabled:opacity-40"
           >
             {receive.isPending ? "Booking…" : "Book in"}
           </button>
@@ -2661,7 +2654,7 @@ function LoanSofaModal({
   const [notes, setNotes] = useState("");
   const loan = useLoanSofa(orderId);
   const field =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-primary";
 
   function submit() {
     loan.mutate(
@@ -2685,8 +2678,8 @@ function LoanSofaModal({
   return (
     <Modal title="Loan this sofa" onClose={onClose}>
       <div className="space-y-3">
-        <div className="text-[13px] text-base-600">
-          <span className="font-mono text-[11px]">{itemSku}</span>
+        <div className="text-[14px] text-base-600">
+          <span className="font-mono text-[12px]">{itemSku}</span>
           <span className="ml-2 text-base-400">→ {soRef} · FREE loaner</span>
         </div>
         <p className="t-tiny text-base-500">
@@ -2716,7 +2709,7 @@ function LoanSofaModal({
             type="button"
             onClick={onClose}
             disabled={loan.isPending}
-            className="btn-ghost text-[13px]"
+            className="btn-ghost text-[14px]"
           >
             Cancel
           </button>
@@ -2724,7 +2717,7 @@ function LoanSofaModal({
             type="button"
             onClick={submit}
             disabled={loan.isPending}
-            className="btn-primary text-[13px] disabled:opacity-40"
+            className="btn-primary text-[14px] disabled:opacity-40"
           >
             {loan.isPending ? "Loaning…" : "Loan sofa"}
           </button>
@@ -2813,7 +2806,7 @@ export function OrderCustomerCard({
 
   if (editing) {
     const field =
-      "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+      "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-base-700";
     return (
       <div className="space-y-2">
         <label className="block">
@@ -2844,7 +2837,7 @@ export function OrderCustomerCard({
             type="button"
             onClick={() => setEditing(false)}
             disabled={update.isPending}
-            className="btn-ghost text-[13px]"
+            className="btn-ghost text-[14px]"
           >
             Cancel
           </button>
@@ -2852,7 +2845,7 @@ export function OrderCustomerCard({
             type="button"
             onClick={save}
             disabled={update.isPending}
-            className="btn-primary text-[13px]"
+            className="btn-primary text-[14px]"
           >
             {update.isPending ? "Saving…" : "Save"}
           </button>
@@ -2865,7 +2858,7 @@ export function OrderCustomerCard({
   // click Edit to change (place-status only). Ordered date anchored to the
   // card bottom so the column aligns with its siblings.
   return (
-    <div className="flex flex-col h-full text-[13px]">
+    <div className="flex flex-col h-full text-[14px]">
       <CompactField label="Name">
         <span className={`font-medium ${cjkClassName(order.customer_name)}`}>
           {order.customer_name || <span className="text-base-400">—</span>}
@@ -2910,7 +2903,7 @@ export function waLink(phone: string | null | undefined): string | null {
 function CompactField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-[3px] border-b border-base-100/70 last:border-b-0">
-      <span className="text-[11px] text-base-400 shrink-0">{label}</span>
+      <span className="text-[12px] text-base-400 shrink-0">{label}</span>
       <span className="min-w-0 text-right text-base-900">{children}</span>
     </div>
   );
@@ -3022,9 +3015,9 @@ function MoneyRow({
 }) {
   return (
     <div
-      className="flex items-center justify-between gap-2 px-3 h-9"
+      className="flex items-center justify-between gap-2 px-3 h-11"
     >
-      <span className={`text-[11px] text-base-400 ${strong ? "font-medium" : ""}`}>{label}</span>
+      <span className={`text-[12px] text-base-400 ${strong ? "font-medium" : ""}`}>{label}</span>
       <span className="text-right">{children}</span>
     </div>
   );
@@ -3048,7 +3041,7 @@ function RecordPaymentForm({
   const amt = Number(amount);
   const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
   const cell =
-    "w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+    "w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-base-700";
   return (
     <div className="rounded-[8px] border border-base-200/70 bg-base-50 p-2 space-y-1.5">
       <div className="grid grid-cols-2 gap-1.5">
@@ -3085,14 +3078,14 @@ function RecordPaymentForm({
           onClick={() =>
             onSubmit({ amount: amt, paidOn, note: note.trim() || null })
           }
-          className="btn-hero text-[13px] disabled:opacity-50"
+          className="btn-hero text-[14px] disabled:opacity-50"
         >
           {pending ? "Recording…" : "Record payment"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="text-[13px] text-base-500 hover:text-base-700"
+          className="text-[14px] text-base-500 hover:text-base-700"
         >
           Cancel
         </button>
@@ -3143,20 +3136,20 @@ function MoneyCard({
         <MoneyRow label="Outstanding" strong>
           {totalSet ? (
             <span
-              className={`font-mono text-[22px] font-bold leading-none ${
-                outstanding > 0 ? "text-[#991B1B]" : "text-success"
+              className={`font-mono text-[20px] font-bold leading-none ${
+                outstanding > 0 ? "text-[#A32D2D]" : "text-success"
               }`}
             >
               {outstanding > 0 ? RM(outstanding) : "Settled"}
             </span>
           ) : (
-            <span className="text-[11px] text-base-400">Total not set</span>
+            <span className="text-[12px] text-base-400">Total not set</span>
           )}
         </MoneyRow>
         <MoneyRow label="Total">
           {hasLineTotal ? (
             <span
-              className="font-mono text-[13px] text-base-600"
+              className="font-mono text-[14px] text-base-600"
               title="Summed from the order items"
             >
               {RM(orderTotal)}
@@ -3172,21 +3165,21 @@ function MoneyCard({
               onBlur={() => setEditingTotal(false)}
               placeholder="Set total (RM)"
               aria-label="Order total"
-              className="w-32 text-right font-mono text-[13px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+              className="w-32 text-right font-mono text-[14px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
             />
           ) : (
             <button
               type="button"
               onClick={() => setEditingTotal(true)}
               title="Keyed total — click to edit"
-              className="font-mono text-[13px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
+              className="font-mono text-[14px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
             >
               {RM(orderTotal)}
             </button>
           )}
         </MoneyRow>
         <MoneyRow label="Collected">
-          <span className="font-mono text-[13px] text-base-600">
+          <span className="font-mono text-[14px] text-base-600">
             {RM(collected)}
           </span>
         </MoneyRow>
@@ -3194,13 +3187,13 @@ function MoneyCard({
 
       {/* Payment history — one line per payment: label · date · amount · receipt. */}
       {ledger.length === 0 ? (
-        <div className="text-[11px] text-base-400">No payments recorded yet.</div>
+        <div className="text-[12px] text-base-400">No payments recorded yet.</div>
       ) : (
         <div className="space-y-1">
           {ledger.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between gap-2 text-[13px] border-b border-base-100 pb-1 last:border-b-0"
+              className="flex items-center justify-between gap-2 text-[14px] border-b border-base-100 pb-1 last:border-b-0"
             >
               <span className="min-w-0 truncate">
                 <span className="font-medium text-base-800">
@@ -3228,7 +3221,7 @@ function MoneyCard({
                     disabled={voidPay.isPending}
                     title="Void this payment"
                     aria-label={`Void payment ${p.receipt_no ?? p.id}`}
-                    className="text-[11px] text-base-300 hover:text-destructive"
+                    className="text-[12px] text-base-300 hover:text-destructive"
                   >
                     void
                   </button>
@@ -3252,7 +3245,7 @@ function MoneyCard({
           }
         />
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[13px]">
+        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[14px]">
           Record payment
         </button>
       )}
@@ -3281,7 +3274,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 ${
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[14px] hover:bg-base-50 ${
         disabled
           ? "opacity-40 cursor-not-allowed"
           : danger
@@ -3470,7 +3463,7 @@ function ActionsMenu({
                 aria-haspopup="menu"
                 aria-expanded={dlOpen}
                 onClick={() => setDlOpen((o) => !o)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 text-base-900"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[14px] hover:bg-base-50 text-base-900"
               >
                 <span className="flex items-center gap-2">
                   <span className="text-base-500 shrink-0">
@@ -3559,23 +3552,23 @@ function PoRow({
     <div
       className={`grid grid-cols-[auto_1fr_auto] gap-3 px-3.5 py-3 items-center ${divider ? "border-t border-base-100" : ""}`}
     >
-      <span className="font-mono text-[13px] font-semibold">{po.id.slice(0, 8)}</span>
+      <span className="font-mono text-[14px] font-semibold">{po.id.slice(0, 8)}</span>
       <div>
         {po.lines.map((l, j) => (
-          <div key={j} className="text-[11px] leading-snug font-body">
+          <div key={j} className="text-[12px] leading-snug font-body">
             <span className="font-mono">{l.sku}</span>{" "}
             <span className="font-mono text-base-500">
               {l.received_qty || 0}/{l.qty}
             </span>
           </div>
         ))}
-        <div className="text-[11px] text-base-500 mt-0.5">
+        <div className="text-[12px] text-base-500 mt-0.5">
           ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <span
-          className={`text-[11px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
+          className={`text-[12px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
         >
           {po.status}
         </span>
@@ -3583,7 +3576,7 @@ function PoRow({
           <button
             type="button"
             onClick={() => onReceive(po)}
-            className="btn-primary text-[11px] py-1 px-2.5 whitespace-nowrap"
+            className="btn-primary text-[12px] py-1 px-2.5 whitespace-nowrap"
             title="Receive this PO's goods (GRN) — books them in as ready stock"
           >
             Receive (GRN)
@@ -3644,7 +3637,7 @@ function PrintDoButton({
       type="button"
       onClick={open}
       disabled={pending}
-      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 disabled:opacity-40 text-base-900"
+      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[14px] hover:bg-base-50 disabled:opacity-40 text-base-900"
     >
       <span className="text-base-500 shrink-0">
         <FileText className="w-4 h-4" />

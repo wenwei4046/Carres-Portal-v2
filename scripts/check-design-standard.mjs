@@ -26,13 +26,13 @@
  *   chrome; ADD each file here as it is migrated to the kit). POS
  *   (pages/dealer/**) has its own contract and is never in scope.
  *
- *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 17}. (kit scope)
- *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {11, 13} body /
- *     {16, 22} money. Headings use `.t-*` classes. (kit scope)
+ *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 18}. (kit scope)
+ *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {12 label, 13 btn/ref,
+ *     14 secondary, 15 content, 20 hero number}. Headings use `.t-*`. (kit scope)
  *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
  *     index.css. (all web src)
- *   RULE F — drawer panel row heights: `h-[Npx]` with N ≠ 36 — rows are `h-9`;
- *     the List page's 40px rows live outside this scope. (kit scope)
+ *   RULE F — row heights: `h-[Npx]` with N ≠ 44 — rows are 44px FIXED (`h-11`);
+ *     content truncates, the row never grows. (kit scope)
  *   RULE G — hand-rolled section chrome: a literal `section-band` class in JSX
  *     outside components/SectionPanel.tsx — render <SectionBand>. (all web src)
  *
@@ -152,8 +152,8 @@ const KIT_FILES = new Set([
   "apps/web/src/pages/operation/components/RouteJourneyBar.tsx",
   "apps/web/src/pages/operation/components/OrderControlPanel.tsx",
 ]);
-const ICON_SIZES = new Set([14, 16, 17]);
-const TEXT_SIZES = new Set([11, 13, 16, 22]); // 11/13 body · 16/22 money (headings use .t-*)
+const ICON_SIZES = new Set([14, 16, 18]); // v4: 14 pill/inline · 16 default UI · 18 top-bar
+const TEXT_SIZES = new Set([12, 13, 14, 15, 20]); // v4: 12 label · 13 btn/ref · 14 secondary · 15 content · 20 hero number
 // A `section-band` class inside a string literal (comments don't count).
 const BAND_CLASS_RE = /["'`][^"'`\n]*\bsection-band\b[^"'`\n]*["'`]/g;
 
@@ -194,7 +194,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!ICON_SIZES.has(n)) {
         errors.push(
-          `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (inline) / 16 (panel action) / 17 (top bar) only (docs/UI-KIT.md §A4).`,
+          `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (pill/inline) / 16 (default UI) / 18 (top bar) only (docs/UI-KIT.md §A4).`,
         );
       }
     }
@@ -208,7 +208,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
         errors.push(
-          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11/13 (body) and 16/22 (money) — headings via .t-* (docs/UI-KIT.md §A3).`,
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 12/13/14/15 (+20 hero number) — headings via .t-* (docs/UI-KIT.md §A3).`,
         );
       }
     }
@@ -220,9 +220,9 @@ for (const f of files) {
     const hRe = /\bh-\[(\d+)px\]/g;
     while ((m = hRe.exec(src))) {
       const n = Number(m[1]);
-      if (n !== 36) {
+      if (n !== 44) {
         errors.push(
-          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; drawer panel rows are 36px (h-9) (docs/UI-KIT.md §A7).`,
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 44px FIXED (h-11) (docs/UI-KIT.md §A7).`,
         );
       }
     }

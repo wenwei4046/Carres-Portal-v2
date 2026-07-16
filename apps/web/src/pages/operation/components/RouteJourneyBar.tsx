@@ -107,7 +107,7 @@ export function RouteJourneyBar({
   open?: boolean;
 }) {
   if (legs.length === 0) {
-    return <span className="text-base-300 text-[11px]">—</span>;
+    return <span className="text-base-300 text-[12px]">—</span>;
   }
   const stuck = legs.some((l) => l.status === "stuck");
   return (
@@ -178,7 +178,7 @@ export function RouteQuietButton({
         onClick?.();
       }}
       title="Goes here by default — click to arrange a special transfer"
-      className={`w-full flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] hover:bg-base-50 ${
+      className={`w-full flex items-center gap-1.5 rounded px-1.5 py-1 text-[12px] hover:bg-base-50 ${
         open ? "bg-base-50 text-primary" : "text-base-600 hover:text-primary"
       }`}
     >
@@ -230,11 +230,11 @@ export function StopsEditor({
   const update = (i: number, v: string) =>
     onChange(shown.map((s, j) => (j === i ? v : s)));
   const sel =
-    "border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[11px] focus:border-primary focus:outline-none";
+    "border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[12px] focus:border-primary focus:outline-none";
   return (
     <div className="space-y-1.5">
       {shown.map((s, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-[11px]">
+        <div key={i} className="flex items-center gap-1.5 text-[12px]">
           <span className="w-4 text-right text-base-300 tabular-nums shrink-0">
             {i + 1}.
           </span>
@@ -276,7 +276,7 @@ export function StopsEditor({
           halt(e);
           onChange([...shown, "Carres Klang"]);
         }}
-        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
       >
         <Plus className="w-3 h-3" /> Add stop
       </button>
@@ -294,7 +294,7 @@ export function RouteLegList({ legs }: { legs: RouteLeg[] }) {
   return (
     <div className="space-y-1">
       {legs.map((leg, i) => (
-        <div key={i} className="flex items-center gap-2 text-[11px]">
+        <div key={i} className="flex items-center gap-2 text-[12px]">
           <span style={{ color: iconColor(leg.status) }} className="shrink-0">
             {leg.status === "done" ? (
               "●"
@@ -310,7 +310,7 @@ export function RouteLegList({ legs }: { legs: RouteLeg[] }) {
           <PlaceIcon loc={leg.to} className="w-3.5 h-3.5 text-base-500 shrink-0" />
           <span className="text-base-600 truncate">{leg.to}</span>
           {leg.carrier && (
-            <span className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
+            <span className="ml-auto text-[12px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
               {leg.carrier}
             </span>
           )}

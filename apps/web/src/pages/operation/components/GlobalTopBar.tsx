@@ -116,7 +116,7 @@ export function TopBarIcons() {
           aria-expanded={open === "alerts"}
           className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
         >
-          <Bell size={17} />
+          <Bell size={18} />
           {alerts.total > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-bold leading-[16px] text-center">
               {alerts.total > 99 ? "99+" : alerts.total}
@@ -180,7 +180,7 @@ export function TopBarIcons() {
           aria-expanded={open === "help"}
           className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
         >
-          <HelpCircle size={17} />
+          <HelpCircle size={18} />
         </button>
         {open === "help" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1">
@@ -189,7 +189,7 @@ export function TopBarIcons() {
               onClick={() => setOpen(null)}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
             >
-              <HelpCircle size={15} className="shrink-0 text-base-400" />
+              <HelpCircle size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
                 <span className="t-small text-base-800 block">Help</span>
                 <span className="t-tiny text-base-400 block">Coming soon</span>
@@ -200,7 +200,7 @@ export function TopBarIcons() {
               onClick={() => setOpen(null)}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
             >
-              <GraduationCap size={15} className="shrink-0 text-base-400" />
+              <GraduationCap size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
                 <span className="t-small text-base-800 block">Training · SOP</span>
                 <span className="t-tiny text-base-400 block">
@@ -223,7 +223,7 @@ export function TopBarIcons() {
           aria-expanded={open === "settings"}
           className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
         >
-          <Settings size={17} />
+          <Settings size={18} />
         </button>
         {open === "settings" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg p-4 text-center">

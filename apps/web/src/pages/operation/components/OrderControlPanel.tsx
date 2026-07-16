@@ -114,7 +114,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // must clearly look like fields). A visible hairline box on white, flame ring on
 // focus — clean but structured.
 const CELL =
-  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
+  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[14px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -128,7 +128,7 @@ export function FieldRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-2 min-w-0 py-[3px] border-b border-base-100/70 last:border-b-0">
-      <span className="text-[11px] text-base-400 shrink-0">{label}</span>
+      <span className="text-[12px] text-base-400 shrink-0">{label}</span>
       <div className="min-w-0 flex-1 flex items-center justify-end text-right">
         {children}
       </div>
@@ -395,7 +395,7 @@ export function RoutingFields({
               onClick={() =>
                 setLogistic.mutate({ deliveryPartnerId: suggestedPartner.id })
               }
-              className="text-[11px] px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
+              className="text-[12px] px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
             >
               Apply {suggestedPartner.name}
             </button>
@@ -608,7 +608,7 @@ function LegacyPaidOutstanding({
       </FieldRow>
       <FieldRow label="Outstanding">
         <div
-          className={`px-2 py-1.5 font-mono text-[13px] font-semibold ${
+          className={`px-2 py-1.5 font-mono text-[14px] font-semibold ${
             !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
           }`}
         >
@@ -673,11 +673,11 @@ function PaymentLedger({
         {/* Outstanding headline + auto status (Jess 2026-07-02). */}
         <div className="flex items-end justify-between gap-2">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.05em] text-base-400">
+            <div className="text-[12px] uppercase tracking-[0.05em] text-base-400">
               Outstanding
             </div>
             <div
-              className={`font-mono text-[22px] font-semibold leading-tight ${
+              className={`font-mono text-[20px] font-semibold leading-tight ${
                 !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
               }`}
             >
@@ -687,13 +687,13 @@ function PaymentLedger({
           <span className={`pill ${status.c} mb-0.5`}>{status.t}</span>
         </div>
         {hasBill && (
-          <div className="text-[11px] text-base-500">
+          <div className="text-[12px] text-base-500">
             Paid {RM(paidSoFar)} of {RM(bill)} owed
           </div>
         )}
-        {isLoading && <div className="text-[11px] text-base-400">Loading…</div>}
+        {isLoading && <div className="text-[12px] text-base-400">Loading…</div>}
         {!isLoading && payments.length === 0 && (
-          <div className="text-[11px] text-base-400">No payments recorded yet.</div>
+          <div className="text-[12px] text-base-400">No payments recorded yet.</div>
         )}
         {payments.map((p) => (
           <LedgerRow
@@ -717,7 +717,7 @@ function PaymentLedger({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:underline"
           >
             <Plus size={14} strokeWidth={2.5} /> Record payment
           </button>
@@ -765,7 +765,7 @@ function LedgerRow({
   receiptMeta?: { orderCode: string; customerName: string };
 }) {
   return (
-    <div className="flex items-center gap-2 text-[11px]">
+    <div className="flex items-center gap-2 text-[12px]">
       <span className="text-base-500 tabular-nums w-[68px] shrink-0">{row.paid_on}</span>
       <span className="font-mono font-semibold text-base-900 w-[78px] shrink-0">
         {RM(Number(row.amount))}
@@ -871,14 +871,14 @@ function AddPaymentForm({
           type="button"
           disabled={!valid}
           onClick={() => onSubmit({ amount: amt, paidOn, method, kind })}
-          className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+          className="btn-primary text-[12px] py-1 px-2.5 disabled:opacity-50"
         >
           {pending ? "Recording…" : "Record"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="text-[11px] text-base-500 hover:text-base-700"
+          className="text-[12px] text-base-500 hover:text-base-700"
         >
           Cancel
         </button>
@@ -1041,19 +1041,19 @@ export function StorageControlFields({
             {hasMsbf && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[11px] uppercase tracking-[0.04em] text-base-400">
+                  <span className="text-[12px] uppercase tracking-[0.04em] text-base-400">
                     MS / BF
                   </span>
                   {impMsbf != null && (
-                    <span className="text-[11px] uppercase tracking-[0.04em] text-primary font-semibold">
+                    <span className="text-[12px] uppercase tracking-[0.04em] text-primary font-semibold">
                       Master
                     </span>
                   )}
                 </div>
-                <div className="text-[13px] font-semibold text-base-900">
+                <div className="text-[14px] font-semibold text-base-900">
                   RM {dispMsbf.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-base-500">
+                <div className="text-[12px] text-base-500">
                   {impMsbf != null
                     ? "imported fee"
                     : storage.msbf > 0
@@ -1065,19 +1065,19 @@ export function StorageControlFields({
             {hasSof && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[11px] uppercase tracking-[0.04em] text-base-400">
+                  <span className="text-[12px] uppercase tracking-[0.04em] text-base-400">
                     Sofa
                   </span>
                   {impSof != null && (
-                    <span className="text-[11px] uppercase tracking-[0.04em] text-primary font-semibold">
+                    <span className="text-[12px] uppercase tracking-[0.04em] text-primary font-semibold">
                       Master
                     </span>
                   )}
                 </div>
-                <div className="text-[13px] font-semibold text-base-900">
+                <div className="text-[14px] font-semibold text-base-900">
                   RM {dispSof.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-base-500">
+                <div className="text-[12px] text-base-500">
                   {impSof != null
                     ? "imported fee"
                     : storage.sofCharged
@@ -1221,10 +1221,10 @@ function StorageExtensionRow({
   if (extended && !open) {
     return (
       <FieldRow label="Extension">
-        <div className="px-2 py-1.5 text-[13px] w-full">
+        <div className="px-2 py-1.5 text-[14px] w-full">
           <div className="font-semibold text-base-900">
             → {fmt(control?.extension_new_date)}
-            <span className="ml-1 text-[11px] font-normal text-base-500">
+            <span className="ml-1 text-[12px] font-normal text-base-500">
               · {control?.extension_reason ?? "—"} · free from {fmt(control?.extension_original_date)}
             </span>
           </div>
@@ -1232,7 +1232,7 @@ function StorageExtensionRow({
             <button
               type="button"
               onClick={() => void exportAgreement()}
-              className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
+              className="text-[12px] text-primary hover:underline inline-flex items-center gap-1"
             >
               <Receipt size={14} strokeWidth={2} />
               Export agreement (PDF)
@@ -1241,14 +1241,14 @@ function StorageExtensionRow({
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="text-[11px] text-primary hover:underline"
+                className="text-[12px] text-primary hover:underline"
               >
                 + Extend again
               </button>
             )}
           </div>
           {!isPrincipal && (
-            <div className="mt-0.5 text-[11px] text-base-400">
+            <div className="mt-0.5 text-[12px] text-base-400">
               One-time extension used — a further extension needs principal approval.
             </div>
           )}
@@ -1263,7 +1263,7 @@ function StorageExtensionRow({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="px-2 py-1.5 text-[13px] text-primary hover:underline inline-flex items-center gap-1"
+          className="px-2 py-1.5 text-[14px] text-primary hover:underline inline-flex items-center gap-1"
         >
           <Plus size={14} strokeWidth={2.5} />
           Extend storage
@@ -1279,7 +1279,7 @@ function StorageExtensionRow({
     <FieldRow label="Extension">
       <div className="px-1.5 py-1.5 w-full space-y-1.5 border border-base-200 rounded-[3px] bg-base-50">
         <div className="grid grid-cols-2 gap-1.5">
-          <label className="text-[11px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+          <label className="text-[12px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
             New delivery date
             <input
               type="date"
@@ -1289,7 +1289,7 @@ function StorageExtensionRow({
               className={CELL}
             />
           </label>
-          <label className="text-[11px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+          <label className="text-[12px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
             Reason
             <select
               value={reason}
@@ -1315,7 +1315,7 @@ function StorageExtensionRow({
             className={CELL + " w-full"}
           />
         )}
-        <label className="flex items-start gap-1.5 text-[11px] text-base-700">
+        <label className="flex items-start gap-1.5 text-[12px] text-base-700">
           <input
             type="checkbox"
             checked={ack}
@@ -1336,14 +1336,14 @@ function StorageExtensionRow({
                 acknowledged: true,
               })
             }
-            className="btn-primary text-[11px] px-2 py-1 disabled:opacity-40"
+            className="btn-primary text-[12px] px-2 py-1 disabled:opacity-40"
           >
             {extend.isPending ? "Saving…" : "Record extension"}
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-[11px] text-base-500 hover:text-base-900"
+            className="text-[12px] text-base-500 hover:text-base-900"
           >
             Cancel
           </button>
@@ -1393,7 +1393,7 @@ function StorageCollectWaiver({
   if (collectedAt) {
     return (
       <FieldRow label="Collected">
-        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+        <div className="px-2 py-1.5 text-[14px] text-success font-semibold inline-flex items-center gap-1">
           <ShieldCheck size={14} strokeWidth={2.5} />
           Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
         </div>
@@ -1403,7 +1403,7 @@ function StorageCollectWaiver({
   if (waiverStatus === "approved") {
     return (
       <FieldRow label="Waiver">
-        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+        <div className="px-2 py-1.5 text-[14px] text-success font-semibold inline-flex items-center gap-1">
           <ShieldCheck size={14} strokeWidth={2.5} />
           Waived by principal · delivery unlocked
         </div>
@@ -1414,7 +1414,7 @@ function StorageCollectWaiver({
   return (
     <FieldRow label="Collect">
       <div className="px-1.5 py-1.5 w-full space-y-1.5">
-        <div className="text-[11px] text-warning font-medium">
+        <div className="text-[12px] text-warning font-medium">
           Storage fee must be collected (or waived) before dispatch.
         </div>
 
@@ -1460,14 +1460,14 @@ function StorageCollectWaiver({
                     { onSuccess: () => setCollecting(false) },
                   );
                 }}
-                className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+                className="btn-primary text-[12px] py-1 px-2.5 disabled:opacity-50"
               >
                 {collect.isPending ? "Collecting…" : "Collect + receipt"}
               </button>
               <button
                 type="button"
                 onClick={() => setCollecting(false)}
-                className="text-[11px] text-base-500 hover:text-base-700"
+                className="text-[12px] text-base-500 hover:text-base-700"
               >
                 Cancel
               </button>
@@ -1478,7 +1478,7 @@ function StorageCollectWaiver({
             <button
               type="button"
               onClick={() => setCollecting(true)}
-              className="btn-primary text-[11px] py-1 px-2.5"
+              className="btn-primary text-[12px] py-1 px-2.5"
             >
               Collect storage fee
             </button>
@@ -1486,7 +1486,7 @@ function StorageCollectWaiver({
               <button
                 type="button"
                 onClick={() => setRequesting((v) => !v)}
-                className="text-[11px] text-base-500 hover:text-base-700"
+                className="text-[12px] text-base-500 hover:text-base-700"
               >
                 Request waiver
               </button>
@@ -1515,14 +1515,14 @@ function StorageCollectWaiver({
                     { onSuccess: () => setRequesting(false) },
                   )
                 }
-                className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+                className="btn-primary text-[12px] py-1 px-2.5 disabled:opacity-50"
               >
                 {requestWaiver.isPending ? "Requesting…" : "Submit request"}
               </button>
               <button
                 type="button"
                 onClick={() => setRequesting(false)}
-                className="text-[11px] text-base-500 hover:text-base-700"
+                className="text-[12px] text-base-500 hover:text-base-700"
               >
                 Cancel
               </button>
@@ -1533,7 +1533,7 @@ function StorageCollectWaiver({
         {/* Waiver pending — operator sees status, principal decides */}
         {waiverStatus === "requested" && (
           <div className="border border-warning/40 bg-warning-soft/40 rounded-[3px] p-2 space-y-1.5">
-            <div className="text-[11px] text-base-700">
+            <div className="text-[12px] text-base-700">
               <span className="pill pill-warning mr-1.5">Waiver requested</span>
               {control?.storage_waiver_reason ?? ""}
             </div>
@@ -1543,7 +1543,7 @@ function StorageCollectWaiver({
                   type="button"
                   disabled={decideWaiver.isPending}
                   onClick={() => decideWaiver.mutate({ decision: "approved" })}
-                  className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+                  className="btn-primary text-[12px] py-1 px-2.5 disabled:opacity-50"
                 >
                   Approve waiver
                 </button>
@@ -1551,19 +1551,19 @@ function StorageCollectWaiver({
                   type="button"
                   disabled={decideWaiver.isPending}
                   onClick={() => decideWaiver.mutate({ decision: "rejected" })}
-                  className="text-[11px] text-danger hover:underline"
+                  className="text-[12px] text-danger hover:underline"
                 >
                   Reject
                 </button>
               </div>
             ) : (
-              <div className="text-[11px] text-base-500">Awaiting principal approval.</div>
+              <div className="text-[12px] text-base-500">Awaiting principal approval.</div>
             )}
           </div>
         )}
 
         {waiverStatus === "rejected" && (
-          <div className="text-[11px] text-danger">
+          <div className="text-[12px] text-danger">
             Waiver rejected — collect the fee to dispatch.
           </div>
         )}
@@ -1647,7 +1647,7 @@ export function RemarkControlField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[13px]"
+        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[14px]"
       >
         {val.trim() ? (
           <span className="text-base-900">{val}</span>
@@ -1667,7 +1667,7 @@ export function OrderControlSaveBar({ form }: { form: OrderControlForm }) {
     <div className="flex items-center gap-2">
       <button
         type="button"
-        className="text-[11px] text-base-500 hover:text-base-700"
+        className="text-[12px] text-base-500 hover:text-base-700"
         onClick={form.reset}
         disabled={form.saving}
       >
@@ -1675,7 +1675,7 @@ export function OrderControlSaveBar({ form }: { form: OrderControlForm }) {
       </button>
       <button
         type="button"
-        className="btn-primary text-[13px] disabled:opacity-50"
+        className="btn-primary text-[14px] disabled:opacity-50"
         onClick={form.submit}
         disabled={form.saving}
       >
@@ -1694,7 +1694,7 @@ function AreaBadge({ area }: { area: "KV" | "Outstation" | "Unknown" }) {
         : "text-base-400 border-base-200";
   return (
     <span
-      className={`inline-block text-[11px] font-bold uppercase tracking-[0.04em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
+      className={`inline-block text-[12px] font-bold uppercase tracking-[0.04em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
     >
       {area === "KV"
         ? "Klang Valley"
@@ -1737,10 +1737,10 @@ export function PaymentSummary({ paid, total }: { paid: number; total: number })
           key={r.label}
           className="flex items-baseline justify-between gap-3 py-1 border-b border-base-100 last:border-0"
         >
-          <span className="text-[11px] uppercase tracking-[0.04em] text-base-500">
+          <span className="text-[12px] uppercase tracking-[0.04em] text-base-500">
             {r.label}
           </span>
-          <span className={`font-mono text-[13px] font-semibold ${r.tone}`}>
+          <span className={`font-mono text-[14px] font-semibold ${r.tone}`}>
             {r.value}
           </span>
         </div>
@@ -1768,7 +1768,7 @@ function RemarkField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700 resize-y"
+        className="w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-base-700 resize-y"
       />
     </div>
   );

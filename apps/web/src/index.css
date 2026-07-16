@@ -15,7 +15,9 @@
      *   • cards     → white (hierarchy now from borders + subtle shadow, not
      *                 stacked cream layers)
      * Approved by Loo via side-by-side preview 2026-06-09. */
-    --background: 38 33% 94%;          /* #F5F1EA — Carres cream page */
+    /* v4 (2026-07-17, Jess): canvas flipped cream → clean neutral grey.
+     * Brand lives in the flame, not the background. */
+    --background: 240 11% 96%;         /* #F5F5F7 — v4 canvas (was cream #F5F1EA) */
     --foreground: 221 39% 11%;         /* gray-900 ink */
 
     --card: 0 0% 100%;                 /* white cards */
@@ -98,59 +100,80 @@
    * CODES (SKU, model key, compartment, dimensions) stay `font-mono`. */
   .t-num {
     @apply font-medium;
-    font-variant-numeric: lining-nums tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums slashed-zero;
+    font-feature-settings: "zero" 1;
+  }
+  /* v4 — every mono figure (SKU / PO / phone / money) carries a slashed zero
+   * so `0` never reads as `o`. */
+  .font-mono {
+    font-variant-numeric: slashed-zero tabular-nums;
+    font-feature-settings: "zero" 1;
   }
 
-  /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
-   * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
-   * `.btn-primary` = black workhorse for every other primary action;
-   * `.btn-danger` = red text on white for destructive actions. */
-  .btn-primary {
-    @apply inline-flex items-center justify-center
-           bg-base-900 text-white
-           px-[18px] py-2.5 rounded-md
+  /* v4 button hierarchy (2026-07-17, Jess — docs/UI-KIT.md §A5): `.btn-hero` =
+   * the ONE flame CTA per page/block; `.btn-primary` = the GREY-SOFT workhorse
+   * (solid black is retired — "no heavy black buttons"); `.btn-secondary` =
+   * white box, tertiary; `.btn-danger` = red text on white, never red-filled.
+   * Colour is a signal: flame=action · blue=selection · green/amber/red=status.
+   * Sentence case, 13px semibold, 8px radius (rounded-lg). */
+  .btn-primary,
+  .btn-soft {
+    @apply inline-flex items-center justify-center gap-1.5
+           text-base-900
+           px-[18px] py-2.5 rounded-lg
            text-[13px] font-semibold
            transition-colors
-           hover:bg-base-800
+           disabled:opacity-40 disabled:cursor-not-allowed;
+    background: #f1f0ec;
+  }
+  .btn-primary:hover:not(:disabled),
+  .btn-soft:hover:not(:disabled) {
+    background: #e7e6e0;
+  }
+  /* Boxed icon button (v4) — ⋮ / expand / bell / top-bar actions. */
+  .icon-btn {
+    @apply inline-grid place-items-center w-[34px] h-[34px] rounded-[9px]
+           bg-white border border-base-200 text-base-500
+           transition-colors
+           hover:bg-base-50 hover:text-base-800
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   /* HERO — the single flame CTA per page (v17). Now distinct from `.btn-primary`
    * (black): flame marks the page's one primary action. */
   .btn-hero {
-    @apply inline-flex items-center justify-center
+    @apply inline-flex items-center justify-center gap-1.5
            bg-primary text-primary-foreground
-           px-[18px] py-2.5 rounded-md
+           px-[18px] py-2.5 rounded-lg
            text-[13px] font-semibold
            transition-colors
            hover:bg-signature-700
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center
+    @apply inline-flex items-center justify-center gap-1.5
            bg-white text-base-900
            border border-base-300
-           px-[18px] py-2.5 rounded-md
+           px-[18px] py-2.5 rounded-lg
            text-[13px] font-semibold
            transition-colors
            hover:border-base-500
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center
+    @apply inline-flex items-center justify-center gap-1.5
            bg-transparent text-base-700
-           px-3.5 py-2 rounded-md
+           px-3.5 py-2 rounded-lg
            text-[13px] font-semibold
            transition-colors
            hover:text-base-900 hover:bg-base-100
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
-  /* DANGER — red text on white, never red-filled (v17). For destructive
-   * actions (cancel / delete). */
+  /* DANGER — red text on white, never red-filled. For destructive actions. */
   .btn-danger {
-    @apply inline-flex items-center justify-center
+    @apply inline-flex items-center justify-center gap-1.5
            bg-white text-danger
            border border-danger
-           px-[18px] py-2.5 rounded-md
+           px-[18px] py-2.5 rounded-lg
            text-[13px] font-semibold
            transition-colors
            hover:bg-error-soft
@@ -202,21 +225,43 @@
    * chips (soft warm fill + 1px border); INK text colours are unchanged. The base
    * `.pill` carries a transparent border so bordered + border-less pills share the
    * same box geometry (no height jump when they sit side by side). */
-  /* KPI mission-track box (UI-KIT §A8) — the drawer-header metric card. The
-   * ONE home of the #F7F4EE fill; inline use of that hex fails lint RULE E. */
-  .kpi-box { background: #F7F4EE; @apply rounded-[8px] px-3 py-2 min-w-0 flex flex-col; }
+  /* KPI mission-track card (UI-KIT §A8, v4) — an INDEPENDENT white card on the
+   * canvas (was a #F7F4EE tinted box; the tint is retired — lint RULE E keeps
+   * that hex banned so it can't creep back). Number stays ink; colour lives in
+   * the status pill only. */
+  .kpi-box { @apply bg-white border border-base-200 rounded-[12px] px-4 py-3 min-w-0 flex flex-col; }
 
-  .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
+  /* v4 status pills (2026-07-17) — soft tint + dark same-hue ink, icon+word
+   * (a 14px Lucide glyph sits inside the pill; `inline-flex gap` makes room).
+   * Blue `.pill-sent` (scheduled) is a documented 4th STATUS tone — the only
+   * blue that isn't selection. */
+  .pill           { @apply inline-flex items-center gap-[5px] text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
+  .pill svg       { width: 14px; height: 14px; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
   .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue */
-  .pill-confirmed { background:#D6EFD9; border-color:#A9D8B0; color:#166534; } /* ready — green */
+  .pill-confirmed { background:#EAF3DE; border-color:#A9D8B0; color:#3B6D11; } /* ready — green */
   .pill-collected { background:#E0E7FF; color:#3730A3; }
-  .pill-overdue   { background:#FCE4E4; border-color:#F3B4B4; color:#991B1B; } /* overdue / no-PO — red */
-  /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
-   * warning/low/pending/in-production states read as pills too. Added 2026-06-12
-   * per Jess; fill warmed to the Orders-list amber 2026-07-12. */
-  .pill-warning   { background:#FBE8C6; border-color:#F0D08A; color:#92400E; } /* waiting — amber */
+  .pill-overdue   { background:#FCEBEB; border-color:#F3B4B4; color:#A32D2D; } /* overdue / no-PO — red */
+  .pill-warning   { background:#FAEEDA; border-color:#F0D08A; color:#854F0B; } /* waiting — amber */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
+
+  /* v4 checkbox — 17px, flame fill + white tick when checked; the `.is-select`
+   * variant turns BLUE (blue = selection, used only for row multi-select). */
+  .checkbox {
+    appearance: none; -webkit-appearance: none;
+    width: 17px; height: 17px; flex: 0 0 17px;
+    @apply border-[1.5px] border-base-400 rounded bg-white cursor-pointer;
+    display: inline-grid; place-content: center;
+    transition: background-color 0.12s, border-color 0.12s;
+  }
+  .checkbox::after {
+    content: ""; width: 9px; height: 9px; transform: scale(0);
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+    background: #fff; transition: transform 0.12s;
+  }
+  .checkbox:checked { @apply bg-primary border-primary; }
+  .checkbox:checked::after { transform: scale(1); }
+  .checkbox.is-select:checked { background: #2563eb; border-color: #2563eb; }
 
   /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the
    * dealer POS; pure presentation, no token-value changes to :root. ===== */
@@ -293,7 +338,7 @@
      (recorded in lib/design-standard.ts COLOR.sectionBand). */
   .section-band { background: #F1EFE8; }
   .section-band-title { color: #221F20; }
-  .section-band-title-danger { color: #991B1B; }
+  .section-band-title-danger { color: #A32D2D; }
   .section-band-total { color: #6F6960; }
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }

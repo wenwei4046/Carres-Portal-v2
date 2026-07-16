@@ -34,7 +34,7 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 
 | Role | Hex | Class |
 |---|---|---|
-| Page background (cream) | `#F5F1EA` | `bg-background` |
+| Page canvas (v4 neutral grey — brand lives in the flame, not the bg) | `#F5F5F7` | `bg-background` |
 | Card surface | `#FFFFFF` | `bg-white` / `bg-card` |
 | Main bg behind cards | `#F9FAFB` | `bg-base-50` |
 | Hairline border | `#E5E7EB` | `border-base-200` |
@@ -44,24 +44,31 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 | **Brand flame** (ONE hero CTA / page) | `#C44D2B` | `bg-primary` / `text-primary` |
 | Flame hover | `#9A3D22` | `hover:bg-signature-700` |
 | Flame tint (active fill / bulk bar) | `#F4E4DD` | `bg-signature-50` |
-| Black workhorse (primary buttons, active tab) | `#111827` | `bg-base-900` |
+| Grey-soft workhorse button (v4 — black retired) | `#F1F0EC` | `.btn-primary` / `.btn-soft` |
+| Ink (active tab fill) | `#111827` | `bg-base-900` |
 | Section band (cream title bars) | `#F1EFE8` | `.section-band` |
 | Section band ink / danger / total | `#221F20` / `#991B1B` / `#6F6960` | `.section-band-title(-danger)` / `.section-band-total` |
-| KPI box fill (drawer header metric cards) | `#F7F4EE` | `.kpi-box` |
+| KPI mission-track card (independent WHITE card) | white + hairline | `.kpi-box` |
+| Selection blue (checkbox `.is-select` + row wash) | `#2563EB` / wash `#EAF1FD` | `.checkbox.is-select` |
 
 Neutral ramp = Tailwind cool gray as `base-50…base-900`. Focus ring = flame.
 
-Semantic status (Tailwind 600 ink / 100 soft fill):
-success `#16A34A`/`#DCFCE7` · warning `#D97706`/`#FEF3C7` · danger/red
-`#DC2626`/`#FEE2E2` · info `#2563EB`/`#DBEAFE`.
+**Colour is a signal, not decoration (v4)**: flame = action · blue = selection
+· green/amber/red = status · bare red = alert accent. Everything else is
+black/grey/white. Content text is near-black (`text-base-900`); muted grey
+(`base-400/500`) is for labels/meta ONLY — never pale content text.
+
+Semantic tokens (for `bg-success` etc.): success `#16A34A` · warning `#D97706`
+· danger `#DC2626` · info `#2563EB`. Status is ALWAYS a pill (§A6), never bare
+coloured text.
 
 ## A2. Fonts
 
 | Use | Family | Class |
 |---|---|---|
 | Everything (body + display) | **Inter** | `font-sans` |
-| Codes: SKU, SO/ref numbers, dimensions | **JetBrains Mono** | `font-mono` |
-| Money / qty / margin readouts | Inter + lining + tabular figures | `.t-num` |
+| Codes: SKU, SO/ref numbers, phone, dimensions | **JetBrains Mono** + slashed zero | `font-mono` |
+| Money / qty / margin readouts | Inter + lining + tabular + slashed-zero figures | `.t-num` |
 
 ## A3. Type scale — LOCKED sizes
 
@@ -81,55 +88,63 @@ stays on the element):
 | `.kicker` | 11 | 600 | uppercase 0.22em, flame overline |
 | `.label` | 11 | 600 | uppercase 0.1em, form/KV labels |
 
-**Kit-governed detail surfaces (order drawer + its components) allow exactly
-two inline body sizes: `text-[13px]` (body) and `text-[11px]` (labels /
-sub-facts / badges), plus the two money sizes below. Everything else uses a
-`.t-*` class.** 9/10/12/11.5px inline sizes are banned (lint RULE D).
+**v4 principle: LAYER BY WEIGHT, NOT SIZE.** Almost everything is 14–15px;
+only the page title (24, `.t-h2`) and the hero number (20) go bigger. REF and
+SO ids are the SAME size — tell them apart by weight + colour.
 
-**Money — exactly two tiers (lint RULE D):**
+Kit-governed surfaces allow exactly these inline sizes (lint RULE D):
 
-| Tier | Spec | Use |
-|---|---|---|
-| Hero | `text-[22px]` bold, mono for IDs / `.t-num` for RM | header #SO + ref, Balance Outstanding |
-| Standard | `text-[16px]` semibold tabular | KPI values, secondary money readouts |
+| Inline size | Use |
+|---|---|
+| `text-[15px]` medium | content you READ — customer, dates, amounts (near-black) |
+| `text-[14px]` | secondary info / drawer body |
+| `text-[13px]` | buttons (via `.btn-*`) / row REF (bold) |
+| `text-[12px]` | labels, table headers (uppercase, muted), sub-facts |
+| `text-[20px]` bold | THE hero number — header #SO + ref (mono), Outstanding, KPI values |
 
-Row-level amounts inside 36px rows use body 13px `.t-num`.
+Everything else uses a `.t-*` class. 9/10/11/16/18/22px inline are banned.
 
 ## A4. Icons — exactly three sizes (lint RULE C)
 
-Lucide only, zero emoji. On kit-governed surfaces every icon is one of:
+Lucide only, stroke 2, zero emoji, no hand-drawn SVG, no brand logos (chase =
+`message-circle`, never the WhatsApp mark). Same meaning ⇒ same glyph on every
+page. On kit-governed surfaces every icon is one of:
 
 | Size | Use |
 |---|---|
-| **14** | inline glyphs: band chevrons, KPI track icons, per-row affordances |
-| **16** | panel/menu actions: ⋮ menus, back chevron, close |
-| **17** | top-bar actions: Bell / Help / Settings / Flag |
+| **14** | inside pills / row-inline glyphs / band chevrons |
+| **16** | default UI: KPI track icons, ⋮ menus, back, close, buttons |
+| **18** | top-bar / page-level actions: Bell / Help / Settings / Flag |
 
-## A5. Buttons (sentence case, 13px semibold, 6px radius)
+## A5. Buttons (sentence case, 13px semibold, 8px radius — v4: NO solid black)
 
 | Class | Look | Use |
 |---|---|---|
-| `.btn-hero` | flame fill, white text | THE one create/commit CTA per page |
-| `.btn-primary` | **black** fill (`base-900`), white text | every other primary action |
-| `.btn-secondary` | white, 1px `base-300` border | secondary |
-| `.btn-ghost` | transparent, base-700 text | tertiary / toolbar |
+| `.btn-hero` | flame fill, white text | THE one flame per page/block — the single most urgent action |
+| `.btn-primary` / `.btn-soft` | **grey base** `#F1F0EC`, ink text | the normal workhorse action (soft, not heavy — black is retired) |
+| `.btn-secondary` | white box, 1px `base-300` border | light / tertiary |
+| `.icon-btn` | 34px white box, hairline | icon-only actions: ⋮, expand, bell |
+| `.btn-ghost` | transparent, base-700 text | inline tertiary |
 | `.btn-danger` | white bg, **red text + red border**, never red-filled | destructive |
 
-All: `px-[18px] py-2.5 rounded-md text-[13px] font-semibold`, `disabled:opacity-40`.
+Never a rainbow of solid colour buttons — colour is a signal (§A1).
+All: `px-[18px] py-2.5 rounded-lg text-[13px] font-semibold`, `disabled:opacity-40`.
 Drawer chase pair: `[Reminder]` = flame outline · `[Chase]` = solid flame,
 both `text-[11px] font-semibold px-2.5 py-1 rounded-md`.
 
-## A6. Status pills
+## A6. Status pills — icon + word (v4)
 
-`.pill` = `text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border
-border-transparent` (transparent border keeps bordered/borderless the same box).
+Status is ALWAYS a pill: soft tint + dark same-hue ink + a 14px Lucide glyph
+(`check` ready · `clock` waiting · `alert-circle` overdue · `pause-circle` on
+hold). Never bare coloured text. `.pill` = inline-flex, 11.5px semibold,
+rounded-full, transparent border for box parity.
 
 | Class | Fill / border / ink | Meaning |
 |---|---|---|
-| `.pill-warning` | `#FBE8C6` / `#F0D08A` / `#92400E` | waiting / low / on-hold (amber) |
-| `.pill-confirmed` | `#D6EFD9` / `#A9D8B0` / `#166534` | ready / confirmed / delivered (green) |
-| `.pill-overdue` | `#FCE4E4` / `#F3B4B4` / `#991B1B` | overdue / no-PO / chase (red) |
-| `.pill-sent` | `#D3E4FB` / `#A9C8F2` / `#1E40AF` | scheduled / booked (blue) |
+| `.pill-warning` | `#FAEEDA` / `#F0D08A` / `#854F0B` | waiting / low / on-hold (amber) |
+| `.pill-confirmed` | `#EAF3DE` / `#A9D8B0` / `#3B6D11` | ready / confirmed / delivered (green) |
+| `.pill-overdue` | `#FCEBEB` / `#F3B4B4` / `#A32D2D` | overdue / no-PO / chase (red) |
+| `.pill-sent` | `#D3E4FB` / `#A9C8F2` / `#1E40AF` | scheduled / booked — the ONE status blue (blue otherwise = selection) |
 | `.pill-neutral` | `base-100` / — / `base-700` | done / neutral (grey) |
 
 Order-STATE pills in the drawer header are amber/blue/green/grey only — never
@@ -139,12 +154,11 @@ danger red (red = actionable alarms).
 
 | | px |
 |---|---|
-| Radius: SectionCard / `--radius` / buttons / grid cells / pills | 12 · 8 · 6 · 4 · full |
+| Radius: SectionCard+cards / `--radius` / buttons / grid cells / pills | 12 · 8 · 8 (`rounded-lg`) · 4 · full |
 | Sidebar expanded / collapsed | 232 / 60 (flame 3px active bar) |
 | Right rail panel / icon strip | 320 / 52 |
 | Page header | 56 (h-14) |
-| **List table rows** | **40** (`[&_td]:h-[40px]`), `table-fixed` + % colgroup, never horizontal-scrolls |
-| **Drawer panel rows** | **36** (`h-9`) — every KV / money / item row inside a drawer panel (lint RULE F) |
+| **ALL rows — list + drawer** | **44 FIXED** (`h-11` / `[&_td]:h-[44px]`) — content truncates (`+N`), the row NEVER grows; target 18–20 rows per screen (lint RULE F) |
 | Facet panel width | 240 |
 | Drawer body columns | `340px minmax(0,1fr)` — left view · right work |
 | Card padding / page gutter / default gap | 16 (p-4) · 24 (p-6) · 8 (gap-2) |
@@ -164,9 +178,12 @@ construction. **Hand-rolling this chrome fails lint RULE G.**
   SectionCard; collapsible, persisted per title
   (`ops-drawer-panel-v3:<title>`). Defaults: Balance/Delivery/Items/Warehouse
   open; Customer/Storage/Loan collapsed.
-- `.kpi-box` = the drawer-header metric card: `#F7F4EE` fill, NO border,
-  `rounded-[8px] px-3 py-2` (token in `index.css`; inline `#F7F4EE` fails
-  lint RULE E).
+- `.kpi-box` = ONE mission track as an INDEPENDENT WHITE card on the canvas:
+  `bg-white border-base-200 rounded-[12px] px-4 py-3`. Number stays INK;
+  colour only as the alert signal. (The old `#F7F4EE` tint is retired — that
+  hex inline fails lint RULE E.)
+- `.checkbox` = 17px, flame fill + white tick; `.is-select` variant = BLUE
+  (blue means selection, only for row multi-select).
 
 ## A9. List page template (canonical = Orders list, locked 2026-07-13)
 
@@ -176,7 +193,7 @@ row, table column-header all FIXED; only the facet body and table rows scroll.
 1. **Header** — ONE full-width WHITE band (`bg-white border-b border-base-200`):
    breadcrumb 12px `base-400` › `t-h2` title + `Synced <date>` ↻ stamp;
    right: rounded-full 230px search → `Bell` (live alerts, red count badge) →
-   `HelpCircle` → `Settings`, all Lucide **17px**.
+   `HelpCircle` → `Settings`, all Lucide **18px**.
 2. **Toolbar** — one white panel: status pills left (active = solid ink fill);
    right in order: `N of M` · short action buttons (`+ Master` style, full
    words in `title`) · ⋮ overflow (Show-columns, persisted).
@@ -185,7 +202,7 @@ row, table column-header all FIXED; only the facet body and table rows scroll.
 4. **Facet** — one white 240px panel, cream `SectionBand` groups
    (SUMMARY → CHASE NOW (danger) → STOCK → LOGISTIC → REGION → CATEGORY);
    rows = Gmail-nav pills; « on SUMMARY collapses the whole panel.
-5. **Table** — 40px rows, sticky head, infinite scroll ×30, single-verb NEXT
+5. **Table** — 44px FIXED rows, sticky head, infinite scroll ×30, single-verb NEXT
    column (`Order PO → Chase supplier → Book logistic → Chase logistic →
    Confirm`, Confirm 🔒 on a money-hold), sort = slack ascending.
 6. **Footer** — `N orders · Reset filters`.
@@ -199,32 +216,35 @@ don't hand-roll chrome.
 
 Full-screen takeover on the cream page (‹ Orders back, no ✕):
 
-- **Header panel** = ONE SectionCard, fixed:
-  - Row 1: ‹ back (chevron 16) · `#SO` + ref `font-mono text-[22px] font-bold`
-    adjacent · order-state pill · meta 13px `base-500`
-    (`customer · region · ordered <date>`) · Flag 17 · ⋮ menu 16.
-  - Row 2: **3 `.kpi-box` mission tracks** (`grid grid-cols-3 gap-2`) —
-    CUSTOMER·MONEY / STOCK / LOGISTIC: icon 14 + 11px uppercase label; value
-    `text-[16px] font-semibold tabular-nums` coloured by status; sub-facts
-    11px; chase buttons INSIDE the box when red.
+- **Header** (fixed):
+  - Row 1 in ONE SectionCard: ‹ back (chevron 16) · `#SO` + ref `font-mono
+    text-[20px] font-bold` adjacent (same size — weight/colour differentiate)
+    · order-state pill (icon+word) · meta 14px `base-500`
+    (`customer · region · ordered <date>`) · Flag 18 · ⋮ menu 16.
+  - Below it: **3 `.kpi-box` INDEPENDENT WHITE CARDS** (`grid grid-cols-3
+    gap-2.5`) — CUSTOMER·MONEY / STOCK / LOGISTIC: icon 16 + 12px uppercase
+    label; value `text-[20px] font-bold .t-num` INK (colour only as the alert
+    mark); sub-facts 12px; chase buttons INSIDE the card when red.
 - **Body** = 2 independently-scrolling columns (`340px | 1fr`, overlay
   scrollbars), each ONE SectionCard of stacked Panels:
   LEFT (view): CUSTOMER / BALANCE / STORAGE / DELIVERY / ACTIVITY.
   RIGHT (work): ITEMS ORDERED / WAREHOUSE STOCK / LOAN.
-- **All panel rows are 36px** (`h-9`, RULE F): MoneyRows, KV rows, item rows.
-- **Balance**: Outstanding leads at money-hero 22px (red `#991B1B` owing /
-  green Settled); Total + Collected as 36px rows.
+- **All rows are 44px FIXED** (`h-11`, RULE F): MoneyRows, KV rows, item rows.
+- **Balance**: Outstanding leads at hero 20px (red `#991B1B` owing /
+  green Settled); Total + Collected as 44px rows.
 - Storage rule: fees start deadline+7d; MS/BF RM150/month, sofa 14d free then
   RM200/2-weeks.
 
 ## A11. Hard rules
 
 1. Token classes only — no raw hex in JSX (lint RULE A ratchet).
-2. Lucide icons only, zero emoji; sizes ∈ {14, 16, 17} (RULE C).
-3. Inline text sizes ∈ {11, 13} body + {16, 22} money (RULE D); headings via `.t-*`.
-4. ONE flame CTA per page; black is the workhorse; destructive = red on white.
-5. Section chrome only via `SectionCard`/`SectionBand` (RULE G); KPI fill only
-   via `.kpi-box` (RULE E); drawer rows 36px (RULE F).
+2. Lucide icons only, stroke 2, zero emoji; sizes ∈ {14, 16, 18} (RULE C).
+3. Inline text sizes ∈ {12, 13, 14, 15} + 20 hero (RULE D); headings via `.t-*`;
+   content near-black, muted grey for labels only.
+4. ONE flame CTA per page; the workhorse is GREY-SOFT (`.btn-primary`), never
+   solid black; destructive = red on white; no solid-colour button rainbow.
+5. Section chrome only via `SectionCard`/`SectionBand` (RULE G); KPI = white
+   `.kpi-box` cards (RULE E bans the old tint); ALL rows 44px FIXED (RULE F).
 6. List pages through `ListPageShell` (RULE B).
 7. Reading conventions: no `·` between status words; LATE = date + red pill;
    never "by" before a partner; short labels, full words in `title`.
@@ -270,10 +290,10 @@ below fail HARD on kit-governed files.
 |---|---|---|
 | A | all `apps/web/src` (ratchet) | new raw hex literal |
 | B | `pages/**` | List page without `ListPageShell` |
-| C | kit scope | Lucide `size={N}` with N ∉ {14,16,17} |
-| D | kit scope | `text-[Npx]` with N ∉ {11,13,16,22} |
-| E | all `apps/web/src` | inline `#F7F4EE` (use `.kpi-box`) |
-| F | drawer components | `h-[Npx]` with N ≠ 36 (rows are `h-9`; the list's 40px lives outside this scope) |
+| C | kit scope | Lucide `size={N}` with N ∉ {14,16,18} |
+| D | kit scope | `text-[Npx]` with N ∉ {12,13,14,15,20} |
+| E | all `apps/web/src` | inline `#F7F4EE` (the retired KPI tint) |
+| F | kit scope | `h-[Npx]` with N ≠ 44 (rows are 44 FIXED, `h-11`) |
 | G | all `apps/web/src` except `SectionPanel.tsx` | literal `section-band` class in JSX (render `<SectionBand>`) |
 
 **Kit scope** = the `KIT_FILES` list in the script (today: `SectionPanel.tsx`,
@@ -284,4 +304,14 @@ C/D/F (separate contract / non-Tailwind). Legacy operation modals join the
 scope as they're touched.
 
 PR checklist: right archetype shell · no new hex · `.t-*`/`.btn-*` classes ·
-one `.btn-hero` · icons 14/16/17 · drawer rows 36 · lint green.
+one `.btn-hero`, grey workhorse, no black/rainbow · icons 14/16/18 stroke 2 ·
+rows 44 FIXED · status = icon+word pill · content near-black · lint green.
+
+---
+
+**v4 adoption (2026-07-17, Jess).** This kit absorbed the "Carres ERP 系统 UI
+Kit" Claude-Design export (the v4 design law). Its internal contradictions were
+resolved as: canvas `#F5F5F7` · icon stroke 2 · workhorse = grey soft (no
+black) · `--radius-panel` 18 (unused until a panel needs it). The export lives
+on as the local skill `.claude/skills/carres-design/` (tokens corrected to
+match this file); UI-KIT.md remains the law when they disagree.

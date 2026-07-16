@@ -34,7 +34,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export const COLOR = {
   // Surfaces
-  pageBg:      { hex: "#F5F1EA", cssVar: "--background", class: "bg-background" }, // Carres cream
+  pageBg:      { hex: "#F5F5F7", cssVar: "--background", class: "bg-background" }, // v4 neutral canvas (2026-07-17; was cream)
   card:        { hex: "#FFFFFF", cssVar: "--card",       class: "bg-card" },       // white card
   sidebarBg:   { hex: "#FFFFFF", cssVar: "--card",       class: "bg-white" },      // rail + right rail
   mainBg:      { hex: "#F9FAFB", cssVar: "--base-50",    class: "bg-base-50" },    // <main> behind cards
@@ -62,7 +62,7 @@ export const COLOR = {
   flame:       { hex: "#C44D2B", cssVar: "--primary",     class: "text-primary / bg-primary" }, // brand / hero CTA
   flameHover:  { hex: "#9A3D22", cssVar: "--signature-700", class: "hover:bg-signature-700" },
   flameFill:   { hex: "#F4E4DD", cssVar: "--signature-50", class: "bg-signature-50" },  // active chip/card fill
-  darkPrimary: { hex: "#111827", cssVar: "--base-900",   class: "bg-base-900" },  // BLACK workhorse btn / active tab
+  darkPrimary: { hex: "#111827", cssVar: "--base-900",   class: "bg-base-900" },  // active tab fill (v4: the workhorse BUTTON is grey-soft .btn-primary #F1F0EC, black buttons retired)
   focusRing:   { hex: "#C44D2B", cssVar: "--ring",       class: "ring-primary" },
 } as const;
 
@@ -79,9 +79,9 @@ export const COLOR = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const CHIP = {
   // key → { text (ink, SHARED by both), ordersFill, ordersBorder, pillFill, pillClass }
-  waiting:   { meaning: "waiting stock / low",   text: "#92400E", ordersFill: "#FBE8C6", ordersBorder: "#F0D08A", pillFill: "#FEF3C7", pillClass: "pill-warning"   }, // amber
-  ready:     { meaning: "ready / confirmed",     text: "#166534", ordersFill: "#D6EFD9", ordersBorder: "#A9D8B0", pillFill: "#DCFCE7", pillClass: "pill-confirmed" }, // green
-  overdue:   { meaning: "overdue / no-PO / chase", text: "#991B1B", ordersFill: "#FCE4E4", ordersBorder: "#F3B4B4", pillFill: "#FEE2E2", pillClass: "pill-overdue"   }, // red
+  waiting:   { meaning: "waiting stock / low",   text: "#854F0B", ordersFill: "#FAEEDA", ordersBorder: "#F0D08A", pillFill: "#FAEEDA", pillClass: "pill-warning"   }, // amber (v4)
+  ready:     { meaning: "ready / confirmed",     text: "#3B6D11", ordersFill: "#EAF3DE", ordersBorder: "#A9D8B0", pillFill: "#EAF3DE", pillClass: "pill-confirmed" }, // green (v4)
+  overdue:   { meaning: "overdue / no-PO / chase", text: "#A32D2D", ordersFill: "#FCEBEB", ordersBorder: "#F3B4B4", pillFill: "#FCEBEB", pillClass: "pill-overdue"   }, // red (v4)
   scheduled: { meaning: "scheduled / call / assign", text: "#1E40AF", ordersFill: "#D3E4FB", ordersBorder: "#A9C8F2", pillFill: "#DBEAFE", pillClass: "pill-sent"      }, // blue
   done:      { meaning: "done / neutral",        text: "#4B5563", ordersFill: "#EAE7DF", ordersBorder: "#D6D2C6", pillFill: "#F3F4F6", pillClass: "pill-neutral"   }, // grey
 } as const;
@@ -104,7 +104,7 @@ export const LAYOUT = {
   rightRailPanel:      320, // OperationRightRail expanded panel (px)
   rightRailStrip:       52, // OperationRightRail icon strip (px)
   railHeaderHeight:     48, // right-rail panel header (h-12)
-  tableRowHeight:       50, // Orders list row (`[&_td]:h-[50px]`)
+  tableRowHeight:       44, // ALL rows, list + drawer — 44px FIXED (v4; `h-11` / `[&_td]:h-[44px]`)
   // NOTE: there is NO single global top bar. The portal shell is a 3-column grid
   // `auto minmax(0,1fr) auto` (sidebar | main | right rail); each page renders
   // its own header. Page/section headers cluster at 48–56px (h-12 / h-14) — use
@@ -117,7 +117,7 @@ export const LAYOUT = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const RADIUS = {
   card:  8,  // proto `.card` / token `--radius` (rounded-lg)
-  md:    6,  // buttons (rounded-md)
+  md:    8,  // buttons (rounded-lg, v4)
   sm:    4,  // small chips / cells (most-used in Orders grid: rounded-[4px])
   pill: 9999,// fully round (rounded-full)
   pos:  16,  // 2990s POS card (rounded-2xl) — dealer POS only
