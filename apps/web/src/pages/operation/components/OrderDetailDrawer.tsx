@@ -1842,8 +1842,12 @@ function DrawerBody({
                                     )}
                                   </button>
                                 )}
+                                {/* Closed set: the ITEM NAME is the hero
+                                    table's key content — 12px EMPHASIS ink
+                                    (was a pale 10px whisper). Truncates; the
+                                    row stays 44px; full name in the tooltip. */}
                                 <span
-                                  className="font-mono text-[10px] leading-tight break-words"
+                                  className="font-mono text-[12px] font-semibold text-[#1A1A1A] leading-tight truncate min-w-0"
                                   title={l.sku}
                                 >
                                   {l.sku}
@@ -1860,11 +1864,11 @@ function DrawerBody({
                                 <span className="text-base-300 text-[11px]">—</span>
                               ) : poNo ? (
                                 /* v4 §4 — a PO code is CONTENT: dark, no tint. */
-                                <span className="font-mono text-[10px] text-base-800">
+                                <span className="font-mono text-[12px] text-[#1A1A1A]">
                                   {poNo}
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-base-600">
+                                <span className="text-[12px] text-[#1A1A1A]">
                                   Klang stock
                                 </span>
                               )}

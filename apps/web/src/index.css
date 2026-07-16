@@ -118,6 +118,13 @@
   .t4-secondary  { @apply text-[14px] font-normal text-base-500; }             /* secondary info */
   .t4-label      { @apply text-[12px] font-medium uppercase text-[#A8A8A8]; }  /* panel label / table header */
   .t4-caption    { @apply text-[12px] font-normal text-[#A8A8A8]; }            /* meta */
+  /* In-row closed set (Jess 2026-07-16 — the ONLY row typography; picked over
+   * hand-mixed base-4/5/6xx greys + 9-14px sizes that kept drifting):
+   *   .t4-row        = row CONTENT (dates, regions, qty, addresses …)
+   *   .t4-row-strong = row EMPHASIS (names, amounts, REF — the sample's bold)
+   * Ink #1a1a1a via --foreground; label/meta stays .t4-label / .t4-caption. */
+  .t4-row        { @apply text-[13px] font-medium text-foreground; }
+  .t4-row-strong { @apply text-[13px] font-semibold text-foreground; }
 
   /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
    * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
