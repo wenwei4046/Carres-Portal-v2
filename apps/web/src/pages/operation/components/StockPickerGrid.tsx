@@ -306,11 +306,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           >
             {loanMode ? (
               <>
-                <X size={11} strokeWidth={2.5} /> Same model only
+                <X size={14} strokeWidth={2.5} /> Same model only
               </>
             ) : (
               <>
-                <Handshake size={11} strokeWidth={2.5} /> Loan any sofa
+                <Handshake size={14} strokeWidth={2.5} /> Loan any sofa
               </>
             )}
           </button>
@@ -321,7 +321,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           Matches model / size / category / PO / old ref / date / condition. */}
       <div className="px-1.5 pb-1.5 shrink-0 relative">
         <Search
-          size={13}
+          size={14}
           className="absolute left-3.5 top-1/2 -translate-y-[calc(50%+3px)] text-base-400 pointer-events-none"
         />
         <input
@@ -329,7 +329,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search model / size / PO / old ref…"
-          className="w-full pl-7 pr-2 py-1 text-[12px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
+          className="w-full pl-7 pr-2 py-1 text-[13px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
         />
       </div>
 
@@ -337,7 +337,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         <div className="min-w-[560px]">
           {/* header — §7.8 columns; neutral base-50 (the cream is the band's). */}
           <div
-            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[10px] font-bold"
+            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[11px] font-bold"
             style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
@@ -355,7 +355,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center min-h-[40px] border-b border-base-100 cursor-pointer text-[11px] ${
+                className={`grid items-center h-9 border-b border-base-100 cursor-pointer text-[11px] ${
                   on
                     ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
                     : i % 2
@@ -406,7 +406,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         onLoan?.(r.id, r.sku);
                       }}
                       title="Issue a loan DO + mark this unit on-loan to the order"
-                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap"
+                      className="text-[11px] font-semibold text-primary hover:underline whitespace-nowrap"
                     >
                       Lend
                     </button>
@@ -419,7 +419,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         void reserveIds([r.id]);
                       }}
                       title={`Reserve this unit to ${soRef}`}
-                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
+                      className="text-[11px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
                     >
                       Reserve
                     </button>

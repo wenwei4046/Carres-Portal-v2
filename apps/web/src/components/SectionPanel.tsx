@@ -74,9 +74,9 @@ export function SectionBand({
         className="flex-1 min-w-0 flex items-center gap-1 text-left hover:brightness-[0.97]"
       >
         {collapsed ? (
-          <ChevronRight size={12} className="shrink-0 text-base-500" aria-hidden="true" />
+          <ChevronRight size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         ) : (
-          <ChevronDown size={12} className="shrink-0 text-base-500" aria-hidden="true" />
+          <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
         <span
           className={`uppercase flex-1 truncate text-[11px] font-bold tracking-[0.04em] ${

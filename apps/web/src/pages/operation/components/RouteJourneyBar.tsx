@@ -310,7 +310,7 @@ export function RouteLegList({ legs }: { legs: RouteLeg[] }) {
           <PlaceIcon loc={leg.to} className="w-3.5 h-3.5 text-base-500 shrink-0" />
           <span className="text-base-600 truncate">{leg.to}</span>
           {leg.carrier && (
-            <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
+            <span className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
               {leg.carrier}
             </span>
           )}

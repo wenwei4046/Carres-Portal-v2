@@ -114,7 +114,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // must clearly look like fields). A visible hairline box on white, flame ring on
 // focus — clean but structured.
 const CELL =
-  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[12px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
+  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -570,7 +570,7 @@ function DueDateRow({
         />
         {overdue && (
           <span className="pill pill-overdue inline-flex items-center gap-1 shrink-0">
-            <AlertTriangle size={11} strokeWidth={2.5} />
+            <AlertTriangle size={14} strokeWidth={2.5} />
             Overdue
           </span>
         )}
@@ -608,7 +608,7 @@ function LegacyPaidOutstanding({
       </FieldRow>
       <FieldRow label="Outstanding">
         <div
-          className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
+          className={`px-2 py-1.5 font-mono text-[13px] font-semibold ${
             !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
           }`}
         >
@@ -673,11 +673,11 @@ function PaymentLedger({
         {/* Outstanding headline + auto status (Jess 2026-07-02). */}
         <div className="flex items-end justify-between gap-2">
           <div>
-            <div className="text-[9px] uppercase tracking-[0.05em] text-base-400">
+            <div className="text-[11px] uppercase tracking-[0.05em] text-base-400">
               Outstanding
             </div>
             <div
-              className={`font-mono text-[18px] font-semibold leading-tight ${
+              className={`font-mono text-[22px] font-semibold leading-tight ${
                 !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
               }`}
             >
@@ -687,7 +687,7 @@ function PaymentLedger({
           <span className={`pill ${status.c} mb-0.5`}>{status.t}</span>
         </div>
         {hasBill && (
-          <div className="text-[10px] text-base-500">
+          <div className="text-[11px] text-base-500">
             Paid {RM(paidSoFar)} of {RM(bill)} owed
           </div>
         )}
@@ -719,7 +719,7 @@ function PaymentLedger({
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
           >
-            <Plus size={12} strokeWidth={2.5} /> Record payment
+            <Plus size={14} strokeWidth={2.5} /> Record payment
           </button>
         )}
       </div>
@@ -765,7 +765,7 @@ function LedgerRow({
   receiptMeta?: { orderCode: string; customerName: string };
 }) {
   return (
-    <div className="flex items-center gap-2 text-[11.5px]">
+    <div className="flex items-center gap-2 text-[11px]">
       <span className="text-base-500 tabular-nums w-[68px] shrink-0">{row.paid_on}</span>
       <span className="font-mono font-semibold text-base-900 w-[78px] shrink-0">
         {RM(Number(row.amount))}
@@ -782,7 +782,7 @@ function LedgerRow({
           aria-label={`Receipt ${row.receipt_no ?? row.id}`}
           className="text-base-400 hover:text-primary shrink-0"
         >
-          <Receipt size={12} strokeWidth={2} />
+          <Receipt size={14} strokeWidth={2} />
         </button>
       )}
       {canVoid && (
@@ -793,7 +793,7 @@ function LedgerRow({
           aria-label={`Void payment ${row.receipt_no ?? row.id}`}
           className="text-base-400 hover:text-danger shrink-0"
         >
-          <Trash2 size={12} strokeWidth={2} />
+          <Trash2 size={14} strokeWidth={2} />
         </button>
       )}
     </div>
@@ -1023,7 +1023,7 @@ export function StorageControlFields({
                   className={`pill ${storageAlert.pill} ${storageAlert.urgent ? "inline-flex items-center gap-1" : ""}`}
                 >
                   {storageAlert.urgent && (
-                    <AlertTriangle size={11} strokeWidth={2.5} />
+                    <AlertTriangle size={14} strokeWidth={2.5} />
                   )}
                   {storageAlert.label}
                 </span>
@@ -1041,11 +1041,11 @@ export function StorageControlFields({
             {hasMsbf && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                  <span className="text-[11px] uppercase tracking-[0.04em] text-base-400">
                     MS / BF
                   </span>
                   {impMsbf != null && (
-                    <span className="text-[9px] uppercase tracking-[0.04em] text-primary font-semibold">
+                    <span className="text-[11px] uppercase tracking-[0.04em] text-primary font-semibold">
                       Master
                     </span>
                   )}
@@ -1053,7 +1053,7 @@ export function StorageControlFields({
                 <div className="text-[13px] font-semibold text-base-900">
                   RM {dispMsbf.toLocaleString()}
                 </div>
-                <div className="text-[10px] text-base-500">
+                <div className="text-[11px] text-base-500">
                   {impMsbf != null
                     ? "imported fee"
                     : storage.msbf > 0
@@ -1065,11 +1065,11 @@ export function StorageControlFields({
             {hasSof && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                  <span className="text-[11px] uppercase tracking-[0.04em] text-base-400">
                     Sofa
                   </span>
                   {impSof != null && (
-                    <span className="text-[9px] uppercase tracking-[0.04em] text-primary font-semibold">
+                    <span className="text-[11px] uppercase tracking-[0.04em] text-primary font-semibold">
                       Master
                     </span>
                   )}
@@ -1077,7 +1077,7 @@ export function StorageControlFields({
                 <div className="text-[13px] font-semibold text-base-900">
                   RM {dispSof.toLocaleString()}
                 </div>
-                <div className="text-[10px] text-base-500">
+                <div className="text-[11px] text-base-500">
                   {impSof != null
                     ? "imported fee"
                     : storage.sofCharged
@@ -1221,7 +1221,7 @@ function StorageExtensionRow({
   if (extended && !open) {
     return (
       <FieldRow label="Extension">
-        <div className="px-2 py-1.5 text-[12px] w-full">
+        <div className="px-2 py-1.5 text-[13px] w-full">
           <div className="font-semibold text-base-900">
             → {fmt(control?.extension_new_date)}
             <span className="ml-1 text-[11px] font-normal text-base-500">
@@ -1234,7 +1234,7 @@ function StorageExtensionRow({
               onClick={() => void exportAgreement()}
               className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
             >
-              <Receipt size={12} strokeWidth={2} />
+              <Receipt size={14} strokeWidth={2} />
               Export agreement (PDF)
             </button>
             {isPrincipal && (
@@ -1263,9 +1263,9 @@ function StorageExtensionRow({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="px-2 py-1.5 text-[12px] text-primary hover:underline inline-flex items-center gap-1"
+          className="px-2 py-1.5 text-[13px] text-primary hover:underline inline-flex items-center gap-1"
         >
-          <Plus size={13} strokeWidth={2.5} />
+          <Plus size={14} strokeWidth={2.5} />
           Extend storage
         </button>
       </FieldRow>
@@ -1279,7 +1279,7 @@ function StorageExtensionRow({
     <FieldRow label="Extension">
       <div className="px-1.5 py-1.5 w-full space-y-1.5 border border-base-200 rounded-[3px] bg-base-50">
         <div className="grid grid-cols-2 gap-1.5">
-          <label className="text-[10px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+          <label className="text-[11px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
             New delivery date
             <input
               type="date"
@@ -1289,7 +1289,7 @@ function StorageExtensionRow({
               className={CELL}
             />
           </label>
-          <label className="text-[10px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+          <label className="text-[11px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
             Reason
             <select
               value={reason}
@@ -1393,8 +1393,8 @@ function StorageCollectWaiver({
   if (collectedAt) {
     return (
       <FieldRow label="Collected">
-        <div className="px-2 py-1.5 text-[12px] text-success font-semibold inline-flex items-center gap-1">
-          <ShieldCheck size={13} strokeWidth={2.5} />
+        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+          <ShieldCheck size={14} strokeWidth={2.5} />
           Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
         </div>
       </FieldRow>
@@ -1403,8 +1403,8 @@ function StorageCollectWaiver({
   if (waiverStatus === "approved") {
     return (
       <FieldRow label="Waiver">
-        <div className="px-2 py-1.5 text-[12px] text-success font-semibold inline-flex items-center gap-1">
-          <ShieldCheck size={13} strokeWidth={2.5} />
+        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+          <ShieldCheck size={14} strokeWidth={2.5} />
           Waived by principal · delivery unlocked
         </div>
       </FieldRow>
@@ -1647,7 +1647,7 @@ export function RemarkControlField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[12px]"
+        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[13px]"
       >
         {val.trim() ? (
           <span className="text-base-900">{val}</span>
@@ -1675,7 +1675,7 @@ export function OrderControlSaveBar({ form }: { form: OrderControlForm }) {
       </button>
       <button
         type="button"
-        className="btn-primary text-[12px] disabled:opacity-50"
+        className="btn-primary text-[13px] disabled:opacity-50"
         onClick={form.submit}
         disabled={form.saving}
       >
@@ -1694,7 +1694,7 @@ function AreaBadge({ area }: { area: "KV" | "Outstation" | "Unknown" }) {
         : "text-base-400 border-base-200";
   return (
     <span
-      className={`inline-block text-[9px] font-bold uppercase tracking-[0.04em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
+      className={`inline-block text-[11px] font-bold uppercase tracking-[0.04em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
     >
       {area === "KV"
         ? "Klang Valley"
@@ -1737,10 +1737,10 @@ export function PaymentSummary({ paid, total }: { paid: number; total: number })
           key={r.label}
           className="flex items-baseline justify-between gap-3 py-1 border-b border-base-100 last:border-0"
         >
-          <span className="text-[10px] uppercase tracking-[0.04em] text-base-500">
+          <span className="text-[11px] uppercase tracking-[0.04em] text-base-500">
             {r.label}
           </span>
-          <span className={`font-mono text-[12px] font-semibold ${r.tone}`}>
+          <span className={`font-mono text-[13px] font-semibold ${r.tone}`}>
             {r.value}
           </span>
         </div>
@@ -1768,7 +1768,7 @@ function RemarkField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-2 py-1.5 border border-base-200 rounded text-[12px] bg-white outline-none focus:border-base-700 resize-y"
+        className="w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700 resize-y"
       />
     </div>
   );

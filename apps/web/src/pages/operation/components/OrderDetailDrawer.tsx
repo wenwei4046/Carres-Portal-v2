@@ -26,6 +26,7 @@ import {
   RotateCcw,
   Truck,
   Wallet,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -448,9 +449,9 @@ function DrawerSkeleton({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Close drawer"
-          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none"
+          className="p-1 text-base-700 hover:text-base-900 leading-none"
         >
-          ×
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
       <div className="p-7 space-y-3">
@@ -477,16 +478,16 @@ function DrawerError({
           type="button"
           onClick={onClose}
           aria-label="Close drawer"
-          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none"
+          className="p-1 text-base-700 hover:text-base-900 leading-none"
         >
-          ×
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
       <div className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-[13px]">
         <div className="text-destructive font-semibold mb-2">
           Couldn&rsquo;t load order
         </div>
-        <div className="text-[12px] text-base-700 mb-3">{message}</div>
+        <div className="text-[13px] text-base-700 mb-3">{message}</div>
         <button
           type="button"
           onClick={onRetry}
@@ -625,7 +626,7 @@ function PanelMenu({
                   setOpen(false);
                   it.onClick();
                 }}
-                className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
+                className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
               >
                 {it.icon}
                 {it.label}
@@ -659,7 +660,7 @@ function MiniBadge({
   };
   return (
     <span
-      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
+      className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
     >
       {children}
     </span>
@@ -673,7 +674,7 @@ function MiniBadge({
  *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
  *  small alert mark when red — no dots), sub-facts side by side when a track
  *  carries more than one, and the track's chase action(s) INSIDE the box when
- *  it's red/actionable. Light #F7F4EE fill (the kit's KPI fill), NO border. */
+ *  it's red/actionable. `.kpi-box` token fill (UI-KIT §A8), NO border. */
 function KpiBox({
   icon,
   label,
@@ -698,17 +699,17 @@ function KpiBox({
     neutral: "text-base-900",
   };
   return (
-    <div className="rounded-[8px] bg-[#F7F4EE] px-3 py-2 min-w-0 flex flex-col">
+    <div className="kpi-box">
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="shrink-0 text-base-400" aria-hidden="true">
           {icon}
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
           {label}
         </span>
         {tone === "danger" && (
           <AlertCircle
-            size={12}
+            size={14}
             strokeWidth={2.5}
             className="shrink-0 text-danger"
             aria-label="needs action"
@@ -1333,7 +1334,7 @@ function DrawerBody({
             aria-label="Back to Orders"
             className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
           >
-            <ChevronLeft size={15} aria-hidden="true" />
+            <ChevronLeft size={16} aria-hidden="true" />
             Orders
           </button>
           <span className="w-px h-4 bg-base-200 shrink-0" aria-hidden="true" />
@@ -1398,7 +1399,7 @@ function DrawerBody({
               title="Add a follow-up (write the issue + assign)"
               className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary"
             >
-              <Flag className="w-[18px] h-[18px]" />
+              <Flag size={17} />
             </button>
             <ActionsMenu
               order={order}
@@ -1426,7 +1427,7 @@ function DrawerBody({
             multiple buttons, each a logged chase event. */}
         <div className="px-4 pt-2.5 pb-2.5 grid grid-cols-3 gap-2">
           <KpiBox
-            icon={<Wallet size={13} strokeWidth={2.25} />}
+            icon={<Wallet size={14} strokeWidth={2.25} />}
             label="Customer · Money"
             tone={moneyTone}
             value={
@@ -1451,7 +1452,7 @@ function DrawerBody({
             }
           />
           <KpiBox
-            icon={<Package size={13} strokeWidth={2.25} />}
+            icon={<Package size={14} strokeWidth={2.25} />}
             label="Stock"
             tone={stockTone}
             value={`${readyN}/${goodsLines.length} ready`}
@@ -1481,7 +1482,7 @@ function DrawerBody({
             }
           />
           <KpiBox
-            icon={<Truck size={13} strokeWidth={2.25} />}
+            icon={<Truck size={14} strokeWidth={2.25} />}
             label="Logistic"
             tone={logisticTone}
             value={
@@ -1518,13 +1519,13 @@ function DrawerBody({
         </div>
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
-          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+          <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[13px]">
             <AlertCircle
               className="w-4 h-4 shrink-0 mt-0.5 text-warning"
               aria-hidden="true"
             />
             <span className="text-base-900">
-              <span className="block text-[10px] font-semibold text-warning">
+              <span className="block text-[11px] font-semibold text-warning">
                 Action needed
               </span>
               {form.draft.action_for_logistic}
@@ -1608,31 +1609,33 @@ function DrawerBody({
             {/* §7.7 — the white table sits APART from the cream band (a gap +
                 a neutral base-50 header row, not another cream strip). */}
             <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
-              <table className="w-full border-collapse">
+              {/* 36px locked rows (UI-KIT §A7) — td height acts as min-height,
+                  so a wrapping SKU can still grow the row. */}
+              <table className="w-full border-collapse [&_tbody_td]:h-9">
                 <thead className="sticky top-0 z-10">
                   {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
                       Stock ETA / route / GRN moved into the row's expand
                       (chevron on Item); Status is AUTO-derived (no dropdown). */}
                   <tr className="bg-base-50 text-base-500">
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-base-200">
+                    <th className="text-left text-[11px] font-semibold px-2 py-1.5 border-r border-base-200">
                       Item
                     </th>
-                    <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
+                    <th className="text-right text-[11px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
                       Qty
                     </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
+                      className="text-left text-[11px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
                       title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
                     >
                       Source
                     </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
+                      className="text-left text-[11px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
                       title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
                       Status
                     </th>
-                    <th className="text-center text-[10px] font-semibold px-2 py-1.5 w-[70px]">
+                    <th className="text-center text-[11px] font-semibold px-2 py-1.5 w-[70px]">
                       Action
                     </th>
                   </tr>
@@ -1742,14 +1745,14 @@ function DrawerBody({
                                     className="shrink-0 mt-0.5 text-base-400 hover:text-base-700"
                                   >
                                     {routeOpen ? (
-                                      <ChevronDown size={12} />
+                                      <ChevronDown size={14} />
                                     ) : (
-                                      <ChevronRight size={12} />
+                                      <ChevronRight size={14} />
                                     )}
                                   </button>
                                 )}
                                 <span
-                                  className="font-mono text-[10px] leading-tight break-words"
+                                  className="font-mono text-[11px] leading-tight break-words"
                                   title={l.sku}
                                 >
                                   {l.sku}
@@ -1757,7 +1760,7 @@ function DrawerBody({
                               </div>
                             </td>
                             {/* Qty */}
-                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                            <td className="border border-base-200 px-2 py-1 text-right text-[13px] tabular-nums align-top">
                               {l.qty}
                             </td>
                             {/* Source — PO/#### or own Klang stock. */}
@@ -1765,7 +1768,7 @@ function DrawerBody({
                               {isService ? (
                                 <span className="text-base-300 text-[11px]">—</span>
                               ) : poNo ? (
-                                <span className="font-mono text-[10px] text-primary">
+                                <span className="font-mono text-[11px] text-primary">
                                   {poNo}
                                 </span>
                               ) : (
@@ -1779,7 +1782,7 @@ function DrawerBody({
                               {pill ? (
                                 <span
                                   title={pill.hint}
-                                  className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                  className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
                                 >
                                   {pill.t}
                                 </span>
@@ -1854,7 +1857,7 @@ function DrawerBody({
                                         Received {lineReceivedOf(l.sku)}/{l.qty}
                                         {lineReceivedOf(l.sku) < l.qty && (
                                           <>
-                                            <PackagePlus size={11} strokeWidth={2} />
+                                            <PackagePlus size={14} strokeWidth={2} />
                                             Book in
                                           </>
                                         )}
@@ -1862,7 +1865,7 @@ function DrawerBody({
                                     </div>
                                   )}
                                   <div>
-                                    <div className="text-[10px] font-semibold text-base-500 mb-1">
+                                    <div className="text-[11px] font-semibold text-base-500 mb-1">
                                       Route — stop 1 is where the item sits; add
                                       a stop for a special transfer. Delivery to
                                       the customer is set in the Delivery panel.
@@ -1902,7 +1905,7 @@ function DrawerBody({
                       <tr key={`sub-${label}`}>
                         <td
                           colSpan={5}
-                          className="border border-base-200 bg-base-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-base-500"
+                          className="border border-base-200 bg-base-50 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.04em] text-base-500"
                         >
                           {label}
                         </td>
@@ -2115,7 +2118,7 @@ function DrawerBody({
               {/* Optional preferred-name/title for WhatsApp messages — blank
                   falls back to the Title-Cased customer name; NEVER an
                   auto-inferred Mr/Ms. Local-only until an API column ships. */}
-              <div className="mt-2 pt-2 border-t border-base-100 flex items-center justify-between gap-2">
+              <div className="mt-2 border-t border-base-100 h-9 flex items-center justify-between gap-2">
                 <span
                   className="text-[11px] text-base-400 shrink-0"
                   title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
@@ -2128,7 +2131,7 @@ function DrawerBody({
                   onChange={(e) => saveSalutation(e.target.value)}
                   placeholder={titleCaseName(order.customer_name ?? "")}
                   aria-label="Preferred salutation for messages"
-                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[12px] text-right outline-none hover:border-base-400 focus:border-primary"
+                  className="w-40 border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-right outline-none hover:border-base-400 focus:border-primary"
                 />
               </div>
             </div>
@@ -2198,10 +2201,10 @@ function DrawerBody({
                         ? "Collect before delivery"
                         : "Outstanding balance"
                   }
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
                 >
                   {balanceGate === "hold" && (
-                    <AlertCircle size={10} strokeWidth={2.5} />
+                    <AlertCircle size={14} strokeWidth={2.5} />
                   )}
                   {RM(owingAmt)} owing
                 </span>
@@ -2217,7 +2220,7 @@ function DrawerBody({
                 /* Colour lock: no red block here — hold/warn read as coloured
                    TEXT on the neutral surface (the banner owns the red block). */
                 <div
-                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] bg-base-50 ${
+                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] bg-base-50 ${
                     balanceGate === "hold"
                       ? "text-danger"
                       : balanceGate === "warn"
@@ -2267,12 +2270,12 @@ function DrawerBody({
                           ? "Collect storage before delivery"
                           : "Storage fee running"
                     }
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
                       storageGate === "hold" ? "text-danger" : "text-warning"
                     }`}
                   >
                     {storageGate === "hold" && (
-                      <AlertCircle size={10} strokeWidth={2.5} />
+                      <AlertCircle size={14} strokeWidth={2.5} />
                     )}
                     {(() => {
                       const from =
@@ -2364,7 +2367,7 @@ function DrawerBody({
                   );
                 if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
                       overdue
                     </span>
                   );
@@ -2395,8 +2398,8 @@ function DrawerBody({
                   feeds the list's next-action engine, it does NOT auto-message. */}
               {contactByLabel && (
                 <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                  <span className="flex items-center gap-1 text-[11.5px] font-medium text-info min-w-0">
-                    <Phone size={12} strokeWidth={2.25} className="shrink-0" />
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-info min-w-0">
+                    <Phone size={14} strokeWidth={2.25} className="shrink-0" />
                     <span className="truncate">Chase partner by {contactByLabel}</span>
                   </span>
                   <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
@@ -2420,7 +2423,7 @@ function DrawerBody({
                   §5.1 (moved out of the old header banner). Same quick sparse-
                   save; the list stays unaffected. */}
               <label className="flex items-center justify-between gap-2 rounded-md bg-base-50 px-2 py-1 cursor-pointer select-none">
-                <span className="text-[11.5px] text-base-500">
+                <span className="text-[11px] text-base-500">
                   Customer confirmed
                 </span>
                 <input
@@ -2564,7 +2567,7 @@ function ReceiveLineModal({
   return (
     <Modal title="Book in received stock" onClose={onClose}>
       <div className="space-y-3">
-        <div className="text-[12px] text-base-600">
+        <div className="text-[13px] text-base-600">
           <span className="font-mono text-[11px]">{sku}</span>
           <span className="ml-2 text-base-400">
             received {alreadyReceived}/{lineQty}
@@ -2621,7 +2624,7 @@ function ReceiveLineModal({
             type="button"
             onClick={onClose}
             disabled={receive.isPending}
-            className="btn-ghost text-[12px]"
+            className="btn-ghost text-[13px]"
           >
             Cancel
           </button>
@@ -2629,7 +2632,7 @@ function ReceiveLineModal({
             type="button"
             onClick={submit}
             disabled={!valid || receive.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-[13px] disabled:opacity-40"
           >
             {receive.isPending ? "Booking…" : "Book in"}
           </button>
@@ -2682,7 +2685,7 @@ function LoanSofaModal({
   return (
     <Modal title="Loan this sofa" onClose={onClose}>
       <div className="space-y-3">
-        <div className="text-[12px] text-base-600">
+        <div className="text-[13px] text-base-600">
           <span className="font-mono text-[11px]">{itemSku}</span>
           <span className="ml-2 text-base-400">→ {soRef} · FREE loaner</span>
         </div>
@@ -2713,7 +2716,7 @@ function LoanSofaModal({
             type="button"
             onClick={onClose}
             disabled={loan.isPending}
-            className="btn-ghost text-[12px]"
+            className="btn-ghost text-[13px]"
           >
             Cancel
           </button>
@@ -2721,7 +2724,7 @@ function LoanSofaModal({
             type="button"
             onClick={submit}
             disabled={loan.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-[13px] disabled:opacity-40"
           >
             {loan.isPending ? "Loaning…" : "Loan sofa"}
           </button>
@@ -2841,7 +2844,7 @@ export function OrderCustomerCard({
             type="button"
             onClick={() => setEditing(false)}
             disabled={update.isPending}
-            className="btn-ghost text-[12px]"
+            className="btn-ghost text-[13px]"
           >
             Cancel
           </button>
@@ -2849,7 +2852,7 @@ export function OrderCustomerCard({
             type="button"
             onClick={save}
             disabled={update.isPending}
-            className="btn-primary text-[12px]"
+            className="btn-primary text-[13px]"
           >
             {update.isPending ? "Saving…" : "Save"}
           </button>
@@ -2862,7 +2865,7 @@ export function OrderCustomerCard({
   // click Edit to change (place-status only). Ordered date anchored to the
   // card bottom so the column aligns with its siblings.
   return (
-    <div className="flex flex-col h-full text-[12px]">
+    <div className="flex flex-col h-full text-[13px]">
       <CompactField label="Name">
         <span className={`font-medium ${cjkClassName(order.customer_name)}`}>
           {order.customer_name || <span className="text-base-400">—</span>}
@@ -3019,9 +3022,9 @@ function MoneyRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
+      className="flex items-center justify-between gap-2 px-3 h-9"
     >
-      <span className="text-[11px] text-base-400">{label}</span>
+      <span className={`text-[11px] text-base-400 ${strong ? "font-medium" : ""}`}>{label}</span>
       <span className="text-right">{children}</span>
     </div>
   );
@@ -3082,14 +3085,14 @@ function RecordPaymentForm({
           onClick={() =>
             onSubmit({ amount: amt, paidOn, note: note.trim() || null })
           }
-          className="btn-hero text-[12px] disabled:opacity-50"
+          className="btn-hero text-[13px] disabled:opacity-50"
         >
           {pending ? "Recording…" : "Record payment"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="text-[12px] text-base-500 hover:text-base-700"
+          className="text-[13px] text-base-500 hover:text-base-700"
         >
           Cancel
         </button>
@@ -3140,7 +3143,7 @@ function MoneyCard({
         <MoneyRow label="Outstanding" strong>
           {totalSet ? (
             <span
-              className={`font-mono text-[18px] font-bold leading-none ${
+              className={`font-mono text-[22px] font-bold leading-none ${
                 outstanding > 0 ? "text-[#991B1B]" : "text-success"
               }`}
             >
@@ -3153,7 +3156,7 @@ function MoneyCard({
         <MoneyRow label="Total">
           {hasLineTotal ? (
             <span
-              className="font-mono text-[12px] text-base-600"
+              className="font-mono text-[13px] text-base-600"
               title="Summed from the order items"
             >
               {RM(orderTotal)}
@@ -3169,21 +3172,21 @@ function MoneyCard({
               onBlur={() => setEditingTotal(false)}
               placeholder="Set total (RM)"
               aria-label="Order total"
-              className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+              className="w-32 text-right font-mono text-[13px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
             />
           ) : (
             <button
               type="button"
               onClick={() => setEditingTotal(true)}
               title="Keyed total — click to edit"
-              className="font-mono text-[12px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
+              className="font-mono text-[13px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
             >
               {RM(orderTotal)}
             </button>
           )}
         </MoneyRow>
         <MoneyRow label="Collected">
-          <span className="font-mono text-[12px] text-base-600">
+          <span className="font-mono text-[13px] text-base-600">
             {RM(collected)}
           </span>
         </MoneyRow>
@@ -3197,7 +3200,7 @@ function MoneyCard({
           {ledger.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1 last:border-b-0"
+              className="flex items-center justify-between gap-2 text-[13px] border-b border-base-100 pb-1 last:border-b-0"
             >
               <span className="min-w-0 truncate">
                 <span className="font-medium text-base-800">
@@ -3216,7 +3219,7 @@ function MoneyCard({
                   aria-label={`Receipt ${p.receipt_no ?? p.id}`}
                   className="text-base-400 hover:text-primary"
                 >
-                  <FileText size={13} />
+                  <FileText size={14} />
                 </button>
                 {isPrincipal && (
                   <button
@@ -3225,7 +3228,7 @@ function MoneyCard({
                     disabled={voidPay.isPending}
                     title="Void this payment"
                     aria-label={`Void payment ${p.receipt_no ?? p.id}`}
-                    className="text-[10px] text-base-300 hover:text-destructive"
+                    className="text-[11px] text-base-300 hover:text-destructive"
                   >
                     void
                   </button>
@@ -3249,7 +3252,7 @@ function MoneyCard({
           }
         />
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[12px]">
+        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[13px]">
           Record payment
         </button>
       )}
@@ -3278,7 +3281,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 ${
         disabled
           ? "opacity-40 cursor-not-allowed"
           : danger
@@ -3467,7 +3470,7 @@ function ActionsMenu({
                 aria-haspopup="menu"
                 aria-expanded={dlOpen}
                 onClick={() => setDlOpen((o) => !o)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 text-base-900"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 text-base-900"
               >
                 <span className="flex items-center gap-2">
                   <span className="text-base-500 shrink-0">
@@ -3556,7 +3559,7 @@ function PoRow({
     <div
       className={`grid grid-cols-[auto_1fr_auto] gap-3 px-3.5 py-3 items-center ${divider ? "border-t border-base-100" : ""}`}
     >
-      <span className="font-mono text-[12px] font-semibold">{po.id.slice(0, 8)}</span>
+      <span className="font-mono text-[13px] font-semibold">{po.id.slice(0, 8)}</span>
       <div>
         {po.lines.map((l, j) => (
           <div key={j} className="text-[11px] leading-snug font-body">
@@ -3566,13 +3569,13 @@ function PoRow({
             </span>
           </div>
         ))}
-        <div className="text-[10px] text-base-500 mt-0.5">
+        <div className="text-[11px] text-base-500 mt-0.5">
           ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <span
-          className={`text-[9px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
+          className={`text-[11px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
         >
           {po.status}
         </span>
@@ -3580,7 +3583,7 @@ function PoRow({
           <button
             type="button"
             onClick={() => onReceive(po)}
-            className="btn-primary text-[10px] py-1 px-2.5 whitespace-nowrap"
+            className="btn-primary text-[11px] py-1 px-2.5 whitespace-nowrap"
             title="Receive this PO's goods (GRN) — books them in as ready stock"
           >
             Receive (GRN)
@@ -3641,7 +3644,7 @@ function PrintDoButton({
       type="button"
       onClick={open}
       disabled={pending}
-      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 disabled:opacity-40 text-base-900"
+      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-base-50 disabled:opacity-40 text-base-900"
     >
       <span className="text-base-500 shrink-0">
         <FileText className="w-4 h-4" />
