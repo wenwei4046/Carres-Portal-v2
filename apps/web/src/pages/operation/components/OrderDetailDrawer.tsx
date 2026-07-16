@@ -28,6 +28,7 @@ import {
   Phone,
   RotateCcw,
   Truck,
+  Undo2,
   Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -658,14 +659,15 @@ function MiniBadge({
   tone: "nopo" | "waiting" | "ready" | "kv" | "outstation" | "muted";
   children: ReactNode;
 }) {
-  // App-wide colour rule (Jess 2026-07-02): red = action / blocks · amber = warning
-  // · green = ok. No PO is RED (must raise a PO), not grey.
+  // v4 §6 — status = soft tint + dark same-hue text, NEVER a solid block
+  // (the old solid-red nopo badge is gone). red = blocks · amber = warning ·
+  // green = ok; values from docs/CARRES_UI_KIT_V4.md §1.
   const TONE: Record<string, string> = {
-    nopo: "bg-[#DC2626] text-white",
-    waiting: "bg-[#FEF3C7] text-[#92400E]",
-    ready: "bg-[#DCFCE7] text-[#166534]",
-    kv: "bg-[#DCFCE7] text-[#166534]",
-    outstation: "bg-[#FEF3C7] text-[#92400E]",
+    nopo: "bg-[#FCEBEB] text-[#A32D2D]",
+    waiting: "bg-[#FAEEDA] text-[#854F0B]",
+    ready: "bg-[#EAF3DE] text-[#3B6D11]",
+    kv: "bg-[#EAF3DE] text-[#3B6D11]",
+    outstation: "bg-[#FAEEDA] text-[#854F0B]",
     muted: "bg-base-100 text-base-500",
   };
   return (
@@ -684,7 +686,7 @@ function MiniBadge({
  *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
  *  small alert mark when red — no dots), sub-facts side by side when a track
  *  carries more than one, and the track's chase action(s) INSIDE the box when
- *  it's red/actionable. Light #F7F4EE fill (the kit's KPI fill), NO border. */
+ *  it's red/actionable. v4: WHITE tile + hairline; the value never tinted. */
 function KpiBox({
   icon,
   label,
@@ -702,14 +704,16 @@ function KpiBox({
   /** Chase button(s) when the track is red/actionable. */
   actions?: ReactNode;
 }) {
+  /* v4 §2/§4 — number VALUES are never tinted: the headline reads dark in
+     every tone; the small danger icon (below) is the alert signal. */
   const VALUE: Record<string, string> = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
+    success: "text-base-900",
+    warning: "text-base-900",
+    danger: "text-base-900",
     neutral: "text-base-900",
   };
   return (
-    <div className="rounded-[8px] bg-[#F7F4EE] px-3 py-2 min-w-0 flex flex-col">
+    <div className="rounded-[8px] bg-white border border-base-200 px-3 py-2 min-w-0 flex flex-col">
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="shrink-0 text-base-400" aria-hidden="true">
           {icon}
@@ -754,8 +758,10 @@ function KpiBox({
  *  auto-fires the same event). */
 const CHASE_BTN =
   "text-[11px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
+/* v4 §2 — Chase is the pair's ONE flame primary; Reminder is the SECONDARY
+   (grey outline — never a second flame in the block). */
 const REMIND_BTN =
-  "text-[11px] font-semibold px-2.5 py-1 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
+  "text-[11px] font-semibold px-2.5 py-1 rounded-md border border-base-300 text-base-700 bg-white hover:bg-base-50 whitespace-nowrap";
 
 /** The [Reminder]+[Chase] pair for one audience. */
 function ChasePair({
@@ -1469,7 +1475,7 @@ function DrawerBody({
               onClick={onFollowUpClick}
               aria-label="Add follow-up"
               title="Add a follow-up (write the issue + assign)"
-              className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary"
+              className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-base-800"
             >
               <Flag className="w-[18px] h-[18px]" />
             </button>
@@ -1698,26 +1704,27 @@ function DrawerBody({
                   {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
                       Stock ETA / route / GRN moved into the row's expand
                       (chevron on Item); Status is AUTO-derived (no dropdown). */}
-                  <tr className="bg-base-50 text-base-500">
-                    <th className="text-left text-[10px] font-semibold px-2 py-1.5 border-r border-base-200">
+                  {/* v4 §3 — table header = 12px Medium uppercase MUTED. */}
+                  <tr className="bg-base-50 text-[#A8A8A8]">
+                    <th className="text-left text-[12px] font-medium uppercase px-2 py-1.5 border-r border-base-200">
                       Item
                     </th>
-                    <th className="text-right text-[10px] font-semibold px-2 py-1.5 w-10 border-r border-base-200">
+                    <th className="text-right text-[12px] font-medium uppercase px-2 py-1.5 w-10 border-r border-base-200">
                       Qty
                     </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-24 border-r border-base-200"
+                      className="text-left text-[12px] font-medium uppercase px-2 py-1.5 w-24 border-r border-base-200"
                       title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
                     >
                       Source
                     </th>
                     <th
-                      className="text-left text-[10px] font-semibold px-2 py-1.5 w-40 border-r border-base-200"
+                      className="text-left text-[12px] font-medium uppercase px-2 py-1.5 w-40 border-r border-base-200"
                       title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
                     >
                       Status
                     </th>
-                    <th className="text-center text-[10px] font-semibold px-2 py-1.5 w-[70px]">
+                    <th className="text-center text-[12px] font-medium uppercase px-2 py-1.5 w-[70px]">
                       Action
                     </th>
                   </tr>
@@ -1773,7 +1780,7 @@ function DrawerBody({
                           : rd === "reserved"
                             ? {
                                 t: `Reserved · ${locValue || "Carres Klang"}`,
-                                c: "bg-success-soft text-success",
+                                c: "pill-confirmed",
                                 hint: isAcc
                                   ? "Accessory — always in the Klang warehouse"
                                   : "Reserved to this SO",
@@ -1781,7 +1788,7 @@ function DrawerBody({
                             : rd === "to_reserve"
                               ? {
                                   t: `To reserve · ${received}/${l.qty}`,
-                                  c: "bg-warning-soft text-warning",
+                                  c: "pill-warning",
                                   hint: "Matching free stock exists — reserve it to this SO",
                                 }
                               : rd === "on_po"
@@ -1799,14 +1806,16 @@ function DrawerBody({
                         <Fragment key={l.sku}>
                           {/* A line that still needs reserving reads as an
                               AMBER tint (warning, never danger red). */}
+                          {/* v4 §8 — the ACTIVE line reads as the SELECTION
+                              blue wash (flame is action-only, never a row
+                              tint); status lives in the Status pill, so the
+                              old full-row amber wash is gone. 44px row. */}
                           <tr
                             onClick={() => setPickerSku(l.sku)}
-                            className={`cursor-pointer ${
+                            className={`cursor-pointer h-[44px] ${
                               l.sku === activeLineSku
-                                ? "bg-primary/10"
-                                : rd === "to_reserve"
-                                  ? "bg-warning-soft/40 hover:bg-warning-soft/60"
-                                  : "hover:bg-base-50"
+                                ? "bg-[#e6f1fb]"
+                                : "hover:bg-base-50"
                             }`}
                           >
                             {/* Item — chevron expands the detail (stock ETA /
@@ -1850,7 +1859,8 @@ function DrawerBody({
                               {isService ? (
                                 <span className="text-base-300 text-[11px]">—</span>
                               ) : poNo ? (
-                                <span className="font-mono text-[10px] text-primary">
+                                /* v4 §4 — a PO code is CONTENT: dark, no tint. */
+                                <span className="font-mono text-[10px] text-base-800">
                                   {poNo}
                                 </span>
                               ) : (
@@ -1889,7 +1899,10 @@ function DrawerBody({
                                       });
                                   }}
                                   title="Open the warehouse picker filtered to this line"
-                                  className="text-[11px] font-semibold text-primary border border-primary rounded-md px-2 py-0.5 hover:bg-primary/5 whitespace-nowrap"
+                                  /* v4 §2/§8c — a per-row action is SECONDARY:
+                                     grey outline (shape gives the boundary);
+                                     flame stays for block-level primaries. */
+                                  className="text-[11px] font-semibold text-base-700 border border-base-300 rounded-md px-2 py-0.5 hover:bg-base-50 whitespace-nowrap"
                                 >
                                   Reserve
                                 </button>
@@ -1932,8 +1945,9 @@ function DrawerBody({
                                         title="Book in received units (GRN)"
                                         className={`inline-flex items-center gap-1 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
                                           lineReceivedOf(l.sku) >= l.qty
-                                            ? "text-success font-semibold"
-                                            : "text-primary hover:bg-primary/10"
+                                            ? /* v4 — complete count is CONTENT: dark, not green. */
+                                              "text-base-900 font-semibold"
+                                            : "text-base-700 hover:text-base-900 hover:bg-base-50"
                                         }`}
                                       >
                                         Received {lineReceivedOf(l.sku)}/{l.qty}
@@ -2314,8 +2328,11 @@ function DrawerBody({
                           ? "Collect storage before delivery"
                           : "Storage fee running"
                     }
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 ${
-                      storageGate === "hold" ? "text-danger" : "text-warning"
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      /* v4 §6 — status pill: soft tint + dark same-hue. */
+                      storageGate === "hold"
+                        ? "bg-[#FCEBEB] text-[#A32D2D]"
+                        : "bg-[#FAEEDA] text-[#854F0B]"
                     }`}
                   >
                     {storageGate === "hold" && (
@@ -2411,7 +2428,7 @@ function DrawerBody({
                   );
                 if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
                       overdue
                     </span>
                   );
@@ -2520,7 +2537,7 @@ function DrawerBody({
                     type="button"
                     onClick={() => setShowRouteBlock(true)}
                     title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
-                    className="text-[11px] font-medium text-primary hover:underline"
+                    className="text-[11px] font-medium text-base-600 hover:text-base-900 hover:underline"
                   >
                     + Add stop (multi-leg)
                   </button>
@@ -3652,7 +3669,8 @@ function MoneyCard({
         <MoneyRow label="Total">{totalNode}</MoneyRow>
         {(totalSet || collected > 0) && (
           <MoneyRow label="Collected">
-            <span className="font-mono text-[12px] text-success">
+            {/* v4 §2/§4 — amounts are never tinted: dark content. */}
+            <span className="font-mono text-[12px] text-base-900">
               {RM(collected)}
             </span>
           </MoneyRow>
@@ -3693,10 +3711,12 @@ function MoneyCard({
                 <span className="font-medium text-base-800">
                   {p.note?.trim() || (p.kind === "deposit" ? "Deposit" : "Payment")}
                 </span>
-                <span className="text-base-400"> · {fmtDate(p.paid_on)}</span>
+                {/* v4 §4 — the date is CONTENT (dark), not a pale label. */}
+                <span className="text-base-800"> · {fmtDate(p.paid_on)}</span>
               </span>
               <span className="flex items-center gap-2 shrink-0">
-                <span className="font-mono font-semibold text-success">
+                {/* v4 §2/§4 — amounts never tinted. */}
+                <span className="font-mono font-semibold text-base-900">
                   {RM(Number(p.amount))}
                 </span>
                 <button
@@ -3704,7 +3724,7 @@ function MoneyCard({
                   onClick={() => void openReceipt(p, receiptMeta)}
                   title={`Receipt ${p.receipt_no ?? ""}`}
                   aria-label={`Receipt ${p.receipt_no ?? p.id}`}
-                  className="text-base-400 hover:text-primary"
+                  className="text-base-400 hover:text-base-800"
                 >
                   <FileText size={13} />
                 </button>
@@ -3713,11 +3733,12 @@ function MoneyCard({
                     type="button"
                     onClick={() => voidPay.mutate(p.id)}
                     disabled={voidPay.isPending}
-                    title="Void this payment"
+                    title="Void this payment (reversible — payments are never deleted)"
                     aria-label={`Void payment ${p.receipt_no ?? p.id}`}
-                    className="text-[10px] text-base-300 hover:text-destructive"
+                    /* v4 §7 — row action = outline icon, not a text link. */
+                    className="text-base-400 hover:text-danger"
                   >
-                    void
+                    <Undo2 size={13} />
                   </button>
                 )}
               </span>
@@ -4061,12 +4082,13 @@ function PoRow({
 }) {
   const totalQty = po.lines.reduce((s, l) => s + Number(l.qty || 0), 0);
   const got = po.lines.reduce((s, l) => s + Number(l.received_qty || 0), 0);
+  /* v4 §6 — status = FILLED pill (soft tint + dark same-hue); the outline
+     chip + the blue partial state are gone (blue = selection only; a
+     part-received PO still reads amber = waiting). */
   const stColor =
     po.status === "received"
-      ? "text-success border-success"
-      : got > 0
-        ? "text-info border-info"
-        : "text-warning border-warning";
+      ? "bg-[#EAF3DE] text-[#3B6D11]"
+      : "bg-[#FAEEDA] text-[#854F0B]";
   return (
     <div
       className={`grid grid-cols-[auto_1fr_auto] gap-3 px-3.5 py-3 items-center ${divider ? "border-t border-base-100" : ""}`}
@@ -4087,7 +4109,7 @@ function PoRow({
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <span
-          className={`text-[9px] font-bold py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
+          className={`text-[10px] font-semibold py-[3px] px-[7px] rounded-full ${stColor}`}
         >
           {po.status}
         </span>

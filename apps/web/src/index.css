@@ -308,10 +308,14 @@
      header. Previously #F1EFE8 + its inks were bare hexes inside
      OperationOrdersControl; now they live here as the single source
      (recorded in lib/design-standard.ts COLOR.sectionBand). */
-  .section-band { background: #F1EFE8; }
-  .section-band-title { color: #221F20; }
-  .section-band-title-danger { color: #991B1B; }
-  .section-band-total { color: #6F6960; }
+  /* ⭐ UI-KIT v4 (2026-07-16): the cream band is gone — panel/facet header
+     bands are the light NEUTRAL grey on white; the title is a v4 LABEL
+     (muted); danger keeps the v4 alert red. (Shared by the Orders list
+     facet groups AND every order-drawer panel header.) */
+  .section-band { background: #F9FAFB; }
+  .section-band-title { color: #A8A8A8; }
+  .section-band-title-danger { color: #A32D2D; }
+  .section-band-total { color: #A8A8A8; }
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }

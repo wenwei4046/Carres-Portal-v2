@@ -299,9 +299,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 : "Show every free sofa so you can loan one (any model / fabric)"
             }
             className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 t-tiny transition-colors ${
+              /* v4 §2 — a toggle is a secondary control: active reads as the
+                 dark/grey state, never a flame tint (flame = primary action). */
               loanMode
-                ? "border-primary bg-primary/10 text-primary font-semibold"
-                : "border-base-200 text-base-600 hover:border-primary hover:text-primary"
+                ? "border-base-800 bg-base-100 text-base-900 font-semibold"
+                : "border-base-200 text-base-600 hover:border-base-400 hover:text-base-900"
             }`}
           >
             {loanMode ? (
@@ -347,7 +349,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
               </div>
             ))}
           </div>
-          {/* body — 40px rows */}
+          {/* body — v4 §8b 44px FIXED rows; §8 selection = BLUE wash + blue
+              checkbox (flame is action-only — the old flame wash/stripe and
+              flame hovers are gone). */}
           {view.map((r, i) => {
             const on = checked.has(r.id);
             return (
@@ -355,12 +359,12 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center min-h-[40px] border-b border-base-100 cursor-pointer text-[11px] ${
+                className={`grid items-center h-[44px] border-b border-base-100 cursor-pointer text-[11px] ${
                   on
-                    ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
+                    ? "bg-[#e6f1fb]"
                     : i % 2
-                      ? "bg-base-100/60 hover:bg-primary/5"
-                      : "bg-white hover:bg-primary/5"
+                      ? "bg-base-100/60 hover:bg-base-50"
+                      : "bg-white hover:bg-base-50"
                 }`}
                 style={{ gridTemplateColumns: GRID }}
               >
@@ -370,7 +374,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                     checked={on}
                     onChange={() => toggle(r.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="accent-primary w-3.5 h-3.5"
+                    /* shrink-0 — the tight grid cell must not flex-squash the
+                       17px box (§8b) back down to 14. */
+                    className="accent-[#378ADD] w-[17px] h-[17px] shrink-0"
                   />
                 </div>
                 <div className="px-2 py-1 font-mono text-base-900 truncate">
@@ -406,7 +412,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         onLoan?.(r.id, r.sku);
                       }}
                       title="Issue a loan DO + mark this unit on-loan to the order"
-                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap"
+                      className="text-[10px] font-semibold text-base-700 border border-base-300 rounded-md px-1.5 py-0.5 hover:bg-base-50 whitespace-nowrap"
                     >
                       Lend
                     </button>
@@ -419,7 +425,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                         void reserveIds([r.id]);
                       }}
                       title={`Reserve this unit to ${soRef}`}
-                      className="text-[10px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
+                      /* v4 §2/§8c — per-row action = grey outline secondary
+                         (flame is reserved for block-level primaries). */
+                      className="text-[10px] font-semibold text-base-700 border border-base-300 rounded-md px-1.5 py-0.5 hover:bg-base-50 whitespace-nowrap disabled:opacity-40"
                     >
                       Reserve
                     </button>
