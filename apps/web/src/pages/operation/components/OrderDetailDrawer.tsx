@@ -1646,7 +1646,10 @@ function DrawerBody({
               />
             </div>
           </SectionCard>
-          <SectionCard className="flex-1">
+          {/* v4 §10 SPLIT (Jess 2026-07-16): every panel is its OWN white card
+              on the grey canvas, 12px apart — boundaries read from the gaps,
+              never from bands inside one lump. */}
+          <SectionCard className="shrink-0">
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
               only the rows scroll (up to ~8, then inside the box). */}
@@ -2047,7 +2050,9 @@ function DrawerBody({
               </FieldGrid>
             </div>
           </Panel>
+          </SectionCard>
 
+          <SectionCard className="shrink-0">
           {/* Panel 2 — Warehouse stock. StockPickerGrid owns its own dark-slate
               pinned header + funnel filters + Reserve, styled as a 12px card; it
               GROWS to fill the leftover left-column height so the column bottom
@@ -2102,7 +2107,9 @@ function DrawerBody({
               </div>
             </Panel>
           )}
+          </SectionCard>
 
+          <SectionCard className="shrink-0">
           {/* Loan (migration 0209 + 0217) — AFTER Warehouse stock in the work
               column (Jess 2026-07-13): lending a substitute is a stock action.
               Two sources: own warehouse OR borrowed from a supplier (a return
@@ -2135,7 +2142,9 @@ function DrawerBody({
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
             />
           </Panel>
+          </SectionCard>
 
+          <SectionCard className="flex-1">
           {/* Card C — Activity & notes (Jess 2026-07-11 Option 1; moved to the
               right column BOTTOM 2026-07-15 — page-rebuild step 2). THE single
               place for all hand-written follow-up on this order: the compose box
@@ -2160,11 +2169,14 @@ function DrawerBody({
           style={{ gridArea: "side" }}
           className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
-          <SectionCard className="min-h-full">
+          {/* v4 §10 SPLIT (Jess 2026-07-16): one WHITE CARD per panel, 12px
+              apart on the grey canvas — boundaries read from the gaps. */}
+          <div className="min-h-full flex flex-col gap-3">
           {/* 1. Balance — its OWN card (Jess: split from Storage). Chip = the
               owing amount as danger TEXT (colour lock). The id anchors the
               banner's "Confirm & collect" push. */}
-          <div id="card-balance" className="min-w-0 flex flex-col min-h-0">
+          <div id="card-balance" className="min-w-0 flex flex-col min-h-0 shrink-0">
+          <SectionCard>
           <Panel
             title="Balance"
             actions={
@@ -2308,6 +2320,7 @@ function DrawerBody({
               />
             </div>
           </Panel>
+          </SectionCard>
           {/* Add-payment modal (v4 §2 rebuild) — lives at the drawer level so
               the collapsed band's shortcut works with the body unmounted. */}
           {addingPayment && (
@@ -2326,6 +2339,7 @@ function DrawerBody({
               never a red block) · "not accruing" otherwise. ⋮ hidden until 1B
               (receipt printing not wired into the new pattern yet). */}
           {(hasMsbf || hasSof) && (
+            <SectionCard className="shrink-0">
             <Panel
               title="Storage"
               defaultOpen={false}
@@ -2396,6 +2410,7 @@ function DrawerBody({
                 />
               </div>
             </Panel>
+            </SectionCard>
           )}
 
           {/* Loan moved to the RIGHT (work) column, after Warehouse stock
@@ -2405,6 +2420,7 @@ function DrawerBody({
               Logistic update; then the 2 remark rows; then a Route section only
               for a cross-border / multi-leg order. (Natural height now — the
               Activity card below carries `grow` to fill the column bottom.) */}
+          <SectionCard className="shrink-0">
           <Panel
             title="Delivery"
             actions={
@@ -2556,8 +2572,9 @@ function DrawerBody({
               )}
             </div>
           </Panel>
-
           </SectionCard>
+
+          </div>
         </div>{/* /left panel */}
         </div>{/* /main|side grid */}
       </div>{/* /scroll body */}
