@@ -35,7 +35,11 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
+  Clock,
   ExternalLink,
+  Inbox,
+  LayoutGrid,
+  PackageOpen,
   Truck,
   Download,
   CheckCircle2,
@@ -2139,33 +2143,39 @@ function StatusTabs({
   active: ControlTab;
   onSelect: (k: ControlTab) => void;
 }) {
+  // v4 §9 (LOCKED, sample type 2): icon + label + count chip; active = ink +
+  // a 2px dark underline; inactive = mid-grey. No pill-buttons, no boxes.
+  const TAB_ICON: Record<ControlTab, LucideIcon> = {
+    all: LayoutGrid,
+    placed: Inbox,
+    proceed: PackageOpen,
+    pending: Clock,
+    scheduled: Truck,
+    completed: CheckCircle2,
+  };
   return (
-    <div data-testid="filter-status" className="flex items-center gap-0.5 flex-wrap">
+    <div data-testid="filter-status" className="flex items-center gap-1 flex-wrap">
       {tabs.map((t) => {
         const on = active === t.key;
+        const Icon = TAB_ICON[t.key];
         return (
           <button
             key={t.key}
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
-            style={{
-              // The active tab is a solid ink fill (2990s-style) — a control
-              // needs clear contrast to read as "selected"; a tab pill is a
-              // point of emphasis, not the heavy header band we removed. Inactive
-              // stays white + hairline. Colour is still reserved for alerts.
-              fontSize: "13px",
-              fontWeight: on ? 600 : 500,
-              color: on ? "#FFFFFF" : "#4B5563",
-              background: on ? "#221F20" : "#FFFFFF",
-              border: on ? "1px solid #221F20" : "1px solid #DDD8CE",
-            }}
+            className={`inline-flex items-center gap-1.5 px-3 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] ${
+              on
+                ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
+                : "border-transparent text-base-500 font-medium hover:text-base-800"
+            }`}
           >
+            <Icon size={16} strokeWidth={2} className="shrink-0" aria-hidden="true" />
             {t.label}
             <span
-              className="tabular-nums"
-              style={{ color: on ? "rgba(255,255,255,0.7)" : "#9CA3AF", fontSize: "12px" }}
+              className={`tabular-nums text-[11px] px-1.5 rounded-full ${
+                on ? "bg-base-200 text-base-700" : "bg-base-100 text-base-500"
+              }`}
             >
               {t.count}
             </span>

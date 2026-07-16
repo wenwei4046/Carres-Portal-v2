@@ -1,195 +1,147 @@
-# Carres UI-KIT v4
+# Carres UI-KIT v4 (consolidated 2026-07-16)
 
-> **THIS FILE OVERWRITES ALL PRIOR UI BASELINES.** It is the single source of visual
-> truth on `main`. Every page, every Claude Code build, every Claude chat MUST follow
-> it. Where any older doc, code comment, or design-standard conflicts with this file,
-> **this file wins.** Prior scattered UI decisions (cream backgrounds, mixed font
-> sizes, light-grey text, small checkboxes) are void.
->
-> Reset reason: the old kit was never fixed, so every design drifted and reading was
-> hard. v4 is calibrated against professional Inter-based UI kits: white base, dark
-> text, restrained type scale, colour only as a functional signal.
+> **THE single source of visual truth.** Every page, every Claude Code build, every
+> chat MUST follow it; where any older doc, code comment or design-standard
+> conflicts, **this file wins**. This is the CONSOLIDATED edition — every rule
+> below is as agreed with Jess up to 2026-07-16; all superseded values (cream,
+> warm canvas, muted headers, mixed sizes, mono-on-words) are deleted, not
+> merely deprecated. Machine mirror: `apps/web/src/lib/design-standard.ts`.
+> Enforcement: `pnpm --filter @carres/web run check:v4` runs inside the build.
+
+**Why the samples read easy (the standard in one line):** white base + dark
+content + colour only on status/action/selection/alert + ONE row template +
+room to breathe. Nothing designs freely.
 
 ---
 
-## 1. Colour — white base, functional colour only
+## 1. Colour — white base, cool neutral canvas
 
-**The content area is white. Brand colour lives only in the left nav.** Colour appears
-in the content only when it carries one of four functions: action, selection, status,
-alert. Everything else is black / grey / white.
+The content area is white. Brand colour lives only in the left nav. Colour in
+content carries one of four functions ONLY: **action · selection · status ·
+alert**. Everything else black / grey / white. **No warm/cream tint anywhere**
+(warm `#F0EFE9` / `#F5F1EA` are retired — hard to match, the guard bans them).
 
-Core palette (5 neutrals + brand + semantic):
 ```
-Text primary   #1a1a1a   near-black — main content (REF, customer, date, amount, address)
-Text secondary #6B7280   mid-grey  — secondary info
-Text muted     #A8A8A8   light-grey — labels, icons, meta words ("ordered", "PHONE")
-Surface white  #FFFFFF   content background, panels, rows
-Canvas grey    #F0EFE9   page canvas behind white panels (very light)
+Text primary   #1a1a1a   near-black — all CONTENT (names, REF, dates, amounts, addresses)
+Text secondary #6B7280   mid-grey  — secondary info, form labels, action icons at rest
+Text muted     #A8A8A8   light-grey — true META only ("ordered", "+N more", captions)
+Surface white  #FFFFFF   panels, rows, tiles
+Canvas grey    #F3F4F6   the page canvas behind white panels (COOL neutral = base-100)
 
-Brand flame    #C44D2B   PRIMARY ACTION buttons + checkbox-checked ONLY
-Select blue    #378ADD   row selected / multi-select ONLY
-Semantic green #3B6D11 on #EAF3DE   status: ready / paid / on-time
-Semantic amber #854F0B on #FAEEDA   status: waiting / chasing
-Semantic red   #A32D2D on #FCEBEB   status: problem / overdue / alert
+Brand flame    #C44D2B   PRIMARY ACTION buttons + checked single-checkbox ONLY
+Select blue    #378ADD   row selection ONLY (row wash #e6f1fb)
+Status green   #3B6D11 on #EAF3DE   ready / paid / on-time
+Status amber   #854F0B on #FAEEDA   waiting / chasing
+Status red     #A32D2D on #FCEBEB   problem / No PO / overdue / alert
 ```
-
-Brand identity is carried by the left nav (Carres theme). The content area does NOT
-re-carry brand colour.
 
 ## 2. Colour discipline — anti-abuse (CRITICAL)
 
-Colour is a functional signal, not decoration. Default is no colour (black/white/grey).
-Colour only for: **action · selection · status · alert.**
+- Flame ONLY on a clickable primary action; **max ONE flame button per
+  block/section** (a collapsed band's shortcut and its expanded body's CTA never
+  show together). Never on titles, icons, borders, dividers, hovers, decoration.
+- Number VALUES are never tinted — amounts/dates/counts stay dark even inside a
+  warning context; the pill or the small alert icon carries the colour.
+- Blue = selection only. Green/amber/red = status pills + alerts only.
+- Self-check: "is this colour a clickable primary action, a selection, a status
+  pill, or an alert?" No → make it grey/ink.
 
-**Flame rules (most-abused — enforce hard):**
-- Flame appears ONLY on a clickable primary action, and on a checked checkbox.
-- **At most ONE flame primary button per block/section.** Other actions use secondary
-  style (outline / grey).
-- Flame is NEVER used on: titles, icons, borders, dividers, hovers, or any decoration.
-- Flame (action) and red (alert) must stay visually distinct and never swap roles.
+## 3. Typography — Inter, weight-layered, closed sets
 
-**Self-check test (apply to any screen):**
-1. "Is this orange a clickable primary action?" No → it's abuse, make it grey.
-2. "Does this block have more than one flame button?" Yes → keep only the most
-   important as flame, demote the rest to secondary.
+**Font:** Inter for ALL words. Weights 400 / 500 / 600 / 700. Layer by WEIGHT,
+never by inventing sizes.
 
-Result: every page is mostly black-white-grey with a few meaningful coloured points —
-like the reference kits.
+**Mono scope (slashed-zero JetBrains Mono) — glyph-confusable strings ONLY:**
+| String | Font |
+|---|---|
+| Amounts (RM 200), qty ratios (0/1), phone, SO/REF/PO/unit codes, in-table dates | Mono |
+| Product/item NAMES, customer names, addresses, sentences, words ("Collected") | Inter — NEVER mono |
+Mono wraps the number/code TOKEN only, never the words around it.
 
-## 3. Typography — Inter, restrained scale
+**Page scale:** 24/600 page title (largest — nothing exceeds) · 20/700 hero
+number · 16/600 in-content section title · 15/500 content · 14/400 secondary ·
+12 label/caption.
 
-**Font:** Inter for all text/UI. Weights used: Regular 400 · Medium 500 · SemiBold 600
-· Bold 700. Layer by WEIGHT, not by making everything a different size.
-
-**Numbers / codes / money / phone:** a slashed-zero monospace (e.g. JetBrains Mono or
-IBM Plex Mono, or Inter with `zero` + `tnum` features) so 0 and o are never confused.
-Applies to REF, SO, amounts, phone numbers, PO numbers, dates in code-like contexts.
-
-**Type scale (px / weight):**
-```
-Page title (Orders)        24  SemiBold   ← largest. Nothing exceeds this.
-Hero number (Outstanding)  20  Bold       ← big, but < page title
-Section title (ITEMS…)     16  SemiBold
-Main content (REF/cust/date/amount) 15  Medium
-Secondary info             14  Regular
-Panel label / table header 12  Medium, uppercase, muted
-Caption / meta             12  Regular, muted
-```
-Most content sits at 14–15; only the page title (24) and hero number (20) rise above.
-REF and SO are the SAME size — distinguish by weight/colour, never by size.
+**In-row closed set (the ONLY row typography — utilities in index.css):**
+- `.t4-row` 13/500 ink — row content (regions, partners, qty…)
+- `.t4-row-strong` 13/600 ink — row emphasis (names, REF, dates, amounts)
+- `.t4-label` 12/600 uppercase `#374151` — panel band titles + table headers (DARK)
+- `.t4-caption` 12/400 `#A8A8A8` — true meta only
+Minimum font anywhere: 11px. No 9–10px text.
 
 ## 4. Text colour layering
 
-- Main content (what you READ: REF, customer, **date**, amount, address) = primary
-  near-black. Date is content, not a label — it is dark, never light-grey.
-- Secondary info = mid-grey.
-- Labels, icons, meta words ("PHONE", "ordered", table headers) = muted light-grey.
-
-Never set content to light-grey. Light-grey is for labels/meta only. (This was the old
-"everything is pale, can't read" bug — fixed here.)
+Content (what you READ) = near-black — dates included, always. Secondary =
+mid-grey. **Muted `#A8A8A8` is ONLY for meta — never for content, never for the
+header that names a block.** Panel band titles + table column headers are DARK
+(12/600 uppercase `#374151`) — the reference tables' headers are dark.
 
 ## 5. Checkbox
 
-- 16–18px square, clearly visible (not a tiny dot).
-- Unchecked: grey outline empty box.
-- Checked: flame-filled box + white tick.
+17–18px square, clearly visible: unchecked = 1.5px grey outline on white;
+checked in a SELECTION context = blue `#378ADD` fill + white tick (row/multi
+select); checked in a single yes/no field = flame fill + white tick. Never let
+a flex cell squash it (`shrink-0`).
 
-## 6. Status = pill
+## 6. Status = pill, ONE spec
 
-Soft tinted background + dark same-hue text, pill radius:
-- Ready / Paid / on-time → green (`#3B6D11` on `#EAF3DE`)
-- Waiting / chasing → amber (`#854F0B` on `#FAEEDA`)
-- Problem / No PO / overdue → red (`#A32D2D` on `#FCEBEB`)
-Status is always a pill, never bare text.
+`11px · 600 · px-2 py-0.5 · rounded-full · §1 tint/ink pair · NO border.`
+Status is always a pill, never bare text, never a solid colour block. Any
+status chip not matching this spec is wrong.
 
 ## 7. Action = icon
 
-Outline Tabler icons, aligned in a row, mid-grey, ~17px:
-`ti-eye` (view) · `ti-edit` (edit) · `ti-trash` (delete), etc.
-Never text links ("View / Edit / Delete") for row actions.
+Row actions are outline icons (never "View / Edit / Delete" text links):
+**17px, `#6B7280` at rest, darken to `#1F2937` on hover**, aligned in a row.
+Expander chevrons 14px. Never flame, never `#A8A8A8` (invisible).
 
-## 8. Selected row
+## 8. Selection
 
-- Checkbox turns blue-filled with white tick.
-- Whole selected row gets a soft blue wash (`#e6f1fb`).
-- Blue = selection only; it never doubles as an action or decoration.
+Checkbox turns blue-filled + white tick; the whole selected row gets the soft
+blue wash `#e6f1fb`. Blue never doubles as action or decoration.
 
-## 8b. Row density (locked)
+## 8b. Row density (LOCKED)
 
-- **Row height = 44px, FIXED — not min-height.** Content adapts to the row, the row
-  never grows to the content. (The old bug: `h-[40px]` was min-height semantics, so
-  two-line content pushed rows to 48px and the three sources — code, design-standard,
-  render — all disagreed. Fixed here: one value, 44px, 固定.)
-- Content longer than one line (multi-REF, two-line item tags) → truncate with
-  ellipsis or collapse; never expand the row.
-- Inside the 44px row: content font 12px, checkbox 17px, status pill 11px, selected
-  row gets the blue wash.
-- The room comes from a slightly smaller font + breathing space, NOT from taller
-  boxes. Boxes stay tight; the page never grows mile-long.
-- Align all three sources to 44: `OperationOrdersControl.tsx` td height,
-  `design-standard.ts` `tableRowHeight`, and the actual render.
+- **Row height = 44px FIXED — never min-height.** Content adapts to the row
+  (truncate/ellipsis/fold to "+N", full value in the tooltip); the row never
+  grows. `whitespace-nowrap` on cells kills silent text-wrap row growth.
+- Inside the row: content 12–13px, checkbox 17px, pill 11px, blue wash select.
+- Three sources always agree: the code's td height, `design-standard.ts
+  ROW.heightPx`, the actual render — all 44.
 
-## 8c. Read by shape, not by reading (locked)
+## 8c. Read by shape, not by reading (LOCKED)
 
-Users should tell rows/elements apart by shape and colour BEFORE reading text:
-- Layer by SHAPE first (fill vs outline = primary vs secondary action), then weight,
-  then colour — not by enlarging font.
-- Every clickable thing has a clear box/pill boundary.
-- Big-enough checkbox (17px), status as a filled pill, selected row as a blue block —
-  these register by shape/colour first; text is confirmation, not the only signal.
-- Font stays small (12–15) and calm; it does not carry the whole load of telling
-  things apart.
+Shape/colour registers before text: fill vs outline = primary vs secondary
+action; clear box/pill boundaries on every clickable thing; 17px checkbox;
+filled status pills; blue selected block. Font stays small (12–15) and calm.
 
-## 9. Layout basics (carried from prior locked decisions)
+## 9. Tabs (LOCKED 2026-07-16 — sample type 2)
 
-- Order-detail page: two columns 32% (left) / 68% (right). Left = summaries; right =
-  the Items table (the hero). Panels default collapsed to a one-line summary; expand to
-  edit.
-- White panels on the grey canvas; 0.5px hairline borders; 12px radius on cards.
+Main tab bars (e.g. the Orders status tabs) use **icon + label + underline**:
+- Each tab: 16px outline icon + sentence-case label + count as a small grey chip.
+- Active: ink text 600, icon ink, a 2px dark underline under the tab.
+- Inactive: `#6B7280` text + icon, no underline; hover darkens.
+- The bar sits on a white/light strip with a bottom hairline; no pill-buttons,
+  no boxes per tab.
+
+## 10. Layout + breathing
+
+- Order-detail page: 32% (left summaries) / 68% (right — the Items table is the
+  hero); panels default collapsed to one line; expand to edit.
+- White panels on the grey canvas; 0.5px hairlines; 12px card radius.
+- **Breathing:** table cells pad 12px horizontal (16px first column); the
+  toolbar (bulk action buttons + search) is its OWN row above the table with a
+  12px gap; panels 12px apart. Actions in the toolbar are outline buttons with
+  icons; search sits right with an inline magnifier.
 - Sentence case everywhere. Human dates ("14 Jul 26 · Sat").
 
-## 10. How to use
+## 11. The template rule + how to use
 
-- Any page / chat / Claude Code task: read this file first. It governs all visuals.
-- Conflicts with older docs or code → this file wins; update the old thing.
-- **Action for Claude Code:** wire the fonts into the repo config — Inter for text,
-  a slashed-zero monospace for numbers/codes — and replace the old design-standard
-  tokens with the palette and type scale above. Do this as its own step; show Jess;
-  do not deploy.
-
-## 11. Decision table (LOCKED 2026-07-16 — closes every ambiguity that caused drift)
-
-Every restart used to re-guess these four. No more guessing — the answer is here.
-The **Orders list table is THE template**: every listing/table surface copies its
-row anatomy exactly (44px row · 17px checkbox · pills · icon actions · header).
-
-**11a. Canvas (v4 §1 amended):** the page canvas is the COOL neutral grey
-`#F3F4F6` (`base-100`) — the warm `#F0EFE9` is retired (warm/cream tints don't
-match a neutral kit; the reference samples are all cool-neutral). White panels
-on cool grey. No warm hex anywhere.
-
-**11b. Mono scope — mono is for GLYPH-CONFUSABLE strings only:**
-| String | Font |
-|---|---|
-| Amounts (`RM 200`), qty ratios (`0/1`), phone, SO/REF/PO codes, unit codes, dates inside tables | JetBrains Mono (slashed zero) |
-| Product/item NAMES, customer names, addresses, sentences, words like "Collected" | Inter — NEVER mono |
-Mono wraps the number/code TOKEN only, never the words around it.
-
-**11c. Headers are DARK, not muted** (the samples' table headers are dark):
-| Element | Spec |
-|---|---|
-| Panel band title (BALANCE, ITEMS ORDERED) | 12px · 600 · uppercase · `#374151` |
-| Table column header | 12px · 600 · uppercase · `#374151` |
-| True meta words ("ordered", "+N more", "PHONE") | 12px · 400–500 · `#A8A8A8` |
-Muted `#A8A8A8` is ONLY for meta — never for the header that names a block.
-
-**11d. Action icons:** `#6B7280` mid-grey at rest (17px in tables), darken to
-`#1F2937` on hover. Never `#A8A8A8` (invisible), never flame.
-
-**11e. Status pill — ONE spec everywhere:** 11px · 600 · `px-2 py-0.5` ·
-`rounded-full` · the §6 tint/ink pairs · no border. Any status chip that isn't
-this spec is wrong (MiniBadge/StockPill/NextPill all conform).
-
-**11f. Enforcement:** `pnpm --filter @carres/web run check:v4` runs INSIDE the
-build — a violation fails the build. Claude Code must read this file + run the
-guard before committing any UI change (also stated in root CLAUDE.md §10).
+- **The Orders list table is THE template.** Every listing/table surface copies
+  its row anatomy exactly (44px row · 17px checkbox · pills · icon actions ·
+  dark 12/600 headers · toolbar row). Panels copy the Balance panel's header
+  anatomy (`LABEL · summary ···· ⋮`, collapsed shortcut slot).
+- Any page / chat / task: read THIS file first; run
+  `pnpm --filter @carres/web run check:v4` before committing UI work (it also
+  gates the build). Conflicts with older docs/code → this file wins; fix the
+  old thing. Root `CLAUDE.md` §10 points here.
