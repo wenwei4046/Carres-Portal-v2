@@ -623,15 +623,17 @@ function PanelMenu({
   if (items.length === 0) return null;
   return (
     <div className="relative">
-      <button
-        type="button"
+      {/* v4 "box = clickable": the panel ⋮ is the SAME boxed round icon
+          button as the strip's (sm 24px — it lives inside a band). */}
+      <Btn
+        iconOnly
+        size="sm"
         aria-label="Panel actions"
+        title="Panel actions"
         onClick={() => setOpen((o) => !o)}
-        /* v4 §11d — action icons rest at mid-grey, never invisible. */
-        className="p-0.5 text-base-500 hover:text-base-800 leading-none"
       >
-        <MoreVertical size={16} />
-      </button>
+        <MoreVertical size={14} />
+      </Btn>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
@@ -694,7 +696,7 @@ function MiniBadge({
 
 /** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
-type DrawerTab = "items" | "delivery" | "balance" | "storage" | "activity";
+type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
 type TrackStepState = "done" | "current" | "todo";
 type TrackStep = { label: string; state: TrackStepState; meta?: string };
@@ -712,7 +714,7 @@ function ProgressTrack({
   steps: TrackStep[];
 }) {
   return (
-    <div className="px-3 py-3 border-b border-base-100 last:border-b-0">
+    <div className="min-w-0">
       <div className="flex items-center gap-1.5 mb-2.5">
         <span className="text-base-400">{icon}</span>
         <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
@@ -1806,6 +1808,28 @@ function DrawerBody({
                 />
               )}
         </div>
+        {/* PROGRESS band (Jess 2026-07-17 rev 2): HORIZONTAL at the top —
+            screens are wide, not tall; a stepper only reads when the steps
+            spread. 3 party journeys side by side (reference: the Inventar
+            order-stage tracker). */}
+        <div className="shrink-0 bg-white border border-base-200 rounded-[12px] px-4 py-3 grid grid-cols-3 gap-8">
+          <ProgressTrack
+            icon={<User size={16} strokeWidth={2} aria-hidden="true" />}
+            label="Customer"
+            steps={clampTrack(customerSteps)}
+          />
+          <ProgressTrack
+            icon={<Package size={16} strokeWidth={2} aria-hidden="true" />}
+            label="Supplier"
+            steps={clampTrack(supplierSteps)}
+          />
+          <ProgressTrack
+            icon={<Truck size={16} strokeWidth={2} aria-hidden="true" />}
+            label="Logistic"
+            steps={clampTrack(logisticSteps)}
+          />
+        </div>
+
         {/* Tab bar (Jess 2026-07-17 + UI-KIT §9 type-2): the detail surfaces
             live behind tabs; Items + Warehouse share ONE tab (one workflow).
             Contents stay MOUNTED (hidden) so edits survive tab switches. */}
@@ -1818,6 +1842,7 @@ function DrawerBody({
               ...(hasMsbf || hasSof
                 ? [{ key: "storage", label: "Storage", icon: Warehouse, alert: storageGate === "hold" }]
                 : []),
+              { key: "loan", label: "Loan", icon: Undo2, alert: false },
               { key: "activity", label: "Activity", icon: ScrollText, alert: false },
             ] as { key: DrawerTab; label: string; icon: LucideIcon; alert: boolean }[]
           ).map((t) => (
@@ -2339,6 +2364,9 @@ function DrawerBody({
           )}
           </SectionCard>
 
+          </div>
+
+          <div className={tab === "loan" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           <SectionCard className="shrink-0">
           {/* Loan (migration 0209 + 0217) — AFTER Warehouse stock in the work
               column (Jess 2026-07-13): lending a substitute is a stock action.
@@ -2346,7 +2374,6 @@ function DrawerBody({
               obligation). The lend entry stays even at 0 loans. */}
           <Panel
             title="Loan"
-            defaultOpen={false}
             summary={
               liveLoanCount > 0 ? (
                 <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
@@ -2801,34 +2828,75 @@ function DrawerBody({
           </div>
         </div>{/* /tab contents */}
 
-        {/* LEFT — the 3-line PROGRESS panel (Jess 2026-07-17): where each
-            party's journey stands — Customer / Supplier / Logistic. Read-only
-            triage; the KPI cards above carry the numbers + chase actions. */}
+        {/* LEFT — the CUSTOMER panel (Jess 2026-07-17 rev 2): identity detail
+            always visible; width is abundant, height is not — the journey
+            tracker moved to the top band. */}
         <div
           style={{ gridArea: "side" }}
           className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
           <SectionCard className="min-h-full">
-            <SectionBand
-              title="Progress"
-              collapsed={false}
-              onToggle={() => {}}
-            />
-            <ProgressTrack
-              icon={<User size={16} strokeWidth={2} aria-hidden="true" />}
-              label="Customer"
-              steps={clampTrack(customerSteps)}
-            />
-            <ProgressTrack
-              icon={<Package size={16} strokeWidth={2} aria-hidden="true" />}
-              label="Supplier"
-              steps={clampTrack(supplierSteps)}
-            />
-            <ProgressTrack
-              icon={<Truck size={16} strokeWidth={2} aria-hidden="true" />}
-              label="Logistic"
-              steps={clampTrack(logisticSteps)}
-            />
+            <Panel
+              title="Customer"
+              summary={
+                loc.label ? (
+                  <span className="text-[12px] text-base-500">{loc.label}</span>
+                ) : undefined
+              }
+            >
+              <div className="p-3 space-y-1">
+                <div className="flex items-center justify-between gap-2 h-11">
+                  <span className="text-[12px] text-base-400 shrink-0">Name</span>
+                  <span className="text-[14px] font-medium text-base-900 text-right truncate">
+                    {order.customer_name ?? "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 h-11 border-t border-base-100">
+                  <span className="text-[12px] text-base-400 shrink-0">Phone</span>
+                  <button
+                    type="button"
+                    title="Copy phone"
+                    disabled={!order.customer_phone}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(order.customer_phone ?? "");
+                      toast.success("Phone copied");
+                    }}
+                    className="font-mono text-[14px] font-medium text-base-900 truncate hover:text-base-700"
+                  >
+                    {order.customer_phone ?? "—"}
+                  </button>
+                </div>
+                <div className="flex items-start justify-between gap-2 py-2.5 border-t border-base-100">
+                  <span className="text-[12px] text-base-400 shrink-0">Address</span>
+                  <button
+                    type="button"
+                    title="Copy address"
+                    disabled={!order.customer_address}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(order.customer_address ?? "");
+                      toast.success("Address copied");
+                    }}
+                    className="text-[13px] text-base-900 text-right leading-snug hover:text-base-700"
+                  >
+                    {order.customer_address ?? "—"}
+                  </button>
+                </div>
+                <div className="pt-2 border-t border-base-100 flex items-center justify-end gap-1.5">
+                  <Btn
+                    size="sm"
+                    icon={MessageCircle}
+                    disabled={!waLink(order.customer_phone)}
+                    onClick={() => {
+                      const wa = waLink(order.customer_phone);
+                      if (wa) window.open(wa, "_blank", "noopener");
+                    }}
+                    title="Open WhatsApp chat with the customer"
+                  >
+                    WhatsApp
+                  </Btn>
+                </div>
+              </div>
+            </Panel>
           </SectionCard>
         </div>
 
