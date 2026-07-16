@@ -92,6 +92,26 @@
     font-feature-settings: "zero" 1;
     font-variant-numeric: slashed-zero tabular-nums;
   }
+  /* UI-KIT v4 §10 — ONE thin scrollbar everywhere (ported from the POS):
+   * 6px, transparent track, soft ink thumb. Fat default bars are gone. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(26, 26, 26, 0.16) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(26, 26, 26, 0.16);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(26, 26, 26, 0.28);
+  }
 }
 
 @layer components {

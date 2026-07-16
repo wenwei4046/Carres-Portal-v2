@@ -147,6 +147,16 @@ Main tab bars (e.g. the Orders status tabs) use **icon + label + underline**:
 - Order-detail page: 32% (left summaries) / 68% (right — the Items table is the
   hero); panels default collapsed to one line; expand to edit.
 - White panels on the grey canvas; 0.5px hairlines; 12px card radius.
+- **Radius ladder (LOCKED — always pick from these four, never invent):**
+  `999` pills / circles / segmented rails · `12` cards (SectionCard) ·
+  `8` inner blocks (money stack, grey containers) · `6` controls (Btn, Field).
+- **Segmented control** (`components/Segmented.tsx`): grey pill rail
+  (base-100, radius 999, 2px inset) + the active option as a WHITE chip —
+  for view toggles / modes. Not for status (pills), not for actions (Btn).
+- **Round icon button**: `Btn iconOnly` — a circle at the same md 32 / sm 24
+  heights, white + hairline, grey glyph (flame only if it IS the page hero).
+- **Scrollbars**: thin 6px, transparent track, `rgba(26,26,26,.16)` thumb —
+  global (index.css), so every scroll area reads the same.
 - **Breathing:** table cells pad 12px horizontal (16px first column); the
   toolbar (bulk action buttons + search) is its OWN row above the table with a
   12px gap; panels 12px apart. Actions in the toolbar are outline buttons with

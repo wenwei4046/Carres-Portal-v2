@@ -2976,18 +2976,17 @@ function CustomerExpand({
         </button>
       </div>
       <span className="flex items-center gap-1.5 shrink-0">
-        {/* WhatsApp — round WHITE button (same family as the pills, no brand
-            colour) with the outline whatsapp glyph in muted grey; opens wa.me
-            directly, no confirm. */}
-        <button
-          type="button"
+        {/* WhatsApp — THE round icon-button recipe (Btn iconOnly): white +
+            hairline, grey outline glyph; opens wa.me directly, no confirm. */}
+        <Btn
+          iconOnly
           onClick={() => {
             if (wa) window.open(wa, "_blank", "noopener");
           }}
           disabled={!wa}
           title="Open WhatsApp chat with the customer"
           aria-label="WhatsApp the customer"
-          className="w-8 h-8 rounded-full bg-white border border-base-200 hover:brightness-[0.98] disabled:opacity-50 flex items-center justify-center shrink-0 text-base-500 hover:text-base-800"
+          className="shrink-0 text-base-500 hover:text-base-800"
         >
           <svg
             viewBox="0 0 24 24"
@@ -3003,7 +3002,7 @@ function CustomerExpand({
             <path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9" />
             <path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1" />
           </svg>
-        </button>
+        </Btn>
         <PanelMenu
           items={[
             ...(order.status === "place"
