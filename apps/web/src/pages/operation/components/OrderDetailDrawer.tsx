@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Bell,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -1803,16 +1804,18 @@ function DrawerBody({
                         <Fragment key={l.sku}>
                           {/* A line that still needs reserving reads as an
                               AMBER tint (warning, never danger red). */}
-                          {/* v4 §8 — the ACTIVE line reads as the SELECTION
-                              blue wash (flame is action-only, never a row
-                              tint); status lives in the Status pill, so the
-                              old full-row amber wash is gone. 44px row. */}
+                          {/* v4 §8/§8d — the ACTIVE line reads as the SELECTION
+                              blue wash; while one line is active the OTHER rows
+                              dim to ~60% (attention moves by light, the POS
+                              pattern). Status lives in the Status pill. 44px. */}
                           <tr
                             onClick={() => setPickerSku(l.sku)}
-                            className={`cursor-pointer h-[44px] ${
+                            className={`cursor-pointer h-[44px] transition-opacity ${
                               l.sku === activeLineSku
                                 ? "bg-[#e6f1fb]"
-                                : "hover:bg-base-50"
+                                : `hover:bg-base-50 ${
+                                    activeLineSku ? "opacity-60 hover:opacity-100" : ""
+                                  }`
                             }`}
                           >
                             {/* Item — chevron expands the detail (stock ETA /
@@ -1904,6 +1907,20 @@ function DrawerBody({
                                 >
                                   Reserve
                                 </Btn>
+                              ) : rd === "reserved" ? (
+                                /* §8d pick-state circle — picked, at a glance
+                                   (status indicator, never clickable). */
+                                <span
+                                  className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#EAF3DE]"
+                                  title="Reserved — this line is picked"
+                                >
+                                  <Check
+                                    size={14}
+                                    strokeWidth={2.5}
+                                    className="text-[#3B6D11]"
+                                    aria-label="Reserved"
+                                  />
+                                </span>
                               ) : (
                                 <span className="text-base-300 text-[11px]">—</span>
                               )}

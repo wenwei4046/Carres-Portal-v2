@@ -133,6 +133,18 @@ Shape/colour registers before text: fill vs outline = primary vs secondary
 action; clear box/pill boundaries on every clickable thing; 17px checkbox;
 filled status pills; blue selected block. Font stays small (12–15) and calm.
 
+## 8d. Focus dimming + pick-state circles (LOCKED 2026-07-16 — the POS pattern)
+
+- **Dim the rest:** when ONE row/card is active in a work surface (a line's
+  picker open, a mutex lock), the non-relevant rows drop to ~60% opacity; the
+  active one stays full contrast (+ its selection wash). Attention moves by
+  LIGHT, not by borders. Locked/never-pickable items dim + carry a tooltip
+  saying why.
+- **Pick-state circle:** a small round mark answers "picked or not" at a
+  glance — done/picked = a soft green circle with a dark-green ✓; pickable =
+  the action Btn; not applicable = a muted "—". The circle is a STATUS
+  indicator (never clickable); the clickable thing stays a Btn.
+
 ## 9. Tabs (LOCKED 2026-07-16 — sample type 2)
 
 Main tab bars (e.g. the Orders status tabs) use **icon + label + underline**:
