@@ -43,8 +43,8 @@ a button** (consistency by architecture, not discipline).
 
 | Rung | Look | Rule |
 |---|---|---|
-| **Hero** | flame filled | **ONE PER PAGE** — the page's single main action (Orders list = + AutoCount · order detail = + Add payment). A modal counts as its own surface and may carry one hero. |
-| **Secondary** | **white box + hairline + BOLD icon + BOLD word** | the default for every other action; **a panel shows at most TWO**, the rest fold into ⋮ |
+| **Hero** | flame filled PILL | **ONE PER PAGE** — the page's single main action (Orders list = + AutoCount · order detail = + Add payment). A modal counts as its own surface and may carry one hero. |
+| **Secondary** | **white PILL + 1.5px ink-22% border + BOLD icon + BOLD ink word** (the POS .btn recipe, never pale) | the default for every other action; **a panel shows at most TWO**, the rest fold into ⋮ |
 | **Tertiary** | ghost text / 17px grey icon | row actions, cancel, "+ add …" |
 | **Overflow** | ⋮ menu | everything beyond the panel's two-button budget — actions are HIDDEN, not restyled |
 
@@ -148,8 +148,9 @@ Main tab bars (e.g. the Orders status tabs) use **icon + label + underline**:
   hero); panels default collapsed to one line; expand to edit.
 - White panels on the grey canvas; 0.5px hairlines; 12px card radius.
 - **Radius ladder (LOCKED — always pick from these four, never invent):**
-  `999` pills / circles / segmented rails · `12` cards (SectionCard) ·
-  `8` inner blocks (money stack, grey containers) · `6` controls (Btn, Field).
+  `999` BUTTONS (all Btn variants) / status pills / circles / segmented rails ·
+  `12` cards (SectionCard) · `8` inner blocks (money stack, grey containers) ·
+  `6` inputs (Field).
 - **Segmented control** (`components/Segmented.tsx`): grey pill rail
   (base-100, radius 999, 2px inset) + the active option as a WHITE chip —
   for view toggles / modes. Not for status (pills), not for actions (Btn).

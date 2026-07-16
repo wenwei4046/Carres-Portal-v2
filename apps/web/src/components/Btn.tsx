@@ -24,16 +24,19 @@ import type { LucideIcon } from "lucide-react";
 type Variant = "hero" | "box" | "ghost";
 type Size = "md" | "sm";
 
+/* PILL buttons (Jess 2026-07-16, ported from the POS .btn recipe): 999
+ * radius, a CLEAR 1.5px ink-22% border and INK text — never pale. Flame
+ * pill = the hero; white pill = everything else. */
 const VARIANT: Record<Variant, string> = {
-  hero: "bg-primary text-white border border-primary hover:bg-signature-700",
-  box: "bg-white text-base-800 border border-base-300 hover:bg-base-50",
+  hero: "bg-primary text-white border-[1.5px] border-primary hover:bg-signature-700",
+  box: "bg-white text-base-900 border-[1.5px] border-[rgba(26,26,26,0.22)] hover:bg-base-50 hover:border-[rgba(26,26,26,0.38)]",
   ghost:
-    "bg-transparent text-base-600 border border-transparent hover:text-base-900 hover:bg-base-50",
+    "bg-transparent text-base-700 border-[1.5px] border-transparent hover:text-base-900 hover:bg-base-50",
 };
 
 const SIZE: Record<Size, string> = {
-  md: "h-8 px-3 text-[13px] gap-1.5 [&_svg]:w-4 [&_svg]:h-4",
-  sm: "h-6 px-2 text-[11px] gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
+  md: "h-8 px-4 text-[13px] gap-1.5 [&_svg]:w-4 [&_svg]:h-4",
+  sm: "h-6 px-2.5 text-[11px] gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
 };
 
 /** iconOnly circles share the md/sm heights; the glyph centres, no label. */
@@ -62,8 +65,8 @@ export default function Btn({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center font-semibold whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${VARIANT[variant]} ${
-        iconOnly ? `rounded-full ${SIZE_CIRCLE[size]}` : `rounded-md ${SIZE[size]}`
+      className={`inline-flex items-center justify-center font-semibold whitespace-nowrap rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${VARIANT[variant]} ${
+        iconOnly ? SIZE_CIRCLE[size] : SIZE[size]
       } ${className}`}
       {...rest}
     >
