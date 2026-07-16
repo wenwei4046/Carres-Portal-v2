@@ -532,6 +532,7 @@ function Panel({
   title,
   summary,
   actions,
+  collapsedAction,
   grow,
   defaultOpen = true,
   className,
@@ -542,10 +543,13 @@ function Panel({
   summary?: ReactNode;
   /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
   actions?: ReactNode;
+  /** v4 §4 standard header — a shortcut rendered in the band's right slot
+   *  ONLY while the panel is collapsed (e.g. Balance's "+ Add payment"), so
+   *  the expanded body's own flame CTA never doubles up (one flame/block). */
+  collapsedAction?: ReactNode;
   grow?: boolean;
-  /** Initial state when the user hasn't toggled this panel yet (UI-KIT §5.1:
-   *  Balance + Delivery + Items + Warehouse open; Customer, Storage, Loan
-   *  collapsed). */
+  /** Initial state when the user hasn't toggled this panel yet. UI-KIT v4 §9:
+   *  panels default COLLAPSED to a one-line summary; expand to edit. */
   defaultOpen?: boolean;
   className?: string;
   children: ReactNode;
@@ -553,9 +557,9 @@ function Panel({
   // Per-panel hide / expand (Jess 2026-07-11) — every panel header toggles its
   // own body (accordion), so a big order can collapse the cards it doesn't need.
   // State persists across orders via localStorage, keyed by the panel title.
-  // Key bumped v3 (2026-07-13 UI-KIT rebuild) so the new per-section defaults
-  // actually land for users who toggled panels under the old defaults.
-  const storeKey = `ops-drawer-panel-v3:${title}`;
+  // Key bumped v4 (2026-07-16 UI-KIT v4 panel rebuild) so the new per-section
+  // defaults actually land for users who toggled under the old defaults.
+  const storeKey = `ops-drawer-panel-v4:${title}`;
   const [open, setOpen] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem(storeKey);
@@ -590,6 +594,7 @@ function Panel({
         right={
           <span className="shrink-0 flex items-center gap-1.5">
             {summary}
+            {!open && collapsedAction}
             {actions}
           </span>
         }
@@ -818,6 +823,10 @@ function DrawerBody({
   // Customer identity lives in the header strip now (Jess 2026-07-15): the
   // name is the anchor; ▾ expands the full-width customer block inline.
   const [customerOpen, setCustomerOpen] = useState(false);
+  // Add-payment modal lifted to the drawer level (v4 panel rebuild): the
+  // Balance band's collapsed "+ Add payment" shortcut must work while the
+  // panel body (MoneyCard) is unmounted.
+  const [addingPayment, setAddingPayment] = useState(false);
   // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
   // Outstanding-only state carries no Total row, so ⋮ is the way back in).
   const balanceEditTotalRef = useRef<(() => void) | null>(null);
@@ -1355,7 +1364,7 @@ function DrawerBody({
           page is two columns with no separate header band). */}
       <header className="shrink-0 px-5 pt-3 bg-background">
         <SectionCard className="!p-0">
-        <div className="px-4 py-2.5 flex items-center gap-2.5 min-w-0">
+        <div className="px-4 h-[44px] flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={onClose}
@@ -1428,6 +1437,18 @@ function DrawerBody({
                 <ChevronUp size={14} className="shrink-0 text-base-400" aria-hidden="true" />
               ) : (
                 <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
+              )}
+              {/* v4 rebuild — the collapsed line carries phone + region (the
+                  expand shows the full address); hidden while open to avoid
+                  double-reading against the pills. Phone = slashed-zero mono. */}
+              {!customerOpen && (order.customer_phone || loc.label) && (
+                <span className="min-w-0 truncate text-[12px] text-base-500 ml-1.5">
+                  {order.customer_phone && (
+                    <span className="font-mono">{order.customer_phone}</span>
+                  )}
+                  {order.customer_phone && loc.label ? " · " : ""}
+                  {loc.label ?? ""}
+                </span>
               )}
             </button>
           </div>
@@ -2183,30 +2204,54 @@ function DrawerBody({
                 ]}
               />
             }
+            defaultOpen={false}
             summary={
-              /* Colour lock: the owing amount is danger TEXT on a neutral chip —
-                 never a red block (the banner is the only red block). */
-              isOwing ? (
+              /* v4 state-adaptive one-liner. FIX (Jess): never a bare "no
+                 total" chip beside collected money — money-in-no-total reads
+                 "Collected RMx · set total", neutral (no red). Amounts in the
+                 slashed-zero mono; "Paid" is a status → pill. */
+              !totalSet ? (
+                <span className="text-[11px] text-base-500 font-mono whitespace-nowrap">
+                  {collected > 0 ? `Collected ${RM(collected)} · ` : ""}
+                  <span className="font-sans text-base-400">set total</span>
+                </span>
+              ) : isOwing ? (
                 <span
                   title={
                     balanceGate === "hold"
                       ? "Delivery on hold — collect before dispatch"
-                      : balanceGate === "warn"
-                        ? "Collect before delivery"
-                        : "Outstanding balance"
+                      : "Outstanding balance"
                   }
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-base-100 text-danger"
+                  className={`text-[11px] font-mono font-semibold whitespace-nowrap ${
+                    deliveryEveLabel ? "text-danger" : "text-base-800"
+                  }`}
                 >
-                  {balanceGate === "hold" && (
-                    <AlertCircle size={10} strokeWidth={2.5} />
-                  )}
-                  {RM(owingAmt)} owing
+                  Outstanding {RM(owingAmt)}
+                  {collected > 0 ? (
+                    <span className="font-normal text-base-500">
+                      {" "}
+                      · {RM(collected)} in
+                    </span>
+                  ) : null}
                 </span>
-              ) : totalSet ? (
-                <MiniBadge tone="muted">paid</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">no total</MiniBadge>
+                <span className="pill pill-confirmed text-[11px]">Paid ✓</span>
               )
+            }
+            collapsedAction={
+              /* §1 — the collapsed line's "+ Add payment" shortcut (the ONE
+                 flame in this block while collapsed; the expanded body's own
+                 CTA takes over when open). */
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddingPayment(true);
+                }}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap"
+              >
+                + Add payment
+              </button>
             }
           >
             <div className="p-3">
@@ -2234,9 +2279,21 @@ function DrawerBody({
                 onChase={() => copyChase("customer", "chase")}
                 lastChasedAt={form.control?.last_chased_at ?? null}
                 startEditTotalRef={balanceEditTotalRef}
+                onAddPayment={() => setAddingPayment(true)}
               />
             </div>
           </Panel>
+          {/* Add-payment modal (v4 §2 rebuild) — lives at the drawer level so
+              the collapsed band's shortcut works with the body unmounted. */}
+          {addingPayment && (
+            <AddPaymentModal
+              orderId={order.id}
+              totalSet={totalSet}
+              orderTotal={orderTotal}
+              collected={collected}
+              onClose={() => setAddingPayment(false)}
+            />
+          )}
           </div>
 
           {/* 3. Storage — its OWN card (Jess: split from Balance). Chip (Round
@@ -2870,9 +2927,10 @@ function CustomerExpand({
 
   return (
     /* Light-grey container (base-50, one step under white) — the white pills
-       float on it. Rounded to sit inside the white card's inset. */
+       float on it. Rounded to sit inside the white card's inset. v4 §8b
+       density: the read row is 44px fixed. */
     <div
-      className="px-4 py-2 rounded-[8px] bg-base-50 flex items-center gap-2 min-w-0"
+      className="px-4 h-[44px] rounded-[8px] bg-base-50 flex items-center gap-2 min-w-0"
       data-testid="customer-expand"
     >
       <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -2884,7 +2942,8 @@ function CustomerExpand({
           className={`${pillCls} shrink-0`}
         >
           <Phone size={13} className="shrink-0 text-base-400" aria-hidden="true" />
-          <span className="truncate font-medium text-primary">
+          {/* v4 — phone is CONTENT: dark, slashed-zero mono (never accent). */}
+          <span className="truncate font-medium font-mono text-base-900">
             {order.customer_phone ?? "—"}
           </span>
         </button>
@@ -3247,7 +3306,8 @@ async function openDoPdf(orderId: string) {
 void openInvoicePdf;
 void openDoPdf;
 
-/** One row of the Total / Collected / Outstanding stack. */
+/** One row of the Total / Collected / Outstanding stack — v4 §3: label =
+ *  12px uppercase muted; the value (right) is CONTENT, dark. */
 function MoneyRow({
   label,
   children,
@@ -3261,80 +3321,206 @@ function MoneyRow({
     <div
       className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
     >
-      <span className="text-[11px] text-base-400">{label}</span>
+      <span className="text-[12px] font-medium uppercase text-[#A8A8A8]">
+        {label}
+      </span>
       <span className="text-right">{children}</span>
     </div>
   );
 }
 
-/** The 3-field Record-payment form (amount + date + note only, Jess: the whole
- *  point — split the free-text mess into clean typed inputs). method='cash' /
- *  kind='payment' are applied by the caller. */
-function RecordPaymentForm({
-  pending,
-  onCancel,
-  onSubmit,
+/** v4 §2 — the Add-payment modal: two columns. LEFT = typed fields (amount /
+ *  date-received default today / method Transfer·Cash·Card / bank when
+ *  transfer / slip / note). RIGHT = the live "after this payment" balance —
+ *  bill / collected / outstanding recompute per keystroke. Payments stay
+ *  VOID-able (principal), never deletable. `Transfer` maps to the ledger's
+ *  'bank' method; the bank name (HLB/RHB) rides `reference` (no schema
+ *  change). Slip upload is a SHELL — order_payments.receipt_url exists but
+ *  the record API doesn't accept it yet (receipt/invoice workstream). */
+function AddPaymentModal({
+  orderId,
+  totalSet,
+  orderTotal,
+  collected,
+  onClose,
 }: {
-  pending: boolean;
-  onCancel: () => void;
-  onSubmit: (input: { amount: number; paidOn: string; note: string | null }) => void;
+  orderId: string;
+  totalSet: boolean;
+  orderTotal: number;
+  collected: number;
+  onClose: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState<"bank" | "cash" | "card">("bank");
+  const [bank, setBank] = useState<"" | "HLB" | "RHB">("");
   const [note, setNote] = useState("");
+  const record = useRecordPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+  });
   const amt = Number(amount);
-  const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
+  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
+  const afterCollected = collected + (amtOk ? amt : 0);
+  const afterOutstanding = Math.max(0, orderTotal - afterCollected);
   const cell =
-    "w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  const money = "font-mono text-[13px] text-base-900";
   return (
-    <div className="rounded-[8px] border border-base-200/70 bg-base-50 p-2 space-y-1.5">
-      <div className="grid grid-cols-2 gap-1.5">
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount (RM)"
-          aria-label="Payment amount"
-          className={cell}
-        />
-        <input
-          type="date"
-          value={paidOn}
-          onChange={(e) => setPaidOn(e.target.value)}
-          aria-label="Payment date"
-          className={cell}
-        />
+    <Modal title="Add payment" onClose={onClose} size="lg">
+      <div className="grid grid-cols-[3fr_2fr] gap-4">
+        {/* LEFT — the typed fields. */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="t4-label">Amount (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                autoFocus
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                aria-label="Payment amount"
+                className={cell}
+              />
+            </label>
+            <label className="block">
+              <span className="t4-label">Date received</span>
+              <input
+                type="date"
+                value={paidOn}
+                onChange={(e) => setPaidOn(e.target.value)}
+                aria-label="Payment date"
+                className={cell}
+              />
+            </label>
+            <label className="block">
+              <span className="t4-label">Method</span>
+              <select
+                value={method}
+                onChange={(e) =>
+                  setMethod(e.target.value as "bank" | "cash" | "card")
+                }
+                aria-label="Payment method"
+                className={cell}
+              >
+                <option value="bank">Transfer</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </label>
+            {method === "bank" ? (
+              <label className="block">
+                <span className="t4-label">Bank</span>
+                <select
+                  value={bank}
+                  onChange={(e) => setBank(e.target.value as "" | "HLB" | "RHB")}
+                  aria-label="Receiving bank"
+                  className={cell}
+                >
+                  <option value="">—</option>
+                  <option value="HLB">HLB</option>
+                  <option value="RHB">RHB</option>
+                </select>
+              </label>
+            ) : (
+              <div aria-hidden="true" />
+            )}
+          </div>
+          <label className="block">
+            <span className="t4-label">Upload slip</span>
+            <button
+              type="button"
+              disabled
+              title="Slip / receipt upload lands with the receipt workstream (order_payments.receipt_url is ready)"
+              className="mt-0.5 w-full px-2 py-1.5 border border-dashed border-base-300 rounded text-[12px] text-base-400 bg-base-50 cursor-not-allowed text-left"
+            >
+              Attach transfer slip — coming with receipts
+            </button>
+          </label>
+          <label className="block">
+            <span className="t4-label">Note (optional)</span>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Deposit · 2nd payment · final"
+              aria-label="Payment note"
+              className={cell}
+            />
+          </label>
+        </div>
+        {/* RIGHT — live "after this payment" (grey container, white page). */}
+        <div
+          className="rounded-[8px] bg-base-50 p-3 self-start"
+          data-testid="payment-live-preview"
+        >
+          <div className="t4-label mb-2">After this payment</div>
+          {totalSet ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-base-500">Bill total</span>
+                <span className={money}>{RM(orderTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-base-500">Collected</span>
+                <span className={money}>{RM(afterCollected)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-base-200">
+                <span className="text-[12px] text-base-500">Outstanding</span>
+                {afterOutstanding > 0 ? (
+                  <span className="font-mono text-[20px] font-bold text-base-900">
+                    {RM(afterOutstanding)}
+                  </span>
+                ) : (
+                  <span className="pill pill-confirmed text-[11px]">Paid ✓</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-base-500">Collected</span>
+                <span className={money}>{RM(afterCollected)}</span>
+              </div>
+              <div className="text-[12px] text-base-400">
+                No total set — set the total in Balance to compute outstanding.
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <input
-        type="text"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Note (e.g. Deposit · 2nd payment · final)"
-        aria-label="Payment note"
-        className={cell}
-      />
-      <div className="flex items-center gap-2">
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+          Cancel
+        </button>
         <button
           type="button"
-          disabled={!valid}
+          disabled={!amtOk || record.isPending}
           onClick={() =>
-            onSubmit({ amount: amt, paidOn, note: note.trim() || null })
+            record.mutate(
+              {
+                amount: amt,
+                paidOn,
+                note: note.trim() || null,
+                method,
+                kind: "payment",
+                reference: method === "bank" && bank ? bank : null,
+              },
+              {
+                onSuccess: () => {
+                  toast.success("Payment recorded");
+                  onClose();
+                },
+              },
+            )
           }
           className="btn-hero text-[12px] disabled:opacity-50"
         >
-          {pending ? "Recording…" : "Record payment"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-[12px] text-base-500 hover:text-base-700"
-        >
-          Cancel
+          {record.isPending ? "Recording…" : "Record payment"}
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -3354,6 +3540,7 @@ function MoneyCard({
   onChase,
   lastChasedAt,
   startEditTotalRef,
+  onAddPayment,
 }: {
   orderId: string;
   form: ReturnType<typeof useOrderControlForm>;
@@ -3376,31 +3563,29 @@ function MoneyCard({
   /** Lets the panel ⋮ re-open the total entry once the stack has collapsed to
    *  the Outstanding-only state (same pattern as the Customer card's edit). */
   startEditTotalRef?: MutableRefObject<(() => void) | null>;
+  /** Opens the drawer-level AddPaymentModal (v4 §2 — lifted so the collapsed
+   *  band shortcut works too). */
+  onAddPayment: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
-  const [adding, setAdding] = useState(false);
   // §7.4 — a keyed Total READS formatted ("RM 1,749"), click to edit the raw
   // number. Starts in edit mode only while no total is set yet.
   const [editingTotal, setEditingTotal] = useState(false);
-  const record = useRecordPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
-  });
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
   });
 
-  // Page-rebuild §3.2 — the four adaptive states. (totalSet && collected===0
-  // implies outstanding = the full total, so the four cover everything.)
+  // v4 rebuild states: paid-in-full / owing / no-total. (The Add-payment
+  // modal itself lives at the drawer level now — see AddPaymentModal.)
   const paidInFull = totalSet && outstanding <= 0;
-  const partial = totalSet && collected > 0 && outstanding > 0;
   // Outside entry point (panel ⋮ "Edit total") into the total editor.
   if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
   // Colour = problem only: Outstanding reads plain ink; danger ONLY on
-  // delivery-eve (the step-3 alert row owns the on-hold red).
+  // delivery-eve. v4 §3: Outstanding is the HERO NUMBER — 20 Bold.
   const outstandingBig = (
     <span
-      className={`font-mono text-[18px] font-bold leading-none ${
+      className={`font-mono text-[20px] font-bold leading-none ${
         deliveryEve ? "text-danger" : "text-base-900"
       }`}
     >
@@ -3457,21 +3642,17 @@ function MoneyCard({
         </div>
       )}
 
-      {/* §3.2 state-adaptive stack — SectionBand style, values right-aligned.
-          Row FLAGS (not exclusive branches) so the Total entry can stay
-          mounted while it is being typed into, whatever state the keystrokes
-          flip the stack through:
-            · Total row      — total not yet set · partial · while editing
-            · Collected row  — partial only (spec: don't repeat it elsewhere;
-                               the ledger list below shows any stray money)
-            · Outstanding    — owing (big; plain ink unless delivery-eve)
-            · Paid ✓         — settled in full
-            · hint lines     — "Set total…" (no total) / "Collect by" (0 in) */}
+      {/* v4 §1 expanded stack — the ORIGINAL BILL amount + outstanding always
+          read together: Total / Collected / Outstanding (hero). States:
+            · no total   → Total entry + Collected (if any money in) + neutral
+                           "set total" hint — NEVER an error-red Outstanding
+            · owing      → all three rows; Outstanding = 20 Bold hero
+            · paid       → Total / Collected / Paid ✓ pill
+          The Total entry pins itself while focused (editingTotal) so typing
+          the first digit can't unmount it. */}
       <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
-        {(!totalSet || partial || editingTotal) && (
-          <MoneyRow label="Total">{totalNode}</MoneyRow>
-        )}
-        {partial && (
+        <MoneyRow label="Total">{totalNode}</MoneyRow>
+        {(totalSet || collected > 0) && (
           <MoneyRow label="Collected">
             <span className="font-mono text-[12px] text-success">
               {RM(collected)}
@@ -3479,21 +3660,14 @@ function MoneyCard({
           </MoneyRow>
         )}
         {!totalSet ? (
-          /* Total not set → neutral hint + the set-total entry ONLY. NEVER an
-             error-red Outstanding in this state. */
           <div className="px-3 py-1.5 text-[11px] text-base-400">
             Set total to calculate balance
           </div>
         ) : paidInFull ? (
-          /* Paid in full → Paid ✓ green, no Outstanding. */
-          <MoneyRow label="Balance" strong>
-            <span className="font-mono text-[18px] font-bold leading-none text-success">
-              Paid ✓
-            </span>
+          <MoneyRow label="Outstanding" strong>
+            <span className="pill pill-confirmed text-[11px]">Paid ✓</span>
           </MoneyRow>
         ) : (
-          /* Owing → Outstanding big; when NOTHING is collected yet, only this
-             plus the collect-by line (no Total/Collected repeat). */
           <>
             <MoneyRow label="Outstanding" strong>
               {outstandingBig}
@@ -3554,14 +3728,14 @@ function MoneyCard({
         </div>
       )}
 
-      {/* §3.2 bottom actions — + Add payment (the ONE flame CTA; opens the
-          3-field popup) · Remind + Chase to the CUSTOMER (both stamp the ONE
-          shared chase log). On delivery-eve the Remind flips to the firmer
-          final-reminder tone. */}
+      {/* Bottom actions — + Add payment (the ONE flame CTA while expanded;
+          opens the drawer-level 2-col modal) · Remind + Chase to the CUSTOMER
+          (both stamp the ONE shared chase log). On delivery-eve the Remind
+          flips to the firmer final-reminder tone. */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
-          onClick={() => setAdding(true)}
+          onClick={onAddPayment}
           className="btn-hero text-[12px]"
         >
           + Add payment
@@ -3595,24 +3769,6 @@ function MoneyCard({
         <div className="text-[11px] text-base-400">
           Last chased {fmtDate(lastChasedAt)}
         </div>
-      )}
-
-      {/* + Add payment popup (§3.2): amount + date received (default today) +
-          note ONLY. Collected/Outstanding recompute from the ledger on save;
-          payments can be VOIDED (reversed), never deleted. */}
-      {adding && (
-        <Modal title="Add payment" onClose={() => setAdding(false)}>
-          <RecordPaymentForm
-            pending={record.isPending}
-            onCancel={() => setAdding(false)}
-            onSubmit={(input) =>
-              record.mutate(
-                { ...input, method: "cash", kind: "payment" },
-                { onSuccess: () => setAdding(false) },
-              )
-            }
-          />
-        </Modal>
       )}
     </div>
   );
