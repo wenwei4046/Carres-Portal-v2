@@ -1756,7 +1756,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
         className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden"
+          /* UI-KIT v4 §8b (LOCKED): rows are 44px FIXED — content adapts to
+             the row, never the reverse. whitespace-nowrap kills the silent
+             row-growers (text WRAPPING inside narrow fixed columns — "SO-1112"
+             at a 31px column folded to 2 lines and pushed rows to 48/57px);
+             stacked multi-DIV cells (ref ≤2 lines, logistic, deadline) still
+             stack, each line just ellipsises. Keep in sync with
+             design-standard.ts ROW.heightPx. */
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
@@ -2240,7 +2247,8 @@ function OrderRow({
           checked={selected}
           onChange={onToggle}
           aria-label={`Select SO-${o.so}`}
-          className="cursor-pointer accent-base-900 align-middle"
+          /* v4 §8b — 17px checkbox: registers by shape before reading. */
+          className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
         />
       </td>
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
@@ -2258,28 +2266,34 @@ function OrderRow({
         </span>
       </td>
       )}
-      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. All refs
-          stack vertically; only >3 fold to "+N". Tight to the identity trio. */}
+      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. v4 §8b:
+          the row is 44px FIXED, so at most 2 refs show (2×16px lines fit);
+          the rest fold to "+N" ON the second line — content adapts to the
+          row, never the other way. Full list stays in the title tooltip. */}
       {showCol("ref") && (
       <td className="px-1 py-1.5">
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
           <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            {ref.slice(0, 3).map((r, i) => (
+            <div
+              className="truncate tabular-nums"
+              style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
+            >
+              {ref[0]}
+            </div>
+            {ref.length === 2 ? (
               <div
-                key={i}
                 className="truncate tabular-nums"
                 style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
               >
-                {r}
+                {ref[1]}
               </div>
-            ))}
-            {ref.length > 3 && (
+            ) : ref.length > 2 ? (
               <div style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}>
-                +{ref.length - 3} more
+                +{ref.length - 1} more
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </td>

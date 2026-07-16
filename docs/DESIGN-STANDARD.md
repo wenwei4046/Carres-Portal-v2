@@ -1,13 +1,16 @@
 # Carres Portal — Page Design Standard
 
-> **Read this before changing ANY page.** It is the single source of truth for how
-> every screen in the portal is laid out, coloured, and structured. The machine-readable
-> companion is [`apps/web/src/lib/design-standard.ts`](../apps/web/src/lib/design-standard.ts)
-> (import `COLOR`, `CHIP`, `LAYOUT`, `RADIUS`, `SPACE`, `TYPE`, `FONT`). This markdown
-> explains the *why* and the *rules*; the `.ts` file holds the *values*.
+> ## ⚠️ SUPERSEDED by UI-KIT v4 (2026-07-15)
 >
-> Locked 2026-07-12. Visual tokens are **v17** (locked 2026-06-09, see root `CLAUDE.md` §10).
-> This document does **not** introduce new visuals — it records + enforces what is already live.
+> **The single source of visual truth is now [`docs/CARRES_UI_KIT_V4.md`](CARRES_UI_KIT_V4.md)**
+> (white base · functional colour only · restrained Inter scale · slashed-zero mono),
+> mirrored machine-readably in [`apps/web/src/lib/design-standard.ts`](../apps/web/src/lib/design-standard.ts).
+> Where anything below conflicts with v4, **v4 wins** — the v17 cream-content tokens,
+> the 32px `.t-h*` type ramp and the old chip palette recorded here are void.
+> This file is kept only as the historical record of the pre-v4 (v17) system and for
+> the structural rules v4 explicitly carries forward (§9 layout decisions).
+>
+> ~~Locked 2026-07-12. Visual tokens are **v17** (locked 2026-06-09, see root `CLAUDE.md` §10).~~
 
 ---
 
