@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Search, Trash2 } from "lucide-react";
 import type { Order } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
@@ -41,7 +42,8 @@ const priceOf = (l: RawLine) => {
   return Number.isFinite(n) && n >= 0 ? n : NaN;
 };
 
-export default function PrincipalNewOrder({ setTab }: { setTab?: (tab: string) => void }) {
+export default function PrincipalNewOrder() {
+  const navigate = useNavigate();
   const dealersQ = usePrincipalDealers();
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
@@ -192,7 +194,7 @@ export default function PrincipalNewOrder({ setTab }: { setTab?: (tab: string) =
             {(submitted.lines?.length ?? 0) === 1 ? "" : "s"} · saved exactly as entered.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
-            <button type="button" className="btn-secondary" onClick={() => setTab?.("orders")}>
+            <button type="button" className="btn-secondary" onClick={() => navigate("/operation/orders")}>
               View orders
             </button>
             <button type="button" className="btn-primary" onClick={startAnother}>

@@ -195,7 +195,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // POS-parity (Loo 2026-07-03): the entry opens the POS *catalog* — named
       // like 2990s (the POS home IS the catalog), not "New order".
       { key: "pos", label: "Catalog", icon: LayoutGrid },
-      { key: "orders", label: "Orders", icon: ClipboardList },
+      // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
+      // "Orders" jumps straight to the Operations order control grid.
+      { key: "orders", label: "Orders", icon: ClipboardList, path: "/operation/orders" },
       { key: "dealers", label: "Dealers", icon: Users },
       { key: "partners", label: "Partners", icon: Network },
       { key: "audit", label: "Audit log", icon: ScrollText },

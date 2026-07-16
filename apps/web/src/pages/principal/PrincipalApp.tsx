@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PrincipalDashboard from "./PrincipalDashboard";
@@ -11,9 +11,10 @@ import PrincipalAudit from "./PrincipalAudit";
 import DealerPos from "@/pages/dealer/DealerPos";
 import PrincipalNewOrder from "./PrincipalNewOrder";
 import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
-import PrincipalOrders from "./PrincipalOrders";
-// 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
-// order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
+// 2026-05-19 — Suppliers / Stock moved to Operation sidebar. A place-order POS
+// (on behalf of a picked dealer) re-added to Principal 2026-06-25. The trace-
+// only PrincipalOrders page was removed 2026-07-16 — order views live in the
+// Operations area (/operation/orders).
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 import OrderEntryPage from "@/pages/operation/OrderEntryPage";
 
@@ -30,6 +31,7 @@ import OrderEntryPage from "@/pages/operation/OrderEntryPage";
  */
 export default function PrincipalApp() {
   const [tab, setTab] = useState<string>("dashboard");
+  const navigate = useNavigate();
 
   // Unified Internal Portal — PortalSidebar links to `/principal?tab=<key>`.
   // Sync the inbound param into local tab state (in-page callbacks like the
@@ -55,15 +57,14 @@ export default function PrincipalApp() {
         {/* POS-parity (2990s) — "New order" opens the POS catalog DIRECTLY; the
             principal picks the acting dealer in-flow at the CUSTOMER step (the
             old pre-pick page is gone). */}
-        {tab === "pos" && <DealerPos onExit={() => setTab("orders")} />}
+        {tab === "pos" && <DealerPos onExit={() => navigate("/operation/orders")} />}
         {/* MAINTAIN → New Order — raw SO creation (no POS gates). */}
-        {tab === "new-order" && <PrincipalNewOrder setTab={setTab} />}
+        {tab === "new-order" && <PrincipalNewOrder />}
         {/* MAINTAIN → Sales analysis — overview / customer data / products. */}
         {tab === "sales-analysis" && <PrincipalSalesAnalysis />}
         {/* MAINTAIN → Order Entry — POS payment methods + Customer-step form
             fields (moved out of the SO Maintenance modal 2026-07-12). */}
         {tab === "order-entry" && <OrderEntryPage />}
-        {tab === "orders" && <PrincipalOrders />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
         {tab === "partners" && <PrincipalPartners />}
