@@ -80,6 +80,13 @@ Mono wraps the number/code TOKEN only, never the words around it.
 number · 16/600 in-content section title · 15/500 content · 14/400 secondary ·
 12 label/caption.
 
+**Money (LOCKED 2026-07-16 — the POS "LIVE TOTAL" pattern, in code as
+`components/Money.tsx`):** the currency marker is META — tiny, muted,
+uppercase ("RM" at ~half the digit size, `#A8A8A8`); the DIGITS are content —
+bold slashed-zero mono, ink (danger only when the block is an alert). Never
+render "RM" at the same size/colour as the amount. Tones: hero 20/700 ·
+lg 16/700 · md 13/600 · sm 11/600.
+
 **In-row closed set (the ONLY row typography — utilities in index.css):**
 - `.t4-row` 13/500 ink — row content (regions, partners, qty…)
 - `.t4-row-strong` 13/600 ink — row emphasis (names, REF, dates, amounts)

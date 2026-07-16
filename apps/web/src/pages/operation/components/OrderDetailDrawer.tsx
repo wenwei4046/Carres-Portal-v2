@@ -92,6 +92,7 @@ import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
+import Money from "@/components/Money";
 import { fieldCls, fieldAreaCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
@@ -1566,11 +1567,16 @@ function DrawerBody({
                 label="Customer · Money"
                 tone={moneyTone}
                 value={
-                  totalSet
-                    ? moneyOutstanding > 0
-                      ? RM(moneyOutstanding)
-                      : "Paid"
-                    : "—"
+                  totalSet ? (
+                    moneyOutstanding > 0 ? (
+                      /* v4 §3 money recipe — tiny RM, bold 16 digits. */
+                      <Money value={moneyOutstanding} tone="lg" />
+                    ) : (
+                      "Paid"
+                    )
+                  ) : (
+                    "—"
+                  )
                 }
                 subs={moneySubs}
                 actions={
@@ -1820,8 +1826,11 @@ function DrawerBody({
                           >
                             {/* Item — chevron expands the detail (stock ETA /
                                 GRN / route-transfer). */}
-                            <td className="border border-base-200 px-2 py-1 align-top">
-                              <div className="flex items-start gap-1">
+                            {/* §8b row-align fix (Jess): EVERY cell centres
+                                vertically — no more top/middle mix reading as
+                                "rows up and down". */}
+                            <td className="border border-base-200 px-2 py-1 align-middle">
+                              <div className="flex items-center gap-1 min-w-0">
                                 {!isService && (
                                   <button
                                     type="button"
@@ -1833,7 +1842,7 @@ function DrawerBody({
                                     }}
                                     title="Details — stock ETA, receiving (GRN), route / transfer"
                                     aria-expanded={routeOpen}
-                                    className="shrink-0 mt-0.5 text-base-500 hover:text-base-800"
+                                    className="shrink-0 text-base-500 hover:text-base-800"
                                   >
                                     {routeOpen ? (
                                       <ChevronDown size={12} />
@@ -1855,7 +1864,7 @@ function DrawerBody({
                               </div>
                             </td>
                             {/* Qty */}
-                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] font-mono tabular-nums align-middle">
                               {l.qty}
                             </td>
                             {/* Source — PO/#### or own Klang stock. */}
@@ -1863,8 +1872,10 @@ function DrawerBody({
                               {isService ? (
                                 <span className="text-base-300 text-[11px]">—</span>
                               ) : poNo ? (
-                                /* v4 §4 — a PO code is CONTENT: dark, no tint. */
-                                <span className="font-mono text-[12px] text-[#1A1A1A]">
+                                /* v4 §4 — a PO code is CONTENT: dark, no tint.
+                                   nowrap: a wrapping code was the row-height
+                                   breaker (PO/2607- / 019 on two lines). */
+                                <span className="font-mono text-[12px] text-[#1A1A1A] whitespace-nowrap">
                                   {poNo}
                                 </span>
                               ) : (
@@ -2248,12 +2259,12 @@ function DrawerBody({
                  total" chip beside collected money — money-in-no-total reads
                  "Collected RMx · set total", neutral (no red). Amounts in the
                  slashed-zero mono; "Paid" is a status → pill. */
-              /* v4 §11b — mono wraps the AMOUNT token only; words stay Inter. */
+              /* v4 §3 money recipe — tiny muted RM, bold digits; words Inter. */
               !totalSet ? (
                 <span className="text-[11px] text-base-500 whitespace-nowrap">
                   {collected > 0 ? (
                     <>
-                      Collected <span className="font-mono">{RM(collected)}</span> ·{" "}
+                      Collected <Money value={collected} tone="sm" className="text-base-800" /> ·{" "}
                     </>
                   ) : null}
                   <span className="text-base-400">set total</span>
@@ -2269,11 +2280,11 @@ function DrawerBody({
                     deliveryEveLabel ? "text-danger" : "text-base-800"
                   }`}
                 >
-                  Outstanding <span className="font-mono">{RM(owingAmt)}</span>
+                  Outstanding <Money value={owingAmt} tone="sm" />
                   {collected > 0 ? (
                     <span className="font-normal text-base-500">
                       {" "}
-                      · <span className="font-mono">{RM(collected)}</span> in
+                      · <Money value={collected} tone="sm" className="text-base-500" /> in
                     </span>
                   ) : null}
                 </span>
@@ -3382,7 +3393,6 @@ function AddPaymentModal({
   const afterCollected = collected + (amtOk ? amt : 0);
   const afterOutstanding = Math.max(0, orderTotal - afterCollected);
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
-  const money = "font-mono text-[13px] text-base-900";
   return (
     <Modal title="Add payment" onClose={onClose} size="lg">
       <div className="grid grid-cols-[3fr_2fr] gap-4">
@@ -3478,18 +3488,20 @@ function AddPaymentModal({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12px] text-base-500">Bill total</span>
-                <span className={money}>{RM(orderTotal)}</span>
+                <Money value={orderTotal} tone="md" className="text-base-900" />
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12px] text-base-500">Collected</span>
-                <span className={money}>{RM(afterCollected)}</span>
+                <Money value={afterCollected} tone="md" className="text-base-900" />
               </div>
               <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-base-200">
                 <span className="text-[12px] text-base-500">Outstanding</span>
                 {afterOutstanding > 0 ? (
-                  <span className="font-mono text-[20px] font-bold text-base-900">
-                    {RM(afterOutstanding)}
-                  </span>
+                  <Money
+                    value={afterOutstanding}
+                    tone="hero"
+                    className="text-base-900"
+                  />
                 ) : (
                   <span className="pill pill-confirmed text-[11px]">Paid ✓</span>
                 )}
@@ -3499,7 +3511,7 @@ function AddPaymentModal({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12px] text-base-500">Collected</span>
-                <span className={money}>{RM(afterCollected)}</span>
+                <Money value={afterCollected} tone="md" className="text-base-900" />
               </div>
               <div className="text-[12px] text-base-400">
                 No total set — set the total in Balance to compute outstanding.
@@ -3600,24 +3612,19 @@ function MoneyCard({
   // Outside entry point (panel ⋮ "Edit total") into the total editor.
   if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
   // Colour = problem only: Outstanding reads plain ink; danger ONLY on
-  // delivery-eve. v4 §3: Outstanding is the HERO NUMBER — 20 Bold.
+  // delivery-eve. v4 §3 money recipe: tiny muted RM + 20/700 hero digits.
   const outstandingBig = (
-    <span
-      className={`font-mono text-[20px] font-bold leading-none ${
-        deliveryEve ? "text-danger" : "text-base-900"
-      }`}
-    >
-      {RM(outstanding)}
-    </span>
+    <Money
+      value={outstanding}
+      tone="hero"
+      className={deliveryEve ? "text-danger" : "text-base-900"}
+    />
   );
   // The set-total entry — reused by the partial Total row AND the no-total
   // hint state. Reads formatted once keyed; click to edit.
   const totalNode = hasLineTotal ? (
-    <span
-      className="font-mono text-[12px] text-base-600"
-      title="Summed from the order items"
-    >
-      {RM(orderTotal)}
+    <span title="Summed from the order items">
+      <Money value={orderTotal} tone="md" className="text-base-900" />
     </span>
   ) : editingTotal || orderTotal <= 0 ? (
     <input
@@ -3640,9 +3647,9 @@ function MoneyCard({
       type="button"
       onClick={() => setEditingTotal(true)}
       title="Keyed total — click to edit"
-      className="font-mono text-[12px] text-base-600 hover:text-base-900 underline decoration-dotted decoration-base-300 underline-offset-2"
+      className="underline decoration-dotted decoration-base-300 underline-offset-2"
     >
-      {RM(orderTotal)}
+      <Money value={orderTotal} tone="md" className="text-base-900" />
     </button>
   );
 
@@ -3673,9 +3680,7 @@ function MoneyCard({
         {(totalSet || collected > 0) && (
           <MoneyRow label="Collected">
             {/* v4 §2/§4 — amounts are never tinted: dark content. */}
-            <span className="font-mono text-[12px] text-base-900">
-              {RM(collected)}
-            </span>
+            <Money value={collected} tone="md" className="text-base-900" />
           </MoneyRow>
         )}
         {!totalSet ? (
@@ -3718,10 +3723,8 @@ function MoneyCard({
                 <span className="text-base-800"> · {fmtDate(p.paid_on)}</span>
               </span>
               <span className="flex items-center gap-2 shrink-0">
-                {/* v4 §2/§4 — amounts never tinted. */}
-                <span className="font-mono font-semibold text-base-900">
-                  {RM(Number(p.amount))}
-                </span>
+                {/* v4 §2/§4 — amounts never tinted; the ONE money recipe. */}
+                <Money value={Number(p.amount)} tone="md" className="text-base-900" />
                 <button
                   type="button"
                   onClick={() => void openReceipt(p, receiptMeta)}
