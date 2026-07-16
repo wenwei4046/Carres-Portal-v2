@@ -3321,9 +3321,7 @@ function MoneyRow({
     <div
       className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
     >
-      <span className="text-[12px] font-medium uppercase text-[#A8A8A8]">
-        {label}
-      </span>
+      <span className="t4-label">{label}</span>
       <span className="text-right">{children}</span>
     </div>
   );
