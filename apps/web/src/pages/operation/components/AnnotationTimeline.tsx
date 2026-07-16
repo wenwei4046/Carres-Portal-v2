@@ -67,8 +67,10 @@ function LifecycleStepper({ index, cancelled }: { index: number; cancelled: bool
       {STEPS.map((label, i) => {
         const done = i < index;
         const current = i === index;
-        const dot = done ? "#3B6D11" : current ? "#185FA5" : "#F1EFE8";
-        const line = i <= index ? "#97C459" : "#E5E1D8";
+        {/* v4 sweep — cream/warm greys out: pending dots + lines read as the
+            neutral hairline grey; done/current keep their status colours. */}
+        const dot = done ? "#3B6D11" : current ? "#185FA5" : "#E5E7EB";
+        const line = i <= index ? "#97C459" : "#E5E7EB";
         return (
           <div key={label} className="flex-1 text-center relative">
             {i > 0 && (
@@ -82,7 +84,7 @@ function LifecycleStepper({ index, cancelled }: { index: number; cancelled: bool
               style={{
                 background: dot,
                 color: done || current ? "#fff" : "#B4B2A9",
-                border: !done && !current ? "1px solid #E5E1D8" : undefined,
+                border: !done && !current ? "1px solid #E5E7EB" : undefined,
               }}
             >
               {done && <Check size={11} strokeWidth={3} />}
@@ -181,7 +183,7 @@ function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
       >
         <div
           className="flex-none w-7 h-7 rounded-full grid place-items-center"
-          style={{ backgroundColor: "#F1EFE8", color: "#5F5E5A" }}
+          style={{ backgroundColor: "#F3F4F6", color: "#6B7280" }}
           aria-hidden
         >
           <FileInput size={15} strokeWidth={2} />

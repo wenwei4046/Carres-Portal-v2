@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
+import Segmented from "@/components/Segmented";
 
 /**
  * OperationStockOnHand — the unified Stock "On Hand" list.
@@ -371,27 +372,16 @@ export default function OperationStockOnHand() {
                 </span>{" "}
                 of {counts.all} units
               </div>
-              <div
-                className="flex gap-1 p-0.5 bg-base-100 rounded"
-                role="tablist"
-                aria-label="Stock view"
-              >
-                {(["grouped", "flat"] as const).map((v) => (
-                  <button
-                    key={v}
-                    role="tab"
-                    aria-selected={view === v}
-                    onClick={() => setView(v)}
-                    className={`px-2.5 py-1 text-[11px] rounded capitalize ${
-                      view === v
-                        ? "bg-white text-base-900 font-semibold shadow-sm"
-                        : "text-base-600 hover:text-base-900"
-                    }`}
-                  >
-                    {v === "grouped" ? "Grouped by model" : "Flat units"}
-                  </button>
-                ))}
-              </div>
+              {/* v4 §10 — THE segmented recipe (grey rail + white active chip). */}
+              <Segmented
+                ariaLabel="Stock view"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "grouped", label: "Grouped by model" },
+                  { value: "flat", label: "Flat units" },
+                ]}
+              />
             </div>
             <OpsStockListView
               embedded

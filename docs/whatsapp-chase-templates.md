@@ -45,6 +45,22 @@ Item: {items}
 Kindly arrange payment so we can proceed. Thank you!
 ```
 
+Final reminder (delivery-eve only — page-rebuild §3.2, 2026-07-15): fires when
+delivery is today/tomorrow AND the balance is still owing; the Balance panel's
+Remind flips to this tone automatically. The ONE customer template allowed to
+reference delivery timing ({when} = "today"/"tomorrow"):
+
+```
+Hi {salutation},
+Final reminder — your delivery is arranged for {when} and the balance below is still outstanding.
+
+REF: {ref}
+Outstanding: RM {outstanding}
+Item: {items}
+
+Kindly settle before delivery so everything can proceed as planned. Thank you!
+```
+
 ## LOGISTIC partner (REF-led)
 
 Reminder:

@@ -32,12 +32,12 @@
 }
 .btn-hero      { background:var(--flame); color:#fff; }
 .btn-hero:hover{ background:var(--flame-dark); }
-.btn-primary       { background:#F1F0EC; color:var(--base-900); }        /* GREY-SOFT workhorse (v4: black retired) — same recipe as .btn-soft */
-.btn-primary:hover { background:#E7E6E0; }
+.btn-primary       { background:#F3F4F6; color:var(--base-900); }        /* GREY-SOFT workhorse, cool grey (v4: black retired) */
+.btn-primary:hover { background:#E5E7EB; }
 .btn-secondary       { background:#fff; color:var(--base-900); border-color:var(--base-300); }  /* white box — light/tertiary actions */
 .btn-secondary:hover { background:#F7F6F2; border-color:var(--base-400); }
-.btn-soft         { background:#F1F0EC; color:var(--base-900); }  /* grey base — the normal workhorse action (soft, not heavy) */
-.btn-soft:hover   { background:#E7E6E0; }
+.btn-soft         { background:#F3F4F6; color:var(--base-900); }  /* grey base — the normal workhorse action (soft, not heavy) */
+.btn-soft:hover   { background:#E5E7EB; }
 .icon-btn         { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:9px; background:#fff; border:1px solid var(--hairline); color:var(--base-500); cursor:pointer; }  /* boxed icon button — ⋮ / expand / bell / etc */
 .icon-btn:hover   { background:var(--base-50); color:var(--base-800); }
 .btn-ghost       { background:transparent; color:var(--base-700); padding:8px 14px; }

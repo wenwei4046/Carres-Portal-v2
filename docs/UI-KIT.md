@@ -34,7 +34,7 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 
 | Role | Hex | Class |
 |---|---|---|
-| Page canvas (v4 grey — brand lives in the nav flame, not the bg) | `#F0EFE9` | `bg-background` |
+| Page canvas (v4 §11a COOL neutral — warm retired 2026-07-16) | `#F3F4F6` | `bg-background` |
 | Content ink (near-black `--foreground`) | `#1A1A1A` | `text-foreground` |
 | Card surface | `#FFFFFF` | `bg-white` / `bg-card` |
 | Main bg behind cards | `#F9FAFB` | `bg-base-50` |
@@ -45,10 +45,9 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 | **Brand flame** (ONE hero CTA / page) | `#C44D2B` | `bg-primary` / `text-primary` |
 | Flame hover | `#9A3D22` | `hover:bg-signature-700` |
 | Flame tint (active fill / bulk bar) | `#F4E4DD` | `bg-signature-50` |
-| Grey-soft workhorse button (v4 — black retired) | `#F1F0EC` | `.btn-primary` / `.btn-soft` |
+| Grey-base workhorse button (v4 — black retired; Jess 2026-07-17) | `#F3F4F6` (base-100) | `.btn-primary` / `.btn-soft` / `Btn box` |
 | Ink (active tab fill) | `#111827` | `bg-base-900` |
-| Section band (cream title bars) | `#F1EFE8` | `.section-band` |
-| Section band ink / danger / total | `#221F20` / `#991B1B` / `#6F6960` | `.section-band-title(-danger)` / `.section-band-total` |
+| Section band (v4: NEUTRAL grey header band — cream retired 2026-07-16) | base-100 grey on white | `.section-band*` (via `<SectionBand>`) |
 | KPI mission-track card (independent WHITE card) | white + hairline | `.kpi-box` |
 | Selection blue (checkbox `.is-select` + row wash) | `#378ADD` / wash `#E6F1FB` | `.checkbox.is-select` |
 
@@ -148,21 +147,30 @@ stock `package`/`boxes` · warehouse `warehouse` · logistic `truck` · money
 activity `scroll-text`. Status inside pills: ready `check` · waiting `clock` ·
 overdue `alert-circle` · on hold `pause-circle`.
 
-## A5. Buttons (sentence case, 13px semibold, 8px radius — v4: NO solid black)
+## A5. Buttons — THE ACTION LADDER (v4 §2, LOCKED; recipe = `components/Btn.tsx`)
 
-| Class | Look | Use |
+Every clickable action sits on ONE of four rungs — never invent a fifth look.
+**Import `Btn` (+ `Field` / `Segmented` / `Money`); never hand-roll a button.**
+
+| Rung | Look | Rule |
 |---|---|---|
-| `.btn-hero` | flame fill, white text | THE one flame per page/block — the single most urgent action |
-| `.btn-primary` / `.btn-soft` | **grey base** `#F1F0EC`, ink text | the normal workhorse action (soft, not heavy — black is retired) |
-| `.btn-secondary` | white box, 1px `base-300` border | light / tertiary |
-| `.icon-btn` | 34px white box, hairline | icon-only actions: ⋮, expand, bell |
-| `.btn-ghost` | transparent, base-700 text | inline tertiary |
-| `.btn-danger` | white bg, **red text + red border**, never red-filled | destructive |
+| **Hero** | flame filled PILL (`Btn hero`) | **ONE PER PAGE** — the page's single main action (a modal is its own surface) |
+| **Secondary** | **GREY-BASE pill** (base-100, borderless — Jess 2026-07-17) + BOLD icon + BOLD ink word (`Btn box`) | the default for every other action; a panel shows at most TWO, rest fold into ⋮ |
+| **Tertiary** | ghost text / grey icon (`Btn ghost`, `Btn iconOnly` circle) | row actions, cancel, "+ add …" |
+| **Overflow** | ⋮ menu | beyond the two-button budget — actions HIDDEN, not restyled |
 
-Never a rainbow of solid colour buttons — colour is a signal (§A1).
-All: `px-[18px] py-2.5 rounded-lg text-[13px] font-semibold`, `disabled:opacity-40`.
-Drawer chase pair: `[Reminder]` = flame outline · `[Chase]` = solid flame,
-both `text-[11px] font-semibold px-2.5 py-1 rounded-md`.
+- Two control sizes only: **md 32px** (toolbars, forms; `Field` inputs match) ·
+  **sm 24px** (dense bands, inside 44px rows). Radius 999 (pills/circles).
+- Black is NEVER a button colour (black = active states: nav, tab underline).
+- **Pill ≠ button**: a pill is STATUS, never clickable; anything clickable is a
+  box/pill-button or icon. Number VALUES are never tinted.
+- **Box = clickable**: if you can click/type it, it has a box; reading content
+  never does. No solid-colour button rainbow.
+- Legacy `.btn-*` classes (grey `.btn-primary`/`.btn-soft`, white
+  `.btn-secondary`, `.btn-ghost`, red-on-white `.btn-danger`, `.icon-btn`)
+  remain for old pages — migrate to `Btn` on touch.
+- Chase pair = `Btn box` **bell** Reminder + `Btn box` **message-circle**
+  Chase (the page's one flame stays + Add payment).
 
 ## A6. Status pills — icon + word (v4)
 
@@ -180,7 +188,27 @@ rounded-full, transparent border for box parity.
 | `.pill-neutral` | `base-100` / — / `base-700` | done / neutral (grey) |
 
 Order-STATE pills in the drawer header are amber/blue/green/grey only — never
-danger red (red = actionable alarms).
+danger red (red = actionable alarms). ONE pill spec: 11–12px/600, soft tint +
+dark same-hue ink; borderless (v4 §6).
+
+**Focus dimming + pick-state circles (v4 §8d, LOCKED — the POS pattern):**
+when ONE row/card is active, the rest drop to ~60% opacity — attention moves
+by LIGHT, not borders; locked items dim + tooltip why. Picked = a soft green
+circle w/ dark-green ✓ (status, never clickable); pickable = a `Btn`; n/a = "—".
+
+**Tabs (v4 §9, LOCKED — type 2):** main tab bars = 16px outline icon +
+sentence-case label + count chip; active = ink 600 + 2px dark underline;
+inactive grey; a white strip with a bottom hairline — no pill-buttons per tab.
+
+**Radius ladder (v4 §10, LOCKED — only these four):** `999` buttons/pills/
+circles/segmented rails · `12` cards (SectionCard) · `8` inner blocks · `6`
+inputs (Field). `Segmented` = grey rail + active WHITE chip (view toggles
+only). Scrollbars: thin 6px transparent-track globally.
+
+**The template rule (v4 §11):** the Orders list table is THE template — every
+listing surface copies its row anatomy (44px row · 17px checkbox · pills ·
+icon actions · dark 12/600 headers · toolbar row). Panels copy the Balance
+panel's header anatomy (LABEL · summary ···· ⋮, collapsed shortcut slot).
 
 ## A7. Geometry — never re-type these numbers (import `LAYOUT`)
 

@@ -17,7 +17,7 @@
 
   /* ---- Surfaces ---- */
   --surface:  #FFFFFF;         /* content background, panels, rows */
-  --canvas:   #F0EFE9;         /* page canvas — v4 grey (office-verified; brand lives in the flame, not the background) */
+  --canvas:   #F3F4F6;         /* page canvas — v4 §11a COOL neutral (warm retired 2026-07-16) */
   --hairline: #E5E7EB;         /* 1px panel / row borders */
 
   /* ---- Brand flame — PRIMARY ACTION + checked checkbox ONLY ---- */

@@ -5,7 +5,7 @@
  * Items ordered / Warehouse stock / …). No page may hand-roll this card or
  * band again — bespoke panel styling in the drawer is banned.
  *
- * Tokens (docs/UI-KIT.md §A1 · lib/design-standard.ts COLOR):
+ * Tokens (docs/DESIGN-STANDARD.md §2 · lib/design-standard.ts COLOR):
  *   card    = white surface `bg-white` + 1px `border-base-200` frame,
  *             12px radius, floating on the cream page (`bg-background`).
  *   band    = `.section-band` cream (index.css; hex recorded in
@@ -79,7 +79,9 @@ export function SectionBand({
           <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
         <span
-          className={`uppercase flex-1 truncate text-[12px] font-bold tracking-[0.04em] ${
+          /* v4 §11c — panel header is DARK 12/600 (muted headers were
+             unreadable; muted is for meta only). */
+          className={`uppercase flex-1 truncate text-[12px] font-semibold tracking-[0.04em] ${
             danger ? "section-band-title-danger" : "section-band-title"
           }`}
         >

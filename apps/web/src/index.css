@@ -9,7 +9,7 @@
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
      * design-standard.ts is the machine-readable mirror. */
-    --background: 51.4 18.9% 92.7%;    /* #F0EFE9 — v4 canvas grey (was cream) */
+    --background: 220 14% 96%;         /* #F3F4F6 — v4 §11a COOL neutral canvas (warm retired) */
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */
@@ -92,6 +92,26 @@
     font-feature-settings: "zero" 1;
     font-variant-numeric: slashed-zero tabular-nums;
   }
+  /* UI-KIT v4 §10 — ONE thin scrollbar everywhere (ported from the POS):
+   * 6px, transparent track, soft ink thumb. Fat default bars are gone. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(26, 26, 26, 0.16) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(26, 26, 26, 0.16);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(26, 26, 26, 0.28);
+  }
 }
 
 @layer components {
@@ -124,7 +144,13 @@
   .t4-secondary  { @apply text-[14px] font-normal text-base-500; }             /* secondary info */
   .t4-label      { @apply text-[12px] font-medium uppercase text-[#A8A8A8]; }  /* panel label / table header */
   .t4-caption    { @apply text-[12px] font-normal text-[#A8A8A8]; }            /* meta */
-
+  /* In-row closed set (Jess 2026-07-16 — the ONLY row typography; picked over
+   * hand-mixed base-4/5/6xx greys + 9-14px sizes that kept drifting):
+   *   .t4-row        = row CONTENT (dates, regions, qty, addresses …)
+   *   .t4-row-strong = row EMPHASIS (names, amounts, REF — the sample's bold)
+   * Ink #1a1a1a via --foreground; label/meta stays .t4-label / .t4-caption. */
+  .t4-row        { @apply text-[13px] font-medium text-foreground; }
+  .t4-row-strong { @apply text-[13px] font-semibold text-foreground; }
 
   /* v4 button hierarchy (2026-07-17, Jess — docs/UI-KIT.md §A5): `.btn-hero` =
    * the ONE flame CTA per page/block; `.btn-primary` = the GREY-SOFT workhorse
@@ -140,11 +166,11 @@
            text-[13px] font-semibold
            transition-colors
            disabled:opacity-40 disabled:cursor-not-allowed;
-    background: #f1f0ec;
+    background: #f3f4f6; /* base-100 — cool grey (v4 §11a; warm retired) */
   }
   .btn-primary:hover:not(:disabled),
   .btn-soft:hover:not(:disabled) {
-    background: #e7e6e0;
+    background: #e5e7eb; /* base-200 */
   }
   /* Boxed icon button (v4) — ⋮ / expand / bell / top-bar actions. */
   .icon-btn {
@@ -256,11 +282,15 @@
   .pill           { @apply inline-flex items-center gap-[5px] text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
   .pill svg       { width: 14px; height: 14px; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
-  .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue */
-  .pill-confirmed { background:#EAF3DE; border-color:#A9D8B0; color:#3B6D11; } /* ready — green */
+  .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue (LEGACY: v4 blue = selection; realign per page) */
+  /* ⭐ UI-KIT v4 §6 — the three semantic pills: soft tint + dark same-hue text. */
+  .pill-confirmed { background:#EAF3DE; color:#3B6D11; } /* ready / paid / on-time */
   .pill-collected { background:#E0E7FF; color:#3730A3; }
-  .pill-overdue   { background:#FCEBEB; border-color:#F3B4B4; color:#A32D2D; } /* overdue / no-PO — red */
-  .pill-warning   { background:#FAEEDA; border-color:#F0D08A; color:#854F0B; } /* waiting — amber */
+  .pill-overdue   { background:#FCEBEB; color:#A32D2D; } /* problem / No PO / overdue */
+  /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
+   * warning/low/pending/in-production states read as pills too. Added 2026-06-12
+   * per Jess; fill warmed to the Orders-list amber 2026-07-12. */
+  .pill-warning   { background:#FAEEDA; color:#854F0B; } /* waiting / chasing — amber (v4 §6) */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 
   /* v4 checkbox — 17px, flame fill + white tick when checked; the `.is-select`
@@ -354,10 +384,16 @@
      header. Previously #F1EFE8 + its inks were bare hexes inside
      OperationOrdersControl; now they live here as the single source
      (recorded in lib/design-standard.ts COLOR.sectionBand). */
-  .section-band { background: #F1EFE8; }
-  .section-band-title { color: #221F20; }
+  /* ⭐ UI-KIT v4 (2026-07-16): the cream band is gone — panel/facet header
+     bands are the light NEUTRAL grey on white; the title is a v4 LABEL
+     (muted); danger keeps the v4 alert red. (Shared by the Orders list
+     facet groups AND every order-drawer panel header.) */
+  /* v4 §11c — headers are DARK (the reference tables' headers are dark);
+     muted is for meta only. */
+  .section-band { background: #F9FAFB; }
+  .section-band-title { color: #374151; }
   .section-band-title-danger { color: #A32D2D; }
-  .section-band-total { color: #6F6960; }
+  .section-band-total { color: #6B7280; }
   /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }

@@ -35,7 +35,11 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
+  Clock,
   ExternalLink,
+  Inbox,
+  LayoutGrid,
+  PackageOpen,
   Truck,
   Download,
   CheckCircle2,
@@ -403,12 +407,16 @@ export interface NextAction {
 // (carres_full_page_final_dateformat.html) so the five action tones read as
 // five DISTINCT colours, not one washed-out red. Each = soft fill + strong
 // ink + a matching border; carried inline so the shared global `.pill` stays put.
+/* v4 §6 hues (tone SEMANTICS unchanged): red/amber/green/grey from the kit;
+ * borders dropped (v4 pills are borderless — border mirrors the fill). The
+ * blue info tone is the same known legacy as `.pill-sent` (v4 blue =
+ * selection) — realigned when the scheduled-tone question is settled. */
 const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
-  danger: { text: "#A32D2D", bg: "#FCEBEB", border: "#F3B4B4" }, // chase / overdue — red
-  warning: { text: "#854F0B", bg: "#FAEEDA", border: "#F0D08A" }, // waiting stock — amber
-  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#A9C8F2" }, // call / assign — blue
-  success: { text: "#3B6D11", bg: "#EAF3DE", border: "#A9D8B0" }, // schedule delivery — green
-  neutral: { text: "#4B5563", bg: "#EAE7DF", border: "#D6D2C6" }, // done — grey
+  danger: { text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" }, // chase / overdue — red
+  warning: { text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" }, // waiting stock — amber
+  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#D3E4FB" }, // call / assign — blue (LEGACY)
+  success: { text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" }, // schedule delivery — green
+  neutral: { text: "#6B7280", bg: "#F3F4F6", border: "#F3F4F6" }, // done — grey
 };
 
 function ovlOf(o: operationOrderListRow) {
@@ -2076,9 +2084,9 @@ function KanbanRow({
 }
 
 /** Gmail-minimal filter GROUP (Loo GMAIL_FINAL, C3) — a light-grey TITLE BAR
- *  (#F1EFE8, radius 6) with the group total on the right + a collapse toggle
- *  (▾ open / ▸ collapsed). CHASE NOW's title reads dark red; all other titles
- *  are black. `testid` keeps `filter-logistic` addressable for the tests. */
+ *  (`.section-band`, v4 neutral grey) with the group total on the right + a
+ *  collapse toggle (▾ open / ▸ collapsed). CHASE NOW's title reads v4 red;
+ *  titles are the v4 LABEL. `testid` keeps `filter-logistic` addressable. */
 function KanbanGroup({
   title,
   danger,
@@ -2135,33 +2143,39 @@ function StatusTabs({
   active: ControlTab;
   onSelect: (k: ControlTab) => void;
 }) {
+  // v4 §9 (LOCKED, sample type 2): icon + label + count chip; active = ink +
+  // a 2px dark underline; inactive = mid-grey. No pill-buttons, no boxes.
+  const TAB_ICON: Record<ControlTab, LucideIcon> = {
+    all: LayoutGrid,
+    placed: Inbox,
+    proceed: PackageOpen,
+    pending: Clock,
+    scheduled: Truck,
+    completed: CheckCircle2,
+  };
   return (
-    <div data-testid="filter-status" className="flex items-center gap-0.5 flex-wrap">
+    <div data-testid="filter-status" className="flex items-center gap-1 flex-wrap">
       {tabs.map((t) => {
         const on = active === t.key;
+        const Icon = TAB_ICON[t.key];
         return (
           <button
             key={t.key}
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
-            style={{
-              // The active tab is a solid ink fill (2990s-style) — a control
-              // needs clear contrast to read as "selected"; a tab pill is a
-              // point of emphasis, not the heavy header band we removed. Inactive
-              // stays white + hairline. Colour is still reserved for alerts.
-              fontSize: "13px",
-              fontWeight: on ? 600 : 500,
-              color: on ? "#FFFFFF" : "#4B5563",
-              background: on ? "#221F20" : "#FFFFFF",
-              border: on ? "1px solid #221F20" : "1px solid #DDD8CE",
-            }}
+            className={`inline-flex items-center gap-1.5 px-3 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] ${
+              on
+                ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
+                : "border-transparent text-base-500 font-medium hover:text-base-800"
+            }`}
           >
+            <Icon size={16} strokeWidth={2} className="shrink-0" aria-hidden="true" />
             {t.label}
             <span
-              className="tabular-nums"
-              style={{ color: on ? "rgba(255,255,255,0.7)" : "#9CA3AF", fontSize: "12px" }}
+              className={`tabular-nums text-[11px] px-1.5 rounded-full ${
+                on ? "bg-base-200 text-base-700" : "bg-base-100 text-base-500"
+              }`}
             >
               {t.count}
             </span>
@@ -2212,7 +2226,7 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#DCEAF4]" : "bg-white hover:bg-[#F5F0E7]"
+        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-base-50"
       }`}
       data-testid="order-row"
     >
@@ -2235,7 +2249,7 @@ function OrderRow({
       <td className="pl-1 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
         <span
           className="font-mono tabular-nums"
-          style={{ fontSize: "13px", fontWeight: 500, color: "#1F2937" }}
+          style={{ fontSize: "13px", fontWeight: 500, color: "#1A1A1A" }}
         >
           SO-{o.so}
         </span>
@@ -2250,51 +2264,29 @@ function OrderRow({
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
+          /* Closed set: REF = row EMPHASIS (13/600 ink); "+N" = caption. */
           <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            <div
-              className="truncate tabular-nums"
-              style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
-            >
-              {ref[0]}
-            </div>
+            <div className="truncate tabular-nums t4-row-strong">{ref[0]}</div>
             {ref.length === 2 ? (
-              <div
-                className="truncate tabular-nums"
-                style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
-              >
-                {ref[1]}
-              </div>
+              <div className="truncate tabular-nums t4-row-strong">{ref[1]}</div>
             ) : ref.length > 2 ? (
-              <div style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}>
-                +{ref.length - 1} more
-              </div>
+              <div className="t4-caption">+{ref.length - 1} more</div>
             ) : null}
           </div>
         )}
       </td>
       )}
-      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2).
-          Phone shown as a visible second line (Loo 2026-07-16 — was tooltip-only
-          on the SO cell; ops shouldn't have to hover to get a number to call). */}
+      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
       {showCol("customer") && (
-      <td className="pl-1 pr-2 py-1.5">
+      <td className="pl-1 pr-2 py-2">
         {o.customer_name ? (
-          <>
-            <span
-              className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
-              title={o.customer_name}
-            >
-              {o.customer_name}
-            </span>
-            {o.customer_phone && (
-              <span
-                className="block truncate font-mono tabular-nums text-base-400"
-                style={{ fontSize: "11px", lineHeight: "14px" }}
-              >
-                {o.customer_phone}
-              </span>
-            )}
-          </>
+          /* Closed set: the NAME is row EMPHASIS (the sample's bold company). */
+          <span
+            className={`${cjkClassName(o.customer_name)} t4-row-strong block truncate`}
+            title={o.customer_name}
+          >
+            {o.customer_name}
+          </span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -2304,9 +2296,10 @@ function OrderRow({
       {showCol("region") && (
       <td className="pl-4 pr-2 py-2">
         {loc.label ? (
+          /* Closed set: region = row content, ink (the outstation gold tint
+             was decoration — the tooltip + MiniBadge carry that signal). */
           <span
-            className="text-[14px] block truncate"
-            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563" }}
+            className="t4-row block truncate"
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -2326,12 +2319,12 @@ function OrderRow({
       {showCol("logistic") && (
       <td className="pl-4 pr-1 py-2 whitespace-nowrap leading-[1.25]">
         {logi.key === "unassigned" ? (
-          <span className="text-[13px]" style={{ color: "#9CA3AF" }}>— unassigned</span>
+          <span className="t4-caption text-[13px]">— unassigned</span>
         ) : (
           <>
-            <span className="text-[14px] block truncate" style={{ color: "#4B5563" }}>
-              {logi.partner}
-            </span>
+            {/* Closed set: partner name = row content (ink); the sub-line is a
+                STATUS signal so it keeps colour — v4 hues only. */}
+            <span className="t4-row block truncate">{logi.partner}</span>
             <div style={{ marginTop: 1 }}>
               {logi.key === "delivered" ? (
                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
@@ -2349,7 +2342,7 @@ function OrderRow({
                   call now
                 </span>
               ) : (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#9CA3AF" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#A8A8A8" }}>
                   no date yet
                 </span>
               )}
@@ -2366,7 +2359,7 @@ function OrderRow({
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date_tbd ? (
-          <span className="text-[11px] font-medium" style={{ color: "#9A7B3F" }}>TBD</span>
+          <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const datePart = fmtDate(o.delivery_date).split(", ")[0];
@@ -2378,14 +2371,16 @@ function OrderRow({
             // Countdown heat (Loo 2026-07-09): a 4-level ramp by days-left so 2–6d
             // read as orange / yellow urgency; only 7d+ goes grey. The DATE text
             // stays clear black — only this pill carries the heat.
+            // v4 hues (ramp SEMANTICS unchanged — Loo-locked 4 tiers; only the
+            // fills moved onto the kit's red/amber family + neutral grey).
             const heat =
               dd == null || dd <= 1
                 ? { bg: "#FCEBEB", fg: "#A32D2D" } // overdue / today / 1d — red
                 : dd <= 3
-                  ? { bg: "#FDEBD8", fg: "#B45309" } // 2–3d — orange
+                  ? { bg: "#FAEEDA", fg: "#854F0B" } // 2–3d — amber
                   : dd <= 6
-                    ? { bg: "#FEF7CD", fg: "#854D0E" } // 4–6d — yellow
-                    : { bg: "#EAE7DF", fg: "#6B7280" }; // 7d+ — grey
+                    ? { bg: "#FEF7CD", fg: "#854D0E" } // 4–6d — light amber
+                    : { bg: "#F3F4F6", fg: "#6B7280" }; // 7d+ — neutral grey
             return (
               <div className="flex items-center gap-1.5">
                 {/* Badge FIRST (Loo round 3), fixed min-width so today/1d/2d/over
@@ -2394,7 +2389,7 @@ function OrderRow({
                   <span
                     className="tabular-nums shrink-0 text-center"
                     style={{
-                      fontSize: "11.5px",
+                      fontSize: "11px",
                       color: heat.fg,
                       background: heat.bg,
                       padding: "0 4px",
@@ -2406,12 +2401,8 @@ function OrderRow({
                     {pillText}
                   </span>
                 )}
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
-                >
-                  {datePart}
-                </span>
+                {/* Closed set: the date is row EMPHASIS — clear dark ink. */}
+                <span className="tabular-nums t4-row-strong">{datePart}</span>
               </div>
             );
           })()
@@ -2471,7 +2462,7 @@ function OrderRow({
             onClick={() => onFlag(o)}
             title="Flag for follow-up"
             aria-label="Flag for follow-up"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-[#9A7B3F]"
+            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
           >
             <Flag size={13} />
           </button>
@@ -2526,11 +2517,12 @@ function ActionCell({
         className="inline-flex"
       >
         {!lead ? (
-          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-[#9A7B3F]" />
+          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-base-800" />
         ) : u === "overdue" ? (
           <Flag size={15} strokeWidth={2.5} className="fill-current text-danger" />
         ) : (
-          <Flag size={15} strokeWidth={2} className="fill-current" style={{ color: "#9A7B3F" }} />
+          /* Open follow-up = amber STATUS — v4 amber ink. */
+          <Flag size={15} strokeWidth={2} className="fill-current" style={{ color: "#854F0B" }} />
         )}
       </button>
     </td>
@@ -2544,9 +2536,9 @@ const STOCK_PILL: Record<
   "ready" | "waiting" | "no_po",
   { label: string; text: string; bg: string; border: string }
 > = {
-  ready: { label: "Ready", text: "#3B6D11", bg: "#EAF3DE", border: "#A9D8B0" },
-  waiting: { label: "Waiting", text: "#854F0B", bg: "#FAEEDA", border: "#F0D08A" },
-  no_po: { label: "No PO", text: "#A32D2D", bg: "#FCEBEB", border: "#F3B4B4" },
+  ready: { label: "Ready", text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" },
+  waiting: { label: "Waiting", text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" },
+  no_po: { label: "No PO", text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" },
 };
 
 /** Stock cell — a status pill (Ready / Waiting / No PO, Partial folded into
@@ -2601,14 +2593,15 @@ function StockDot({
     // Colour carries the state (red=overdue · orange=late · grey=on-track), like
     // the DEADLINE pill — no text suffix, so the line stays short + never clips.
     if (se.state === "no_eta")
-      return { text: "ETA —", color: "#9CA3AF", tip: "Waiting on stock — no supplier ETA entered yet" };
+      return { text: "ETA —", color: "#A8A8A8", tip: "Waiting on stock — no supplier ETA entered yet" };
     if (!se.etaIso) return null;
     const d = fmtDate(se.etaIso).split(", ")[0];
+    // v4 hues: red overdue · amber late; on-track is CONTENT (a date) → ink.
     if (se.state === "overdue")
       return { text: `ETA ${d}`, color: "#A32D2D", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
-      return { text: `ETA ${d}`, color: "#B45309", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
-    return { text: `ETA ${d}`, color: "#6B7280", tip: "Supplier arrival ETA — on track" };
+      return { text: `ETA ${d}`, color: "#854F0B", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
+    return { text: `ETA ${d}`, color: "#1A1A1A", tip: "Supplier arrival ETA — on track" };
   })();
 
   return (
@@ -2616,7 +2609,7 @@ function StockDot({
       <span
         className="inline-flex items-center rounded-full whitespace-nowrap"
         style={{
-          fontSize: "11.5px",
+          fontSize: "11px",
           fontWeight: 600,
           padding: "1px 9px",
           color: S.text,

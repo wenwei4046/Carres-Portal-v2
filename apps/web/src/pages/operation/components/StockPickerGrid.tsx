@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Search, X, Handshake } from "lucide-react";
+import { Search, X, Handshake, Wand2, PackageCheck } from "lucide-react";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
+import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -299,9 +300,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 : "Show every free sofa so you can loan one (any model / fabric)"
             }
             className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 t-tiny transition-colors ${
+              /* v4 §2 — a toggle is a secondary control: active reads as the
+                 dark/grey state, never a flame tint (flame = primary action). */
               loanMode
-                ? "border-primary bg-primary/10 text-primary font-semibold"
-                : "border-base-200 text-base-600 hover:border-primary hover:text-primary"
+                ? "border-base-800 bg-base-100 text-base-900 font-semibold"
+                : "border-base-200 text-base-600 hover:border-base-400 hover:text-base-900"
             }`}
           >
             {loanMode ? (
@@ -329,7 +332,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search model / size / PO / old ref…"
-          className="w-full pl-7 pr-2 py-1 text-[14px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
+          className="w-full pl-7 pr-2 py-1 text-[12px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
         />
       </div>
 
@@ -347,7 +350,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
               </div>
             ))}
           </div>
-          {/* body — 40px rows */}
+          {/* body — v4 §8b 44px FIXED rows; §8 selection = BLUE wash + blue
+              checkbox (flame is action-only — the old flame wash/stripe and
+              flame hovers are gone). */}
           {view.map((r, i) => {
             const on = checked.has(r.id);
             return (
@@ -355,12 +360,12 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center h-11 border-b border-base-100 cursor-pointer text-[12px] ${
+                className={`grid items-center h-[44px] border-b border-base-100 cursor-pointer text-[12px] ${
                   on
-                    ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
+                    ? "bg-[#e6f1fb]"
                     : i % 2
-                      ? "bg-base-100/60 hover:bg-primary/5"
-                      : "bg-white hover:bg-primary/5"
+                      ? "bg-base-100/60 hover:bg-base-50"
+                      : "bg-white hover:bg-base-50"
                 }`}
                 style={{ gridTemplateColumns: GRID }}
               >
@@ -370,15 +375,19 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                     checked={on}
                     onChange={() => toggle(r.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="accent-primary w-3.5 h-3.5"
+                    /* shrink-0 — the tight grid cell must not flex-squash the
+                       17px box (§8b) back down to 14. */
+                    className="accent-[#378ADD] size-[17px] shrink-0"
                   />
                 </div>
-                <div className="px-2 py-1 font-mono text-base-900 truncate">
+                {/* Closed set — every read column is CONTENT: ink, not pale.
+                    §11b: the item is a product NAME → Inter (mono = codes only). */}
+                <div className="px-2 py-1 font-semibold text-[#1A1A1A] truncate">
                   {r.sku}
                 </div>
-                <div className="px-2 py-1 text-base-600 truncate">{r.size}</div>
+                <div className="px-2 py-1 text-[#1A1A1A] truncate">{r.size}</div>
                 <div
-                  className="px-2 py-1 text-base-500 truncate"
+                  className="px-2 py-1 text-[#1A1A1A] truncate"
                   title={r.location ?? ""}
                 >
                   {r.location ?? "—"}
@@ -389,40 +398,38 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   </span>
                 </div>
                 <div
-                  className="px-2 py-1 text-base-500 tabular-nums truncate"
+                  className="px-2 py-1 text-[#1A1A1A] tabular-nums truncate"
                   title={r.dateLabel ? `in since ${r.dateLabel}` : ""}
                 >
                   {r.ageDays != null ? `${r.ageDays}d` : "—"}
                 </div>
-                <div className="px-2 py-1 font-mono text-base-600 truncate" title={r.poNo ?? ""}>
+                <div className="px-2 py-1 font-mono text-[#1A1A1A] truncate" title={r.poNo ?? ""}>
                   {r.poNo ?? "—"}
                 </div>
                 <div className="px-1 py-1 text-right">
                   {loaning ? (
-                    <button
-                      type="button"
+                    <Btn
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         onLoan?.(r.id, r.sku);
                       }}
                       title="Issue a loan DO + mark this unit on-loan to the order"
-                      className="text-[12px] font-semibold text-primary hover:underline whitespace-nowrap"
                     >
                       Lend
-                    </button>
+                    </Btn>
                   ) : (
-                    <button
-                      type="button"
+                    <Btn
+                      size="sm"
                       disabled={submitting}
                       onClick={(e) => {
                         e.stopPropagation();
                         void reserveIds([r.id]);
                       }}
                       title={`Reserve this unit to ${soRef}`}
-                      className="text-[12px] font-semibold text-primary hover:underline whitespace-nowrap disabled:opacity-40"
                     >
                       Reserve
-                    </button>
+                    </Btn>
                   )}
                 </div>
               </div>
@@ -447,39 +454,38 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           need {need} · {checked.size} picked
         </span>
         {loaning ? (
-          <button
-            type="button"
+          <Btn
+            icon={Handshake}
             onClick={loanOne}
             disabled={checked.size === 0}
             title="Issue a loan DO + mark this sofa on-loan to the order"
-            className="btn-primary t-tiny py-1.5 px-4"
           >
             Loan to {soRef}
-          </button>
+          </Btn>
         ) : (
           <>
-            {/* §7.8 — FIFO shortcut: reserve the oldest matching unit(s). */}
-            <button
-              type="button"
+            {/* §7.8 — FIFO shortcut: reserve the oldest matching unit(s).
+                v4 §2 ladder: both are secondary boxes (the page hero is
+                + Add payment; black buttons are retired). */}
+            <Btn
+              icon={Wand2}
               onClick={autoMatch}
               disabled={submitting || rows.length === 0}
               title="Reserve the oldest matching free unit(s) covering this line"
-              className="btn-secondary t-tiny py-1.5 px-3 disabled:opacity-40"
             >
               Auto-match & reserve
-            </button>
-            <button
-              type="button"
+            </Btn>
+            <Btn
+              icon={PackageCheck}
               onClick={reserve}
               disabled={submitting || checked.size === 0}
-              className="btn-primary t-tiny py-1.5 px-4"
             >
               {submitting
                 ? "Reserving…"
                 : checked.size === 0
                   ? "Select stock to reserve"
                   : `Reserve ${checked.size} to ${soRef}`}
-            </button>
+            </Btn>
           </>
         )}
       </div>

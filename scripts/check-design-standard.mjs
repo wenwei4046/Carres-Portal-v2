@@ -154,8 +154,8 @@ const KIT_FILES = new Set([
 ]);
 const ICON_SIZES = new Set([14, 16, 18]); // v4: 14 pill/inline · 16 default UI · 18 top-bar
 const TEXT_SIZES = new Set([12, 13, 14, 15, 20]); // v4: 12 label · 13 btn/ref · 14 secondary · 15 content · 20 hero number
-// A `section-band` class inside a string literal (comments don't count).
-const BAND_CLASS_RE = /["'`][^"'`\n]*\bsection-band\b[^"'`\n]*["'`]/g;
+// A `section-band` class inside a className attribute (comments don't count).
+const BAND_CLASS_RE = /className=\{?["'`][^"'\n]*\bsection-band\b/g;
 
 const lineOf = (src, index) => src.slice(0, index).split("\n").length;
 

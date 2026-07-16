@@ -21,7 +21,7 @@ All token values here are copied verbatim from that repo.
 ## THE 4 RULES (memorise these)
 
 1. **White content, brand in the nav.** The content area is white on a very-light
-   grey canvas (`#F0EFE9`). The flame brand colour lives in the left nav and on
+   grey canvas (`#F3F4F6`). The flame brand colour lives in the left nav and on
    the ONE primary action per block — nowhere else.
 2. **Colour is a signal, not decoration.** Default is black/grey/white. Colour
    appears ONLY for **action · selection · status · alert**. Flame = action.

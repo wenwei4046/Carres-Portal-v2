@@ -35,7 +35,7 @@ export const COLOR = {
 
   // Surfaces — white content on a very-light grey canvas.
   surface: { hex: "#FFFFFF", use: "content background, panels, rows", class: "bg-white" },
-  canvas:  { hex: "#F0EFE9", use: "page canvas behind white panels", cssVar: "--background", class: "bg-background" },
+  canvas:  { hex: "#F3F4F6", use: "page canvas behind white panels — v4 §11a COOL neutral (warm #F0EFE9 retired)", cssVar: "--background", class: "bg-background" },
 
   // Brand + selection (functional ONLY — see §2 discipline).
   flame:      { hex: "#C44D2B", use: "PRIMARY ACTION buttons + checkbox-checked ONLY", cssVar: "--primary" },

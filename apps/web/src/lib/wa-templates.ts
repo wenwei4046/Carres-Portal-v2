@@ -80,6 +80,26 @@ export function buildCustomerReminder(i: CustomerChaseInput): string {
   );
 }
 
+/** Delivery-eve FINAL reminder (page-rebuild §3.2, Jess 2026-07-15): the
+ *  Balance panel's Remind switches to this tone when delivery is today/
+ *  tomorrow and the balance is still owing. This is the ONE customer template
+ *  allowed to reference delivery timing — the locked "no delivery date" rule
+ *  still holds for the ordinary reminder/chase. `when` = "today"/"tomorrow". */
+export function buildCustomerFinalReminder(
+  i: CustomerChaseInput & { when: string },
+): string {
+  return (
+    `Hi ${i.salutation},\n` +
+    `Final reminder — your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
+    `\n` +
+    `REF: ${i.ref ?? "—"}\n` +
+    `Outstanding: RM ${i.outstanding}\n` +
+    `Item: ${itemsBlock(i.lines)}\n` +
+    `\n` +
+    `Kindly settle before delivery so everything can proceed as planned. Thank you!`
+  );
+}
+
 /** Firmer follow-up. */
 export function buildCustomerChase(i: CustomerChaseInput): string {
   return (
