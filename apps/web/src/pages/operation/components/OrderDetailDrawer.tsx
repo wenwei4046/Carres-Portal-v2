@@ -2627,7 +2627,7 @@ function ReceiveLineModal({
     <Modal title="Book in received stock" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-[12px] text-base-600">
-          <span className="font-mono text-[11px]">{sku}</span>
+          <span className="font-semibold text-[12px] text-[#1A1A1A]">{sku}</span>
           <span className="ml-2 text-base-400">
             received {alreadyReceived}/{lineQty}
           </span>
@@ -2745,7 +2745,7 @@ function LoanSofaModal({
     <Modal title="Loan this sofa" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-[12px] text-base-600">
-          <span className="font-mono text-[11px]">{itemSku}</span>
+          <span className="font-semibold text-[12px] text-[#1A1A1A]">{itemSku}</span>
           <span className="ml-2 text-base-400">→ {soRef} · FREE loaner</span>
         </div>
         <p className="t-tiny text-base-500">
@@ -4108,7 +4108,7 @@ function PoRow({
       <div>
         {po.lines.map((l, j) => (
           <div key={j} className="text-[11px] leading-snug font-body">
-            <span className="font-mono">{l.sku}</span>{" "}
+            <span className="text-[#1A1A1A]">{l.sku}</span>{" "}
             <span className="font-mono text-base-500">
               {l.received_qty || 0}/{l.qty}
             </span>

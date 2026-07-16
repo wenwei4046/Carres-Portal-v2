@@ -379,8 +379,9 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                     className="accent-[#378ADD] w-[17px] h-[17px] shrink-0"
                   />
                 </div>
-                {/* Closed set — every read column is CONTENT: ink, not pale. */}
-                <div className="px-2 py-1 font-mono text-[#1A1A1A] truncate">
+                {/* Closed set — every read column is CONTENT: ink, not pale.
+                    §11b: the item is a product NAME → Inter (mono = codes only). */}
+                <div className="px-2 py-1 font-semibold text-[#1A1A1A] truncate">
                   {r.sku}
                 </div>
                 <div className="px-2 py-1 text-[#1A1A1A] truncate">{r.size}</div>
