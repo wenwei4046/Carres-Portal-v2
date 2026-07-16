@@ -192,7 +192,10 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // 2026-06-09 (Jess P2) — ops_assigned_logistic surfaced so the drawer's
       // OrderControlPanel can show + inline-edit the planned carrier (region
       // default, overridable) on status='place' orders.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      // 2026-07-16 (Loo) — customer_emergency + customer_billing(_same) added:
+      // the POS stores them but the drawer had no way to show them (the
+      // customer card renders Emergency / Billing rows when present).
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, customer_emergency, customer_billing, customer_billing_same, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -228,8 +231,34 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
   if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
 
-  const lines = linesRes.data ?? [];
+  const rawLines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
+
+  // 2026-07-16 (Loo) — resolve a human-readable product label per line
+  // (model name · variant) so the drawer's Items table shows names, not just
+  // raw sku codes. Same separate-query pattern as print-do-data below:
+  // order_lines.sku has no FK to product_skus, so no PostgREST embed.
+  const labelBySku: Record<string, string> = {};
+  {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const skus = [...new Set(rawLines.map((l: any) => l.sku))];
+    if (skus.length > 0) {
+      const { data: skuRows, error: e_sku } = await sb
+        .from("product_skus")
+        .select("sku, variant, product_models(name)")
+        .in("sku", skus);
+      if (e_sku) { const m = mapPgError(e_sku); return c.json(m.body, m.status); }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const r of (skuRows ?? []) as any[]) {
+        const model = r.product_models?.name ?? "";
+        const variant = r.variant ?? "";
+        const label = [model, variant].filter(Boolean).join(" · ");
+        if (label) labelBySku[r.sku] = label;
+      }
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = rawLines.map((l: any) => ({ ...l, label: labelBySku[l.sku] ?? null }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const total = [...lines, ...addons].reduce((s: number, r: any) => s + Number(r.unit_price) * Number(r.qty), 0);
 
