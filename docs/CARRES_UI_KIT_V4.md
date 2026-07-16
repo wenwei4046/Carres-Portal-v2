@@ -114,6 +114,32 @@ Never text links ("View / Edit / Delete") for row actions.
 - Whole selected row gets a soft blue wash (`#e6f1fb`).
 - Blue = selection only; it never doubles as an action or decoration.
 
+## 8b. Row density (locked)
+
+- **Row height = 44px, FIXED — not min-height.** Content adapts to the row, the row
+  never grows to the content. (The old bug: `h-[40px]` was min-height semantics, so
+  two-line content pushed rows to 48px and the three sources — code, design-standard,
+  render — all disagreed. Fixed here: one value, 44px, 固定.)
+- Content longer than one line (multi-REF, two-line item tags) → truncate with
+  ellipsis or collapse; never expand the row.
+- Inside the 44px row: content font 12px, checkbox 17px, status pill 11px, selected
+  row gets the blue wash.
+- The room comes from a slightly smaller font + breathing space, NOT from taller
+  boxes. Boxes stay tight; the page never grows mile-long.
+- Align all three sources to 44: `OperationOrdersControl.tsx` td height,
+  `design-standard.ts` `tableRowHeight`, and the actual render.
+
+## 8c. Read by shape, not by reading (locked)
+
+Users should tell rows/elements apart by shape and colour BEFORE reading text:
+- Layer by SHAPE first (fill vs outline = primary vs secondary action), then weight,
+  then colour — not by enlarging font.
+- Every clickable thing has a clear box/pill boundary.
+- Big-enough checkbox (17px), status as a filled pill, selected row as a blue block —
+  these register by shape/colour first; text is confirmation, not the only signal.
+- Font stays small (12–15) and calm; it does not carry the whole load of telling
+  things apart.
+
 ## 9. Layout basics (carried from prior locked decisions)
 
 - Order-detail page: two columns 32% (left) / 68% (right). Left = summaries; right =

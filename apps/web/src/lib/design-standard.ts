@@ -78,12 +78,24 @@ export const SELECTION = {
   rowWash:  "#E6F1FB",
 } as const;
 
-/** Checkbox (v4 §5): 16–18px square, clearly visible. Unchecked = grey
- *  outline empty box; checked = flame-filled + white tick. */
+/** Checkbox (v4 §5 + §8b): 16–18px square, clearly visible; the locked
+ *  in-row density value is 17px. Unchecked = grey outline empty box;
+ *  checked = flame-filled + white tick. */
 export const CHECKBOX = {
-  sizePx: 16,           // 16–18 allowed; 16 is the floor
+  sizePx: 17,           // §8b locked (16–18 allowed range)
   checkedFill: "#C44D2B",
   uncheckedBorder: "#A8A8A8",
+} as const;
+
+/** Row density (v4 §8b, LOCKED): list rows are 44px FIXED — content adapts
+ *  to the row (truncate/collapse), the row NEVER grows to the content. The
+ *  three sources must agree: OperationOrdersControl td height, this value,
+ *  and the actual render. */
+export const ROW = {
+  heightPx: 44,         // FIXED — not min-height semantics
+  contentFontPx: 12,
+  checkboxPx: 17,
+  pillFontPx: 11,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,7 +137,7 @@ export const LAYOUT = {
   rightRailPanel:      320,
   rightRailStrip:       52,
   railHeaderHeight:     48,
-  tableRowHeight:       50,
+  tableRowHeight:       44, // v4 §8b LOCKED — FIXED height, see ROW below
   headerHeight:         56,
 } as const;
 
