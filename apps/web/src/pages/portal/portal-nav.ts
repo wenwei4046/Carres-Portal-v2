@@ -72,6 +72,10 @@ export interface PortalNavItem {
   badge?: PortalBadge;
   /** principal Approvals carries the pending-count pill. */
   pendingPill?: boolean;
+  /** optional per-item narrowing of the group's roles — the item shows only
+   *  for these roles (0226: Product & Maintenance is principal-only; operation
+   *  gets the costing-focused Operation Catalog instead). */
+  roles?: ReadonlyArray<Role>;
 }
 
 export interface PortalNavGroup {
@@ -117,7 +121,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "stock-onhand", label: "Stock · On Hand", icon: Boxes },
       { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
       { key: "payments", label: "Payments", icon: Wallet },
-      { key: "catalog", label: "Product & Maintenance", icon: BookOpen },
+      // 0226 (Loo 2026-07-16) — Product & Maintenance is PRINCIPAL-ONLY: only
+      // the principal touches selling prices. Operation records buying costs
+      // in the Operation Catalog below instead.
+      { key: "catalog", label: "Product & Maintenance", icon: BookOpen, roles: ["principal"] },
       // 0226 — the operation-facing COSTING catalog (SKU Master / Modular /
       // Fabric; prices there are buying costs, isolated from POS selling).
       { key: "op-catalog", label: "Operation Catalog", icon: Calculator },
@@ -212,6 +219,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
 export function visibleGroups(role: Role | null): PortalNavGroup[] {
   if (!role) return [];
   return PORTAL_NAV.filter((g) => g.roles.includes(role));
+}
+
+/** The items of a group a given role may see (per-item `roles` narrowing). */
+export function visibleItems(
+  group: PortalNavGroup,
+  role: Role | null,
+): PortalNavItem[] {
+  return group.items.filter((it) => !it.roles || (role != null && it.roles.includes(role)));
 }
 
 /** The href a nav item points at. */

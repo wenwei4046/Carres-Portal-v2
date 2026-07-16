@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import {
   visibleGroups,
+  visibleItems,
   navItemHref,
   areaDefaultHref,
   type PortalArea,
@@ -194,7 +195,7 @@ export default function PortalSidebar() {
         {collapsed
           ? // Icon rail — the active area's items only (collapse = more room,
             // not area-switching; expand to jump areas).
-            activeGroup?.items.map((item) => {
+            (activeGroup ? visibleItems(activeGroup, role) : []).map((item) => {
               const active = isItemActive(activeGroup, item);
               const dot =
                 (item.badge && (badgeCount[item.badge] ?? 0) > 0) ||
@@ -253,7 +254,7 @@ export default function PortalSidebar() {
 
                   {open && (
                     <div className="flex flex-col gap-0.5">
-                      {group.items.map((item) => {
+                      {visibleItems(group, role).map((item) => {
                         const active = isItemActive(group, item);
                         const baseCls =
                           "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";

@@ -9,6 +9,7 @@ import {
 // Unified Internal Portal (2026-06-30) — the three private rails (Operation /
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
+import { useAuth } from "@/lib/auth";
 import OperationDashboard from "./OperationDashboard";
 // Jess redesign step 2 (2026-06-08) — the Orders tab is now the unified control
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
@@ -70,6 +71,10 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp() {
   const location = useLocation();
   const navigate = useNavigate();
+  // 0226 (Loo 2026-07-16) — Product & Maintenance (selling prices) is
+  // principal-only; operation lands on the costing Operation Catalog instead,
+  // even on a stale `?tab=catalog` deep link.
+  const role = useAuth((s) => s.role);
 
   // Detect URL-driven sections. Anything under `/operation/procurement` or
   // `/operation/orders` flips the sidebar highlight to that tab without
@@ -277,7 +282,8 @@ export default function OperationApp() {
             {tab === "receiving" && <OperationReceiving />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
-            {tab === "catalog" && <ProductMaintenancePage />}
+            {tab === "catalog" &&
+              (role === "principal" ? <ProductMaintenancePage /> : <OperationCatalogPage />)}
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
