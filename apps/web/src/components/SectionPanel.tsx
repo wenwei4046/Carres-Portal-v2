@@ -5,7 +5,7 @@
  * Items ordered / Warehouse stock / …). No page may hand-roll this card or
  * band again — bespoke panel styling in the drawer is banned.
  *
- * Tokens (docs/DESIGN-STANDARD.md §2 · lib/design-standard.ts COLOR):
+ * Tokens (docs/UI-KIT.md §A1 · lib/design-standard.ts COLOR):
  *   card    = white surface `bg-white` + 1px `border-base-200` frame,
  *             12px radius, floating on the cream page (`bg-background`).
  *   band    = `.section-band` cream (index.css; hex recorded in

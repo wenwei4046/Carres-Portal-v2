@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Design-standard guard (zero-dependency lint) — enforces docs/DESIGN-STANDARD.md.
+ * Design-standard guard (zero-dependency lint) — enforces docs/UI-KIT.md.
  * Wired as `@carres/web`'s `lint` script; runs in CI + locally.
  *
  * The repo has 362 pre-existing raw-hex literals across 44 files and only ONE
@@ -99,7 +99,7 @@ for (const [f, n] of Object.entries(currentHex)) {
   if (n > base) {
     errors.push(
       `RULE A · hard-coded hex — ${f}: ${n} hex literal(s) (baseline ${base}). ` +
-        `Use a token class (bg-*/text-*/border-*) from docs/DESIGN-STANDARD.md §2.`,
+        `Use a token class (bg-*/text-*/border-*) from docs/UI-KIT.md §A1.`,
     );
   }
 }
@@ -111,7 +111,7 @@ for (const f of MUST_USE_SHELL) {
   if (!files.includes(p)) continue;
   const src = readFileSync(join(ROOT, p), "utf8");
   if (!SHELL_IMPORT_RE.test(src)) {
-    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/DESIGN-STANDARD.md §4).`);
+    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/UI-KIT.md §A9).`);
   }
 }
 for (const f of files) {
@@ -121,7 +121,7 @@ for (const f of files) {
   if (LIST_MARKER_RE.test(src) && !SHELL_IMPORT_RE.test(src) && !OPT_OUT_RE.test(src)) {
     errors.push(
       `RULE B · new List page without shell — ${f} renders a table/DataGrid but does not use ` +
-        `ListPageShell/PageHeader. Adopt the shell (docs/DESIGN-STANDARD.md §4) or add ` +
+        `ListPageShell/PageHeader. Adopt the shell (docs/UI-KIT.md §A9) or add ` +
         `\`// design-standard: not-a-list-page\` with a reason.`,
     );
   }
@@ -130,7 +130,7 @@ for (const f of files) {
 if (errors.length) {
   console.error(`\n✗ design-standard: ${errors.length} violation(s)\n`);
   for (const e of errors) console.error("  • " + e);
-  console.error("\nSee docs/DESIGN-STANDARD.md. Legacy debt is baselined; this only flags NEW violations.\n");
+  console.error("\nSee docs/UI-KIT.md. Legacy debt is baselined; this only flags NEW violations.\n");
   process.exit(1);
 }
 console.log("✓ design-standard: no new violations.");

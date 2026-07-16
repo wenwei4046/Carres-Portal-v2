@@ -4,9 +4,10 @@
 > Master plan lives in `CARRES_PORTAL_V2_PLAN.md` at repo root — read it for any planning, schema, or phase question.
 >
 > **Before changing ANY page/component in `apps/web`, read and follow
-> [`docs/DESIGN-STANDARD.md`](docs/DESIGN-STANDARD.md)** (values in
+> [`docs/UI-KIT.md`](docs/UI-KIT.md) — the SINGLE design source; do not deviate** (values in
 > `apps/web/src/lib/design-standard.ts`). List pages use `<ListPageShell>`; colours come from token
-> classes (no hard-coded hex); run `pnpm --filter @carres/web lint` before committing UI work.
+> classes (no hard-coded hex); icons 14/16/17; drawer rows 36px; run
+> `pnpm --filter @carres/web lint` before committing UI work.
 
 ---
 

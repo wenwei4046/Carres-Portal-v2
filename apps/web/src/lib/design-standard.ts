@@ -1,5 +1,5 @@
 /**
- * CARRES PORTAL — DESIGN STANDARD (single source of truth)
+ * CARRES PORTAL — DESIGN STANDARD record (the contract lives in docs/UI-KIT.md)
  * =========================================================
  * Locked 2026-07-12. This file RECORDS the values that are already live in the
  * codebase — it does NOT introduce new visuals. Every value here was read back
