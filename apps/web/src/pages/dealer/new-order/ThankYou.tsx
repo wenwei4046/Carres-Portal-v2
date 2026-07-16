@@ -181,7 +181,7 @@ export default function ThankYou({
                       className="summary__item-photo"
                       style={
                         info?.photo
-                          ? { backgroundImage: `url(${info.photo})`, backgroundColor: "#fff" }
+                          ? { backgroundImage: `url(${info.photo})`, backgroundColor: "white" }
                           : undefined
                       }
                     />
@@ -192,7 +192,10 @@ export default function ThankYou({
                     {isFree ? (
                       <span
                         className="summary__item-price"
-                        style={{ color: "var(--success, #16a34a)" }}
+                        // --success is an HSL triplet token — must go through hsl().
+                        // (The old `var(--success, #hex)` resolved to the bare
+                        // triplet = invalid color; the fallback never applied.)
+                        style={{ color: "hsl(var(--success))" }}
                       >
                         FREE
                       </span>

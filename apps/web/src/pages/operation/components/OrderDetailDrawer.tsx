@@ -55,6 +55,7 @@ import {
   type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
+import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
 import {
@@ -809,15 +810,32 @@ function DrawerBody({
   ]).size;
   const { data: suppliersData } = useOperationSuppliers();
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
-  // then list mattress → bedframe → sofa → pillow → M.P → service.
+  // then list mattress → bedframe → sofa → pillow → M.P → service. Carries the
+  // server-resolved product label + unit_price (same sku ⇒ same price) so the
+  // Items table can show a readable name and, on native POS orders, the price.
   const orderedLines = Object.values(
-    lines.reduce<Record<string, { sku: string; qty: number }>>((acc, l) => {
-      const e = acc[l.sku] ?? { sku: l.sku, qty: 0 };
+    lines.reduce<
+      Record<
+        string,
+        { sku: string; qty: number; label: string | null; unitPrice: number }
+      >
+    >((acc, l) => {
+      const e =
+        acc[l.sku] ??
+        {
+          sku: l.sku,
+          qty: 0,
+          label: l.label ?? null,
+          unitPrice: Number(l.unit_price || 0),
+        };
       e.qty += Number(l.qty || 0);
       acc[l.sku] = e;
       return acc;
     }, {}),
   ).sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku));
+  // AutoCount imports carry unit_price 0 on every line — showing an all-zero
+  // Price column there is noise. Only native (POS) orders get the column.
+  const showLinePrices = lines.some((l) => Number(l.unit_price) > 0);
   // The line whose stock shows in the right pane — the clicked one, else the
   // first non-service line so the grid isn't empty on open (Jess: embed stock).
   const activeLineSku =
@@ -1264,6 +1282,11 @@ function DrawerBody({
                     <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-[#E5E1D8]">
                       Qty
                     </th>
+                    {showLinePrices && (
+                      <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-20 border-r border-base-200">
+                        Price
+                      </th>
+                    )}
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-[#E5E1D8]">
                       PO
                     </th>
@@ -1385,10 +1408,17 @@ function DrawerBody({
                             />
                           </td>
                         )}
-                        {/* Item */}
+                        {/* Item — readable product name (server-resolved from the
+                            catalog) with the raw sku code beneath; sku-only when
+                            the catalog has no match (AutoCount free-text skus). */}
                         <td className="border border-base-200 px-2 py-1 align-top">
+                          {l.label && (
+                            <div className="text-[12px] leading-tight break-words">
+                              {l.label}
+                            </div>
+                          )}
                           <div
-                            className="font-mono text-[10px] leading-tight break-words"
+                            className={`font-mono text-[10px] leading-tight break-words ${l.label ? "text-base-400" : ""}`}
                             title={l.sku}
                           >
                             {l.sku}
@@ -1398,6 +1428,12 @@ function DrawerBody({
                         <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
                           {l.qty}
                         </td>
+                        {/* Price — native POS orders only (AutoCount lines are all 0). */}
+                        {showLinePrices && (
+                          <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top whitespace-nowrap">
+                            {l.unitPrice > 0 ? rm(l.unitPrice) : <span className="text-base-300">—</span>}
+                          </td>
+                        )}
                         {/* PO */}
                         <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
                           {poNo ? (
@@ -1441,7 +1477,7 @@ function DrawerBody({
                       {!isService && routeOpen && (
                         <tr className="bg-base-50">
                           <td
-                            colSpan={6}
+                            colSpan={showLinePrices ? 7 : 6}
                             className="border border-base-200 px-3 py-2"
                           >
                             <div className="space-y-2">
@@ -2261,6 +2297,10 @@ export function OrderCustomerCard({
     customer_name: string | null;
     customer_phone: string | null;
     customer_address: string | null;
+    /** POS-captured extras (2026-07-16) — rendered read-only when present. */
+    customer_emergency?: string | null;
+    customer_billing?: string | null;
+    customer_billing_same?: boolean;
     placed_at?: string | null;
   };
   /** Lets an outside control (the panel ⋮) open this card's safe-edit mode. */
@@ -2385,6 +2425,20 @@ export function OrderCustomerCard({
           {order.customer_address || <span className="text-base-400">—</span>}
         </span>
       </CompactField>
+      {/* POS-captured extras (2026-07-16) — shown only when the order carries
+          them (AutoCount imports never do). Emergency is the composed
+          "Name · Phone · Relationship" string; billing only when it differs
+          from the delivery address. Read-only — edit stays name/phone/address. */}
+      {order.customer_emergency && (
+        <CompactField label="Emergency">
+          <span className="leading-snug text-base-600">{order.customer_emergency}</span>
+        </CompactField>
+      )}
+      {order.customer_billing && !order.customer_billing_same && (
+        <CompactField label="Billing">
+          <span className="leading-snug text-base-600">{order.customer_billing}</span>
+        </CompactField>
+      )}
       {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
           its header ⋮; the redundant inline button is gone). Read-only by default;
           the ⋮ "Edit details" opens the safe Save / Cancel mode. */}

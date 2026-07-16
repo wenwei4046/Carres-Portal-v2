@@ -2190,6 +2190,13 @@ export interface operationOrderDetailOrder {
   customer_phone: string | null;
   customer_address: string | null;
   customer_address_unknown: boolean;
+  /** 2026-07-16 — POS-captured extras surfaced to the drawer's customer card.
+   *  Emergency = one composed string ("Name · Phone · Relationship"); billing
+   *  only meaningful when customer_billing_same is false. Optional so older
+   *  detail fixtures keep typechecking. */
+  customer_emergency?: string | null;
+  customer_billing?: string | null;
+  customer_billing_same?: boolean;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
@@ -2231,6 +2238,10 @@ export interface operationOrderDetailLine {
   sku: string;
   qty: number;
   unit_price: number;
+  /** 2026-07-16 — server-resolved readable product name ("Model · Variant")
+   *  from product_skus/product_models; null when the sku isn't in the catalog
+   *  (e.g. AutoCount free-text skus). Optional for older fixtures. */
+  label?: string | null;
   // 2026-05-10 (Loo) — cascade picker payload threaded into the "+ Issue POs"
   // → CreatePOModal navigation so bedframe color/gap and sofa fabric stay
   // attached to the new PO line. Null for mattress lines (no extras) and

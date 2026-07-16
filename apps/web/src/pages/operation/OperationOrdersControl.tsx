@@ -2284,17 +2284,29 @@ function OrderRow({
         )}
       </td>
       )}
-      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
+      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2).
+          Phone shown as a visible second line (Loo 2026-07-16 — was tooltip-only
+          on the SO cell; ops shouldn't have to hover to get a number to call). */}
       {showCol("customer") && (
-      <td className="pl-1 pr-2 py-2">
+      <td className="pl-1 pr-2 py-1.5">
         {o.customer_name ? (
-          <span
-            className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
-            style={{ color: "#1F2937" }}
-            title={o.customer_name}
-          >
-            {o.customer_name}
-          </span>
+          <>
+            <span
+              className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
+              style={{ color: "#1F2937" }}
+              title={o.customer_name}
+            >
+              {o.customer_name}
+            </span>
+            {o.customer_phone && (
+              <span
+                className="block truncate font-mono tabular-nums text-base-400"
+                style={{ fontSize: "11px", lineHeight: "14px" }}
+              >
+                {o.customer_phone}
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-base-300">—</span>
         )}
