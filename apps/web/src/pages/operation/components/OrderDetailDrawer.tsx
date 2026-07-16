@@ -1535,9 +1535,8 @@ function DrawerBody({
         <div
           className="grid gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden"
           style={{
-            // Round 1A: left view column 340px (was 300 — Delivery inputs were
-            // truncating), right work column fills.
-            gridTemplateColumns: "340px minmax(0, 1fr)",
+            // v4 §9 LOCKED: left summaries 32% / right Items hero 68%.
+            gridTemplateColumns: "minmax(0, 32fr) minmax(0, 68fr)",
             gridTemplateAreas: '"side main"',
           }}
         >

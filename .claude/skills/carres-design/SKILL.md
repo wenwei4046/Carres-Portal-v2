@@ -8,7 +8,7 @@ user-invocable: true
 
 > **Precedence:** `docs/UI-KIT.md` in the repo is the LAW. This skill mirrors it
 > for generation; if they ever disagree, UI-KIT.md wins (adopted 2026-07-17;
-> contradictions resolved: canvas #F5F5F7 · stroke 2 · grey-soft workhorse, no
+> contradictions resolved: canvas #F0EFE9 · stroke 2 · grey-soft workhorse, no
 > black · radius-panel 18 · icons 14/16/18 · rows 44 FIXED).
 
 Read `README.md` first — it holds the 4 rules, content fundamentals, and visual
@@ -17,7 +17,7 @@ tokens and components defined here.**
 
 ## The non-negotiables
 
-1. **White content area on the `#F5F5F7` canvas.** Flame `#C44D2B` only in the
+1. **White content area on the `#F0EFE9` canvas.** Flame `#C44D2B` only in the
    left nav + the ONE primary action per block.
 2. **Colour = action · selection · status · alert only.** Everything else is
    black/grey/white. Flame=action, blue=selection, green/amber/red=status.

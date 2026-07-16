@@ -17,7 +17,7 @@
 
   /* ---- Surfaces ---- */
   --surface:  #FFFFFF;         /* content background, panels, rows */
-  --canvas:   #F5F5F7;         /* page canvas — Apple system grey (clean neutral; brand lives in the flame, not the background) */
+  --canvas:   #F0EFE9;         /* page canvas — v4 grey (office-verified; brand lives in the flame, not the background) */
   --hairline: #E5E7EB;         /* 1px panel / row borders */
 
   /* ---- Brand flame — PRIMARY ACTION + checked checkbox ONLY ---- */
@@ -26,8 +26,8 @@
   --flame-light: #F4E4DD;      /* active chip / selected-nav fill */
 
   /* ---- Selection — BLUE means selection ONLY, never action/decoration ---- */
-  --select-blue:   #2563EB;    /* selected checkbox fill (Apple/Stripe blue) */
-  --select-wash:   #EAF1FD;    /* whole selected-row soft blue wash */
+  --select-blue:   #378ADD;    /* selected checkbox fill (v4) */
+  --select-wash:   #E6F1FB;    /* whole selected-row soft blue wash */
 
   /* ---- Semantic status — always shown as a PILL: soft tint + dark same-hue
    * text. Three semantics only. ---- */

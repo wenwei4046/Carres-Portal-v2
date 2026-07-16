@@ -12,7 +12,7 @@ once. That's the whole point: consistency you can't accidentally break.
 --flame-dark:  #9A3D22;   /* its hover shade (pick ~15% darker than --flame) */
 --flame-light: #F4E4DD;   /* its soft fill for active nav/chips (pick a very pale tint of --flame) */
 
---canvas:      #F5F5F7;   /* the page background behind the white panels */
+--canvas:      #F0EFE9;   /* the page background behind the white panels */
 --surface:     #FFFFFF;   /* the white cards/panels */
 --text-primary:#1A1A1A;   /* body text you READ — keep it near-black */
 --text-muted:  #A8A8A8;   /* labels/meta only */

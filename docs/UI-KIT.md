@@ -34,7 +34,8 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 
 | Role | Hex | Class |
 |---|---|---|
-| Page canvas (v4 neutral grey — brand lives in the flame, not the bg) | `#F5F5F7` | `bg-background` |
+| Page canvas (v4 grey — brand lives in the nav flame, not the bg) | `#F0EFE9` | `bg-background` |
+| Content ink (near-black `--foreground`) | `#1A1A1A` | `text-foreground` |
 | Card surface | `#FFFFFF` | `bg-white` / `bg-card` |
 | Main bg behind cards | `#F9FAFB` | `bg-base-50` |
 | Hairline border | `#E5E7EB` | `border-base-200` |
@@ -49,14 +50,21 @@ only via Tailwind classes. Raw hex in JSX is banned (lint RULE A).
 | Section band (cream title bars) | `#F1EFE8` | `.section-band` |
 | Section band ink / danger / total | `#221F20` / `#991B1B` / `#6F6960` | `.section-band-title(-danger)` / `.section-band-total` |
 | KPI mission-track card (independent WHITE card) | white + hairline | `.kpi-box` |
-| Selection blue (checkbox `.is-select` + row wash) | `#2563EB` / wash `#EAF1FD` | `.checkbox.is-select` |
+| Selection blue (checkbox `.is-select` + row wash) | `#378ADD` / wash `#E6F1FB` | `.checkbox.is-select` |
 
 Neutral ramp = Tailwind cool gray as `base-50…base-900`. Focus ring = flame.
 
 **Colour is a signal, not decoration (v4)**: flame = action · blue = selection
 · green/amber/red = status · bare red = alert accent. Everything else is
-black/grey/white. Content text is near-black (`text-base-900`); muted grey
-(`base-400/500`) is for labels/meta ONLY — never pale content text.
+black/grey/white. Content text is near-black (`text-foreground` #1A1A1A);
+muted grey (`base-400/500`) is for labels/meta ONLY — never pale content text.
+
+**Flame anti-abuse self-check (v4 §2, LOCKED)** — apply to any screen:
+1. "Is this orange a clickable primary action?" No → abuse; make it grey.
+2. "Does this block have more than one flame button?" Yes → keep only the
+   most important as flame, demote the rest.
+Flame never appears on titles, icons, borders, dividers, hovers, or any
+decoration; flame (action) and red (alert) never swap roles.
 
 Semantic tokens (for `bg-success` etc.): success `#16A34A` · warning `#D97706`
 · danger `#DC2626` · info `#2563EB`. Status is ALWAYS a pill (§A6), never bare
@@ -102,7 +110,17 @@ Kit-governed surfaces allow exactly these inline sizes (lint RULE D):
 | `text-[12px]` | labels, table headers (uppercase, muted), sub-facts |
 | `text-[20px]` bold | THE hero number — header #SO + ref (mono), Outstanding, KPI values |
 
-Everything else uses a `.t-*` class. 9/10/11/16/18/22px inline are banned.
+Everything else uses a `.t4-*` class (`.t4-page-title` 24 · `.t4-hero-num` 20
+· `.t4-section` 16 · `.t4-content` 15 · `.t4-secondary` 14 · `.t4-label` /
+`.t4-caption` 12 — in `index.css`; the old `.t-h*` ramp is DEPRECATED, swap on
+touch). 9/10/11/16/18/22px inline are banned in kit scope (dense-row
+sub-ids at 10/11px live inside the row recipe above, outside kit files).
+
+**Read by shape, not by reading (v4 §8c, LOCKED):** users tell things apart by
+SHAPE first (fill vs outline = primary vs secondary; pill = status; blue block
+= selected), then weight, then colour — never by enlarging the font. Every
+clickable thing has a clear box/pill boundary; text confirms, it doesn't carry
+the whole load.
 
 ## A4. Icons — exactly three sizes (lint RULE C)
 
@@ -172,7 +190,9 @@ danger red (red = actionable alarms).
 | Sidebar expanded / collapsed | 232 / 60 (flame 3px active bar) |
 | Right rail panel / icon strip | 320 / 52 |
 | Page header | 56 (h-14) |
-| **ALL rows — list + drawer** | **44 FIXED** (`h-11` / `[&_td]:h-[44px]`) — content truncates (`+N`), the row NEVER grows; target 18–20 rows per screen (lint RULE F) |
+| **ALL rows — list + drawer** | **44 FIXED** (`h-11` / `[&_td]:h-[44px]` + `whitespace-nowrap`) — content truncates (`+N`), the row NEVER grows; target 18–20 rows per screen (lint RULE F) |
+| Inside a 44px row (v4 §8b LOCKED) | content 12px · REF 13px/600 + `+N` 11px grey · sub-id 10px grey · pill 11px · checkbox 17px — room comes from the smaller font, never a taller box |
+| Order-detail split (v4 §9) | left summaries **32%** / right Items hero **68%** |
 | Facet panel width | 240 |
 | Drawer body columns | `340px minmax(0,1fr)` — left view · right work |
 | Card padding / page gutter / default gap | 16 (p-4) · 24 (p-6) · 8 (gap-2) |
@@ -323,9 +343,15 @@ rows 44 FIXED · status = icon+word pill · content near-black · lint green.
 
 ---
 
-**v4 adoption (2026-07-17, Jess).** This kit absorbed the "Carres ERP 系统 UI
-Kit" Claude-Design export (the v4 design law). Its internal contradictions were
-resolved as: canvas `#F5F5F7` · icon stroke 2 · workhorse = grey soft (no
-black) · `--radius-panel` 18 (unused until a panel needs it). The export lives
-on as the local skill `.claude/skills/carres-design/` (tokens corrected to
-match this file); UI-KIT.md remains the law when they disagree.
+**v4 adoption + consolidation (2026-07-17, Jess).** This file absorbed BOTH v4
+sources and is now the only design doc: (1) the office `docs/CARRES_UI_KIT_V4.md`
+(batch-1, live-smoked — canvas `#F0EFE9`, ink `#1A1A1A`, §8b row density, §8c
+read-by-shape, 32/68 split; file deleted, content here) and (2) the
+Claude-Design export (buttons/pills/icons/KPI recipes; lives on as the skill
+`.claude/skills/carres-design/`, committed in-repo, tokens matched to this
+file). `LISTING_ROW_SPEC.md` folded into the §A7 row recipe. Contradictions
+resolved: canvas `#F0EFE9` · selection `#378ADD` · **Lucide** (not Tabler) ·
+icon stroke 2 · workhorse = grey soft, no black · pills keep their 1px
+same-hue border (matches the list chips). The system-level context lives in
+`docs/CARRES_SYSTEM_MASTERPLAN.md` (what to build); this file owns how it
+looks. When anything disagrees with this file, this file wins.

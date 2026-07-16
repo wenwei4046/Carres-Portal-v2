@@ -1,7 +1,7 @@
 /**
  * CARRES PORTAL — DESIGN STANDARD (single source of truth)
  * =========================================================
- * ⭐ v4 — rewritten 2026-07-15 from `docs/CARRES_UI_KIT_V4.md` (Jess).
+ * ⭐ v4 — rewritten 2026-07-15 from `docs/UI-KIT.md` (Jess).
  * THAT file overwrites ALL prior UI baselines; this module is its
  * machine-readable mirror. Where any older doc, code comment, or token
  * conflicts with UI-KIT v4, **v4 wins**. Prior scattered UI decisions

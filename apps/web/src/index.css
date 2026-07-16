@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/CARRES_UI_KIT_V4.md) — overwrites
+    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/UI-KIT.md) — overwrites
      * all prior baselines (v17 cream et al). White content base; brand colour
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
@@ -279,7 +279,7 @@
   }
   .checkbox:checked { @apply bg-primary border-primary; }
   .checkbox:checked::after { transform: scale(1); }
-  .checkbox.is-select:checked { background: #2563eb; border-color: #2563eb; }
+  .checkbox.is-select:checked { background: #378ADD; border-color: #378ADD; }
 
   /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the
    * dealer POS; pure presentation, no token-value changes to :root. ===== */
