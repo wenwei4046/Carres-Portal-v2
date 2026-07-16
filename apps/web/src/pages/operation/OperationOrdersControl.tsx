@@ -2307,7 +2307,6 @@ function OrderRow({
           <>
             <span
               className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
-              style={{ color: "#1F2937" }}
               title={o.customer_name}
             >
               {o.customer_name}
