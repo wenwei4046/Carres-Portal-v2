@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   AlertCircle,
+  Bell,
   Calendar,
   CheckCircle2,
   ChevronDown,
@@ -16,6 +17,8 @@ import {
   ChevronUp,
   Copy,
   Home,
+  MessageSquare,
+  Plus,
   Download,
   ExternalLink,
   FileText,
@@ -87,6 +90,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
+import Btn from "@/components/Btn";
+import { fieldCls, fieldAreaCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import {
@@ -494,13 +499,9 @@ function DrawerError({
           Couldn&rsquo;t load order
         </div>
         <div className="text-[12px] text-base-700 mb-3">{message}</div>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="btn-secondary text-[11px] py-1.5 px-3"
-        >
+        <Btn size="sm" onClick={onRetry}>
           Retry
-        </button>
+        </Btn>
       </div>
     </div>
   );
@@ -753,19 +754,10 @@ function KpiBox({
   );
 }
 
-/** Chase actions inside a KpiBox — each actionable track carries a TWO-TONE
- *  pair (docs/whatsapp-chase-templates.md): [Reminder] gentle first contact
- *  (outline) + [Chase] firmer follow-up (solid flame). Both copy the template
- *  AND stamp the chase event (today manual WhatsApp; the future portal
- *  auto-fires the same event). */
-const CHASE_BTN =
-  "text-[11px] font-semibold px-2.5 py-1 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
-/* v4 §2 — Chase is the pair's ONE flame primary; Reminder is the SECONDARY
-   (grey outline — never a second flame in the block). */
-const REMIND_BTN =
-  "text-[11px] font-semibold px-2.5 py-1 rounded-md border border-base-300 text-base-700 bg-white hover:bg-base-50 whitespace-nowrap";
-
-/** The [Reminder]+[Chase] pair for one audience. */
+/** The [Reminder]+[Chase] pair for one audience — v4 §2 action ladder: both
+ *  are SECONDARY white boxes (bold icon + bold word; the page's ONE flame is
+ *  + Add payment). Both copy the template AND stamp the ONE shared chase log
+ *  (today manual WhatsApp; the future portal auto-fires the same event). */
 function ChasePair({
   onReminder,
   onChase,
@@ -777,22 +769,22 @@ function ChasePair({
 }) {
   return (
     <>
-      <button
-        type="button"
+      <Btn
+        size="sm"
+        icon={Bell}
         onClick={onReminder}
         title={`Copy the gentle ${audience} reminder + log the chase event`}
-        className={REMIND_BTN}
       >
         Reminder
-      </button>
-      <button
-        type="button"
+      </Btn>
+      <Btn
+        size="sm"
+        icon={MessageSquare}
         onClick={onChase}
         title={`Copy the firmer ${audience} chase + log the chase event`}
-        className={CHASE_BTN}
       >
         Chase
-      </button>
+      </Btn>
     </>
   );
 }
@@ -1603,14 +1595,14 @@ function DrawerBody({
                   stockTone === "danger" || stockTone === "warning" ? (
                     <>
                       {nopoN > 0 && (
-                        <button
-                          type="button"
+                        <Btn
+                          size="sm"
+                          icon={Plus}
                           onClick={() => onIssuePOsClick()}
                           title="Raise a PO for the no-PO lines"
-                          className={CHASE_BTN}
                         >
                           Raise PO
-                        </button>
+                        </Btn>
                       )}
                       {(rCounts.onPo > 0 || onPoStalled) && (
                         <ChasePair
@@ -1895,8 +1887,9 @@ function DrawerBody({
                                 opens the warehouse picker filtered to it. */}
                             <td className="border border-base-200 px-1.5 py-1 text-center align-middle">
                               {rd && rd !== "reserved" ? (
-                                <button
-                                  type="button"
+                                /* v4 §2 ladder — row action = secondary Btn. */
+                                <Btn
+                                  size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setPickerSku(l.sku);
@@ -1908,13 +1901,9 @@ function DrawerBody({
                                       });
                                   }}
                                   title="Open the warehouse picker filtered to this line"
-                                  /* v4 §2/§8c — a per-row action is SECONDARY:
-                                     grey outline (shape gives the boundary);
-                                     flame stays for block-level primaries. */
-                                  className="text-[11px] font-semibold text-base-700 border border-base-300 rounded-md px-2 py-0.5 hover:bg-base-50 whitespace-nowrap"
                                 >
                                   Reserve
-                                </button>
+                                </Btn>
                               ) : (
                                 <span className="text-base-300 text-[11px]">—</span>
                               )}
@@ -2276,19 +2265,19 @@ function DrawerBody({
               )
             }
             collapsedAction={
-              /* §1 — the collapsed line's "+ Add payment" shortcut (the ONE
-                 flame in this block while collapsed; the expanded body's own
-                 CTA takes over when open). */
-              <button
-                type="button"
+              /* The collapsed line's shortcut to the page hero (only one of
+                 the two ever shows — v4 §2 one-flame-per-page holds). */
+              <Btn
+                variant="hero"
+                size="sm"
+                icon={Plus}
                 onClick={(e) => {
                   e.stopPropagation();
                   setAddingPayment(true);
                 }}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap"
               >
-                + Add payment
-              </button>
+                Add payment
+              </Btn>
             }
           >
             <div className="p-3">
@@ -2560,14 +2549,15 @@ function DrawerBody({
                 </div>
               ) : (
                 <div className="border-t border-base-100 pt-1.5">
-                  <button
-                    type="button"
+                  <Btn
+                    variant="ghost"
+                    size="sm"
+                    icon={Plus}
                     onClick={() => setShowRouteBlock(true)}
                     title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
-                    className="text-[11px] font-medium text-base-600 hover:text-base-900 hover:underline"
                   >
-                    + Add stop (multi-leg)
-                  </button>
+                    Add stop (multi-leg)
+                  </Btn>
                 </div>
               )}
             </div>
@@ -2615,8 +2605,7 @@ function ReceiveLineModal({
   const receive = useReceiveLine(orderId);
   const n = Number(qty);
   const valid = Number.isFinite(n) && n >= 1 && n <= 999;
-  const field =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+  const field = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   function submit() {
     if (!valid) return;
@@ -2696,22 +2685,13 @@ function ReceiveLineModal({
           />
         </label>
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={receive.isPending}
-            className="btn-ghost text-[12px]"
-          >
+          <Btn variant="ghost" onClick={onClose} disabled={receive.isPending}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!valid || receive.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
-          >
+          </Btn>
+          {/* The modal's own hero (a modal is its own surface — v4 §2). */}
+          <Btn variant="hero" onClick={submit} disabled={!valid || receive.isPending}>
             {receive.isPending ? "Booking…" : "Book in"}
-          </button>
+          </Btn>
         </div>
       </div>
     </Modal>
@@ -2736,8 +2716,7 @@ function LoanSofaModal({
   const [doNumber, setDoNumber] = useState("");
   const [notes, setNotes] = useState("");
   const loan = useLoanSofa(orderId);
-  const field =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+  const field = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   function submit() {
     loan.mutate(
@@ -2788,22 +2767,12 @@ function LoanSofaModal({
           />
         </label>
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loan.isPending}
-            className="btn-ghost text-[12px]"
-          >
+          <Btn variant="ghost" onClick={onClose} disabled={loan.isPending}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={loan.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
-          >
+          </Btn>
+          <Btn variant="hero" onClick={submit} disabled={loan.isPending}>
             {loan.isPending ? "Loaning…" : "Loan sofa"}
-          </button>
+          </Btn>
         </div>
       </div>
     </Modal>
@@ -2893,8 +2862,7 @@ function CustomerExpand({
     toast.success(`${label} copied`);
   };
   const wa = waLink(order.customer_phone);
-  const field =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  const field = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
   // One WHITE pill per field (rev 3 colour fix): content brighter than its
   // container — white pill + hairline floating on the light-grey (base-50)
   // expand strip. Never cream-on-cream: cream is the PAGE background only.
@@ -2943,28 +2911,20 @@ function CustomerExpand({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={2}
-              className={`${field} resize-none`}
+              className={`mt-0.5 ${fieldAreaCls} resize-none`}
             />
           </label>
         </div>
         {err && <p className="t-tiny text-danger mt-1.5">{err}</p>}
         <div className="mt-2 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            disabled={update.isPending}
-            className="btn-ghost text-[12px]"
-          >
+          <Btn variant="ghost" onClick={() => setEditing(false)} disabled={update.isPending}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={update.isPending}
-            className="btn-primary text-[12px]"
-          >
+          </Btn>
+          {/* Inline edit confirm = secondary box (the page hero stays
+              + Add payment; black is retired as a button colour). */}
+          <Btn onClick={save} disabled={update.isPending}>
             {update.isPending ? "Saving…" : "Save"}
-          </button>
+          </Btn>
         </div>
       </div>
     );
@@ -3405,8 +3365,7 @@ function AddPaymentModal({
   const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
   const afterCollected = collected + (amtOk ? amt : 0);
   const afterOutstanding = Math.max(0, orderTotal - afterCollected);
-  const cell =
-    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
   const money = "font-mono text-[13px] text-base-900";
   return (
     <Modal title="Add payment" onClose={onClose} size="lg">
@@ -3534,11 +3493,12 @@ function AddPaymentModal({
         </div>
       </div>
       <div className="mt-3 flex items-center justify-end gap-2">
-        <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+        <Btn variant="ghost" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
+        </Btn>
+        {/* The modal's own hero (its own surface — v4 §2). */}
+        <Btn
+          variant="hero"
           disabled={!amtOk || record.isPending}
           onClick={() =>
             record.mutate(
@@ -3558,10 +3518,9 @@ function AddPaymentModal({
               },
             )
           }
-          className="btn-hero text-[12px] disabled:opacity-50"
         >
           {record.isPending ? "Recording…" : "Record payment"}
-        </button>
+        </Btn>
       </div>
     </Modal>
   );
@@ -3780,35 +3739,30 @@ function MoneyCard({
           (both stamp the ONE shared chase log). On delivery-eve the Remind
           flips to the firmer final-reminder tone. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button
-          type="button"
-          onClick={onAddPayment}
-          className="btn-hero text-[12px]"
-        >
-          + Add payment
-        </button>
+        {/* THE page hero (v4 §2 ladder — the one flame on the page). */}
+        <Btn variant="hero" icon={Plus} onClick={onAddPayment}>
+          Add payment
+        </Btn>
         {totalSet && outstanding > 0 && (
           <>
-            <button
-              type="button"
+            <Btn
+              icon={Bell}
               onClick={onRemind}
               title={
                 deliveryEve
                   ? "Copy the delivery-eve FINAL reminder + log the chase event"
                   : "Copy the gentle payment reminder + log the chase event"
               }
-              className={REMIND_BTN}
             >
               {deliveryEve ? "Final reminder" : "Remind"}
-            </button>
-            <button
-              type="button"
+            </Btn>
+            <Btn
+              icon={MessageSquare}
               onClick={onChase}
               title="Copy the firmer payment chase + log the chase event"
-              className={CHASE_BTN}
             >
               Chase
-            </button>
+            </Btn>
           </>
         )}
       </div>
@@ -4142,14 +4096,14 @@ function PoRow({
           {po.status}
         </span>
         {po.status !== "received" && po.status !== "cancelled" && (
-          <button
-            type="button"
+          <Btn
+            size="sm"
+            icon={PackagePlus}
             onClick={() => onReceive(po)}
-            className="btn-primary text-[10px] py-1 px-2.5 whitespace-nowrap"
             title="Receive this PO's goods (GRN) — books them in as ready stock"
           >
             Receive (GRN)
-          </button>
+          </Btn>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Search, X, Handshake } from "lucide-react";
+import { Search, X, Handshake, Wand2, PackageCheck } from "lucide-react";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
+import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -407,32 +408,28 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 </div>
                 <div className="px-1 py-1 text-right">
                   {loaning ? (
-                    <button
-                      type="button"
+                    <Btn
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         onLoan?.(r.id, r.sku);
                       }}
                       title="Issue a loan DO + mark this unit on-loan to the order"
-                      className="text-[10px] font-semibold text-base-700 border border-base-300 rounded-md px-1.5 py-0.5 hover:bg-base-50 whitespace-nowrap"
                     >
                       Lend
-                    </button>
+                    </Btn>
                   ) : (
-                    <button
-                      type="button"
+                    <Btn
+                      size="sm"
                       disabled={submitting}
                       onClick={(e) => {
                         e.stopPropagation();
                         void reserveIds([r.id]);
                       }}
                       title={`Reserve this unit to ${soRef}`}
-                      /* v4 §2/§8c — per-row action = grey outline secondary
-                         (flame is reserved for block-level primaries). */
-                      className="text-[10px] font-semibold text-base-700 border border-base-300 rounded-md px-1.5 py-0.5 hover:bg-base-50 whitespace-nowrap disabled:opacity-40"
                     >
                       Reserve
-                    </button>
+                    </Btn>
                   )}
                 </div>
               </div>
@@ -457,39 +454,38 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           need {need} · {checked.size} picked
         </span>
         {loaning ? (
-          <button
-            type="button"
+          <Btn
+            icon={Handshake}
             onClick={loanOne}
             disabled={checked.size === 0}
             title="Issue a loan DO + mark this sofa on-loan to the order"
-            className="btn-primary t-tiny py-1.5 px-4"
           >
             Loan to {soRef}
-          </button>
+          </Btn>
         ) : (
           <>
-            {/* §7.8 — FIFO shortcut: reserve the oldest matching unit(s). */}
-            <button
-              type="button"
+            {/* §7.8 — FIFO shortcut: reserve the oldest matching unit(s).
+                v4 §2 ladder: both are secondary boxes (the page hero is
+                + Add payment; black buttons are retired). */}
+            <Btn
+              icon={Wand2}
               onClick={autoMatch}
               disabled={submitting || rows.length === 0}
               title="Reserve the oldest matching free unit(s) covering this line"
-              className="btn-secondary t-tiny py-1.5 px-3 disabled:opacity-40"
             >
               Auto-match & reserve
-            </button>
-            <button
-              type="button"
+            </Btn>
+            <Btn
+              icon={PackageCheck}
               onClick={reserve}
               disabled={submitting || checked.size === 0}
-              className="btn-primary t-tiny py-1.5 px-4"
             >
               {submitting
                 ? "Reserving…"
                 : checked.size === 0
                   ? "Select stock to reserve"
                   : `Reserve ${checked.size} to ${soRef}`}
-            </button>
+            </Btn>
           </>
         )}
       </div>

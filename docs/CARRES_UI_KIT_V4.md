@@ -35,16 +35,34 @@ Status amber   #854F0B on #FAEEDA   waiting / chasing
 Status red     #A32D2D on #FCEBEB   problem / No PO / overdue / alert
 ```
 
-## 2. Colour discipline — anti-abuse (CRITICAL)
+## 2. Colour discipline + the ACTION LADDER (CRITICAL — locked 2026-07-16)
 
-- Flame ONLY on a clickable primary action; **max ONE flame button per
-  block/section** (a collapsed band's shortcut and its expanded body's CTA never
-  show together). Never on titles, icons, borders, dividers, hovers, decoration.
+Every clickable action sits on ONE of four rungs. Never invent a fifth look.
+The recipe lives in code as `components/Btn.tsx` — **import it, never hand-roll
+a button** (consistency by architecture, not discipline).
+
+| Rung | Look | Rule |
+|---|---|---|
+| **Hero** | flame filled | **ONE PER PAGE** — the page's single main action (Orders list = + AutoCount · order detail = + Add payment). A modal counts as its own surface and may carry one hero. |
+| **Secondary** | **white box + hairline + BOLD icon + BOLD word** | the default for every other action; **a panel shows at most TWO**, the rest fold into ⋮ |
+| **Tertiary** | ghost text / 17px grey icon | row actions, cancel, "+ add …" |
+| **Overflow** | ⋮ menu | everything beyond the panel's two-button budget — actions are HIDDEN, not restyled |
+
+- Black is NEVER a button colour — black marks ACTIVE states only (nav item,
+  tab underline). The old black `.btn-primary` is retired for new code.
+- **Pill ≠ button:** a pill is STATUS and never clickable; anything clickable
+  is a box or an icon. An action dressed as a coloured pill is a bug.
+- Flame never on titles, icons, borders, dividers, hovers, decoration.
 - Number VALUES are never tinted — amounts/dates/counts stay dark even inside a
   warning context; the pill or the small alert icon carries the colour.
 - Blue = selection only. Green/amber/red = status pills + alerts only.
-- Self-check: "is this colour a clickable primary action, a selection, a status
-  pill, or an alert?" No → make it grey/ink.
+- Two control sizes only: **md 32px** (toolbars, forms — inputs share the same
+  32px via `components/Field.tsx`) · **sm 24px** (dense bands, inside 44px rows).
+- **Box = clickable.** If you can click or type it, it has a box; if you only
+  read it, it never does.
+- **Wizard steps** (SOP flows only): numbered progress boxes — current = white
+  box + flame outline + flame number dot + bold label; upcoming = grey box +
+  grey dot. Position is visible before reading (§8c).
 
 ## 3. Typography — Inter, weight-layered, closed sets
 
