@@ -866,13 +866,14 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 0175 — Master-Admin pricing lock. Only the principal may SET/CHANGE
-// product_skus.price or .cost. The DB trigger is the real boundary; this API
-// gate returns a clean 403 before the round-trip. All OTHER SKU edits stay
-// open to internal (operation) roles, and a non-principal may still create an
-// UNPRICED sku (price 0 / cost null).
+// 0175 — Master-Admin pricing lock (relaxed 0226). price / pwp_price /
+// pricesBySize stay principal-only; COST (the buying price) is writable by
+// operation + principal since 0226 (the Operation Catalog records it). The DB
+// trigger is the real boundary; this API gate returns a clean 403 before the
+// round-trip. All OTHER SKU edits stay open to internal (operation) roles, and
+// a non-principal may still create an UNPRICED sku (price 0).
 // ---------------------------------------------------------------------------
-describe("0175 — SKU price/cost lock (principal only)", () => {
+describe("0175/0226 — SKU pricing lock", () => {
   const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
 
   it("PATCH price by a non-principal → 403", async () => {
@@ -890,7 +891,26 @@ describe("0175 — SKU price/cost lock (principal only)", () => {
     expect(body.message).toMatch(/Master Admin/i);
   });
 
-  it("PATCH cost by a non-principal → 403", async () => {
+  // 0226 — cost is operation-writable (the Operation Catalog records buying
+  // prices). price stays locked (asserted above); non-internal roles stay out.
+  it("PATCH cost by operation → allowed (0226)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: 950,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
@@ -900,10 +920,29 @@ describe("0175 — SKU price/cost lock (principal only)", () => {
       }),
       env,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ cost: 950 });
   });
 
-  it("PATCH cost:null (clearing) by a non-principal → 403", async () => {
+  it("PATCH cost:null (clearing) by operation → allowed (0226)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
@@ -913,7 +952,24 @@ describe("0175 — SKU price/cost lock (principal only)", () => {
       }),
       env,
     );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ cost: null });
+  });
+
+  it("PATCH cost by a dealer → 403 (cost is internal-only)", async () => {
+    const jwt = await makeJwt("dealer", "00000000-0000-0000-0000-00000000dd01");
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 950 }),
+      }),
+      env,
+    );
     expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/operation or the principal/i);
   });
 
   it("PATCH a non-price/cost field (pos_active) by a non-principal → allowed", async () => {
@@ -1002,8 +1058,55 @@ describe("0175 — SKU price/cost lock (principal only)", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST a costed sku by a non-principal → 403", async () => {
+  // 0226 — operation may seed the buying cost on create (price must stay 0).
+  it("POST an unpriced-but-costed sku by operation → allowed (0226)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [
+            { id: "00000000-0000-0000-0000-00000000ff01", cat_covered: ["mattress"] },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Twin",
+          variant: "Twin",
+          variant_kind: "size",
+          price: 0,
+          cost: 1300,
+          supplier_id: "00000000-0000-0000-0000-00000000ff01",
+          discontinued_at: null,
+        },
+      }),
+    );
     const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+          cost: 1300,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { cost: number }).cost).toBe(1300);
+  });
+
+  it("POST a costed sku by a dealer → 403", async () => {
+    const jwt = await makeJwt("dealer", "00000000-0000-0000-0000-00000000dd01");
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus", {
         method: "POST",
@@ -5120,6 +5223,89 @@ describe("0202 — fabric master batch save + history", () => {
       env,
     );
     expect(res.status).toBe(422);
+  });
+
+  // 0226 — Operation Catalog fabric costing (PATCH /fabrics/:id/cost →
+  // catalog_fabrics_set_cost DEFINER RPC). Internal (operation + principal).
+  const FABRIC_ID = "00000000-0000-0000-0000-0000000fab01";
+
+  it("PATCH /fabrics/:id/cost — operation → RPC with p_id + p_cost", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/fabrics/${FABRIC_ID}/cost`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 120.5 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("catalog_fabrics_set_cost");
+    expect(calls[0].args).toEqual({ p_id: FABRIC_ID, p_cost: 120.5 });
+  });
+
+  it("PATCH /fabrics/:id/cost — cost:null clears the recorded cost", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/fabrics/${FABRIC_ID}/cost`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls[0].args).toEqual({ p_id: FABRIC_ID, p_cost: null });
+  });
+
+  it("PATCH /fabrics/:id/cost — dealer → 403, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/fabrics/${FABRIC_ID}/cost`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 100 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PATCH /fabrics/:id/cost — negative cost → 422", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/fabrics/${FABRIC_ID}/cost`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: -5 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /fabrics/:id/cost — unknown fabric (P0002) → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildRpcSb({ rpcError: { code: "P0002", message: "fabric not found" } }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/fabrics/${FABRIC_ID}/cost`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 100 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
   });
 
   it("GET /fabrics/history — internal read maps fabric-shaped snapshots", async () => {

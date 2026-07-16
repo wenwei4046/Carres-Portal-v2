@@ -1,33 +1,31 @@
 /**
- * Sales Order PDF template — proto `pdf-render.jsx` `printSalesOrder`
- * (line 504+) ported to @react-pdf/renderer. Customer-facing document handed
- * out at point of sale. Loo 2026-05-12.
+ * Sales Order PDF template — customer-facing document handed out at point
+ * of sale.
  *
- * Layout mirrors the proto:
- *   - Brand header (CARRES + HOUZS subline + accent rule)
- *   - Doc meta (SO-001001 · date · order ref)
- *   - Meta band (Order ref · Delivery · Status)
- *   - Parties (Bill To customer · Sold By dealer-or-outlet · Salesperson)
- *   - Line table (sku + description with attrs + qty + unit price + total)
- *   - Addons mini-table (only if any)
- *   - Totals block (subtotal · paid · balance due)
- *   - Customer signature box
- *   - Terms paragraph
- *   - Footer
+ * 2026-07-14 (Loo) — relaid out to match the 2990s Sales Order (the two
+ * reference screenshots Loo supplied): company block + big SALES ORDER
+ * title, rounded info cards (ORDER REFERENCE · DELIVERY ESTIMATE DATE with
+ * PAYMENTS RECEIVED · BILL TO · SOLD BY), an items table whose Description
+ * column carries the PRODUCT NAME (server-resolved `Model name (Variant)`)
+ * with PWP / voucher / remark sub-lines, a dashed customer-signature box
+ * beside the totals card (BALANCE DUE on a soft flame band), and flame
+ * numbered terms. Accent moved to the v17 flame #C44D2B.
  *
- * Reuses the invoice template's visual conventions (terracotta accent,
- * warm-linen palette) so SO + Invoice look like a matched pair.
+ * The header always prints Carres HQ (brand-consistency rule); the showroom
+ * / outlet address prints in the SOLD BY card — same as the 2990s doc.
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { DocHeader } from "./letterhead";
+import { CARRES_COMPANY } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
 
-const ACCENT = "#D64F20";
-const BORDER = "#D9D2C7";
-const MUTED  = "#7A7268";
-const SOFT   = "#F5EFE6";
+const ACCENT = "#C44D2B"; // v17 flame (supersedes the old #D64F20 terracotta)
+const ACCENT_SOFT = "#FBEEE8"; // flame wash — BALANCE DUE band
+const BORDER = "#E4DFD6";
+const MUTED = "#6F675E";
+const INK = "#1A1714";
+const SOFT = "#F7F2E9"; // table header beige
 
 const styles = StyleSheet.create({
   page: {
@@ -36,47 +34,61 @@ const styles = StyleSheet.create({
     paddingTop: 36,
     paddingBottom: 36,
     paddingHorizontal: 36,
-    color: "#1A1714",
+    color: INK,
   },
-  // 2026-05-16 — header rendering moved to shared DocHeader.
 
-  metaBand: {
+  // ── Header: company block left · big doc title right ──
+  header: {
     flexDirection: "row",
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: 16,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 18,
   },
-  metaCol: {
-    flex: 1,
-    padding: 8,
-    borderRightWidth: 1,
-    borderRightColor: BORDER,
-  },
-  metaColLast: { flex: 1, padding: 8 },
-  metaLbl: {
-    fontSize: 8,
-    color: MUTED,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  metaVal: { fontSize: 10, fontWeight: 700 },
-  metaSub: { fontSize: 8, color: MUTED, marginTop: 1 },
+  companyName: { fontSize: 13, fontWeight: 700, letterSpacing: 0.4 },
+  companyRegNo: { fontSize: 8, color: MUTED, marginTop: 2 },
+  companyAddrLine: { fontSize: 8.5, color: "#3F3A33", marginTop: 1 },
+  companyAddrFirst: { marginTop: 6 },
+  headerMeta: { alignItems: "flex-end" },
+  docTitle: { fontSize: 20, fontWeight: 700, letterSpacing: 0.6 },
+  docNumber: { fontSize: 11, fontWeight: 700, color: ACCENT, marginTop: 3 },
+  docDate: { fontSize: 9, color: MUTED, marginTop: 2 },
 
-  partyRow: { flexDirection: "row", marginBottom: 16, gap: 16 },
-  party: {
+  // ── Info cards (rounded, bordered — reference look) ──
+  cardRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
+  card: {
     flex: 1,
     borderWidth: 1,
     borderColor: BORDER,
+    borderRadius: 6,
     padding: 10,
   },
-  partyLabel: {
+  cardLabel: {
     fontSize: 8,
-    color: MUTED,
+    fontWeight: 700,
+    color: ACCENT,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: 3,
   },
+  cardValue: { fontSize: 12, fontWeight: 700 },
+  cardSub: { fontSize: 8.5, color: MUTED, marginTop: 2 },
+  cardDivider: {
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    marginTop: 7,
+    paddingTop: 7,
+  },
+  payRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 2,
+    gap: 8,
+  },
+  payLabel: { fontSize: 8.5, color: MUTED, flexShrink: 1 },
+  payAmount: { fontSize: 9, fontWeight: 700 },
+
   partyName: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
   partyLine: { fontSize: 9, color: "#3F3A33", marginBottom: 1 },
   partyDivider: {
@@ -86,7 +98,12 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 
-  table: { borderWidth: 1, borderColor: BORDER, marginBottom: 14 },
+  // ── Items table ──
+  // NOTE: the rows are DIRECT Page children (no wrapper View) — @react-pdf
+  // v4 can't split a wrapper View's children across pages, which shoved the
+  // whole table to page 2 on long orders. Frameless look (beige header band
+  // + row dividers) matches the reference anyway.
+  tableEnd: { marginBottom: 14 },
   tableHeaderRow: {
     flexDirection: "row",
     backgroundColor: SOFT,
@@ -101,24 +118,54 @@ const styles = StyleSheet.create({
   tableRowLast: { flexDirection: "row" },
   th: { fontSize: 9, fontWeight: 700, padding: 6 },
   td: { fontSize: 9, padding: 6 },
-  tdSub: { fontSize: 8, color: MUTED, paddingHorizontal: 6, paddingBottom: 4 },
-  colSku:       { width: "14%" },
-  colDesc:      { width: "44%" },
-  colQty:       { width: "8%",  textAlign: "right" },
+  descCell: { padding: 6 },
+  descMain: { fontSize: 9 },
+  descSub: { fontSize: 8, color: MUTED, marginTop: 2 },
+  descSubAccent: { fontSize: 8, fontWeight: 700, color: ACCENT, marginTop: 2 },
+  colSku: { width: "16%" },
+  colDesc: { width: "42%" },
+  colQty: { width: "8%", textAlign: "right" },
   colUnitPrice: { width: "17%", textAlign: "right" },
-  colTotal:     { width: "17%", textAlign: "right" },
+  colTotal: { width: "17%", textAlign: "right" },
+
+  // Vouchers earned on this order whose trigger sku no longer matches a
+  // printed line (defensive) — listed under the table instead of dropped.
+  voucherBlock: { marginBottom: 14, marginTop: -6 },
+  voucherLine: { fontSize: 8, color: MUTED, marginTop: 1 },
+
+  // ── Signature (dashed box) beside the totals card ──
+  signTotalsRow: {
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 16,
+    alignItems: "flex-start",
+  },
+  signBlock: { flex: 1 },
+  signBox: {
+    borderWidth: 1,
+    borderColor: "#C9C2B6",
+    borderStyle: "dashed",
+    borderRadius: 6,
+    height: 84,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  signImage: { width: 180, height: 64, objectFit: "contain" },
+  signLabel: { fontSize: 8.5, fontWeight: 700, color: ACCENT, marginTop: 6 },
+  signName: { fontSize: 8.5, color: MUTED, marginTop: 2 },
+  signMark: { fontSize: 8, color: ACCENT, marginTop: 2 },
 
   totalsBlock: {
     width: "45%",
-    alignSelf: "flex-end",
     borderWidth: 1,
     borderColor: BORDER,
-    marginBottom: 18,
+    borderRadius: 6,
+    overflow: "hidden",
   },
   totalsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
@@ -126,55 +173,25 @@ const styles = StyleSheet.create({
   totalsRowLast: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    alignItems: "center",
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    backgroundColor: SOFT,
+    backgroundColor: ACCENT_SOFT,
   },
   totalsLabel: { fontSize: 9, color: MUTED, textTransform: "uppercase", letterSpacing: 0.6 },
+  totalsLabelGrand: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: ACCENT,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
   totalsValue: { fontSize: 10, fontWeight: 700 },
   totalsValueGrand: { fontSize: 12, fontWeight: 700, color: ACCENT },
 
-  // 2026-05-22 (Loo) — single-column customer signature block on the left.
-  // The earlier 2-column version had a Carres-side "Authorised by" line on
-  // the left which Loo removed (customer is the only required signatory on
-  // the SO — Carres-side authorisation lives in the audit trail, not on
-  // the customer-facing doc). The captured eSign PNG renders inline above
-  // the signer's printed name + phone for in-store verification.
-  signRow: {
-    flexDirection: "row",
-    marginBottom: 18,
-    marginTop: 12,
-  },
-  signBlock: {
-    width: "50%",
-    paddingTop: 4,
-    minHeight: 80,
-  },
-  signImage: {
-    width: 140,
-    height: 56,
-    objectFit: "contain",
-    marginBottom: 4,
-  },
-  signImagePlaceholder: {
-    width: 140,
-    height: 56,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderStyle: "dashed",
-    marginBottom: 4,
-  },
-  signRule: {
-    borderTopWidth: 1,
-    borderTopColor: "#1A1714",
-    marginBottom: 4,
-    width: 140,
-  },
-  signLabel: { fontSize: 8, color: MUTED },
-  signMark: { fontSize: 9, color: ACCENT, fontWeight: 700, marginBottom: 4 },
-
-  terms: { fontSize: 8, color: MUTED, lineHeight: 1.4, marginBottom: 12 },
-  termsLine: { marginBottom: 2 },
+  // ── Terms (flame numbered lines — reference look) ──
+  terms: { marginBottom: 12 },
+  termsLine: { fontSize: 8, color: ACCENT, lineHeight: 1.5, marginBottom: 2 },
 
   footer: {
     marginTop: "auto",
@@ -189,7 +206,10 @@ const styles = StyleSheet.create({
 });
 
 function formatMoney(value: number, currency: string): string {
-  return `${currency} ${value.toFixed(2)}`;
+  return `${currency} ${value.toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 /** Pretty-print line attrs: bedframe `{color, gap}`, sofa
@@ -214,6 +234,46 @@ function attrsDescription(attrs: Record<string, unknown> | null): string | null 
   return bits.length > 0 ? bits.join(" · ") : null;
 }
 
+/** Flame PWP marker for a reward line carrying `attrs.pwp` (P8b/c/d server
+ *  canonical marker `{ruleId, type, code?, …}`). Null when the line isn't a
+ *  PWP/promo reward. */
+function pwpMarkerLine(attrs: Record<string, unknown> | null): string | null {
+  const pwp = attrs?.["pwp"] as Record<string, unknown> | undefined;
+  if (!pwp || typeof pwp !== "object") return null;
+  const code = typeof pwp["code"] === "string" ? pwp["code"] : null;
+  const base = pwp["type"] === "promo" ? "Promo · FREE" : "PWP price";
+  return code ? `${base} · ${code}` : base;
+}
+
+/** Muted free-line marker (P7 default gift / make-free campaign). */
+function freeMarkerLine(attrs: Record<string, unknown> | null): string | null {
+  if (attrs?.["free_gift"]) return "Free gift";
+  if (attrs?.["free_item"]) return "Free item";
+  return null;
+}
+
+/** Muted add-on sub-line: disposal size tag + delivery follow-up remark. */
+function addonAttrsDescription(attrs: Record<string, unknown> | null | undefined): string | null {
+  if (!attrs) return null;
+  const bits: string[] = [];
+  const size = attrs["size"];
+  if (typeof size === "string" && size.length > 0) bits.push(`Size: ${size}`);
+  const followUp = attrs["cross_category_source_so"];
+  if (typeof followUp === "string" && followUp.length > 0) {
+    bits.push(`Remark: Follow-up of ${followUp}`);
+  }
+  return bits.length > 0 ? bits.join(" · ") : null;
+}
+
+type Voucher = NonNullable<SalesOrderTemplateData["vouchers"]>[number];
+
+/** "PWP voucher issued: PWP-1401JXWP (bedframe) · not redeemed yet" */
+function voucherIssuedLine(v: Voucher): string {
+  const kind = v.type === "promo" ? "Free-item" : "PWP";
+  const reward = v.reward_category ? ` (${v.reward_category})` : "";
+  return `${kind} voucher issued: ${v.code}${reward} · ${v.redeemed ? "redeemed" : "not redeemed yet"}`;
+}
+
 export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const {
     so_number,
@@ -235,11 +295,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     signed,
     signature_url,
   } = data;
+  const payments = data.payments ?? [];
+  const vouchers = data.vouchers ?? [];
 
-  // Loo 2026-05-16 — Sales Orders override the default Carres HQ address
-  // in the shared DocHeader with the showroom/outlet address so the
-  // customer sees where the sale actually happened. Legal name + reg no
-  // stay Carres per the brand-consistency rule.
   const outletName =
     dealer.outlet_name && dealer.outlet_name.trim().length > 0
       ? dealer.outlet_name.trim()
@@ -250,59 +308,103 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
       : null;
   // 2026-05-22 (Loo, migration 0144) — when an order isn't tied to an outlet
   // (pure dealer channel), fall back to the dealer's own address. The "Sold
-  // By" block below renders whichever resolves first.
+  // By" card renders whichever resolves first.
   const sellerAddress =
     outletAddress ??
     (dealer.address && dealer.address.trim().length > 0 ? dealer.address.trim() : null);
+  // Showroom orders sell under the OUTLET name (reference: "PJ Showroom");
+  // pure dealer channel keeps the dealer name.
+  const sellerName = outletName ?? dealer.name;
+
+  // Earned vouchers print under the FIRST table line matching their trigger
+  // sku (the 2990s look); the rest fall through to a block below the table.
+  const vouchersByTrigger = new Map<string, Voucher[]>();
+  for (const v of vouchers) {
+    if (!v.trigger_sku) continue;
+    const list = vouchersByTrigger.get(v.trigger_sku) ?? [];
+    list.push(v);
+    vouchersByTrigger.set(v.trigger_sku, list);
+  }
+  const attachedTriggerSkus = new Set<string>();
+  const printedLineSkus = new Set(lines.map((l) => l.sku));
+  const orphanVouchers = vouchers.filter(
+    (v) => !v.trigger_sku || !printedLineSkus.has(v.trigger_sku),
+  );
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <DocHeader
-          docTitle="SALES ORDER"
-          docMetaRows={[so_number, `Date: ${issue_date}`, `Order: ${order_code}`]}
-          subTitle={outletName}
-          addressLines={outletAddress ? [outletAddress] : undefined}
-        />
-
-        {/* 2026-05-22 (Loo) — Status column removed; meta band collapsed to
-            Order reference + Delivery. status_label still flows in via the
-            payload but customer-facing PDF no longer shows it. */}
-        <View style={styles.metaBand}>
-          <View style={styles.metaCol}>
-            <Text style={styles.metaLbl}>Order reference</Text>
-            <Text style={styles.metaVal}>{order_code}</Text>
-            <Text style={styles.metaSub}>{so_number}</Text>
+        {/* ── Header: Carres HQ (brand rule) · big SALES ORDER title ── */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+            <Text style={styles.companyRegNo}>SSM {CARRES_COMPANY.regNo}</Text>
+            {CARRES_COMPANY.addressLines.map((line, i) => (
+              <Text
+                key={i}
+                style={
+                  i === 0
+                    ? [styles.companyAddrLine, styles.companyAddrFirst]
+                    : styles.companyAddrLine
+                }
+              >
+                {line}
+              </Text>
+            ))}
           </View>
-          <View style={styles.metaColLast}>
-            <Text style={styles.metaLbl}>Delivery</Text>
-            <Text style={styles.metaVal}>{delivery.date}</Text>
-            <Text style={styles.metaSub}>
-              Floor {delivery.floor} · {delivery.has_lift ? "lift available" : "no lift"}
-            </Text>
+          <View style={styles.headerMeta}>
+            <Text style={styles.docTitle}>SALES ORDER</Text>
+            <Text style={styles.docNumber}>{so_number}</Text>
+            <Text style={styles.docDate}>Date: {issue_date}</Text>
           </View>
         </View>
 
-        <View style={styles.partyRow}>
-          <View style={styles.party}>
-            <Text style={styles.partyLabel}>Bill To</Text>
+        {/* ── Card row 1: Order reference · Delivery + payments received ── */}
+        <View style={styles.cardRow}>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Order reference</Text>
+            <Text style={styles.cardValue}>{order_code}</Text>
+            <Text style={styles.cardSub}>Placed {issue_date}</Text>
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Delivery estimate date</Text>
+            <Text style={styles.cardValue}>{delivery.date}</Text>
+            <Text style={styles.cardSub}>
+              Floor {delivery.floor} · {delivery.has_lift ? "lift available" : "no lift"}
+            </Text>
+            {payments.length > 0 ? (
+              <View style={styles.cardDivider}>
+                <Text style={styles.cardLabel}>Payments received</Text>
+                {payments.map((p, i) => (
+                  <View key={i} style={styles.payRow}>
+                    <Text style={styles.payLabel}>
+                      {p.label}
+                      {p.reference ? ` · ${p.reference}` : ""}
+                    </Text>
+                    <Text style={styles.payAmount}>{formatMoney(p.amount, currency)}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {/* ── Card row 2: Bill To · Sold By ── */}
+        <View style={styles.cardRow}>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Bill To</Text>
             <Text style={styles.partyName}>{customer.name}</Text>
             <Text style={styles.partyLine}>{customer.address}</Text>
             {customer.phone ? <Text style={styles.partyLine}>{customer.phone}</Text> : null}
           </View>
-          <View style={styles.party}>
-            <Text style={styles.partyLabel}>Sold By</Text>
-            <Text style={styles.partyName}>{dealer.name}</Text>
-            {/* 2026-05-22 (Loo) — seller address resolves to outlet_address
-                first (showroom orders), falling back to dealers.address
-                (pure dealer channel). Rendered here in the Sold By block as
-                Loo requested; the letterhead still also carries the outlet
-                line (no duplication for dealer-channel which has no outlet). */}
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Sold By</Text>
+            <Text style={styles.partyName}>{sellerName}</Text>
             {sellerAddress ? <Text style={styles.partyLine}>{sellerAddress}</Text> : null}
             {dealer.contact ? <Text style={styles.partyLine}>{dealer.contact}</Text> : null}
             {dealer.salesperson_name ? (
               <View style={styles.partyDivider}>
-                <Text style={styles.partyLabel}>Salesperson</Text>
+                <Text style={styles.cardLabel}>Salesperson</Text>
                 <Text style={styles.partyLine}>{dealer.salesperson_name}</Text>
                 {dealer.salesperson_phone ? (
                   <Text style={styles.partyLine}>{dealer.salesperson_phone}</Text>
@@ -312,43 +414,68 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.tableHeaderRow}>
-            <Text style={[styles.th, styles.colSku]}>SKU</Text>
-            <Text style={[styles.th, styles.colDesc]}>Description</Text>
-            <Text style={[styles.th, styles.colQty]}>Qty</Text>
-            <Text style={[styles.th, styles.colUnitPrice]}>Unit Price</Text>
-            <Text style={[styles.th, styles.colTotal]}>Line Total</Text>
-          </View>
-          {lines.map((line, idx) => {
+        {/* ── Items table — Description = product name + sub-lines.
+            Rows sit directly on the Page so long orders split per-row;
+            minPresenceAhead keeps the header from stranding alone. ── */}
+        <View style={styles.tableHeaderRow} minPresenceAhead={40}>
+          <Text style={[styles.th, styles.colSku]}>SKU</Text>
+          <Text style={[styles.th, styles.colDesc]}>Description</Text>
+          <Text style={[styles.th, styles.colQty]}>Qty</Text>
+          <Text style={[styles.th, styles.colUnitPrice]}>Unit Price</Text>
+          <Text style={[styles.th, styles.colTotal]}>Line Total</Text>
+        </View>
+        {lines.map((line, idx) => {
             const isLast = idx === lines.length - 1 && addons.length === 0;
             const variantSub = attrsDescription(line.attrs);
+            const pwpSub = pwpMarkerLine(line.attrs);
+            const freeSub = freeMarkerLine(line.attrs);
+            let issuedSubs: Voucher[] = [];
+            if (!attachedTriggerSkus.has(line.sku) && vouchersByTrigger.has(line.sku)) {
+              attachedTriggerSkus.add(line.sku);
+              issuedSubs = vouchersByTrigger.get(line.sku) ?? [];
+            }
             return (
-              <View key={`${line.sku}-${idx}`}>
-                <View style={isLast ? styles.tableRowLast : styles.tableRow}>
-                  <Text style={[styles.td, styles.colSku]}>{line.sku}</Text>
-                  <Text style={[styles.td, styles.colDesc]}>{line.description}</Text>
-                  <Text style={[styles.td, styles.colQty]}>{line.qty}</Text>
-                  <Text style={[styles.td, styles.colUnitPrice]}>
-                    {formatMoney(line.unit_price, currency)}
-                  </Text>
-                  <Text style={[styles.td, styles.colTotal]}>
-                    {formatMoney(line.line_total, currency)}
-                  </Text>
+              <View
+                key={`${line.sku}-${idx}`}
+                wrap={false}
+                style={isLast ? styles.tableRowLast : styles.tableRow}
+              >
+                <Text style={[styles.td, styles.colSku]}>{line.sku}</Text>
+                <View style={[styles.descCell, styles.colDesc]}>
+                  <Text style={styles.descMain}>{line.description}</Text>
+                  {variantSub ? <Text style={styles.descSub}>{variantSub}</Text> : null}
+                  {pwpSub ? <Text style={styles.descSubAccent}>{pwpSub}</Text> : null}
+                  {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}
+                  {issuedSubs.map((v) => (
+                    <Text key={v.code} style={styles.descSub}>
+                      {voucherIssuedLine(v)}
+                    </Text>
+                  ))}
                 </View>
-                {variantSub ? <Text style={styles.tdSub}>{variantSub}</Text> : null}
+                <Text style={[styles.td, styles.colQty]}>{line.qty}</Text>
+                <Text style={[styles.td, styles.colUnitPrice]}>
+                  {formatMoney(line.unit_price, currency)}
+                </Text>
+                <Text style={[styles.td, styles.colTotal]}>
+                  {formatMoney(line.line_total, currency)}
+                </Text>
               </View>
             );
           })}
           {addons.map((a, idx) => {
             const isLast = idx === addons.length - 1;
+            const addonSub = addonAttrsDescription(a.attrs);
             return (
               <View
                 key={`addon-${idx}`}
+                wrap={false}
                 style={isLast ? styles.tableRowLast : styles.tableRow}
               >
                 <Text style={[styles.td, styles.colSku]}>ADD-ON</Text>
-                <Text style={[styles.td, styles.colDesc]}>{a.label}</Text>
+                <View style={[styles.descCell, styles.colDesc]}>
+                  <Text style={styles.descMain}>{a.label}</Text>
+                  {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
+                </View>
                 <Text style={[styles.td, styles.colQty]}>{a.qty}</Text>
                 <Text style={[styles.td, styles.colUnitPrice]}>
                   {formatMoney(a.unit_price, currency)}
@@ -359,51 +486,56 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               </View>
             );
           })}
-        </View>
+        <View style={styles.tableEnd} />
 
-        <View style={styles.totalsBlock}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Subtotal</Text>
-            <Text style={styles.totalsValue}>{formatMoney(subtotal, currency)}</Text>
+        {/* Vouchers whose trigger line isn't on the doc (defensive) */}
+        {orphanVouchers.length > 0 ? (
+          <View style={styles.voucherBlock}>
+            {orphanVouchers.map((v) => (
+              <Text key={v.code} style={styles.voucherLine}>
+                {voucherIssuedLine(v)}
+              </Text>
+            ))}
           </View>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Deposit paid</Text>
-            <Text style={styles.totalsValue}>{formatMoney(paid, currency)}</Text>
-          </View>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Total (incl. SST 8%)</Text>
-            <Text style={styles.totalsValue}>{formatMoney(total, currency)}</Text>
-          </View>
-          <View style={styles.totalsRowLast}>
-            <Text style={styles.totalsLabel}>Balance due</Text>
-            <Text style={styles.totalsValueGrand}>
-              {formatMoney(balance_due, currency)}
-            </Text>
-          </View>
-        </View>
+        ) : null}
 
-        {/* 2026-05-22 (Loo) — single-column customer signature on the left.
-            "Authorised by James" block dropped per Loo's request — Carres-
-            side authorisation lives in the audit trail, customer is the
-            only required signatory on the SO. The captured eSign PNG
-            renders inline above the signer's printed name + phone so
-            in-store staff can eyeball-verify it matches the customer. */}
-        <View style={styles.signRow}>
+        {/* ── Customer signature (dashed box) · totals card ── */}
+        <View style={styles.signTotalsRow} wrap={false}>
           <View style={styles.signBlock}>
-            {signed && signature_url ? (
-              <Image src={signature_url} style={styles.signImage} />
-            ) : (
-              <View style={styles.signImagePlaceholder} />
-            )}
-            <View style={styles.signRule} />
-            {signed ? (
-              <Text style={styles.signMark}>✓ Signed electronically by customer</Text>
-            ) : null}
+            <View style={styles.signBox}>
+              {signed && signature_url ? (
+                <Image src={signature_url} style={styles.signImage} />
+              ) : null}
+            </View>
             <Text style={styles.signLabel}>Customer signature</Text>
-            <Text style={styles.signLabel}>
+            <Text style={styles.signName}>
               {customer.name}
               {customer.phone ? ` · ${customer.phone}` : ""}
             </Text>
+            {signed ? (
+              <Text style={styles.signMark}>✓ Signed electronically by customer</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.totalsBlock}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Subtotal</Text>
+              <Text style={styles.totalsValue}>{formatMoney(subtotal, currency)}</Text>
+            </View>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Paid to date</Text>
+              <Text style={styles.totalsValue}>{formatMoney(paid, currency)}</Text>
+            </View>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Total (incl. SST 8%)</Text>
+              <Text style={styles.totalsValue}>{formatMoney(total, currency)}</Text>
+            </View>
+            <View style={styles.totalsRowLast}>
+              <Text style={styles.totalsLabelGrand}>Balance due</Text>
+              <Text style={styles.totalsValueGrand}>
+                {formatMoney(balance_due, currency)}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -426,7 +558,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerLeft}>{so_number}</Text>
+          <Text style={styles.footerLeft}>{order_code}</Text>
           <Text style={styles.footerRight}>Carres Portal · {issue_date}</Text>
         </View>
       </Page>

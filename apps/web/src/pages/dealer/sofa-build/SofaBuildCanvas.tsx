@@ -762,19 +762,24 @@ export default function SofaBuildCanvas({
 
       {/* Body: palette | room */}
       <div className="flex min-h-0 flex-1">
-        {/* Left palette */}
+        {/* Left palette — prototype/pos-sofa-config.jsx structure: head strip,
+            then a scrolling list of groups with sticky burnt group heads. */}
         <aside
-          className="hidden w-64 shrink-0 flex-col overflow-y-auto p-3 md:flex"
+          className="hidden w-[280px] shrink-0 flex-col overflow-hidden md:flex"
           style={{ borderRight: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
           data-testid="sofa-build-palette"
         >
-          {palette.length === 0 && (
-            <p className="t-small text-base-500">This model has no offered compartments.</p>
-          )}
-          {palette.map(({ group, rows }) => (
-            <div key={group} className="mb-4">
-              <div className="pos-eyebrow mb-1.5" style={{ fontSize: 10 }}>{group}</div>
-              <div className="flex flex-col gap-2">
+          <div className="sof-cust__paletteHead">
+            <span className="pos-eyebrow">Modules</span>
+            <span className="sof-cust__paletteHint">Tap to add</span>
+          </div>
+          <div className="sof-cust__paletteList">
+            {palette.length === 0 && (
+              <p className="t-small text-base-500">This model has no offered compartments.</p>
+            )}
+            {palette.map(({ group, rows }) => (
+              <div key={group} className="sof-cust__paletteGroup">
+                <div className="sof-cust__paletteGroupHead">{group}</div>
                 {rows.map(({ pool, offered }) => (
                   <ModulePaletteItem
                     key={pool.id}
@@ -785,8 +790,8 @@ export default function SofaBuildCanvas({
                   />
                 ))}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </aside>
 
         {/* Center room */}
@@ -1191,15 +1196,29 @@ export default function SofaBuildCanvas({
           </label>
         )}
 
-        {/* Price + combo badge */}
+        {/* Price + combo marker. The marker is a short green suffix INSIDE the
+            eyebrow line (savings detail in its title tooltip) — it must never
+            be a standalone pill: the old wide pill pushed the right cluster
+            onto a second flex-wrap row, so the whole bar jumped taller every
+            time a combo matched/unmatched (Loo 2026-07-14). */}
         <div className="ml-auto flex items-center gap-3">
-          {priceResult.basis === "combo" && (
-            <span className="pill pill-confirmed" data-testid="sofa-build-combo-badge">
-              Combo applied · saves RM {fmtRM(comboSavings)}
-            </span>
-          )}
           <div className="text-right">
-            <div className="pos-eyebrow" style={{ fontSize: 10 }}>Live total</div>
+            <div className="pos-eyebrow" style={{ fontSize: 10 }}>
+              Live total
+              {priceResult.basis === "combo" && (
+                <span
+                  className="text-success"
+                  data-testid="sofa-build-combo-badge"
+                  title={
+                    comboSavings > 0
+                      ? `Combo applied · saves RM ${fmtRM(comboSavings)}`
+                      : "Combo price applied"
+                  }
+                >
+                  · Combo
+                </span>
+              )}
+            </div>
             <div
               style={{
                 fontFamily: "var(--font-num, system-ui, sans-serif)",

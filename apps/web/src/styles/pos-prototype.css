@@ -516,6 +516,54 @@
 .quote-row__total { font-family: var(--font-num); font-weight: 900; font-size: 18px; color: var(--c-burnt); letter-spacing: -0.02em; }
 .quote-row__total sup { font-size: 9px; vertical-align: baseline; }
 
+/* ========= Quote detail floating window ========= */
+.quote-detail {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(34, 31, 32, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: fadeIn 180ms ease;
+}
+.quote-detail__panel {
+  width: 480px; max-width: 100%;
+  max-height: 82vh;
+  background: var(--pos-panel, #fff);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(34, 31, 32, 0.28);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: slideInR 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.quote-detail__head { padding: 20px 22px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.quote-detail__title { font-family: var(--font-title); font-weight: 700; font-size: 20px; margin-top: 2px; letter-spacing: -0.005em; }
+.quote-detail__body { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.quote-detail__card {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+  padding: 12px;
+  background: var(--pos-panel, #fff);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+}
+.quote-detail__card--addon { background: var(--c-cream); border-style: dashed; }
+.quote-detail__photo {
+  width: 52px; height: 52px; border-radius: 10px;
+  background-color: #d8d2c4; background-size: cover; background-position: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--fg-muted);
+}
+.quote-detail__photo--addon { background-color: transparent; border: 1.5px dashed var(--line-strong); font-size: 18px; font-weight: 400; }
+.quote-detail__info { min-width: 0; }
+.quote-detail__name { font-family: var(--font-title); font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-detail__meta { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+.quote-detail__price { font-family: var(--font-num); font-weight: 700; font-size: 15px; letter-spacing: -0.02em; white-space: nowrap; }
+.quote-detail__price sup { font-size: 8px; vertical-align: baseline; }
+.quote-detail__foot { padding: 14px 18px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quote-detail__total-label {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-muted);
+}
+
 /* ========= Animation utility ========= */
 .fade-in { animation: fadeIn 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -981,20 +1029,31 @@
   grid-template-columns: 1fr 460px;
   overflow: hidden;
 }
+/* 2026-07-15 (Loo) — the prototype's lifestyle photo never shipped with the
+   repo, so the hero rendered as a dead grey wash. Redesigned as a pure-CSS
+   brand hero: cream base, a terracotta glow, and an oversized Bodoni "C"
+   watermark — no imagery dependency, reads warm at every viewport. */
 .confirm__hero {
   position: relative;
-  background-image: url('assets/imagery/carres-lifestyle-couple.png');
-  background-size: cover; background-position: center;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  padding: 56px 64px;
-  color: var(--c-cream);
+  background:
+    radial-gradient(1000px 700px at 88% -12%, color-mix(in oklab, var(--c-orange) 15%, transparent) 0%, transparent 62%),
+    radial-gradient(820px 620px at -18% 112%, color-mix(in oklab, var(--c-beige) 75%, transparent) 0%, transparent 58%),
+    var(--c-cream);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 56px 72px;
+  color: var(--c-ink);
   overflow: hidden;
 }
 .confirm__hero::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(34,31,32,0.25) 0%, rgba(34,31,32,0) 30%, rgba(34,31,32,0) 50%, rgba(34,31,32,0.7) 100%);
+  /* Ghost monogram — the CARRES Bodoni "C", cropped off the right edge. */
+  content: 'C';
+  position: absolute; right: -70px; top: 50%; transform: translateY(-53%);
+  font-family: var(--font-mark);
+  font-size: 640px; line-height: 1; font-weight: 500;
+  color: color-mix(in oklab, var(--c-orange) 8%, transparent);
+  pointer-events: none;
 }
-.confirm__hero-inner { position: relative; max-width: 600px; display: flex; flex-direction: column; gap: 16px; }
+.confirm__hero-inner { position: relative; max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
 .confirm__check {
   width: 64px; height: 64px; border-radius: 999px;
   background: var(--c-orange); display: inline-flex; align-items: center; justify-content: center;
@@ -1002,11 +1061,28 @@
   box-shadow: 0 8px 24px rgba(232,107,58,0.4);
 }
 .confirm__check svg { width: 32px; height: 32px; stroke-width: 2.5; color: var(--c-cream); }
-.confirm__eyebrow { font-family: var(--font-button); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+.confirm__eyebrow { font-family: var(--font-button); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt); }
 .confirm__head { font-family: var(--font-title); font-weight: 900; font-size: 48px; line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance; }
 .confirm__head .accent { font-family: var(--font-script); color: var(--c-orange); font-weight: 500; font-size: 56px; }
-.confirm__sub { font-family: var(--font-sans); font-size: 16px; line-height: 1.55; max-width: 44ch; opacity: 0.92; font-weight: 300; }
-.confirm__cta-row { display: flex; gap: 10px; margin-top: 18px; }
+.confirm__sub { font-family: var(--font-sans); font-size: 16px; line-height: 1.55; max-width: 44ch; color: var(--fg-muted); font-weight: 400; }
+.confirm__cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
+.confirm__cta-row .btn { white-space: nowrap; }
+/* 0224 — "collected online" confirmation bar (its own row above the CTAs —
+   a payment fact reads as a statement, not another button). */
+.confirm__paidbar {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 4px;
+  padding: 14px 18px;
+  max-width: 480px;
+  border-radius: 16px;
+  background: color-mix(in oklab, #2F8F4F 9%, #fff);
+  border: 1.5px solid color-mix(in oklab, #2F8F4F 40%, transparent);
+}
+.confirm__paidbar svg { flex: 0 0 auto; color: #2F8F4F; }
+.confirm__paidbar-amt {
+  font-family: var(--font-button); font-size: 15px; font-weight: 700; color: #1F6B3A;
+}
+.confirm__paidbar-sub { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 .confirm__panel { background: var(--pos-panel, #fff); display: flex; flex-direction: column; overflow: hidden; }
 
 /* ========= Add-on cards ========= */
@@ -3420,8 +3496,15 @@
   background: var(--c-ink); color: var(--c-cream); border-color: var(--c-ink);
 }
 
-/* ---------- Order Status Page ---------- */
+/* ---------- Order Status Page ----------
+   Scroll model (Loo 2026-07-14): ONE page scrollbar, no nested lane
+   windows. Lanes grow to their content; the controls row sticks to the
+   top and each lane head sticks just below it, so deep in a 40-card
+   lane you still see which lane you're in and can reach search. */
 .os-page {
+  /* Sticky offset for the lane heads = the stuck controls row's height
+     (44px pills + 12px top + 14px bottom padding). Keep in sync. */
+  --os-controls-h: 70px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -3459,7 +3542,9 @@
 /* ----- Revenue summary cards ----- */
 .os-summary {
   display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-  padding: 6px 32px 18px;
+  /* 6px bottom + the sticky controls row's 12px top = the design's
+     original 18px gap. */
+  padding: 6px 32px 6px;
 }
 .os-sumcard {
   background: var(--pos-panel, #fff);
@@ -3501,8 +3586,12 @@
 
 /* ----- Controls row ----- */
 .os-controls {
+  position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 12px;
-  padding: 0 32px 18px;
+  padding: 12px 32px 14px;
+  background: color-mix(in srgb, var(--pos-bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .os-controls .os-search { flex: 1; min-width: 0; max-width: 520px; }
 .os-people { position: relative; }
@@ -3617,29 +3706,39 @@
 .os-stat__num sup { font-size: 9px; font-weight: 700; vertical-align: baseline; margin-right: 1px; }
 .os-stat__lbl { font-size: 10px; color: var(--fg-muted); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; margin-top: 4px; }
 
-/* Board */
+/* Board — no fixed height and no overflow clip: lanes run their full
+   content length and the page is the only scroll container (an
+   overflow other than visible here would also break the sticky lane
+   heads, whose scroll root must stay .os-page). */
 .os-board {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 1px;
   background: var(--line);
-  overflow: hidden;
-  flex: 1 0 560px;
-  min-height: 560px;
+  flex: 1 0 auto;
 }
 .os-lane {
   background: var(--pos-bg);
   display: flex; flex-direction: column;
-  min-height: 0;
 }
 .os-lane--place    { background: linear-gradient(180deg, color-mix(in oklab, var(--c-orange) 6%, var(--pos-bg)) 0%, var(--pos-bg) 240px); }
 .os-lane--proceed  { background: linear-gradient(180deg, color-mix(in oklab, #2F8F4F 7%, var(--pos-bg)) 0%, var(--pos-bg) 240px); }
 .os-lane--delivered{ background: linear-gradient(180deg, color-mix(in oklab, #5A6B7A 7%, var(--pos-bg)) 0%, var(--pos-bg) 240px); }
 
 .os-lane__head {
+  /* Sticks under the stuck controls row. The background is opaque and
+     matches its lane gradient's 0% colour, so at rest it is invisible
+     and once stuck it reads as the lane's colour band with cards
+     sliding underneath. */
+  position: sticky; top: var(--os-controls-h, 70px); z-index: 10;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: 14px; padding: 22px 24px 16px;
+  background: var(--pos-bg);
+  box-shadow: 0 8px 14px -12px rgba(34, 31, 32, 0.28);
 }
+.os-lane--place .os-lane__head     { background: color-mix(in oklab, var(--c-orange) 6%, var(--pos-bg)); }
+.os-lane--proceed .os-lane__head   { background: color-mix(in oklab, #2F8F4F 7%, var(--pos-bg)); }
+.os-lane--delivered .os-lane__head { background: color-mix(in oklab, #5A6B7A 7%, var(--pos-bg)); }
 .os-lane__num {
   font-family: var(--font-num); font-weight: 900; font-stretch: 80%;
   font-size: 36px; letter-spacing: -0.04em; line-height: 1;
@@ -3680,11 +3779,10 @@
 .os-lane__backend strong { display: block; color: var(--fg); font-weight: 600; margin-bottom: 2px; }
 
 .os-lane__body {
+  /* Natural height — no inner scroll window (design decision above). */
   flex: 1;
-  overflow-y: auto;
-  padding: 0 18px 24px;
+  padding: 0 18px 28px;
   display: flex; flex-direction: column; gap: 12px;
-  min-height: 0;
 }
 
 .os-empty {
@@ -4030,6 +4128,38 @@
 .os-detail__cta {
   display: flex; gap: 10px; justify-content: flex-end;
 }
+/* Footer error line + un-proceed hint (PosOrderDetail, 2026-07-14 —
+   mirrors 2990s .detailFootError / .detailCtaHint). */
+.os-detail__err {
+  font-size: 12px; color: #B8331F;
+  margin-bottom: 10px;
+}
+.os-detail__hint {
+  margin-right: auto; align-self: center;
+  font-size: 12px; color: var(--fg-muted);
+}
+
+/* Record-payment method chips (PosOrderDetail §6 — cash / bank / online /
+   cheque / card, same values TopUpOrderInput accepts). */
+.os-paychips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.os-paychip {
+  padding: 7px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--pos-panel, #fff);
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+  transition: 150ms ease;
+}
+.os-paychip:hover { border-color: var(--c-orange); color: var(--c-burnt); }
+.os-paychip.is-on {
+  border-color: var(--c-orange);
+  color: var(--c-burnt);
+  background: color-mix(in oklab, var(--c-orange) 8%, var(--pos-panel, #fff));
+}
 
 
 /* Payment slip attachment */
@@ -4099,4 +4229,70 @@
 .os-sumrow__val sup, .os-stat__num sup, .os-card__total-num sup,
 .os-item__price sup, .os-items__total sup, .os-pay__row sup { margin-right: 3px; }
 
-
+
+/* ---------- Stripe collect-online modal (0223, Loo 2026-07-14) ---------- */
+.os-stripe__overlay {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(34, 31, 32, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.os-stripe {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--pos-panel, #fff);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-3);
+  padding: 26px 28px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.os-stripe__close { position: absolute; top: 14px; right: 14px; }
+.os-stripe__eyebrow {
+  font-family: var(--font-button); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-burnt);
+}
+.os-stripe__title {
+  font-family: var(--font-title); font-weight: 700; font-size: 21px;
+  letter-spacing: -0.01em; line-height: 1.15; margin: 0;
+}
+.os-stripe__title sup { font-family: var(--font-button); font-size: 12px; font-weight: 700; color: var(--fg-muted); margin-right: 2px; }
+.os-stripe__sub { font-size: 13px; line-height: 1.5; color: var(--fg-muted); margin: 0; }
+.os-stripe__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.os-stripe__qr {
+  align-self: center;
+  padding: 14px;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  line-height: 0;
+}
+.os-stripe__waiting { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.os-stripe__spin { animation: os-stripe-spin 1.6s linear infinite; }
+@keyframes os-stripe-spin { to { transform: rotate(360deg); } }
+.os-stripe__actions { display: flex; gap: 10px; justify-content: center; }
+.os-stripe__hint { font-size: 11.5px; line-height: 1.45; color: var(--fg-soft); text-align: center; margin: 0; }
+.os-stripe__done { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 8px 0 2px; }
+.os-stripe__done svg { color: #2F8F4F; }
+.os-stripe__divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: var(--fg-soft);
+  letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+}
+.os-stripe__divider::before, .os-stripe__divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+
+/* 0224 — the ThankYou "collected online" pill was replaced by the
+   .confirm__paidbar row (see the confirm section above). */
+
+/* 0224 — pay-before-create void escape hatch on the QR stage. */
+.os-stripe__void {
+  align-self: center;
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  color: var(--c-burnt);
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 4px 8px;
+  transition: 120ms ease;
+}
+.os-stripe__void:hover { color: var(--c-orange); }

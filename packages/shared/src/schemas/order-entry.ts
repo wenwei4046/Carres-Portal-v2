@@ -110,6 +110,25 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
 
 /** The ACTIVE method list the POS renders + the server validates against:
  *  the configured list when non-empty, else the code defaults. */
+/**
+ * 0224 — Stripe online collection as a FIRST-CLASS wizard method (Loo
+ * 2026-07-15: "后面全部只用这种 payment"). Deliberately NOT part of the
+ * operator-editable order_entry_config list: its proof fields (reference =
+ * PaymentIntent id, slip = Stripe hosted receipt) are system-generated, so
+ * there is nothing for the operator to configure and nothing a config edit
+ * should be able to break. Both gates (wizard step4Valid + the Hono create
+ * route) special-case this key alongside the resolved config methods.
+ */
+export const STRIPE_METHOD_KEY = "stripe";
+export const STRIPE_PAYMENT_METHOD: PaymentMethodConfig = {
+  key: STRIPE_METHOD_KEY,
+  label: "Pay online",
+  sublabel: "Stripe QR / link",
+  active: true,
+  approvalCodeRequired: false,
+  followUps: [],
+};
+
 export function resolvePaymentMethods(
   cfg?: { paymentMethods?: PaymentMethodConfig[] | null } | null,
 ): PaymentMethodConfig[] {

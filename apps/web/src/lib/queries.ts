@@ -120,6 +120,8 @@ import {
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
+  type CreateStripeCheckoutInput,
+  type StripeCheckoutSessionInfo,
   type TransferReadyInput,
   type UpdateOrderInput,
   type WarehousePickInput,
@@ -149,6 +151,9 @@ export const qk = {
   dealerSelf:   () => ["dealers", "me"] as const,
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
   order:        (id: string) => ["orders", id] as const,
+  /** 0223 — one Stripe Checkout link's status poll (collect-online modal). */
+  stripeSession: (orderId: string, sessionId: string) =>
+    ["orders", orderId, "stripe-session", sessionId] as const,
   catalog:      () => ["catalog"] as const,
   /** 0201 — per-pool config-history snapshots. Nested under 'catalog' so every
    *  catalog mutation's ["catalog"] prefix-invalidation refreshes it too. */
@@ -814,6 +819,36 @@ export function useProceedOrder(
 }
 
 /**
+ * useUnproceedOrder — POST /api/orders/:id/unproceed (0220). Reverses the
+ * sales-side Proceed marker: Proceed → Place while operation hasn't started
+ * (operation_stage still 'confirmed') and the proceed date hasn't passed.
+ * Mirrors useProceedOrder's cache mechanics (prime detail + invalidate list).
+ *
+ * Errors:
+ *   - 422 with `{ error: "unproceed_blocked", code }` — code is one of
+ *     wrong_status / wrong_stage / proceed_date_passed for inline copy.
+ *   - 403 / 404 / 500 — generic toast.
+ */
+export function useUnproceedOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, void>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<Order>(`/api/orders/${orderId}/unproceed`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
  * useTopUpOrder — POST /api/orders/:id/top-up. Records an additional partial
  * payment toward the order total. On success, primes the detail cache + busts
  * the list so kanban paid pct updates on next mount.
@@ -852,6 +887,52 @@ export function useTopUpOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+/**
+ * useCreateStripeCheckout — POST /api/orders/:id/stripe/checkout (0223).
+ * Mints a Stripe Checkout link (QR at the counter / WhatsApp) for RM<amount>.
+ * The server re-validates amount ≤ outstanding; 422 codes:
+ * amount_exceeds_outstanding (body carries maxAmount) / already_paid /
+ * wrong_status. 503 = Stripe keys not configured yet.
+ */
+export function useCreateStripeCheckout(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ session: StripeCheckoutSessionInfo }, ApiError, CreateStripeCheckoutInput>>,
+) {
+  return useMutation<{ session: StripeCheckoutSessionInfo }, ApiError, CreateStripeCheckoutInput>({
+    mutationFn: (input) =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(`/api/orders/${orderId}/stripe/checkout`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+  });
+}
+
+/**
+ * useStripeCheckoutStatus — GET /api/orders/:id/stripe/checkout/:sid (0223).
+ * Polls one checkout link while the collect modal is open. While the session
+ * is 'open' the SERVER also live-reconciles against Stripe, so a counter
+ * payment lands within one poll even before the webhook endpoint exists.
+ * Callers watch data.session.status flip to 'paid' and then invalidate
+ * qk.order(orderId) + ["orders"] (the RPC moved orders.paid server-side).
+ */
+export function useStripeCheckoutStatus(
+  orderId: string,
+  sessionId: string | null,
+  opts?: { enabled?: boolean; refetchInterval?: number },
+) {
+  return useQuery<{ session: StripeCheckoutSessionInfo }, ApiError>({
+    queryKey: qk.stripeSession(orderId, sessionId ?? ""),
+    queryFn: () =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(
+        `/api/orders/${orderId}/stripe/checkout/${sessionId}`,
+      ),
+    enabled: !!sessionId && (opts?.enabled ?? true),
+    refetchInterval: opts?.refetchInterval ?? 4000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -2109,6 +2190,13 @@ export interface operationOrderDetailOrder {
   customer_phone: string | null;
   customer_address: string | null;
   customer_address_unknown: boolean;
+  /** 2026-07-16 — POS-captured extras surfaced to the drawer's customer card.
+   *  Emergency = one composed string ("Name · Phone · Relationship"); billing
+   *  only meaningful when customer_billing_same is false. Optional so older
+   *  detail fixtures keep typechecking. */
+  customer_emergency?: string | null;
+  customer_billing?: string | null;
+  customer_billing_same?: boolean;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
@@ -2150,6 +2238,10 @@ export interface operationOrderDetailLine {
   sku: string;
   qty: number;
   unit_price: number;
+  /** 2026-07-16 — server-resolved readable product name ("Model · Variant")
+   *  from product_skus/product_models; null when the sku isn't in the catalog
+   *  (e.g. AutoCount free-text skus). Optional for older fixtures. */
+  label?: string | null;
   // 2026-05-10 (Loo) — cascade picker payload threaded into the "+ Issue POs"
   // → CreatePOModal navigation so bedframe color/gap and sofa fabric stay
   // attached to the new PO line. Null for mattress lines (no extras) and
@@ -5296,6 +5388,17 @@ export function useBatchSaveCatalogFabrics() {
   return useMutation({
     mutationFn: (input: CatalogFabricsBatchSaveInput) =>
       apiFetch<{ ok: true }>("/api/catalog/fabrics", catalogJson("PUT", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** 0226 — Operation Catalog: record a fabric's buying add-on (RM). Internal
+ *  (operation + principal) via the catalog_fabrics_set_cost DEFINER RPC. */
+export function useSetCatalogFabricCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cost }: { id: string; cost: number | null }) =>
+      apiFetch<{ ok: true }>(`/api/catalog/fabrics/${id}/cost`, catalogJson("PATCH", { cost })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

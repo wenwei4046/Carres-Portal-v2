@@ -1,155 +1,157 @@
 /**
- * CARRES PORTAL — DESIGN STANDARD record (the contract lives in docs/UI-KIT.md)
+ * CARRES PORTAL — DESIGN STANDARD (single source of truth)
  * =========================================================
- * Locked 2026-07-12. This file RECORDS the values that are already live in the
- * codebase — it does NOT introduce new visuals. Every value here was read back
- * from the real source:
- *   • colours + radius  → `apps/web/src/index.css` `:root` (v17, locked 2026-06-09)
- *   • tailwind mapping  → `apps/web/tailwind.config.ts`
- *   • layout dims       → the live shells (`PortalSidebar.tsx`, `OperationApp.tsx`,
- *                         `OperationRightRail.tsx`)
- *   • status chips      → `OperationOrdersControl.tsx` (Jess's Orders list)
+ * ⭐ v4 — rewritten 2026-07-15 from `docs/CARRES_UI_KIT_V4.md` (Jess).
+ * THAT file overwrites ALL prior UI baselines; this module is its
+ * machine-readable mirror. Where any older doc, code comment, or token
+ * conflicts with UI-KIT v4, **v4 wins**. Prior scattered UI decisions
+ * (cream content backgrounds, mixed font sizes, light-grey content text,
+ * small checkboxes) are VOID.
  *
- * WHY THIS FILE EXISTS
- * --------------------
- * Colours are ALREADY a single source of truth: they live once in index.css
- * `:root` (as HSL) and reach components only through Tailwind utility classes
- * (`bg-primary`, `text-base-700`, …). Panels should NEVER hard-code a hex that
- * duplicates a token — use the class.
+ * Principles (UI-KIT v4 §1–§2):
+ *  - The content area is WHITE. Brand colour lives only in the left nav.
+ *  - Colour is a functional signal, never decoration. It appears only for
+ *    ACTION · SELECTION · STATUS · ALERT. Everything else black/grey/white.
+ *  - Flame appears ONLY on a clickable primary action + a checked checkbox;
+ *    at most ONE flame primary button per block; never on titles / icons /
+ *    borders / dividers / hovers.
+ *  - Content is darker than labels: main content near-black, secondary
+ *    mid-grey, labels/meta muted. NEVER light-grey content text.
  *
- * What was NOT centralised before today is the LAYOUT geometry (sidebar width,
- * rail width, header height, card radius) — those numbers were re-typed inline in
- * each shell. This file makes them importable so new panels reference ONE set
- * instead of eyeballing a magic number. Import `LAYOUT`, `RADIUS`, `TYPE`, and
- * (only where a token class can't be used) `CHIP`.
- *
- * DO NOT edit a value here to change the look. To change the look, edit index.css
- * (colours/radius) or the owning shell (layout), THEN update this record.
+ * Page-by-page alignment status: tokens below are LIVE law; existing pages
+ * still carrying old values get converged one page at a time (Jess's call
+ * on order). Do NOT hand-roll a hex/px that exists here.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. COLOUR — exact hex + the CSS var + the Tailwind class to use.
-//    Authoritative source = index.css `:root`. Values below are the resolved hex
-//    of those HSL tokens, for reference/reporting only. In JSX, use `className`.
+// 1. COLOUR — UI-KIT v4 §1: 5 neutrals + brand + semantic. In JSX prefer the
+//    Tailwind class / CSS var; the hex is the authoritative value.
 // ─────────────────────────────────────────────────────────────────────────────
 export const COLOR = {
-  // Surfaces
-  pageBg:      { hex: "#F5F5F7", cssVar: "--background", class: "bg-background" }, // v4 neutral canvas (2026-07-17; was cream)
-  card:        { hex: "#FFFFFF", cssVar: "--card",       class: "bg-card" },       // white card
-  sidebarBg:   { hex: "#FFFFFF", cssVar: "--card",       class: "bg-white" },      // rail + right rail
-  mainBg:      { hex: "#F9FAFB", cssVar: "--base-50",    class: "bg-base-50" },    // <main> behind cards
+  // Text layering (§4) — content DARK, labels muted. Date is content (dark).
+  textPrimary:   { hex: "#1A1A1A", use: "main content — REF, customer, date, amount, address" },
+  textSecondary: { hex: "#6B7280", use: "secondary info", class: "text-base-500" },
+  textMuted:     { hex: "#A8A8A8", use: "labels, icons, meta words ('ordered', 'PHONE'), table headers" },
 
-  // Hairline / borders
-  hairline:    { hex: "#E5E7EB", cssVar: "--border",     class: "border-base-200" }, // gray-200, 1px
-  cardHairline:{ hex: "rgba(17,24,39,0.08)", cssVar: "—", class: ".card border" },   // proto .card border
+  // Surfaces — white content on a very-light grey canvas.
+  surface: { hex: "#FFFFFF", use: "content background, panels, rows", class: "bg-white" },
+  canvas:  { hex: "#F0EFE9", use: "page canvas behind white panels", cssVar: "--background", class: "bg-background" },
 
-  // Text
-  ink:         { hex: "#111827", cssVar: "--foreground", class: "text-base-900" }, // gray-900 body ink
-  inkStrong:   { hex: "#1F2937", cssVar: "--base-800",   class: "text-base-800" },
-  muted:       { hex: "#6B7280", cssVar: "--base-500",   class: "text-base-500" }, // gray-500 muted
-  faint:       { hex: "#9CA3AF", cssVar: "--base-400",   class: "text-base-400" }, // icons at rest
+  // Brand + selection (functional ONLY — see §2 discipline).
+  flame:      { hex: "#C44D2B", use: "PRIMARY ACTION buttons + checkbox-checked ONLY", cssVar: "--primary" },
+  selectBlue: { hex: "#378ADD", use: "row selected / multi-select ONLY" },
+  selectedRowWash: { hex: "#E6F1FB", use: "whole selected row soft blue wash" },
 
-  // Section band — the ONE cream title band shared by the list facet groups
-  // (SUMMARY / CHASE NOW / …) and every order-drawer panel header. Values live
-  // in index.css `.section-band*` (2026-07-13); render via <SectionBand>
-  // (components/SectionPanel.tsx), never a bespoke bar. NOTE: deliberately a
-  // slightly deeper cream than pageBg (#F5F1EA) so the band reads on the card.
-  sectionBand:      { hex: "#F1EFE8", cssVar: "—", class: "section-band" },
-  sectionBandTitle: { hex: "#221F20", cssVar: "—", class: "section-band-title" }, // danger variant #991B1B = .section-band-title-danger
-  sectionBandTotal: { hex: "#6F6960", cssVar: "—", class: "section-band-total" },
+  // Semantic status (always rendered as a PILL — §6; dark same-hue text on
+  // a soft tint, never bare coloured text).
+  green: { text: "#3B6D11", fill: "#EAF3DE", use: "ready / paid / on-time" },
+  amber: { text: "#854F0B", fill: "#FAEEDA", use: "waiting / chasing" },
+  red:   { text: "#A32D2D", fill: "#FCEBEB", use: "problem / No PO / overdue / alert" },
 
-  // Brand + primary action
-  flame:       { hex: "#C44D2B", cssVar: "--primary",     class: "text-primary / bg-primary" }, // brand / hero CTA
-  flameHover:  { hex: "#9A3D22", cssVar: "--signature-700", class: "hover:bg-signature-700" },
-  flameFill:   { hex: "#F4E4DD", cssVar: "--signature-50", class: "bg-signature-50" },  // active chip/card fill
-  darkPrimary: { hex: "#111827", cssVar: "--base-900",   class: "bg-base-900" },  // active tab fill (v4: the workhorse BUTTON is grey-soft .btn-primary #F1F0EC, black buttons retired)
-  focusRing:   { hex: "#C44D2B", cssVar: "--ring",       class: "ring-primary" },
+  // Hairline (v4 §9: 0.5px hairline borders on white panels).
+  hairline: { hex: "#E5E7EB", cssVar: "--border", class: "border-base-200" },
+
+  // LEGACY (pre-v4, pending page-by-page removal): the cream section band
+  // inside white panels. v4 voids cream content backgrounds — replace with
+  // white/canvas layering as each page is aligned.
+  sectionBand:      { hex: "#F1EFE8", class: "section-band", legacy: true },
+  sectionBandTitle: { hex: "#221F20", class: "section-band-title", legacy: true },
+  sectionBandTotal: { hex: "#6F6960", class: "section-band-total", legacy: true },
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. STATUS CHIPS — the four semantic tones.
-//
-//    ✅ RESOLVED 2026-07-12 (Jess): the two chip palettes were unified onto the
-//    warmer Orders-list fill. `index.css` `.pill-warning/-confirmed/-overdue/-sent`
-//    now carry the `ordersFill` + `ordersBorder` values below (ink text unchanged),
-//    so a `.pill-*` renders identically to an `OperationOrdersControl` chip. The
-//    base `.pill` got a transparent border so bordered + border-less pills (draft/
-//    collected/neutral keep no border) share one box height. `pillFill` below is
-//    the PRE-unification cooler Tailwind-100 fill, kept for historical reference.
+// 2. STATUS PILLS — v4 §6: soft tinted bg + dark same-hue text, pill radius.
+//    Status is ALWAYS a pill, never bare text. Three semantics only.
+//    (`.pill-confirmed` / `.pill-warning` / `.pill-overdue` in index.css now
+//    carry these values; blue `.pill-sent` is a legacy scheduled chip pending
+//    v4 alignment — v4 blue means SELECTION, not status.)
 // ─────────────────────────────────────────────────────────────────────────────
 export const CHIP = {
-  // key → { text (ink, SHARED by both), ordersFill, ordersBorder, pillFill, pillClass }
-  waiting:   { meaning: "waiting stock / low",   text: "#854F0B", ordersFill: "#FAEEDA", ordersBorder: "#F0D08A", pillFill: "#FAEEDA", pillClass: "pill-warning"   }, // amber (v4)
-  ready:     { meaning: "ready / confirmed",     text: "#3B6D11", ordersFill: "#EAF3DE", ordersBorder: "#A9D8B0", pillFill: "#EAF3DE", pillClass: "pill-confirmed" }, // green (v4)
-  overdue:   { meaning: "overdue / no-PO / chase", text: "#A32D2D", ordersFill: "#FCEBEB", ordersBorder: "#F3B4B4", pillFill: "#FCEBEB", pillClass: "pill-overdue"   }, // red (v4)
-  scheduled: { meaning: "scheduled / call / assign", text: "#1E40AF", ordersFill: "#D3E4FB", ordersBorder: "#A9C8F2", pillFill: "#DBEAFE", pillClass: "pill-sent"      }, // blue
-  done:      { meaning: "done / neutral",        text: "#4B5563", ordersFill: "#EAE7DF", ordersBorder: "#D6D2C6", pillFill: "#F3F4F6", pillClass: "pill-neutral"   }, // grey
+  ready:   { meaning: "ready / paid / on-time",      text: "#3B6D11", fill: "#EAF3DE", pillClass: "pill-confirmed" },
+  waiting: { meaning: "waiting / chasing",           text: "#854F0B", fill: "#FAEEDA", pillClass: "pill-warning" },
+  overdue: { meaning: "problem / No PO / overdue",   text: "#A32D2D", fill: "#FCEBEB", pillClass: "pill-overdue" },
 } as const;
 
-// The semantic token behind each tone (for `bg-success` / `text-info` etc.).
-export const CHIP_TOKEN = {
-  waiting:   { hex: "#D97706", cssVar: "--warning", soft: "#FEF3C7" },
-  ready:     { hex: "#16A34A", cssVar: "--success", soft: "#DCFCE7" },
-  overdue:   { hex: "#DC2626", cssVar: "--danger",  soft: "#FEE2E2" },
-  scheduled: { hex: "#2563EB", cssVar: "--info",    soft: "#DBEAFE" },
+/** Selection (v4 §8) — blue is selection ONLY, never action/decoration. */
+export const SELECTION = {
+  checkbox: "#378ADD",
+  rowWash:  "#E6F1FB",
+} as const;
+
+/** Checkbox (v4 §5 + §8b): 16–18px square, clearly visible; the locked
+ *  in-row density value is 17px. Unchecked = grey outline empty box;
+ *  checked = flame-filled + white tick. */
+export const CHECKBOX = {
+  sizePx: 17,           // §8b locked (16–18 allowed range)
+  checkedFill: "#C44D2B",
+  uncheckedBorder: "#A8A8A8",
+} as const;
+
+/** Row density (v4 §8b, LOCKED): list rows are 44px FIXED — content adapts
+ *  to the row (truncate/collapse), the row NEVER grows to the content. The
+ *  three sources must agree: OperationOrdersControl td height, this value,
+ *  and the actual render. */
+export const ROW = {
+  heightPx: 44,         // FIXED — not min-height semantics
+  contentFontPx: 12,
+  checkboxPx: 17,
+  pillFontPx: 11,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. LAYOUT — exact px. These are the numbers to import instead of re-typing.
+// 3. TYPOGRAPHY — v4 §3: Inter, layer by WEIGHT not size. Weights 400/500/
+//    600/700. Numbers/codes/money/phone = slashed-zero monospace (JetBrains
+//    Mono with the `zero` feature — wired in index.css `@layer base`).
+//    Most content sits at 14–15; ONLY page title (24) + hero number (20)
+//    rise above. REF and SO are the SAME size — distinguish by weight/colour.
+//    Utility classes live in index.css (`.t4-*` = the v4 ramp).
+// ─────────────────────────────────────────────────────────────────────────────
+export const TYPE = {
+  pageTitle:    { px: 24, weight: 600, class: "t4-page-title", note: "largest — NOTHING exceeds this" },
+  heroNumber:   { px: 20, weight: 700, class: "t4-hero-num", note: "e.g. Outstanding — big, but < page title" },
+  sectionTitle: { px: 16, weight: 600, class: "t4-section" },
+  content:      { px: 15, weight: 500, class: "t4-content", note: "REF / customer / date / amount — near-black" },
+  secondary:    { px: 14, weight: 400, class: "t4-secondary" },
+  label:        { px: 12, weight: 500, class: "t4-label", note: "uppercase, muted — panel labels / table headers" },
+  caption:      { px: 12, weight: 400, class: "t4-caption", note: "muted meta" },
+} as const;
+
+/** Fonts (v4 §3; loaded in apps/web/index.html, mapped in tailwind.config.ts). */
+export const FONT = {
+  body: "Inter",           // all text/UI — weights 400 / 500 / 600 / 700
+  mono: "JetBrains Mono",  // numbers / codes / money / phone — slashed zero
+                           // (`font-feature-settings: "zero" 1` — index.css)
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. LAYOUT — v4 §9 locked decisions + live shell geometry (unchanged by v4).
 // ─────────────────────────────────────────────────────────────────────────────
 export const LAYOUT = {
-  sidebarWidth:        232, // PortalSidebar expanded (px)
-  sidebarCollapsed:     60, // PortalSidebar icon rail (px)
-  sidebarActiveBar:      3, // flame active-item left bar (px)
-  rightRailPanel:      320, // OperationRightRail expanded panel (px)
-  rightRailStrip:       52, // OperationRightRail icon strip (px)
-  railHeaderHeight:     48, // right-rail panel header (h-12)
-  tableRowHeight:       44, // ALL rows, list + drawer — 44px FIXED (v4; `h-11` / `[&_td]:h-[44px]`)
-  // NOTE: there is NO single global top bar. The portal shell is a 3-column grid
-  // `auto minmax(0,1fr) auto` (sidebar | main | right rail); each page renders
-  // its own header. Page/section headers cluster at 48–56px (h-12 / h-14) — use
-  // `headerHeight` for a new page header to stay consistent.
-  headerHeight:         56, // recommended page header (h-14)
+  // Order-detail page: two columns, left = summaries, right = Items hero.
+  orderDetailLeftPct:  32,
+  orderDetailRightPct: 68,
+  // Shell geometry (live values — PortalSidebar / OperationRightRail).
+  sidebarWidth:        232,
+  sidebarCollapsed:     60,
+  sidebarActiveBar:      3,
+  rightRailPanel:      320,
+  rightRailStrip:       52,
+  railHeaderHeight:     48,
+  tableRowHeight:       44, // v4 §8b LOCKED — FIXED height, see ROW below
+  headerHeight:         56,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. RADIUS + spacing scale (exact px). Radius token base = --radius (8px).
-// ─────────────────────────────────────────────────────────────────────────────
 export const RADIUS = {
-  card:  8,  // proto `.card` / token `--radius` (rounded-lg)
-  md:    8,  // buttons (rounded-lg, v4)
-  sm:    4,  // small chips / cells (most-used in Orders grid: rounded-[4px])
-  pill: 9999,// fully round (rounded-full)
-  pos:  16,  // 2990s POS card (rounded-2xl) — dealer POS only
+  card:  12,  // v4 §9 — 12px radius on cards (SectionCard already complies)
+  md:    6,   // buttons
+  sm:    4,   // small chips / cells
+  pill: 9999, // status pills — fully round
 } as const;
 
 export const SPACE = {
-  hairline: 1,   // border width (px)
-  cardPad:  16,  // p-4 — standard card padding
-  pagePad:  24,  // p-6 / px-6 — page gutter
-  gap:      8,   // gap-2 — default element gap (most-used)
-  gapRow:   12,  // gap-3 — row/label gap
-} as const;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. TYPE SCALE — exact px (mirrors the `.t-*` utilities in index.css @layer
-//    components). Use the CLASS in JSX; the px here is for reference/reporting.
-// ─────────────────────────────────────────────────────────────────────────────
-export const TYPE = {
-  h1:    { px: 32, weight: 700, class: "t-h1" },
-  h2:    { px: 24, weight: 700, class: "t-h2" },
-  h3:    { px: 18, weight: 600, class: "t-h3" },
-  h4:    { px: 15, weight: 600, class: "t-h4" },
-  body:  { px: 14, weight: 400, class: "t-body" },
-  small: { px: 13, weight: 400, class: "t-small" },  // also the button text size
-  tiny:  { px: 12, weight: 400, class: "t-tiny" },
-  micro: { px: 11, weight: 500, class: "t-micro" },  // uppercase label / kicker
-} as const;
-
-/** Font families (from tailwind.config.ts). */
-export const FONT = {
-  body:  "Inter",           // font-sans / font-body / font-display
-  mono:  "JetBrains Mono",  // font-mono — SKU / codes / dimensions
-  price: "Archivo",         // font-price — POS price hero only
-  num:   ".t-num",          // Inter + lining+tabular figures — money / qty / margin
+  hairline: 1,   // rendered border width (px) — "0.5px hairline" intent
+  cardPad:  16,
+  pagePad:  24,
+  gap:      8,
+  gapRow:   12,
 } as const;

@@ -5,6 +5,12 @@ export type Bindings = {
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_JWT_SECRET: string;
+  // Stripe online collection (0223). Secrets — undefined until
+  // `wrangler secret put` runs; routes answer 503 stripe_not_configured.
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  // Where Checkout lands after paying (wrangler.toml [vars]).
+  PUBLIC_WEB_URL?: string;
 };
 
 export type AuthContext = {

@@ -4,21 +4,13 @@
 
 @layer base {
   :root {
-    /* ===== Carres UI v17 (locked 2026-06-09) — clean modern SaaS + Carres warmth.
-     * Token NAMES are unchanged from the warm-linen system, so every component
-     * (bg-base-*, text-primary, bg-card, status badges…) re-themes with ZERO
-     * churn — only the VALUES flip:
-     *   • neutrals  → Tailwind cool gray
-     *   • brand     → flame (#C44D2B)
-     *   • status    → bright semantic
-     *   • page bg   → kept CREAM for Carres warmth (v17 page-bg option B)
-     *   • cards     → white (hierarchy now from borders + subtle shadow, not
-     *                 stacked cream layers)
-     * Approved by Loo via side-by-side preview 2026-06-09. */
-    /* v4 (2026-07-17, Jess): canvas flipped cream → clean neutral grey.
-     * Brand lives in the flame, not the background. */
-    --background: 240 11% 96%;         /* #F5F5F7 — v4 canvas (was cream #F5F1EA) */
-    --foreground: 221 39% 11%;         /* gray-900 ink */
+    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/CARRES_UI_KIT_V4.md) — overwrites
+     * all prior baselines (v17 cream et al). White content base; brand colour
+     * only in the left nav; colour = action/selection/status/alert ONLY.
+     * Token NAMES unchanged (zero component churn) — VALUES follow v4.
+     * design-standard.ts is the machine-readable mirror. */
+    --background: 51.4 18.9% 92.7%;    /* #F0EFE9 — v4 canvas grey (was cream) */
+    --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */
     --card-foreground: 221 39% 11%;
@@ -91,6 +83,15 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+  /* UI-KIT v4 §3 — numbers / codes / money / phone never confuse 0 and o:
+   * every monospace surface renders the SLASHED zero (JetBrains Mono `zero`
+   * feature) + tabular figures. */
+  code,
+  kbd,
+  .font-mono {
+    font-feature-settings: "zero" 1;
+    font-variant-numeric: slashed-zero tabular-nums;
+  }
 }
 
 @layer components {
@@ -109,6 +110,21 @@
     font-variant-numeric: slashed-zero tabular-nums;
     font-feature-settings: "zero" 1;
   }
+
+  /* ===== ⭐ UI-KIT v4 type ramp (§3) — Inter, layer by WEIGHT not size.
+   * Most content sits at 14–15; ONLY page title (24) + hero number (20)
+   * rise above. REF and SO same size — distinguish by weight/colour.
+   * The old `.t-h*` ramp below is DEPRECATED (v4 supersedes it) — swap each
+   * page onto `.t4-*` during the page-by-page alignment; do not use `.t-h*`
+   * in NEW code. */
+  .t4-page-title { @apply text-[24px] font-semibold text-foreground; }         /* largest — nothing exceeds */
+  .t4-hero-num   { @apply text-[20px] font-bold text-foreground; }             /* e.g. Outstanding */
+  .t4-section    { @apply text-[16px] font-semibold text-foreground; }         /* ITEMS ORDERED … */
+  .t4-content    { @apply text-[15px] font-medium text-foreground; }           /* REF / customer / date / amount */
+  .t4-secondary  { @apply text-[14px] font-normal text-base-500; }             /* secondary info */
+  .t4-label      { @apply text-[12px] font-medium uppercase text-[#A8A8A8]; }  /* panel label / table header */
+  .t4-caption    { @apply text-[12px] font-normal text-[#A8A8A8]; }            /* meta */
+
 
   /* v4 button hierarchy (2026-07-17, Jess — docs/UI-KIT.md §A5): `.btn-hero` =
    * the ONE flame CTA per page/block; `.btn-primary` = the GREY-SOFT workhorse
@@ -209,6 +225,8 @@
   /* v17 type scale (spec NOTES v17 §TYPOGRAPHY SIZES) — one class per role so
    * pages stop hand-rolling `text-[Npx] font-* tracking-*`. Colour stays on the
    * element (these set size/weight/tracking only). */
+  /* DEPRECATED ramp (pre-v4) — kept alive so unaligned pages don't break;
+   * every page moves to the `.t4-*` ramp above during v4 alignment. */
   .t-h1    { @apply text-[32px] font-bold tracking-[-0.02em] leading-[1.05]; }
   .t-h2    { @apply text-[24px] font-bold tracking-[-0.01em]; }
   .t-h3    { @apply text-[18px] font-semibold; }

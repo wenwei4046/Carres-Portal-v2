@@ -14,6 +14,7 @@ import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
+import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -159,6 +160,11 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* 0223 — Stripe Checkout landings. PUBLIC on purpose: the CUSTOMER's
+         *  browser arrives here after paying; there is no session and nothing
+         *  sensitive on the page. */}
+        <Route path="/pay/success" element={<PaySuccess />} />
+        <Route path="/pay/cancelled" element={<PayCancelled />} />
         <Route path="/" element={<HomeRedirect />} />
         <Route path="*" element={<HomeRedirect />} />
       </Routes>

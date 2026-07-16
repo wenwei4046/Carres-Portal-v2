@@ -1,7 +1,7 @@
 /**
  * OrderStatusPage — the POS "My orders" board (design: pos-order-status.jsx).
  * PIN gate → revenue summary → 3 lanes from REAL dealer orders; card click
- * opens the existing DealerOrderDetail overlay (mocked here).
+ * opens the POS-native PosOrderDetail drawer (mocked here).
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -76,8 +76,8 @@ vi.mock("@/lib/queries", () => ({
   useOrders: () => ({ data: { orders: ORDERS, total: ORDERS.length }, isLoading: false }),
   useSalespersons: () => ({ data: { salespersons: [{ id: "sp-1", name: "Aisyah" }] } }),
 }));
-vi.mock("../DealerOrderDetail", () => ({
-  default: ({ id }: { id: string }) => <div data-testid="dealer-order-detail">{id}</div>,
+vi.mock("./PosOrderDetail", () => ({
+  default: ({ id }: { id: string }) => <div data-testid="pos-order-detail">{id}</div>,
 }));
 
 function unlock() {
@@ -131,8 +131,9 @@ describe("OrderStatusPage", () => {
     render(<OrderStatusPage onClose={() => {}} />);
     expect(screen.getByTestId("os-pin-gate")).toBeTruthy();
 
-    // Wrong pin shakes + clears — board stays hidden.
-    for (const d of "111111") fireEvent.click(screen.getByTestId(`os-pin-${d}`));
+    // Wrong pin shakes + clears — board stays hidden. (Any 6 digits that are
+    // NOT the real ORDER_STATUS_PIN.)
+    for (const d of "990099") fireEvent.click(screen.getByTestId(`os-pin-${d}`));
     expect(screen.queryByTestId("os-lane-place")).toBeNull();
     // The gate clears a wrong entry after ~700ms; keys are ignored until then.
     await new Promise((r) => setTimeout(r, 800));
@@ -157,7 +158,7 @@ describe("OrderStatusPage", () => {
     const card = screen.getByTestId("os-card-1202");
 
     fireEvent.click(card);
-    expect(screen.getByTestId("dealer-order-detail")).toBeTruthy();
+    expect(screen.getByTestId("pos-order-detail")).toBeTruthy();
   });
 
   it("Lock again returns to the PIN gate", async () => {

@@ -42,7 +42,10 @@ describe("PortalSidebar — role visibility", () => {
     mockRole = "operation";
     renderAt("/operation");
     expect(screen.getByText("Purchase Order")).toBeInTheDocument();
-    expect(screen.getByText("Product & Maintenance")).toBeInTheDocument();
+    // 0226 — operation gets the costing Operation Catalog; Product &
+    // Maintenance (selling prices) is principal-only.
+    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
+    expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
@@ -63,8 +66,10 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.getByText("Operations")).toBeInTheDocument();
     expect(screen.getByText("Finance")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
-    // Active area (operation) is expanded → its items render.
+    // Active area (operation) is expanded → its items render. The principal
+    // keeps BOTH catalog entries (0226: P&M principal-only + Operation Catalog).
     expect(screen.getByText("Product & Maintenance")).toBeInTheDocument();
+    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
     // Inactive areas are collapsed → their items are hidden until clicked.
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
