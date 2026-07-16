@@ -213,10 +213,12 @@ export {
   catalogFabricSchema,
   catalogFabricEntryInput,
   catalogFabricsBatchSaveInput,
+  catalogFabricCostInput,
   catalogFabricsHistorySchema,
   type CatalogFabricDto,
   type CatalogFabricEntryInput,
   type CatalogFabricsBatchSaveInput,
+  type CatalogFabricCostInput,
   type CatalogFabricsHistoryDto,
   // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
   deliveryFeeConfigSchema,

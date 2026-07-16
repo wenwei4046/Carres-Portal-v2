@@ -5392,6 +5392,17 @@ export function useBatchSaveCatalogFabrics() {
   });
 }
 
+/** 0226 — Operation Catalog: record a fabric's buying add-on (RM). Internal
+ *  (operation + principal) via the catalog_fabrics_set_cost DEFINER RPC. */
+export function useSetCatalogFabricCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cost }: { id: string; cost: number | null }) =>
+      apiFetch<{ ok: true }>(`/api/catalog/fabrics/${id}/cost`, catalogJson("PATCH", { cost })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
 /** 0202 — the Fabrics History dialog's snapshot log (newest first). Rides the
  *  ["catalog"] prefix so every fabric save refreshes it. */
 export function useCatalogFabricsHistory(enabled: boolean) {

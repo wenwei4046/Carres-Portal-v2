@@ -218,6 +218,8 @@ export interface CatalogFabric {
   bedframeTier: FabricTier;
   active: boolean;
   sortOrder: number;
+  /** 0226 — operation's recorded buying add-on (RM); null = not recorded. */
+  cost: number | null;
 }
 
 /**

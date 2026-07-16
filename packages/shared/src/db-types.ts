@@ -292,6 +292,9 @@ export interface CatalogFabricRow {
   bedframe_tier: "PRICE_1" | "PRICE_2" | "PRICE_3";
   active: boolean;
   sort_order: number;
+  /** 0226 — operation's recorded buying add-on (RM). Postgres numeric may
+   *  arrive as a string; nullable = not recorded. */
+  cost: number | string | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

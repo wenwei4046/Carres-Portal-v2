@@ -42,6 +42,7 @@ import {
   CATALOG_CONFIG_HISTORY,
   CATALOG_FABRICS,
   catalogFabricsBatchSaveInput,
+  catalogFabricCostInput,
   deliveryFeeConfigPatchInput,
   specialDeliveryFeeRuleInput,
   DELIVERY_FEE_CONFIG,
@@ -111,26 +112,36 @@ function principalOnly(
 // add-ons, supplier_id) stay open to internal roles.
 // 0186 — pwp_price joins price + cost under the same principal lock (the DB
 // trigger enforce_sku_price_cost_principal_only was EXTENDED to cover it).
+// 0226 — COST leaves the principal-only set: operation records buying prices
+// in the Operation Catalog, so cost is writable by operation + principal
+// (the DB trigger was relaxed the same way). price / pwp_price / pricesBySize
+// stay principal-only.
 const SKU_PRICE_COST_ERROR =
-  "Only the principal (Master Admin) can set SKU price, cost, or pwp_price";
+  "Only the principal (Master Admin) can set SKU price, pwp_price, or per-size prices";
+const SKU_COST_ERROR = "Only operation or the principal can set SKU cost";
 
-// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null /
-// pwp_price null); block only when they try to seed a price, cost, or pwp_price.
+// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / pwp_price
+// null); operation may additionally seed the buying cost. Block only when a
+// role tries to set something outside its lane.
 function gateSkuCreatePriceCost(
   c: { var: { auth: { role: string } } },
   data: { price: number; cost?: number | null; pwpPrice?: number | null },
 ) {
-  if (c.var.auth.role === "principal") return;
+  const role = c.var.auth.role;
+  if (role === "principal") return;
   const setsPrice = data.price !== 0;
   const setsCost = data.cost !== null && data.cost !== undefined;
   const setsPwpPrice = data.pwpPrice !== null && data.pwpPrice !== undefined;
-  if (setsPrice || setsCost || setsPwpPrice) {
+  if (setsPrice || setsPwpPrice) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
+  }
+  if (setsCost && role !== "operation") {
+    throw new HTTPException(403, { message: SKU_COST_ERROR });
   }
 }
 
-// PATCH /skus/:id: block when a non-principal includes a price, cost, or
-// pwp_price key at all (presence = intent to change; a `null` clearing counts).
+// PATCH /skus/:id: block when a role includes a pricing key outside its lane
+// (presence = intent to change; a `null` clearing counts).
 function gateSkuPatchPriceCost(
   c: { var: { auth: { role: string } } },
   data: {
@@ -141,14 +152,17 @@ function gateSkuPatchPriceCost(
     pricesBySize?: Record<string, number> | null;
   },
 ) {
-  if (c.var.auth.role === "principal") return;
+  const role = c.var.auth.role;
+  if (role === "principal") return;
   if (
     data.price !== undefined ||
-    data.cost !== undefined ||
     data.pwpPrice !== undefined ||
     data.pricesBySize !== undefined
   ) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
+  }
+  if (data.cost !== undefined && role !== "operation") {
+    throw new HTTPException(403, { message: SKU_COST_ERROR });
   }
 }
 
@@ -2287,6 +2301,33 @@ function fabricDuplicate() {
     message: "Duplicate fabric codes — each fabric code must be unique.",
   } as const;
 }
+
+// PATCH /fabrics/:id/cost — 0226 Operation Catalog: operation records a
+// fabric's buying add-on (RM). Internal (operation + principal); the table's
+// write RLS stays principal-only, so the write goes through the
+// catalog_fabrics_set_cost SECURITY DEFINER RPC (is_internal() gated inside).
+catalogRouter.patch("/fabrics/:id/cost", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, catalogFabricCostInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("catalog_fabrics_set_cost", {
+    p_id: id,
+    p_cost: parsed.data.cost,
+  });
+  if (error) {
+    if (error.code === "P0002") {
+      return c.json(
+        { error: "not_found", code: "not_found", message: "fabric not found" },
+        404,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, result: data ?? null });
+});
 
 // GET /fabrics/history — the section='fabrics' snapshot log, newest first
 // (internal read; the History dialog is operation+principal facing).

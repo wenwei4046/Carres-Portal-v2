@@ -1,0 +1,275 @@
+import { memo, useMemo, useState } from "react";
+import { toast } from "sonner";
+import type {
+  CatalogResponse,
+  ProductCategory,
+  ProductModelDto,
+  ProductSkuDto,
+} from "@carres/shared";
+import { PRODUCT_CATEGORIES } from "@carres/shared";
+import { ApiError } from "@/lib/api";
+import { usePatchCatalogSku } from "@/lib/queries";
+import { INPUT_CLS } from "@/pages/operation/components/Modal";
+import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
+
+/**
+ * Operation Catalog › SKU Master (0226) — the COSTING view of the shared
+ * product_skus list. One money column: COST (the buying price operation
+ * records), writable by operation + principal (DB trigger relaxed in 0226).
+ * Deliberately NOT here: selling price, PWP, margin, per-size price grid,
+ * bulk delete, import/export, + New SKU — this is a recording surface, not a
+ * structure editor (structure lives in Product & Maintenance).
+ *
+ * Same render cap as the selling SKU Master: at most VISIBLE_CAP rows, with a
+ * refine-your-filter hint past that (Loo's HV-Portal lag rule).
+ */
+
+const VISIBLE_CAP = 300;
+// 7 tracks: code · desc · product · category · size · cost · edit
+const GRID_COLS =
+  "170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 130px 60px";
+
+type CatFilter = ProductCategory | "all";
+
+interface FlatRow {
+  sku: ProductSkuDto;
+  model: ProductModelDto | undefined;
+  category: ProductCategory | undefined;
+  productName: string;
+}
+
+function fmtRm(n: number): string {
+  return `RM ${n.toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export default function OperationSkuCostTab({ catalog }: { catalog: CatalogResponse }) {
+  const [category, setCategory] = useState<CatFilter>("all");
+  const [modelFilter, setModelFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [editMode, setEditMode] = useState(false);
+
+  const modelById = useMemo(() => {
+    const m = new Map<string, ProductModelDto>();
+    for (const model of catalog.models) m.set(model.id, model);
+    return m;
+  }, [catalog.models]);
+
+  const allRows = useMemo<FlatRow[]>(
+    () =>
+      catalog.skus.map((sku) => {
+        const model = modelById.get(sku.modelId);
+        return {
+          sku,
+          model,
+          category: model?.category,
+          productName: model?.name ?? "—",
+        };
+      }),
+    [catalog.skus, modelById],
+  );
+
+  const categoryModels = useMemo(
+    () =>
+      catalog.models
+        .filter((m) => category === "all" || m.category === category)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog.models, category],
+  );
+
+  function pickCategory(next: CatFilter) {
+    setCategory(next);
+    setModelFilter("all");
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allRows
+      .filter((r) => (category === "all" ? true : r.category === category))
+      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
+      .filter((r) => {
+        if (!q) return true;
+        return (
+          r.sku.sku.toLowerCase().includes(q) ||
+          (r.sku.description ?? "").toLowerCase().includes(q) ||
+          r.productName.toLowerCase().includes(q) ||
+          r.sku.variant.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
+  }, [allRows, category, modelFilter, search]);
+
+  const visible = filtered.slice(0, VISIBLE_CAP);
+  const overflow = filtered.length - visible.length;
+
+  return (
+    <div>
+      {/* Filter + actions */}
+      <div className="flex justify-between items-center gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <CategoryChip active={category === "all"} onClick={() => pickCategory("all")}>
+            All
+          </CategoryChip>
+          {PRODUCT_CATEGORIES.map((c) => (
+            <CategoryChip key={c} active={category === c} onClick={() => pickCategory(c)}>
+              {CATEGORY_LABEL[c]}
+            </CategoryChip>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search code / name / size…"
+            aria-label="Search SKUs"
+            data-testid="opcost-sku-search"
+            className={`${INPUT_CLS} w-56`}
+          />
+          <button
+            type="button"
+            onClick={() => setEditMode((v) => !v)}
+            className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
+            data-testid="opcost-edit-costs"
+          >
+            {editMode ? "Done editing" : "Edit Costs"}
+          </button>
+        </div>
+      </div>
+
+      {/* Model pill row — second-level filter under the category chips. */}
+      {category !== "all" && categoryModels.length > 0 && (
+        <div
+          className="flex items-center gap-1.5 flex-wrap -mt-1 mb-4"
+          data-testid="opcost-model-filter"
+        >
+          <span className="t-micro text-base-400 mr-1">Model</span>
+          <CategoryChip active={modelFilter === "all"} onClick={() => setModelFilter("all")}>
+            All {CATEGORY_LABEL[category]}
+          </CategoryChip>
+          {categoryModels.map((m) => (
+            <CategoryChip
+              key={m.id}
+              active={modelFilter === m.id}
+              onClick={() => setModelFilter(m.id)}
+            >
+              {m.name}
+            </CategoryChip>
+          ))}
+        </div>
+      )}
+
+      <p className="t-tiny text-base-500 mb-2">
+        {filtered.length} SKU{filtered.length === 1 ? "" : "s"}
+        {overflow > 0 && (
+          <span className="text-base-400">
+            {" "}
+            · showing first {VISIBLE_CAP} — refine the search or category to see the rest
+          </span>
+        )}
+        <span className="text-base-400"> · cost = buying price (isolated from POS selling)</span>
+      </p>
+
+      {/* Grid */}
+      <div className="bg-white border border-base-200 rounded-[4px] overflow-x-auto">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          style={{ gridTemplateColumns: GRID_COLS }}
+        >
+          <div className="label">Code</div>
+          <div className="label">Description</div>
+          <div className="label">Product</div>
+          <div className="label">Category</div>
+          <div className="label">Size</div>
+          <div className="label text-right">Cost</div>
+          <div className="label" />
+        </div>
+
+        {visible.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-6 text-center">
+            No SKUs match. Adjust the filter or the search.
+          </div>
+        )}
+
+        {visible.map((r) => (
+          <CostRowView key={r.sku.id} row={r} editMode={editMode} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const CostRowView = memo(function CostRowView({
+  row,
+  editMode,
+}: {
+  row: FlatRow;
+  editMode: boolean;
+}) {
+  const { sku, category, productName } = row;
+  const patch = usePatchCatalogSku();
+  const discontinued = !!sku.discontinuedAt;
+
+  // Blank clears back to "not set" (cost is nullable, unlike selling price).
+  function commitCost(raw: string) {
+    const trimmed = raw.trim();
+    const val = trimmed === "" ? null : Number(trimmed);
+    if (val !== null && (!Number.isFinite(val) || val < 0)) {
+      toast.error("Enter a non-negative number (blank = not set)");
+      return;
+    }
+    if (val === (sku.cost ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { cost: val } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · cost updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+      style={{ gridTemplateColumns: GRID_COLS, opacity: discontinued ? 0.5 : 1 }}
+      data-testid={`opcost-row-${sku.sku}`}
+    >
+      <div>
+        <CodeChip>{sku.sku}</CodeChip>
+      </div>
+      <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
+        {sku.description || <span className="text-base-400">—</span>}
+      </div>
+      <div className="t-small text-base-800 truncate" title={productName}>
+        {productName}
+      </div>
+      <div className="t-tiny text-base-600">{category ? CATEGORY_LABEL[category] : "—"}</div>
+      <div className="t-small text-base-700">{sku.variant || "—"}</div>
+      <div className="text-right" data-testid={`opcost-cost-${sku.sku}`}>
+        {editMode ? (
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={sku.cost ?? ""}
+            placeholder="—"
+            onBlur={(e) => commitCost(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            aria-label={`${sku.sku} cost`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+          />
+        ) : sku.cost == null ? (
+          <span className="t-tiny text-base-400 italic">not set</span>
+        ) : (
+          <span className="t-num text-[12px] text-base-800">{fmtRm(sku.cost)}</span>
+        )}
+      </div>
+      <div />
+    </div>
+  );
+});

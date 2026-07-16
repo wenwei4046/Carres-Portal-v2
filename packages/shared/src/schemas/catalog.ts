@@ -279,6 +279,9 @@ export const catalogFabricSchema = z.object({
   bedframeTier: fabricTierValueSchema,
   active: z.boolean(),
   sortOrder: z.number().int(),
+  // 0226 — operation's buying add-on (RM). Optional so pre-0226 fixtures and
+  // history-shaped entries stay valid; the adapter always emits it.
+  cost: z.number().nullable().optional(),
 });
 export type CatalogFabricDto = z.infer<typeof catalogFabricSchema>;
 
@@ -307,6 +310,15 @@ export const catalogFabricsBatchSaveInput = z
   })
   .strict();
 export type CatalogFabricsBatchSaveInput = z.infer<typeof catalogFabricsBatchSaveInput>;
+
+/** 0226 — PATCH /fabrics/:id/cost body: operation records a fabric's buying
+ *  add-on (RM). null clears it back to "not recorded". */
+export const catalogFabricCostInput = z
+  .object({
+    cost: z.number().min(0).nullable(),
+  })
+  .strict();
+export type CatalogFabricCostInput = z.infer<typeof catalogFabricCostInput>;
 
 /** 0202 — one section='fabrics' history row (fabric-shaped snapshot entries). */
 export const catalogFabricsHistorySchema = z.object({

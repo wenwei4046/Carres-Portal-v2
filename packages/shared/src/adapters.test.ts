@@ -449,6 +449,7 @@ describe("catalogFabricFromRow (0202)", () => {
     bedframe_tier: "PRICE_1",
     active: true,
     sort_order: "19" as unknown as number,
+    cost: null,
     created_at: "2026-07-06T08:00:00.000Z",
     updated_at: "2026-07-06T08:00:00.000Z",
     updated_by: null,
@@ -466,6 +467,7 @@ describe("catalogFabricFromRow (0202)", () => {
       bedframeTier: "PRICE_1",
       active: true,
       sortOrder: 19,
+      cost: null,
     });
   });
 
@@ -479,6 +481,13 @@ describe("catalogFabricFromRow (0202)", () => {
     expect(out.series).toBeNull();
     expect(out.description).toBeNull();
     expect(out.supplierCode).toBeNull();
+  });
+
+  // 0226 — the buying add-on: Postgres numeric may arrive as a string.
+  it("coerces a string-numeric cost; null stays null", () => {
+    expect(catalogFabricFromRow({ ...row, cost: "120.50" }).cost).toBe(120.5);
+    expect(catalogFabricFromRow({ ...row, cost: 0 }).cost).toBe(0);
+    expect(catalogFabricFromRow({ ...row, cost: null }).cost).toBeNull();
   });
 });
 

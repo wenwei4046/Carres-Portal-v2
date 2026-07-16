@@ -238,6 +238,7 @@ export const catalogFabricFromRow = (r: DB.CatalogFabricRow): D.CatalogFabric =>
   bedframeTier: (r.bedframe_tier ?? "PRICE_2") as D.FabricTier,
   active: r.active,
   sortOrder: Number(r.sort_order),
+  cost: r.cost == null ? null : Number(r.cost),
 });
 
 const FABRIC_TIERS: readonly D.FabricTier[] = ["PRICE_1", "PRICE_2", "PRICE_3"];
