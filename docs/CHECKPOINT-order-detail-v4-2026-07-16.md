@@ -2,8 +2,41 @@
 
 > **New-session handoff.** Read this + `docs/CARRES_SYSTEM_MASTERPLAN.md` +
 > `docs/CARRES_UI_KIT_V4.md` before touching anything. Branch:
-> **`feat/orders-drawer`** (pushed, head `cbb760c`). Do NOT deploy without
+> **`feat/orders-drawer`** (pushed, head `09707e5`+). Do NOT deploy without
 > Jess's explicit 上线.
+
+## ⭐ START HERE (evening update — the consistency-pass-v2 queue)
+
+Everything below in "Where we are" happened, PLUS the 7/16 afternoon/evening
+run: kit consolidated (§2 action ladder · §8d focus-dimming/pick-circles ·
+§9 type-2 tabs · §10 radius ladder + breathing + segmented + scrollbars ·
+§3 Money recipe) and the recipe components now in `apps/web/src/components/`:
+**Btn** (hero/box/ghost pills + iconOnly circles, md32/sm24) · **Field** ·
+**Segmented** · **Money** (tiny muted RM + bold digits) · panel SPLIT (one
+white SectionCard per panel, 12px gaps) · type-2 tabs on Orders · closed
+row typography (.t4-row/-strong) + v4-guard in the build.
+
+**Jess's OPEN GRIPES (2026-07-16 night — this is the next work, in order):**
+1. **Icons: ONE size, bolder.** KPI tile icons are 13px; others 12/14/16
+   scattered. Lock: panel/tile icons 16px stroke 2.25 · expander chevrons 14 ·
+   row-action icons 17 (§11d). Kill every 12/13px icon.
+2. **KPI box → SPLIT into 3 separate white cards** (one per tile: Customer ·
+   Money / Stock / Logistic), same as the per-panel split. (The §4-spec
+   "one panel with hairline dividers" is superseded by Jess's ask.)
+3. **Row height: one value per surface.** Table rows 44 FIXED (done); panel
+   field/money rows currently drift (~36 via py) — lock panel rows to a fixed
+   36px (h-9) everywhere so no panel has its own rhythm.
+4. **Font sizes converge:** every panel body content = 13 (t4-row family);
+   no per-panel 11/12/14 soup. Pills already one spec (11/600) — audit strays.
+5. **Hero sizes questioned:** Jess doesn't buy the 20px Outstanding ("why
+   here big there small"). DISCUSS FIRST: either keep 2 display sizes only
+   (20 hero + 13 rest, nothing between — drop the 16 KPI tier), or flatten
+   money to one size. Don't code before he picks.
+6. **Flame check:** the page's ONE flame = "+ Add payment" (band shortcut OR
+   expanded body CTA — never both). If Jess still sees two, hunt it.
+
+Working rules reminder: preview per step · commit per change · no push
+without "push" · never deploy.
 
 ## Where we are
 
