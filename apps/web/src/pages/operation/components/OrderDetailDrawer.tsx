@@ -9,6 +9,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
+  Bed,
+  BedDouble,
   Bell,
   Check,
   CheckCircle2,
@@ -32,6 +34,7 @@ import {
   Phone,
   RotateCcw,
   ScrollText,
+  Sofa,
   Truck,
   Undo2,
   User,
@@ -83,9 +86,11 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
+  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
+  lineSize,
   lineKind,
   lineSortRank,
   defaultLineLocation,
@@ -695,11 +700,19 @@ function MiniBadge({
 //  "<ready> ready · <toReserve> to reserve" inline, from the shared lineReadiness.)
 
 
+
+/** 42px listing-thumb fallback — the line's CATEGORY icon (no product photos
+ *  in the order payload yet; when photoUrl lands, render it here instead). */
+function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
+  const I = cat === "mattress" ? BedDouble : cat === "bedframe" ? Bed : cat === "sofa" ? Sofa : Package;
+  return <I size={18} strokeWidth={2} aria-hidden="true" />;
+}
+
 /** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-type CheckState = "done" | "bad" | "part" | "todo" | "none";
+type CheckState = "done" | "bad" | "late" | "part" | "todo" | "none";
 type CheckItem = {
   label: string;
   state: CheckState;
@@ -776,6 +789,14 @@ function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
         className={`${box} rounded-full grid place-items-center bg-error-soft text-danger shrink-0`}
       >
         <X size={icon} strokeWidth={2.5} aria-label="needs action" />
+      </span>
+    );
+  if (state === "late")
+    return (
+      <span
+        className={`${box} rounded-full grid place-items-center bg-error-soft text-danger shrink-0`}
+      >
+        <Clock size={icon} strokeWidth={2.5} aria-label="waiting — late" />
       </span>
     );
   if (state === "part")
@@ -1365,6 +1386,10 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // Item-listing groups (Jess 2026-07-18): Ready collapsible; category groups
+  // remember manual toggles (default: all-reserved groups start collapsed).
+  const [readyCollapsed, setReadyCollapsed] = useState(false);
+  const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
   // Vertical tab rail (Jess 2026-07-17 rev 5) — collapsible to icon-only.
   const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
     try {
@@ -1448,7 +1473,6 @@ function DrawerBody({
           : {
               label: "Paid",
               state: "none",
-              meta: "no total",
               dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
               action: (
                 <button
@@ -1476,7 +1500,7 @@ function DrawerBody({
               </Btn>
             ),
           }
-        : { label: "PO raised", state: "done", meta: pos.length > 0 ? `${pos.length} PO` : "from stock" },
+        : { label: "PO raised", state: "done", meta: pos.length > 0 ? `${pos.length} PO` : "in stock · no PO" },
     {
       label: "ETA set",
       state: anyEta ? "done" : goodsN > 0 && pos.length > 0 ? "todo" : "none",
@@ -1515,7 +1539,7 @@ function DrawerBody({
       : overDeadline
         ? {
             label: "Booked",
-            state: "bad",
+            state: "late",
             meta: "deadline over",
           }
         : {
@@ -1738,27 +1762,31 @@ function DrawerBody({
             }
             rows={moneyRows}
             onOpen={() => setTab("balance")}
+            /* Nothing owing (paid / no total) → nothing to chase: the pair
+               hides entirely (Jess 2026-07-18). */
             footer={
-              <>
-                <button
-                  type="button"
-                  className="btn-reminder"
-                  onClick={() => copyChase("customer", "reminder")}
-                  title="Copy the gentle customer reminder (WhatsApp) + log it"
-                >
-                  <Bell size={14} aria-hidden="true" />
-                  Reminder
-                </button>
-                <button
-                  type="button"
-                  className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
-                  onClick={() => copyChase("customer", "chase")}
-                  title="Copy the firmer customer chase (WhatsApp) + log it"
-                >
-                  <MessageCircle size={14} aria-hidden="true" />
-                  Chase
-                </button>
-              </>
+              balanceOwing ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-reminder"
+                    onClick={() => copyChase("customer", "reminder")}
+                    title="Copy the gentle customer reminder (WhatsApp) + log it"
+                  >
+                    <Bell size={14} aria-hidden="true" />
+                    Reminder
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
+                    onClick={() => copyChase("customer", "chase")}
+                    title="Copy the firmer customer chase (WhatsApp) + log it"
+                  >
+                    <MessageCircle size={14} aria-hidden="true" />
+                    Chase
+                  </button>
+                </>
+              ) : undefined
             }
           />
           <div className="relative min-w-0">
@@ -1874,7 +1902,7 @@ function DrawerBody({
             )}
           </div>
           <PartyCard
-            label="Logistic"
+            label="Delivery"
             media={
               <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
                 <Truck size={16} strokeWidth={2} aria-hidden="true" />
@@ -1927,7 +1955,8 @@ function DrawerBody({
                 label: "Items",
                 icon: Package,
                 dot: stockTone === "danger",
-                count: goodsN - readyN > 0 ? `${goodsN - readyN} needs stock` : undefined,
+                count: goodsN - readyN > 0 ? String(goodsN - readyN) : undefined,
+                alertText: stockTone === "danger" ? "needs stock" : undefined,
               },
               {
                 key: "delivery",
@@ -1935,6 +1964,7 @@ function DrawerBody({
                 icon: Truck,
                 dot: logisticTone === "danger",
                 count: undefined,
+                alertText: overDeadline && !deliveredDone ? "overdue" : "needs action",
               },
               {
                 key: "balance",
@@ -1942,6 +1972,7 @@ function DrawerBody({
                 icon: Wallet,
                 dot: moneyTone === "danger",
                 count: undefined,
+                alertText: "payment overdue",
               },
               ...(hasMsbf || hasSof
                 ? [
@@ -1959,10 +1990,10 @@ function DrawerBody({
                 label: "Loan",
                 icon: Undo2,
                 dot: false,
-                count: liveLoanCount > 0 ? `${liveLoanCount} out` : undefined,
+                count: liveLoanCount > 0 ? String(liveLoanCount) : undefined,
               },
               { key: "activity", label: "Activity", icon: ScrollText, dot: false, count: undefined },
-            ] as { key: DrawerTab; label: string; icon: LucideIcon; dot: boolean; count?: string }[]
+            ] as { key: DrawerTab; label: string; icon: LucideIcon; dot: boolean; count?: string; alertText?: string }[]
           ).map((t) => (
             <button
               key={t.key}
@@ -1983,12 +2014,19 @@ function DrawerBody({
               {!railCollapsed && (t.count || t.dot) && (
                 <span className="ml-auto flex items-center gap-1.5 shrink-0">
                   {t.count && (
-                    <span className="text-[12px] font-semibold text-warning bg-white border border-base-200 rounded-full px-1.5">
+                    <span
+                      className="text-[12px] font-semibold text-base-700 bg-white border border-base-200 rounded-full px-1.5 tabular-nums"
+                      title={t.alertText ? `${t.count} ${t.alertText}` : t.count}
+                    >
                       {t.count}
                     </span>
                   )}
                   {t.dot && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-danger" aria-label="needs action" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-danger"
+                      title={t.alertText ?? "needs action"}
+                      aria-label={t.alertText ?? "needs action"}
+                    />
                   )}
                 </span>
               )}
@@ -2086,35 +2124,6 @@ function DrawerBody({
                 a neutral base-50 header row, not another cream strip). */}
             <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
-                <thead className="sticky top-0 z-10">
-                  {/* §7.7 (2026-07-13): Item · Qty · Source · Status · Action.
-                      Stock ETA / route / GRN moved into the row's expand
-                      (chevron on Item); Status is AUTO-derived (no dropdown). */}
-                  {/* v4 §11c — table header = 12px SemiBold uppercase DARK. */}
-                  <tr className="bg-base-50 text-[#374151]">
-                    <th className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 border-r border-base-200">
-                      Item
-                    </th>
-                    <th className="text-right text-[12px] font-semibold uppercase px-2 py-1.5 w-10 border-r border-base-200">
-                      Qty
-                    </th>
-                    <th
-                      className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 w-24 border-r border-base-200"
-                      title="Where the line is fulfilled from — a linked PO, or own Klang warehouse stock"
-                    >
-                      Source
-                    </th>
-                    <th
-                      className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 w-40 border-r border-base-200"
-                      title="Auto-derived from reservations, free stock and POs — reserve stock to flip it green"
-                    >
-                      Status
-                    </th>
-                    <th className="text-center text-[12px] font-semibold uppercase px-2 py-1.5 w-[70px]">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
                 <tbody>
                   {(() => {
                     // §7.7 — ONE row renderer, grouped into Needs action /
@@ -2173,7 +2182,7 @@ function DrawerBody({
                               }
                             : rd === "to_reserve"
                               ? {
-                                  t: `To reserve · ${received}/${l.qty}`,
+                                  t: `Need ${Math.max(1, l.qty - received)}`,
                                   c: "pill-warning",
                                   hint: "Matching free stock exists — reserve it to this SO",
                                 }
@@ -2198,10 +2207,14 @@ function DrawerBody({
                               pattern). Status lives in the Status pill. 44px. */}
                           <tr
                             onClick={() => setPickerSku(l.sku)}
-                            className={`cursor-pointer h-[44px] transition-opacity ${
+                            className={`cursor-pointer h-14 transition-opacity ${
                               l.sku === activeLineSku
                                 ? "bg-[#e6f1fb]"
-                                : `hover:bg-base-50 ${
+                                : `${
+                                    rd && rd !== "reserved"
+                                      ? "bg-info-soft/40 hover:bg-info-soft/60"
+                                      : "hover:bg-base-50"
+                                  } ${
                                     activeLineSku ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
@@ -2211,8 +2224,11 @@ function DrawerBody({
                             {/* §8b row-align fix (Jess): EVERY cell centres
                                 vertically — no more top/middle mix reading as
                                 "rows up and down". */}
-                            <td className="border border-base-200 px-2 py-1 align-middle">
-                              <div className="flex items-center gap-1 min-w-0">
+                            {/* Option A row (Jess 2026-07-18): 42px category
+                                thumb + name over "size · ×qty · source" — qty
+                                and source fold into the sub-line. */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              <div className="flex items-center gap-2 min-w-0">
                                 {!isService && (
                                   <button
                                     type="button"
@@ -2233,46 +2249,38 @@ function DrawerBody({
                                     )}
                                   </button>
                                 )}
-                                {/* Closed set: the ITEM NAME is the hero
-                                    table's key content — 12px EMPHASIS ink.
-                                    §11b: it is a product NAME → Inter, never
-                                    mono (mono = digits/codes only). */}
-                                <span
-                                  className="text-[12px] font-semibold text-[#1A1A1A] leading-tight truncate min-w-0"
-                                  title={l.sku}
-                                >
-                                  {l.sku}
+                                <span className="size-[42px] rounded-[8px] bg-base-100 grid place-items-center shrink-0 text-base-400">
+                                  <CatIcon cat={lineCategory(l.sku)} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span
+                                    className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
+                                    title={l.sku}
+                                  >
+                                    {l.sku}
+                                  </span>
+                                  <span className="block text-[12px] text-base-500 leading-tight truncate font-mono">
+                                    {[
+                                      lineSize(l.sku),
+                                      `×${l.qty}`,
+                                      isService ? null : poNo ?? "Klang stock",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </span>
                                 </span>
                               </div>
                             </td>
-                            {/* Qty */}
-                            <td className="border border-base-200 px-2 py-1 text-right text-[12px] font-mono tabular-nums align-middle">
-                              {l.qty}
-                            </td>
-                            {/* Source — PO/#### or own Klang stock. */}
-                            <td className="border border-base-200 px-2 py-1 align-middle">
-                              {isService ? (
-                                <span className="text-base-300 text-[12px]">—</span>
-                              ) : poNo ? (
-                                /* v4 §4 — a PO code is CONTENT: dark, no tint.
-                                   nowrap: a wrapping code was the row-height
-                                   breaker (PO/2607- / 019 on two lines). */
-                                <span className="font-mono text-[12px] text-[#1A1A1A] whitespace-nowrap">
-                                  {poNo}
-                                </span>
-                              ) : (
-                                <span className="text-[12px] text-[#1A1A1A]">
-                                  Klang stock
-                                </span>
-                              )}
-                            </td>
                             {/* Status — auto-derived pill. */}
-                            <td className="border border-base-200 px-1.5 py-1 align-middle">
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle w-44">
                               {pill ? (
                                 <span
                                   title={pill.hint}
-                                  className={`inline-flex items-center text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                  className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
                                 >
+                                  {rd === "reserved" && (
+                                    <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                                  )}
                                   {pill.t}
                                 </span>
                               ) : (
@@ -2281,7 +2289,7 @@ function DrawerBody({
                             </td>
                             {/* Action — inline Reserve on an unfulfilled line;
                                 opens the warehouse picker filtered to it. */}
-                            <td className="border border-base-200 px-1.5 py-1 text-center align-middle">
+                            <td className="border-b border-base-100 px-1.5 py-1 text-center align-middle w-[88px]">
                               {rd && rd !== "reserved" ? (
                                 /* v4 §2 ladder — row action = secondary Btn. */
                                 <Btn
@@ -2301,20 +2309,6 @@ function DrawerBody({
                                 >
                                   Reserve
                                 </Btn>
-                              ) : rd === "reserved" ? (
-                                /* §8d pick-state circle — picked, at a glance
-                                   (status indicator, never clickable). */
-                                <span
-                                  className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#EAF3DE]"
-                                  title="Reserved — this line is picked"
-                                >
-                                  <Check
-                                    size={14}
-                                    strokeWidth={2.5}
-                                    className="text-[#3B6D11]"
-                                    aria-label="Reserved"
-                                  />
-                                </span>
                               ) : (
                                 <span className="text-base-300 text-[12px]">—</span>
                               )}
@@ -2323,8 +2317,8 @@ function DrawerBody({
                           {!isService && routeOpen && (
                             <tr className="bg-base-50">
                               <td
-                                colSpan={5}
-                                className="border border-base-200 px-3 py-2"
+                                colSpan={3}
+                                className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
                                 <div className="space-y-2">
                                   {!isAcc && (
@@ -2396,34 +2390,113 @@ function DrawerBody({
                         </Fragment>
                       );
                     };
-                    // Flat under 6 lines; else grouped Needs action / Ready.
-                    if (orderedLines.length <= 5)
-                      return orderedLines.map(renderRow);
-                    const needs = orderedLines.filter(
-                      (l) =>
-                        lineKind(l.sku) !== "service" &&
-                        readinessOf(l.sku, l.qty) !== "reserved",
-                    );
-                    const needSet = new Set(needs.map((l) => l.sku));
-                    const rest = orderedLines.filter((l) => !needSet.has(l.sku));
-                    const subheader = (label: string) => (
-                      <tr key={`sub-${label}`}>
-                        <td
-                          colSpan={5}
-                          className="border border-base-200 bg-base-50 px-2 py-1 text-[12px] font-bold uppercase tracking-[0.04em] text-base-500"
-                        >
-                          {label}
+                    // ≤5 lines → Needs action / Ready (Ready collapsible).
+                    // >5 lines → auto-group by CATEGORY (Jess 2026-07-18):
+                    // grey band header (icon + count + "N need stock"),
+                    // all-reserved groups auto-collapse.
+                    const needsLine = (l: { sku: string; qty: number }) =>
+                      lineKind(l.sku) !== "service" &&
+                      readinessOf(l.sku, l.qty) !== "reserved";
+                    const groupHeader = (
+                      key: string,
+                      label: string,
+                      icon: ReactNode,
+                      total: number,
+                      needN: number,
+                      open: boolean,
+                      onToggle: () => void,
+                    ) => (
+                      <tr key={`grp-${key}`}>
+                        <td colSpan={3} className="border-b border-base-100 p-0">
+                          <button
+                            type="button"
+                            onClick={onToggle}
+                            aria-expanded={open}
+                            className="w-full flex items-center gap-1.5 bg-base-100/70 px-2 py-1.5 text-left"
+                          >
+                            {open ? (
+                              <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
+                            ) : (
+                              <ChevronRight size={14} className="shrink-0 text-base-500" aria-hidden="true" />
+                            )}
+                            <span className="text-base-500">{icon}</span>
+                            <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-base-600">
+                              {label}
+                            </span>
+                            <span className="text-[12px] tabular-nums text-base-500">{total}</span>
+                            {needN > 0 && (
+                              <span className="ml-auto text-[12px] font-semibold text-warning">
+                                {needN} need stock
+                              </span>
+                            )}
+                          </button>
                         </td>
                       </tr>
                     );
-                    return (
-                      <>
-                        {needs.length > 0 && subheader("Needs action")}
-                        {needs.map(renderRow)}
-                        {rest.length > 0 && subheader("Ready")}
-                        {rest.map(renderRow)}
-                      </>
-                    );
+                    if (orderedLines.length <= 5) {
+                      const needs = orderedLines.filter(needsLine);
+                      const needSet = new Set(needs.map((l) => l.sku));
+                      const rest = orderedLines.filter((l) => !needSet.has(l.sku));
+                      if (needs.length === 0)
+                        return orderedLines.map(renderRow);
+                      return (
+                        <>
+                          {groupHeader(
+                            "needs",
+                            "Needs action",
+                            null,
+                            needs.length,
+                            needs.length,
+                            true,
+                            () => {},
+                          )}
+                          {needs.map(renderRow)}
+                          {rest.length > 0 &&
+                            groupHeader(
+                              "ready",
+                              "Ready",
+                              null,
+                              rest.length,
+                              0,
+                              !readyCollapsed,
+                              () => setReadyCollapsed((v) => !v),
+                            )}
+                          {!readyCollapsed && rest.map(renderRow)}
+                        </>
+                      );
+                    }
+                    const CATS: {
+                      key: "mattress" | "bedframe" | "sofa" | "acc";
+                      label: string;
+                    }[] = [
+                      { key: "mattress", label: "Mattress" },
+                      { key: "bedframe", label: "Bedframe" },
+                      { key: "sofa", label: "Sofa" },
+                      { key: "acc", label: "Accessory" },
+                    ];
+                    return CATS.map(({ key, label }) => {
+                      const rows = orderedLines.filter(
+                        (l) => lineCategory(l.sku) === key,
+                      );
+                      if (rows.length === 0) return null;
+                      const needN = rows.filter(needsLine).length;
+                      const open = catOpen[key] ?? needN > 0; // all-reserved auto-collapses
+                      return (
+                        <Fragment key={key}>
+                          {groupHeader(
+                            key,
+                            label,
+                            <CatIcon cat={key} />,
+                            rows.length,
+                            needN,
+                            open,
+                            () =>
+                              setCatOpen((cur) => ({ ...cur, [key]: !open })),
+                          )}
+                          {open && rows.map(renderRow)}
+                        </Fragment>
+                      );
+                    });
                   })()}
                 </tbody>
               </table>
@@ -3226,7 +3299,6 @@ function CustomerIdentityCard({
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [showAddress, setShowAddress] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -3259,7 +3331,7 @@ function CustomerIdentityCard({
             className={`block text-[14px] font-bold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ?? "—"}
+            {order.customer_name ? titleCaseName(order.customer_name) : "—"}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
             {/* The ONE black element on the page — the order id badge. */}
@@ -3293,47 +3365,41 @@ function CustomerIdentityCard({
         </button>
       </div>
       {!editing ? (
-        <div className="mt-2 flex items-center gap-1 flex-wrap min-w-0">
-          {order.customer_phone && (
-            <button
-              type="button"
-              className={chip}
-              onClick={() => copy(order.customer_phone ?? "", "Phone")}
-              title="Copy phone"
-            >
-              <Phone size={14} aria-hidden="true" />
-              <span className="font-mono truncate">{order.customer_phone}</span>
-            </button>
-          )}
-          {wa && (
-            <button
-              type="button"
-              className={`${chip} text-chase`}
-              onClick={() => window.open(wa, "_blank", "noopener")}
-              title="Open WhatsApp chat"
-              aria-label="WhatsApp"
-            >
-              <MessageCircle size={14} aria-hidden="true" />
-            </button>
-          )}
+        <div className="mt-2 space-y-1.5 min-w-0">
+          <div className="flex items-center gap-1 flex-wrap min-w-0">
+            {order.customer_phone && (
+              <button
+                type="button"
+                className={chip}
+                onClick={() => copy(order.customer_phone ?? "", "Phone")}
+                title="Copy phone"
+              >
+                <Phone size={14} aria-hidden="true" />
+                <span className="font-mono truncate">{order.customer_phone}</span>
+              </button>
+            )}
+            {wa && (
+              <button
+                type="button"
+                className={`${chip} text-chase`}
+                onClick={() => window.open(wa, "_blank", "noopener")}
+                title="Open WhatsApp chat"
+                aria-label="WhatsApp"
+              >
+                <MessageCircle size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          {/* FULL address, openly shown (Jess 2026-07-18 — never hidden behind
+              a chip); click = copy. */}
           {order.customer_address && (
             <button
               type="button"
-              className={chip}
-              onClick={() => setShowAddress((v) => !v)}
-              title={showAddress ? "Hide address" : "Show full address (click again to hide)"}
-            >
-              <MapPin size={14} aria-hidden="true" />
-              Address
-            </button>
-          )}
-          {showAddress && order.customer_address && (
-            <button
-              type="button"
-              className="w-full text-left text-[12px] text-base-700 leading-snug bg-base-50 border border-base-200 rounded-[6px] px-2 py-1.5 hover:border-base-300"
+              className="w-full text-left text-[13px] text-base-900 leading-snug hover:text-base-700"
               onClick={() => copy(order.customer_address ?? "", "Address")}
               title="Click to copy the address"
             >
+              <MapPin size={14} aria-hidden="true" className="inline-block mr-1 -mt-0.5 text-base-400" />
               {order.customer_address}
             </button>
           )}
