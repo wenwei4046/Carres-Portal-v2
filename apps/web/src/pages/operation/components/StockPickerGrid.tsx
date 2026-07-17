@@ -360,7 +360,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center h-[44px] border-b border-base-100 cursor-pointer text-[12px] ${
+                className={`grid items-center h-[40px] border-b border-base-100 cursor-pointer text-[12px] ${
                   on
                     ? "bg-[#e6f1fb]"
                     : i % 2

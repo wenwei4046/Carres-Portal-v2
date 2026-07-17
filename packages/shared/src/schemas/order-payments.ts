@@ -37,6 +37,12 @@ export const recordPaymentInputSchema = z.object({
   kind: z.enum(PAYMENT_KINDS).default("payment"),
   reference: z.string().trim().max(120).nullish(),
   note: z.string().trim().max(500).nullish(),
+  /** Customer proof-of-payment (Balance v3, 2026-07-17): the storage path of
+   *  the uploaded slip ("orders-attachments/orders/<id>/payments/…") or an
+   *  https receipt URL → order_payments.receipt_url. DEPLOY-GATED persistence:
+   *  the live Worker's older (non-strict) schema strips this key harmlessly —
+   *  payments still record, only the slip link waits for the deploy. */
+  receiptUrl: z.string().trim().max(300).nullish(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 

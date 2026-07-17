@@ -30,6 +30,7 @@ import {
   MoreVertical,
   Package,
   PackagePlus,
+  Paperclip,
   Pencil,
   Phone,
   RotateCcw,
@@ -37,6 +38,7 @@ import {
   Sofa,
   Truck,
   Undo2,
+  Upload,
   User,
   Wallet,
   Warehouse,
@@ -46,11 +48,15 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  computeStorageFee,
   normalizeSkuKey,
   updateOrderInputSchema,
   type OpsStockListResponse,
+  type OrderPaymentMethod,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+import { ATTACHMENTS_BUCKET } from "@/lib/storage";
 import { renderDoPdf, renderReceiptPdf, renderInvoicePdf } from "@/lib/pdf/render";
 import type { DoTemplateData, InvoiceTemplateData } from "@/lib/pdf/types";
 import {
@@ -471,7 +477,7 @@ function DrawerSkeleton({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Close drawer"
-          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none"
+          className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
         >
           ×
         </button>
@@ -500,7 +506,7 @@ function DrawerError({
           type="button"
           onClick={onClose}
           aria-label="Close drawer"
-          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none"
+          className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
         >
           ×
         </button>
@@ -725,43 +731,61 @@ type CheckItem = {
   dial?: ReactNode;
 };
 
-/** PieDial (STATUS-STANDARD §1) — a 30px donut whose fill fraction + colour
- *  ARE the state (Balance: collected÷total · Stock: ready÷goods). SVG strokes
- *  currentColor so the tone is a text-* class — no bespoke hex. */
+/** Dial states (MASTER SPEC §8) — NO blue: Unpaid/No-stock = gray · Deposit/
+ *  Partial/Arriving = amber · Overdue/Delayed = red · Paid/Ready = green. */
+type DialState = "gray" | "amber" | "red" | "green";
+const DIAL_COLOR: Record<DialState, { main: string; soft: string }> = {
+  gray: { main: "var(--dial-gray)", soft: "var(--dial-gray-soft)" },
+  amber: { main: "var(--dial-amber)", soft: "var(--dial-amber-soft)" },
+  red: { main: "var(--dial-red)", soft: "var(--dial-red-soft)" },
+  green: { main: "var(--dial-green)", soft: "var(--dial-green-soft)" },
+};
+
+/** A pie SECTOR from 12 o'clock, clockwise, `frac` of the full circle. */
+function sectorPath(cx: number, cy: number, r: number, frac: number): string {
+  const a = frac * 2 * Math.PI - Math.PI / 2;
+  const x = cx + r * Math.cos(a);
+  const y = cy + r * Math.sin(a);
+  const large = frac > 0.5 ? 1 : 0;
+  return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${large} 1 ${x} ${y} Z`;
+}
+
+/** PieDial (MASTER SPEC §8, rebuilt 2026-07-18) — a filled-SECTOR dial:
+ *  soft-tinted disc + 2.5 ring, the sector fills the REAL fraction, and a
+ *  CHECK replaces the sector at full. Sits BESIDE the KPI headline value —
+ *  never on a stage row. Palette = the 4 dial states (no blue). */
 function PieDial({
   fraction,
-  tone,
-  px = 30,
+  state,
+  px = 24,
 }: {
   fraction: number;
-  tone: string;
-  /** Rendered box in px — 20 = inline on a checklist stage row. (Named `px`,
-   *  not `size`: RULE C reserves `size={N}` for Lucide icons.) */
+  state: DialState;
+  /** Rendered box in px. (Named `px`, not `size`: RULE C reserves `size={N}`
+   *  for Lucide icons.) */
   px?: number;
 }) {
-  const size = px;
-  const r = size * 0.3;
-  const mid = size / 2;
-  const sw = size / 5;
-  const c = 2 * Math.PI * r;
+  const c = DIAL_COLOR[state];
   const f = Math.max(0, Math.min(1, fraction));
+  const full = f >= 1;
   return (
     <span
-      className={`grid place-items-center shrink-0 ${tone}`}
-      style={{ width: size, height: size }}
+      className="inline-grid place-items-center shrink-0 align-middle"
+      style={{ width: px, height: px }}
       aria-hidden="true"
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={mid} cy={mid} r={r} fill="none" strokeWidth={sw} className="stroke-base-200" />
-        {f > 0 && (
-          <circle
-            cx={mid}
-            cy={mid}
-            r={r}
+      {/* viewBox 28: r12 ring + 2.5 stroke (SPEC §8 geometry). */}
+      <svg width={px} height={px} viewBox="0 0 28 28">
+        <circle cx={14} cy={14} r={12} fill={c.soft} stroke={c.main} strokeWidth={2.5} />
+        {!full && f > 0 && <path d={sectorPath(14, 14, 12, f)} fill={c.main} />}
+        {full && (
+          <polyline
+            points="8.5,14.5 12.5,18.5 19.5,10.5"
             fill="none"
-            strokeWidth={sw}
-            stroke="currentColor"
-            strokeDasharray={`${c * f} ${c}`}
+            stroke={state === "green" ? "var(--dial-check)" : c.main}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         )}
       </svg>
@@ -775,10 +799,12 @@ function PieDial({
 function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
   const box = big ? "w-7 h-7" : "w-5 h-5";
   const icon = big ? 18 : 14;
+  // §8 checklist marks — Done/Blocked read FILLED (circle-check-filled /
+  // alert-circle-filled); Waiting keeps the amber clock; Pending = empty ring.
   if (state === "done")
     return (
       <span
-        className={`${box} rounded-full grid place-items-center bg-success-soft text-success shrink-0`}
+        className={`${box} rounded-full grid place-items-center bg-success text-white shrink-0`}
       >
         <Check size={icon} strokeWidth={2.5} aria-label="done" />
       </span>
@@ -786,9 +812,11 @@ function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
   if (state === "bad")
     return (
       <span
-        className={`${box} rounded-full grid place-items-center bg-error-soft text-danger shrink-0`}
+        className={`${box} rounded-full grid place-items-center bg-danger text-white shrink-0`}
       >
-        <X size={icon} strokeWidth={2.5} aria-label="needs action" />
+        <span className="text-[12px] font-bold leading-none" aria-label="needs action">
+          !
+        </span>
       </span>
     );
   if (state === "late")
@@ -832,6 +860,7 @@ function PartyCard({
   media,
   value,
   rows,
+  extra,
   footer,
   onOpen,
 }: {
@@ -840,6 +869,8 @@ function PartyCard({
   media: ReactNode;
   value: ReactNode;
   rows: CheckItem[];
+  /** Extra section under the stage rows (the Stock card's category split). */
+  extra?: ReactNode;
   /** Reminder + Chase pair (both copy the locked WhatsApp templates). */
   footer?: ReactNode;
   onOpen?: () => void;
@@ -852,14 +883,15 @@ function PartyCard({
     >
       <div className="flex items-center gap-2 mb-1.5 min-w-0">
         {media}
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+        {/* The label NEVER truncates (shrink-0); the box min-width carries it. */}
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 shrink-0">
           {label}
         </span>
         <span className="ml-auto text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
       </div>
       <div className="min-w-0">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center gap-2 min-w-0 min-h-8">
+          <div key={r.label} className="flex items-center gap-2 min-w-0 min-h-9">
             {r.dial ?? <CheckMark state={r.state} />}
             <span
               className={`text-[13px] truncate ${
@@ -890,6 +922,7 @@ function PartyCard({
           </div>
         ))}
       </div>
+      {extra}
       {footer && (
         <div
           className="mt-2 flex items-center gap-1.5 [&>*]:flex-1"
@@ -897,6 +930,215 @@ function PartyCard({
         >
           {footer}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Clean SKU CODE for the Items SKU column (§9) — the trailing model code
+ *  ("Lumi FirmCare-L1201F-Q" → "L1201F-Q"); no code (accessories/services)
+ *  → em-dash, never the lowercase normalize slug. */
+function skuCode(sku: string): string {
+  const m = sku.trim().match(/([A-Za-z]{0,3}\d{3,}[A-Za-z]{0,2}(?:-[A-Za-z])?)\s*$/);
+  return m ? m[1].toUpperCase() : "—";
+}
+
+/** Site SHORT name for the Items LOCATION column (§9 — "Klang/NETS", never
+ *  the full site string). */
+function shortSite(loc: string): string {
+  const l = loc.toLowerCase();
+  if (l.includes("klang")) return "Klang";
+  if (l.includes("balakong") || l.includes("houzs")) return "HOUZS";
+  if (l.includes("future")) return "NF";
+  if (l.includes("supplier")) return "Supplier";
+  if (l.includes("ohana")) return "Ohana";
+  return loc;
+}
+
+/** §9 ACTION column — "Manage ▾": the row's secondary actions (Reserve /
+ *  Loan / Change route). The row's MUST-DO action renders as its own direct
+ *  button beside this menu. */
+function RowManageMenu({
+  items,
+}: {
+  items: { label: string; onClick: () => void; disabled?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <Btn size="sm" onClick={() => setOpen((v) => !v)} title="Row actions">
+        Manage
+        <ChevronDown size={14} aria-hidden="true" />
+      </Btn>
+      {open && (
+        <>
+          <span className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <span className="absolute right-0 top-full mt-1 w-40 z-20 bg-white border border-base-200 rounded-[8px] shadow-lg py-1 block">
+            {items.map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+                className="w-full text-left px-2.5 py-1.5 text-[12px] hover:bg-base-50 disabled:opacity-40"
+              >
+                {it.label}
+              </button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** One PO-led chase target — a supplier (portal PO) or a bare AutoCount PO
+ *  number, with the category lines it covers. */
+interface ChaseGroup {
+  key: string;
+  /** Supplier name when known, else the PO number itself. */
+  label: string;
+  poNo: string;
+  lines: { sku: string; qty: number }[];
+  eta: string | null;
+  overdue: boolean;
+}
+
+/** One category row of the Stock card (Option A, 2026-07-18). */
+interface StockCat {
+  cat: "mattress" | "bedframe" | "sofa" | "acc";
+  label: string;
+  ready: number;
+  total: number;
+  allReady: boolean;
+  /** PO-led chase targets, overdue first. */
+  groups: ChaseGroup[];
+  /** The row's supplier-status readout ("in stock" / "no PO" / "<sup> · ETA x"). */
+  status: string;
+  /** Stalled / overdue — the chase turns hot. */
+  hot: boolean;
+}
+
+/** The Stock card's category split (KPI rev 10): one row per core category —
+ *  label · N/M ready · that category's supplier status · its own PO-led
+ *  Chase. Multiple suppliers → "Chase (N)" pops a per-supplier list
+ *  (overdue on top). */
+function StockCategoryRow({
+  c,
+  onChase,
+}: {
+  c: StockCat;
+  onChase: (g: ChaseGroup, tone: "reminder" | "chase") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const chaseBtn = `btn-chase ${c.hot ? "btn-chase-hot" : ""}`;
+  return (
+    <div className="relative flex items-center gap-2 min-h-9 min-w-0">
+      <span className="text-[13px] font-medium text-base-900 shrink-0 w-[72px]">
+        {c.label}
+      </span>
+      <span
+        className={`text-[12px] font-semibold t-num shrink-0 ${
+          c.allReady ? "text-success" : c.hot ? "text-danger" : "text-warning"
+        }`}
+        title={`${c.ready} of ${c.total} line${c.total === 1 ? "" : "s"} ready`}
+      >
+        {c.ready}/{c.total}
+      </span>
+      {!c.allReady && (
+        <span
+          className={`text-[12px] truncate min-w-0 ${
+            c.hot ? "text-danger font-medium" : "text-base-500"
+          }`}
+          title={c.status}
+        >
+          {c.status}
+        </span>
+      )}
+      <span className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
+        {c.allReady && (
+          <span className="text-[12px] font-semibold text-success whitespace-nowrap">
+            Ready ✓
+          </span>
+        )}
+        {c.groups.length === 1 && !c.allReady && (
+          <button
+            type="button"
+            className={chaseBtn}
+            onClick={() => onChase(c.groups[0], "chase")}
+            title={`Chase ${c.groups[0].label} — PO ${c.groups[0].poNo} (copies the WhatsApp template + logs it)`}
+          >
+            <MessageCircle size={14} aria-hidden="true" />
+            Chase
+          </button>
+        )}
+        {c.groups.length > 1 && (
+          <button
+            type="button"
+            className={chaseBtn}
+            onClick={() => setOpen((v) => !v)}
+            title="Multiple suppliers — pick who to chase (PO-led)"
+          >
+            <MessageCircle size={14} aria-hidden="true" />
+            Chase ({c.groups.length})
+          </button>
+        )}
+      </span>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          {/* Per-supplier chase popover — PO-led, overdue on top + red. */}
+          <div
+            className="absolute right-0 top-full mt-1 w-64 z-20 bg-white border border-base-200 rounded-[8px] shadow-lg p-2 space-y-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {c.groups.map((g) => (
+              <div key={g.key} className="flex items-center gap-2 min-h-9 px-1">
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-[13px] font-medium truncate ${
+                      g.overdue ? "text-danger" : "text-base-900"
+                    }`}
+                  >
+                    {g.label}
+                  </span>
+                  <span className="block text-[12px] text-base-500 font-mono truncate">
+                    {g.poNo}
+                    {g.eta
+                      ? ` · ETA ${fmtDate(g.eta).split(",")[0]}${g.overdue ? " — over" : ""}`
+                      : " · no ETA"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className={`btn-chase ${g.overdue ? "btn-chase-hot" : ""}`}
+                  onClick={() => {
+                    onChase(g, "chase");
+                    setOpen(false);
+                  }}
+                  title={`Chase ${g.label} — ${g.poNo}`}
+                >
+                  <MessageCircle size={14} aria-hidden="true" />
+                  Chase
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn-chase w-full justify-center"
+              onClick={() => {
+                for (const g of c.groups) onChase(g, "chase");
+                setOpen(false);
+              }}
+              title="One chase per supplier — copies each template + logs each"
+            >
+              Chase all
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1248,6 +1490,62 @@ function DrawerBody({
   // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
+  // ── Balance v3 invoice math (2026-07-17) — the Balance tab reads as an
+  // INVOICE: CHARGES (goods + the storage fee) − PAYMENTS (all kinds) =
+  // Balance due. The storage FEE flows in as one charge line; the Storage tab
+  // owns the detail (rule per STATUS-STANDARD §7.5: start = next same weekday
+  // after the deadline; MS/BF RM150/month; sofa 14d free then RM200).
+  const storageEndEff =
+    form.draft.storage_to.trim() || form.draft.logistic_eta.trim() || todayIso;
+  const storageAuto = computeStorageFee({
+    startDate: form.storageFrom,
+    asOf: storageEndEff,
+    hasMsbf,
+    hasSof,
+  });
+  // Effective storage charge: manual override > Master-imported fee > auto.
+  const storageCharge = storageIncurred
+    ? (form.storageOverride ?? (storageFee > 0 ? storageFee : storageAuto.total))
+    : 0;
+  const storageCollected = ledger
+    .filter((p) => p.kind === "storage")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const invoiceTotal = orderTotal + storageCharge;
+  const collectedAll = collected + storageCollected;
+  const balanceDue = totalSet ? Math.max(0, invoiceTotal - collectedAll) : 0;
+  // Collect-by = delivery − 7d (the date collectByLabel shows) — past it and
+  // still owing ⇒ the dial family reads Overdue.
+  const collectByPast =
+    deliveryMs !== null && Date.now() > deliveryMs - 7 * 86_400_000;
+  // Payment status dial family (STATUS-STANDARD §1): Unpaid / Deposit /
+  // Overdue / Paid. "Sent" is omitted — no invoice-sent signal exists today.
+  const payStatus: "Unpaid" | "Deposit" | "Overdue" | "Paid" | null = !totalSet
+    ? null
+    : balanceDue <= 0
+      ? "Paid"
+      : collectByPast
+        ? "Overdue"
+        : collectedAll > 0
+          ? "Deposit"
+          : "Unpaid";
+  const payFraction =
+    payStatus === "Paid" ? 1 : invoiceTotal > 0 ? collectedAll / invoiceTotal : 0;
+  const payToneCls =
+    payStatus === "Paid"
+      ? "text-success"
+      : payStatus === "Overdue"
+        ? "text-danger"
+        : "text-info";
+  // Dial state (§8 — NO blue): Unpaid=gray · Deposit=amber · Overdue=red ·
+  // Paid=green. One mapping for the band pill AND the headline dial.
+  const payDialState: DialState =
+    payStatus === "Paid"
+      ? "green"
+      : payStatus === "Overdue"
+        ? "red"
+        : payStatus === "Deposit"
+          ? "amber"
+          : "gray";
   // Balance panel STATUS pill + status-strip Money cell (batch 2): the ledger
   // Outstanding drives them all, so pill / strip / header sticker never disagree.
   const isOwing = balanceOwing;
@@ -1413,30 +1711,12 @@ function DrawerBody({
   const deliveredDone = pipelineStatus === "completed";
   const placedDate = order.placed_at ? fmtDate(order.placed_at).split(",")[0] : undefined;
   const paidDone = totalSet && moneyOutstanding <= 0;
-  const anyEta =
-    Object.values(form.draft.line_etas ?? {}).some((v) => !!v) ||
-    pos.some((p) => !!p.eta_date);
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
 
   // ═══ STATUS-STANDARD dials + the supplier chase popover data ═══
-  const balFraction = paidDone ? 1 : totalSet && orderTotal > 0 ? collected / orderTotal : 0;
-  const balTone = paidDone
-    ? "text-success"
-    : balanceOwing && overDeadline
-      ? "text-danger"
-      : "text-info";
-  const stockFraction = goodsN === 0 ? 0 : readyN / goodsN;
   const stockDelayed =
     readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
-  const stockTone2 =
-    goodsN === 0
-      ? "text-base-300"
-      : readyN === goodsN
-        ? "text-success"
-        : stockDelayed
-          ? "text-danger"
-          : "text-warning";
 
   const moneyRows: CheckItem[] = [
     { label: "Placed", state: "done", meta: placedDate },
@@ -1445,15 +1725,13 @@ function DrawerBody({
       ? {
           label: "Paid",
           state: "done",
-          dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
         }
       : balanceOwing
         ? {
             label: "Paid",
             state: "bad",
             meta: `${RM(moneyOutstanding)} due`,
-            dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
-            action: (
+              action: (
               <button
                 type="button"
                 className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
@@ -1468,13 +1746,11 @@ function DrawerBody({
           ? {
               label: "Paid",
               state: collected > 0 ? "part" : "todo",
-              dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
-            }
+                }
           : {
               label: "Paid",
               state: "none",
-              dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
-              action: (
+                  action: (
                 <button
                   type="button"
                   className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
@@ -1485,41 +1761,6 @@ function DrawerBody({
                 </button>
               ),
             },
-  ];
-  const stockRows: CheckItem[] = [
-    goodsN === 0
-      ? { label: "PO raised", state: "none" }
-      : nopoN > 0
-        ? {
-            label: "PO raised",
-            state: "bad",
-            meta: `${nopoN} no PO`,
-            action: (
-              <Btn size="sm" icon={Plus} onClick={() => onIssuePOsClick()} title="Raise a PO for the no-PO lines">
-                Raise PO
-              </Btn>
-            ),
-          }
-        : { label: "PO raised", state: "done", meta: pos.length > 0 ? `${pos.length} PO` : "in stock · no PO" },
-    {
-      label: "ETA set",
-      state: anyEta ? "done" : goodsN > 0 && pos.length > 0 ? "todo" : "none",
-    },
-    goodsN === 0
-      ? { label: "Goods ready", state: "none" }
-      : readyN === goodsN
-        ? {
-            label: "Goods ready",
-            state: "done",
-            meta: `${readyN}/${goodsN}`,
-            dial: <PieDial px={20} fraction={stockFraction} tone={stockTone2} />,
-          }
-        : {
-            label: "Goods ready",
-            state: readyN > 0 ? "part" : "todo",
-            meta: `${readyN}/${goodsN}`,
-            dial: <PieDial px={20} fraction={stockFraction} tone={stockTone2} />,
-          },
   ];
   const logisticRows: CheckItem[] = [
     assignedLogisticName
@@ -1554,16 +1795,97 @@ function DrawerBody({
     { label: "Delivered", state: deliveredDone ? "done" : "todo" },
   ];
 
-  // Open POs grouped by supplier — feeds Chase (N) + its popover.
-  const openPos = pos.filter((p) => p.status !== "received");
-  const posBySupplier = new Map<string, typeof pos>();
-  for (const po of openPos) {
-    const arr = posBySupplier.get(po.supplier_id) ?? [];
-    arr.push(po);
-    posBySupplier.set(po.supplier_id, arr);
-  }
-  const supplierCount = posBySupplier.size;
-  const [chasePopover, setChasePopover] = useState(false);
+  // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
+  // N/M ready + that category's supplier status + its OWN PO-led chase.
+  // Chase targets group by PO: a portal PO resolves its supplier name; an
+  // AutoCount source_po chases by the PO number itself.
+  const CAT_WORD = {
+    mattress: "Mattress",
+    bedframe: "Bedframe",
+    sofa: "Sofa",
+    acc: "Accessory",
+  } as const;
+  const stockCats: StockCat[] = (
+    ["mattress", "bedframe", "sofa", "acc"] as const
+  ).flatMap((cat) => {
+    const catLines = goodsLines.filter((l) => lineCategory(l.sku) === cat);
+    if (catLines.length === 0) return [];
+    const ready = catLines.filter(
+      (l) => readinessOf(l.sku, l.qty) === "reserved",
+    ).length;
+    const allReady = ready === catLines.length;
+    const byPo = new Map<string, ChaseGroup>();
+    for (const l of catLines) {
+      const k = normalizeSkuKey(l.sku);
+      const srcPo = soPoBySku.get(k);
+      const portalPo = pos.find((p) =>
+        p.lines.some((pl) => normalizeSkuKey(pl.sku) === k),
+      );
+      const poNo = srcPo ?? (portalPo ? portalPo.id.slice(0, 8) : null);
+      if (!poNo) continue;
+      const supName = portalPo
+        ? (suppliersData?.suppliers.find((sp) => sp.id === portalPo.supplier_id)
+            ?.name ?? null)
+        : null;
+      const eta =
+        form.draft.line_etas[l.sku] ??
+        poEtaBySku.get(l.sku) ??
+        portalPo?.eta_date ??
+        null;
+      const g =
+        byPo.get(poNo) ??
+        ({ key: poNo, label: supName ?? poNo, poNo, lines: [], eta: null, overdue: false } as ChaseGroup);
+      g.lines.push({ sku: l.sku, qty: l.qty });
+      if (eta && (!g.eta || eta < g.eta)) g.eta = eta;
+      byPo.set(poNo, g);
+    }
+    const groups = [...byPo.values()].map((g) => ({
+      ...g,
+      overdue: !!g.eta && g.eta < todayIso,
+    }));
+    groups.sort((a, b) => Number(b.overdue) - Number(a.overdue));
+    const status = allReady
+      ? "in stock"
+      : groups.length === 0
+        ? "no PO"
+        : groups[0].overdue
+          ? `${groups[0].label} · overdue`
+          : groups[0].eta
+            ? `${groups[0].label} · ETA ${fmtDate(groups[0].eta).split(",")[0]}`
+            : `${groups[0].label} · no ETA`;
+    const hot =
+      !allReady &&
+      groups.length > 0 &&
+      (groups.some((g) => g.overdue) || groups.every((g) => !g.eta));
+    return [
+      {
+        cat,
+        label: CAT_WORD[cat],
+        ready,
+        total: catLines.length,
+        allReady,
+        groups,
+        status,
+        hot,
+      },
+    ];
+  });
+  // A PO-led supplier chase for ONE group — the category rows + popover use
+  // this (fixes the old popover copying the generic first-PO template no
+  // matter which supplier was picked).
+  const copySupplierChaseFor = (g: ChaseGroup, tone: "reminder" | "chase") => {
+    const text = (tone === "reminder" ? buildSupplierReminder : buildSupplierChase)({
+      poNo: g.poNo,
+      ref: orderRef,
+      lines: g.lines,
+      deadline: deadlineLabel,
+    });
+    void navigator.clipboard.writeText(text);
+    toast.success(
+      `${tone === "reminder" ? "Reminder" : "Chase"} copied — ${g.label}`,
+    );
+    chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
+  };
   const logisticTone: KpiTone =
     pipelineStatus === "completed" || bookedEta
       ? "success"
@@ -1722,15 +2044,19 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* KPI tracks (Jess 2026-07-17): SEPARATE white cards, full width,
-            one per mission track — each card jumps to its tab. */}
-        {/* 4 STAT PANELS (Jess 2026-07-17 rev 4): CUSTOMER identity ·
-            MONEY / STOCK / LOGISTIC checklist tracks. Category icon = 38px
-            tinted circle; headline value right; the stuck stage carries its
-            action inline. */}
-        {/* Equal-height stat row (Jess): grid stretch — every card fills the
-            tallest; inner content scrolls/keeps its own rhythm. */}
-        <div className="shrink-0 grid grid-cols-4 items-stretch gap-2.5">
+        {/* ═══ TWO-COLUMN SHELL (rev 9, 2026-07-18) ═══
+            LEFT 260px fixed (collapsible to 56 icon-only): the Customer block
+            on top + the section tab rail below. RIGHT fills the rest: the 3
+            KPI track boxes (Balance · Stock wider · Delivery — 1fr 1.8fr 1fr,
+            equal height) pinned on top + the selected tab's content scrolling
+            below. Desktop ~1920 is the truth — no responsive reflow. */}
+        <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
+        {/* LEFT — customer identity + the section rail. */}
+        <div
+          className={`shrink-0 flex flex-col gap-2.5 min-h-0 ${
+            railCollapsed ? "w-14" : "w-[260px]"
+          }`}
+        >
           <CustomerIdentityCard
             order={order}
             regionLabel={loc.label ?? null}
@@ -1741,211 +2067,10 @@ function DrawerBody({
                   ? "Delivered"
                   : PIPELINE_LABEL[pipelineStatus]
             }
+            collapsed={railCollapsed}
           />
-          <PartyCard
-            label="Balance"
-            media={
-              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                <Wallet size={16} strokeWidth={2} aria-hidden="true" />
-              </span>
-            }
-            value={
-              paidDone ? (
-                <span className="text-success">Paid</span>
-              ) : balanceOwing ? (
-                <span className="text-danger">{RM(moneyOutstanding)}</span>
-              ) : totalSet ? (
-                RM(moneyOutstanding)
-              ) : (
-                <span className="text-base-400 font-semibold">No total</span>
-              )
-            }
-            rows={moneyRows}
-            onOpen={() => setTab("balance")}
-            /* Nothing owing (paid / no total) → nothing to chase: the pair
-               hides entirely (Jess 2026-07-18). */
-            footer={
-              balanceOwing ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn-reminder"
-                    onClick={() => copyChase("customer", "reminder")}
-                    title="Copy the gentle customer reminder (WhatsApp) + log it"
-                  >
-                    <Bell size={14} aria-hidden="true" />
-                    Reminder
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
-                    onClick={() => copyChase("customer", "chase")}
-                    title="Copy the firmer customer chase (WhatsApp) + log it"
-                  >
-                    <MessageCircle size={14} aria-hidden="true" />
-                    Chase
-                  </button>
-                </>
-              ) : undefined
-            }
-          />
-          <div className="relative min-w-0">
-            <PartyCard
-              label="Stock"
-              media={
-                <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                  <Package size={16} strokeWidth={2} aria-hidden="true" />
-                </span>
-              }
-              value={
-                goodsN === 0 ? (
-                  <span className="text-base-400 font-semibold">—</span>
-                ) : readyN === goodsN ? (
-                  <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
-                ) : stockDelayed ? (
-                  <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
-                ) : (
-                  <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
-                )
-              }
-              rows={stockRows}
-              onOpen={() => setTab("items")}
-              footer={
-                <>
-                  <button
-                    type="button"
-                    className="btn-reminder"
-                    onClick={() => copyChase("supplier", "reminder")}
-                    title="Copy the gentle supplier reminder (WhatsApp) + log it"
-                  >
-                    <Bell size={14} aria-hidden="true" />
-                    Reminder
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn-chase ${stockDelayed ? "btn-chase-hot" : ""}`}
-                    onClick={() =>
-                      supplierCount > 1 ? setChasePopover((v) => !v) : copyChase("supplier", "chase")
-                    }
-                    title={
-                      supplierCount > 1
-                        ? "Multiple suppliers — pick who to chase"
-                        : "Copy the supplier chase (WhatsApp) + log it"
-                    }
-                  >
-                    <MessageCircle size={14} aria-hidden="true" />
-                    Chase{supplierCount > 1 ? ` (${supplierCount})` : ""}
-                  </button>
-                </>
-              }
-            />
-            {chasePopover && supplierCount > 1 && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setChasePopover(false)} />
-                {/* Supplier chase popover — PO-led, overdue first + red. */}
-                <div
-                  className="absolute right-0 top-full mt-1 w-64 z-20 bg-white border border-base-200 rounded-[8px] shadow-lg p-2 space-y-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {[...posBySupplier.entries()]
-                    .sort((x, y) => {
-                      const od = (arr: operationOrderDetailPo[]) =>
-                        arr.some((po2) => !!po2.eta_date && po2.eta_date < todayIso) ? 0 : 1;
-                      return od(x[1]) - od(y[1]);
-                    })
-                    .map(([supId, supPos]) => {
-                      const overdue = supPos.some(
-                        (po2) => !!po2.eta_date && po2.eta_date < todayIso,
-                      );
-                      const supName =
-                        suppliersData?.suppliers.find((sp) => sp.id === supId)?.name ??
-                        `Supplier ${supId.slice(0, 6)}`;
-                      return (
-                        <div key={supId} className="flex items-center gap-2 min-h-8 px-1">
-                          <span className="min-w-0 flex-1">
-                            <span
-                              className={`block text-[13px] font-medium truncate ${overdue ? "text-danger" : "text-base-900"}`}
-                            >
-                              {supName}
-                            </span>
-                            <span className="block text-[12px] text-base-500 font-mono truncate">
-                              {supPos.map((sp) => sp.id.slice(0, 8)).join(" · ")}
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            className={`btn-chase ${overdue ? "btn-chase-hot" : ""}`}
-                            onClick={() => {
-                              copyChase("supplier", "chase");
-                              setChasePopover(false);
-                            }}
-                          >
-                            <MessageCircle size={14} aria-hidden="true" />
-                            Chase
-                          </button>
-                        </div>
-                      );
-                    })}
-                  <button
-                    type="button"
-                    className="btn-chase w-full justify-center"
-                    onClick={() => {
-                      copyChase("supplier", "chase");
-                      setChasePopover(false);
-                    }}
-                    title="One chase per supplier — copies the template + logs each"
-                  >
-                    Chase all
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          <PartyCard
-            label="Delivery"
-            media={
-              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                <Truck size={16} strokeWidth={2} aria-hidden="true" />
-              </span>
-            }
-            value={
-              <span className={overDeadline && !deliveredDone ? "text-danger" : undefined}>
-                {deadlineLabel}
-                {overDeadline && !deliveredDone ? " · over" : ""}
-              </span>
-            }
-            rows={logisticRows}
-            onOpen={() => setTab("delivery")}
-            footer={
-              <>
-                <button
-                  type="button"
-                  className="btn-reminder"
-                  onClick={() => copyChase("logistic", "reminder")}
-                  title="Copy the gentle logistic reminder (WhatsApp) + log it"
-                >
-                  <Bell size={14} aria-hidden="true" />
-                  Reminder
-                </button>
-                <button
-                  type="button"
-                  className={`btn-chase ${overDeadline && !deliveredDone ? "btn-chase-hot" : ""}`}
-                  onClick={() => copyChase("logistic", "chase")}
-                  title="Copy the firmer logistic chase (WhatsApp) + log it"
-                >
-                  <MessageCircle size={14} aria-hidden="true" />
-                  Chase
-                </button>
-              </>
-            }
-          />
-        </div>
-        {/* Work area (Jess 2026-07-17 rev 5): VERTICAL tab rail left (BARE
-            column, 200px, collapsible to 56px icon-only) + content right.
-            Contents stay MOUNTED (hidden) so edits survive tab switches. */}
-        <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
-        <nav
-          className={`shrink-0 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar ${railCollapsed ? "w-14" : "w-[200px]"}`}
+          <nav
+          className={"flex-1 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar"}
           aria-label="Order sections"
         >
           {(
@@ -2055,7 +2180,190 @@ function DrawerBody({
             )}
           </button>
         </nav>
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
+        </div>
+        {/* RIGHT — KPI track boxes pinned + the tab content below. */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
+        {/* Equal-height track row — every card fills the tallest. */}
+        <div
+          className="shrink-0 grid items-stretch gap-2.5"
+          style={{
+            /* Labels never truncate: Balance/Delivery keep ≥200px; Stock is
+               the one that flexes wider (≥300px, 1.8 share of the extra). */
+            gridTemplateColumns:
+              "minmax(240px,1fr) minmax(300px,1.8fr) minmax(240px,1fr)",
+          }}
+        >
+          <PartyCard
+            label="Balance"
+            media={
+              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                <Wallet size={16} strokeWidth={2} aria-hidden="true" />
+              </span>
+            }
+            value={
+              /* §8 — the payment dial sits BESIDE the headline value. */
+              <span className="inline-flex items-center gap-1.5">
+                <PieDial px={20} fraction={payFraction} state={payDialState} />
+                {paidDone ? (
+                  <span className="text-success">Paid</span>
+                ) : balanceOwing ? (
+                  <span className="text-danger">{RM(moneyOutstanding)}</span>
+                ) : totalSet ? (
+                  RM(moneyOutstanding)
+                ) : (
+                  <span className="text-base-400 font-semibold">No total</span>
+                )}
+              </span>
+            }
+            rows={moneyRows}
+            onOpen={() => setTab("balance")}
+            /* Nothing owing (paid / no total) → nothing to chase: the pair
+               hides entirely (Jess 2026-07-18). */
+            footer={
+              balanceOwing ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-reminder"
+                    onClick={() => copyChase("customer", "reminder")}
+                    title="Copy the gentle customer reminder (WhatsApp) + log it"
+                  >
+                    <Bell size={14} aria-hidden="true" />
+                    Reminder
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
+                    onClick={() => copyChase("customer", "chase")}
+                    title="Copy the firmer customer chase (WhatsApp) + log it"
+                  >
+                    <MessageCircle size={14} aria-hidden="true" />
+                    Chase
+                  </button>
+                </>
+              ) : undefined
+            }
+          />
+          <div className="relative min-w-0">
+            <PartyCard
+              label="Stock"
+              media={
+                <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                  <Package size={16} strokeWidth={2} aria-hidden="true" />
+                </span>
+              }
+              value={
+                /* §8 — the stock dial sits BESIDE the headline value (the
+                   card body is category rows; there is no stage list). */
+                <span className="inline-flex items-center gap-1.5">
+                  <PieDial
+                    px={20}
+                    fraction={goodsN === 0 ? 0 : readyN / goodsN}
+                    state={
+                      goodsN === 0
+                        ? "gray"
+                        : readyN === goodsN
+                          ? "green"
+                          : stockDelayed
+                            ? "red"
+                            : "amber"
+                    }
+                  />
+                  {goodsN === 0 ? (
+                    <span className="text-base-400 font-semibold">—</span>
+                  ) : readyN === goodsN ? (
+                    <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
+                  ) : stockDelayed ? (
+                    <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
+                  ) : (
+                    <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
+                  )}
+                </span>
+              }
+              rows={[]}
+              onOpen={() => setTab("items")}
+              extra={
+                /* Option A (2026-07-18) — the category rows ARE the body: one
+                   per category present (incl. Accessory): label · N/M ·
+                   supplier + status (or "Ready ✓") · PO-led Chase
+                   (multi-supplier → "Chase (N)" popover, overdue on top). */
+                stockCats.length > 0 ? (
+                  <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+                    {stockCats.map((c) => (
+                      <StockCategoryRow
+                        key={c.cat}
+                        c={c}
+                        onChase={copySupplierChaseFor}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[12px] text-base-400 min-h-9 flex items-center">
+                    No goods lines.
+                  </div>
+                )
+              }
+              footer={
+                /* The category rows own Chase now — the footer keeps only the
+                   gentle generic Reminder (hidden once everything is ready). */
+                readyN < goodsN ? (
+                  <button
+                    type="button"
+                    className="btn-reminder"
+                    onClick={() => copyChase("supplier", "reminder")}
+                    title="Copy the gentle supplier reminder (WhatsApp) + log it"
+                  >
+                    <Bell size={14} aria-hidden="true" />
+                    Reminder
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
+          <PartyCard
+            label="Delivery"
+            media={
+              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                <Truck size={16} strokeWidth={2} aria-hidden="true" />
+              </span>
+            }
+            value={
+              /* §7 — the RED colour IS the overdue signal (no " · over"
+                 suffix; it overflowed the 240px box at MacBook width). */
+              <span
+                className={overDeadline && !deliveredDone ? "text-danger" : undefined}
+                title={overDeadline && !deliveredDone ? "Deadline passed" : undefined}
+              >
+                {deadlineLabel}
+              </span>
+            }
+            rows={logisticRows}
+            onOpen={() => setTab("delivery")}
+            footer={
+              <>
+                <button
+                  type="button"
+                  className="btn-reminder"
+                  onClick={() => copyChase("logistic", "reminder")}
+                  title="Copy the gentle logistic reminder (WhatsApp) + log it"
+                >
+                  <Bell size={14} aria-hidden="true" />
+                  Reminder
+                </button>
+                <button
+                  type="button"
+                  className={`btn-chase ${overDeadline && !deliveredDone ? "btn-chase-hot" : ""}`}
+                  onClick={() => copyChase("logistic", "chase")}
+                  title="Copy the firmer logistic chase (WhatsApp) + log it"
+                >
+                  <MessageCircle size={14} aria-hidden="true" />
+                  Chase
+                </button>
+              </>
+            }
+          />
+        </div>
+<div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
@@ -2124,6 +2432,20 @@ function DrawerBody({
                 a neutral base-50 header row, not another cream strip). */}
             <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
               <table className="w-full border-collapse">
+                {/* §9 — formal columns across the FULL width (data tables are
+                    exempt from the ~1000 forms cap). */}
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-base-50 text-base-500">
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-44">SKU</th>
+                    <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Source</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-20">Location</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Stock ETA</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-36">Status</th>
+                    <th className="text-center text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-40">Action</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {(() => {
                     // §7.7 — ONE row renderer, grouped into Needs action /
@@ -2169,12 +2491,16 @@ function DrawerBody({
                       const routeOpen = routeOpenSku === l.sku;
                       // AUTO-derived status (§7.7 — the manual dropdown is gone;
                       // reserving stock is what flips a line green).
+                      // §9 status vocab (same words as the dial): Reserved
+                      // green · Need N amber · On PO grey · Delayed red (the
+                      // PO's ETA has passed and the goods aren't in).
+                      const etaPassed = !!etaValue && etaValue < todayIso;
                       const pill =
                         !rd
                           ? null
                           : rd === "reserved"
                             ? {
-                                t: `Reserved · ${locValue || "Carres Klang"}`,
+                                t: "Reserved",
                                 c: "pill-confirmed",
                                 hint: isAcc
                                   ? "Accessory — always in the Klang warehouse"
@@ -2187,11 +2513,17 @@ function DrawerBody({
                                   hint: "Matching free stock exists — reserve it to this SO",
                                 }
                               : rd === "on_po"
-                                ? {
-                                    t: "On PO",
-                                    c: "bg-base-100 text-base-500",
-                                    hint: "Waiting on supplier stock (PO raised)",
-                                  }
+                                ? etaPassed
+                                  ? {
+                                      t: "Delayed",
+                                      c: "pill-overdue",
+                                      hint: "The PO's ETA has passed — chase the supplier",
+                                    }
+                                  : {
+                                      t: "On PO",
+                                      c: "bg-base-100 text-base-500",
+                                      hint: "Waiting on supplier stock (PO raised)",
+                                    }
                                 : {
                                     t: "No PO",
                                     c: "bg-base-100 text-base-500",
@@ -2207,7 +2539,7 @@ function DrawerBody({
                               pattern). Status lives in the Status pill. 44px. */}
                           <tr
                             onClick={() => setPickerSku(l.sku)}
-                            className={`cursor-pointer h-14 transition-opacity ${
+                            className={`cursor-pointer h-[52px] transition-opacity ${
                               l.sku === activeLineSku
                                 ? "bg-[#e6f1fb]"
                                 : `${
@@ -2219,14 +2551,9 @@ function DrawerBody({
                                   }`
                             }`}
                           >
-                            {/* Item — chevron expands the detail (stock ETA /
-                                GRN / route-transfer). */}
-                            {/* §8b row-align fix (Jess): EVERY cell centres
-                                vertically — no more top/middle mix reading as
-                                "rows up and down". */}
-                            {/* Option A row (Jess 2026-07-18): 42px category
-                                thumb + name over "size · ×qty · source" — qty
-                                and source fold into the sub-line. */}
+                            {/* §9 columns — ITEM (chevron + thumb + name/size)
+                                · SKU · QTY · SOURCE · LOCATION · STOCK ETA ·
+                                STATUS · ACTION (must-do + Manage ▾). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               <div className="flex items-center gap-2 min-w-0">
                                 {!isService && (
@@ -2238,7 +2565,7 @@ function DrawerBody({
                                         cur === l.sku ? null : l.sku,
                                       );
                                     }}
-                                    title="Details — stock ETA, receiving (GRN), route / transfer"
+                                    title="Details — receiving (GRN), route / transfer"
                                     aria-expanded={routeOpen}
                                     className="shrink-0 text-base-500 hover:text-base-800"
                                   >
@@ -2259,20 +2586,92 @@ function DrawerBody({
                                   >
                                     {l.sku}
                                   </span>
-                                  <span className="block text-[12px] text-base-500 leading-tight truncate font-mono">
-                                    {[
-                                      lineSize(l.sku),
-                                      `×${l.qty}`,
-                                      isService ? null : poNo ?? "Klang stock",
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </span>
+                                  {lineSize(l.sku) && (
+                                    <span className="block text-[12px] text-base-500 leading-tight truncate">
+                                      {lineSize(l.sku) === "K"
+                                        ? "King"
+                                        : lineSize(l.sku) === "Q"
+                                          ? "Queen"
+                                          : "Single"}
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </td>
-                            {/* Status — auto-derived pill. */}
-                            <td className="border-b border-base-100 px-1.5 py-1 align-middle w-44">
+                            {/* SKU — the raw code (mono; today the name IS the
+                                sku — splits when a catalog lands). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              <span
+                                className="block font-mono text-[11px] text-base-500 truncate max-w-[170px]"
+                                title={l.sku}
+                              >
+                                {skuCode(l.sku)}
+                              </span>
+                            </td>
+                            {/* QTY — the bare number (§9: no "QTY" word). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
+                              {l.qty}
+                            </td>
+                            {/* SOURCE — In stock / PO#### */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              {isService ? (
+                                <span className="text-base-300 text-[12px]">—</span>
+                              ) : poNo ? (
+                                <span className="font-mono text-[12px] text-base-700 truncate block max-w-[110px]" title={poNo}>
+                                  {poNo}
+                                </span>
+                              ) : (
+                                <span className="text-[12px] text-base-600">In stock</span>
+                              )}
+                            </td>
+                            {/* LOCATION — site short name. */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle text-[12px] text-base-600">
+                              {isService ? "—" : shortSite(locValue || "Carres Klang")}
+                            </td>
+                            {/* STOCK ETA — red alert when late / missing. */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              {isService || isAcc || rd === "reserved" ? (
+                                <span className="text-base-300 text-[12px]">—</span>
+                              ) : etaValue ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[12px] tabular-nums ${
+                                    etaPassed ||
+                                    (!order.delivery_date_tbd &&
+                                      !!order.delivery_date &&
+                                      etaValue > order.delivery_date)
+                                      ? "text-danger font-medium"
+                                      : "text-base-700"
+                                  }`}
+                                  title={
+                                    etaPassed
+                                      ? "ETA has passed — goods not in"
+                                      : !order.delivery_date_tbd &&
+                                          !!order.delivery_date &&
+                                          etaValue > order.delivery_date
+                                        ? "ETA is AFTER the delivery deadline"
+                                        : "Expected stock arrival"
+                                  }
+                                >
+                                  {(etaPassed ||
+                                    (!order.delivery_date_tbd &&
+                                      !!order.delivery_date &&
+                                      etaValue > order.delivery_date)) && (
+                                    <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
+                                  )}
+                                  {fmtDate(etaValue).split(",")[0]}
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-danger"
+                                  title="No stock ETA — chase the supplier"
+                                >
+                                  <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
+                                  no ETA
+                                </span>
+                              )}
+                            </td>
+                            {/* STATUS — auto-derived pill (dial vocabulary). */}
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {pill ? (
                                 <span
                                   title={pill.hint}
@@ -2287,37 +2686,65 @@ function DrawerBody({
                                 <span className="text-base-300 text-[12px]">—</span>
                               )}
                             </td>
-                            {/* Action — inline Reserve on an unfulfilled line;
-                                opens the warehouse picker filtered to it. */}
-                            <td className="border-b border-base-100 px-1.5 py-1 text-center align-middle w-[88px]">
-                              {rd && rd !== "reserved" ? (
-                                /* v4 §2 ladder — row action = secondary Btn. */
-                                <Btn
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPickerSku(l.sku);
-                                    setPickerOpen(true);
-                                    document
-                                      .getElementById("warehouse-stock-panel")
-                                      ?.scrollIntoView({
-                                        block: "start",
-                                        behavior: "smooth",
-                                      });
-                                  }}
-                                  title="Open the warehouse picker filtered to this line"
-                                >
-                                  Reserve
-                                </Btn>
-                              ) : (
+                            {/* ACTION — the must-do action directly + Manage ▾
+                                for the rest; Reserved rows read "—" (§9). */}
+                            <td className="border-b border-base-100 px-1.5 py-1 text-center align-middle">
+                              {isService || rd === "reserved" ? (
                                 <span className="text-base-300 text-[12px]">—</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1">
+                                  {rd === "to_reserve" && (
+                                    <Btn
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPickerSku(l.sku);
+                                        setPickerOpen(true);
+                                        document
+                                          .getElementById("warehouse-stock-panel")
+                                          ?.scrollIntoView({
+                                            block: "start",
+                                            behavior: "smooth",
+                                          });
+                                      }}
+                                      title="Open the warehouse picker filtered to this line"
+                                    >
+                                      Reserve
+                                    </Btn>
+                                  )}
+                                  <RowManageMenu
+                                    items={[
+                                      {
+                                        label: "Reserve stock",
+                                        onClick: () => {
+                                          setPickerSku(l.sku);
+                                          setPickerOpen(true);
+                                          document
+                                            .getElementById("warehouse-stock-panel")
+                                            ?.scrollIntoView({
+                                              block: "start",
+                                              behavior: "smooth",
+                                            });
+                                        },
+                                      },
+                                      {
+                                        label: "Loan a substitute",
+                                        onClick: () => setTab("loan"),
+                                      },
+                                      {
+                                        label: "Change route",
+                                        onClick: () => setRouteOpenSku(l.sku),
+                                      },
+                                    ]}
+                                  />
+                                </span>
                               )}
                             </td>
                           </tr>
                           {!isService && routeOpen && (
                             <tr className="bg-base-50">
                               <td
-                                colSpan={3}
+                                colSpan={8}
                                 className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
                                 <div className="space-y-2">
@@ -2407,7 +2834,7 @@ function DrawerBody({
                       onToggle: () => void,
                     ) => (
                       <tr key={`grp-${key}`}>
-                        <td colSpan={3} className="border-b border-base-100 p-0">
+                        <td colSpan={8} className="border-b border-base-100 p-0">
                           <button
                             type="button"
                             onClick={onToggle}
@@ -2720,41 +3147,30 @@ function DrawerBody({
             }
             defaultOpen={false}
             summary={
-              /* v4 state-adaptive one-liner. FIX (Jess): never a bare "no
-                 total" chip beside collected money — money-in-no-total reads
-                 "Collected RMx · set total", neutral (no red). Amounts in the
-                 slashed-zero mono; "Paid" is a status → pill. */
-              /* v4 §3 money recipe — tiny muted RM, bold digits; words Inter. */
-              !totalSet ? (
-                <span className="text-[12px] text-base-500 whitespace-nowrap">
-                  {collected > 0 ? (
-                    <>
-                      Collected <Money value={collected} tone="sm" className="text-base-800" /> ·{" "}
-                    </>
-                  ) : null}
-                  <span className="text-base-400">set total</span>
-                </span>
-              ) : isOwing ? (
+              /* Balance v3 header — the payment status PILL from the dial
+                 family (STATUS-STANDARD §1): Unpaid / Deposit / Overdue /
+                 Paid. The dial's fill = collected ÷ invoice total. */
+              payStatus ? (
                 <span
                   title={
                     balanceGate === "hold"
                       ? "Delivery on hold — collect before dispatch"
-                      : "Outstanding balance"
+                      : `Collected ${RM(collectedAll)} of ${RM(invoiceTotal)}`
                   }
-                  className={`text-[12px] font-semibold whitespace-nowrap ${
-                    deliveryEveLabel ? "text-danger" : "text-base-800"
-                  }`}
+                  className={`inline-flex items-center gap-1.5 text-[12px] font-semibold whitespace-nowrap ${payToneCls}`}
                 >
-                  Outstanding <Money value={owingAmt} tone="sm" />
-                  {collected > 0 ? (
-                    <span className="font-normal text-base-500">
-                      {" "}
-                      · <Money value={collected} tone="sm" className="text-base-500" /> in
-                    </span>
-                  ) : null}
+                  <PieDial px={18} fraction={payFraction} state={payDialState} />
+                  {payStatus}
                 </span>
               ) : (
-                <span className="pill pill-confirmed text-[12px]">Paid ✓</span>
+                <span className="text-[12px] text-base-500 whitespace-nowrap">
+                  {collected > 0 ? (
+                    <>
+                      Collected <Money value={collected} tone="row" className="text-base-800" /> ·{" "}
+                    </>
+                  ) : null}
+                  <span className="text-base-400">set total</span>
+                </span>
               )
             }
             collapsedAction={
@@ -2779,12 +3195,18 @@ function DrawerBody({
                   hold/warn strip folded into it). */}
               <MoneyCard
                 orderId={order.id}
+                so={order.so}
                 form={form}
                 hasLineTotal={hasLineTotal}
                 orderTotal={orderTotal}
                 totalSet={totalSet}
-                collected={collected}
-                outstanding={moneyOutstanding}
+                collected={collectedAll}
+                lines={lines}
+                storageCharge={storageCharge}
+                storageIncurred={storageIncurred}
+                invoiceTotal={invoiceTotal}
+                balanceDue={balanceDue}
+                collectByPast={collectByPast}
                 ledger={ledger}
                 receiptMeta={{
                   orderCode: `SO-${order.so}`,
@@ -2795,10 +3217,8 @@ function DrawerBody({
                 onRemind={() =>
                   copyChase("customer", deliveryEveLabel ? "final" : "reminder")
                 }
-                onChase={() => copyChase("customer", "chase")}
                 lastChasedAt={form.control?.last_chased_at ?? null}
                 startEditTotalRef={balanceEditTotalRef}
-                onAddPayment={() => setAddingPayment(true)}
               />
             </div>
           </Panel>
@@ -2808,9 +3228,6 @@ function DrawerBody({
           {addingPayment && (
             <AddPaymentModal
               orderId={order.id}
-              totalSet={totalSet}
-              orderTotal={orderTotal}
-              collected={collected}
               onClose={() => setAddingPayment(false)}
             />
           )}
@@ -3059,8 +3476,8 @@ function DrawerBody({
           </SectionCard>
           </div>
         </div>{/* /tab contents */}
-
-        </div>{/* /main|side grid */}
+        </div>{/* /right column */}
+        </div>{/* /two-column shell */}
       </div>{/* /scroll body */}
     </div>
   );
@@ -3285,6 +3702,7 @@ function CustomerIdentityCard({
   order,
   regionLabel,
   statusWord,
+  collapsed = false,
 }: {
   order: {
     id: string;
@@ -3296,9 +3714,14 @@ function CustomerIdentityCard({
   };
   regionLabel: string | null;
   statusWord: string;
+  /** Rail collapsed (56px icon-only) — the block shrinks to the avatar. */
+  collapsed?: boolean;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  // rev 9 shell: the block reads COMPACT by default; the full address expands
+  // on demand (it ate the 260px rail's height when always open).
+  const [showAddr, setShowAddr] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -3320,6 +3743,20 @@ function CustomerIdentityCard({
     "inline-flex items-center gap-1 rounded-[6px] border border-base-200 bg-base-50 px-1.5 py-0.5 text-[12px] text-base-700 hover:border-base-300 min-w-0";
   const field =
     "mt-0.5 w-full px-2 py-1 border border-base-200 rounded-[6px] text-[13px] bg-white outline-none focus:border-primary";
+  // Rail collapsed (56px) — icon-only: the avatar carries the identity as a
+  // tooltip; everything else waits for the rail to expand.
+  if (collapsed) {
+    return (
+      <div
+        className="kpi-box grid place-items-center py-2"
+        title={`${order.customer_name ? titleCaseName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+      >
+        <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+          <User size={18} strokeWidth={2} aria-hidden="true" />
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="kpi-box relative">
       <div className="flex items-start gap-2 min-w-0">
@@ -3328,20 +3765,33 @@ function CustomerIdentityCard({
         </span>
         <span className="min-w-0 flex-1">
           <span
-            className={`block text-[14px] font-bold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
+            className={`block text-[13px] font-bold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
             {order.customer_name ? titleCaseName(order.customer_name) : "—"}
           </span>
-          <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+          <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
             <span className="font-mono font-bold text-[12px] text-white bg-base-900 rounded-[5px] px-1.5 py-0.5 shrink-0">
               #{order.so}
             </span>
-            <span className="text-[12px] text-base-500 truncate">
-              {regionLabel ? `${regionLabel} · ` : ""}
+            {/* State PILL (rev 9 shell spec) + the region as quiet text. */}
+            <span
+              className={`pill text-[12px] shrink-0 ${
+                statusWord === "On hold"
+                  ? "pill-warning"
+                  : statusWord === "Delivered"
+                    ? "pill-confirmed"
+                    : "pill-neutral"
+              }`}
+            >
               {statusWord}
             </span>
+            {regionLabel && (
+              <span className="text-[12px] text-base-500 truncate">
+                {regionLabel}
+              </span>
+            )}
           </span>
         </span>
         <button
@@ -3390,18 +3840,37 @@ function CustomerIdentityCard({
               </button>
             )}
           </div>
-          {/* FULL address, openly shown (Jess 2026-07-18 — never hidden behind
-              a chip); click = copy. */}
+          {/* Address behind an expand (rev 9 shell — the compact block keeps
+              the 260px rail short; expanding shows the FULL address, click =
+              copy as before). */}
           {order.customer_address && (
-            <button
-              type="button"
-              className="w-full text-left text-[13px] text-base-900 leading-snug hover:text-base-700"
-              onClick={() => copy(order.customer_address ?? "", "Address")}
-              title="Click to copy the address"
-            >
-              <MapPin size={14} aria-hidden="true" className="inline-block mr-1 -mt-0.5 text-base-400" />
-              {order.customer_address}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowAddr((v) => !v)}
+                aria-expanded={showAddr}
+                title={showAddr ? "Hide the address" : "Show the full address"}
+                className="flex items-center gap-1 text-[12px] font-medium text-base-500 hover:text-base-800"
+              >
+                <MapPin size={14} aria-hidden="true" className="text-base-400" />
+                Address
+                {showAddr ? (
+                  <ChevronDown size={14} aria-hidden="true" />
+                ) : (
+                  <ChevronRight size={14} aria-hidden="true" />
+                )}
+              </button>
+              {showAddr && (
+                <button
+                  type="button"
+                  className="w-full text-left text-[13px] text-base-900 leading-snug hover:text-base-700"
+                  onClick={() => copy(order.customer_address ?? "", "Address")}
+                  title="Click to copy the address"
+                >
+                  {order.customer_address}
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : (
@@ -3735,458 +4204,724 @@ async function openDoPdf(orderId: string) {
 void openInvoicePdf;
 void openDoPdf;
 
-/** One row of the Total / Collected / Outstanding stack — v4 §3: label =
- *  12px uppercase muted; the value (right) is CONTENT, dark. */
-function MoneyRow({
-  label,
-  children,
-  strong,
-}: {
-  label: string;
-  children: ReactNode;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
-    >
-      <span className="t4-label">{label}</span>
-      <span className="text-right">{children}</span>
-    </div>
-  );
-}
+/** Malaysian receiving banks for the Bank-transfer dropdown (free set — the
+ *  name rides `reference`, no schema change). */
+const MY_BANKS = [
+  "Maybank",
+  "CIMB",
+  "Public Bank",
+  "RHB",
+  "HLB",
+  "AmBank",
+  "Bank Islam",
+  "BSN",
+  "HSBC",
+  "UOB",
+  "OCBC",
+  "Other",
+] as const;
 
-/** v4 §2 — the Add-payment modal: two columns. LEFT = typed fields (amount /
- *  date-received default today / method Transfer·Cash·Card / bank when
- *  transfer / slip / note). RIGHT = the live "after this payment" balance —
- *  bill / collected / outstanding recompute per keystroke. Payments stay
- *  VOID-able (principal), never deletable. `Transfer` maps to the ledger's
- *  'bank' method; the bank name (HLB/RHB) rides `reference` (no schema
- *  change). Slip upload is a SHELL — order_payments.receipt_url exists but
- *  the record API doesn't accept it yet (receipt/invoice workstream). */
-function AddPaymentModal({
+/** PaymentForm (Balance-tab inline spec, 2026-07-18) — ONE payment entry
+ *  form, used INLINE in the Balance tab's Payments column and (wrapped in a
+ *  Modal) by the collapsed band's Add-payment shortcut. Amount · Date ·
+ *  Method (Cash / Bank transfer / Cheque / e-wallet) · Bank (when transfer) ·
+ *  Ref no · receipt UPLOAD (drag/tap, image/PDF → orders-attachments, live
+ *  via the 0180 internal-write policy) · Save/Cancel. Saving uploads the slip
+ *  first, then records with `receiptUrl` (persistence deploy-gated — the live
+ *  schema strips the key; the payment itself always records). The Save is the
+ *  inline form's PRIMARY → the black workhorse (spec-sanctioned here). */
+function PaymentForm({
   orderId,
-  totalSet,
-  orderTotal,
-  collected,
-  onClose,
+  onDone,
+  onCancel,
 }: {
   orderId: string;
-  totalSet: boolean;
-  orderTotal: number;
-  collected: number;
-  onClose: () => void;
+  onDone: () => void;
+  onCancel: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<"bank" | "cash" | "card">("bank");
-  const [bank, setBank] = useState<"" | "HLB" | "RHB">("");
+  const [method, setMethod] = useState<OrderPaymentMethod>("bank");
+  const [bank, setBank] = useState("");
+  const [refNo, setRefNo] = useState("");
   const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [saving, setSaving] = useState(false);
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
   });
   const amt = Number(amount);
   const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
-  const afterCollected = collected + (amtOk ? amt : 0);
-  const afterOutstanding = Math.max(0, orderTotal - afterCollected);
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
+
+  const acceptFile = (f: File | undefined | null) => {
+    if (!f) return;
+    if (!/^image\/|^application\/pdf$/.test(f.type)) {
+      toast.error("Receipt must be an image or a PDF");
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      toast.error("Receipt too large — max 10 MB");
+      return;
+    }
+    setFile(f);
+  };
+
+  async function save() {
+    if (!amtOk || saving || record.isPending) return;
+    setSaving(true);
+    // 1. Upload the customer's proof first. A failed upload blocks the save
+    //    so a slip is never silently dropped; remove the file to record
+    //    without one.
+    let receiptUrl: string | null = null;
+    if (file) {
+      const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60);
+      const path = `orders/${orderId}/payments/${Date.now()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from(ATTACHMENTS_BUCKET)
+        .upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: false,
+        });
+      if (error) {
+        setSaving(false);
+        toast.error(`Slip upload failed — ${error.message}`);
+        return;
+      }
+      receiptUrl = `${ATTACHMENTS_BUCKET}/${path}`;
+    }
+    // 2. Record. Bank + ref ride `reference`; the slip path rides `receiptUrl`.
+    const reference =
+      [method === "bank" ? bank : "", refNo.trim()].filter(Boolean).join(" · ") ||
+      null;
+    record.mutate(
+      {
+        amount: amt,
+        paidOn,
+        note: note.trim() || null,
+        method,
+        kind: "payment",
+        reference,
+        receiptUrl,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Payment recorded");
+          onDone();
+        },
+        onSettled: () => setSaving(false),
+      },
+    );
+  }
+
   return (
-    <Modal title="Add payment" onClose={onClose} size="lg">
-      <div className="grid grid-cols-[3fr_2fr] gap-4">
-        {/* LEFT — the typed fields. */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="t4-label">Amount (RM)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                autoFocus
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                aria-label="Payment amount"
-                className={cell}
-              />
-            </label>
-            <label className="block">
-              <span className="t4-label">Date received</span>
-              <input
-                type="date"
-                value={paidOn}
-                onChange={(e) => setPaidOn(e.target.value)}
-                aria-label="Payment date"
-                className={cell}
-              />
-            </label>
-            <label className="block">
-              <span className="t4-label">Method</span>
-              <select
-                value={method}
-                onChange={(e) =>
-                  setMethod(e.target.value as "bank" | "cash" | "card")
-                }
-                aria-label="Payment method"
-                className={cell}
-              >
-                <option value="bank">Transfer</option>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-              </select>
-            </label>
-            {method === "bank" ? (
-              <label className="block">
-                <span className="t4-label">Bank</span>
-                <select
-                  value={bank}
-                  onChange={(e) => setBank(e.target.value as "" | "HLB" | "RHB")}
-                  aria-label="Receiving bank"
-                  className={cell}
-                >
-                  <option value="">—</option>
-                  <option value="HLB">HLB</option>
-                  <option value="RHB">RHB</option>
-                </select>
-              </label>
-            ) : (
-              <div aria-hidden="true" />
-            )}
-          </div>
+    <div className="rounded-[8px] border border-base-200 bg-base-50 p-2.5 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="t4-label">Amount (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            autoFocus
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            aria-label="Payment amount"
+            className={cell}
+          />
+        </label>
+        <label className="block">
+          <span className="t4-label">Date received</span>
+          <input
+            type="date"
+            value={paidOn}
+            onChange={(e) => setPaidOn(e.target.value)}
+            aria-label="Payment date"
+            className={cell}
+          />
+        </label>
+        <label className="block">
+          <span className="t4-label">Method</span>
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+            aria-label="Payment method"
+            className={cell}
+          >
+            <option value="cash">Cash</option>
+            <option value="bank">Bank transfer</option>
+            <option value="cheque">Cheque</option>
+            <option value="online">e-wallet</option>
+          </select>
+        </label>
+        {method === "bank" ? (
           <label className="block">
-            <span className="t4-label">Upload slip</span>
-            <button
-              type="button"
-              disabled
-              title="Slip / receipt upload lands with the receipt workstream (order_payments.receipt_url is ready)"
-              className="mt-0.5 w-full px-2 py-1.5 border border-dashed border-base-300 rounded text-[12px] text-base-400 bg-base-50 cursor-not-allowed text-left"
+            <span className="t4-label">Bank</span>
+            <select
+              value={bank}
+              onChange={(e) => setBank(e.target.value)}
+              aria-label="Receiving bank"
+              className={cell}
             >
-              Attach transfer slip — coming with receipts
-            </button>
+              <option value="">—</option>
+              {MY_BANKS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
           </label>
+        ) : (
           <label className="block">
-            <span className="t4-label">Note (optional)</span>
+            <span className="t4-label">Ref no (optional)</span>
             <input
               type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Deposit · 2nd payment · final"
-              aria-label="Payment note"
+              value={refNo}
+              onChange={(e) => setRefNo(e.target.value)}
+              placeholder="e.g. transaction no"
+              aria-label="Payment reference number"
               className={cell}
             />
           </label>
-        </div>
-        {/* RIGHT — live "after this payment" (grey container, white page). */}
-        <div
-          className="rounded-[8px] bg-base-50 p-3 self-start"
-          data-testid="payment-live-preview"
-        >
-          <div className="t4-label mb-2">After this payment</div>
-          {totalSet ? (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] text-base-500">Bill total</span>
-                <Money value={orderTotal} tone="md" className="text-base-900" />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] text-base-500">Collected</span>
-                <Money value={afterCollected} tone="md" className="text-base-900" />
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-base-200">
-                <span className="text-[12px] text-base-500">Outstanding</span>
-                {afterOutstanding > 0 ? (
-                  <Money
-                    value={afterOutstanding}
-                    tone="hero"
-                    className="text-base-900"
-                  />
-                ) : (
-                  <span className="pill pill-confirmed text-[12px]">Paid ✓</span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] text-base-500">Collected</span>
-                <Money value={afterCollected} tone="md" className="text-base-900" />
-              </div>
-              <div className="text-[12px] text-base-400">
-                No total set — set the total in Balance to compute outstanding.
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-      <div className="mt-3 flex items-center justify-end gap-2">
-        <Btn variant="ghost" onClick={onClose}>
+      {method === "bank" && (
+        <label className="block">
+          <span className="t4-label">Ref no (optional)</span>
+          <input
+            type="text"
+            value={refNo}
+            onChange={(e) => setRefNo(e.target.value)}
+            placeholder="e.g. transaction / cheque no"
+            aria-label="Payment reference number"
+            className={cell}
+          />
+        </label>
+      )}
+      {/* Customer proof — drag/tap; image/PDF. */}
+      <div className="block">
+        <span className="t4-label">Upload receipt (customer proof)</span>
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            acceptFile(e.dataTransfer.files?.[0]);
+          }}
+          className={`mt-0.5 flex items-center gap-2 w-full px-2 py-2 border border-dashed rounded text-[12px] cursor-pointer ${
+            dragOver
+              ? "border-primary bg-primary/5 text-base-700"
+              : file
+                ? "border-base-300 bg-white text-base-800"
+                : "border-base-300 bg-white text-base-500 hover:border-base-400"
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="sr-only"
+            aria-label="Upload payment receipt"
+            onChange={(e) => {
+              acceptFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {file ? (
+            <>
+              <Paperclip size={14} className="shrink-0 text-base-600" />
+              <span className="min-w-0 truncate">
+                {file.name}
+                <span className="text-base-400">
+                  {" "}
+                  · {(file.size / 1024).toFixed(0)} KB
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setFile(null);
+                }}
+                title="Remove file"
+                aria-label="Remove receipt file"
+                className="ml-auto shrink-0 text-base-400 hover:text-danger"
+              >
+                <X size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <Upload size={14} className="shrink-0" />
+              Drop the slip here, or tap to choose (image / PDF)
+            </>
+          )}
+        </label>
+      </div>
+      <label className="block">
+        <span className="t4-label">Note (optional)</span>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Deposit · 2nd payment · final"
+          aria-label="Payment note"
+          className={cell}
+        />
+      </label>
+      <div className="flex items-center justify-end gap-2 pt-0.5">
+        <Btn variant="ghost" onClick={onCancel}>
           Cancel
         </Btn>
-        {/* The modal's own hero (its own surface — v4 §2). */}
-        <Btn
-          variant="hero"
-          disabled={!amtOk || record.isPending}
-          onClick={() =>
-            record.mutate(
-              {
-                amount: amt,
-                paidOn,
-                note: note.trim() || null,
-                method,
-                kind: "payment",
-                reference: method === "bank" && bank ? bank : null,
-              },
-              {
-                onSuccess: () => {
-                  toast.success("Payment recorded");
-                  onClose();
-                },
-              },
-            )
-          }
+        {/* Inline-form primary — the black workhorse (spec 2026-07-18). */}
+        <button
+          type="button"
+          disabled={!amtOk || saving || record.isPending}
+          onClick={() => void save()}
+          className="btn-primary text-[13px] disabled:opacity-40"
         >
-          {record.isPending ? "Recording…" : "Record payment"}
-        </Btn>
+          {saving || record.isPending ? "Saving…" : "Save payment"}
+        </button>
       </div>
+    </div>
+  );
+}
+
+/** The collapsed band's Add-payment shortcut — the SAME PaymentForm, wrapped
+ *  in a Modal (the panel body is unmounted while collapsed, so the inline
+ *  spot doesn't exist yet). */
+function AddPaymentModal({
+  orderId,
+  onClose,
+}: {
+  orderId: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title="Record payment" onClose={onClose}>
+      <PaymentForm orderId={orderId} onDone={onClose} onCancel={onClose} />
     </Modal>
   );
 }
 
+/** Method → display label (Balance v3 payment rows + the record modal). */
+const PAY_METHOD_LABEL: Record<OrderPaymentMethod, string> = {
+  cash: "Cash",
+  bank: "Bank transfer",
+  card: "Card",
+  cheque: "Cheque",
+  online: "e-wallet",
+  other: "Other",
+};
+
+/** Open a payment's uploaded proof: an https receipt URL directly, or a
+ *  storage path via a fresh signed URL (internal read, 1h TTL). */
+async function viewSlip(p: OrderPaymentRow) {
+  const u = p.receipt_url;
+  if (!u) return;
+  if (/^https?:/i.test(u)) {
+    window.open(u, "_blank", "noopener");
+    return;
+  }
+  const path = u.startsWith(`${ATTACHMENTS_BUCKET}/`)
+    ? u.slice(ATTACHMENTS_BUCKET.length + 1)
+    : u;
+  const { data, error } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) {
+    toast.error(`Couldn't open slip — ${error?.message ?? "no URL"}`);
+    return;
+  }
+  window.open(data.signedUrl, "_blank", "noopener");
+}
+
+/** One charge row of the invoice list — label left, amount right (v4 §3:
+ *  words Inter, amounts the ONE money recipe). */
+function ChargeRow({
+  num,
+  label,
+  sub,
+  amount,
+}: {
+  /** Line number (1, 2, 3…) — the storage-fee line carries none. */
+  num?: number;
+  label: string;
+  sub?: string;
+  amount: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="min-w-0 truncate text-[13px] text-base-800">
+        {num !== undefined && (
+          <span className="text-base-400 tabular-nums">{num}. </span>
+        )}
+        {label}
+        {sub && <span className="text-base-400"> {sub}</span>}
+      </span>
+      <span className="shrink-0 text-right">{amount}</span>
+    </div>
+  );
+}
+
+/**
+ * MoneyCard v4 (Balance-tab inline spec, 2026-07-18) — TWO internal columns
+ * filling the tab: LEFT = numbered CHARGES (order items auto + the storage
+ * fee from the §7.5 rule + bold Total, keyed-total set INLINE) · RIGHT =
+ * PAYMENTS (each with its uploaded proof + View) + the INLINE expandable
+ * Record-payment form (no modal) + Balance due (15/700, red/green) + the
+ * Invoice · Receipt · Remind action row. Money: hero15 due / row12 ledger,
+ * always tabular. Invoice renders its PDF on click — never an always-on
+ * preview.
+ */
 function MoneyCard({
   orderId,
+  so,
   form,
   hasLineTotal,
   orderTotal,
   totalSet,
   collected,
-  outstanding,
+  lines,
+  storageCharge,
+  storageIncurred,
+  invoiceTotal,
+  balanceDue,
+  collectByPast,
   ledger,
   receiptMeta,
   collectByLabel,
   deliveryEve,
   onRemind,
-  onChase,
   lastChasedAt,
   startEditTotalRef,
-  onAddPayment,
 }: {
   orderId: string;
+  so: number;
   form: ReturnType<typeof useOrderControlForm>;
   hasLineTotal: boolean;
+  /** Goods total — the line sum (native) or the keyed figure (AutoCount). */
   orderTotal: number;
   totalSet: boolean;
+  /** Σ ALL payments (goods + deposit + storage) — the invoice nets one pot. */
   collected: number;
-  outstanding: number;
+  /** Raw order lines — the CHARGES item rows (unit_price 0 on imports). */
+  lines: operationOrderDetailLine[];
+  /** The effective storage fee (override > Master import > auto §7.5 rule). */
+  storageCharge: number;
+  storageIncurred: boolean;
+  /** Goods + storage. */
+  invoiceTotal: number;
+  /** invoiceTotal − collected, floored at 0. */
+  balanceDue: number;
+  collectByPast: boolean;
   ledger: OrderPaymentRow[];
   receiptMeta: { orderCode: string; customerName: string };
-  /** "Collect by <date>" under Outstanding when nothing is collected yet. */
+  /** "Collect by <date>" under Balance due while owing. */
   collectByLabel: string | null;
-  /** Owing + delivery today/tomorrow → red flag + danger Outstanding +
+  /** Owing + delivery today/tomorrow → red flag + danger due +
    *  final-reminder Remind tone (page-rebuild §3.2). */
   deliveryEve: "today" | "tomorrow" | null;
   onRemind: () => void;
-  onChase: () => void;
   /** Shared chase log — the same last_chased_at every chase button stamps. */
   lastChasedAt: string | null;
-  /** Lets the panel ⋮ re-open the total entry once the stack has collapsed to
-   *  the Outstanding-only state (same pattern as the Customer card's edit). */
+  /** Lets the panel ⋮ re-open the keyed-total entry. */
   startEditTotalRef?: MutableRefObject<(() => void) | null>;
-  /** Opens the drawer-level AddPaymentModal (v4 §2 — lifted so the collapsed
-   *  band shortcut works too). */
-  onAddPayment: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
-  // §7.4 — a keyed Total READS formatted ("RM 1,749"), click to edit the raw
-  // number. Starts in edit mode only while no total is set yet.
+  // A keyed Total READS formatted; click to edit. Starts in edit mode only
+  // while no total is set yet.
   const [editingTotal, setEditingTotal] = useState(false);
+  // The INLINE Record-payment form (Balance-tab spec — no modal here; the
+  // collapsed band's shortcut still wraps the same form in a Modal).
+  const [addingInline, setAddingInline] = useState(false);
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
   });
-
-  // v4 rebuild states: paid-in-full / owing / no-total. (The Add-payment
-  // modal itself lives at the drawer level now — see AddPaymentModal.)
-  const paidInFull = totalSet && outstanding <= 0;
-  // Outside entry point (panel ⋮ "Edit total") into the total editor.
   if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
-  // Colour = problem only: Outstanding reads plain ink; danger ONLY on
-  // delivery-eve. v4 §3 money recipe: tiny muted RM + 20/700 hero digits.
-  const outstandingBig = (
-    <Money
-      value={outstanding}
-      tone="hero"
-      className={deliveryEve ? "text-danger" : "text-base-900"}
-    />
-  );
-  // The set-total entry — reused by the partial Total row AND the no-total
-  // hint state. Reads formatted once keyed; click to edit.
-  const totalNode = hasLineTotal ? (
-    <span title="Summed from the order items">
-      <Money value={orderTotal} tone="md" className="text-base-900" />
-    </span>
-  ) : editingTotal || orderTotal <= 0 ? (
-    <input
-      type="number"
-      min={0}
-      step="0.01"
-      autoFocus={editingTotal}
-      value={form.draft.balance}
-      onChange={(e) => form.set("balance", e.target.value)}
-      /* Pin the input while focused: the first digit typed flips totalSet and
-         re-shapes the stack — without this the entry unmounts mid-typing. */
-      onFocus={() => setEditingTotal(true)}
-      onBlur={() => setEditingTotal(false)}
-      placeholder="Set total (RM)"
-      aria-label="Order total"
-      className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
-    />
-  ) : (
-    <button
-      type="button"
-      onClick={() => setEditingTotal(true)}
-      title="Keyed total — click to edit"
-      className="underline decoration-dotted decoration-base-300 underline-offset-2"
-    >
-      <Money value={orderTotal} tone="md" className="text-base-900" />
-    </button>
-  );
+
+  // CHARGES — merge same-SKU lines; per-line amounts only exist on a
+  // line-priced (native) order. "<model> · <size> ×<qty>".
+  const merged: { sku: string; qty: number; amount: number }[] = [];
+  for (const l of lines) {
+    const e = merged.find((m) => m.sku === l.sku);
+    const amt = Number(l.unit_price || 0) * Number(l.qty || 0);
+    if (e) {
+      e.qty += Number(l.qty || 0);
+      e.amount += amt;
+    } else {
+      merged.push({ sku: l.sku, qty: Number(l.qty || 0), amount: amt });
+    }
+  }
+  const sizeWord = (sku: string) => {
+    const s = lineSize(sku);
+    return s === "K" ? "King" : s === "Q" ? "Queen" : s === "S" ? "Single" : null;
+  };
+
+  // The keyed-total entry — the goods amount on an AutoCount order.
+  const keyedTotalNode =
+    editingTotal || orderTotal <= 0 ? (
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        autoFocus={editingTotal}
+        value={form.draft.balance}
+        onChange={(e) => form.set("balance", e.target.value)}
+        onFocus={() => setEditingTotal(true)}
+        onBlur={() => setEditingTotal(false)}
+        placeholder="Set total (RM)"
+        aria-label="Order total"
+        className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+      />
+    ) : (
+      <button
+        type="button"
+        onClick={() => setEditingTotal(true)}
+        title="Keyed total — click to edit"
+        className="underline decoration-dotted decoration-base-300 underline-offset-2"
+      >
+        <Money value={orderTotal} tone="row" className="text-base-900" />
+      </button>
+    );
 
   return (
-    <div className="space-y-2.5">
-      {/* Delivery-eve red flag (§3.2) — danger TEXT on the neutral surface
-          (no red block; the alert stripe belongs to the step-3 alert rows). */}
+    <div className="grid grid-cols-[1fr_1fr] gap-x-5 gap-y-2.5 items-start">
+      {/* Delivery-eve red flag (§3.2) — spans both columns. */}
       {deliveryEve && (
         <div
-          className="flex items-center gap-1.5 rounded-md bg-base-50 px-2 py-1.5 text-[12px] font-medium text-danger"
+          className="col-span-2 flex items-center gap-1.5 rounded-md bg-base-50 px-2 py-1.5 text-[12px] font-medium text-danger"
           data-testid="balance-delivery-eve"
         >
           <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
-          Delivery {deliveryEve}, still owing {RM(outstanding)}
+          Delivery {deliveryEve}, still owing {RM(balanceDue)}
         </div>
       )}
 
-      {/* v4 §1 expanded stack — the ORIGINAL BILL amount + outstanding always
-          read together: Total / Collected / Outstanding (hero). States:
-            · no total   → Total entry + Collected (if any money in) + neutral
-                           "set total" hint — NEVER an error-red Outstanding
-            · owing      → all three rows; Outstanding = 20 Bold hero
-            · paid       → Total / Collected / Paid ✓ pill
-          The Total entry pins itself while focused (editingTotal) so typing
-          the first digit can't unmount it. */}
-      <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
-        <MoneyRow label="Total">{totalNode}</MoneyRow>
-        {(totalSet || collected > 0) && (
-          <MoneyRow label="Collected">
-            {/* v4 §2/§4 — amounts are never tinted: dark content. */}
-            <Money value={collected} tone="md" className="text-base-900" />
-          </MoneyRow>
-        )}
-        {!totalSet ? (
-          <div className="px-3 py-1.5 text-[12px] text-base-400">
-            Set total to calculate balance
-          </div>
-        ) : paidInFull ? (
-          <MoneyRow label="Outstanding" strong>
-            <span className="pill pill-confirmed text-[12px]">Paid ✓</span>
-          </MoneyRow>
-        ) : (
-          <>
-            <MoneyRow label="Outstanding" strong>
-              {outstandingBig}
-            </MoneyRow>
-            {collected === 0 && collectByLabel && (
-              <div className="px-3 py-1.5 text-[12px] text-base-400">
-                Collect by {collectByLabel}
-              </div>
+      {/* ── LEFT · CHARGES ─────────────────────────────────────────── */}
+      <div className="min-w-0">
+        <div className="t4-label mb-1">Charges</div>
+        <div className="rounded-[8px] border border-base-200/70 bg-white px-3 divide-y divide-base-100">
+          {merged.map((m, i) => (
+            <ChargeRow
+              key={m.sku}
+              num={i + 1}
+              label={m.sku}
+              sub={`${sizeWord(m.sku) ? `· ${sizeWord(m.sku)} ` : ""}×${m.qty}`}
+              amount={
+                hasLineTotal ? (
+                  <Money value={m.amount} tone="row" className="text-base-900" />
+                ) : (
+                  <span
+                    className="text-[12px] text-base-300"
+                    title="Imported order — no per-line prices; the keyed goods total below carries the amount"
+                  >
+                    —
+                  </span>
+                )
+              }
+            />
+          ))}
+          {/* Imported orders carry ONE keyed goods figure instead of line
+              prices — settable INLINE right here (no modal). */}
+          {!hasLineTotal && (
+            <ChargeRow label="Goods total" sub="· keyed" amount={keyedTotalNode} />
+          )}
+          {/* The storage FEE flows in as a charge (no number); the Storage tab
+              owns the detail (STATUS-STANDARD §7.5 rule). */}
+          <ChargeRow
+            label="Storage fee"
+            sub={storageIncurred ? undefined : "· not accruing"}
+            amount={
+              <Money
+                value={storageCharge}
+                tone="row"
+                className={storageCharge > 0 ? "text-base-900" : "text-base-400"}
+              />
+            }
+          />
+          {/* Total = goods + storage — top-bordered, bold. */}
+          <div className="flex items-center justify-between gap-3 py-2 border-t border-base-200">
+            <span className="text-[13px] font-bold text-base-900">Total</span>
+            {totalSet ? (
+              <Money value={invoiceTotal} tone="row" className="text-base-900" />
+            ) : (
+              <span className="text-[12px] text-base-400">
+                set the goods total above
+              </span>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
-      {/* Payment history — one line per payment: label · date · amount · receipt. */}
-      {ledger.length === 0 ? (
-        <div className="text-[12px] text-base-400">No payments recorded yet.</div>
-      ) : (
-        <div className="space-y-1">
-          {ledger.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1 last:border-b-0"
-            >
-              <span className="min-w-0 truncate">
-                <span className="font-medium text-base-800">
-                  {p.note?.trim() || (p.kind === "deposit" ? "Deposit" : "Payment")}
-                </span>
-                {/* v4 §4 — the date is CONTENT (dark), not a pale label. */}
-                <span className="text-base-800"> · {fmtDate(p.paid_on)}</span>
-              </span>
-              <span className="flex items-center gap-2 shrink-0">
-                {/* v4 §2/§4 — amounts never tinted; the ONE money recipe. */}
-                <Money value={Number(p.amount)} tone="md" className="text-base-900" />
-                <button
-                  type="button"
-                  onClick={() => void openReceipt(p, receiptMeta)}
-                  title={`Receipt ${p.receipt_no ?? ""}`}
-                  aria-label={`Receipt ${p.receipt_no ?? p.id}`}
-                  className="text-base-500 hover:text-base-800"
-                >
-                  <FileText size={14} />
-                </button>
-                {isPrincipal && (
+      {/* ── RIGHT · PAYMENTS + DUE ─────────────────────────────────── */}
+      <div className="min-w-0 space-y-2.5">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="t4-label">Payments</span>
+            {!addingInline && (
+              <Btn size="sm" icon={Plus} onClick={() => setAddingInline(true)}>
+                Record payment
+              </Btn>
+            )}
+          </div>
+          {/* INLINE expandable entry form (no modal — Balance-tab spec). */}
+          {addingInline && (
+            <div className="mb-2">
+              <PaymentForm
+                orderId={orderId}
+                onDone={() => setAddingInline(false)}
+                onCancel={() => setAddingInline(false)}
+              />
+            </div>
+          )}
+          {ledger.length === 0 ? (
+            !addingInline && (
+              <div className="text-[12px] text-base-400 py-1">
+                No payments recorded yet.
+              </div>
+            )
+          ) : (
+            <div className="rounded-[8px] border border-base-200/70 bg-white px-3 divide-y divide-base-100">
+              {ledger.map((p) => (
+                <div key={p.id} className="flex items-center gap-2.5 py-2">
+                  {/* Proof thumbnail — the uploaded slip when present. */}
                   <button
                     type="button"
-                    onClick={() => voidPay.mutate(p.id)}
-                    disabled={voidPay.isPending}
-                    title="Void this payment (reversible — payments are never deleted)"
-                    aria-label={`Void payment ${p.receipt_no ?? p.id}`}
-                    /* v4 §7/§11d — row action = outline icon, mid-grey. */
-                    className="text-base-500 hover:text-danger"
+                    onClick={() => void viewSlip(p)}
+                    disabled={!p.receipt_url}
+                    title={p.receipt_url ? "Open the uploaded slip" : "No slip uploaded"}
+                    className={`w-9 h-9 rounded-md border grid place-items-center shrink-0 ${
+                      p.receipt_url
+                        ? "border-base-200 bg-base-50 text-base-600 hover:text-base-900"
+                        : "border-dashed border-base-200 bg-base-50 text-base-300 cursor-default"
+                    }`}
                   >
-                    <Undo2 size={14} />
+                    <Paperclip size={14} />
                   </button>
-                )}
-              </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-base-900 truncate">
+                      {p.note?.trim() ||
+                        (p.kind === "deposit"
+                          ? "Deposit"
+                          : p.kind === "storage"
+                            ? "Storage fee"
+                            : "Payment")}{" "}
+                      · <Money value={Number(p.amount)} tone="row" className="text-base-900" />
+                    </div>
+                    <div className="text-[12px] text-base-500 truncate">
+                      {fmtDate(p.paid_on)} · {PAY_METHOD_LABEL[p.method] ?? p.method}
+                      {p.reference ? ` · ${p.reference}` : ""}
+                    </div>
+                  </div>
+                  {p.receipt_url && (
+                    <button
+                      type="button"
+                      onClick={() => void viewSlip(p)}
+                      className="text-[12px] font-medium text-info hover:underline shrink-0"
+                    >
+                      View
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void openReceipt(p, receiptMeta)}
+                    title={`Receipt ${p.receipt_no ?? ""}`}
+                    aria-label={`Receipt ${p.receipt_no ?? p.id}`}
+                    className="text-base-500 hover:text-base-800 shrink-0"
+                  >
+                    <FileText size={14} />
+                  </button>
+                  {isPrincipal && (
+                    <button
+                      type="button"
+                      onClick={() => voidPay.mutate(p.id)}
+                      disabled={voidPay.isPending}
+                      title="Void this payment (reversible — payments are never deleted)"
+                      aria-label={`Void payment ${p.receipt_no ?? p.id}`}
+                      className="text-base-500 hover:text-danger shrink-0"
+                    >
+                      <Undo2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
 
-      {/* Bottom actions — + Add payment (the ONE flame CTA while expanded;
-          opens the drawer-level 2-col modal) · Remind + Chase to the CUSTOMER
-          (both stamp the ONE shared chase log). On delivery-eve the Remind
-          flips to the firmer final-reminder tone. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* THE page hero (v4 §2 ladder — the one flame on the page). */}
-        <Btn variant="hero" icon={Plus} onClick={onAddPayment}>
-          Add payment
-        </Btn>
-        {totalSet && outstanding > 0 && (
-          <>
-            <Btn
-              icon={Bell}
+        {/* Balance due = Total − Collected · 2px top border · 15/700. */}
+        <div className="border-t-2 border-base-300 pt-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-base-900">Balance due</span>
+            {!totalSet ? (
+              <span className="text-[12px] text-base-400">
+                Set the goods total to calculate
+              </span>
+            ) : balanceDue > 0 ? (
+              <Money value={balanceDue} tone="hero" className="text-danger" />
+            ) : (
+              <span className="text-[13px] font-bold leading-none text-success">
+                Settled
+              </span>
+            )}
+          </div>
+          {totalSet && balanceDue > 0 && collectByLabel && (
+            <div
+              className={`mt-0.5 text-[12px] ${
+                collectByPast ? "font-medium text-danger" : "text-base-500"
+              }`}
+            >
+              Collect by {collectByLabel}
+              {collectByPast ? " — passed" : ""}
+            </div>
+          )}
+        </div>
+
+        {/* Actions — Invoice (PDF on click, never an always-on preview) ·
+            Receipt · Remind (WhatsApp green outline; final tone on
+            delivery-eve, hot fill past collect-by). */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Btn icon={FileText} onClick={() => void openInvoicePdf(orderId, so)}>
+            Invoice
+          </Btn>
+          <Btn
+            icon={Download}
+            disabled={ledger.length === 0}
+            title={ledger.length === 0 ? "No payment yet" : "Open the latest receipt PDF"}
+            onClick={() => {
+              if (ledger[0]) void openReceipt(ledger[0], receiptMeta);
+            }}
+          >
+            Receipt
+          </Btn>
+          {totalSet && balanceDue > 0 && (
+            <button
+              type="button"
               onClick={onRemind}
               title={
                 deliveryEve
-                  ? "Copy the delivery-eve FINAL reminder + log the chase event"
-                  : "Copy the gentle payment reminder + log the chase event"
+                  ? "Copy the delivery-eve FINAL reminder (WhatsApp) + log the chase event"
+                  : "Copy the gentle payment reminder (WhatsApp) + log the chase event"
               }
+              className={`btn-chase ${collectByPast ? "btn-chase-hot" : ""}`}
             >
+              <MessageCircle size={14} aria-hidden="true" />
               {deliveryEve ? "Final reminder" : "Remind"}
-            </Btn>
-            <Btn
-              icon={MessageCircle}
-              onClick={onChase}
-              title="Copy the firmer payment chase + log the chase event"
-            >
-              Chase
-            </Btn>
-          </>
+            </button>
+          )}
+        </div>
+        {lastChasedAt && (
+          <div className="text-[12px] text-base-400">
+            Last chased {fmtDate(lastChasedAt)}
+          </div>
         )}
       </div>
-      {lastChasedAt && (
-        <div className="text-[12px] text-base-400">
-          Last chased {fmtDate(lastChasedAt)}
-        </div>
-      )}
     </div>
   );
 }

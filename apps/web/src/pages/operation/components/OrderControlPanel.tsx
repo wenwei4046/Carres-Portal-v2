@@ -114,7 +114,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // must clearly look like fields). A visible hairline box on white, flame ring on
 // focus — clean but structured.
 const CELL =
-  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[14px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
+  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -127,7 +127,7 @@ export function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 min-w-0 py-[3px] border-b border-base-100/70 last:border-b-0">
+    <div className="flex items-center justify-between gap-2 min-w-0 min-h-9 py-[3px] border-b border-base-100/70 last:border-b-0">
       <span className="text-[12px] text-base-400 shrink-0">{label}</span>
       <div className="min-w-0 flex-1 flex items-center justify-end text-right">
         {children}
@@ -608,7 +608,7 @@ function LegacyPaidOutstanding({
       </FieldRow>
       <FieldRow label="Outstanding">
         <div
-          className={`px-2 py-1.5 font-mono text-[14px] font-semibold ${
+          className={`px-2 py-1.5 font-mono text-[13px] font-semibold ${
             !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
           }`}
         >
@@ -677,7 +677,7 @@ function PaymentLedger({
               Outstanding
             </div>
             <div
-              className={`font-mono text-[20px] font-semibold leading-tight ${
+              className={`font-mono text-[18px] font-semibold leading-tight ${
                 !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
               }`}
             >
@@ -1050,7 +1050,7 @@ export function StorageControlFields({
                     </span>
                   )}
                 </div>
-                <div className="text-[14px] font-semibold text-base-900">
+                <div className="text-[13px] font-semibold text-base-900">
                   RM {dispMsbf.toLocaleString()}
                 </div>
                 <div className="text-[12px] text-base-500">
@@ -1074,7 +1074,7 @@ export function StorageControlFields({
                     </span>
                   )}
                 </div>
-                <div className="text-[14px] font-semibold text-base-900">
+                <div className="text-[13px] font-semibold text-base-900">
                   RM {dispSof.toLocaleString()}
                 </div>
                 <div className="text-[12px] text-base-500">
@@ -1221,7 +1221,7 @@ function StorageExtensionRow({
   if (extended && !open) {
     return (
       <FieldRow label="Extension">
-        <div className="px-2 py-1.5 text-[14px] w-full">
+        <div className="px-2 py-1.5 text-[13px] w-full">
           <div className="font-semibold text-base-900">
             → {fmt(control?.extension_new_date)}
             <span className="ml-1 text-[12px] font-normal text-base-500">
@@ -1263,7 +1263,7 @@ function StorageExtensionRow({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="px-2 py-1.5 text-[14px] text-primary hover:underline inline-flex items-center gap-1"
+          className="px-2 py-1.5 text-[13px] text-primary hover:underline inline-flex items-center gap-1"
         >
           <Plus size={14} strokeWidth={2.5} />
           Extend storage
@@ -1393,7 +1393,7 @@ function StorageCollectWaiver({
   if (collectedAt) {
     return (
       <FieldRow label="Collected">
-        <div className="px-2 py-1.5 text-[14px] text-success font-semibold inline-flex items-center gap-1">
+        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
           <ShieldCheck size={14} strokeWidth={2.5} />
           Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
         </div>
@@ -1403,7 +1403,7 @@ function StorageCollectWaiver({
   if (waiverStatus === "approved") {
     return (
       <FieldRow label="Waiver">
-        <div className="px-2 py-1.5 text-[14px] text-success font-semibold inline-flex items-center gap-1">
+        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
           <ShieldCheck size={14} strokeWidth={2.5} />
           Waived by principal · delivery unlocked
         </div>
@@ -1647,7 +1647,7 @@ export function RemarkControlField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[14px]"
+        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[13px]"
       >
         {val.trim() ? (
           <span className="text-base-900">{val}</span>
@@ -1675,7 +1675,7 @@ export function OrderControlSaveBar({ form }: { form: OrderControlForm }) {
       </button>
       <button
         type="button"
-        className="btn-primary text-[14px] disabled:opacity-50"
+        className="btn-primary text-[13px] disabled:opacity-50"
         onClick={form.submit}
         disabled={form.saving}
       >
@@ -1740,7 +1740,7 @@ export function PaymentSummary({ paid, total }: { paid: number; total: number })
           <span className="text-[12px] uppercase tracking-[0.04em] text-base-500">
             {r.label}
           </span>
-          <span className={`font-mono text-[14px] font-semibold ${r.tone}`}>
+          <span className={`font-mono text-[13px] font-semibold ${r.tone}`}>
             {r.value}
           </span>
         </div>
@@ -1768,7 +1768,7 @@ function RemarkField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-2 py-1.5 border border-base-200 rounded text-[14px] bg-white outline-none focus:border-base-700 resize-y"
+        className="w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700 resize-y"
       />
     </div>
   );

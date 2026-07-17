@@ -99,22 +99,19 @@ stays on the element):
 only the page title (24, `.t-h2`) and the hero number (20) go bigger. REF and
 SO ids are the SAME size — tell them apart by weight + colour.
 
-Kit-governed surfaces allow exactly these inline sizes (lint RULE D):
+Kit-governed surfaces allow exactly these inline sizes (lint RULE D — SIZING
+LAW final 2026-07-18, `docs/CARRES_ORDER_PORTAL_SPEC.md` §3 wins):
 
 | Inline size | Use |
 |---|---|
-| `text-[15px]` medium | content you READ — customer, dates, amounts (near-black) |
-| `text-[14px]` | secondary info / drawer body |
-| `text-[13px]` | buttons (via `.btn-*`) / row REF (bold) |
-| `text-[12px]` | labels, table headers (uppercase, muted), sub-facts |
-| `text-[18px]` bold | stat-card headline value (Balance / Stock / Logistic cards — money 18 hero / 13 row) |
-| `text-[20px]` bold | THE hero number — Outstanding in the Balance tab |
+| `text-[13px]` | BODY — content you read, buttons, row REF |
+| `text-[12px]` | caption / meta / pill / table headers / sub-facts |
+| `text-[11px]` | micro / uppercase label (10 deleted → use 11) |
+| `text-[18px]` bold mono | MONEY HERO — stat-card headline / Balance due (the `Money` component's `hero` tone; `row` = 13) |
 
-Everything else uses a `.t4-*` class (`.t4-page-title` 24 · `.t4-hero-num` 20
-· `.t4-section` 16 · `.t4-content` 15 · `.t4-secondary` 14 · `.t4-label` /
-`.t4-caption` 12 — in `index.css`; the old `.t-h*` ramp is DEPRECATED, swap on
-touch). 9/10/11/18/22px inline are banned in kit scope (dense-row
-sub-ids at 10/11px live inside the row recipe above, outside kit files).
+14/15/16/20/22 are DELETED for new code (legacy baselined). Rows: **40 list ·
+36 panel/KV · 52 Items product-line** (44/56 deleted; lint RULE F). Headings
+still via `.t4-*` classes (`.t4-page-title` 24 etc. — class-based, not inline).
 
 **Read by shape, not by reading (v4 §8c, LOCKED):** users tell things apart by
 SHAPE first (fill vs outline = primary vs secondary; pill = status; blue block

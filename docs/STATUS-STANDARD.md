@@ -44,19 +44,22 @@ the rest.
 
 ## 3. The chase pair (every party panel's footer)
 
+> ⚠ RESKINNED 2026-07-18 per `docs/CARRES_ORDER_PORTAL_SPEC.md` §4 (the master
+> spec wins): buttons are GREY-family only — **no green buttons anywhere**.
+
 Both COPY the locked WhatsApp template (`lib/wa-templates.ts`) and stamp the
 chase log. Customer templates are multi-line and never mention a delivery date.
 
 | Button | Look | Tone |
 |---|---|---|
-| **Reminder** | `.btn-reminder` — white, grey `base-300` outline, `bell` 14 | gentle / first contact |
-| **Chase** | `.btn-chase` — white, WhatsApp-green outline `#1D9E75`, ink `#0F6E56`, `message-circle` 14 | firm follow-up |
-| **Chase (hot)** | `.btn-chase-hot` — light green fill `#E1F5EE` | the track is OVERDUE |
+| **Reminder** | `.btn-reminder` — GHOST: transparent, grey ink, `bell` 14 | gentle / first contact |
+| **Chase** | `.btn-chase` — SECONDARY: white, grey `base-300` outline, ink text; ONLY the `message-circle` 14 glyph reads danger-red | firm follow-up |
+| **Chase (hot)** | `.btn-chase-hot` — NO colour shift (kept as a no-op alias); overdue urgency lives in the status TEXT/value, never the button | the track is OVERDUE |
 
-Green is the WhatsApp association — never the brand mark glyph (copyright);
+The red glyph is the WhatsApp cue — never the brand mark glyph (copyright);
 the glyph is always `message-circle`. Flame stays reserved for the page's ONE
 hero; **panels carry no flame**. Black paints ONLY the `#so` badge in the
-Customer panel.
+Customer panel (+ the inline-form primary Save, spec §4).
 
 ## 4. Tab rail states
 

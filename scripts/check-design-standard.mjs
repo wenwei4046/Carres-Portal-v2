@@ -153,8 +153,10 @@ const KIT_FILES = new Set([
   "apps/web/src/pages/operation/components/RouteJourneyBar.tsx",
   "apps/web/src/pages/operation/components/OrderControlPanel.tsx",
 ]);
-const ICON_SIZES = new Set([14, 16, 18]); // v4: 14 pill/inline · 16 default UI · 18 top-bar
-const TEXT_SIZES = new Set([12, 13, 14, 15, 18, 20]); // v4: 12 label · 13 btn/ref · 14 secondary · 15 content · 18 stat-card money hero · 20 page hero
+const ICON_SIZES = new Set([14, 16, 18]); // SIZING LAW: 14 pill/inline · 16 default UI · 18 top-bar (stroke 2)
+// SIZING LAW (MASTER SPEC §3, final 2026-07-18): 13 body · 12 caption/meta/pill
+// · 11 micro/label · 18 money hero. 10 deleted (use 11); 14/15/16/20/22 deleted.
+const TEXT_SIZES = new Set([11, 12, 13, 18]);
 // A `section-band` class inside a className attribute (comments don't count).
 const BAND_CLASS_RE = /className=\{?["'`][^"'\n]*\bsection-band\b/g;
 
@@ -209,21 +211,23 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
         errors.push(
-          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 12/13/14/15 (+18 stat hero, 20 page hero) — headings via .t-* (docs/UI-KIT.md §A3).`,
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — SIZING LAW, docs/CARRES_ORDER_PORTAL_SPEC.md §3.`,
         );
       }
     }
   }
 
-  // RULE F — drawer panel row heights: any arbitrary px height must be 36.
+  // RULE F — row heights (SIZING LAW): panel/KV 36 · list 40 · Items
+  // product-line 52 (thumbnail + 2 lines, the ONE exemption). 44/56 deleted.
   {
     let m;
     const hRe = /\bh-\[(\d+)px\]/g;
+    const ROW_HEIGHTS = new Set([36, 40, 52]);
     while ((m = hRe.exec(src))) {
       const n = Number(m[1]);
-      if (n !== 44) {
+      if (!ROW_HEIGHTS.has(n)) {
         errors.push(
-          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 44px FIXED (h-11) (docs/UI-KIT.md §A7).`,
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — SIZING LAW, docs/CARRES_ORDER_PORTAL_SPEC.md §3.`,
         );
       }
     }

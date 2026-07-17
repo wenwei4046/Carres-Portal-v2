@@ -96,6 +96,9 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
       kind: parsed.data.kind,
       reference: parsed.data.reference ?? null,
       note: parsed.data.note ?? null,
+      // Customer proof-of-payment slip (Balance v3) — a storage path or https
+      // receipt URL. Lands on redeploy; the live schema strips the input key.
+      receipt_url: parsed.data.receiptUrl ?? null,
       receipt_no: receiptNo,
       recorded_by: auth.id,
     })
@@ -168,6 +171,9 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
       kind: "storage",
       reference: parsed.data.reference ?? null,
       note: parsed.data.note ?? null,
+      // Customer proof-of-payment slip (Balance v3) — a storage path or https
+      // receipt URL. Lands on redeploy; the live schema strips the input key.
+      receipt_url: parsed.data.receiptUrl ?? null,
       receipt_no: receiptNo,
       recorded_by: auth.id,
     })

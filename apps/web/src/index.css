@@ -9,6 +9,13 @@
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
      * design-standard.ts is the machine-readable mirror. */
+    /* STATUS dial palette (MASTER SPEC §8, 2026-07-18) — sector-fill dials;
+     * NO blue (Unpaid=gray, Deposit=amber). The check ink rides the green. */
+    --dial-gray: #9ca3af;   --dial-gray-soft: #f3f4f6;
+    --dial-amber: #ef9f27;  --dial-amber-soft: #faeeda;
+    --dial-red: #e24b4a;    --dial-red-soft: #fcebeb;
+    --dial-green: #639922;  --dial-green-soft: #eaf3de;
+    --dial-check: #3b6d11;
     --background: 220 14% 96%;         /* #F3F4F6 — v4 §11a COOL neutral canvas (warm retired) */
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
@@ -293,26 +300,29 @@
   .pill-warning   { background:#FAEEDA; color:#854F0B; } /* waiting / chasing — amber (v4 §6) */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 
-  /* STATUS-STANDARD (2026-07-17, Jess): the WhatsApp chase pair + rail-tab
-   * blue. Green = the WhatsApp association (glyph stays message-circle, never
-   * the brand mark); flame stays the page hero only. */
+  /* MASTER SPEC §4 (2026-07-18, supersedes the green STATUS-STANDARD pair):
+   * buttons are GREY-family only. Reminder = ghost + grey bell. Chase =
+   * secondary (white + grey border + ink text) with ONLY the WhatsApp glyph
+   * red — never a green button, never a whole-red button. Overdue urgency
+   * lives in the status TEXT/value, the button does not change colour
+   * (`.btn-chase-hot` is kept as a no-op alias so call sites stay stable). */
   .btn-reminder {
     @apply inline-flex items-center justify-center gap-1.5
-           bg-white text-base-700 border border-base-300
+           bg-transparent text-base-600 border border-transparent
            px-2.5 py-1 rounded-md text-[12px] font-semibold
-           transition-colors hover:border-base-400
+           transition-colors hover:bg-base-900/5 hover:text-base-800
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-chase {
     @apply inline-flex items-center justify-center gap-1.5
-           bg-white px-2.5 py-1 rounded-md text-[12px] font-semibold
-           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
-    color: #0f6e56;
-    border: 1px solid #1d9e75;
+           bg-white text-base-800 border border-base-300
+           px-2.5 py-1 rounded-md text-[12px] font-semibold
+           transition-colors hover:border-base-400
+           disabled:opacity-40 disabled:cursor-not-allowed;
   }
-  .btn-chase:hover:not(:disabled) { background: #e1f5ee; }
-  .btn-chase-hot { background: #e1f5ee; }
-  .text-chase { color: #0f6e56; } /* WhatsApp-green ink for chase-adjacent chips */
+  .btn-chase svg { color: hsl(var(--danger)); } /* the WhatsApp glyph ONLY */
+  .btn-chase-hot { @apply bg-white; } /* no colour shift on overdue (§4) */
+  .text-chase { @apply text-base-700; } /* chase-adjacent chips read ink now */
   /* Vertical tab rail — active + hover read BLUE (selection colour). */
   .railtab-active { background: #dbeafe; color: #1e40af; }
   .railtab-idle:hover { background: rgba(219, 234, 254, 0.5); }

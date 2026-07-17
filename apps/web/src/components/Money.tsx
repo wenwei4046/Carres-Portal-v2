@@ -9,20 +9,18 @@
  * Colour: the wrapper inherits/accepts a colour for the DIGITS (e.g.
  * text-danger on delivery-eve); the RM marker stays muted always.
  */
-type Tone = "hero" | "lg" | "md" | "sm";
+// SIZING LAW (MASTER SPEC §3, final 2026-07-18): money has exactly TWO
+// recipes — 18 mono hero · 13 tabular row. 20/16/15/12 are deleted.
+type Tone = "hero" | "row";
 
 const DIGITS: Record<Tone, string> = {
-  hero: "text-[20px] font-bold leading-none",
-  lg: "text-[16px] font-bold leading-none",
-  md: "text-[13px] font-semibold",
-  sm: "text-[11px] font-semibold",
+  hero: "text-[18px] font-bold leading-none",
+  row: "text-[13px] font-semibold",
 };
 
 const MARK: Record<Tone, string> = {
-  hero: "text-[11px]",
-  lg: "text-[10px]",
-  md: "text-[10px]",
-  sm: "text-[9px]",
+  hero: "text-[10px]",
+  row: "text-[9px]",
 };
 
 /** "1,749" — thousands-separated, no decimals (matches the drawer's RM()). */
@@ -32,7 +30,7 @@ function fmt(n: number): string {
 
 export default function Money({
   value,
-  tone = "md",
+  tone = "row",
   className = "",
 }: {
   value: number;
