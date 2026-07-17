@@ -1,8 +1,10 @@
 # Carres icon standard
 
 **One icon system: [Lucide](https://lucide.dev)** (same as Carres POS). Stroke
-width **2**, size **16–18px** in UI / **15px** inside buttons / **13–14px**
-inside pills. Colour = `--muted`/`--ink-2`, or the pill's own ink inside a pill.
+width **2**. THREE sizes only (locked 2026-07-17, Jess — bigger contrast):
+**14** inside pills / row-inline / band chevrons · **16** default UI (buttons,
+⋮ menus, KPI tile icons) · **18** top bar / page-level actions. Colour =
+`--muted`/`--ink-2`, or the pill's own ink inside a pill.
 **No emoji. No hand-drawn SVG. No brand logos** (chasing is via WhatsApp, but we
 use a neutral chat-bubble, not the WhatsApp mark — copyright).
 

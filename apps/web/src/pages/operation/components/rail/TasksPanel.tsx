@@ -219,9 +219,9 @@ function TaskRow({
         aria-label={done ? "Mark not done" : "Mark done"}
       >
         {done ? (
-          <CircleCheckBig size={17} className="text-success" />
+          <CircleCheckBig size={18} className="text-success" />
         ) : (
-          <Circle size={17} className={t.overdue ? "text-danger" : "text-base-400 hover:text-base-700"} />
+          <Circle size={18} className={t.overdue ? "text-danger" : "text-base-400 hover:text-base-700"} />
         )}
       </button>
       <div className="min-w-0 flex-1">

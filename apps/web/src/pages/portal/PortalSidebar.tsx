@@ -217,7 +217,7 @@ export default function PortalSidebar() {
                     />
                   )}
                   <item.icon
-                    size={17}
+                    size={18}
                     strokeWidth={2}
                     className={`shrink-0 ${active ? "text-primary" : "text-base-400"}`}
                   />
@@ -275,7 +275,7 @@ export default function PortalSidebar() {
                               />
                             )}
                             <item.icon
-                              size={17}
+                              size={18}
                               strokeWidth={2}
                               className={`shrink-0 ${
                                 active ? "text-primary" : "text-base-400"

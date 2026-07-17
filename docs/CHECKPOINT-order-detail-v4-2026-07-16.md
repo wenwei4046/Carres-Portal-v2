@@ -17,9 +17,9 @@ white SectionCard per panel, 12px gaps) · type-2 tabs on Orders · closed
 row typography (.t4-row/-strong) + v4-guard in the build.
 
 **Jess's OPEN GRIPES (2026-07-16 night — this is the next work, in order):**
-1. **Icons: ONE size, bolder.** KPI tile icons are 13px; others 12/14/16
-   scattered. Lock: panel/tile icons 16px stroke 2.25 · expander chevrons 14 ·
-   row-action icons 17 (§11d). Kill every 12/13px icon.
+1. **Icons: ONE size, bolder.** ✅ DONE — but the final lock (Jess 2026-07-17,
+   supersedes the 16/14/17 draft here) is **14 / 16 / 18** (pill·inline /
+   default UI / top bar), stroke 2 — docs/UI-KIT.md §A4 + lint RULE C enforce.
 2. **KPI box → SPLIT into 3 separate white cards** (one per tile: Customer ·
    Money / Stock / Logistic), same as the per-panel split. (The §4-spec
    "one panel with hairline dividers" is superseded by Jess's ask.)
