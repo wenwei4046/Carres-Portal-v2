@@ -26,6 +26,7 @@ import {
   FileText,
   Flag,
   MapPin,
+  Minus,
   MoreVertical,
   Package,
   PackagePlus,
@@ -35,9 +36,9 @@ import {
   ScrollText,
   Truck,
   Undo2,
-  User,
   Wallet,
   Warehouse,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -698,149 +699,101 @@ function MiniBadge({
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-type TrackStepState = "done" | "current" | "todo";
-type TrackStep = { label: string; state: TrackStepState; meta?: string };
+type CheckState = "done" | "bad" | "todo" | "none";
+type CheckItem = { label: string; state: CheckState; meta?: string };
 
-/** ProgressTrack — one party's journey as a step line (UI-KIT §8c/§8d: read
- *  by shape — pick-state circles; done=green ✓ · current=flame ring · todo=
- *  grey). Read-only triage; actions live in the KPI cards / tabs. */
-function ProgressTrack({
-  icon,
-  label,
-  steps,
-}: {
-  icon: ReactNode;
-  label: string;
-  steps: TrackStep[];
-}) {
+/** CheckMark — the rounded mark (Jess 2026-07-17 rev 3): a circle so the
+ *  state reads as a SHAPE before the text does (v4 §8c). done = green ✓ ·
+ *  bad = red ✗ (needs action) · todo = empty ring · none = grey dash. */
+function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
+  const box = big ? "w-7 h-7" : "w-5 h-5";
+  const icon = big ? 18 : 14;
+  if (state === "done")
+    return (
+      <span
+        className={`${box} rounded-full grid place-items-center bg-success-soft text-success shrink-0`}
+      >
+        <Check size={icon} strokeWidth={2.5} aria-label="done" />
+      </span>
+    );
+  if (state === "bad")
+    return (
+      <span
+        className={`${box} rounded-full grid place-items-center bg-error-soft text-danger shrink-0`}
+      >
+        <X size={icon} strokeWidth={2.5} aria-label="needs action" />
+      </span>
+    );
+  if (state === "none")
+    return (
+      <span
+        className={`${box} rounded-full grid place-items-center bg-base-100 text-base-400 shrink-0`}
+      >
+        <Minus size={icon} strokeWidth={2.5} aria-label="not applicable" />
+      </span>
+    );
   return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-1.5 mb-2.5">
-        <span className="text-base-400">{icon}</span>
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
-          {label}
-        </span>
-      </div>
-      <ol className="flex items-start">
-        {steps.map((st, i) => (
-          <li key={st.label} className="flex-1 min-w-0">
-            <div className="flex items-center">
-              <span
-                className={`shrink-0 w-5 h-5 rounded-full inline-grid place-items-center border-[1.5px] ${
-                  st.state === "done"
-                    ? "bg-success-soft border-success text-success"
-                    : st.state === "current"
-                      ? "bg-white border-primary"
-                      : "bg-white border-base-300"
-                }`}
-                aria-label={`${st.label}: ${st.state}`}
-              >
-                {st.state === "done" ? (
-                  <Check size={14} strokeWidth={2.5} aria-hidden="true" />
-                ) : st.state === "current" ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                ) : null}
-              </span>
-              {i < steps.length - 1 && (
-                <span
-                  className={`flex-1 h-0.5 mx-1 rounded-full ${
-                    st.state === "done" ? "bg-success/50" : "bg-base-200"
-                  }`}
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-            <div
-              className={`mt-1.5 pr-1 text-[12px] leading-tight ${
-                st.state === "todo" ? "text-base-400" : "text-base-900 font-medium"
-              }`}
-            >
-              {st.label}
-            </div>
-            {st.meta && (
-              <div className="text-[12px] text-base-400 leading-tight truncate" title={st.meta}>
-                {st.meta}
-              </div>
-            )}
-          </li>
-        ))}
-      </ol>
-    </div>
+    <span
+      className={`${box} rounded-full border-[1.5px] border-base-300 bg-white shrink-0`}
+      aria-label="pending"
+    />
   );
 }
 
-/** KpiBox — a header metric card for ONE mission track (UI-KIT §3 + §7.2):
- *  Lucide track icon + label, headline value COLOURED by the §5.2 status (+ a
- *  small alert mark when red — no dots), sub-facts side by side when a track
- *  carries more than one, and the track's chase action(s) INSIDE the box when
- *  it's red/actionable. v4: WHITE tile + hairline; the value never tinted. */
-function KpiBox({
-  icon,
+/** PartyCard — ONE party as a CHECKLIST card (Jess 2026-07-17 rev 3, merges
+ *  the old KPI box + progress line): BIG round mark top-right answers "does
+ *  this track need me?" (red = yes, green = no); each row = rounded mark +
+ *  fact + meta; chase actions live inside when red. Click = open its tab. */
+function PartyCard({
   label,
-  tone,
-  value,
-  subs,
+  rows,
   actions,
   onOpen,
 }: {
-  icon: ReactNode;
   label: string;
-  tone: "success" | "warning" | "danger" | "neutral";
-  value: ReactNode;
-  /** Sub-facts, rendered SIDE BY SIDE (§7.2 — a party with >1 issue). */
-  subs?: ReactNode[];
-  /** Chase button(s) when the track is red/actionable. */
+  rows: CheckItem[];
   actions?: ReactNode;
-  /** Click-through — the whole card jumps to its detail tab. */
   onOpen?: () => void;
 }) {
-  /* v4 §2/§4 — number VALUES are never tinted: the headline reads dark in
-     every tone; the small danger icon (below) is the alert signal. */
-  const VALUE: Record<string, string> = {
-    success: "text-base-900",
-    warning: "text-base-900",
-    danger: "text-base-900",
-    neutral: "text-base-900",
-  };
+  const overall: CheckState = rows.some((r) => r.state === "bad") ? "bad" : "done";
   return (
     <div
       className={`kpi-box ${onOpen ? "cursor-pointer transition-colors hover:border-base-300" : ""}`}
       onClick={onOpen}
       role={onOpen ? "button" : undefined}
     >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="shrink-0 text-base-400" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+      <div className="flex items-start justify-between gap-2">
+        <span className="pt-1 text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
           {label}
         </span>
-        {tone === "danger" && (
-          <AlertCircle
-            size={14}
-            strokeWidth={2.5}
-            className="shrink-0 text-danger"
-            aria-label="needs action"
-          />
-        )}
+        <CheckMark state={overall} big />
       </div>
-      <div
-        className={`mt-0.5 text-[20px] font-semibold tabular-nums truncate ${VALUE[tone]}`}
-      >
-        {value}
-      </div>
-      {subs && subs.length > 0 && (
-        <div className="flex items-center gap-3 min-w-0 text-[12px] text-base-500">
-          {subs.map((s, i) => (
-            <span key={i} className="truncate">
-              {s}
+      <div className="mt-1.5 space-y-1.5 min-w-0">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-2 min-w-0">
+            <CheckMark state={r.state} />
+            <span
+              className={`text-[13px] truncate ${
+                r.state === "none" ? "text-base-400" : "text-base-900 font-medium"
+              }`}
+            >
+              {r.label}
             </span>
-          ))}
-        </div>
-      )}
+            {r.meta && (
+              <span
+                className={`ml-auto text-[12px] whitespace-nowrap ${
+                  r.state === "bad" ? "text-danger font-semibold" : "text-base-500"
+                }`}
+              >
+                {r.meta}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
       {actions && (
         <div
-          className="mt-1.5 flex items-center gap-1.5 flex-wrap"
+          className="mt-2 flex items-center gap-1.5 flex-wrap"
           onClick={(e) => e.stopPropagation()}
         >
           {actions}
@@ -1142,7 +1095,7 @@ function DrawerBody({
     goodsLines.map((l) => readinessOf(l.sku, l.qty)),
   );
   const readyN = rCounts.ready;
-  const toReserveN = rCounts.toReserve;
+
   const nopoN = rCounts.noPo;
   // Every goods line is reserved to this SO. Empty goods list (service-only) is
   // NOT "all received". Feeds the pipeline status + delivered gating.
@@ -1375,68 +1328,56 @@ function DrawerBody({
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
 
-  // ═══ The 3-line PROGRESS panel (Jess 2026-07-17) — each party's journey,
-  // derived ONLY from signals the book actually has (no fictional stages). ═══
+  // ═══ Party CHECKLISTS (Jess 2026-07-17 rev 3) — every line derived from a
+  // real book signal; "none" = not applicable, never invented. ═══
   const deliveredDone = pipelineStatus === "completed";
   const placedDate = order.placed_at ? fmtDate(order.placed_at).split(",")[0] : undefined;
   const paidDone = totalSet && moneyOutstanding <= 0;
-  const customerSteps: TrackStep[] = [
-    { label: "Placed", state: "done", meta: placedDate },
-    {
-      label: "Confirmed",
-      state: customerConfirmed ? "done" : deliveredDone ? "done" : "current",
-    },
-    {
-      label: "Paid",
-      state: paidDone ? "done" : collected > 0 ? "current" : "todo",
-      meta: totalSet && !paidDone ? `${RM(moneyOutstanding)} due` : undefined,
-    },
-    { label: "Delivered", state: deliveredDone ? "done" : "todo" },
-  ];
   const anyEta =
     Object.values(form.draft.line_etas ?? {}).some((v) => !!v) ||
     pos.some((p) => !!p.eta_date);
   const goodsN = goodsLines.length;
-  const supplierSteps: TrackStep[] = [
-    {
-      label: "PO raised",
-      state: goodsN > 0 && nopoN === 0 ? "done" : pos.length > 0 ? "current" : "todo",
-      meta: nopoN > 0 ? `${nopoN} no PO` : undefined,
-    },
-    {
-      label: "ETA set",
-      state: anyEta ? "done" : goodsN > 0 && nopoN === 0 ? "current" : "todo",
-    },
-    {
-      label: "Goods ready",
-      state:
-        goodsN > 0 && readyN === goodsN ? "done" : readyN > 0 ? "current" : "todo",
-      meta: goodsN > 0 ? `${readyN}/${goodsN}` : undefined,
-    },
+  const customerRows: CheckItem[] = [
+    { label: "Placed", state: "done", meta: placedDate },
+    { label: "Confirmed", state: customerConfirmed || deliveredDone ? "done" : "todo" },
+    paidDone
+      ? { label: "Paid", state: "done" }
+      : balanceOwing
+        ? { label: "Paid", state: "bad", meta: `${RM(moneyOutstanding)} due` }
+        : { label: "Paid", state: totalSet ? "todo" : "none", meta: totalSet ? undefined : "no total" },
+    hasMsbf || hasSof
+      ? storageOwing
+        ? { label: "Storage", state: "bad", meta: storageFee > 0 ? RM(storageFee) : "accruing" }
+        : storageIncurred
+          ? { label: "Storage", state: "done", meta: "cleared" }
+          : { label: "Storage", state: "none", meta: "not accruing" }
+      : { label: "Storage", state: "none", meta: "none" },
+    liveLoanCount > 0
+      ? { label: "Loan", state: "todo", meta: `${liveLoanCount} out` }
+      : { label: "Loan", state: "none", meta: "none" },
   ];
-  /** A later DONE implies the earlier steps happened — clamp so a track never
-   *  reads "todo → done" left to right (data-honest but readable). */
-  const clampTrack = (steps: TrackStep[]): TrackStep[] => {
-    let seenDone = false;
-    const out = [...steps];
-    for (let i = out.length - 1; i >= 0; i--) {
-      if (out[i].state === "done") seenDone = true;
-      else if (seenDone) out[i] = { ...out[i], state: "done" };
-    }
-    return out;
-  };
-
-  const logisticSteps: TrackStep[] = [
-    {
-      label: "Assigned",
-      state: assignedLogisticName ? "done" : "todo",
-      meta: assignedLogisticName ?? undefined,
-    },
-    {
-      label: "Booked",
-      state: bookedEta ? "done" : assignedLogisticName ? "current" : "todo",
-      meta: bookedEta ? fmtDate(bookedEta).split(",")[0] : undefined,
-    },
+  const supplierRows: CheckItem[] = [
+    goodsN === 0
+      ? { label: "PO raised", state: "none" }
+      : nopoN > 0
+        ? { label: "PO raised", state: "bad", meta: `${nopoN} no PO` }
+        : { label: "PO raised", state: "done" },
+    { label: "ETA set", state: anyEta ? "done" : goodsN > 0 ? "todo" : "none" },
+    goodsN === 0
+      ? { label: "Goods ready", state: "none" }
+      : readyN === goodsN
+        ? { label: "Goods ready", state: "done", meta: `${readyN}/${goodsN}` }
+        : { label: "Goods ready", state: "todo", meta: `${readyN}/${goodsN}` },
+  ];
+  const logisticRows: CheckItem[] = [
+    assignedLogisticName
+      ? { label: "Assigned", state: "done", meta: assignedLogisticName }
+      : { label: "Assigned", state: "bad", meta: "no partner" },
+    bookedEta
+      ? { label: "Booked", state: "done", meta: fmtDate(bookedEta).split(",")[0] }
+      : daysToDelivery !== null && daysToDelivery < 0
+        ? { label: "Booked", state: "bad", meta: "deadline over" }
+        : { label: "Booked", state: "todo" },
     { label: "Delivered", state: deliveredDone ? "done" : "todo" },
   ];
   const logisticTone: KpiTone =
@@ -1450,30 +1391,6 @@ function DrawerBody({
             ? "warning"
             : "success";
   // Sub-facts per box — side by side when a party carries more than one (§7.2).
-  const moneySubs: string[] = !totalSet
-    ? ["no total set"]
-    : !balanceOwing
-      ? [`${RM(collected)} collected`]
-      : [
-          `${RM(collected)} of ${RM(orderTotal)} collected`,
-          collectByLabel ? `collect by ${collectByLabel}` : "collect on delivery",
-        ];
-  const stockSubs: string[] =
-    goodsLines.length === 0
-      ? ["no goods lines"]
-      : readyN === goodsLines.length
-        ? ["all reserved"]
-        : ([
-            toReserveN > 0 ? `${toReserveN} to reserve` : null,
-            rCounts.onPo > 0 ? `${rCounts.onPo} on PO` : null,
-            nopoN > 0 ? `${nopoN} no PO` : null,
-          ].filter(Boolean) as string[]);
-  const logisticSubs: string[] = bookedEta
-    ? [
-        `booked ${fmtDate(bookedEta).split(", ")[0]}`,
-        ...(chasePartnerName ? [chasePartnerName] : []),
-      ]
-    : [chasePartnerName ?? "no carrier assigned", "not booked"];
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1695,141 +1612,69 @@ function DrawerBody({
         )}
         {/* KPI tracks (Jess 2026-07-17): SEPARATE white cards, full width,
             one per mission track — each card jumps to its tab. */}
-        <div className={`shrink-0 grid gap-2.5 ${hasMsbf || hasSof ? "grid-cols-4" : "grid-cols-3"}`}>
-
-              <KpiBox
-                onOpen={() => setTab("balance")}
-                icon={<Wallet size={14} strokeWidth={2.25} />}
-                label="Customer · Money"
-                tone={moneyTone}
-                value={
-                  totalSet ? (
-                    moneyOutstanding > 0 ? (
-                      /* v4 §3 money recipe — tiny RM, bold 16 digits. */
-                      <Money value={moneyOutstanding} tone="lg" />
-                    ) : (
-                      "Paid"
-                    )
-                  ) : (
-                    "—"
-                  )
-                }
-                subs={moneySubs}
-                actions={
-                  /* Owing → the customer pair: Reminder while gentle contact is
-                     right (amber), Chase once firmer follow-up is due — both
-                     always offered; ops picks the tone. */
-                  balanceOwing ? (
-                    <ChasePair
-                      audience="customer payment"
-                      onReminder={() => copyChase("customer", "reminder")}
-                      onChase={() => copyChase("customer", "chase")}
-                    />
-                  ) : undefined
-                }
-              />
-              <KpiBox
-                onOpen={() => setTab("items")}
-                icon={<Package size={14} strokeWidth={2.25} />}
-                label="Stock"
-                tone={stockTone}
-                value={`${readyN}/${goodsLines.length} ready`}
-                subs={stockSubs}
-                actions={
-                  stockTone === "danger" || stockTone === "warning" ? (
-                    <>
-                      {nopoN > 0 && (
-                        <Btn
-                          size="sm"
-                          icon={Plus}
-                          onClick={() => onIssuePOsClick()}
-                          title="Raise a PO for the no-PO lines"
-                        >
-                          Raise PO
-                        </Btn>
-                      )}
-                      {(rCounts.onPo > 0 || onPoStalled) && (
-                        <ChasePair
-                          audience="supplier (PO-led)"
-                          onReminder={() => copyChase("supplier", "reminder")}
-                          onChase={() => copyChase("supplier", "chase")}
-                        />
-                      )}
-                    </>
-                  ) : undefined
-                }
-              />
-              <KpiBox
-                onOpen={() => setTab("delivery")}
-                icon={<Truck size={14} strokeWidth={2.25} />}
-                label="Logistic"
-                tone={logisticTone}
-                value={
-                  <>
-                    {deadlineLabel}
-                    {daysToDelivery !== null && daysToDelivery < 0 ? " · over" : ""}
-                  </>
-                }
-                subs={logisticSubs}
-                actions={
-                  logisticTone === "danger" || logisticTone === "warning" ? (
-                    <ChasePair
-                      audience="logistic partner (REF-led)"
-                      onReminder={() => copyChase("logistic", "reminder")}
-                      onChase={() => copyChase("logistic", "chase")}
-                    />
-                  ) : undefined
-                }
-              />
-              {(hasMsbf || hasSof) && (
-                <KpiBox
-                  onOpen={() => setTab("storage")}
-                  icon={<Warehouse size={16} strokeWidth={2} />}
-                  label="Storage"
-                  tone={
-                    storageGate === "hold"
-                      ? "danger"
-                      : storageGate === "warn"
-                        ? "warning"
-                        : "neutral"
-                  }
-                  value={
-                    storageOwing
-                      ? storageFee > 0
-                        ? RM(storageFee)
-                        : "Accruing"
-                      : "Not accruing"
-                  }
-                  subs={
-                    storageOwing && storageGate === "hold"
-                      ? ["delivery on hold"]
-                      : undefined
-                  }
-                />
-              )}
-        </div>
-        {/* PROGRESS band (Jess 2026-07-17 rev 2): HORIZONTAL at the top —
-            screens are wide, not tall; a stepper only reads when the steps
-            spread. 3 party journeys side by side (reference: the Inventar
-            order-stage tracker). */}
-        <div className="shrink-0 bg-white border border-base-200 rounded-[12px] px-4 py-3 grid grid-cols-3 gap-8">
-          <ProgressTrack
-            icon={<User size={16} strokeWidth={2} aria-hidden="true" />}
+        {/* Party CHECKLIST cards (Jess 2026-07-17 rev 3 — Option B): ONE row
+            answers "who do I chase" — big round mark = the whole track
+            (green ok / red needs me); rows = rounded marks + facts; chase
+            actions inside when red. Click a card to open its tab. Storage
+            folds into the Customer card; the Storage TAB keeps the detail. */}
+        <div className="shrink-0 grid grid-cols-3 gap-2.5">
+          <PartyCard
             label="Customer"
-            steps={clampTrack(customerSteps)}
+            onOpen={() => setTab("balance")}
+            rows={customerRows}
+            actions={
+              balanceOwing ? (
+                <ChasePair
+                  audience="customer payment"
+                  onReminder={() => copyChase("customer", "reminder")}
+                  onChase={() => copyChase("customer", "chase")}
+                />
+              ) : undefined
+            }
           />
-          <ProgressTrack
-            icon={<Package size={16} strokeWidth={2} aria-hidden="true" />}
+          <PartyCard
             label="Supplier"
-            steps={clampTrack(supplierSteps)}
+            onOpen={() => setTab("items")}
+            rows={supplierRows}
+            actions={
+              stockTone === "danger" || stockTone === "warning" ? (
+                <>
+                  {nopoN > 0 && (
+                    <Btn
+                      size="sm"
+                      icon={Plus}
+                      onClick={() => onIssuePOsClick()}
+                      title="Raise a PO for the no-PO lines"
+                    >
+                      Raise PO
+                    </Btn>
+                  )}
+                  {(rCounts.onPo > 0 || onPoStalled) && (
+                    <ChasePair
+                      audience="supplier (PO-led)"
+                      onReminder={() => copyChase("supplier", "reminder")}
+                      onChase={() => copyChase("supplier", "chase")}
+                    />
+                  )}
+                </>
+              ) : undefined
+            }
           />
-          <ProgressTrack
-            icon={<Truck size={16} strokeWidth={2} aria-hidden="true" />}
+          <PartyCard
             label="Logistic"
-            steps={clampTrack(logisticSteps)}
+            onOpen={() => setTab("delivery")}
+            rows={logisticRows}
+            actions={
+              logisticTone === "danger" || logisticTone === "warning" ? (
+                <ChasePair
+                  audience="logistic partner (REF-led)"
+                  onReminder={() => copyChase("logistic", "reminder")}
+                  onChase={() => copyChase("logistic", "chase")}
+                />
+              ) : undefined
+            }
           />
         </div>
-
         {/* Tab bar (Jess 2026-07-17 + UI-KIT §9 type-2): the detail surfaces
             live behind tabs; Items + Warehouse share ONE tab (one workflow).
             Contents stay MOUNTED (hidden) so edits survive tab switches. */}
@@ -1865,23 +1710,13 @@ function DrawerBody({
             </button>
           ))}
         </div>
-        {/* Body split (Jess 2026-07-17): LEFT 32% = the 3-line PROGRESS panel
-            (Customer / Supplier / Logistic journeys); RIGHT 68% = the tabbed
-            work surfaces. */}
-        <div
-          className="grid gap-3 items-stretch flex-1 min-h-0 overflow-hidden"
-          style={{
-            gridTemplateColumns: "minmax(0, 32fr) minmax(0, 68fr)",
-            gridTemplateAreas: '"side main"',
-          }}
-        >
+        {/* Body (Jess 2026-07-17 rev 3): tabs FULL WIDTH — customer detail
+            lives in the strip (click the name to expand; ⋮ Edit inside). */}
+        <div className="flex-1 min-h-0 overflow-hidden flex">
 
         {/* RIGHT — the tab contents. All tabs stay mounted; only the active
             one is visible, so form edits survive switching. */}
-        <div
-          style={{ gridArea: "main" }}
-          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
-        >
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Items LEFT | Warehouse RIGHT (Jess 2026-07-17) — the reserve
               workflow reads ACROSS: pick a line on the left, reserve its stock
@@ -2830,78 +2665,6 @@ function DrawerBody({
           </SectionCard>
           </div>
         </div>{/* /tab contents */}
-
-        {/* LEFT — the CUSTOMER panel (Jess 2026-07-17 rev 2): identity detail
-            always visible; width is abundant, height is not — the journey
-            tracker moved to the top band. */}
-        <div
-          style={{ gridArea: "side" }}
-          className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
-        >
-          <SectionCard className="min-h-full">
-            <Panel
-              title="Customer"
-              summary={
-                loc.label ? (
-                  <span className="text-[12px] text-base-500">{loc.label}</span>
-                ) : undefined
-              }
-            >
-              <div className="p-3 space-y-1">
-                <div className="flex items-center justify-between gap-2 h-11">
-                  <span className="text-[12px] text-base-400 shrink-0">Name</span>
-                  <span className="text-[14px] font-medium text-base-900 text-right truncate">
-                    {order.customer_name ?? "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 h-11 border-t border-base-100">
-                  <span className="text-[12px] text-base-400 shrink-0">Phone</span>
-                  <button
-                    type="button"
-                    title="Copy phone"
-                    disabled={!order.customer_phone}
-                    onClick={() => {
-                      void navigator.clipboard.writeText(order.customer_phone ?? "");
-                      toast.success("Phone copied");
-                    }}
-                    className="font-mono text-[14px] font-medium text-base-900 truncate hover:text-base-700"
-                  >
-                    {order.customer_phone ?? "—"}
-                  </button>
-                </div>
-                <div className="flex items-start justify-between gap-2 py-2.5 border-t border-base-100">
-                  <span className="text-[12px] text-base-400 shrink-0">Address</span>
-                  <button
-                    type="button"
-                    title="Copy address"
-                    disabled={!order.customer_address}
-                    onClick={() => {
-                      void navigator.clipboard.writeText(order.customer_address ?? "");
-                      toast.success("Address copied");
-                    }}
-                    className="text-[13px] text-base-900 text-right leading-snug hover:text-base-700"
-                  >
-                    {order.customer_address ?? "—"}
-                  </button>
-                </div>
-                <div className="pt-2 border-t border-base-100 flex items-center justify-end gap-1.5">
-                  <Btn
-                    size="sm"
-                    icon={MessageCircle}
-                    disabled={!waLink(order.customer_phone)}
-                    onClick={() => {
-                      const wa = waLink(order.customer_phone);
-                      if (wa) window.open(wa, "_blank", "noopener");
-                    }}
-                    title="Open WhatsApp chat with the customer"
-                  >
-                    WhatsApp
-                  </Btn>
-                </div>
-              </div>
-            </Panel>
-          </SectionCard>
-        </div>
 
         </div>{/* /main|side grid */}
       </div>{/* /scroll body */}
