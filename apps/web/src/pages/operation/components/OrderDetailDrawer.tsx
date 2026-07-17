@@ -1310,6 +1310,23 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // Vertical tab rail (Jess 2026-07-17 rev 5) — collapsible to icon-only.
+  const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("ops-drawer-rail") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleRail = () =>
+    setRailCollapsed((v) => {
+      try {
+        localStorage.setItem("ops-drawer-rail", v ? "0" : "1");
+      } catch {
+        /* private mode */
+      }
+      return !v;
+    });
 
   // ═══ Party CHECKLISTS (Jess 2026-07-17 rev 4) — stage rows with the
   // action ON the stuck stage. Chase buttons = the locked WhatsApp templates.
@@ -1660,47 +1677,115 @@ function DrawerBody({
             onOpen={() => setTab("delivery")}
           />
         </div>
-        {/* Tab bar (Jess 2026-07-17 + UI-KIT §9 type-2): the detail surfaces
-            live behind tabs; Items + Warehouse share ONE tab (one workflow).
+        {/* Work area (Jess 2026-07-17 rev 5): VERTICAL tab rail left (BARE
+            column, 200px, collapsible to 56px icon-only) + content right.
             Contents stay MOUNTED (hidden) so edits survive tab switches. */}
-        <div className="shrink-0 bg-white border border-base-200 rounded-[12px] px-2 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
+        <nav
+          className={`shrink-0 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar ${railCollapsed ? "w-14" : "w-[200px]"}`}
+          aria-label="Order sections"
+        >
           {(
             [
-              { key: "items", label: "Items & stock", icon: Package, alert: stockTone === "danger" },
-              { key: "delivery", label: "Delivery", icon: Truck, alert: logisticTone === "danger" },
-              { key: "balance", label: "Balance", icon: Wallet, alert: moneyTone === "danger" },
+              {
+                key: "items",
+                label: "Items & stock",
+                icon: Package,
+                dot: stockTone === "danger",
+                count: goodsN - readyN > 0 ? `${goodsN - readyN} needs stock` : undefined,
+              },
+              {
+                key: "delivery",
+                label: "Delivery",
+                icon: Truck,
+                dot: logisticTone === "danger",
+                count: undefined,
+              },
+              {
+                key: "balance",
+                label: "Balance",
+                icon: Wallet,
+                dot: moneyTone === "danger",
+                count: undefined,
+              },
               ...(hasMsbf || hasSof
-                ? [{ key: "storage", label: "Storage", icon: Warehouse, alert: storageGate === "hold" }]
+                ? [
+                    {
+                      key: "storage" as DrawerTab,
+                      label: "Storage",
+                      icon: Warehouse,
+                      dot: storageGate === "hold",
+                      count: undefined,
+                    },
+                  ]
                 : []),
-              { key: "loan", label: "Loan", icon: Undo2, alert: false },
-              { key: "activity", label: "Activity", icon: ScrollText, alert: false },
-            ] as { key: DrawerTab; label: string; icon: LucideIcon; alert: boolean }[]
+              {
+                key: "loan",
+                label: "Loan",
+                icon: Undo2,
+                dot: false,
+                count: liveLoanCount > 0 ? `${liveLoanCount} out` : undefined,
+              },
+              { key: "activity", label: "Activity", icon: ScrollText, dot: false, count: undefined },
+            ] as { key: DrawerTab; label: string; icon: LucideIcon; dot: boolean; count?: string }[]
           ).map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
               aria-selected={tab === t.key}
-              className={`inline-flex items-center gap-1.5 h-10 px-3 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
+              title={t.label + (t.count ? ` — ${t.count}` : "")}
+              className={`h-10 rounded-lg flex items-center gap-2 shrink-0 ${
+                railCollapsed ? "justify-center px-0" : "px-2.5"
+              } text-[13px] font-semibold transition-colors ${
                 tab === t.key
-                  ? "text-base-900 border-base-900"
-                  : "text-base-500 border-transparent hover:text-base-800"
+                  ? "bg-base-900 text-white"
+                  : "text-base-700 hover:bg-base-900/5"
               }`}
             >
-              <t.icon size={16} strokeWidth={2} aria-hidden="true" />
-              {t.label}
-              {t.alert && (
-                <span className="w-1.5 h-1.5 rounded-full bg-danger" aria-label="needs action" />
+              <t.icon size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+              {!railCollapsed && <span className="truncate">{t.label}</span>}
+              {!railCollapsed && (t.count || t.dot) && (
+                <span className="ml-auto flex items-center gap-1.5 shrink-0">
+                  {t.count && (
+                    <span
+                      className={`text-[12px] font-medium ${
+                        tab === t.key ? "text-white/70" : "text-warning"
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                  {t.dot && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-danger" aria-label="needs action" />
+                  )}
+                </span>
+              )}
+              {railCollapsed && t.dot && (
+                <span className="absolute" aria-hidden="true" />
               )}
             </button>
           ))}
-        </div>
-        {/* Body (Jess 2026-07-17 rev 3): tabs FULL WIDTH — customer detail
-            lives in the strip (click the name to expand; ⋮ Edit inside). */}
-        <div className="flex-1 min-h-0 overflow-hidden flex">
-
-        {/* RIGHT — the tab contents. All tabs stay mounted; only the active
-            one is visible, so form edits survive switching. */}
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-label={railCollapsed ? "Expand sections" : "Collapse sections"}
+            title={railCollapsed ? "Expand" : "Collapse"}
+            className={`h-10 rounded-lg flex items-center gap-2 shrink-0 text-base-400 hover:bg-base-900/5 hover:text-base-700 ${
+              railCollapsed ? "justify-center px-0" : "px-2.5"
+            }`}
+          >
+            {railCollapsed ? (
+              <ChevronRight size={16} aria-hidden="true" />
+            ) : (
+              <>
+                <ChevronLeft size={16} aria-hidden="true" />
+                <span className="text-[13px] font-medium">Collapse</span>
+              </>
+            )}
+          </button>
+        </nav>
         <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Items LEFT | Warehouse RIGHT (Jess 2026-07-17) — the reserve
