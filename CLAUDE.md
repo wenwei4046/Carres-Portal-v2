@@ -579,6 +579,27 @@ Components in `apps/web/src/pages/` are **written from scratch by reading `refer
 
 ---
 
+## PRE-GOLIVE GUARDRAILS (until NETS live ~Jul 30)
+
+1. RLS VERIFY: NETS role permissions must be enforced in Supabase
+   RLS policies, not only hidden in UI. Any change touching orders/
+   payments tables: confirm RLS policy exists and state which one.
+2. KNOWN BUG: delivered/completed orders must NOT show red overdue
+   countdown. If touching countdown/deadline code, fix or flag this.
+3. PAGINATION: orders list currently caps ~200 rows. Do not build
+   new features assuming full list is loaded.
+4. NO SILENT MONEY EDITS: line prices/totals must not be editable
+   without an activity log entry. Flag any code path that allows it.
+5. CONCURRENCY: multiple users edit same order from Jul 20. When
+   writing update logic, prefer explicit updated_at checks; warn me
+   if a code path is last-write-wins on critical fields.
+6. WORKTREE RULE: Activity workstream must not touch
+   OrderDetailDrawer.tsx while Batch 3 is active.
+7. After any bug fix: explain root cause + what else it touches,
+   in plain language, before I accept.
+
+---
+
 > **Loo's stake**: 9 roles delivered, performance beats old system, on-time Go-live.
 > **Your stake**: every phase acceptance ✅, no red lines crossed, docs updated as you go.
 
