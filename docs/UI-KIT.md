@@ -107,12 +107,13 @@ Kit-governed surfaces allow exactly these inline sizes (lint RULE D):
 | `text-[14px]` | secondary info / drawer body |
 | `text-[13px]` | buttons (via `.btn-*`) / row REF (bold) |
 | `text-[12px]` | labels, table headers (uppercase, muted), sub-facts |
-| `text-[20px]` bold | THE hero number — header #SO + ref (mono), Outstanding, KPI values |
+| `text-[16px]` bold | stat-card headline value (Money / Stock / Logistic cards — Jess 2026-07-17) |
+| `text-[20px]` bold | THE hero number — Outstanding in the Balance tab |
 
 Everything else uses a `.t4-*` class (`.t4-page-title` 24 · `.t4-hero-num` 20
 · `.t4-section` 16 · `.t4-content` 15 · `.t4-secondary` 14 · `.t4-label` /
 `.t4-caption` 12 — in `index.css`; the old `.t-h*` ramp is DEPRECATED, swap on
-touch). 9/10/11/16/18/22px inline are banned in kit scope (dense-row
+touch). 9/10/11/18/22px inline are banned in kit scope (dense-row
 sub-ids at 10/11px live inside the row recipe above, outside kit files).
 
 **Read by shape, not by reading (v4 §8c, LOCKED):** users tell things apart by

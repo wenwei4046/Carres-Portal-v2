@@ -10,15 +10,13 @@ import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   Bell,
-  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
+  Clock,
   Copy,
-  Home,
   MessageCircle,
   Plus,
   Download,
@@ -36,6 +34,7 @@ import {
   ScrollText,
   Truck,
   Undo2,
+  User,
   Wallet,
   Warehouse,
   X,
@@ -84,7 +83,6 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
-  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
@@ -98,7 +96,7 @@ import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
 import Money from "@/components/Money";
-import { fieldCls, fieldAreaCls } from "@/components/Field";
+import { fieldCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import {
@@ -157,6 +155,7 @@ const RM = (n: number) =>
 interface Props {
   orderId: string;
   onClose: () => void;
+  nav?: DrawerNav;
 }
 
 /**
@@ -231,17 +230,16 @@ const PIPELINE_PILL: Record<PipelineStatus, string> = {
 void PIPELINE_PILL;
 
 /** Hover copy per status — one plain-English line explaining what it means. */
-const PIPELINE_HINT: Record<PipelineStatus, string> = {
-  needs_setup: "No PO, ETA, or stock yet — this order hasn't been set up",
-  proceed: "Confirmed — being arranged",
-  pending: "PO raised — waiting for stock at the warehouse",
-  in_production: "Supplier has given an ETA — in production",
-  ready: "All goods are in stock — ready to schedule delivery",
-  scheduled: "Delivery partner assigned / out for delivery",
-  completed: "Delivered and closed",
+
+/** Prev/next stepping through the list the drawer was opened from. */
+export type DrawerNav = {
+  index: number;
+  total: number;
+  onPrev?: () => void;
+  onNext?: () => void;
 };
 
-export default function OrderDetailDrawer({ orderId, onClose }: Props) {
+export default function OrderDetailDrawer({ orderId, onClose, nav }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
   const navigate = useNavigate();
 
@@ -364,6 +362,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
         {!isLoading && !isError && data && (
           <>
             <DrawerBody
+              nav={nav}
               data={data}
               onClose={onClose}
               onDispatchClick={() => setShowDispatch(true)}
@@ -515,6 +514,7 @@ function DrawerError({
 }
 
 interface DrawerBodyProps {
+  nav?: DrawerNav;
   data: NonNullable<ReturnType<typeof useOperationOrder>["data"]>;
   onClose: () => void;
   onServiceNoteClick: () => void;
@@ -699,8 +699,15 @@ function MiniBadge({
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-type CheckState = "done" | "bad" | "todo" | "none";
-type CheckItem = { label: string; state: CheckState; meta?: string };
+type CheckState = "done" | "bad" | "part" | "todo" | "none";
+type CheckItem = {
+  label: string;
+  state: CheckState;
+  meta?: string;
+  /** Inline action rendered ON the stage that needs it (Raise PO / Chase /
+   *  Book / Record payment) — the button lives where the work is stuck. */
+  action?: ReactNode;
+};
 
 /** CheckMark — the rounded mark (Jess 2026-07-17 rev 3): a circle so the
  *  state reads as a SHAPE before the text does (v4 §8c). done = green ✓ ·
@@ -724,6 +731,14 @@ function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
         <X size={icon} strokeWidth={2.5} aria-label="needs action" />
       </span>
     );
+  if (state === "part")
+    return (
+      <span
+        className={`${box} rounded-full grid place-items-center bg-warning-soft text-warning shrink-0`}
+      >
+        <Clock size={icon} strokeWidth={2.5} aria-label="in progress" />
+      </span>
+    );
   if (state === "none")
     return (
       <span
@@ -740,105 +755,83 @@ function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
   );
 }
 
-/** PartyCard — ONE party as a CHECKLIST card (Jess 2026-07-17 rev 3, merges
- *  the old KPI box + progress line): BIG round mark top-right answers "does
- *  this track need me?" (red = yes, green = no); each row = rounded mark +
- *  fact + meta; chase actions live inside when red. Click = open its tab. */
+/** PartyCard v2 (Jess 2026-07-17 rev 4) — a party track: 38px tinted icon
+ *  circle + label + HEADLINE value (right), then the stage CHECKLIST — every
+ *  row a rounded mark + stage + date/detail, and the stuck stage carries its
+ *  action button inline. Click the card body = open its tab. */
 function PartyCard({
   label,
+  icon: Icon,
+  tint,
+  value,
   rows,
-  actions,
   onOpen,
 }: {
   label: string;
+  icon: LucideIcon;
+  /** bg+text tint classes for the icon circle (colour = category signal). */
+  tint: string;
+  value: ReactNode;
   rows: CheckItem[];
-  actions?: ReactNode;
   onOpen?: () => void;
 }) {
-  const overall: CheckState = rows.some((r) => r.state === "bad") ? "bad" : "done";
   return (
     <div
       className={`kpi-box ${onOpen ? "cursor-pointer transition-colors hover:border-base-300" : ""}`}
       onClick={onOpen}
       role={onOpen ? "button" : undefined}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="pt-1 text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
+      <div className="flex items-center gap-2 mb-1.5 min-w-0">
+        <span
+          className={`size-[38px] rounded-full grid place-items-center shrink-0 ${tint}`}
+        >
+          <Icon size={18} strokeWidth={2} aria-hidden="true" />
+        </span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
           {label}
         </span>
-        <CheckMark state={overall} big />
+        <span className="ml-auto text-[16px] font-bold t-num whitespace-nowrap">{value}</span>
       </div>
-      <div className="mt-1.5 space-y-1.5 min-w-0">
+      <div className="min-w-0">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center gap-2 min-w-0">
+          <div key={r.label} className="flex items-center gap-2 min-w-0 min-h-8">
             <CheckMark state={r.state} />
             <span
               className={`text-[13px] truncate ${
-                r.state === "none" ? "text-base-400" : "text-base-900 font-medium"
+                r.state === "none"
+                  ? "text-base-400"
+                  : r.state === "bad"
+                    ? "text-danger font-medium"
+                    : "text-base-900 font-medium"
               }`}
             >
               {r.label}
             </span>
-            {r.meta && (
-              <span
-                className={`ml-auto text-[12px] whitespace-nowrap ${
-                  r.state === "bad" ? "text-danger font-semibold" : "text-base-500"
-                }`}
-              >
-                {r.meta}
-              </span>
-            )}
+            <span
+              className="ml-auto flex items-center gap-1.5 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {r.meta && (
+                <span
+                  className={`text-[12px] whitespace-nowrap ${
+                    r.state === "bad" ? "text-danger font-semibold" : "text-base-500"
+                  }`}
+                >
+                  {r.meta}
+                </span>
+              )}
+              {r.action}
+            </span>
           </div>
         ))}
       </div>
-      {actions && (
-        <div
-          className="mt-2 flex items-center gap-1.5 flex-wrap"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {actions}
-        </div>
-      )}
     </div>
   );
 }
 
-/** The [Reminder]+[Chase] pair for one audience — v4 §2 action ladder: both
- *  are SECONDARY white boxes (bold icon + bold word; the page's ONE flame is
- *  + Add payment). Both copy the template AND stamp the ONE shared chase log
- *  (today manual WhatsApp; the future portal auto-fires the same event). */
-function ChasePair({
-  onReminder,
-  onChase,
-  audience,
-}: {
-  onReminder: () => void;
-  onChase: () => void;
-  audience: string;
-}) {
-  return (
-    <>
-      <Btn
-        size="sm"
-        icon={Bell}
-        onClick={onReminder}
-        title={`Copy the gentle ${audience} reminder + log the chase event`}
-      >
-        Reminder
-      </Btn>
-      <Btn
-        size="sm"
-        icon={MessageCircle}
-        onClick={onChase}
-        title={`Copy the firmer ${audience} chase + log the chase event`}
-      >
-        Chase
-      </Btn>
-    </>
-  );
-}
 
 function DrawerBody({
+  nav,
   data,
   onClose,
   onDispatchClick,
@@ -871,7 +864,6 @@ function DrawerBody({
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
   // Customer identity lives in the header strip now (Jess 2026-07-15): the
   // name is the anchor; ▾ expands the full-width customer block inline.
-  const [customerOpen, setCustomerOpen] = useState(false);
   // Add-payment modal lifted to the drawer level (v4 panel rebuild): the
   // Balance band's collapsed "+ Add payment" shortcut must work while the
   // panel body (MoneyCard) is unmounted.
@@ -1227,22 +1219,13 @@ function DrawerBody({
   // Local-only for now (an ops_order_control column is deploy-gated), keyed by
   // order so it sticks across sessions on this machine.
   const salKey = `ops-salutation:${order.id}`;
-  const [salutation, setSalutation] = useState<string>(() => {
+  const [salutation] = useState<string>(() => {
     try {
       return localStorage.getItem(salKey) ?? "";
     } catch {
       return "";
     }
   });
-  const saveSalutation = (v: string) => {
-    setSalutation(v);
-    try {
-      if (v.trim()) localStorage.setItem(salKey, v);
-      else localStorage.removeItem(salKey);
-    } catch {
-      /* private mode — session-only */
-    }
-  };
   const orderRef = (order.source_ref ?? [])[0] ?? null;
   const copyChase = (
     aud: "customer" | "logistic" | "supplier",
@@ -1328,8 +1311,8 @@ function DrawerBody({
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
 
-  // ═══ Party CHECKLISTS (Jess 2026-07-17 rev 3) — every line derived from a
-  // real book signal; "none" = not applicable, never invented. ═══
+  // ═══ Party CHECKLISTS (Jess 2026-07-17 rev 4) — stage rows with the
+  // action ON the stuck stage. Chase buttons = the locked WhatsApp templates.
   const deliveredDone = pipelineStatus === "completed";
   const placedDate = order.placed_at ? fmtDate(order.placed_at).split(",")[0] : undefined;
   const paidDone = totalSet && moneyOutstanding <= 0;
@@ -1337,47 +1320,120 @@ function DrawerBody({
     Object.values(form.draft.line_etas ?? {}).some((v) => !!v) ||
     pos.some((p) => !!p.eta_date);
   const goodsN = goodsLines.length;
-  const customerRows: CheckItem[] = [
+  const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
+  const chaseOutline =
+    "inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
+  const chaseSolid =
+    "inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
+
+  const moneyRows: CheckItem[] = [
     { label: "Placed", state: "done", meta: placedDate },
     { label: "Confirmed", state: customerConfirmed || deliveredDone ? "done" : "todo" },
     paidDone
       ? { label: "Paid", state: "done" }
       : balanceOwing
-        ? { label: "Paid", state: "bad", meta: `${RM(moneyOutstanding)} due` }
-        : { label: "Paid", state: totalSet ? "todo" : "none", meta: totalSet ? undefined : "no total" },
-    hasMsbf || hasSof
-      ? storageOwing
-        ? { label: "Storage", state: "bad", meta: storageFee > 0 ? RM(storageFee) : "accruing" }
-        : storageIncurred
-          ? { label: "Storage", state: "done", meta: "cleared" }
-          : { label: "Storage", state: "none", meta: "not accruing" }
-      : { label: "Storage", state: "none", meta: "none" },
-    liveLoanCount > 0
-      ? { label: "Loan", state: "todo", meta: `${liveLoanCount} out` }
-      : { label: "Loan", state: "none", meta: "none" },
+        ? {
+            label: "Paid",
+            state: "bad",
+            meta: `${RM(moneyOutstanding)} due`,
+            action: (
+              <Btn size="sm" icon={Plus} onClick={() => setAddingPayment(true)} title="Record a payment against this order">
+                Record
+              </Btn>
+            ),
+          }
+        : totalSet
+          ? { label: "Paid", state: collected > 0 ? "part" : "todo" }
+          : {
+              label: "Paid",
+              state: "none",
+              meta: "no total",
+              action: (
+                <Btn size="sm" icon={Plus} onClick={() => setAddingPayment(true)} title="Record a payment / set the total">
+                  Record
+                </Btn>
+              ),
+            },
   ];
-  const supplierRows: CheckItem[] = [
+  const stockRows: CheckItem[] = [
     goodsN === 0
       ? { label: "PO raised", state: "none" }
       : nopoN > 0
-        ? { label: "PO raised", state: "bad", meta: `${nopoN} no PO` }
-        : { label: "PO raised", state: "done" },
-    { label: "ETA set", state: anyEta ? "done" : goodsN > 0 ? "todo" : "none" },
+        ? {
+            label: "PO raised",
+            state: "bad",
+            meta: `${nopoN} no PO`,
+            action: (
+              <Btn size="sm" icon={Plus} onClick={() => onIssuePOsClick()} title="Raise a PO for the no-PO lines">
+                Raise PO
+              </Btn>
+            ),
+          }
+        : { label: "PO raised", state: "done", meta: pos.length > 0 ? `${pos.length} PO` : "from stock" },
+    {
+      label: "ETA set",
+      state: anyEta ? "done" : goodsN > 0 && pos.length > 0 ? "todo" : "none",
+      action:
+        !anyEta && pos.length > 0 && readyN < goodsN ? (
+          <button type="button" className={chaseOutline} onClick={() => copyChase("supplier", "chase")} title="Copy the supplier chase (WhatsApp) + log it">
+            <MessageCircle size={14} aria-hidden="true" />
+            Chase
+          </button>
+        ) : undefined,
+    },
     goodsN === 0
       ? { label: "Goods ready", state: "none" }
       : readyN === goodsN
         ? { label: "Goods ready", state: "done", meta: `${readyN}/${goodsN}` }
-        : { label: "Goods ready", state: "todo", meta: `${readyN}/${goodsN}` },
+        : {
+            label: "Goods ready",
+            state: readyN > 0 ? "part" : "todo",
+            meta: `${readyN}/${goodsN}`,
+            action:
+              anyEta && pos.length > 0 ? (
+                <button type="button" className={chaseOutline} onClick={() => copyChase("supplier", "chase")} title="Copy the supplier chase (WhatsApp) + log it">
+                  <MessageCircle size={14} aria-hidden="true" />
+                  Chase
+                </button>
+              ) : undefined,
+          },
   ];
   const logisticRows: CheckItem[] = [
     assignedLogisticName
       ? { label: "Assigned", state: "done", meta: assignedLogisticName }
-      : { label: "Assigned", state: "bad", meta: "no partner" },
+      : {
+          label: "Assigned",
+          state: "bad",
+          meta: "no partner",
+          action: (
+            <Btn size="sm" onClick={() => setTab("delivery")} title="Assign a logistic partner (Delivery tab)">
+              Assign
+            </Btn>
+          ),
+        },
     bookedEta
       ? { label: "Booked", state: "done", meta: fmtDate(bookedEta).split(",")[0] }
-      : daysToDelivery !== null && daysToDelivery < 0
-        ? { label: "Booked", state: "bad", meta: "deadline over" }
-        : { label: "Booked", state: "todo" },
+      : overDeadline
+        ? {
+            label: "Booked",
+            state: "bad",
+            meta: "deadline over",
+            action: (
+              <button type="button" className={chaseSolid} onClick={() => copyChase("logistic", "chase")} title="Copy the logistic chase (WhatsApp) + log it">
+                <MessageCircle size={14} aria-hidden="true" />
+                Chase
+              </button>
+            ),
+          }
+        : {
+            label: "Booked",
+            state: "todo",
+            action: assignedLogisticName ? (
+              <Btn size="sm" onClick={() => setTab("delivery")} title="Enter the booked delivery date (Delivery tab)">
+                Book
+              </Btn>
+            ) : undefined,
+          },
     { label: "Delivered", state: deliveredDone ? "done" : "todo" },
   ];
   const logisticTone: KpiTone =
@@ -1443,146 +1499,72 @@ function DrawerBody({
           replaces it). The KPI mission-track boxes moved INTO the right body
           column (page-rebuild §4 — KPI + Alert is a body panel now, so the
           page is two columns with no separate header band). */}
-      <header className="shrink-0 px-5 pt-3 bg-background">
-        <SectionCard className="!p-0">
-        <div className="px-4 h-[44px] flex items-center gap-2.5 min-w-0">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Back to Orders"
-            className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
-          >
-            <ChevronLeft size={16} aria-hidden="true" />
-            Orders
-          </button>
-          <span className="w-px h-4 bg-base-200 shrink-0" aria-hidden="true" />
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            {/* §7.1 — the order's two IDs bold, +2 sizes, ADJACENT. The ref
-                number stands alone (no "REF" word — Jess 2026-07-13). */}
-            <span className="font-mono text-[20px] font-bold text-base-900 shrink-0">
-              #{order.so}
+      {/* HEADER (Jess 2026-07-17 rev 4) — a BARE strip, not a card: back link
+          left; ‹ n of m › prev/next stepping the list + flag + ⋮ right (round
+          34px icon buttons, base-100 hover wash). ZERO order data here — the
+          identity lives in the Customer card below. */}
+      <header className="shrink-0 px-5 h-11 flex items-center gap-1.5 border-b border-base-200 bg-background">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Back to Orders"
+          className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+          Orders
+        </button>
+        <span className="flex-1" />
+        {nav && (
+          <span className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={nav.onPrev}
+              disabled={!nav.onPrev}
+              aria-label="Previous order"
+              title="Previous order in the list"
+              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+            <span className="text-[12px] text-base-500 t-num whitespace-nowrap px-0.5">
+              {nav.index} of {nav.total}
             </span>
-            {order.source_ref?.[0] && (
-              <span
-                className="font-mono text-[20px] font-bold text-base-700 shrink-0"
-                title="Customer reference"
-              >
-                {order.source_ref[0]}
-              </span>
-            )}
-            {(() => {
-              const onHold = balanceOwing || storageOwing;
-              const pill =
-                pipelineStatus === "completed"
-                  ? { cls: "pill-confirmed", label: "Delivered", hint: PIPELINE_HINT.completed }
-                  : onHold
-                    ? {
-                        cls: "pill-warning",
-                        label: "On hold",
-                        hint: "Delivery is held until the balance / storage is collected — see the Balance card",
-                      }
-                    : pipelineStatus === "scheduled"
-                      ? { cls: "pill-sent", label: "Scheduled", hint: PIPELINE_HINT.scheduled }
-                      : {
-                          cls: "pill-neutral",
-                          label:
-                            pipelineStatus === "ready"
-                              ? "Ready to deliver"
-                              : PIPELINE_LABEL[pipelineStatus],
-                          hint: PIPELINE_HINT[pipelineStatus],
-                        };
-              return (
-                <span className={`pill ${pill.cls}`} title={pill.hint}>
-                  {pill.label}
-                </span>
-              );
-            })()}
-            {/* Customer anchor (Jess 2026-07-15) — the NAME stays on the strip;
-                click it (or ▾) to slide the full-width customer block open.
-                Region + ordered date fold INTO that block; the deadline is the
-                KPI Logistic tile's job, never repeated here. */}
             <button
               type="button"
-              onClick={() => setCustomerOpen((o) => !o)}
-              aria-expanded={customerOpen}
-              title={customerOpen ? "Hide customer details" : "Show customer details"}
-              data-testid="customer-strip-toggle"
-              className="min-w-0 flex-1 flex items-center gap-1 text-left text-[13px] text-base-600 hover:text-base-900"
+              onClick={nav.onNext}
+              disabled={!nav.onNext}
+              aria-label="Next order"
+              title="Next order in the list"
+              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <span
-                className={`truncate font-medium ${cjkClassName(order.customer_name ?? "")}`}
-              >
-                {order.customer_name ?? "—"}
-              </span>
-              {customerOpen ? (
-                <ChevronUp size={14} className="shrink-0 text-base-400" aria-hidden="true" />
-              ) : (
-                <ChevronDown size={14} className="shrink-0 text-base-400" aria-hidden="true" />
-              )}
-              {/* v4 rebuild — the collapsed line carries phone + region (the
-                  expand shows the full address); hidden while open to avoid
-                  double-reading against the pills. Phone = slashed-zero mono. */}
-              {!customerOpen && (order.customer_phone || loc.label) && (
-                <span className="min-w-0 truncate text-[12px] text-base-500 ml-1.5">
-                  {order.customer_phone && (
-                    <span className="font-mono">{order.customer_phone}</span>
-                  )}
-                  {order.customer_phone && loc.label ? " · " : ""}
-                  {loc.label ?? ""}
-                </span>
-              )}
+              <ChevronRight size={16} aria-hidden="true" />
             </button>
-          </div>
-          <span className="flex items-center gap-1 shrink-0">
-            {/* Ordered date lives HERE on the collapsed strip (Jess 2026-07-15
-                rev 2) — muted meta, right side, before flag/⋮. */}
-            {order.placed_at && (
-              <span
-                className="flex items-center gap-1 text-[12px] text-base-400 mr-1 whitespace-nowrap"
-                title="Order placed"
-              >
-                <Calendar size={14} className="shrink-0" aria-hidden="true" />
-                ordered {fmtDate(order.placed_at).split(", ")[0]}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={onFollowUpClick}
-              aria-label="Add follow-up"
-              title="Add a follow-up (write the issue + assign)"
-              className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-base-800"
-            >
-              <Flag size={18} />
-            </button>
-            <ActionsMenu
-              order={order}
-              lines={lines}
-              stage={stage}
-              orderId={order.id}
-              pipelineStatus={pipelineStatus}
-              onServiceNoteClick={onServiceNoteClick}
-              onTransferReadyClick={onTransferReadyClick}
-              onConfirmProceedClick={onConfirmProceedClick}
-              onTopUpClick={onTopUpClick}
-              onAbandonClick={onAbandonClick}
-              onIssuePOsClick={onIssuePOsClick}
-              onDispatchClick={onDispatchClick}
-              onDOClick={onDOClick}
-            />
           </span>
-        </div>
-        {/* Customer expand (Jess 2026-07-15) — inline, FULL page width (not
-            bound by the 32% left column): one icon-led read line of copy-chips
-            + WhatsApp + ⋮. Salutation + field edits live in the ⋮ Edit form. */}
-        {customerOpen && (
-          <CustomerExpand
-            order={order}
-            regionLabel={loc.label ?? null}
-            salutation={salutation}
-            onSalutation={saveSalutation}
-          />
         )}
-        </SectionCard>
+        <button
+          type="button"
+          onClick={onFollowUpClick}
+          aria-label="Add follow-up"
+          title="Add a follow-up (write the issue + assign)"
+          className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 hover:text-primary shrink-0"
+        >
+          <Flag size={16} />
+        </button>
+        <ActionsMenu
+          order={order}
+          lines={lines}
+          stage={stage}
+          orderId={order.id}
+          pipelineStatus={pipelineStatus}
+          onServiceNoteClick={onServiceNoteClick}
+          onTransferReadyClick={onTransferReadyClick}
+          onConfirmProceedClick={onConfirmProceedClick}
+          onTopUpClick={onTopUpClick}
+          onAbandonClick={onAbandonClick}
+          onIssuePOsClick={onIssuePOsClick}
+          onDispatchClick={onDispatchClick}
+          onDOClick={onDOClick}
+        />
       </header>
       {/* ═══ BODY ═══ Header + this action bar STAY (shrink-0); the two columns
           each scroll INDEPENDENTLY (Jess 2026-07-11). The body itself does not
@@ -1612,67 +1594,70 @@ function DrawerBody({
         )}
         {/* KPI tracks (Jess 2026-07-17): SEPARATE white cards, full width,
             one per mission track — each card jumps to its tab. */}
-        {/* Party CHECKLIST cards (Jess 2026-07-17 rev 3 — Option B): ONE row
-            answers "who do I chase" — big round mark = the whole track
-            (green ok / red needs me); rows = rounded marks + facts; chase
-            actions inside when red. Click a card to open its tab. Storage
-            folds into the Customer card; the Storage TAB keeps the detail. */}
-        <div className="shrink-0 grid grid-cols-3 gap-2.5">
-          <PartyCard
-            label="Customer"
-            onOpen={() => setTab("balance")}
-            rows={customerRows}
-            actions={
-              balanceOwing ? (
-                <ChasePair
-                  audience="customer payment"
-                  onReminder={() => copyChase("customer", "reminder")}
-                  onChase={() => copyChase("customer", "chase")}
-                />
-              ) : undefined
+        {/* 4 STAT PANELS (Jess 2026-07-17 rev 4): CUSTOMER identity ·
+            MONEY / STOCK / LOGISTIC checklist tracks. Category icon = 38px
+            tinted circle; headline value right; the stuck stage carries its
+            action inline. */}
+        <div className="shrink-0 grid grid-cols-4 gap-2.5">
+          <CustomerIdentityCard
+            order={order}
+            regionLabel={loc.label ?? null}
+            statusWord={
+              balanceOwing || storageOwing
+                ? "On hold"
+                : pipelineStatus === "completed"
+                  ? "Delivered"
+                  : PIPELINE_LABEL[pipelineStatus]
             }
           />
           <PartyCard
-            label="Supplier"
-            onOpen={() => setTab("items")}
-            rows={supplierRows}
-            actions={
-              stockTone === "danger" || stockTone === "warning" ? (
-                <>
-                  {nopoN > 0 && (
-                    <Btn
-                      size="sm"
-                      icon={Plus}
-                      onClick={() => onIssuePOsClick()}
-                      title="Raise a PO for the no-PO lines"
-                    >
-                      Raise PO
-                    </Btn>
-                  )}
-                  {(rCounts.onPo > 0 || onPoStalled) && (
-                    <ChasePair
-                      audience="supplier (PO-led)"
-                      onReminder={() => copyChase("supplier", "reminder")}
-                      onChase={() => copyChase("supplier", "chase")}
-                    />
-                  )}
-                </>
-              ) : undefined
+            label="Money"
+            icon={Wallet}
+            tint="bg-success-soft text-success"
+            value={
+              paidDone ? (
+                <span className="text-success">Paid</span>
+              ) : balanceOwing ? (
+                <span className="text-danger">{RM(moneyOutstanding)}</span>
+              ) : totalSet ? (
+                RM(moneyOutstanding)
+              ) : (
+                <span className="text-base-400 font-semibold">No total</span>
+              )
             }
+            rows={moneyRows}
+            onOpen={() => setTab("balance")}
+          />
+          <PartyCard
+            label="Stock"
+            icon={Package}
+            tint="bg-warning-soft text-warning"
+            value={
+              goodsN === 0 ? (
+                <span className="text-base-400 font-semibold">—</span>
+              ) : readyN === goodsN ? (
+                <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
+              ) : nopoN > 0 ? (
+                <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
+              ) : (
+                <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
+              )
+            }
+            rows={stockRows}
+            onOpen={() => setTab("items")}
           />
           <PartyCard
             label="Logistic"
-            onOpen={() => setTab("delivery")}
-            rows={logisticRows}
-            actions={
-              logisticTone === "danger" || logisticTone === "warning" ? (
-                <ChasePair
-                  audience="logistic partner (REF-led)"
-                  onReminder={() => copyChase("logistic", "reminder")}
-                  onChase={() => copyChase("logistic", "chase")}
-                />
-              ) : undefined
+            icon={Truck}
+            tint="bg-error-soft text-danger"
+            value={
+              <span className={overDeadline && !deliveredDone ? "text-danger" : undefined}>
+                {deadlineLabel}
+                {overDeadline && !deliveredDone ? " · over" : ""}
+              </span>
             }
+            rows={logisticRows}
+            onOpen={() => setTab("delivery")}
           />
         </div>
         {/* Tab bar (Jess 2026-07-17 + UI-KIT §9 type-2): the detail surfaces
@@ -2881,40 +2866,27 @@ function LoanSofaModal({
 
 /** Grid cells (spreadsheet look) — label cell (darker for readability) + value
  *  cell, both fully bordered. Kc/Vc compose into 1- or 2-up grid rows. */
-/**
- * Customer block of the Order section — read-only, with an inline Edit on a
- * Place order so operation can correct a customer's name / phone / address
- * before the order proceeds (typo, customer moved, etc.). Saves via
- * `useUpdateOrder` → PATCH /api/orders/:id; the `update_order` RPC 422s on any
- * non-Place order, so the Edit affordance only shows for status 'place' (which
- * is every real AutoCount order). Validates with the SAME shared zod schema the
- * API uses. (Jess 2026-06-25, #4 drawer edit.)
- */
-/** Header-strip customer block (Jess 2026-07-15 — the left-column Customer
- *  panel folded into the identity strip; rev 2 = cream pills). Read = ONE
- *  full-width line of cream copy-PILLS (icon + value; phone accent), 8px gap
- *  — white panel + cream blocks per UI-KIT, no verticals — + the round green
- *  WhatsApp button + [⋮]. Click a pill = copy that field. Ordered date lives
- *  on the collapsed strip, not here. ⋮ Edit details flips the line into the
- *  edit form (name / phone / address + the messages salutation). Save logic
- *  mirrors OrderCustomerCard (updateOrderInputSchema, presence-only). */
-function CustomerExpand({
+/** CustomerIdentityCard (Jess 2026-07-17 rev 4) — identity ONLY, no stage
+ *  checklist: 38px flame-tint person circle · name · "#so · region · state"
+ *  · contact chips (copy / WhatsApp) · pencil = inline edit of name / phone /
+ *  address. NOTE: Carres has NO customer master yet — the edit updates THIS
+ *  order's customer fields (updateOrderInputSchema, presence-only); a real
+ *  cross-order customer record needs its own table + API (flagged to Jess). */
+function CustomerIdentityCard({
   order,
   regionLabel,
-  salutation,
-  onSalutation,
+  statusWord,
 }: {
   order: {
     id: string;
+    so: number;
     status: string;
     customer_name: string | null;
     customer_phone: string | null;
     customer_address: string | null;
   };
   regionLabel: string | null;
-  /** Preferred greeting for WhatsApp messages (local-only store). */
-  salutation: string;
-  onSalutation: (v: string) => void;
+  statusWord: string;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -2930,216 +2902,142 @@ function CustomerExpand({
     },
     onError: (e) => setErr(e.message),
   });
-  const startEdit = () => {
-    setName(order.customer_name ?? "");
-    setPhone(order.customer_phone ?? "");
-    setAddress(order.customer_address ?? "");
-    setErr(null);
-    setEditing(true);
-  };
-  const save = () => {
-    setErr(null);
-    // Only send fields the user actually changed — the RPC updates by presence.
-    const customer: Record<string, unknown> = {};
-    if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
-    if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
-    if (address.trim() !== (order.customer_address ?? ""))
-      customer.address = address.trim() || null;
-    if (Object.keys(customer).length === 0) {
-      setEditing(false);
-      return;
-    }
-    const parsed = updateOrderInputSchema.safeParse({ customer });
-    if (!parsed.success) {
-      setErr(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
-    update.mutate(parsed.data);
-  };
-  const copy = (label: string, v: string | null) => {
-    if (!v) return;
-    void navigator.clipboard.writeText(v);
-    toast.success(`${label} copied`);
-  };
   const wa = waLink(order.customer_phone);
-  const field = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
-  // One WHITE pill per field (rev 3 colour fix): content brighter than its
-  // container — white pill + hairline floating on the light-grey (base-50)
-  // expand strip. Never cream-on-cream: cream is the PAGE background only.
-  // Muted icon + value in normal ink (phone accent); click = copy; 8px gap.
-  const pillCls =
-    "min-w-0 flex items-center gap-1.5 text-[13px] text-base-800 hover:text-base-900 bg-white border border-base-200 rounded-[8px] px-2.5 py-1 hover:brightness-[0.98] disabled:opacity-50";
-
-  if (editing) {
-    return (
-      <div className="px-4 pb-3 pt-2.5 rounded-[8px] bg-base-50">
-        <div className="grid grid-cols-3 gap-2">
-          <label className="block">
-            <span className="t-tiny text-base-500">Customer name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="block">
-            <span className="t-tiny text-base-500">Phone</span>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              inputMode="tel"
-              className={field}
-            />
-          </label>
-          <label className="block">
-            <span
-              className="t-tiny text-base-500"
-              title="Used as the greeting in WhatsApp messages. Blank = the customer name, title-cased."
-            >
-              Salutation (messages)
-            </span>
-            <input
-              value={salutation}
-              onChange={(e) => onSalutation(e.target.value)}
-              placeholder={titleCaseName(order.customer_name ?? "")}
-              className={field}
-            />
-          </label>
-          <label className="block col-span-3">
-            <span className="t-tiny text-base-500">Address</span>
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={2}
-              className={`mt-0.5 ${fieldAreaCls} resize-none`}
-            />
-          </label>
-        </div>
-        {err && <p className="t-tiny text-danger mt-1.5">{err}</p>}
-        <div className="mt-2 flex items-center justify-end gap-2">
-          <Btn variant="ghost" onClick={() => setEditing(false)} disabled={update.isPending}>
-            Cancel
-          </Btn>
-          {/* Inline edit confirm = secondary box (the page hero stays
-              + Add payment; black is retired as a button colour). */}
-          <Btn onClick={save} disabled={update.isPending}>
-            {update.isPending ? "Saving…" : "Save"}
-          </Btn>
-        </div>
-      </div>
-    );
-  }
-
+  const copy = (v: string, what: string) => {
+    void navigator.clipboard.writeText(v);
+    toast.success(`${what} copied`);
+  };
+  const chip =
+    "inline-flex items-center gap-1 rounded-[6px] border border-base-200 bg-base-50 px-1.5 py-0.5 text-[12px] text-base-700 hover:border-base-300 min-w-0";
+  const field =
+    "mt-0.5 w-full px-2 py-1 border border-base-200 rounded-[6px] text-[13px] bg-white outline-none focus:border-primary";
   return (
-    /* Light-grey container (base-50, one step under white) — the white pills
-       float on it. Rounded to sit inside the white card's inset. v4 §8b
-       density: the read row is 44px fixed. */
-    <div
-      className="px-4 h-[44px] rounded-[8px] bg-base-50 flex items-center gap-2 min-w-0"
-      data-testid="customer-expand"
-    >
-      <div className="min-w-0 flex-1 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => copy("Phone", order.customer_phone)}
-          disabled={!order.customer_phone}
-          title="Copy phone"
-          className={`${pillCls} shrink-0`}
-        >
-          <Phone size={14} className="shrink-0 text-base-500" aria-hidden="true" />
-          {/* v4 — phone is CONTENT: dark, slashed-zero mono (never accent). */}
-          <span className="truncate font-medium font-mono text-base-900">
-            {order.customer_phone ?? "—"}
+    <div className="kpi-box">
+      <div className="flex items-start gap-2 min-w-0">
+        <span className="size-[38px] rounded-full grid place-items-center shrink-0 bg-signature-50 text-primary">
+          <User size={18} strokeWidth={2} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block text-[14px] font-bold leading-tight truncate ${cjkClassName(order.customer_name ?? "")}`}
+          >
+            {order.customer_name ?? "—"}
           </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => copy("Region", regionLabel)}
-          disabled={!regionLabel}
-          title="Copy region"
-          className={`${pillCls} shrink-0`}
-        >
-          <MapPin size={14} className="shrink-0 text-base-500" aria-hidden="true" />
-          <span className="truncate">{regionLabel ?? "—"}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => copy("Address", order.customer_address)}
-          disabled={!order.customer_address}
-          title="Copy address"
-          className={pillCls}
-        >
-          <Home size={14} className="shrink-0 text-base-500" aria-hidden="true" />
-          <span className="truncate text-left">
-            {order.customer_address ?? "—"}
+          <span className="block text-[12px] text-base-500 truncate">
+            <span className="font-mono">#{order.so}</span>
+            {regionLabel ? ` · ${regionLabel}` : ""} · {statusWord}
           </span>
+        </span>
+        <button
+          type="button"
+          aria-label={editing ? "Cancel edit" : "Edit customer details"}
+          title={editing ? "Cancel edit" : "Edit name / phone / address"}
+          onClick={() => {
+            if (editing) {
+              setEditing(false);
+              return;
+            }
+            setName(order.customer_name ?? "");
+            setPhone(order.customer_phone ?? "");
+            setAddress(order.customer_address ?? "");
+            setErr(null);
+            setEditing(true);
+          }}
+          className="size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-base-100 hover:text-base-800 shrink-0"
+        >
+          {editing ? <X size={14} /> : <Pencil size={14} />}
         </button>
       </div>
-      <span className="flex items-center gap-1.5 shrink-0">
-        {/* WhatsApp — THE round icon-button recipe (Btn iconOnly): white +
-            hairline, grey outline glyph; opens wa.me directly, no confirm. */}
-        <Btn
-          iconOnly
-          onClick={() => {
-            if (wa) window.open(wa, "_blank", "noopener");
-          }}
-          disabled={!wa}
-          title="Open WhatsApp chat with the customer"
-          aria-label="WhatsApp the customer"
-          className="shrink-0 text-base-500 hover:text-base-800"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width={16}
-            height={16}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9" />
-            <path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1" />
-          </svg>
-        </Btn>
-        <PanelMenu
-          items={[
-            ...(order.status === "place"
-              ? [
-                  {
-                    label: "Edit details",
-                    icon: <Pencil size={14} />,
-                    onClick: startEdit,
-                  },
-                ]
-              : []),
-            {
-              label: "Copy address",
-              icon: <Copy size={14} />,
-              disabled: !order.customer_address,
-              onClick: () => copy("Address", order.customer_address),
-            },
-            {
-              label: "Copy phone",
-              icon: <Copy size={14} />,
-              disabled: !order.customer_phone,
-              onClick: () => copy("Phone", order.customer_phone),
-            },
-            {
-              label: "WhatsApp customer",
-              icon: <Phone size={14} />,
-              disabled: !wa,
-              onClick: () => {
-                if (wa) window.open(wa, "_blank", "noopener");
-              },
-            },
-          ]}
-        />
-      </span>
+      {!editing ? (
+        <div className="mt-2 flex items-center gap-1 flex-wrap min-w-0">
+          {order.customer_phone && (
+            <button
+              type="button"
+              className={chip}
+              onClick={() => copy(order.customer_phone ?? "", "Phone")}
+              title="Copy phone"
+            >
+              <Phone size={14} aria-hidden="true" />
+              <span className="font-mono truncate">{order.customer_phone}</span>
+            </button>
+          )}
+          {wa && (
+            <button
+              type="button"
+              className={`${chip} text-success`}
+              onClick={() => window.open(wa, "_blank", "noopener")}
+              title="Open WhatsApp chat"
+            >
+              <MessageCircle size={14} aria-hidden="true" />
+              WA
+            </button>
+          )}
+          {order.customer_address && (
+            <button
+              type="button"
+              className={chip}
+              onClick={() => copy(order.customer_address ?? "", "Address")}
+              title={`Copy address — ${order.customer_address}`}
+            >
+              <MapPin size={14} aria-hidden="true" />
+              <span className="truncate max-w-28">{order.customer_address}</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+          <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" aria-label="Customer name" />
+          <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" aria-label="Customer phone" />
+          <input className={field} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" aria-label="Customer address" />
+          <div className="text-[12px] text-warning leading-snug">
+            目前只更新这张单的客户资料 — updates THIS order only (no shared
+            customer record yet).
+          </div>
+          {err && <div className="text-[12px] text-danger">{err}</div>}
+          <div className="flex items-center gap-1.5">
+            <Btn
+              size="sm"
+              onClick={() => {
+                setErr(null);
+                const customer: Record<string, unknown> = {};
+                if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
+                if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
+                if (address.trim() !== (order.customer_address ?? ""))
+                  customer.address = address.trim() || null;
+                if (Object.keys(customer).length === 0) {
+                  setEditing(false);
+                  return;
+                }
+                const parsed = updateOrderInputSchema.safeParse({ customer });
+                if (!parsed.success) {
+                  setErr(parsed.error.issues[0]?.message ?? "Invalid input");
+                  return;
+                }
+                update.mutate(parsed.data);
+              }}
+              disabled={update.isPending}
+            >
+              Save
+            </Btn>
+            <Btn size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Btn>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+/**
+ * Customer block of the Order section — read-only, with an inline Edit on a
+ * Place order so operation can correct a customer's name / phone / address
+ * before the order proceeds (typo, customer moved, etc.). Saves via
+ * `useUpdateOrder` → PATCH /api/orders/:id; the `update_order` RPC 422s on any
+ * non-Place order, so the Edit affordance only shows for status 'place' (which
+ * is every real AutoCount order). Validates with the SAME shared zod schema the
+ * API uses. (Jess 2026-06-25, #4 drawer edit.)
+ */
 
 export function OrderCustomerCard({
   order,

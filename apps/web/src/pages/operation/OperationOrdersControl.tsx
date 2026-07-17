@@ -1286,10 +1286,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // inside the operation shell, so the sidebar + right rail stay visible (no
   // overlay). Close (✕) clears openOrderId → back to the list (filters preserved).
   if (openOrderId) {
+    // ‹ n of m › — step through the SAME filtered+sorted list the table shows.
+    const navIdx = visible.findIndex((o) => o.id === openOrderId);
     return (
       <OrderDetailDrawer
         orderId={openOrderId}
         onClose={() => setOpenOrderId(null)}
+        nav={
+          navIdx >= 0
+            ? {
+                index: navIdx + 1,
+                total: visible.length,
+                onPrev:
+                  navIdx > 0
+                    ? () => setOpenOrderId(visible[navIdx - 1].id)
+                    : undefined,
+                onNext:
+                  navIdx < visible.length - 1
+                    ? () => setOpenOrderId(visible[navIdx + 1].id)
+                    : undefined,
+              }
+            : undefined
+        }
       />
     );
   }
