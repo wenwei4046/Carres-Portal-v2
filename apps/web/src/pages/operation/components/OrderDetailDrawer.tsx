@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Bed,
   BedDouble,
-  Bell,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -26,7 +25,6 @@ import {
   FileText,
   Flag,
   MapPin,
-  Minus,
   MoreVertical,
   Package,
   PackagePlus,
@@ -718,18 +716,19 @@ function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-type CheckState = "done" | "bad" | "late" | "part" | "todo" | "none";
-type CheckItem = {
-  label: string;
-  state: CheckState;
-  meta?: string;
-  /** Inline action rendered ON the stage that needs it (Raise PO / Chase /
-   *  Book / Record payment) — the button lives where the work is stuck. */
-  action?: ReactNode;
-  /** STATUS dial rendered IN PLACE of the check mark — lives on the stage it
-   *  measures (Balance→Paid · Stock→Goods ready), never on the card header. */
-  dial?: ReactNode;
+/** A2 track stages (MASTER SPEC §7, 2026-07-18) — each KPI track is a
+ *  full-width progress LINE of numbered nodes with the stage word under
+ *  each node. done = grey (Jess's stepper reference: grey when finished). */
+type StageState = "done" | "current" | "pending";
+type TrackStage = {
+  word: string;
+  state: StageState;
+  /** Time-based lateness (ETA / deadline passed) — the CURRENT node shows a
+   *  red CLOCK instead of its number (§7: Booked 逾期未约 = 红 clock). */
+  clock?: boolean;
 };
+/** Track tone — colours the CURRENT node + its stage word. */
+type KpiTone = "success" | "warning" | "danger" | "neutral";
 
 /** Dial states (MASTER SPEC §8) — NO blue: Unpaid/No-stock = gray · Deposit/
  *  Partial/Arriving = amber · Overdue/Delayed = red · Paid/Ready = green. */
@@ -793,143 +792,193 @@ function PieDial({
   );
 }
 
-/** CheckMark — the rounded mark (Jess 2026-07-17 rev 3): a circle so the
- *  state reads as a SHAPE before the text does (v4 §8c). done = green ✓ ·
- *  bad = red ✗ (needs action) · todo = empty ring · none = grey dash. */
-function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
-  const box = big ? "w-7 h-7" : "w-5 h-5";
-  const icon = big ? 18 : 14;
-  // §8 checklist marks — Done/Blocked read FILLED (circle-check-filled /
-  // alert-circle-filled); Waiting keeps the amber clock; Pending = empty ring.
-  if (state === "done")
+/** The CURRENT node's fill per track tone (A2) — "状态色圈带编号". A healthy
+ *  current stage reads green, a warning amber, a blocker red; neutral (e.g.
+ *  no total set yet) stays a quiet bold ring. */
+const CURRENT_NODE_CLS: Record<KpiTone, string> = {
+  success: "bg-success text-white",
+  warning: "bg-warning text-white",
+  danger: "bg-danger text-white",
+  neutral: "bg-white border-[1.5px] border-base-400 text-base-600",
+};
+
+/** One A2 node — 24px numbered circle: done = GREY filled ✓ · current =
+ *  tone-colour circle with the number (red CLOCK when time-overdue) ·
+ *  pending = grey empty ring with the number. */
+function StageNode({ n, stage, tone }: { n: number; stage: TrackStage; tone: KpiTone }) {
+  if (stage.state === "done")
     return (
-      <span
-        className={`${box} rounded-full grid place-items-center bg-success text-white shrink-0`}
-      >
-        <Check size={icon} strokeWidth={2.5} aria-label="done" />
+      <span className="w-6 h-6 rounded-full grid place-items-center bg-base-400 text-white shrink-0">
+        <Check size={14} strokeWidth={2.5} aria-label={`${stage.word} — done`} />
       </span>
     );
-  if (state === "bad")
+  if (stage.state === "current")
     return (
       <span
-        className={`${box} rounded-full grid place-items-center bg-danger text-white shrink-0`}
+        className={`w-6 h-6 rounded-full grid place-items-center shrink-0 text-[12px] font-bold ${
+          stage.clock ? "bg-danger text-white" : CURRENT_NODE_CLS[tone]
+        }`}
       >
-        <span className="text-[12px] font-bold leading-none" aria-label="needs action">
-          !
-        </span>
-      </span>
-    );
-  if (state === "late")
-    return (
-      <span
-        className={`${box} rounded-full grid place-items-center bg-error-soft text-danger shrink-0`}
-      >
-        <Clock size={icon} strokeWidth={2.5} aria-label="waiting — late" />
-      </span>
-    );
-  if (state === "part")
-    return (
-      <span
-        className={`${box} rounded-full grid place-items-center bg-warning-soft text-warning shrink-0`}
-      >
-        <Clock size={icon} strokeWidth={2.5} aria-label="in progress" />
-      </span>
-    );
-  if (state === "none")
-    return (
-      <span
-        className={`${box} rounded-full grid place-items-center bg-base-100 text-base-400 shrink-0`}
-      >
-        <Minus size={icon} strokeWidth={2.5} aria-label="not applicable" />
+        {stage.clock ? (
+          <Clock size={14} strokeWidth={2.5} aria-label={`${stage.word} — overdue`} />
+        ) : (
+          n
+        )}
       </span>
     );
   return (
     <span
-      className={`${box} rounded-full border-[1.5px] border-base-300 bg-white shrink-0`}
-      aria-label="pending"
-    />
+      className="w-6 h-6 rounded-full grid place-items-center bg-white border-[1.5px] border-base-300 text-base-400 shrink-0 text-[12px] font-semibold"
+      aria-label={`${stage.word} — pending`}
+    >
+      {n}
+    </span>
   );
 }
 
-/** PartyCard v3 (Jess 2026-07-17 rev 6): NEUTRAL media (grey icon circle or
- *  a status DIAL) + label + 18px headline value (right) + stage checklist +
- *  the Reminder/Chase footer (STATUS-STANDARD §3). Colour lives on values and
- *  status only — never the icon. Card click = open its tab. */
-function PartyCard({
+/** ProgressTrack (A2, MASTER SPEC §7 — replaces PartyCard): ONE full-width
+ *  progress line per KPI track — neutral icon + label · numbered node line
+ *  with the stage word under each node · right = 18px headline value (dial
+ *  beside it, §8) + a SHORT summary. Chasing moved to the left-rail Chase
+ *  Now panel; clicking the track opens its tab. */
+function ProgressTrack({
   label,
-  media,
+  icon: Icon,
+  stages,
+  tone,
   value,
-  rows,
-  extra,
-  footer,
+  summary,
   onOpen,
 }: {
   label: string;
-  /** 30px neutral icon circle OR a PieDial. */
-  media: ReactNode;
+  icon: LucideIcon;
+  stages: TrackStage[];
+  tone: KpiTone;
+  /** 18px headline (the §8 dial rides inside, beside the value). */
   value: ReactNode;
-  rows: CheckItem[];
-  /** Extra section under the stage rows (the Stock card's category split). */
-  extra?: ReactNode;
-  /** Reminder + Chase pair (both copy the locked WhatsApp templates). */
-  footer?: ReactNode;
-  onOpen?: () => void;
+  /** One line under the headline — Balance "+ storage" · Stock category
+   *  badges · Delivery partner + booked state. */
+  summary?: ReactNode;
+  onOpen: () => void;
 }) {
   return (
     <div
-      className={`kpi-box ${onOpen ? "cursor-pointer transition-colors hover:border-base-300" : ""}`}
+      className="kpi-box cursor-pointer transition-colors hover:border-base-300 !flex-row items-center gap-4 min-w-0"
       onClick={onOpen}
-      role={onOpen ? "button" : undefined}
+      role="button"
     >
-      <div className="flex items-center gap-2 mb-1.5 min-w-0">
-        {media}
-        {/* The label NEVER truncates (shrink-0); the box min-width carries it. */}
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 shrink-0">
+      <span className="flex items-center gap-2 w-[120px] shrink-0">
+        <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+          <Icon size={16} strokeWidth={2} aria-hidden="true" />
+        </span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
           {label}
         </span>
-        <span className="ml-auto text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
-      </div>
-      <div className="min-w-0">
-        {rows.map((r) => (
-          <div key={r.label} className="flex items-center gap-2 min-w-0 min-h-9">
-            {r.dial ?? <CheckMark state={r.state} />}
-            <span
-              className={`text-[13px] truncate ${
-                r.state === "none"
-                  ? "text-base-400"
-                  : r.state === "bad"
-                    ? "text-danger font-medium"
-                    : "text-base-900 font-medium"
-              }`}
-            >
-              {r.label}
+      </span>
+      {/* Node line — connectors flex between fixed stage columns; a connector
+          reads "filled" (dark) once the node BEFORE it is done. mt aligns the
+          2px line with the 24px node's centre. */}
+      <div className="flex-1 min-w-0 flex items-start px-1">
+        {stages.map((s, i) => (
+          <Fragment key={s.word}>
+            {i > 0 && (
+              <span
+                className={`flex-1 h-0.5 rounded-full mt-[11px] min-w-4 ${
+                  stages[i - 1].state === "done" ? "bg-base-400" : "bg-base-200"
+                }`}
+                aria-hidden="true"
+              />
+            )}
+            <span className="flex flex-col items-center gap-1 shrink-0 px-1.5">
+              <StageNode n={i + 1} stage={s} tone={tone} />
+              <span
+                className={`text-[12px] whitespace-nowrap ${
+                  s.state === "current"
+                    ? s.clock || tone === "danger"
+                      ? "text-danger font-semibold"
+                      : tone === "warning"
+                        ? "text-warning font-semibold"
+                        : "text-base-900 font-semibold"
+                    : s.state === "done"
+                      ? "text-base-500"
+                      : "text-base-400"
+                }`}
+              >
+                {s.word}
+              </span>
             </span>
-            <span
-              className="ml-auto flex items-center gap-1.5 shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {r.meta && (
-                <span
-                  className={`text-[12px] whitespace-nowrap ${
-                    r.state === "bad" ? "text-danger font-semibold" : "text-base-500"
-                  }`}
-                >
-                  {r.meta}
-                </span>
-              )}
-              {r.action}
-            </span>
-          </div>
+          </Fragment>
         ))}
       </div>
-      {extra}
-      {footer && (
-        <div
-          className="mt-2 flex items-center gap-1.5 [&>*]:flex-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {footer}
-        </div>
+      <span className="shrink-0 text-right">
+        <span className="block text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
+        {summary && (
+          <span className="mt-0.5 flex items-center justify-end gap-1 text-[12px] text-base-500 whitespace-nowrap">
+            {summary}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** One Chase Now row — a counterparty that needs a push right now. */
+interface ChaseNowRow {
+  key: string;
+  label: string;
+  sub: string;
+  /** red dot = overdue (sorts on top) · amber dot = needs attention. */
+  urgency: "overdue" | "attention";
+  onAct: (tone: "reminder" | "chase") => void;
+}
+
+/** Chase Now (MASTER SPEC §7, B2) — the left-rail panel that owns ALL the
+ *  chasing (Reminder/Chase left the KPI tracks): one row per counterparty —
+ *  supplier PO / logistic / owing customer — red dot overdue on top, amber
+ *  attention below, Manage▾ (Reminder/Chase — the same language as the Items
+ *  rows' Manage▾). Empty = "Nothing to chase ✓". */
+function ChaseNowPanel({ rows }: { rows: ChaseNowRow[] }) {
+  return (
+    <div className="kpi-box shrink-0">
+      <span className="block text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-1">
+        Chase now
+      </span>
+      {rows.length === 0 ? (
+        <span className="flex items-center gap-1.5 min-h-9 text-[12px] font-medium text-success">
+          <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+          Nothing to chase
+        </span>
+      ) : (
+        rows.map((r) => (
+          <div key={r.key} className="flex items-center gap-2 min-h-9 min-w-0">
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                r.urgency === "overdue" ? "bg-danger" : "bg-warning"
+              }`}
+              title={r.urgency === "overdue" ? "Overdue" : "Needs attention"}
+              aria-label={r.urgency === "overdue" ? "Overdue" : "Needs attention"}
+            />
+            <span className="min-w-0 flex-1">
+              <span
+                className={`block text-[13px] font-medium leading-tight truncate ${
+                  r.urgency === "overdue" ? "text-danger" : "text-base-900"
+                }`}
+                title={r.label}
+              >
+                {r.label}
+              </span>
+              <span className="block text-[12px] text-base-500 truncate" title={r.sub}>
+                {r.sub}
+              </span>
+            </span>
+            <RowManageMenu
+              items={[
+                { label: "Reminder", onClick: () => r.onAct("reminder") },
+                { label: "Chase", onClick: () => r.onAct("chase") },
+              ]}
+            />
+          </div>
+        ))
       )}
     </div>
   );
@@ -1022,127 +1071,6 @@ interface StockCat {
   hot: boolean;
 }
 
-/** The Stock card's category split (KPI rev 10): one row per core category —
- *  label · N/M ready · that category's supplier status · its own PO-led
- *  Chase. Multiple suppliers → "Chase (N)" pops a per-supplier list
- *  (overdue on top). */
-function StockCategoryRow({
-  c,
-  onChase,
-}: {
-  c: StockCat;
-  onChase: (g: ChaseGroup, tone: "reminder" | "chase") => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const chaseBtn = `btn-chase ${c.hot ? "btn-chase-hot" : ""}`;
-  return (
-    <div className="relative flex items-center gap-2 min-h-9 min-w-0">
-      <span className="text-[13px] font-medium text-base-900 shrink-0 w-[72px]">
-        {c.label}
-      </span>
-      <span
-        className={`text-[12px] font-semibold t-num shrink-0 ${
-          c.allReady ? "text-success" : c.hot ? "text-danger" : "text-warning"
-        }`}
-        title={`${c.ready} of ${c.total} line${c.total === 1 ? "" : "s"} ready`}
-      >
-        {c.ready}/{c.total}
-      </span>
-      {!c.allReady && (
-        <span
-          className={`text-[12px] truncate min-w-0 ${
-            c.hot ? "text-danger font-medium" : "text-base-500"
-          }`}
-          title={c.status}
-        >
-          {c.status}
-        </span>
-      )}
-      <span className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
-        {c.allReady && (
-          <span className="text-[12px] font-semibold text-success whitespace-nowrap">
-            Ready ✓
-          </span>
-        )}
-        {c.groups.length === 1 && !c.allReady && (
-          <button
-            type="button"
-            className={chaseBtn}
-            onClick={() => onChase(c.groups[0], "chase")}
-            title={`Chase ${c.groups[0].label} — PO ${c.groups[0].poNo} (copies the WhatsApp template + logs it)`}
-          >
-            <MessageCircle size={14} aria-hidden="true" />
-            Chase
-          </button>
-        )}
-        {c.groups.length > 1 && (
-          <button
-            type="button"
-            className={chaseBtn}
-            onClick={() => setOpen((v) => !v)}
-            title="Multiple suppliers — pick who to chase (PO-led)"
-          >
-            <MessageCircle size={14} aria-hidden="true" />
-            Chase ({c.groups.length})
-          </button>
-        )}
-      </span>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          {/* Per-supplier chase popover — PO-led, overdue on top + red. */}
-          <div
-            className="absolute right-0 top-full mt-1 w-64 z-20 bg-white border border-base-200 rounded-[8px] shadow-lg p-2 space-y-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {c.groups.map((g) => (
-              <div key={g.key} className="flex items-center gap-2 min-h-9 px-1">
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={`block text-[13px] font-medium truncate ${
-                      g.overdue ? "text-danger" : "text-base-900"
-                    }`}
-                  >
-                    {g.label}
-                  </span>
-                  <span className="block text-[12px] text-base-500 font-mono truncate">
-                    {g.poNo}
-                    {g.eta
-                      ? ` · ETA ${fmtDate(g.eta).split(",")[0]}${g.overdue ? " — over" : ""}`
-                      : " · no ETA"}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className={`btn-chase ${g.overdue ? "btn-chase-hot" : ""}`}
-                  onClick={() => {
-                    onChase(g, "chase");
-                    setOpen(false);
-                  }}
-                  title={`Chase ${g.label} — ${g.poNo}`}
-                >
-                  <MessageCircle size={14} aria-hidden="true" />
-                  Chase
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn-chase w-full justify-center"
-              onClick={() => {
-                for (const g of c.groups) onChase(g, "chase");
-                setOpen(false);
-              }}
-              title="One chase per supplier — copies each template + logs each"
-            >
-              Chase all
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 
 function DrawerBody({
@@ -1649,11 +1577,9 @@ function DrawerBody({
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
 
-  // ═══ KPI boxes = the 3 mission tracks (UI-KIT §7.2, thresholds §5.2) ═══
-  // The boxes ARE the action surface now (the standalone Next row is gone):
-  // each reads the same signals (balance gate, shared lineReadiness, delivery
-  // fields) and carries its own chase action(s) when red/actionable.
-  type KpiTone = "success" | "warning" | "danger" | "neutral";
+  // ═══ KPI tracks = the 3 mission tracks (MASTER SPEC §7, A2) ═══
+  // Three full-width progress lines; the tones colour each track's CURRENT
+  // node. Chasing lives in the left-rail Chase Now panel.
   // CUSTOMER · money — green paid/0 · amber owing pre-last-call · red owing past
   // the collect gate (the same balanceGate the Balance card shows).
   const moneyTone: KpiTone = !totalSet
@@ -1706,94 +1632,13 @@ function DrawerBody({
       return !v;
     });
 
-  // ═══ Party CHECKLISTS (Jess 2026-07-17 rev 4) — stage rows with the
-  // action ON the stuck stage. Chase buttons = the locked WhatsApp templates.
+  // ═══ Track signals (A2) — shared by the stage arrays + Chase Now. ═══
   const deliveredDone = pipelineStatus === "completed";
-  const placedDate = order.placed_at ? fmtDate(order.placed_at).split(",")[0] : undefined;
   const paidDone = totalSet && moneyOutstanding <= 0;
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
-
-  // ═══ STATUS-STANDARD dials + the supplier chase popover data ═══
   const stockDelayed =
     readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
-
-  const moneyRows: CheckItem[] = [
-    { label: "Placed", state: "done", meta: placedDate },
-    { label: "Confirmed", state: customerConfirmed || deliveredDone ? "done" : "todo" },
-    paidDone
-      ? {
-          label: "Paid",
-          state: "done",
-        }
-      : balanceOwing
-        ? {
-            label: "Paid",
-            state: "bad",
-            meta: `${RM(moneyOutstanding)} due`,
-              action: (
-              <button
-                type="button"
-                className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
-                onClick={() => setAddingPayment(true)}
-                title="Record a payment against this order"
-              >
-                Record
-              </button>
-            ),
-          }
-        : totalSet
-          ? {
-              label: "Paid",
-              state: collected > 0 ? "part" : "todo",
-                }
-          : {
-              label: "Paid",
-              state: "none",
-                  action: (
-                <button
-                  type="button"
-                  className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
-                  onClick={() => setAddingPayment(true)}
-                  title="Record a payment / set the total"
-                >
-                  Record
-                </button>
-              ),
-            },
-  ];
-  const logisticRows: CheckItem[] = [
-    assignedLogisticName
-      ? { label: "Assigned", state: "done", meta: assignedLogisticName }
-      : {
-          label: "Assigned",
-          state: "bad",
-          meta: "no partner",
-          action: (
-            <Btn size="sm" onClick={() => setTab("delivery")} title="Assign a logistic partner (Delivery tab)">
-              Assign
-            </Btn>
-          ),
-        },
-    bookedEta
-      ? { label: "Booked", state: "done", meta: fmtDate(bookedEta).split(",")[0] }
-      : overDeadline
-        ? {
-            label: "Booked",
-            state: "late",
-            meta: "deadline over",
-          }
-        : {
-            label: "Booked",
-            state: "todo",
-            action: assignedLogisticName ? (
-              <Btn size="sm" onClick={() => setTab("delivery")} title="Enter the booked delivery date (Delivery tab)">
-                Book
-              </Btn>
-            ) : undefined,
-          },
-    { label: "Delivered", state: deliveredDone ? "done" : "todo" },
-  ];
 
   // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
   // N/M ready + that category's supplier status + its OWN PO-led chase.
@@ -1896,7 +1741,170 @@ function DrawerBody({
           : daysToDelivery <= 3
             ? "warning"
             : "success";
-  // Sub-facts per box — side by side when a party carries more than one (§7.2).
+
+  // ═══ A2 stage arrays (MASTER SPEC §7/§8) — stage words per §8, sequential:
+  // the CURRENT node is the first not-done stage; clock = time-overdue. ═══
+  const confirmedDone = customerConfirmed || deliveredDone;
+  const balanceStages: TrackStage[] = [
+    { word: "Placed", state: "done" },
+    { word: "Confirmed", state: confirmedDone ? "done" : "current" },
+    {
+      word: "Paid",
+      state: paidDone ? "done" : confirmedDone ? "current" : "pending",
+    },
+  ];
+  // Chase groups merged ACROSS categories by PO (a PO spanning two categories
+  // is one counterparty) — un-ready categories only.
+  const chaseByPo = new Map<string, ChaseGroup>();
+  for (const c of stockCats) {
+    if (c.allReady) continue;
+    for (const g of c.groups) {
+      const prev = chaseByPo.get(g.key);
+      if (prev) {
+        prev.lines = [...prev.lines, ...g.lines];
+        if (g.eta && (!prev.eta || g.eta < prev.eta)) prev.eta = g.eta;
+        prev.overdue = prev.overdue || g.overdue;
+      } else {
+        chaseByPo.set(g.key, { ...g, lines: [...g.lines] });
+      }
+    }
+  }
+  const chaseGroups = [...chaseByPo.values()];
+  const stockAllReady = goodsN > 0 && readyN === goodsN;
+  // "PO raised" = every un-reserved line is covered by a PO; "ETA set" =
+  // every open PO carries an ETA (vacuously true for in-stock goods that
+  // just await reserving — the current stage then reads "Goods ready").
+  const poRaisedDone = stockAllReady || (goodsN > 0 && nopoN === 0);
+  const etaSetDone =
+    stockAllReady || (poRaisedDone && chaseGroups.every((g) => g.eta));
+  const stockStages: TrackStage[] =
+    deliveredDone
+      ? /* Delivered = closed — the goods went out; nothing left to shout
+           (pre-golive guardrail #2: no red on delivered orders). */
+        [
+          { word: "PO raised", state: "done" },
+          { word: "ETA set", state: "done" },
+          { word: "Goods ready", state: "done" },
+        ]
+      : goodsN === 0
+      ? [
+          { word: "PO raised", state: "pending" },
+          { word: "ETA set", state: "pending" },
+          { word: "Goods ready", state: "pending" },
+        ]
+      : [
+          { word: "PO raised", state: poRaisedDone ? "done" : "current" },
+          {
+            word: "ETA set",
+            state: etaSetDone ? "done" : poRaisedDone ? "current" : "pending",
+          },
+          {
+            word: "Goods ready",
+            state: stockAllReady ? "done" : etaSetDone ? "current" : "pending",
+            clock: stockDelayed,
+          },
+        ];
+  const deliveryStages: TrackStage[] = [
+    {
+      word: "Assigned",
+      state: assignedLogisticName || deliveredDone ? "done" : "current",
+    },
+    {
+      word: "Booked",
+      state:
+        bookedEta || deliveredDone
+          ? "done"
+          : assignedLogisticName
+            ? "current"
+            : "pending",
+      clock: overDeadline,
+    },
+    {
+      word: "Delivered",
+      state: deliveredDone ? "done" : bookedEta ? "current" : "pending",
+      clock: overDeadline,
+    },
+  ];
+
+  // ═══ Track summaries (§7) — one short line under each headline. ═══
+  // Balance: the storage fee joins the readout while it accrues.
+  const storageBit = storageOwing
+    ? storageCharge > 0
+      ? `+ ${RM(storageCharge)} storage`
+      : "+ storage accruing"
+    : null;
+  const balanceSummary = storageBit
+    ? balanceOwing
+      ? `${RM(moneyOutstanding)} ${storageBit}`
+      : storageBit
+    : undefined;
+  // Stock: per-category mini badges — [MS 0/8][BF 0/4][ACC ✓].
+  const CAT_CODE = { mattress: "MS", bedframe: "BF", sofa: "SOF", acc: "ACC" } as const;
+  const stockSummary =
+    stockCats.length > 0 ? (
+      <>
+        {stockCats.map((c) => (
+          <MiniBadge
+            key={c.cat}
+            tone={
+              deliveredDone || c.allReady ? "ready" : c.hot ? "nopo" : "waiting"
+            }
+          >
+            {CAT_CODE[c.cat]}{" "}
+            {deliveredDone || c.allReady ? "✓" : `${c.ready}/${c.total}`}
+          </MiniBadge>
+        ))}
+      </>
+    ) : undefined;
+  // Delivery: partner + booked state (the headline already holds the deadline).
+  const deliverySummary = deliveredDone
+    ? (chasePartnerName ?? "Delivered")
+    : `${chasePartnerName ?? "No partner"} · ${
+        bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"
+      }`;
+
+  // ═══ Chase Now rows (§7, B2) — one per counterparty; overdue on top.
+  // A delivered order is CLOSED: no supplier/logistic chasing remains — only
+  // an owing customer survives delivery. ═══
+  const chaseRows: ChaseNowRow[] = deliveredDone
+    ? []
+    : chaseGroups.map((g) => {
+        const etaBit = g.eta
+          ? `ETA ${fmtDate(g.eta).split(",")[0]}${g.overdue ? " — over" : ""}`
+          : "no ETA";
+        return {
+          key: `sup-${g.key}`,
+          label: g.label,
+          // An AutoCount PO has no supplier name → the label IS the PO
+          // number; don't repeat it on the sub line.
+          sub: g.label === g.poNo ? etaBit : `${g.poNo} · ${etaBit}`,
+          urgency: g.overdue ? ("overdue" as const) : ("attention" as const),
+          onAct: (tone: "reminder" | "chase") => copySupplierChaseFor(g, tone),
+        };
+      });
+  if (chasePartnerName && !deliveredDone && (!bookedEta || overDeadline)) {
+    chaseRows.push({
+      key: "logistic",
+      label: chasePartnerName,
+      sub: bookedEta
+        ? `booked ${fmtDate(bookedEta).split(",")[0]} — over`
+        : `not booked · due ${deadlineLabel}`,
+      urgency: overDeadline ? "overdue" : "attention",
+      onAct: (tone) => copyChase("logistic", tone),
+    });
+  }
+  if (balanceOwing) {
+    chaseRows.push({
+      key: "customer",
+      label: order.customer_name ? titleCaseName(order.customer_name) : "Customer",
+      sub: `${RM(moneyOutstanding)} outstanding`,
+      urgency: balanceGate === "hold" ? "overdue" : "attention",
+      onAct: (tone) => copyChase("customer", tone),
+    });
+  }
+  chaseRows.sort(
+    (a, b) => Number(b.urgency === "overdue") - Number(a.urgency === "overdue"),
+  );
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -2069,6 +2077,10 @@ function DrawerBody({
             }
             collapsed={railCollapsed}
           />
+          {/* Chase Now (MASTER SPEC §7) — a PANEL (not a tab) between the
+              Customer block and the tab rail; hides with the collapsed rail
+              (the tab dots still carry the alerts). */}
+          {!railCollapsed && <ChaseNowPanel rows={chaseRows} />}
           <nav
           className={"flex-1 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar"}
           aria-label="Order sections"
@@ -2079,9 +2091,17 @@ function DrawerBody({
                 key: "items",
                 label: "Items",
                 icon: Package,
-                dot: stockTone === "danger",
-                count: goodsN - readyN > 0 ? String(goodsN - readyN) : undefined,
-                alertText: stockTone === "danger" ? "needs stock" : undefined,
+                /* Delivered = closed — no red dot / needs-stock count on a
+                   finished order (pre-golive guardrail #2). */
+                dot: !deliveredDone && stockTone === "danger",
+                count:
+                  !deliveredDone && goodsN - readyN > 0
+                    ? String(goodsN - readyN)
+                    : undefined,
+                alertText:
+                  !deliveredDone && stockTone === "danger"
+                    ? "needs stock"
+                    : undefined,
               },
               {
                 key: "delivery",
@@ -2181,25 +2201,19 @@ function DrawerBody({
           </button>
         </nav>
         </div>
-        {/* RIGHT — KPI track boxes pinned + the tab content below. */}
+        {/* RIGHT — A2 progress tracks pinned + the tab content below. */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-        {/* Equal-height track row — every card fills the tallest. */}
-        <div
-          className="shrink-0 grid items-stretch gap-2.5"
-          style={{
-            /* Labels never truncate: Balance/Delivery keep ≥200px; Stock is
-               the one that flexes wider (≥300px, 1.8 share of the extra). */
-            gridTemplateColumns:
-              "minmax(240px,1fr) minmax(300px,1.8fr) minmax(240px,1fr)",
-          }}
-        >
-          <PartyCard
+        {/* ═══ A2 PROGRESS TRACKS (MASTER SPEC §7, 2026-07-18) — the three
+            KPI boxes became three FULL-WIDTH progress lines: numbered nodes
+            + stage words + right headline (dial beside the value, §8) + a
+            short summary. All chasing lives in the left-rail Chase Now
+            panel; clicking a track opens its tab. */}
+        <div className="shrink-0 flex flex-col gap-2.5">
+          <ProgressTrack
             label="Balance"
-            media={
-              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                <Wallet size={16} strokeWidth={2} aria-hidden="true" />
-              </span>
-            }
+            icon={Wallet}
+            stages={balanceStages}
+            tone={moneyTone}
             value={
               /* §8 — the payment dial sits BESIDE the headline value. */
               <span className="inline-flex items-center gap-1.5">
@@ -2215,121 +2229,58 @@ function DrawerBody({
                 )}
               </span>
             }
-            rows={moneyRows}
+            summary={balanceSummary}
             onOpen={() => setTab("balance")}
-            /* Nothing owing (paid / no total) → nothing to chase: the pair
-               hides entirely (Jess 2026-07-18). */
-            footer={
-              balanceOwing ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn-reminder"
-                    onClick={() => copyChase("customer", "reminder")}
-                    title="Copy the gentle customer reminder (WhatsApp) + log it"
-                  >
-                    <Bell size={14} aria-hidden="true" />
-                    Reminder
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
-                    onClick={() => copyChase("customer", "chase")}
-                    title="Copy the firmer customer chase (WhatsApp) + log it"
-                  >
-                    <MessageCircle size={14} aria-hidden="true" />
-                    Chase
-                  </button>
-                </>
-              ) : undefined
-            }
           />
-          <div className="relative min-w-0">
-            <PartyCard
-              label="Stock"
-              media={
-                <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                  <Package size={16} strokeWidth={2} aria-hidden="true" />
-                </span>
-              }
-              value={
-                /* §8 — the stock dial sits BESIDE the headline value (the
-                   card body is category rows; there is no stage list). */
-                <span className="inline-flex items-center gap-1.5">
-                  <PieDial
-                    px={20}
-                    fraction={goodsN === 0 ? 0 : readyN / goodsN}
-                    state={
-                      goodsN === 0
+          <ProgressTrack
+            label="Stock"
+            icon={Package}
+            stages={stockStages}
+            tone={stockTone}
+            value={
+              /* §8 — the stock dial sits BESIDE the headline value. A
+                 delivered order reads green "Delivered" (guardrail #2). */
+              <span className="inline-flex items-center gap-1.5">
+                <PieDial
+                  px={20}
+                  fraction={
+                    deliveredDone ? 1 : goodsN === 0 ? 0 : readyN / goodsN
+                  }
+                  state={
+                    deliveredDone
+                      ? "green"
+                      : goodsN === 0
                         ? "gray"
                         : readyN === goodsN
                           ? "green"
                           : stockDelayed
                             ? "red"
                             : "amber"
-                    }
-                  />
-                  {goodsN === 0 ? (
-                    <span className="text-base-400 font-semibold">—</span>
-                  ) : readyN === goodsN ? (
-                    <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
-                  ) : stockDelayed ? (
-                    <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
-                  ) : (
-                    <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
-                  )}
-                </span>
-              }
-              rows={[]}
-              onOpen={() => setTab("items")}
-              extra={
-                /* Option A (2026-07-18) — the category rows ARE the body: one
-                   per category present (incl. Accessory): label · N/M ·
-                   supplier + status (or "Ready ✓") · PO-led Chase
-                   (multi-supplier → "Chase (N)" popover, overdue on top). */
-                stockCats.length > 0 ? (
-                  <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
-                    {stockCats.map((c) => (
-                      <StockCategoryRow
-                        key={c.cat}
-                        c={c}
-                        onChase={copySupplierChaseFor}
-                      />
-                    ))}
-                  </div>
+                  }
+                />
+                {deliveredDone ? (
+                  <span className="text-success">Delivered</span>
+                ) : goodsN === 0 ? (
+                  <span className="text-base-400 font-semibold">—</span>
+                ) : readyN === goodsN ? (
+                  <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
+                ) : stockDelayed ? (
+                  <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
                 ) : (
-                  <div className="text-[12px] text-base-400 min-h-9 flex items-center">
-                    No goods lines.
-                  </div>
-                )
-              }
-              footer={
-                /* The category rows own Chase now — the footer keeps only the
-                   gentle generic Reminder (hidden once everything is ready). */
-                readyN < goodsN ? (
-                  <button
-                    type="button"
-                    className="btn-reminder"
-                    onClick={() => copyChase("supplier", "reminder")}
-                    title="Copy the gentle supplier reminder (WhatsApp) + log it"
-                  >
-                    <Bell size={14} aria-hidden="true" />
-                    Reminder
-                  </button>
-                ) : undefined
-              }
-            />
-          </div>
-          <PartyCard
-            label="Delivery"
-            media={
-              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-                <Truck size={16} strokeWidth={2} aria-hidden="true" />
+                  <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
+                )}
               </span>
             }
+            summary={stockSummary}
+            onOpen={() => setTab("items")}
+          />
+          <ProgressTrack
+            label="Delivery"
+            icon={Truck}
+            stages={deliveryStages}
+            tone={logisticTone}
             value={
-              /* §7 — the RED colour IS the overdue signal (no " · over"
-                 suffix; it overflowed the 240px box at MacBook width). */
+              /* The RED colour IS the overdue signal (no " · over" suffix). */
               <span
                 className={overDeadline && !deliveredDone ? "text-danger" : undefined}
                 title={overDeadline && !deliveredDone ? "Deadline passed" : undefined}
@@ -2337,30 +2288,8 @@ function DrawerBody({
                 {deadlineLabel}
               </span>
             }
-            rows={logisticRows}
+            summary={deliverySummary}
             onOpen={() => setTab("delivery")}
-            footer={
-              <>
-                <button
-                  type="button"
-                  className="btn-reminder"
-                  onClick={() => copyChase("logistic", "reminder")}
-                  title="Copy the gentle logistic reminder (WhatsApp) + log it"
-                >
-                  <Bell size={14} aria-hidden="true" />
-                  Reminder
-                </button>
-                <button
-                  type="button"
-                  className={`btn-chase ${overDeadline && !deliveredDone ? "btn-chase-hot" : ""}`}
-                  onClick={() => copyChase("logistic", "chase")}
-                  title="Copy the firmer logistic chase (WhatsApp) + log it"
-                >
-                  <MessageCircle size={14} aria-hidden="true" />
-                  Chase
-                </button>
-              </>
-            }
           />
         </div>
 <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
