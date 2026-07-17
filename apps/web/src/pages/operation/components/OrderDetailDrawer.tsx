@@ -707,26 +707,46 @@ type CheckItem = {
   /** Inline action rendered ON the stage that needs it (Raise PO / Chase /
    *  Book / Record payment) — the button lives where the work is stuck. */
   action?: ReactNode;
+  /** STATUS dial rendered IN PLACE of the check mark — lives on the stage it
+   *  measures (Balance→Paid · Stock→Goods ready), never on the card header. */
+  dial?: ReactNode;
 };
 
 /** PieDial (STATUS-STANDARD §1) — a 30px donut whose fill fraction + colour
  *  ARE the state (Balance: collected÷total · Stock: ready÷goods). SVG strokes
  *  currentColor so the tone is a text-* class — no bespoke hex. */
-function PieDial({ fraction, tone }: { fraction: number; tone: string }) {
-  const r = 9;
+function PieDial({
+  fraction,
+  tone,
+  px = 30,
+}: {
+  fraction: number;
+  tone: string;
+  /** Rendered box in px — 20 = inline on a checklist stage row. (Named `px`,
+   *  not `size`: RULE C reserves `size={N}` for Lucide icons.) */
+  px?: number;
+}) {
+  const size = px;
+  const r = size * 0.3;
+  const mid = size / 2;
+  const sw = size / 5;
   const c = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
   return (
-    <span className={`size-[30px] grid place-items-center shrink-0 ${tone}`} aria-hidden="true">
-      <svg width="30" height="30" viewBox="0 0 30 30" className="-rotate-90">
-        <circle cx="15" cy="15" r={r} fill="none" strokeWidth="6" className="stroke-base-200" />
+    <span
+      className={`grid place-items-center shrink-0 ${tone}`}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={mid} cy={mid} r={r} fill="none" strokeWidth={sw} className="stroke-base-200" />
         {f > 0 && (
           <circle
-            cx="15"
-            cy="15"
+            cx={mid}
+            cy={mid}
             r={r}
             fill="none"
-            strokeWidth="6"
+            strokeWidth={sw}
             stroke="currentColor"
             strokeDasharray={`${c * f} ${c}`}
           />
@@ -819,7 +839,7 @@ function PartyCard({
       <div className="min-w-0">
         {rows.map((r) => (
           <div key={r.label} className="flex items-center gap-2 min-w-0 min-h-8">
-            <CheckMark state={r.state} />
+            {r.dial ?? <CheckMark state={r.state} />}
             <span
               className={`text-[13px] truncate ${
                 r.state === "none"
@@ -1374,16 +1394,40 @@ function DrawerBody({
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
 
+  // ═══ STATUS-STANDARD dials + the supplier chase popover data ═══
+  const balFraction = paidDone ? 1 : totalSet && orderTotal > 0 ? collected / orderTotal : 0;
+  const balTone = paidDone
+    ? "text-success"
+    : balanceOwing && overDeadline
+      ? "text-danger"
+      : "text-info";
+  const stockFraction = goodsN === 0 ? 0 : readyN / goodsN;
+  const stockDelayed =
+    readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
+  const stockTone2 =
+    goodsN === 0
+      ? "text-base-300"
+      : readyN === goodsN
+        ? "text-success"
+        : stockDelayed
+          ? "text-danger"
+          : "text-warning";
+
   const moneyRows: CheckItem[] = [
     { label: "Placed", state: "done", meta: placedDate },
     { label: "Confirmed", state: customerConfirmed || deliveredDone ? "done" : "todo" },
     paidDone
-      ? { label: "Paid", state: "done" }
+      ? {
+          label: "Paid",
+          state: "done",
+          dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
+        }
       : balanceOwing
         ? {
             label: "Paid",
             state: "bad",
             meta: `${RM(moneyOutstanding)} due`,
+            dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
             action: (
               <button
                 type="button"
@@ -1396,11 +1440,16 @@ function DrawerBody({
             ),
           }
         : totalSet
-          ? { label: "Paid", state: collected > 0 ? "part" : "todo" }
+          ? {
+              label: "Paid",
+              state: collected > 0 ? "part" : "todo",
+              dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
+            }
           : {
               label: "Paid",
               state: "none",
               meta: "no total",
+              dial: <PieDial px={20} fraction={balFraction} tone={balTone} />,
               action: (
                 <button
                   type="button"
@@ -1435,11 +1484,17 @@ function DrawerBody({
     goodsN === 0
       ? { label: "Goods ready", state: "none" }
       : readyN === goodsN
-        ? { label: "Goods ready", state: "done", meta: `${readyN}/${goodsN}` }
+        ? {
+            label: "Goods ready",
+            state: "done",
+            meta: `${readyN}/${goodsN}`,
+            dial: <PieDial px={20} fraction={stockFraction} tone={stockTone2} />,
+          }
         : {
             label: "Goods ready",
             state: readyN > 0 ? "part" : "todo",
             meta: `${readyN}/${goodsN}`,
+            dial: <PieDial px={20} fraction={stockFraction} tone={stockTone2} />,
           },
   ];
   const logisticRows: CheckItem[] = [
@@ -1475,24 +1530,6 @@ function DrawerBody({
     { label: "Delivered", state: deliveredDone ? "done" : "todo" },
   ];
 
-  // ═══ STATUS-STANDARD dials + the supplier chase popover data ═══
-  const balFraction = paidDone ? 1 : totalSet && orderTotal > 0 ? collected / orderTotal : 0;
-  const balTone = paidDone
-    ? "text-success"
-    : balanceOwing && overDeadline
-      ? "text-danger"
-      : "text-info";
-  const stockFraction = goodsN === 0 ? 0 : readyN / goodsN;
-  const stockDelayed =
-    readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
-  const stockTone2 =
-    goodsN === 0
-      ? "text-base-300"
-      : readyN === goodsN
-        ? "text-success"
-        : stockDelayed
-          ? "text-danger"
-          : "text-warning";
   // Open POs grouped by supplier — feeds Chase (N) + its popover.
   const openPos = pos.filter((p) => p.status !== "received");
   const posBySupplier = new Map<string, typeof pos>();
@@ -1667,7 +1704,9 @@ function DrawerBody({
             MONEY / STOCK / LOGISTIC checklist tracks. Category icon = 38px
             tinted circle; headline value right; the stuck stage carries its
             action inline. */}
-        <div className="shrink-0 grid grid-cols-4 gap-2.5">
+        {/* Equal-height stat row (Jess): grid stretch — every card fills the
+            tallest; inner content scrolls/keeps its own rhythm. */}
+        <div className="shrink-0 grid grid-cols-4 items-stretch gap-2.5">
           <CustomerIdentityCard
             order={order}
             regionLabel={loc.label ?? null}
@@ -1681,7 +1720,11 @@ function DrawerBody({
           />
           <PartyCard
             label="Balance"
-            media={<PieDial fraction={balFraction} tone={balTone} />}
+            media={
+              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                <Wallet size={16} strokeWidth={2} aria-hidden="true" />
+              </span>
+            }
             value={
               paidDone ? (
                 <span className="text-success">Paid</span>
@@ -1721,7 +1764,11 @@ function DrawerBody({
           <div className="relative min-w-0">
             <PartyCard
               label="Stock"
-              media={<PieDial fraction={stockFraction} tone={stockTone2} />}
+              media={
+                <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                  <Package size={16} strokeWidth={2} aria-hidden="true" />
+                </span>
+              }
               value={
                 goodsN === 0 ? (
                   <span className="text-base-400 font-semibold">—</span>
@@ -1972,11 +2019,17 @@ function DrawerBody({
         </nav>
         <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
-          {/* Items LEFT | Warehouse RIGHT (Jess 2026-07-17) — the reserve
-              workflow reads ACROSS: pick a line on the left, reserve its stock
-              beside it. Stacks below xl so laptops don't crush the tables.
-              Each panel stays its OWN white card (v4 §10 split). */}
-          <div className="grid gap-3 items-start xl:grid-cols-2">
+          {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
+              picking a line slides the Warehouse card in from the right at a
+              fixed 56/44 split — NO responsive reflow, the layout is identical
+              on the office 1920 screens and a laptop. */}
+          <div
+            className={
+              pickerOpen
+                ? "grid grid-cols-[56fr_44fr] gap-3 items-start"
+                : "grid grid-cols-1 gap-3 items-start"
+            }
+          >
           <SectionCard className="shrink-0">
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
@@ -3196,7 +3249,7 @@ function CustomerIdentityCard({
   const field =
     "mt-0.5 w-full px-2 py-1 border border-base-200 rounded-[6px] text-[13px] bg-white outline-none focus:border-primary";
   return (
-    <div className="kpi-box">
+    <div className="kpi-box relative">
       <div className="flex items-start gap-2 min-w-0">
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -3286,13 +3339,20 @@ function CustomerIdentityCard({
           )}
         </div>
       ) : (
-        <div className="mt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+        /* Edit expands WITHIN its own card as a floating overlay (Jess: never
+           push the sibling panels — the stat row keeps one equal height). */
+        <div
+          className="absolute left-1 right-1 top-12 z-20 bg-white border border-base-200 rounded-[10px] shadow-lg p-2.5 space-y-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" aria-label="Customer name" />
           <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" aria-label="Customer phone" />
           <input className={field} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" aria-label="Customer address" />
-          <div className="text-[12px] text-warning leading-snug">
-            改的是客户档案，影响这客户所有单 (edits the customer record,
-            affects all their orders)
+          {/* Data-honest (no customer master table exists — each order keeps
+              its own copy): this edit changes THIS ORDER ONLY. */}
+          <div className="text-[12px] text-base-500 leading-snug">
+            只改这张单的客户资料 (updates this order only — other orders keep
+            their own copy)
           </div>
           {err && <div className="text-[12px] text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">
