@@ -28,8 +28,8 @@
  *
  *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 18}. (kit scope)
  *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {12 label, 13 btn/ref,
- *     14 secondary, 15 content, 16 stat-card value, 20 hero number}. Headings
- *     use `.t-*`. (kit scope)
+ *     14 secondary, 15 content, 18 stat-card money hero, 20 page hero}.
+ *     Headings use `.t-*`. (kit scope)
  *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
  *     index.css. (all web src)
  *   RULE F — row heights: `h-[Npx]` with N ≠ 44 — rows are 44px FIXED (`h-11`);
@@ -154,7 +154,7 @@ const KIT_FILES = new Set([
   "apps/web/src/pages/operation/components/OrderControlPanel.tsx",
 ]);
 const ICON_SIZES = new Set([14, 16, 18]); // v4: 14 pill/inline · 16 default UI · 18 top-bar
-const TEXT_SIZES = new Set([12, 13, 14, 15, 16, 20]); // v4: 12 label · 13 btn/ref · 14 secondary · 15 content · 16 stat-card value · 20 hero number
+const TEXT_SIZES = new Set([12, 13, 14, 15, 18, 20]); // v4: 12 label · 13 btn/ref · 14 secondary · 15 content · 18 stat-card money hero · 20 page hero
 // A `section-band` class inside a className attribute (comments don't count).
 const BAND_CLASS_RE = /className=\{?["'`][^"'\n]*\bsection-band\b/g;
 
@@ -209,7 +209,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
         errors.push(
-          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 12/13/14/15 (+16 stat value, 20 hero) — headings via .t-* (docs/UI-KIT.md §A3).`,
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 12/13/14/15 (+18 stat hero, 20 page hero) — headings via .t-* (docs/UI-KIT.md §A3).`,
         );
       }
     }

@@ -92,7 +92,7 @@ interface Props {
 // Age (days in) · PO · a per-row Reserve action. One grid for both the
 // same-model view and the loan view (the Item column shows the model either
 // way; old-ref stays searchable but is no longer a column).
-const GRID = "26px minmax(120px,1.5fr) 58px 90px 84px 50px 90px 72px";
+const GRID = "26px minmax(200px,2.2fr) 58px 90px 84px 50px 90px 72px"; // Item widened (Jess rev 6 — no truncation)
 const COL_LABELS = ["Item", "Size", "Location", "Cond", "Age", "PO", ""];
 
 /** `bare` wrapper — a plain section stack slot (band + body) inside the

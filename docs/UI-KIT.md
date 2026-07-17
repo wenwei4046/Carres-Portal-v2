@@ -107,7 +107,7 @@ Kit-governed surfaces allow exactly these inline sizes (lint RULE D):
 | `text-[14px]` | secondary info / drawer body |
 | `text-[13px]` | buttons (via `.btn-*`) / row REF (bold) |
 | `text-[12px]` | labels, table headers (uppercase, muted), sub-facts |
-| `text-[16px]` bold | stat-card headline value (Money / Stock / Logistic cards — Jess 2026-07-17) |
+| `text-[18px]` bold | stat-card headline value (Balance / Stock / Logistic cards — money 18 hero / 13 row) |
 | `text-[20px]` bold | THE hero number — Outstanding in the Balance tab |
 
 Everything else uses a `.t4-*` class (`.t4-page-title` 24 · `.t4-hero-num` 20
@@ -170,8 +170,14 @@ Every clickable action sits on ONE of four rungs — never invent a fifth look.
 - Legacy `.btn-*` classes (grey `.btn-primary`/`.btn-soft`, white
   `.btn-secondary`, `.btn-ghost`, red-on-white `.btn-danger`, `.icon-btn`)
   remain for old pages — migrate to `Btn` on touch.
-- Chase pair = `Btn box` **bell** Reminder + `Btn box` **message-circle**
-  Chase (the page's one flame stays + Add payment).
+- Chase pair (STATUS-STANDARD §3, 2026-07-17): `.btn-reminder` (grey outline
+  + bell, gentle) · `.btn-chase` (WhatsApp-GREEN outline + message-circle,
+  firm; `.btn-chase-hot` light-green fill when the track is overdue). Both
+  copy the locked WhatsApp template + stamp the chase log. Panels carry NO
+  flame; black paints only the `#so` badge.
+- Status rendering (dials + checklist marks + rail states) is specified in
+  [`docs/STATUS-STANDARD.md`](STATUS-STANDARD.md) — the one detail companion
+  to this file.
 
 ## A6. Status pills — icon + word (v4)
 

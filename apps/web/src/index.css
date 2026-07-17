@@ -293,6 +293,30 @@
   .pill-warning   { background:#FAEEDA; color:#854F0B; } /* waiting / chasing — amber (v4 §6) */
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 
+  /* STATUS-STANDARD (2026-07-17, Jess): the WhatsApp chase pair + rail-tab
+   * blue. Green = the WhatsApp association (glyph stays message-circle, never
+   * the brand mark); flame stays the page hero only. */
+  .btn-reminder {
+    @apply inline-flex items-center justify-center gap-1.5
+           bg-white text-base-700 border border-base-300
+           px-2.5 py-1 rounded-md text-[12px] font-semibold
+           transition-colors hover:border-base-400
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-chase {
+    @apply inline-flex items-center justify-center gap-1.5
+           bg-white px-2.5 py-1 rounded-md text-[12px] font-semibold
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+    color: #0f6e56;
+    border: 1px solid #1d9e75;
+  }
+  .btn-chase:hover:not(:disabled) { background: #e1f5ee; }
+  .btn-chase-hot { background: #e1f5ee; }
+  .text-chase { color: #0f6e56; } /* WhatsApp-green ink for chase-adjacent chips */
+  /* Vertical tab rail — active + hover read BLUE (selection colour). */
+  .railtab-active { background: #dbeafe; color: #1e40af; }
+  .railtab-idle:hover { background: rgba(219, 234, 254, 0.5); }
+
   /* v4 checkbox — 17px, flame fill + white tick when checked; the `.is-select`
    * variant turns BLUE (blue = selection, used only for row multi-select). */
   .checkbox {

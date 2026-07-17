@@ -709,6 +709,33 @@ type CheckItem = {
   action?: ReactNode;
 };
 
+/** PieDial (STATUS-STANDARD §1) — a 30px donut whose fill fraction + colour
+ *  ARE the state (Balance: collected÷total · Stock: ready÷goods). SVG strokes
+ *  currentColor so the tone is a text-* class — no bespoke hex. */
+function PieDial({ fraction, tone }: { fraction: number; tone: string }) {
+  const r = 9;
+  const c = 2 * Math.PI * r;
+  const f = Math.max(0, Math.min(1, fraction));
+  return (
+    <span className={`size-[30px] grid place-items-center shrink-0 ${tone}`} aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 30 30" className="-rotate-90">
+        <circle cx="15" cy="15" r={r} fill="none" strokeWidth="6" className="stroke-base-200" />
+        {f > 0 && (
+          <circle
+            cx="15"
+            cy="15"
+            r={r}
+            fill="none"
+            strokeWidth="6"
+            stroke="currentColor"
+            strokeDasharray={`${c * f} ${c}`}
+          />
+        )}
+      </svg>
+    </span>
+  );
+}
+
 /** CheckMark — the rounded mark (Jess 2026-07-17 rev 3): a circle so the
  *  state reads as a SHAPE before the text does (v4 §8c). done = green ✓ ·
  *  bad = red ✗ (needs action) · todo = empty ring · none = grey dash. */
@@ -755,24 +782,25 @@ function CheckMark({ state, big }: { state: CheckState; big?: boolean }) {
   );
 }
 
-/** PartyCard v2 (Jess 2026-07-17 rev 4) — a party track: 38px tinted icon
- *  circle + label + HEADLINE value (right), then the stage CHECKLIST — every
- *  row a rounded mark + stage + date/detail, and the stuck stage carries its
- *  action button inline. Click the card body = open its tab. */
+/** PartyCard v3 (Jess 2026-07-17 rev 6): NEUTRAL media (grey icon circle or
+ *  a status DIAL) + label + 18px headline value (right) + stage checklist +
+ *  the Reminder/Chase footer (STATUS-STANDARD §3). Colour lives on values and
+ *  status only — never the icon. Card click = open its tab. */
 function PartyCard({
   label,
-  icon: Icon,
-  tint,
+  media,
   value,
   rows,
+  footer,
   onOpen,
 }: {
   label: string;
-  icon: LucideIcon;
-  /** bg+text tint classes for the icon circle (colour = category signal). */
-  tint: string;
+  /** 30px neutral icon circle OR a PieDial. */
+  media: ReactNode;
   value: ReactNode;
   rows: CheckItem[];
+  /** Reminder + Chase pair (both copy the locked WhatsApp templates). */
+  footer?: ReactNode;
   onOpen?: () => void;
 }) {
   return (
@@ -782,15 +810,11 @@ function PartyCard({
       role={onOpen ? "button" : undefined}
     >
       <div className="flex items-center gap-2 mb-1.5 min-w-0">
-        <span
-          className={`size-[38px] rounded-full grid place-items-center shrink-0 ${tint}`}
-        >
-          <Icon size={18} strokeWidth={2} aria-hidden="true" />
-        </span>
+        {media}
         <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 truncate">
           {label}
         </span>
-        <span className="ml-auto text-[16px] font-bold t-num whitespace-nowrap">{value}</span>
+        <span className="ml-auto text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
       </div>
       <div className="min-w-0">
         {rows.map((r) => (
@@ -825,6 +849,14 @@ function PartyCard({
           </div>
         ))}
       </div>
+      {footer && (
+        <div
+          className="mt-2 flex items-center gap-1.5 [&>*]:flex-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
@@ -853,6 +885,9 @@ function DrawerBody({
   // free units grouped by normalized key, so each line resolves its real
   // available units across the order/warehouse naming drift.
   const [pickerSku, setPickerSku] = useState<string | null>(null);
+  // Option C (Jess 2026-07-17 rev 6): Items takes FULL width; the Warehouse
+  // picker slides in on the RIGHT only when a line's Reserve is clicked.
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Route "Option D" — which item's journey legs are expanded in-place (one at a
   // time; the heavy detail stays inside the drawer so the list never gets busy).
   const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
@@ -1338,10 +1373,6 @@ function DrawerBody({
     pos.some((p) => !!p.eta_date);
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
-  const chaseOutline =
-    "inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-md border border-primary text-primary bg-white hover:bg-primary/5 whitespace-nowrap";
-  const chaseSolid =
-    "inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-md bg-primary text-white hover:bg-signature-700 whitespace-nowrap";
 
   const moneyRows: CheckItem[] = [
     { label: "Placed", state: "done", meta: placedDate },
@@ -1354,9 +1385,14 @@ function DrawerBody({
             state: "bad",
             meta: `${RM(moneyOutstanding)} due`,
             action: (
-              <Btn size="sm" icon={Plus} onClick={() => setAddingPayment(true)} title="Record a payment against this order">
+              <button
+                type="button"
+                className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
+                onClick={() => setAddingPayment(true)}
+                title="Record a payment against this order"
+              >
                 Record
-              </Btn>
+              </button>
             ),
           }
         : totalSet
@@ -1366,9 +1402,14 @@ function DrawerBody({
               state: "none",
               meta: "no total",
               action: (
-                <Btn size="sm" icon={Plus} onClick={() => setAddingPayment(true)} title="Record a payment / set the total">
+                <button
+                  type="button"
+                  className="text-[12px] text-base-600 underline underline-offset-2 hover:text-base-900"
+                  onClick={() => setAddingPayment(true)}
+                  title="Record a payment / set the total"
+                >
                   Record
-                </Btn>
+                </button>
               ),
             },
   ];
@@ -1390,13 +1431,6 @@ function DrawerBody({
     {
       label: "ETA set",
       state: anyEta ? "done" : goodsN > 0 && pos.length > 0 ? "todo" : "none",
-      action:
-        !anyEta && pos.length > 0 && readyN < goodsN ? (
-          <button type="button" className={chaseOutline} onClick={() => copyChase("supplier", "chase")} title="Copy the supplier chase (WhatsApp) + log it">
-            <MessageCircle size={14} aria-hidden="true" />
-            Chase
-          </button>
-        ) : undefined,
     },
     goodsN === 0
       ? { label: "Goods ready", state: "none" }
@@ -1406,13 +1440,6 @@ function DrawerBody({
             label: "Goods ready",
             state: readyN > 0 ? "part" : "todo",
             meta: `${readyN}/${goodsN}`,
-            action:
-              anyEta && pos.length > 0 ? (
-                <button type="button" className={chaseOutline} onClick={() => copyChase("supplier", "chase")} title="Copy the supplier chase (WhatsApp) + log it">
-                  <MessageCircle size={14} aria-hidden="true" />
-                  Chase
-                </button>
-              ) : undefined,
           },
   ];
   const logisticRows: CheckItem[] = [
@@ -1435,12 +1462,6 @@ function DrawerBody({
             label: "Booked",
             state: "bad",
             meta: "deadline over",
-            action: (
-              <button type="button" className={chaseSolid} onClick={() => copyChase("logistic", "chase")} title="Copy the logistic chase (WhatsApp) + log it">
-                <MessageCircle size={14} aria-hidden="true" />
-                Chase
-              </button>
-            ),
           }
         : {
             label: "Booked",
@@ -1453,6 +1474,35 @@ function DrawerBody({
           },
     { label: "Delivered", state: deliveredDone ? "done" : "todo" },
   ];
+
+  // ═══ STATUS-STANDARD dials + the supplier chase popover data ═══
+  const balFraction = paidDone ? 1 : totalSet && orderTotal > 0 ? collected / orderTotal : 0;
+  const balTone = paidDone
+    ? "text-success"
+    : balanceOwing && overDeadline
+      ? "text-danger"
+      : "text-info";
+  const stockFraction = goodsN === 0 ? 0 : readyN / goodsN;
+  const stockDelayed =
+    readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
+  const stockTone2 =
+    goodsN === 0
+      ? "text-base-300"
+      : readyN === goodsN
+        ? "text-success"
+        : stockDelayed
+          ? "text-danger"
+          : "text-warning";
+  // Open POs grouped by supplier — feeds Chase (N) + its popover.
+  const openPos = pos.filter((p) => p.status !== "received");
+  const posBySupplier = new Map<string, typeof pos>();
+  for (const po of openPos) {
+    const arr = posBySupplier.get(po.supplier_id) ?? [];
+    arr.push(po);
+    posBySupplier.set(po.supplier_id, arr);
+  }
+  const supplierCount = posBySupplier.size;
+  const [chasePopover, setChasePopover] = useState(false);
   const logisticTone: KpiTone =
     pipelineStatus === "completed" || bookedEta
       ? "success"
@@ -1530,6 +1580,8 @@ function DrawerBody({
           <ChevronLeft size={16} aria-hidden="true" />
           Orders
         </button>
+        <span className="text-base-300" aria-hidden="true">·</span>
+        <span className="font-mono text-[13px] font-semibold text-base-700">#{order.so}</span>
         <span className="flex-1" />
         {nav && (
           <span className="flex items-center gap-0.5 shrink-0">
@@ -1628,9 +1680,8 @@ function DrawerBody({
             }
           />
           <PartyCard
-            label="Money"
-            icon={Wallet}
-            tint="bg-success-soft text-success"
+            label="Balance"
+            media={<PieDial fraction={balFraction} tone={balTone} />}
             value={
               paidDone ? (
                 <span className="text-success">Paid</span>
@@ -1644,29 +1695,144 @@ function DrawerBody({
             }
             rows={moneyRows}
             onOpen={() => setTab("balance")}
-          />
-          <PartyCard
-            label="Stock"
-            icon={Package}
-            tint="bg-warning-soft text-warning"
-            value={
-              goodsN === 0 ? (
-                <span className="text-base-400 font-semibold">—</span>
-              ) : readyN === goodsN ? (
-                <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
-              ) : nopoN > 0 ? (
-                <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
-              ) : (
-                <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
-              )
+            footer={
+              <>
+                <button
+                  type="button"
+                  className="btn-reminder"
+                  onClick={() => copyChase("customer", "reminder")}
+                  title="Copy the gentle customer reminder (WhatsApp) + log it"
+                >
+                  <Bell size={14} aria-hidden="true" />
+                  Reminder
+                </button>
+                <button
+                  type="button"
+                  className={`btn-chase ${balanceOwing && overDeadline ? "btn-chase-hot" : ""}`}
+                  onClick={() => copyChase("customer", "chase")}
+                  title="Copy the firmer customer chase (WhatsApp) + log it"
+                >
+                  <MessageCircle size={14} aria-hidden="true" />
+                  Chase
+                </button>
+              </>
             }
-            rows={stockRows}
-            onOpen={() => setTab("items")}
           />
+          <div className="relative min-w-0">
+            <PartyCard
+              label="Stock"
+              media={<PieDial fraction={stockFraction} tone={stockTone2} />}
+              value={
+                goodsN === 0 ? (
+                  <span className="text-base-400 font-semibold">—</span>
+                ) : readyN === goodsN ? (
+                  <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
+                ) : stockDelayed ? (
+                  <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
+                ) : (
+                  <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
+                )
+              }
+              rows={stockRows}
+              onOpen={() => setTab("items")}
+              footer={
+                <>
+                  <button
+                    type="button"
+                    className="btn-reminder"
+                    onClick={() => copyChase("supplier", "reminder")}
+                    title="Copy the gentle supplier reminder (WhatsApp) + log it"
+                  >
+                    <Bell size={14} aria-hidden="true" />
+                    Reminder
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-chase ${stockDelayed ? "btn-chase-hot" : ""}`}
+                    onClick={() =>
+                      supplierCount > 1 ? setChasePopover((v) => !v) : copyChase("supplier", "chase")
+                    }
+                    title={
+                      supplierCount > 1
+                        ? "Multiple suppliers — pick who to chase"
+                        : "Copy the supplier chase (WhatsApp) + log it"
+                    }
+                  >
+                    <MessageCircle size={14} aria-hidden="true" />
+                    Chase{supplierCount > 1 ? ` (${supplierCount})` : ""}
+                  </button>
+                </>
+              }
+            />
+            {chasePopover && supplierCount > 1 && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setChasePopover(false)} />
+                {/* Supplier chase popover — PO-led, overdue first + red. */}
+                <div
+                  className="absolute right-0 top-full mt-1 w-64 z-20 bg-white border border-base-200 rounded-[8px] shadow-lg p-2 space-y-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {[...posBySupplier.entries()]
+                    .sort((x, y) => {
+                      const od = (arr: operationOrderDetailPo[]) =>
+                        arr.some((po2) => !!po2.eta_date && po2.eta_date < todayIso) ? 0 : 1;
+                      return od(x[1]) - od(y[1]);
+                    })
+                    .map(([supId, supPos]) => {
+                      const overdue = supPos.some(
+                        (po2) => !!po2.eta_date && po2.eta_date < todayIso,
+                      );
+                      const supName =
+                        suppliersData?.suppliers.find((sp) => sp.id === supId)?.name ??
+                        `Supplier ${supId.slice(0, 6)}`;
+                      return (
+                        <div key={supId} className="flex items-center gap-2 min-h-8 px-1">
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block text-[13px] font-medium truncate ${overdue ? "text-danger" : "text-base-900"}`}
+                            >
+                              {supName}
+                            </span>
+                            <span className="block text-[12px] text-base-500 font-mono truncate">
+                              {supPos.map((sp) => sp.id.slice(0, 8)).join(" · ")}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className={`btn-chase ${overdue ? "btn-chase-hot" : ""}`}
+                            onClick={() => {
+                              copyChase("supplier", "chase");
+                              setChasePopover(false);
+                            }}
+                          >
+                            <MessageCircle size={14} aria-hidden="true" />
+                            Chase
+                          </button>
+                        </div>
+                      );
+                    })}
+                  <button
+                    type="button"
+                    className="btn-chase w-full justify-center"
+                    onClick={() => {
+                      copyChase("supplier", "chase");
+                      setChasePopover(false);
+                    }}
+                    title="One chase per supplier — copies the template + logs each"
+                  >
+                    Chase all
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <PartyCard
             label="Logistic"
-            icon={Truck}
-            tint="bg-error-soft text-danger"
+            media={
+              <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
+                <Truck size={16} strokeWidth={2} aria-hidden="true" />
+              </span>
+            }
             value={
               <span className={overDeadline && !deliveredDone ? "text-danger" : undefined}>
                 {deadlineLabel}
@@ -1675,6 +1841,28 @@ function DrawerBody({
             }
             rows={logisticRows}
             onOpen={() => setTab("delivery")}
+            footer={
+              <>
+                <button
+                  type="button"
+                  className="btn-reminder"
+                  onClick={() => copyChase("logistic", "reminder")}
+                  title="Copy the gentle logistic reminder (WhatsApp) + log it"
+                >
+                  <Bell size={14} aria-hidden="true" />
+                  Reminder
+                </button>
+                <button
+                  type="button"
+                  className={`btn-chase ${overDeadline && !deliveredDone ? "btn-chase-hot" : ""}`}
+                  onClick={() => copyChase("logistic", "chase")}
+                  title="Copy the firmer logistic chase (WhatsApp) + log it"
+                >
+                  <MessageCircle size={14} aria-hidden="true" />
+                  Chase
+                </button>
+              </>
+            }
           />
         </div>
         {/* Work area (Jess 2026-07-17 rev 5): VERTICAL tab rail left (BARE
@@ -1689,7 +1877,7 @@ function DrawerBody({
             [
               {
                 key: "items",
-                label: "Items & stock",
+                label: "Items",
                 icon: Package,
                 dot: stockTone === "danger",
                 count: goodsN - readyN > 0 ? `${goodsN - readyN} needs stock` : undefined,
@@ -1739,8 +1927,8 @@ function DrawerBody({
                 railCollapsed ? "justify-center px-0" : "px-2.5"
               } text-[13px] font-semibold transition-colors ${
                 tab === t.key
-                  ? "bg-base-900 text-white"
-                  : "text-base-700 hover:bg-base-900/5"
+                  ? "railtab-active"
+                  : "railtab-idle text-base-700"
               }`}
             >
               <t.icon size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
@@ -1748,11 +1936,7 @@ function DrawerBody({
               {!railCollapsed && (t.count || t.dot) && (
                 <span className="ml-auto flex items-center gap-1.5 shrink-0">
                   {t.count && (
-                    <span
-                      className={`text-[12px] font-medium ${
-                        tab === t.key ? "text-white/70" : "text-warning"
-                      }`}
-                    >
+                    <span className="text-[12px] font-semibold text-warning bg-white border border-base-200 rounded-full px-1.5">
                       {t.count}
                     </span>
                   )}
@@ -2052,6 +2236,7 @@ function DrawerBody({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setPickerSku(l.sku);
+                                    setPickerOpen(true);
                                     document
                                       .getElementById("warehouse-stock-panel")
                                       ?.scrollIntoView({
@@ -2214,6 +2399,17 @@ function DrawerBody({
           </Panel>
           </SectionCard>
 
+          {pickerOpen && (
+          <div className="min-w-0 animate-drawer-slide-in relative">
+          <button
+            type="button"
+            aria-label="Close warehouse stock"
+            title="Close"
+            onClick={() => setPickerOpen(false)}
+            className="absolute right-2 top-2 z-10 size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-base-100 hover:text-base-800"
+          >
+            <X size={14} />
+          </button>
           <SectionCard className="shrink-0">
           {/* Panel 2 — Warehouse stock. StockPickerGrid owns its own dark-slate
               pinned header + funnel filters + Reserve, styled as a 12px card; it
@@ -2270,6 +2466,8 @@ function DrawerBody({
             </Panel>
           )}
           </SectionCard>
+          </div>
+          )}
           </div>
 
           </div>
@@ -2975,6 +3173,7 @@ function CustomerIdentityCard({
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [showAddress, setShowAddress] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -2999,18 +3198,25 @@ function CustomerIdentityCard({
   return (
     <div className="kpi-box">
       <div className="flex items-start gap-2 min-w-0">
-        <span className="size-[38px] rounded-full grid place-items-center shrink-0 bg-signature-50 text-primary">
+        <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
           <span
-            className={`block text-[14px] font-bold leading-tight truncate ${cjkClassName(order.customer_name ?? "")}`}
+            className={`block text-[14px] font-bold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
+            title={order.customer_name ?? undefined}
           >
             {order.customer_name ?? "—"}
           </span>
-          <span className="block text-[12px] text-base-500 truncate">
-            <span className="font-mono">#{order.so}</span>
-            {regionLabel ? ` · ${regionLabel}` : ""} · {statusWord}
+          <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+            {/* The ONE black element on the page — the order id badge. */}
+            <span className="font-mono font-bold text-[12px] text-white bg-base-900 rounded-[5px] px-1.5 py-0.5 shrink-0">
+              #{order.so}
+            </span>
+            <span className="text-[12px] text-base-500 truncate">
+              {regionLabel ? `${regionLabel} · ` : ""}
+              {statusWord}
+            </span>
           </span>
         </span>
         <button
@@ -3049,23 +3255,33 @@ function CustomerIdentityCard({
           {wa && (
             <button
               type="button"
-              className={`${chip} text-success`}
+              className={`${chip} text-chase`}
               onClick={() => window.open(wa, "_blank", "noopener")}
               title="Open WhatsApp chat"
+              aria-label="WhatsApp"
             >
               <MessageCircle size={14} aria-hidden="true" />
-              WA
             </button>
           )}
           {order.customer_address && (
             <button
               type="button"
               className={chip}
-              onClick={() => copy(order.customer_address ?? "", "Address")}
-              title={`Copy address — ${order.customer_address}`}
+              onClick={() => setShowAddress((v) => !v)}
+              title={showAddress ? "Hide address" : "Show full address (click again to hide)"}
             >
               <MapPin size={14} aria-hidden="true" />
-              <span className="truncate max-w-28">{order.customer_address}</span>
+              Address
+            </button>
+          )}
+          {showAddress && order.customer_address && (
+            <button
+              type="button"
+              className="w-full text-left text-[12px] text-base-700 leading-snug bg-base-50 border border-base-200 rounded-[6px] px-2 py-1.5 hover:border-base-300"
+              onClick={() => copy(order.customer_address ?? "", "Address")}
+              title="Click to copy the address"
+            >
+              {order.customer_address}
             </button>
           )}
         </div>
@@ -3075,8 +3291,8 @@ function CustomerIdentityCard({
           <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" aria-label="Customer phone" />
           <input className={field} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" aria-label="Customer address" />
           <div className="text-[12px] text-warning leading-snug">
-            目前只更新这张单的客户资料 — updates THIS order only (no shared
-            customer record yet).
+            改的是客户档案，影响这客户所有单 (edits the customer record,
+            affects all their orders)
           </div>
           {err && <div className="text-[12px] text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">
