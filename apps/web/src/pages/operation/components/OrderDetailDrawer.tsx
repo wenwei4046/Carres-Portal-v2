@@ -1882,10 +1882,12 @@ function DrawerBody({
           style={{ gridArea: "main" }}
           className="min-w-0 min-h-0 overflow-y-auto scroll-overlay"
         >
-          <div className={tab === "items" ? "min-h-full flex flex-col gap-3" : "hidden"}>
-          {/* v4 §10 SPLIT (Jess 2026-07-16): every panel is its OWN white card
-              on the grey canvas, 12px apart — boundaries read from the gaps,
-              never from bands inside one lump. */}
+          <div className={tab === "items" ? "min-h-full" : "hidden"}>
+          {/* Items LEFT | Warehouse RIGHT (Jess 2026-07-17) — the reserve
+              workflow reads ACROSS: pick a line on the left, reserve its stock
+              beside it. Stacks below xl so laptops don't crush the tables.
+              Each panel stays its OWN white card (v4 §10 split). */}
+          <div className="grid gap-3 items-start xl:grid-cols-2">
           <SectionCard className="shrink-0">
           {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
               Ready), counted over the goods lines. Dark-slate pinned header;
@@ -2363,6 +2365,7 @@ function DrawerBody({
             </Panel>
           )}
           </SectionCard>
+          </div>
 
           </div>
 
