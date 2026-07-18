@@ -5,6 +5,7 @@ import {
   DEFAULT_PAYMENT_METHODS,
   ORDER_ENTRY_TABS,
   POS_FORM_BUILTINS,
+  STRIPE_PAYMENT_METHOD,
   resolveFormTab,
   type CustomField,
   type CustomFieldType,
@@ -528,6 +529,22 @@ export default function OrderEntryPage() {
                 </div>
               </div>
             ))}
+            {/* 0230 — Stripe is a SYSTEM method (0224): appended to every
+                checkout as "Pay online — Stripe QR / link" with system-generated
+                proof, so there is nothing to configure. Shown read-only so this
+                page reflects the FULL method list the POS offers. */}
+            <div
+              className="px-3 py-2.5 flex items-center gap-2 opacity-60"
+              data-testid="entry-config-stripe-row"
+            >
+              <Lock className="w-3 h-3 text-base-400 shrink-0" />
+              <span className="t-small text-base-700">{STRIPE_PAYMENT_METHOD.label}</span>
+              <span className="t-tiny text-base-500">{STRIPE_PAYMENT_METHOD.sublabel}</span>
+              <span className="t-tiny text-base-400 font-mono">{STRIPE_PAYMENT_METHOD.key}</span>
+              <span className="t-micro text-base-400 ml-auto">
+                system · always offered at checkout
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2 mb-6">
             <input

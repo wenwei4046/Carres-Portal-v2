@@ -47,6 +47,10 @@ export interface OrderEditScope {
    *  Mirrors 2990s PR 589 (`canUnproceed = CONFIRMED && proceededAt &&
    *  !processingPassed`). */
   canUnproceed: boolean;
+  /** 0231 (add-product P1) — direct "+ Add product" is a PLACE-lane-only
+   *  affordance; the proceed lane goes through the P3 submission + operation
+   *  approval instead. */
+  canAddProduct: boolean;
 }
 
 /** Today in Malaysia (UTC+8) as an ISO yyyy-mm-dd — the un-proceed cutoff
@@ -79,5 +83,6 @@ export function getOrderEditScope(
     editableProceed,
     canEditDetails: editablePlaced || editableProceed,
     canUnproceed,
+    canAddProduct: editablePlaced,
   };
 }

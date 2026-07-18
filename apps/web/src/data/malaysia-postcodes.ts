@@ -202,6 +202,7 @@ export const MY_ADDRESS: MalaysiaAddressMap = {
     "Sabak Bernam":  ["45200","45300"],
     "Tanjung Karang":["45500"],
     "Setia Alam":    ["40170"],
+    "Seri Kembangan":["43300"],
     USJ:             ["47600","47610","47620","47630"],
   },
   Terengganu: {

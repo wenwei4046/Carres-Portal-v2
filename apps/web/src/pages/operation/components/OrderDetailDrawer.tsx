@@ -3,7 +3,6 @@ import {
   type MutableRefObject,
   Fragment,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -1181,9 +1180,6 @@ function DrawerBody({
   const [addingPayment, setAddingPayment] = useState(false);
   // §10 Generate invoice — the full-screen charges + live-preview overlay.
   const [invoiceOverlayOpen, setInvoiceOverlayOpen] = useState(false);
-  // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
-  // Outstanding-only state carries no Total row, so ⋮ is the way back in).
-  const balanceEditTotalRef = useRef<(() => void) | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
@@ -1679,13 +1675,6 @@ function DrawerBody({
   // node. Chasing lives in the left-rail Chase Now panel.
   // CUSTOMER · money — green paid/0 · amber owing pre-last-call · red owing past
   // the collect gate (the same balanceGate the Balance card shows).
-  const moneyTone: KpiTone = !totalSet
-    ? "neutral"
-    : !balanceOwing
-      ? "success"
-      : balanceGate === "hold"
-        ? "danger"
-        : "warning";
   // STOCK — green all reserved · red No PO or an on-PO line with no / passed
   // ETA · amber otherwise (to-reserve or PO on track).
   const onPoStalled = goodsLines.some((l) => {
@@ -2147,43 +2136,129 @@ function DrawerBody({
               lastChasedAt={form.control?.last_chased_at ?? null}
             />
           )}
+          {/* "Where this order is" — deposit → goods → balance → deliver,
+              real numbers on every step (sample grammar: ✓ filled · ONE
+              coloured node · pale not-yet). */}
+          {!railCollapsed && (
+            <JourneyCard
+              onGo={setTab}
+              steps={[
+                {
+                  title: "Collect deposit",
+                  tab: "balance",
+                  state:
+                    collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
+                  sub:
+                    collectedAll > 0
+                      ? `${RM(collectedAll)} in`
+                      : totalSet
+                        ? "nothing received yet"
+                        : "—",
+                },
+                {
+                  title: "Goods ready",
+                  tab: "items",
+                  state:
+                    deliveredDone || (goodsN > 0 && readyN >= goodsN)
+                      ? "done"
+                      : stockTone === "danger"
+                        ? "act"
+                        : "wait",
+                  sub: deliveredDone
+                    ? "all delivered"
+                    : `${readyN}/${goodsN} ready${
+                        goodsN - readyN > 0 ? ` · waiting ${goodsN - readyN}` : ""
+                      }`,
+                },
+                {
+                  title: "Collect balance",
+                  tab: "balance",
+                  state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
+                  sub: !totalSet
+                    ? "nothing owing on record"
+                    : balanceDue > 0
+                      ? `still owes ${RM(balanceDue)} · before delivery`
+                      : "all paid",
+                },
+                {
+                  title: "Deliver",
+                  tab: "delivery",
+                  state: deliveredDone
+                    ? "done"
+                    : logisticTone === "danger"
+                      ? "act"
+                      : "wait",
+                  sub: deliveredDone
+                    ? "delivered"
+                    : `${assignedLogisticName ?? "no partner yet"}${
+                        logisticTone === "danger" ? " · not booked" : ""
+                      }`,
+                },
+              ]}
+            />
+          )}
           <nav
           className={"flex-1 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar"}
           aria-label="Order sections"
         >
           {(
             [
+              /* Tab-status law (Jess 2026-07-18, international pattern): the
+                 icon stays GREY always — colour arrives as an 8px corner
+                 badge on the icon (red = act now · amber = waiting) plus the
+                 right-side value/word in the same tone. Never tint the icon
+                 itself. Delivered = closed: no badges (guardrail #2). */
               {
                 key: "items",
                 label: "Items",
                 icon: Package,
-                /* Delivered = closed — no red dot / needs-stock count on a
-                   finished order (pre-golive guardrail #2). */
-                dot: !deliveredDone && stockTone === "danger",
-                count:
-                  !deliveredDone && goodsN - readyN > 0
-                    ? String(goodsN - readyN)
-                    : undefined,
-                alertText:
-                  !deliveredDone && stockTone === "danger"
-                    ? "needs stock"
-                    : undefined,
+                tone: deliveredDone
+                  ? undefined
+                  : stockTone === "danger"
+                    ? ("danger" as const)
+                    : readyN < goodsN
+                      ? ("warning" as const)
+                      : undefined,
+                v: goodsN > 0 ? `${readyN}/${goodsN}` : undefined,
+                w: deliveredDone
+                  ? "delivered"
+                  : readyN < goodsN
+                    ? `waiting ${goodsN - readyN}`
+                    : "all ready",
               },
               {
                 key: "delivery",
                 label: "Delivery",
                 icon: Truck,
-                dot: logisticTone === "danger",
-                count: undefined,
-                alertText: overDeadline && !deliveredDone ? "overdue" : "needs action",
+                tone:
+                  !deliveredDone && logisticTone === "danger"
+                    ? ("danger" as const)
+                    : undefined,
+                v: deliveredDone
+                  ? "Done"
+                  : logisticTone === "danger"
+                    ? "not booked"
+                    : undefined,
+                w: deliveredDone
+                  ? undefined
+                  : (assignedLogisticName ?? "no partner"),
               },
               {
                 key: "balance",
                 label: "Balance",
                 icon: Wallet,
-                dot: moneyTone === "danger",
-                count: undefined,
-                alertText: "payment overdue",
+                tone:
+                  totalSet && balanceDue > 0 ? ("danger" as const) : undefined,
+                v: totalSet
+                  ? balanceDue > 0
+                    ? RM(balanceDue)
+                    : "Paid"
+                  : undefined,
+                w: totalSet
+                  ? balanceDue > 0
+                    ? "collect before delivery"
+                    : undefined
+                  : "nothing owing",
               },
               ...(hasMsbf || hasSof
                 ? [
@@ -2191,8 +2266,17 @@ function DrawerBody({
                       key: "storage" as DrawerTab,
                       label: "Storage",
                       icon: Warehouse,
-                      dot: storageGate === "hold",
-                      count: undefined,
+                      tone: storageOwing
+                        ? storageGate === "hold"
+                          ? ("danger" as const)
+                          : ("warning" as const)
+                        : undefined,
+                      v: storageOwing
+                        ? storageFee > 0
+                          ? RM(storageFee)
+                          : "fee due"
+                        : undefined,
+                      w: storageOwing ? undefined : "not counting",
                     },
                   ]
                 : []),
@@ -2200,18 +2284,24 @@ function DrawerBody({
                 key: "loan",
                 label: "Loan",
                 icon: Undo2,
-                dot: false,
-                count: liveLoanCount > 0 ? String(liveLoanCount) : undefined,
+                v: liveLoanCount > 0 ? String(liveLoanCount) : undefined,
               },
-              { key: "activity", label: "Activity", icon: ScrollText, dot: false, count: undefined },
-            ] as { key: DrawerTab; label: string; icon: LucideIcon; dot: boolean; count?: string; alertText?: string }[]
+              { key: "activity", label: "Activity", icon: ScrollText },
+            ] as {
+              key: DrawerTab;
+              label: string;
+              icon: LucideIcon;
+              tone?: "danger" | "warning";
+              v?: string;
+              w?: string;
+            }[]
           ).map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
               aria-selected={tab === t.key}
-              title={t.label + (t.count ? ` — ${t.count}` : "")}
+              title={t.label + (t.v ? ` — ${t.v}` : "") + (t.w ? ` ${t.w}` : "")}
               className={`h-10 rounded-lg flex items-center gap-2 shrink-0 ${
                 railCollapsed ? "justify-center px-0" : "px-2.5"
               } text-[13px] font-semibold transition-colors ${
@@ -2220,29 +2310,41 @@ function DrawerBody({
                   : "railtab-idle text-base-700"
               }`}
             >
-              <t.icon size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+              {/* Grey icon + corner badge (iOS-style): red = act · amber =
+                  waiting. The icon itself never changes colour. */}
+              <span className="relative shrink-0">
+                <t.icon size={16} strokeWidth={2} aria-hidden="true" />
+                {t.tone && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute -top-1 -right-1.5 w-2 h-2 rounded-full ring-2 ring-white ${
+                      t.tone === "danger" ? "bg-danger" : "bg-warning"
+                    }`}
+                  />
+                )}
+              </span>
               {!railCollapsed && <span className="truncate">{t.label}</span>}
-              {!railCollapsed && (t.count || t.dot) && (
-                <span className="ml-auto flex items-center gap-1.5 shrink-0">
-                  {t.count && (
+              {!railCollapsed && (t.v || t.w) && (
+                <span className="ml-auto text-right shrink-0 leading-tight">
+                  {t.v && (
                     <span
-                      className="text-[12px] font-semibold text-base-700 bg-white border border-base-200 rounded-full px-1.5 tabular-nums"
-                      title={t.alertText ? `${t.count} ${t.alertText}` : t.count}
+                      className={`block text-[12px] font-bold font-mono tabular-nums ${
+                        t.tone === "danger"
+                          ? "text-danger"
+                          : t.tone === "warning"
+                            ? "text-warning"
+                            : "text-base-700"
+                      }`}
                     >
-                      {t.count}
+                      {t.v}
                     </span>
                   )}
-                  {t.dot && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-danger"
-                      title={t.alertText ?? "needs action"}
-                      aria-label={t.alertText ?? "needs action"}
-                    />
+                  {t.w && (
+                    <span className="block text-[11px] font-medium text-base-500">
+                      {t.w}
+                    </span>
                   )}
                 </span>
-              )}
-              {railCollapsed && t.dot && (
-                <span className="absolute" aria-hidden="true" />
               )}
             </button>
           ))}
@@ -3048,17 +3150,8 @@ function DrawerBody({
                       toast.success("Outstanding copied");
                     },
                   },
-                  // Keyed totals only — a line-priced (native) total is summed
-                  // from the items and can't be hand-edited.
-                  ...(!hasLineTotal
-                    ? [
-                        {
-                          label: "Edit total",
-                          icon: <Pencil size={14} />,
-                          onClick: () => balanceEditTotalRef.current?.(),
-                        },
-                      ]
-                    : []),
+                  // (fix #3) "Edit total" dropped — the inline Goods box is
+                  // THE one entry point for the keyed total.
                 ]}
               />
             }
@@ -3137,7 +3230,8 @@ function DrawerBody({
                   copyChase("customer", deliveryEveLabel ? "final" : "reminder")
                 }
                 lastChasedAt={form.control?.last_chased_at ?? null}
-                startEditTotalRef={balanceEditTotalRef}
+                onShowItems={() => setTab("items")}
+                onGenerateInvoice={() => setInvoiceOverlayOpen(true)}
               />
             </div>
           </Panel>
@@ -4768,6 +4862,76 @@ async function viewSlip(p: OrderPaymentRow) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
+/** "Where this order is" — the journey card (Jess 2026-07-18, from her
+ *  approved timeline sample): 4 FIXED steps in doing order — deposit →
+ *  goods → balance → deliver. Sample grammar: done = ink-filled ✓ · the
+ *  step needing work = the ONLY coloured node (red = act now, amber =
+ *  waiting) · not-yet = pale ring; the connector darkens over completed
+ *  ground. Every step carries its real number; clicking jumps to the tab. */
+type JourneyState = "done" | "act" | "wait" | "todo";
+function JourneyCard({
+  steps,
+  onGo,
+}: {
+  steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
+  onGo: (t: DrawerTab) => void;
+}) {
+  return (
+    <div className="bg-white border border-base-200 rounded-xl p-3 shrink-0">
+      <div className="t4-label mb-2">Where this order is</div>
+      {steps.map((st, i) => {
+        const last = i === steps.length - 1;
+        const groundDone = steps.slice(0, i + 1).every((x) => x.state === "done");
+        return (
+          <button
+            key={st.title}
+            type="button"
+            onClick={() => onGo(st.tab)}
+            title={`Open ${st.tab}`}
+            className="relative w-full flex items-start gap-2.5 text-left group pb-3 last:pb-0"
+          >
+            {!last && (
+              <span
+                aria-hidden="true"
+                className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
+                  groundDone ? "bg-base-800" : "bg-base-200"
+                }`}
+              />
+            )}
+            <span
+              className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
+                st.state === "done"
+                  ? "bg-base-800 text-white"
+                  : st.state === "act"
+                    ? "bg-error-soft text-danger ring-2 ring-danger"
+                    : st.state === "wait"
+                      ? "bg-warning-soft text-warning"
+                      : "bg-white border-2 border-base-300 text-base-400"
+              }`}
+            >
+              {st.state === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-base-900 group-hover:underline">
+                {st.title}
+              </span>
+              <span
+                className={`block text-[12px] ${
+                  st.state === "act"
+                    ? "font-semibold text-danger"
+                    : "text-base-500"
+                }`}
+              >
+                {st.sub}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** One charge row of the invoice list — label left, amount right (v4 §3:
  *  words Inter, amounts the ONE money recipe). */
 function ChargeRow({
@@ -4808,11 +4972,11 @@ function ChargeRow({
  */
 function MoneyCard({
   orderId,
-  so,
   form,
   hasLineTotal,
   orderTotal,
   totalSet,
+  collected,
   lines,
   storageCharge,
   storageIncurred,
@@ -4825,7 +4989,8 @@ function MoneyCard({
   deliveryEve,
   onRemind,
   lastChasedAt,
-  startEditTotalRef,
+  onShowItems,
+  onGenerateInvoice,
 }: {
   orderId: string;
   so: number;
@@ -4856,8 +5021,10 @@ function MoneyCard({
   onRemind: () => void;
   /** Shared chase log — the same last_chased_at every chase button stamps. */
   lastChasedAt: string | null;
-  /** Lets the panel ⋮ re-open the keyed-total entry. */
-  startEditTotalRef?: MutableRefObject<(() => void) | null>;
+  /** Jump to the Items tab (the imported-order "N items" link). */
+  onShowItems: () => void;
+  /** Open the §10 Generate-invoice overlay (the ONE invoice path). */
+  onGenerateInvoice: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
@@ -4870,7 +5037,6 @@ function MoneyCard({
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
   });
-  if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
 
   // CHARGES — merge same-SKU lines; per-line amounts only exist on a
   // line-priced (native) order. "<model> · <size> ×<qty>".
@@ -4890,6 +5056,22 @@ function MoneyCard({
     return s === "K" ? "King" : s === "Q" ? "Queen" : s === "S" ? "Single" : null;
   };
 
+  // ONE plain hint line (the 1·2·3 strip moved to the left-rail journey
+  // card). Everyday words only — Jess 2026-07-18.
+  const stepHint = hasLineTotal
+    ? !totalSet
+      ? "The total comes from the priced items below."
+      : balanceDue > 0
+        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
+        : "All paid — you can print the receipt."
+    : !totalSet
+      ? collected > 0
+        ? `${RM(collected)} already recorded — key what the customer owed BEFORE those payments; the system minus them for you.`
+        : "Nothing owing on record. Key an amount below ONLY if this customer owes money."
+      : balanceDue > 0
+        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
+        : "All paid — you can print the receipt.";
+
   // The keyed-total entry — the goods amount on an AutoCount order.
   const keyedTotalNode =
     editingTotal || orderTotal <= 0 ? (
@@ -4898,11 +5080,19 @@ function MoneyCard({
         min={0}
         step="0.01"
         autoFocus={editingTotal}
-        value={form.draft.balance}
+        // Unset shows an EMPTY box — a resting "0" here reads as "total =
+        // RM 0"; the raw draft only appears while actually editing.
+        value={
+          editingTotal
+            ? form.draft.balance
+            : Number(form.draft.balance || 0) > 0
+              ? form.draft.balance
+              : ""
+        }
         onChange={(e) => form.set("balance", e.target.value)}
         onFocus={() => setEditingTotal(true)}
         onBlur={() => setEditingTotal(false)}
-        placeholder="Set total (RM)"
+        placeholder={hasLineTotal ? "Set total (RM)" : "Still owes (RM)"}
         aria-label="Order total"
         className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
       />
@@ -4919,6 +5109,9 @@ function MoneyCard({
 
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-x-5 gap-y-2.5 items-start">
+      {/* ONE plain sentence — the step strip lives in the left-rail
+          journey card now. */}
+      <div className="col-span-2 text-[12px] text-base-500">{stepHint}</div>
       {/* Delivery-eve red flag (§3.2) — spans both columns. */}
       {deliveryEve && (
         <div
@@ -4934,30 +5127,39 @@ function MoneyCard({
       <div className="min-w-0">
         <div className="t4-label mb-1">Charges</div>
         <div className="rounded-[8px] border border-base-200/70 bg-white px-3 divide-y divide-base-100">
-          {merged.map((m, i) => (
-            <ChargeRow
-              key={m.sku}
-              num={i + 1}
-              label={m.sku}
-              sub={`${sizeWord(m.sku) ? `· ${sizeWord(m.sku)} ` : ""}×${m.qty}`}
-              amount={
-                hasLineTotal ? (
+          {/* International rule (option A, 2026-07-18): an invoice line always
+              carries money. Native orders list their priced item rows; an
+              IMPORTED order (no per-line prices) collapses goods into ONE
+              keyed line — the item detail lives in the Items tab + on the DO,
+              never as amount-less invoice rows. */}
+          {hasLineTotal ? (
+            merged.map((m, i) => (
+              <ChargeRow
+                key={m.sku}
+                num={i + 1}
+                label={m.sku}
+                sub={`${sizeWord(m.sku) ? `· ${sizeWord(m.sku)} ` : ""}×${m.qty}`}
+                amount={
                   <Money value={m.amount} tone="row" className="text-base-900" />
-                ) : (
-                  <span
-                    className="text-[12px] text-base-300"
-                    title="Imported order — no per-line prices; the keyed goods total below carries the amount"
-                  >
-                    —
-                  </span>
-                )
-              }
-            />
-          ))}
-          {/* Imported orders carry ONE keyed goods figure instead of line
-              prices — settable INLINE right here (no modal). */}
-          {!hasLineTotal && (
-            <ChargeRow label="Goods total" sub="· keyed" amount={keyedTotalNode} />
+                }
+              />
+            ))
+          ) : (
+            <div className="flex items-center justify-between gap-3 py-1.5">
+              <span className="min-w-0 truncate text-[13px] text-base-800">
+                Customer still owes
+                <button
+                  type="button"
+                  onClick={onShowItems}
+                  title="See every item in the Items tab"
+                  className="text-base-400 hover:text-info hover:underline"
+                >
+                  {" "}
+                  · {merged.length} item{merged.length === 1 ? "" : "s"}
+                </button>
+              </span>
+              <span className="shrink-0 text-right">{keyedTotalNode}</span>
+            </div>
           )}
           {/* The storage FEE flows in as a charge (no number); the Storage tab
               owns the detail (STATUS-STANDARD §7.5 rule). */}
@@ -4974,12 +5176,16 @@ function MoneyCard({
           />
           {/* Total = goods + storage — top-bordered, bold. */}
           <div className="flex items-center justify-between gap-3 py-2 border-t border-base-200">
-            <span className="text-[13px] font-bold text-base-900">Total</span>
+            <span className="text-[13px] font-bold text-base-900">
+              {hasLineTotal ? "Total" : "To collect"}
+            </span>
             {totalSet ? (
               <Money value={invoiceTotal} tone="row" className="text-base-900" />
             ) : (
               <span className="text-[12px] text-base-400">
-                set the goods total above
+                {hasLineTotal
+                  ? "set the goods total above"
+                  : "key what's owed above"}
               </span>
             )}
           </div>
@@ -5088,7 +5294,9 @@ function MoneyCard({
             <span className="text-[13px] font-bold text-base-900">Balance due</span>
             {!totalSet ? (
               <span className="text-[12px] text-base-400">
-                Set the goods total to calculate
+                {hasLineTotal
+                  ? "Set the goods total to calculate"
+                  : "Key what's owed to calculate"}
               </span>
             ) : balanceDue > 0 ? (
               <Money value={balanceDue} tone="hero" className="text-danger" />
@@ -5114,7 +5322,9 @@ function MoneyCard({
             Receipt · Remind (WhatsApp green outline; final tone on
             delivery-eve, hot fill past collect-by). */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Btn icon={FileText} onClick={() => void openInvoicePdf(orderId, so)}>
+          {/* ONE invoice path (fix #4): both this button and the panel ⋮ open
+              the §10 overlay — the old direct-PDF route 422'd pre-dispatch. */}
+          <Btn icon={FileText} onClick={onGenerateInvoice}>
             Invoice
           </Btn>
           <Btn

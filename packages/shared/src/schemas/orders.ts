@@ -81,6 +81,14 @@ export const orderSchema = z.object({
     race: z.string().nullable().optional(),
     gender: z.string().nullable().optional(),
     birthday: z.string().nullable().optional(),
+    // 0230 — structured MY address parts. Present ⇒ they match the composed
+    // `address` string (flat-only writers clear them). `.optional()` keeps
+    // pre-0230 responses parse-safe.
+    addressLine1: z.string().nullable().optional(),
+    addressLine2: z.string().nullable().optional(),
+    addressState: z.string().nullable().optional(),
+    addressCity: z.string().nullable().optional(),
+    addressPostcode: z.string().nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -198,6 +206,14 @@ export const createOrderInputSchema = z.object({
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .nullable()
       .optional(),
+    // 0230 — structured MY address parts, sent alongside the composed
+    // `address` string by the POS wizard. LENIENT (nullable/optional): non-POS
+    // callers omit them and the order simply has no structured address.
+    addressLine1: z.string().max(200).nullable().optional(),
+    addressLine2: z.string().max(200).nullable().optional(),
+    addressState: z.string().max(60).nullable().optional(),
+    addressCity: z.string().max(120).nullable().optional(),
+    addressPostcode: z.string().max(10).nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -314,25 +330,83 @@ const rawOrderLineInputSchema = z.object({
   sku: z.string().trim().min(1),
   qty: z.number().int().positive(),
   unitPrice: z.number().nonnegative(),
+  /** POS-configurator spec attrs (colour / gap / options / fabric / specials /
+   *  remark…), recorded for downstream display (PO / SO PDF / drawers). OPTIONAL
+   *  — a bare raw line stays attrs-null. The route strips engine-marker keys
+   *  (pwp / free_gift / free_item) so no order-path engine ever recognises a
+   *  raw line as a marker line. */
+  attrs: z.record(z.unknown()).nullable().optional(),
 });
 
 export const rawCreateOrderInputSchema = z.object({
   dealerId: z.string().uuid(),
   outletId: z.string().uuid().nullable().optional(),
   salespersonId: z.string().uuid().nullable().optional(),
+  // POS-structure parity (Loo 2026-07-18) — the raw door now ACCEPTS the full
+  // POS customer block, but everything beyond `name` stays optional/lenient:
+  // this path records exactly what the operator entered, gating nothing.
   customer: z.object({
     name: z.string().trim().min(1),
     phone: z.string().trim().nullable().optional(),
     address: z.string().trim().nullable().optional(),
+    addressUnknown: z.boolean().optional(),
+    billing: z.string().trim().nullable().optional(),
+    billingSame: z.boolean().optional(),
+    /** Composed "name · phone · relationship" string (same as the POS submit). */
+    emergency: z.string().trim().nullable().optional(),
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    // 0230 — structured MY address parts, sent alongside the composed
+    // `address` string (same lenient contract as the POS door).
+    addressLine1: z.string().max(200).nullable().optional(),
+    addressLine2: z.string().max(200).nullable().optional(),
+    addressState: z.string().max(60).nullable().optional(),
+    addressCity: z.string().max(120).nullable().optional(),
+    addressPostcode: z.string().max(10).nullable().optional(),
   }),
-  /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. */
+  /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. No lead-time floor and
+   *  no not-in-the-past rule — the raw door accepts any date (backfill). */
   deliveryDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  /** Production-start date. Persisted only when a deliveryDate is set (the
+   *  create_order pairing); no today-floor on this path. */
+  proceedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  deliveryFloor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
+  deliveryHasLift: z.boolean().optional(),
+  deliveryStairItems: z.number().int().nonnegative().nullable().optional(),
   lines: z.array(rawOrderLineInputSchema).min(1),
+  addons: z.array(orderAddonInputSchema).optional().default([]),
   paid: z.number().nonnegative().default(0),
+  // Payment + signature — the POS Confirm structure, ALL optional ("fill it if
+  // you have it"): a phone/backfill order creates fine with none of these.
+  paymentMethod: z.string().trim().min(1).max(40).nullable().optional(),
+  approvalCode: z.string().trim().nullable().optional(),
+  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable().optional(),
+  signaturePath: z.string().min(1).nullable().optional(),
+  paymentSlipPath: z.string().min(1).nullable().optional(),
+  termsAccepted: z.boolean().optional(),
+  /** 0219 — POS entry extras (payment follow-up answers + custom form-field
+   *  values). Same shape as the POS door. */
+  entryData: z
+    .object({
+      payment: z.record(z.string().max(120)).optional(),
+      fields: z.record(z.string().max(400)).optional(),
+    })
+    .strict()
+    .optional(),
 });
 /** z.input — `paid` stays optional for the POSTing client. */
 export type RawCreateOrderInput = z.input<typeof rawCreateOrderInputSchema>;
@@ -346,8 +420,17 @@ export type RawOrderLineInput = z.infer<typeof rawOrderLineInputSchema>;
 
 export const topUpOrderInputSchema = z.object({
   amount: z.number().positive(),
-  /** Internal method key — matches reference/proto's TopUpDepositModal options. */
-  method: z.enum(["cash", "bank", "cheque", "online", "card"]),
+  /** Internal method key. 0230 — widened from the hardcoded 5-value enum to
+   *  any kebab key so the manual-payment panel can offer the SAME configurable
+   *  methods as checkout (order_entry_config). The route validates the key
+   *  against the active configured methods ∪ the legacy proto keys
+   *  (cash/bank/cheque/online/card) so old clients keep working. */
+  method: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "method must be a kebab-case key"),
   /** Human-readable label captured from the UI so the order_history line reads
    *  "Top-up RM 500 via Bank transfer" without the API needing a label table. */
   methodLabel: z.string().min(1),
@@ -361,12 +444,45 @@ export const topUpOrderInputSchema = z.object({
 });
 export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
 
+/** 0231 — Add-product P1 (design 2026-07-18): append products to a PLACE-lane
+ *  order. NO client price — the route prices from the FRESH catalog (server
+ *  authority, Loo default #2) and re-runs the special-addon + option-pick
+ *  trust gates. `attrs` carries the configurator selections (size / fabric /
+ *  specials / options with their client preview totals). Sofa BUILDS and
+ *  promo/free markers are rejected by the route until P2. */
+export const addOrderLinesInputSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        sku: z.string().trim().min(1),
+        qty: z.number().int().min(1).max(99),
+        attrs: z.record(z.unknown()).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+export type AddOrderLinesInput = z.infer<typeof addOrderLinesInputSchema>;
+
 export const setOrderAddressInputSchema = z.object({
   /** Composed address string the wizard would have written. The RPC stores
    *  it as-is; the `MYAddressFields` cascade is unmounted on submit. */
   address: z.string().min(5),
   billing: z.string().nullable(),
   billingSame: z.boolean(),
+  /** 0230 — the structured parts the modal's MYAddressFields collected,
+   *  persisted alongside the composed string so the POS detail drawer can
+   *  repopulate its dropdowns. OPTIONAL: absent = legacy flat write (the RPC
+   *  clears any previously-stored parts). */
+  parts: z
+    .object({
+      line1: z.string().max(200),
+      line2: z.string().max(200).optional(),
+      state: z.string().max(60),
+      city: z.string().max(120),
+      postcode: z.string().max(10),
+    })
+    .optional(),
 });
 export type SetOrderAddressInput = z.infer<typeof setOrderAddressInputSchema>;
 
@@ -410,6 +526,14 @@ export const updateOrderInputSchema = z
         ).optional(),
         address: z.string().nullable().optional(),
         addressUnknown: z.boolean().optional(),
+        // 0230 — structured MY address parts. The RPC enforces they only ride
+        // WITH `address` (never alone) and that a flat-only `address` write
+        // clears any stored parts.
+        addressLine1: z.string().max(200).nullable().optional(),
+        addressLine2: z.string().max(200).nullable().optional(),
+        addressState: z.string().max(60).nullable().optional(),
+        addressCity: z.string().max(120).nullable().optional(),
+        addressPostcode: z.string().max(10).nullable().optional(),
         billing: z.string().nullable().optional(),
         billingSame: z.boolean().optional(),
         emergency: z.string().min(1).optional(),

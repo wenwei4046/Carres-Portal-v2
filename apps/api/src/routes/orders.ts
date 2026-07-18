@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Adapters,
   DB,
+  addOrderLinesInputSchema,
   autocountImportInput,
   autocountImportResponseSchema,
   cancelOrderInputSchema,
@@ -857,17 +858,34 @@ ordersRouter.post("/", async (c) => {
 
 // ---------------------------------------------------------------------------
 // RAW create door — POST /api/orders/raw (POS-parity, MAINTAIN → New Order)
-// The 2990s-Backend-style creation path for INTERNAL roles: no signature, no
-// terms, no payment method, no emergency contact, NO lead-time floor, and NONE
-// of the POS recompute engines (sofa/PWP/free-gift/special/delivery) — the
-// operator's line skus + prices are persisted exactly as entered; that is the
-// point of this path. Lines are stamped attrs=null so no downstream engine
-// ever recognises them as marker lines. The create_order RPC still enforces:
-// dealer required, ≥1 line, the sofa ↔ mattress/bed-frame composition rule,
-// and the internal-role gate (SECURITY DEFINER re-check).
+// The 2990s-Backend-style creation path for INTERNAL roles: NO lead-time floor
+// and NONE of the POS recompute engines (sofa/PWP/free-gift/special/delivery)
+// — the operator's line skus + prices are persisted exactly as entered; that
+// is the point of this path. Since 2026-07-18 (Loo — New Order = POS-structure
+// parity) the door also ACCEPTS the full POS customer block, delivery extras,
+// addons, line spec attrs and the payment/signature fields — all OPTIONAL
+// ("fill it if you have it"), persisted verbatim, gating nothing. Line attrs
+// are sanitised (engine-marker keys stripped) so no order-path engine ever
+// recognises a raw line as a marker line, and client delivery addons are
+// dropped (those keys are server-exclusive on the POS door). The create_order
+// RPC still enforces: dealer required, ≥1 line, the sofa ↔ mattress/bed-frame
+// composition rule, and the internal-role gate (SECURITY DEFINER re-check).
 // ---------------------------------------------------------------------------
 
 const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
+
+/** Engine-marker attr keys the raw door must never persist — they would make
+ *  downstream order-path machinery (PWP cancel trigger / free-line displays)
+ *  treat a raw line as one of its own. Spec/display attrs pass through. */
+const RAW_STRIPPED_ATTR_KEYS = new Set(["pwp", "free_gift", "free_item"]);
+
+function sanitizeRawLineAttrs(
+  attrs: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!attrs) return null;
+  const entries = Object.entries(attrs).filter(([k]) => !RAW_STRIPPED_ATTR_KEYS.has(k));
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
 
 ordersRouter.post("/raw", async (c) => {
   const auth = c.var.auth;
@@ -889,43 +907,79 @@ ordersRouter.post("/raw", async (c) => {
   }
   const input = parsed.data;
 
+  // Client delivery addons are server-exclusive on the POS door — same rule
+  // here, even though the raw door never appends its own (no engine runs).
+  const RAW_DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+  const addons = input.addons.filter((a) => !RAW_DELIVERY_ADDON_KEYS.has(a.addonKey));
+
   // deposit_pct only feeds the RPC's order_history line — derive it so the
-  // timeline text matches what the operator saw.
-  const total = input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  // timeline text matches what the operator saw. Addons count toward the total
+  // (same base the POS submit uses).
+  const total =
+    input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0) +
+    addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const depositPct =
     total > 0 ? Math.min(100, Math.max(0, Math.round((input.paid / total) * 100))) : 0;
 
+  // POS-parity fields, raw semantics: everything optional; absent → the same
+  // nulls this door always sent, so a minimal body stays byte-identical.
+  const addressUnknown = input.customer.addressUnknown ?? !input.customer.address;
+  const billingSame = input.customer.billingSame ?? true;
   const payload: Record<string, unknown> = {
     dealer_id: input.dealerId,
     outlet_id: input.outletId ?? null,
     salesperson_id: input.salespersonId ?? null,
     customer_name: input.customer.name,
     customer_phone: input.customer.phone ?? null,
-    customer_address: input.customer.address ?? null,
-    customer_address_unknown: !input.customer.address,
-    customer_billing: null,
-    customer_billing_same: true,
-    customer_emergency: null,
+    customer_address: addressUnknown ? null : input.customer.address ?? null,
+    customer_address_unknown: addressUnknown,
+    // 0230 — structured parts ride with the composed string (POS-door parity);
+    // an address-unknown order carries none.
+    customer_address_line1: addressUnknown ? null : input.customer.addressLine1 ?? null,
+    customer_address_line2: addressUnknown ? null : input.customer.addressLine2 ?? null,
+    customer_address_state: addressUnknown ? null : input.customer.addressState ?? null,
+    customer_address_city: addressUnknown ? null : input.customer.addressCity ?? null,
+    customer_address_postcode: addressUnknown ? null : input.customer.addressPostcode ?? null,
+    customer_billing: billingSame ? null : input.customer.billing ?? null,
+    customer_billing_same: billingSame,
+    customer_emergency: input.customer.emergency || null,
+    customer_email: input.customer.email || null,
+    customer_race: input.customer.race || null,
+    customer_gender: input.customer.gender || null,
+    customer_birthday: input.customer.birthday || null,
     delivery_date: input.deliveryDate ?? null,
-    proceed_date: null,
+    // proceed date pairs with the delivery date (create_order's rule) — a
+    // date-less order stays fully TBD.
+    proceed_date: input.deliveryDate ? input.proceedDate ?? null : null,
     delivery_date_tbd: !input.deliveryDate,
-    delivery_floor: 1,
-    delivery_has_lift: false,
-    delivery_stair_items: null,
+    delivery_floor: input.deliveryFloor ?? 1,
+    delivery_has_lift: input.deliveryHasLift ?? false,
+    delivery_stair_items: input.deliveryStairItems ?? null,
     paid: input.paid,
-    signature_url: null,
-    payment_slip_url: null,
-    terms_accepted: false,
-    payment_method: null,
-    approval_code: null,
-    installment_months: null,
+    signature_url: input.signaturePath ?? null,
+    payment_slip_url: input.paymentSlipPath ?? null,
+    terms_accepted: input.termsAccepted ?? false,
+    payment_method: input.paymentMethod ?? null,
+    approval_code: input.approvalCode || null,
+    // Cross-field rule mirrored from create_order (22023 otherwise): months
+    // only ride an installment method.
+    installment_months:
+      input.paymentMethod === "installment" ? input.installmentMonths ?? null : null,
+    // 0219 extras — OMIT the key entirely when absent (jsonb 'null' is NOT SQL
+    // NULL; it would trip create_order's entry_data object guard).
+    ...(input.entryData != null ? { entry_data: input.entryData } : {}),
     lines: input.lines.map((l) => ({
       sku: l.sku,
       qty: l.qty,
-      attrs: null,
+      attrs: sanitizeRawLineAttrs(l.attrs),
       unit_price: l.unitPrice,
     })),
-    addons: [],
+    addons: addons.map((a) => ({
+      addon_key: a.addonKey,
+      qty: a.qty,
+      unit_price: a.unitPrice,
+      attrs: a.attrs ?? null,
+    })),
     deposit_pct: depositPct,
   };
 
@@ -1873,6 +1927,11 @@ async function dispatchOrderMutation<TBody>(
   return c.json(await fetchAndShapeOrder(sb, id));
 }
 
+/** Legacy proto method keys the top-up path accepted before 0230 (the old
+ *  TopUpDepositModal vocab). Kept valid forever so pre-0230 clients and
+ *  historical retry flows never 422. */
+const LEGACY_TOPUP_METHOD_KEYS = ["cash", "bank", "cheque", "online", "card"];
+
 /** POST /api/orders/:id/top-up — record a partial payment toward an order's
  *  total. Photos uploaded to Storage by the dealer before this call; we
  *  validate paths live inside the dealer folder and pass them through to the
@@ -1886,6 +1945,33 @@ ordersRouter.post("/:id/top-up", (c) =>
       for (const p of body.photoPaths) {
         assertDealerOwnedPath(p, dealerId, "photoPaths[]");
       }
+    },
+    // 0230 — the manual-payment panel offers the SAME configurable methods as
+    // checkout: the key must be an ACTIVE order_entry_config method (code
+    // defaults when the config is empty) or a legacy proto key. A config READ
+    // error degrades to the defaults — a config hiccup never blocks a payment.
+    asyncPreFlight: async (body, ctx) => {
+      const cfgR = await ctx.sb
+        .from("order_entry_config")
+        .select("payment_methods, form_fields")
+        .eq("id", true)
+        .maybeSingle();
+      const entryCfg = parseOrderEntryConfigRow(cfgR && !cfgR.error ? cfgR.data : null);
+      const allowed = new Set([
+        ...resolvePaymentMethods(entryCfg).map((m) => m.key),
+        ...LEGACY_TOPUP_METHOD_KEYS,
+      ]);
+      if (!allowed.has(body.method)) {
+        return c.json(
+          {
+            error: "top_up_blocked",
+            code: "invalid_payment_method",
+            message: `payment method "${body.method}" is not an active configured method`,
+          },
+          422,
+        );
+      }
+      return null;
     },
     rpcArgs: (body) => ({
       p_order_id: c.req.param("id"),
@@ -1912,9 +1998,199 @@ ordersRouter.post("/:id/address", (c) =>
       p_address: body.address,
       p_billing: body.billing,
       p_billing_same: body.billingSame,
+      // 0230 — structured parts stored alongside the composed string (null =
+      // legacy flat write; the RPC clears previously-stored parts then).
+      p_parts: body.parts ?? null,
     }),
   }),
 );
+
+/** POST /api/orders/:id/lines — Add-product P1 (0231, design 2026-07-18):
+ *  append products to a PLACE-lane order. Server catalog price authority —
+ *  the client sends sku/qty/attrs ONLY; unitPrice = fresh `product_skus.price`
+ *  + the special-addon and option-pick recomputes (the SAME trust gates the
+ *  create route runs). Sofa BUILDS (attrs.sofa_build) are 409'd until P2;
+ *  promo/free markers (pwp / free_gift / free_item) are server-exclusive and
+ *  rejected. The `add_order_lines` RPC re-checks the place-lane status gate +
+ *  the 0089 merged-cart mutex and appends — existing rows never change. */
+ordersRouter.post("/:id/lines", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  if (!idCheck.success || !idCheck.data) {
+    throw new HTTPException(404, { message: "Order not found" });
+  }
+  const id: string = idCheck.data;
+
+  if (
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
+    auth.role !== "finance" && auth.role !== "bd"
+  ) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = addOrderLinesInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+
+  // Engine-exclusive markers are rejected up front: sofa builds need the P2
+  // merged-cart recompute; pwp/free markers are minted server-side only.
+  for (const line of parsed.data.lines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    if (attrs.sofa_build) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "sofa_build_add_not_supported",
+          message: "Sofa builds can't be added to an existing order yet — place a new order.",
+        },
+        409,
+      );
+    }
+    if (attrs.pwp || attrs.free_gift || attrs.free_item) {
+      throw new HTTPException(400, {
+        message: "promo / free markers are not allowed on added lines",
+      });
+    }
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // Fresh sku rows — server price authority + the POS-visibility gate (an
+  // added product must be currently sellable, same bar as the catalog grid).
+  const skuList = [...new Set(parsed.data.lines.map((l) => l.sku))];
+  const skuR = await sb
+    .from("product_skus")
+    .select("sku, price, pos_active, discontinued_at")
+    .in("sku", skuList);
+  if (skuR.error) throw new HTTPException(500, { message: skuR.error.message });
+  const skuBySku = new Map(
+    ((skuR.data ?? []) as Array<{ sku: string; price: number | string; pos_active: boolean | null; discontinued_at: string | null }>).map(
+      (s) => [s.sku, s] as const,
+    ),
+  );
+  for (const l of parsed.data.lines) {
+    const s = skuBySku.get(l.sku);
+    if (!s || s.pos_active === false || s.discontinued_at) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "unknown_or_inactive_sku",
+          message: `SKU ${l.sku} is not available for sale`,
+        },
+        422,
+      );
+    }
+  }
+
+  // Base = fresh catalog price. The client's attrs preview totals
+  // (specials_total / options_total) are folded in as PREVIEWS so the two
+  // recomputes below can nudge them to server-canonical figures (or 422 on
+  // drift) — exactly the create-route contract; the base itself is never
+  // client-influenced.
+  const lines = parsed.data.lines.map((l) => {
+    const attrs = (l.attrs ?? null) as Record<string, unknown> | null;
+    const previewOf = (key: string): number => {
+      const v = attrs?.[key];
+      return typeof v === "number" && Number.isFinite(v) ? v : 0;
+    };
+    return {
+      sku: l.sku,
+      qty: l.qty,
+      attrs,
+      unitPrice:
+        Number(skuBySku.get(l.sku)!.price) + previewOf("specials_total") + previewOf("options_total"),
+    };
+  });
+
+  const specialRecompute = await recomputeSpecialAddonLines(sb, lines);
+  if (specialRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "special_price_drift",
+        message:
+          `Special add-on price mismatch on '${specialRecompute.drift.lineSku}': client RM ` +
+          `${specialRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${specialRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: specialRecompute.drift.clientTotal,
+        serverTotal: specialRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
+  const optionsRecompute = await recomputeOptionPickLines(sb, specialRecompute.lines);
+  if (optionsRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "options_price_drift",
+        message:
+          `Option price mismatch on '${optionsRecompute.drift.lineSku}': client RM ` +
+          `${optionsRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${optionsRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: optionsRecompute.drift.clientTotal,
+        serverTotal: optionsRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
+  const { error: rpcError } = await sb.rpc("add_order_lines", {
+    p_order_id: id,
+    p_lines: optionsRecompute.lines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: l.attrs,
+      unit_price: l.unitPrice,
+    })),
+    p_source: "direct",
+    p_change_request_id: null,
+  });
+  if (rpcError) {
+    const sqlstate = rpcError.code;
+    if (sqlstate === "42501") throw new HTTPException(403, { message: "Forbidden" });
+    if (sqlstate === "42P01") throw new HTTPException(404, { message: "Order not found" });
+    if (sqlstate === "22023" || sqlstate === "P0001") {
+      return c.json(
+        {
+          error: "add_lines_blocked",
+          code: rpcError.details ?? null,
+          message: rpcError.message ?? "Unprocessable entity",
+        },
+        422,
+      );
+    }
+    throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
 
 /** POST /api/orders/:id/date — confirm a TBD delivery date. Mirrors
  *  ConfirmDateModal in proto. The lead-time floor (mattress/bedframe 14d,
@@ -2011,6 +2287,13 @@ ordersRouter.patch("/:id", async (c) => {
     if ("email" in cust) flat.customer_email = cust.email ?? "";
     if ("address" in cust) flat.customer_address = cust.address ?? "";
     if ("addressUnknown" in cust) flat.customer_address_unknown = cust.addressUnknown;
+    // 0230 — structured parts. The RPC enforces "parts only ride WITH the
+    // composed address" and clears stored parts on a flat-only address write.
+    if ("addressLine1" in cust) flat.customer_address_line1 = cust.addressLine1 ?? "";
+    if ("addressLine2" in cust) flat.customer_address_line2 = cust.addressLine2 ?? "";
+    if ("addressState" in cust) flat.customer_address_state = cust.addressState ?? "";
+    if ("addressCity" in cust) flat.customer_address_city = cust.addressCity ?? "";
+    if ("addressPostcode" in cust) flat.customer_address_postcode = cust.addressPostcode ?? "";
     if ("billing" in cust) flat.customer_billing = cust.billing ?? "";
     if ("billingSame" in cust) flat.customer_billing_same = cust.billingSame;
     if ("emergency" in cust) flat.customer_emergency = cust.emergency ?? "";

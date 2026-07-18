@@ -106,6 +106,38 @@ describe("orderInputToRpcPayload", () => {
     expect(out.customer_address_unknown).toBe(true);
   });
 
+  // 0230 — structured MY address parts ride with the composed string.
+  it("forwards the structured address parts, nulling them when addressUnknown", () => {
+    const withParts = baseInput({
+      customer: {
+        ...baseInput().customer,
+        addressLine1: "12-3 Jalan Telawi 5",
+        addressLine2: "Unit 12-A",
+        addressState: "Selangor",
+        addressCity: "Seri Kembangan",
+        addressPostcode: "43300",
+      },
+    });
+    const out = orderInputToRpcPayload(withParts, DEALER_ID);
+    expect(out.customer_address_line1).toBe("12-3 Jalan Telawi 5");
+    expect(out.customer_address_line2).toBe("Unit 12-A");
+    expect(out.customer_address_state).toBe("Selangor");
+    expect(out.customer_address_city).toBe("Seri Kembangan");
+    expect(out.customer_address_postcode).toBe("43300");
+    // Non-POS caller omitting the parts → nulls (never undefined) in the payload.
+    expect(orderInputToRpcPayload(baseInput(), DEALER_ID).customer_address_line1).toBeNull();
+
+    const unknown = orderInputToRpcPayload(
+      baseInput({
+        customer: { ...withParts.customer, addressUnknown: true, address: "" },
+      }),
+      DEALER_ID,
+    );
+    expect(unknown.customer_address_line1).toBeNull();
+    expect(unknown.customer_address_state).toBeNull();
+    expect(unknown.customer_address_postcode).toBeNull();
+  });
+
   it("nulls customer_billing when billingSame is true", () => {
     const out = orderInputToRpcPayload(baseInput(), DEALER_ID);
     expect(out.customer_billing).toBeNull();

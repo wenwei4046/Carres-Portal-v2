@@ -77,6 +77,11 @@ export default function GenerateInvoiceOverlay({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  // An IMPORTED order (no per-line prices) keeps its TAX invoice in
+  // AutoCount — here we only produce a PAYMENT REQUEST / statement for the
+  // outstanding balance, and never mint an INV number for it (option A,
+  // Jess 2026-07-18).
+  const imported = !hasLineTotal;
   const [issued, setIssued] = useState<IssueInvoiceResponse | null>(null);
   const [issuing, setIssuing] = useState(false);
   const effectiveNo = issued?.invoice_no ?? invoiceNo ?? predictedInvoiceNo(so);
@@ -118,7 +123,12 @@ export default function GenerateInvoiceOverlay({
       : [
           {
             sku: `SO-${so}`,
-            description: "Goods total (as keyed)",
+            // International style: the item names ride the DESCRIPTION of the
+            // one priced line (an invoice line always carries money); the
+            // per-piece breakdown belongs to the DO.
+            description: merged.length
+              ? merged.map((m) => `${m.sku} ×${m.qty}`).join("; ")
+              : "Goods total (as keyed)",
             qty: 1,
             unit: "lot",
             unit_price: +orderTotal.toFixed(2),
@@ -139,7 +149,8 @@ export default function GenerateInvoiceOverlay({
           ]
         : [];
     return {
-      invoice_no: effectiveNo,
+      doc_title: imported ? "PAYMENT REQUEST" : undefined,
+      invoice_no: imported ? `SO-${so}` : effectiveNo,
       issue_date: (issued?.issued_at ?? new Date().toISOString()).slice(0, 10),
       order_id: orderId,
       order_code: `SO-${so}`,
@@ -159,6 +170,7 @@ export default function GenerateInvoiceOverlay({
   }, [
     merged,
     hasLineTotal,
+    imported,
     orderTotal,
     storageCharge,
     storageIncurred,
@@ -196,11 +208,17 @@ export default function GenerateInvoiceOverlay({
 
   /** Issue once (idempotent server-side); every output routes through this. */
   async function ensureIssued(): Promise<string | null> {
-    if (isIssued) return effectiveNo;
     if (!totalSet) {
-      toast.error("Set the goods total first — an invoice needs an amount");
+      toast.error(
+        imported
+          ? "Key the outstanding first — a statement needs an amount"
+          : "Set the goods total first — an invoice needs an amount",
+      );
       return null;
     }
+    // Imported order: statement only — no INV number is ever minted here.
+    if (imported) return `SO-${so}`;
+    if (isIssued) return effectiveNo;
     setIssuing(true);
     try {
       const res = await apiFetch<IssueInvoiceResponse>(
@@ -292,11 +310,11 @@ export default function GenerateInvoiceOverlay({
         <div className="flex items-center gap-2.5 px-4 h-[52px] border-b border-base-200 shrink-0">
           <FileText size={16} className="text-base-500" />
           <span className="text-[13px] font-bold text-base-900">
-            Generate invoice
+            {imported ? "Payment request" : "Generate invoice"}
           </span>
           <span className="font-mono text-[12px] text-base-500">
-            {effectiveNo}
-            {!isIssued && " · draft"}
+            {imported ? `SO-${so} · statement` : effectiveNo}
+            {!imported && !isIssued && " · draft"}
           </span>
           <button
             type="button"
@@ -394,9 +412,11 @@ export default function GenerateInvoiceOverlay({
         {/* Footer — issue state + outputs */}
         <div className="flex items-center gap-2 px-4 h-[52px] border-t border-base-200 shrink-0">
           <span className="text-[12px] text-base-500 min-w-0 truncate">
-            {isIssued
-              ? `Issued · ${effectiveNo}`
-              : "Not issued yet — the first output issues it and logs to the order history"}
+            {imported
+              ? "Statement only — the tax invoice for an imported order lives in AutoCount"
+              : isIssued
+                ? `Issued · ${effectiveNo}`
+                : "Not issued yet — the first output issues it and logs to the order history"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <Btn icon={Mail} disabled={issuing} onClick={() => void outputEmail()}>
@@ -415,7 +435,7 @@ export default function GenerateInvoiceOverlay({
               disabled={issuing}
               onClick={() => void outputPdf()}
             >
-              {issuing ? "Issuing…" : isIssued ? "Open PDF" : "Issue & PDF"}
+              {imported ? "PDF" : issuing ? "Issuing…" : isIssued ? "Open PDF" : "Issue & PDF"}
             </Btn>
           </div>
         </div>
