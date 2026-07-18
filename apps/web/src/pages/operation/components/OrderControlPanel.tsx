@@ -1138,7 +1138,7 @@ export function StorageControlFields({
  *  Extension Google Forms, Jess 2026-06-30). Operation may record ONE extension;
  *  a 2nd needs a principal (the route 403s `extension_used`). The free storage
  *  window recomputes from the snapshotted original delivery date. */
-function StorageExtensionRow({
+export function StorageExtensionRow({
   orderId,
   control,
   hasMsbf = false,
@@ -1357,7 +1357,7 @@ function StorageExtensionRow({
  *  receipt → open the delivery gate. A waiver is the principal-approved
  *  alternative. Reads the gate state off the loaded overlay row (form.control).
  *  Jess IS the principal, so this never gates him — it's the operator guardrail. */
-function StorageCollectWaiver({
+export function StorageCollectWaiver({
   orderId,
   control,
   charge,
