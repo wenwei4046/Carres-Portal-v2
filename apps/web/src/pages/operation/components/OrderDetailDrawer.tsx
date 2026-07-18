@@ -4970,7 +4970,6 @@ function StorageCard({
     ? Math.max(0, dayDiff(effectiveStart, endSet || todayIso))
     : 0;
   const freeBase = supplierLate && latestGoodsEta ? latestGoodsEta : deadline;
-  const [editingFee, setEditingFee] = useState(false);
   // ONE value language (Jess): every fact sits in a chip or a pill — no
   // bare prose, no glyph arrows, no how-to sentences.
   const chip =
@@ -5174,35 +5173,44 @@ function StorageCard({
                     : "free"}
               </span>
             )}
-            <span
-              className={`font-mono font-bold text-[13px] ${effTotal > 0 ? "text-danger" : "text-base-800"}`}
-            >
-              {RM(effTotal)}
-            </span>
-            {effTotal > 0 && <span className="pill pill-overdue">unpaid</span>}
-            {editingFee || overrideSet ? (
+            {/* ONE money control (same law as the step-3 date): the box
+                shows the auto/Master figure; editing IS the override. */}
+            <span className="inline-flex items-center gap-1">
+              <span className="font-mono font-semibold text-[12px] text-base-500">
+                RM
+              </span>
               <input
                 type="number"
                 min={0}
-                autoFocus={editingFee}
-                value={draft.storage_fee_override}
+                value={
+                  overrideSet
+                    ? draft.storage_fee_override
+                    : String(
+                        hasImportedFee
+                          ? (impMsbf ?? 0) + (impSof ?? 0)
+                          : auto.total,
+                      )
+                }
                 onChange={(e) => set("storage_fee_override", e.target.value)}
-                onBlur={() => setEditingFee(false)}
-                placeholder={`auto ${auto.total}`}
-                aria-label="Override storage fee"
-                className={`${chip} w-20 text-right`}
+                aria-label="Storage fee (edit = manual override)"
+                className={`${chip} w-24 text-right ${effTotal > 0 ? "text-danger" : ""}`}
               />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingFee(true)}
-                title="Override the fee"
-                aria-label="Override the storage fee"
-                className="text-base-400 hover:text-base-700"
-              >
-                <Pencil size={14} />
-              </button>
+            </span>
+            {overrideSet && (
+              <>
+                <span className={soft}>manual</span>
+                <button
+                  type="button"
+                  onClick={() => set("storage_fee_override", "")}
+                  title="Back to auto"
+                  aria-label="Reset the fee to auto"
+                  className="text-base-400 hover:text-base-700"
+                >
+                  <X size={14} />
+                </button>
+              </>
             )}
+            {effTotal > 0 && <span className="pill pill-overdue">unpaid</span>}
             <button
               type="button"
               onClick={() => set("storage_fee_override", "0")}
