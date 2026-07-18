@@ -52,6 +52,12 @@ describe("OrderEntryPage", () => {
 
     // The 4 built-in methods can only be deactivated, never removed.
     expect(screen.queryByRole("button", { name: /^Remove Cash$/ })).not.toBeInTheDocument();
+
+    // 0230 — Stripe shows as a locked SYSTEM row (read-only, always offered
+    // at checkout) so the page reflects the full method list the POS renders.
+    expect(screen.getByTestId("entry-config-stripe-row")).toBeInTheDocument();
+    expect(screen.getByText("Pay online")).toBeInTheDocument();
+    expect(screen.getByText("Stripe QR / link")).toBeInTheDocument();
   });
 
   it("toggling a builtin (race → not required) saves formFields.customer.builtins.race.required === false", () => {

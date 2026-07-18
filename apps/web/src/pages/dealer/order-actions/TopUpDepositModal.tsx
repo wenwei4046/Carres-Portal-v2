@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { resolvePaymentMethods } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useTopUpOrder } from "@/lib/queries";
+import { useCatalog, useTopUpOrder } from "@/lib/queries";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 
 /**
@@ -22,14 +23,6 @@ interface Props {
   total: number;
   onClose: () => void;
 }
-
-const METHODS: Array<{ key: "cash" | "bank" | "cheque" | "online" | "card"; label: string }> = [
-  { key: "cash", label: "Cash" },
-  { key: "bank", label: "Bank transfer" },
-  { key: "cheque", label: "Cheque" },
-  { key: "online", label: "Online (FPX/eWallet)" },
-  { key: "card", label: "Card / terminal" },
-];
 
 const RM = (n: number) =>
   `RM ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -65,7 +58,21 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
 
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   const [amount, setAmount] = useState<number>(initialAmount);
-  const [method, setMethod] = useState<(typeof METHODS)[number]["key"]>("bank");
+  // 0230 — the method chips mirror checkout: the ACTIVE configured methods
+  // from order_entry_config (code defaults when the config is empty).
+  const catalogQ = useCatalog();
+  const payMethods = useMemo(
+    () => resolvePaymentMethods(catalogQ.data?.orderEntryConfig),
+    [catalogQ.data?.orderEntryConfig],
+  );
+  const [method, setMethod] = useState<string>("cash");
+  // Keep the selected chip valid against the configured list (the catalog
+  // loads async; the operator may have removed a default key).
+  useEffect(() => {
+    if (payMethods.length > 0 && !payMethods.some((m) => m.key === method)) {
+      setMethod(payMethods[0].key);
+    }
+  }, [payMethods, method]);
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -151,7 +158,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
       );
       setUploading(false);
 
-      const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
+      const methodLabel = payMethods.find((m) => m.key === method)?.label ?? method;
       topUpMut.mutate({
         amount,
         method,
@@ -263,7 +270,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
         <section>
           <label className="label block mb-2">Payment method *</label>
           <div className="grid grid-cols-3 gap-1.5 mb-3">
-            {METHODS.map((m) => {
+            {payMethods.map((m) => {
               const active = method === m.key;
               return (
                 <button
@@ -392,7 +399,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
           ) : (
             <span>
               Will record <strong className="font-mono">{RM(amount)}</strong> via{" "}
-              <strong>{METHODS.find((m) => m.key === method)?.label}</strong>
+              <strong>{payMethods.find((m) => m.key === method)?.label ?? method}</strong>
             </span>
           )}
         </p>
