@@ -34,6 +34,7 @@ import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
   distributeOrders,
+  seenTodayMYT,
   isOpsManager,
   type OpsTask,
   type OpsTasksListResponse,
@@ -1291,7 +1292,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (!isManager) return;
     const all = data?.orders;
     if (!all || !staffQ.data) return;
-    const avail = staffQ.data.staff.filter((s) => s.pooled && s.available);
+    // Available = in the pool + not manually away + SEEN TODAY (0235: opened
+    // the portal = came to work; MC/no-show auto-skipped, zero clicks).
+    const avail = staffQ.data.staff.filter(
+      (s) => s.pooled && s.available && seenTodayMYT(s.last_seen_at),
+    );
     if (avail.length === 0) return;
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const unassigned = open.filter((o) => !ownerOf(o));
@@ -1324,7 +1329,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const all = data?.orders ?? [];
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const mine = open.filter((o) => ownerOf(o) === userId);
-    const others = poolStaff.filter((s) => s.available && s.user_id !== userId);
+    const others = poolStaff.filter(
+      (s) =>
+        s.available && seenTodayMYT(s.last_seen_at) && s.user_id !== userId,
+    );
     if (mine.length === 0 || others.length === 0) {
       toast.error(
         mine.length === 0
@@ -1938,10 +1946,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   {poolStaff.map((s) => (
                     <KanbanRow
                       key={s.user_id}
-                      label={s.available ? staffLabel(s) : `${staffLabel(s)} · away`}
+                      label={
+                        !s.available
+                          ? `${staffLabel(s)} · away`
+                          : !seenTodayMYT(s.last_seen_at)
+                            ? `${staffLabel(s)} · not in`
+                            : staffLabel(s)
+                      }
                       count={staffEntries.counts.get(s.user_id) ?? 0}
                       active={staffFilter === s.user_id}
-                      title={s.email}
+                      title={
+                        !s.available
+                          ? `${s.email} — marked away (MC/leave); new orders skip them`
+                          : !seenTodayMYT(s.last_seen_at)
+                            ? `${s.email} — hasn't opened the portal today; new orders skip them until they do`
+                            : s.email
+                      }
                       onClick={() =>
                         setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
                       }
@@ -2512,7 +2532,11 @@ function TeamPopover({
                     <span className="text-[11px] text-base-500"> · away</span>
                   )}
                 </div>
-                <div className="text-[11px] text-base-500 truncate">{s.email}</div>
+                <div className="text-[11px] text-base-500 truncate">
+                  {s.email}
+                  {s.pooled &&
+                    (seenTodayMYT(s.last_seen_at) ? " · in today" : " · not in yet")}
+                </div>
               </div>
               {!s.pooled ? (
                 <button

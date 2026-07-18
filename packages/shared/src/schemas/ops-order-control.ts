@@ -544,6 +544,9 @@ export const opsStaffMemberSchema = z.object({
   pooled: z.boolean(),
   available: z.boolean(),
   note: z.string().nullable(),
+  /** Presence stamp (0235) — set by touch_last_seen when they open the
+   *  portal; null = never seen. Drives the seen-today auto-availability. */
+  last_seen_at: z.string().nullable().default(null),
 });
 export type OpsStaffMember = z.infer<typeof opsStaffMemberSchema>;
 
@@ -562,6 +565,21 @@ export const updateOpsStaffSettingInput = z
   })
   .strict();
 export type UpdateOpsStaffSettingInput = z.infer<typeof updateOpsStaffSettingInput>;
+
+/** "Came to work today" (0235) — the presence stamp falls on today's date in
+ *  MYT (UTC+8, Malaysia has no DST). The auto-assign sweep only hands NEW
+ *  orders to pool members seen today: MC / no-show = never stamped = skipped
+ *  automatically, no manual click needed. */
+export function seenTodayMYT(
+  lastSeenIso: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!lastSeenIso) return false;
+  const seen = new Date(lastSeenIso);
+  if (Number.isNaN(seen.getTime())) return false;
+  const dayMYT = (d: Date) => Math.floor((d.getTime() + 8 * 3_600_000) / 86_400_000);
+  return dayMYT(seen) === dayMYT(now);
+}
 
 /**
  * Least-loaded distribution (auto-assign + redistribute share this): hand each

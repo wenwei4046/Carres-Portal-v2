@@ -10,6 +10,7 @@ import {
   decideStorageWaiverInput,
   recordStorageExtensionInput,
   distributeOrders,
+  seenTodayMYT,
 } from "./ops-order-control";
 
 /**
@@ -284,5 +285,23 @@ describe("distributeOrders (0232 staff auto-assign)", () => {
     const loads = [{ userId: "a", openCount: 0 }];
     distributeOrders(["o1", "o2"], loads);
     expect(loads[0]!.openCount).toBe(0);
+  });
+});
+
+describe("seenTodayMYT (0235 presence)", () => {
+  // 2026-07-18 10:00 MYT = 02:00 UTC.
+  const now = new Date("2026-07-18T02:00:00Z");
+  it("stamped earlier today (MYT) → true", () => {
+    // 00:30 MYT same day = 16:30 UTC the day before.
+    expect(seenTodayMYT("2026-07-17T16:30:00Z", now)).toBe(true);
+  });
+  it("stamped yesterday MYT → false (even if same UTC date)", () => {
+    // 23:00 MYT on 17 Jul = 15:00 UTC 17 Jul.
+    expect(seenTodayMYT("2026-07-17T15:00:00Z", now)).toBe(false);
+  });
+  it("never stamped / garbage → false", () => {
+    expect(seenTodayMYT(null, now)).toBe(false);
+    expect(seenTodayMYT(undefined, now)).toBe(false);
+    expect(seenTodayMYT("not-a-date", now)).toBe(false);
   });
 });

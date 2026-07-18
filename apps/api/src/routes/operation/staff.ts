@@ -46,7 +46,7 @@ staffRouter.get("/", async (c) => {
   const [users, settings] = await Promise.all([
     sb
       .from("app_users")
-      .select("id, email, name, status")
+      .select("id, email, name, status, last_seen_at")
       .eq("role", "operation")
       .order("email"),
     sb.from("ops_staff_settings").select("user_id, available, note"),
@@ -75,10 +75,25 @@ staffRouter.get("/", async (c) => {
         pooled: !!s,
         available: !!s && s.available !== false,
         note: (s?.note as string | null) ?? null,
+        last_seen_at: (u.last_seen_at as string | null) ?? null,
       };
     });
 
   return c.json({ staff });
+});
+
+// POST /heartbeat — stamp the CALLER's own last_seen_at via the 0235 DEFINER
+// RPC (presence: opened the portal today = available for auto-assign).
+staffRouter.post("/heartbeat", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const sb = userClient(c.env, auth.jwt);
+  const { error } = await sb.rpc("touch_last_seen");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
 });
 
 // PUT /:userId — upsert pool membership. pooled:false deletes the row.
