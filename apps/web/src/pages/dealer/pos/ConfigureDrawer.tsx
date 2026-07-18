@@ -35,7 +35,6 @@ export default function ConfigureDrawer({
   modelSofaCompartments,
   sofaCombos,
   specialAddons,
-  initialSkuId,
   onAdd,
   onClose,
 }: {
@@ -53,9 +52,6 @@ export default function ConfigureDrawer({
   /** Special add-ons (0181) — passed through so a model's offered specials
    *  render in the configurator. ADDITIVE. */
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry (Maintain → New Order): preselect this variant so a
-   *  search hit opens ready-configured. ADDITIVE — absent = unchanged. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -132,7 +128,6 @@ export default function ConfigureDrawer({
             modelSofaCompartments={modelSofaCompartments}
             sofaCombos={sofaCombos}
             specialAddons={specialAddons}
-            initialSkuId={initialSkuId}
             onAdd={(line) => {
               onAdd(line);
               onClose();

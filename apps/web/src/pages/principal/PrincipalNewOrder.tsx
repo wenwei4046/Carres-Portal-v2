@@ -32,7 +32,6 @@ import { newLocalId } from "../dealer/new-order/configurators";
 import { RELATIONSHIPS } from "../dealer/pos/customer-autofill";
 import PosConfigurePage from "../dealer/pos/PosConfigurePage";
 import SofaConfigurePage from "../dealer/pos/SofaConfigurePage";
-import ConfigureDrawer from "../dealer/pos/ConfigureDrawer";
 import { buildCatalogIndex } from "../dealer/pos/catalog-index";
 import { lineEditTarget } from "../dealer/pos/cart";
 
@@ -44,12 +43,14 @@ import { lineEditTarget } from "../dealer/pos/cart";
  * gates anything:
  *   CUSTOMER · ORDER INFO (+ configured custom fields) · EMERGENCY CONTACT ·
  *   DELIVERY ADDRESS (MY cascade + billing) · LINE ITEMS · PAYMENT
- * Line items are pick-or-type comboboxes IN the row (2990s parity): picking a
- * configurable catalog product opens its OWN configure surface (specs follow
- * the product — fabric / divan / gap / leg / specials); free text stays a
- * custom "OTHERS" line. Prices, dates (past OK, empty = TBD), qty — all stay
- * editable, always. Submits via POST /api/orders/raw; the only requirements
- * are dealer + customer name + ≥1 line (the server's own floor).
+ * Line items are pick-or-type comboboxes IN the row (2990s parity): picking an
+ * item fills the row DIRECTLY — it never jumps into the product-option page
+ * (Loo 2026-07-18). Specs stay OPTIONAL via the row's ✎ (opens the product's
+ * own configurator prefilled — fabric / divan / gap / leg / specials — and
+ * writes back to the row); free text stays a custom "OTHERS" line. Prices,
+ * dates (past OK, empty = TBD), qty — all stay editable, always. Submits via
+ * POST /api/orders/raw; the only requirements are dealer + customer name +
+ * ≥1 line (the server's own floor).
  */
 
 /** Raw drafts start with NO payment method picked (payment optional here). */
@@ -82,14 +83,10 @@ export default function PrincipalNewOrder() {
   });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  /** Configure surface to open: the target row + model (+ preselected sku for
-   *  a fresh pick, or edit=true to prefill from the row's stored line). */
-  const [configure, setConfigure] = useState<{
-    rowId: string;
-    modelId: string;
-    skuId: string | null;
-    edit: boolean;
-  } | null>(null);
+  /** ✎ — the row whose product configurator is open. OPTIONAL and explicit:
+   *  picking an item never jumps anywhere (Loo 2026-07-18); the configurator
+   *  only opens from the row's ✎ button, prefilled from the stored line. */
+  const [editRowId, setEditRowId] = useState<string | null>(null);
   /** In-progress unit-price edit strings keyed by localId, so partial input
    *  ("2.") doesn't fight the numeric DraftLine value. */
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
@@ -191,34 +188,23 @@ export default function PrincipalNewOrder() {
     }));
   }
 
-  /** A row's catalog pick. A model with a configure surface (mattress /
-   *  bedframe / sofa) opens it — specs follow the product; accessory /
-   *  service / orphan skus fill the row directly at catalog price. */
+  /** A row's catalog pick fills the row DIRECTLY — sku, display label and
+   *  catalog price (still editable). It NEVER jumps into the product-option
+   *  page (Loo 2026-07-18); specs stay optional via the row's ✎ afterwards.
+   *  A typed remark survives the pick. */
   function pickSkuForRow(rowId: string, sku: ProductSkuDto) {
     const model = modelById.get(sku.modelId);
-    if (
-      model &&
-      (model.category === "mattress" ||
-        model.category === "bedframe" ||
-        model.category === "sofa")
-    ) {
-      setConfigure({ rowId, modelId: model.id, skuId: sku.id, edit: false });
-      return;
-    }
+    const prev = draft.lines.find((l) => l.localId === rowId);
+    const prevAttrs = (prev?.attrs ?? {}) as Record<string, unknown>;
+    const remark = typeof prevAttrs.remark === "string" ? prevAttrs.remark : "";
     fillRow(rowId, {
       localId: rowId,
       sku: sku.sku,
-      qty: 1,
-      attrs: null,
+      qty: prev?.qty ?? 1,
+      attrs: remark ? { remark } : null,
       unitPrice: sku.price ?? 0,
       label: model ? `${model.name} · ${sku.variant}` : sku.variant,
     });
-  }
-
-  function openEditForRow(row: DraftLine) {
-    const sku = skuByCode.get(row.sku);
-    if (!sku) return;
-    setConfigure({ rowId: row.localId, modelId: sku.modelId, skuId: null, edit: true });
   }
 
   /** Rows the operator actually keyed (a fully-empty row is ignored). */
@@ -337,22 +323,19 @@ export default function PrincipalNewOrder() {
     );
   }
 
-  // ── Configure overlay (specs follow the product) ──────────────────────────
+  // ── ✎ configure overlay (OPTIONAL — specs follow the product) ─────────────
   const overlay = (() => {
-    if (!configure || !catalog || !index) return null;
-    const model = modelById.get(configure.modelId);
-    if (!model) return null;
-    const row = draft.lines.find((l) => l.localId === configure.rowId);
-    const editing = configure.edit && row ? row : undefined;
-    const close = () => setConfigure(null);
-    const emit = (line: DraftLine) => fillRow(configure.rowId, line);
-    const offered = (catalog.modelSofaCompartments ?? []).filter(
-      (mc) => mc.modelId === model.id,
-    );
+    if (!editRowId || !catalog || !index) return null;
+    const row = draft.lines.find((l) => l.localId === editRowId);
+    const sku = row ? skuByCode.get(row.sku) : undefined;
+    const model = sku ? modelById.get(sku.modelId) : undefined;
+    if (!row || !model) return null;
+    const close = () => setEditRowId(null);
+    const emit = (line: DraftLine) => fillRow(editRowId, line);
     if (model.category === "mattress" || model.category === "bedframe") {
       return (
         <PosConfigurePage
-          key={configure.rowId + model.id}
+          key={editRowId}
           model={model}
           meta={index.meta.get(model.id)}
           skus={index.skusByModel.get(model.id) ?? []}
@@ -361,21 +344,16 @@ export default function PrincipalNewOrder() {
           fabrics={catalog.fabrics}
           fabricTierConfig={catalog.fabricTierConfig}
           modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-          editLine={editing}
-          initialSkuId={editing ? undefined : configure.skuId ?? undefined}
+          editLine={row}
           onAdd={emit}
           onClose={close}
         />
       );
     }
-    if (
-      model.category === "sofa" &&
-      (offered.length > 0 ||
-        Boolean(editing && lineEditTarget(editing, catalog) === "sofa_build"))
-    ) {
+    if (model.category === "sofa" && lineEditTarget(row, catalog) === "sofa_build") {
       return (
         <SofaConfigurePage
-          key={configure.rowId + model.id}
+          key={editRowId}
           model={model}
           meta={index.meta.get(model.id)}
           skus={index.skusByModel.get(model.id) ?? []}
@@ -385,33 +363,17 @@ export default function PrincipalNewOrder() {
           fabricTierConfig={catalog.fabricTierConfig}
           modelFabricTierOverrides={catalog.modelFabricTierOverrides}
           sofaCompartments={catalog.sofaCompartments ?? []}
-          modelCompartments={offered}
+          modelCompartments={(catalog.modelSofaCompartments ?? []).filter(
+            (mc) => mc.modelId === model.id,
+          )}
           sofaCombos={catalog.sofaCombos ?? []}
-          editLine={editing}
+          editLine={row}
           onAdd={emit}
           onClose={close}
         />
       );
     }
-    if (editing) return null;
-    // Dropdown sofa (no offered compartments) — the drawer configurator.
-    return (
-      <ConfigureDrawer
-        model={model}
-        meta={index.meta.get(model.id)}
-        skus={index.skusByModel.get(model.id) ?? []}
-        fabrics={index.fabricsByModel.get(model.id) ?? []}
-        fabricTierConfig={catalog.fabricTierConfig}
-        modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-        sofaCompartments={catalog.sofaCompartments}
-        modelSofaCompartments={catalog.modelSofaCompartments}
-        sofaCombos={catalog.sofaCombos}
-        specialAddons={catalog.specialAddons}
-        initialSkuId={configure.skuId ?? undefined}
-        onAdd={emit}
-        onClose={close}
-      />
-    );
+    return null;
   })();
 
   return (
@@ -827,7 +789,13 @@ export default function PrincipalNewOrder() {
                     catalog={catalogQ.data ?? null}
                     modelById={modelById}
                     onType={(text) =>
-                      patchLine(l.localId, { sku: text, label: "", attrs: null })
+                      // Typing over a pick resets the product identity but a
+                      // typed remark survives.
+                      patchLine(l.localId, {
+                        sku: text,
+                        label: "",
+                        attrs: remark ? { remark } : null,
+                      })
                     }
                     onPick={(sku) => pickSkuForRow(l.localId, sku)}
                   />
@@ -893,9 +861,9 @@ export default function PrincipalNewOrder() {
                   {editable && (
                     <button
                       type="button"
-                      onClick={() => openEditForRow(l)}
+                      onClick={() => setEditRowId(l.localId)}
                       aria-label="Edit specs"
-                      title="Re-open the product configurator"
+                      title="Optional — open the product configurator for specs"
                       data-testid={`raw-edit-${l.localId}`}
                       className="grid place-items-center w-7 h-7 rounded-md text-base-400 hover:text-base-800 hover:bg-base-100"
                     >
