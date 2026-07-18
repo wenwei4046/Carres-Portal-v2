@@ -5092,15 +5092,11 @@ function StorageCard({
           ) : effectiveStart ? (
             <>
               <span className={chip}>{fmtDate(effectiveStart)}</span>
-              <span className={soft}>{form.storageFrom ? "manual" : "auto"}</span>
+              {form.storageFrom && <span className={soft}>manual</span>}
               <span className="pill pill-confirmed">counting</span>
             </>
           ) : autoAnchor ? (
-            <>
-              <span className={chip}>{fmtDate(autoAnchor)}</span>
-              <span className={soft}>auto</span>
-              <span className={soft}>not started</span>
-            </>
+            <span className={chip}>{fmtDate(autoAnchor)}</span>
           ) : (
             <span className={soft}>—</span>
           )}
@@ -5127,7 +5123,7 @@ function StorageCard({
                 ? "act"
                 : "todo"
         }
-        title="Fee so far"
+        title="Fee"
       >
         {collectedAt ? (
           <span className="pill pill-confirmed">
