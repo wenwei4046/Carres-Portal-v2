@@ -90,9 +90,11 @@ function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 type RpcError = { code?: string; message?: string; details?: string };
 
-/** Minimal sb mock for the /raw path: rpc(create_order) + orders refetch. */
+/** Minimal sb mock for the /raw path: rpc(create_order) + orders refetch +
+ *  the order_payments ledger insert (captured for assertions). */
 function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   const rpcCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
+  const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
   const sb = {
     rpc: async (name: string, args: { payload: Record<string, unknown> }) => {
       rpcCalls.push({ name, payload: args.payload });
@@ -102,7 +104,11 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
         error: null,
       };
     },
-    from: (_table: string) => ({
+    from: (table: string) => ({
+      insert: async (row: Record<string, unknown>) => {
+        inserts.push({ table, row });
+        return { data: null, error: null };
+      },
       select: (_cols?: string) => {
         const chain = {
           eq: () => chain,
@@ -112,6 +118,7 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
       },
     }),
     _rpcCalls: rpcCalls,
+    _inserts: inserts,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return sb as any;
@@ -358,6 +365,53 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.addons).toEqual([
       { addon_key: "dispose-bedframe", qty: 1, unit_price: 80, attrs: { size: "King" } },
     ]);
+  });
+
+  it("paid > 0 posts BACK into the order_payments ledger (deposit, mapped method, approval ref)", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), {
+      ...validBody,
+      paid: 2000,
+      paymentMethod: "credit",
+      approvalCode: "472019",
+    });
+    expect(res.status).toBe(201);
+    const ledger = sb._inserts.filter(
+      (i: { table: string }) => i.table === "order_payments",
+    );
+    expect(ledger.length).toBe(1);
+    expect(ledger[0].row).toMatchObject({
+      order_id: "11111111-1111-1111-1111-111111111111",
+      amount: 2000,
+      method: "card", // credit → the ledger's card bucket
+      kind: "deposit",
+      reference: "472019",
+    });
+    expect(typeof ledger[0].row.paid_on).toBe("string");
+  });
+
+  it("paid = 0 (or absent) writes NO ledger row; unknown method maps to 'other'", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), validBody); // no paid
+    expect(res.status).toBe(201);
+    expect(
+      sb._inserts.filter((i: { table: string }) => i.table === "order_payments").length,
+    ).toBe(0);
+
+    const sb2 = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb2);
+    await post(await makeJwt("operation"), {
+      ...validBody,
+      paid: 100,
+      paymentMethod: "my-custom-method",
+    });
+    const ledger2 = sb2._inserts.filter(
+      (i: { table: string }) => i.table === "order_payments",
+    );
+    expect(ledger2[0].row.method).toBe("other");
+    expect(ledger2[0].row.reference).toBeNull();
   });
 
   it("422 rule_violation when the RPC rejects a sofa + mattress/bed-frame mix", async () => {

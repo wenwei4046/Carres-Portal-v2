@@ -1009,6 +1009,37 @@ ordersRouter.post("/raw", async (c) => {
   const { id } = (created ?? {}) as { id?: string };
   if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
 
+  // Loo 2026-07-18 — the at-creation payment posts BACK into the order_payments
+  // ledger (the 0193 "track payment" place the Balance panel + receipt/SO PDF
+  // read), same as an operation-recorded payment: kind 'deposit', reference =
+  // the approval code, recorded_by = the operator. BEST-EFFORT after the
+  // committed create — a ledger miss must not fail the order (the PDF falls
+  // back to orders.paid); the row can still be keyed manually in Balance.
+  if (input.paid > 0) {
+    const LEDGER_METHOD: Record<string, string> = {
+      cash: "cash",
+      bank: "bank",
+      online: "online",
+      credit: "card",
+      card: "card",
+      installment: "card",
+      cheque: "cheque",
+    };
+    const { error: ledgerErr } = await sb.from("order_payments").insert({
+      order_id: id,
+      amount: input.paid,
+      paid_on: new Date().toISOString().slice(0, 10),
+      method: LEDGER_METHOD[input.paymentMethod ?? ""] ?? "other",
+      kind: "deposit",
+      reference: input.approvalCode || null,
+      note: "Recorded at New Order (raw) creation",
+      recorded_by: auth.id,
+    });
+    if (ledgerErr) {
+      console.error("raw create: order_payments ledger insert failed (non-fatal):", ledgerErr.message);
+    }
+  }
+
   // Same response contract as POST / — the full order, so the client can show
   // the SO number + land on the standard order shape without a second GET.
   const { data: full, error: fetchErr } = await sb

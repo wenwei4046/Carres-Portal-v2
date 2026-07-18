@@ -238,6 +238,11 @@ export default function PrincipalNewOrder() {
       const fields = Object.fromEntries(
         Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
       );
+      // 0219 — the picked method's follow-up answers (e.g. the Credit/Debit
+      // Bank) ride entry_data.payment, same as the POS submit.
+      const followUps = Object.fromEntries(
+        Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
+      );
       const input: RawCreateOrderInput = {
         dealerId,
         outletId: draft.outletId,
@@ -279,7 +284,14 @@ export default function PrincipalNewOrder() {
         approvalCode: draft.payment.approvalCode.trim() || null,
         installmentMonths:
           draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
-        ...(Object.keys(fields).length > 0 ? { entryData: { fields } } : {}),
+        ...(Object.keys(fields).length > 0 || Object.keys(followUps).length > 0
+          ? {
+              entryData: {
+                ...(Object.keys(followUps).length > 0 ? { payment: followUps } : {}),
+                ...(Object.keys(fields).length > 0 ? { fields } : {}),
+              },
+            }
+          : {}),
       };
       const order = await createRaw.mutateAsync(input);
       clearDraft(RAW_DRAFT_STORAGE_KEY);
@@ -917,7 +929,7 @@ export default function PrincipalNewOrder() {
       {/* ── Payment ── */}
       <Section
         title="Payment"
-        hint="Optional — record the deposit taken at order time; later payments go through Finance / top-up"
+        hint="Optional — a paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Paid (RM)">
@@ -979,6 +991,35 @@ export default function PrincipalNewOrder() {
               </select>
             </Field>
           )}
+          {/* 0219 — the picked method's Order-Entry-configured follow-ups
+              (e.g. the Credit/Debit "Bank") render here too, POS parity.
+              Optional on this path; answers ride entry_data.payment. */}
+          {paymentMethods
+            .find((m) => m.key === draft.payment.method)
+            ?.followUps.map((fu) => (
+              <Field key={fu.key} label={fu.label}>
+                <select
+                  value={draft.payment.followUps?.[fu.key] ?? ""}
+                  onChange={(e) =>
+                    setPay({
+                      followUps: {
+                        ...(draft.payment.followUps ?? {}),
+                        [fu.key]: e.target.value,
+                      },
+                    })
+                  }
+                  data-testid={`raw-pay-followup-${fu.key}`}
+                  className={INPUT_CLASS}
+                >
+                  <option value="">— select —</option>
+                  {fu.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ))}
         </div>
         {draft.paid > 0 && subtotal > 0 && (
           <p className="t-small text-base-600 mt-3">
