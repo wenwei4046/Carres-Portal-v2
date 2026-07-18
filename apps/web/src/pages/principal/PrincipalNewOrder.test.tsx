@@ -122,6 +122,22 @@ function catalog(): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    // 0219 Order Entry config — the Payment section renders the SAME methods
+    // + follow-ups the POS gets (here: Credit/Debit with a Bank follow-up).
+    orderEntryConfig: {
+      paymentMethods: [
+        {
+          key: "credit",
+          label: "Credit / Debit",
+          sublabel: "Full payment",
+          active: true,
+          approvalCodeRequired: true,
+          followUps: [
+            { key: "bank", label: "Bank", required: true, options: ["Maybank", "CIMB Bank"] },
+          ],
+        },
+      ],
+    },
     // Maintenance pools + master fabrics — the inline row-variants sources.
     optionPools: [
       { id: "p1", pool: "sofa_size", value: '24"', active: true, sortOrder: 1 },
@@ -324,6 +340,35 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(input.lines).toEqual([
       { sku: "CUSTOM DELIVERY SURCHARGE", qty: 1, unitPrice: 150.5, attrs: null },
     ]);
+  });
+
+  it("payment follows the Order Entry config: follow-ups render here and ride entry_data.payment", async () => {
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-4",
+      so: 1304,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
+    wrap();
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    fireEvent.change(firstSkuInput(), { target: { value: "CUSTOM LINE" } });
+
+    // Pick the configured method → its Bank follow-up appears (POS parity).
+    fireEvent.change(screen.getByTestId("raw-payment-method"), { target: { value: "credit" } });
+    fireEvent.change(screen.getByTestId("raw-pay-followup-bank"), {
+      target: { value: "Maybank" },
+    });
+    fireEvent.change(screen.getByTestId("raw-paid"), { target: { value: "2000" } });
+
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    await screen.findByText("Order SO-1304 created");
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.paid).toBe(2000);
+    expect(input.paymentMethod).toBe("credit");
+    expect(input.entryData).toEqual({ payment: { bank: "Maybank" } });
   });
 
   it("nothing gates beyond dealer + name + one line: dates/payment empty submit as TBD/nulls; remarks + attrs ride", async () => {
