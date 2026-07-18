@@ -66,7 +66,7 @@ Dial 一律贴 KPI headline 值旁,不放在阶段行上。
 - **STOCK ETA**:晚于 deadline/无 ETA→红 alert;**点日期就地变输入框编辑**(只此一处,不再在展开行重复)。
 - **ITEM**:chevron+名粗(**无 icon 缩图**,Jess),副行=size · SKU mono;**特殊多站 route 时名字下常驻 MiniStopsBar**(编号节点:站1实心=货现在的位置,后站灰圈,短站名 "Klang → AL";单站不画=无噪音)。
 - **QTY** 纯数字(在 ITEM 前,Jess 指定顺序)。**PO**:In stock/PO####。
-- **ARRIVED**(**"Received"/"Book in" 两词作废**——Received 与 Reserved 撞脸、Book in 是英式仓库行话):`n/m` 灰数字=到仓件数,未齐时旁边 **[+ Arrived]** 按钮=记录到货(GRN);acc/service/无 PO → "—"。
+- **ARRIVED**(**"Received"/"Book in" 两词作废**——Received 与 Reserved 撞脸、Book in 是英式仓库行话):`n/m` 灰数字=到仓件数(状态);未齐时旁边 **[+ GRN]** 按钮(动作——**GRN 是 Jess 团队 AutoCount 里的正式单据词**;"+ Arrived" 会被读成状态)→ modal "GRN — goods arrived"(Arrived now 数量 · Condition · **Location dropdown**〔STOCK_LOCATIONS 去 at-supplier,自由文字会打错〕· DO# · Save GRN);部分到货天生支持(0/8→3/8→8/8 变黑粗体按钮消失);acc/service/无 PO → "—"。**词汇法:状态词 = Ready / Arrived n·m;动作词 = + GRN;死词 = Reserved · Received · Book in。**
 - **Row 全白**——彩色只住 pill 和红日期(needs-action 蓝底 tint 作废,Jess:底色让表难读);点选中的行才蓝 wash。
 **展开行(chevron)= 只剩 route chips**(goods-in 与 special handling 彻底分开):地点 icon+select 装 pill、chip 间 →、多站 🗑、圆 + 加站;零解释文字。**小单(≤5 行)平铺无组头**;>5 行按 category 分组(组头保留 "N need stock" 提示)。readiness pill 文案:全齐 "All ready ✓"·全无 "N needs stock"·混合 "x ready · y needs stock"(绝不以 0 开头)。ACTION 列作废(Reserve=Need pill 点击;Loan 在 Loan tab;Change route=chevron)。
 Route 平时藏,chevron 展开一行:site→carrier→customer,单件特殊挂 special·direct 可编辑。
