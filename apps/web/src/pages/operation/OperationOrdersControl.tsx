@@ -6,6 +6,10 @@ import {
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
+  useOperationStaff,
+  useUpdateStaffSetting,
+  useAssignOrderStaff,
+  assignOrderStaffRequest,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
@@ -28,7 +32,12 @@ import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
-import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
+import {
+  distributeOrders,
+  type OpsTask,
+  type OpsTasksListResponse,
+  type OpsStaffMember,
+} from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
@@ -48,6 +57,7 @@ import {
   Lock,
   Printer,
   MoreVertical,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -477,6 +487,29 @@ function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
 }
 
+// ─── Staff ownership (migration 0232, Jess model B 2026-07-18) ───────────────
+// One soft owner per order (ops_order_control.assigned_staff). NEVER a
+// visibility wall: everyone sees every row; the owner is who's watching it.
+const NO_STAFF = "__none" as const;
+function ownerOf(o: operationOrderListRow): string | null {
+  return ovlOf(o)?.assigned_staff ?? null;
+}
+/** First name (or the email local-part) — the facet tab label. */
+function staffLabel(m: OpsStaffMember): string {
+  const n = (m.name ?? "").trim();
+  if (n) return n.split(/\s+/)[0]!;
+  return m.email.split("@")[0] || m.email;
+}
+/** Two-letter initials for the row owner chip. */
+function staffInitials(m: OpsStaffMember): string {
+  const n = (m.name ?? "").trim();
+  if (n) {
+    const parts = n.split(/\s+/);
+    return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? parts[0]?.[1] ?? "")).toUpperCase();
+  }
+  return m.email.slice(0, 2).toUpperCase();
+}
+
 function ovlOf(o: operationOrderListRow) {
   const raw = o.ops_order_control;
   return Array.isArray(raw) ? raw[0] : raw;
@@ -884,9 +917,9 @@ interface OrderColDef {
  *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "dots", label: "Status", w: 5 },
+  { key: "dots", label: "Status", w: 7 },
   { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 20 },
+  { key: "customer", label: "Customer", w: 18 },
   { key: "stock", label: "Stock", w: 12 },
   { key: "delivery", label: "Delivery", w: 12 },
   { key: "deadline", label: "Deadline", w: 13 },
@@ -1011,6 +1044,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // `undefined` until loaded → the Stock cell falls back to stage-only state.
   const stockQ = useOperationStock();
   const qc = useQueryClient();
+
+  // Staff assignment pool (0232) — fails soft to an empty list on a Worker
+  // that predates the route, keeping the whole assignment layer inert.
+  const staffQ = useOperationStaff();
+  const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
+  const staffById = useMemo(
+    () => new Map(staffList.map((s) => [s.user_id, s])),
+    [staffList],
+  );
+  const poolStaff = useMemo(() => staffList.filter((s) => s.pooled), [staffList]);
+  const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  const assignStaffMut = useAssignOrderStaff({
+    onSuccess: () => toast.success("Reassigned"),
+    onError: (e) => toast.error(`Reassign failed — ${e.message}`),
+  });
 
   // Bulk-action mutations: assign-logistic loops the Inbox ops-assign endpoint;
   // create-tasks loops the ops cockpit /ops/tasks. CSV export is client-side.
@@ -1187,6 +1235,87 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [tabFiltered],
   );
 
+  // STAFF facet counts — per pool member + Unassigned, over the current tab.
+  const staffEntries = useMemo(() => {
+    const counts = new Map<string, number>();
+    let none = 0;
+    for (const o of tabFiltered) {
+      const owner = ownerOf(o);
+      if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      else none += 1;
+    }
+    return { counts, none };
+  }, [tabFiltered]);
+
+  // AUTO-ASSIGN sweep (Jess 2026-07-18): every OPEN order without an owner is
+  // distributed to the least-loaded AVAILABLE pool member — runs once per page
+  // load, assign-at-entry only (existing owners are never silently moved; MC/
+  // resign moves go through the explicit Team-popover redistribute). No pool →
+  // no-op, so the layer is inert until Jess opts staff in.
+  const sweepDone = useRef(false);
+  useEffect(() => {
+    if (sweepDone.current) return;
+    const all = data?.orders;
+    if (!all || !staffQ.data) return;
+    const avail = staffQ.data.staff.filter((s) => s.pooled && s.available);
+    if (avail.length === 0) return;
+    const open = all.filter((o) => controlTabOf(o) !== "completed");
+    const unassigned = open.filter((o) => !ownerOf(o));
+    sweepDone.current = true;
+    if (unassigned.length === 0) return;
+    const loads = avail.map((s) => ({
+      userId: s.user_id,
+      openCount: open.filter((o) => ownerOf(o) === s.user_id).length,
+    }));
+    const plan = distributeOrders(unassigned.map((o) => o.id), loads);
+    void (async () => {
+      let ok = 0;
+      for (let i = 0; i < plan.length; i += 8) {
+        const chunk = plan.slice(i, i + 8);
+        const results = await Promise.allSettled(
+          chunk.map((p) => assignOrderStaffRequest(p.orderId, p.userId)),
+        );
+        ok += results.filter((r) => r.status === "fulfilled").length;
+      }
+      if (ok > 0) {
+        toast.success(`Auto-assigned ${ok} order${ok === 1 ? "" : "s"}`);
+        void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      }
+    })();
+  }, [data, staffQ.data, qc]);
+
+  // Redistribute ONE member's open orders across the other available members
+  // (the resign / long-MC one-click; Team popover).
+  async function redistributeStaff(userId: string) {
+    const all = data?.orders ?? [];
+    const open = all.filter((o) => controlTabOf(o) !== "completed");
+    const mine = open.filter((o) => ownerOf(o) === userId);
+    const others = poolStaff.filter((s) => s.available && s.user_id !== userId);
+    if (mine.length === 0 || others.length === 0) {
+      toast.error(
+        mine.length === 0
+          ? "No open orders to redistribute"
+          : "No other available staff to take them",
+      );
+      return;
+    }
+    const loads = others.map((s) => ({
+      userId: s.user_id,
+      openCount: open.filter((o) => ownerOf(o) === s.user_id).length,
+    }));
+    const plan = distributeOrders(mine.map((o) => o.id), loads);
+    let ok = 0;
+    for (let i = 0; i < plan.length; i += 8) {
+      const chunk = plan.slice(i, i + 8);
+      const results = await Promise.allSettled(
+        chunk.map((p) => assignOrderStaffRequest(p.orderId, p.userId)),
+      );
+      ok += results.filter((r) => r.status === "fulfilled").length;
+    }
+    toast.success(`Redistributed ${ok} order${ok === 1 ? "" : "s"}`);
+    void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+  }
+
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (flaggedOnly) r = r.filter(hasOpenTask);
@@ -1197,12 +1326,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
+    if (staffFilter)
+      r = r.filter((o) =>
+        staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
+      );
     if (categoryFilter.size > 0) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareBySlack);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1410,6 +1543,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     !!search ||
     !!stockFilter ||
     !!logisticFilter ||
+    !!staffFilter ||
     !!regionFilter ||
     !!dueFilter ||
     categoryFilter.size > 0 ||
@@ -1421,6 +1555,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     setSearch("");
     setStockFilter(null);
     setLogisticFilter(null);
+    setStaffFilter(null);
     setRegionFilter(null);
     setDueFilter(null);
     setCategoryFilter(new Set());
@@ -1442,6 +1577,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
     activeChips.push({
       label: regionFilter === OTHERS_LABEL ? "No region" : `Region: ${regionFilter}`,
       onClear: () => setRegionFilter(null),
+    });
+  if (staffFilter)
+    activeChips.push({
+      label:
+        staffFilter === NO_STAFF
+          ? "Staff: Unassigned"
+          : `Staff: ${(() => {
+              const m = staffById.get(staffFilter);
+              return m ? staffLabel(m) : staffFilter;
+            })()}`,
+      onClear: () => setStaffFilter(null),
     });
   if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
   if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
@@ -1742,6 +1888,48 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </KanbanGroup>
 
+              {/* STAFF — 每人一个 tab (Jess 2026-07-18): pool members + Unassigned.
+                  ⚙ Team manages membership / MC availability / redistribute.
+                  Hidden entirely while the staff route is absent (old Worker). */}
+              {staffList.length > 0 && (
+                <KanbanGroup
+                  title="STAFF"
+                  testid="filter-staff"
+                  total={tabFiltered.length}
+                  collapsed={collapsedGroups.has("STAFF")}
+                  onToggle={() => toggleGroup("STAFF")}
+                  headerRight={
+                    <TeamPopover
+                      staff={staffList}
+                      openCounts={staffEntries.counts}
+                      onRedistribute={(id) => void redistributeStaff(id)}
+                    />
+                  }
+                >
+                  {poolStaff.map((s) => (
+                    <KanbanRow
+                      key={s.user_id}
+                      label={s.available ? staffLabel(s) : `${staffLabel(s)} · away`}
+                      count={staffEntries.counts.get(s.user_id) ?? 0}
+                      active={staffFilter === s.user_id}
+                      title={s.email}
+                      onClick={() =>
+                        setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
+                      }
+                    />
+                  ))}
+                  <KanbanRow
+                    label="Unassigned"
+                    count={staffEntries.none}
+                    active={staffFilter === NO_STAFF}
+                    title="Open orders nobody is watching yet"
+                    onClick={() =>
+                      setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
+                    }
+                  />
+                </KanbanGroup>
+              )}
+
               <KanbanGroup
                 title="STOCK"
                 total={stockEntries
@@ -1930,6 +2118,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onOpen={() => setOpenOrderId(o.id)}
                 onFlag={openFollowUp}
                 showCol={showCol}
+                staffById={staffById}
+                poolStaff={poolStaff}
+                onAssignStaff={(orderId, staff) =>
+                  assignStaffMut.mutate({ orderId, staff })
+                }
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
@@ -2211,6 +2404,127 @@ function KanbanGroup({
   );
 }
 
+/** Team popover (0232) — the ⚙ on the STAFF band. Lists every ACTIVE operation
+ *  account: [Add] opts one into the auto-assign pool; pool members get an
+ *  "away" toggle (MC/leave — new orders skip them) + [Remove] + a one-click
+ *  [Shift N] that redistributes their open orders to the other available
+ *  members. Everything here is pool mechanics — visibility never changes. */
+function TeamPopover({
+  staff,
+  openCounts,
+  onRedistribute,
+}: {
+  staff: OpsStaffMember[];
+  openCounts: Map<string, number>;
+  onRedistribute: (userId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const mut = useUpdateStaffSetting({
+    onError: (e) => toast.error(`Team update failed — ${e.message}`),
+  });
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label="Manage team"
+        title="Manage team — who receives auto-assigned orders"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="p-0.5 rounded text-base-500 hover:text-base-800 hover:bg-base-100"
+      >
+        <Users size={14} strokeWidth={2} />
+      </button>
+      {open && (
+        <div className="absolute z-40 mt-1 right-0 w-72 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
+          <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">
+            Auto-assign pool
+          </div>
+          {staff.map((s) => (
+            <div
+              key={s.user_id}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-base-50"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-base-900 truncate">
+                  {staffLabel(s)}
+                  {s.pooled && !s.available && (
+                    <span className="text-[11px] text-base-500"> · away</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-base-500 truncate">{s.email}</div>
+              </div>
+              {!s.pooled ? (
+                <button
+                  type="button"
+                  className="btn-secondary text-[11px] py-0.5 px-2"
+                  disabled={mut.isPending}
+                  onClick={() => mut.mutate({ userId: s.user_id, pooled: true })}
+                >
+                  Add
+                </button>
+              ) : (
+                <>
+                  <label
+                    className="flex items-center gap-1 text-[11px] text-base-600 cursor-pointer"
+                    title="Away (MC / leave) — new orders skip them; existing orders stay until shifted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!s.available}
+                      disabled={mut.isPending}
+                      onChange={() =>
+                        mut.mutate({
+                          userId: s.user_id,
+                          pooled: true,
+                          available: !s.available ? true : false,
+                        })
+                      }
+                    />
+                    away
+                  </label>
+                  {(openCounts.get(s.user_id) ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      className="btn-ghost text-[11px] py-0.5 px-1.5"
+                      title="Shift all their open orders to the other available staff"
+                      onClick={() => onRedistribute(s.user_id)}
+                    >
+                      Shift {openCounts.get(s.user_id)}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-ghost text-[11px] py-0.5 px-1.5 text-base-500"
+                    disabled={mut.isPending}
+                    title="Remove from the pool (their assigned orders keep the name until shifted)"
+                    onClick={() => mut.mutate({ userId: s.user_id, pooled: false })}
+                  >
+                    ✕
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+          <div className="t-micro text-base-400 px-3 pt-1.5 pb-1">
+            New orders auto-assign to the least-loaded member. Everyone still
+            sees every order.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Status pipeline TABS (P2 H) — Gmail Primary/Social-style horizontal tabs at
  *  the top of the LIST. Keeps `data-testid="filter-status"` + button names
  *  (label + count) so the status-filter tests resolve. Active = ink label +
@@ -2268,6 +2582,89 @@ function StatusTabs({
 }
 
 
+/** Owner chip (0232) — 18px initials circle on every row; hollow when
+ *  unassigned. Click = reassign popover (pool members + Unassign). Grey chrome
+ *  only — status colour stays with the dots. */
+function OwnerChip({
+  o,
+  staffById,
+  poolStaff,
+  onAssignStaff,
+}: {
+  o: operationOrderListRow;
+  staffById: Map<string, OpsStaffMember>;
+  poolStaff: OpsStaffMember[];
+  onAssignStaff: (orderId: string, staff: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const owner = ownerOf(o);
+  const member = owner ? staffById.get(owner) : undefined;
+  // No pool at all (feature dormant) → render nothing.
+  if (poolStaff.length === 0 && !member) return null;
+  return (
+    <div className="relative shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign staff"}
+        title={
+          member
+            ? `${member.name ?? member.email} — click to reassign`
+            : "Unassigned — click to assign"
+        }
+        onClick={() => setOpen((v) => !v)}
+        className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
+          member
+            ? "bg-base-200 text-base-700 hover:bg-base-300"
+            : "border border-dashed border-base-300 text-base-300 hover:border-base-500 hover:text-base-500"
+        }`}
+      >
+        {member ? staffInitials(member) : "+"}
+      </button>
+      {open && (
+        <div className="absolute z-40 mt-1 left-0 w-44 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
+          {poolStaff.map((s) => (
+            <button
+              key={s.user_id}
+              type="button"
+              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-base-50 ${
+                s.user_id === owner ? "font-semibold text-base-900" : "text-base-700"
+              }`}
+              onClick={() => {
+                setOpen(false);
+                if (s.user_id !== owner) onAssignStaff(o.id, s.user_id);
+              }}
+            >
+              {staffLabel(s)}
+              {!s.available && <span className="t4-caption"> · away</span>}
+            </button>
+          ))}
+          {owner && (
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-[13px] text-base-500 hover:bg-base-50 border-t border-base-100"
+              onClick={() => {
+                setOpen(false);
+                onAssignStaff(o.id, null);
+              }}
+            >
+              Unassign
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderRow({
   o,
   partnerName,
@@ -2278,6 +2675,9 @@ function OrderRow({
   onOpen,
   onFlag,
   showCol,
+  staffById,
+  poolStaff,
+  onAssignStaff,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -2291,6 +2691,10 @@ function OrderRow({
   onFlag: (o: operationOrderListRow) => void;
   /** Column visibility predicate (Columns show/hide) — gates the 8 data cells. */
   showCol: (key: string) => boolean;
+  /** Staff pool (0232) — owner-chip lookup + the reassign popover options. */
+  staffById: Map<string, OpsStaffMember>;
+  poolStaff: OpsStaffMember[];
+  onAssignStaff: (orderId: string, staff: string | null) => void;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -2327,18 +2731,26 @@ function OrderRow({
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* 三线点 — Money · Stock · Delivery, the row's ONLY colour channel
-          (§14, C rebuild 2026-07-18). Fact cells stay ink/grey. */}
+          (§14, C rebuild 2026-07-18) + the staff owner chip (0232). */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        <div className="flex items-center gap-[5px]" data-testid="row-dots">
-          {dots.map((d, i) => (
-            <span
-              key={i}
-              title={d.title}
-              className="inline-block w-2 h-2 rounded-full shrink-0"
-              style={{ background: d.color }}
-            />
-          ))}
+        <div className="flex items-center gap-[5px]">
+          <span className="flex items-center gap-[5px]" data-testid="row-dots">
+            {dots.map((d, i) => (
+              <span
+                key={i}
+                title={d.title}
+                className="inline-block w-2 h-2 rounded-full shrink-0"
+                style={{ background: d.color }}
+              />
+            ))}
+          </span>
+          <OwnerChip
+            o={o}
+            staffById={staffById}
+            poolStaff={poolStaff}
+            onAssignStaff={onAssignStaff}
+          />
         </div>
       </td>
       )}

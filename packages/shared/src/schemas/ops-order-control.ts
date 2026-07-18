@@ -195,6 +195,12 @@ export const opsOrderControlSchema = z.object({
    *  sets when it creates the task — READ-only here (system-written). */
   contact_by_days: z.number().int().nullable().default(null),
   contact_by_task_at: z.string().nullable().default(null),
+  /** Staff owner (migration 0232) — soft responsibility pointer (app_users.id);
+   *  null = unassigned. assigned_by null = system auto-assign; assigned_at =
+   *  when it last changed. Never a visibility wall. */
+  assigned_staff: z.string().uuid().nullable().default(null),
+  assigned_by: z.string().uuid().nullable().default(null),
+  assigned_at: z.string().nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -362,6 +368,10 @@ export const updateOpsOrderControlInput = z
     // Contact-by (migration 0197) — per-order override of the default 3-day
     // pre-deadline reminder. contact_by_task_at is system-written (cron), not here.
     contact_by_days: z.number().int().min(0).max(60).nullable(),
+    // Staff owner (migration 0232) — soft responsibility pointer, null =
+    // unassigned. assigned_by / assigned_at are SERVER-stamped when this key
+    // is present (never client-supplied).
+    assigned_staff: z.string().uuid().nullable(),
   })
   .partial()
   .strict();
@@ -522,3 +532,58 @@ export const recordStorageExtensionInput = z
     path: ["note"],
   });
 export type RecordStorageExtensionInput = z.infer<typeof recordStorageExtensionInput>;
+
+// ── Staff assignment pool (migration 0232, Jess model B 2026-07-18) ──────────
+/** One operation staff account as the assignment UI sees it. `pooled` = has an
+ *  ops_staff_settings row (opt-in to auto-assign); `available` = pooled AND not
+ *  away (MC / leave). Visibility is NEVER gated by any of this. */
+export const opsStaffMemberSchema = z.object({
+  user_id: z.string().uuid(),
+  email: z.string(),
+  name: z.string().nullable(),
+  pooled: z.boolean(),
+  available: z.boolean(),
+  note: z.string().nullable(),
+});
+export type OpsStaffMember = z.infer<typeof opsStaffMemberSchema>;
+
+export const opsStaffListResponseSchema = z.object({
+  staff: z.array(opsStaffMemberSchema),
+});
+export type OpsStaffListResponse = z.infer<typeof opsStaffListResponseSchema>;
+
+/** PUT /api/operation/staff/:userId — upsert the pool membership/availability.
+ *  pooled:false deletes the settings row (out of the pool entirely). */
+export const updateOpsStaffSettingInput = z
+  .object({
+    pooled: z.boolean(),
+    available: z.boolean().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+export type UpdateOpsStaffSettingInput = z.infer<typeof updateOpsStaffSettingInput>;
+
+/**
+ * Least-loaded distribution (auto-assign + redistribute share this): hand each
+ * order to whichever staff currently has the fewest open orders, bumping their
+ * count as we go. Deterministic — ties break on userId so two operators running
+ * the sweep concurrently converge on the same plan. Empty staff → no plan
+ * (never throws; the caller just skips the sweep).
+ */
+export function distributeOrders(
+  orderIds: string[],
+  staff: { userId: string; openCount: number }[],
+): { orderId: string; userId: string }[] {
+  if (staff.length === 0 || orderIds.length === 0) return [];
+  const loads = staff.map((s) => ({ ...s }));
+  const plan: { orderId: string; userId: string }[] = [];
+  for (const orderId of orderIds) {
+    loads.sort(
+      (a, b) => a.openCount - b.openCount || a.userId.localeCompare(b.userId),
+    );
+    const target = loads[0]!;
+    target.openCount += 1;
+    plan.push({ orderId, userId: target.userId });
+  }
+  return plan;
+}

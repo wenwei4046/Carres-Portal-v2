@@ -132,6 +132,8 @@ import {
   type OpsOrderControl,
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
+  type OpsStaffListResponse,
+  type UpdateOpsStaffSettingInput,
   type OrderPaymentRow,
   type RecordPaymentInput,
   type CollectStorageInput,
@@ -230,6 +232,8 @@ export const qk = {
      *  drawer. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
     orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
+    /** Staff assignment pool (migration 0232) — operation accounts + pool state. */
+    staff: ["operation", "staff"] as const,
     /** Balance job (migration 0184) — the multi-entry payment ledger for an
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
@@ -2189,6 +2193,10 @@ export interface opsRemarkEmbed {
    *  ETA from these (Jess spec §5, stock_eta version, 2026-07-12). */
   line_etas?: Record<string, string> | null;
   line_stock_status?: Record<string, string> | null;
+  /** Staff owner (migration 0232) — soft responsibility pointer surfaced into
+   *  the list for the owner chip + STAFF facet. Optional so older fixtures
+   *  keep typechecking. */
+  assigned_staff?: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
@@ -3069,6 +3077,89 @@ export function useSaveOrderControl(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ===========================================================================
+// Staff assignment pool (migration 0232, Jess model B 2026-07-18).
+// ===========================================================================
+/** Active operation accounts + their pool/availability state. Fails soft
+ *  (retry off): on a Worker that predates the route the list page simply sees
+ *  an empty pool and the whole assignment layer stays inert. */
+export function useOperationStaff(
+  opts?: Partial<UseQueryOptions<OpsStaffListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.staff,
+    queryFn: () => apiFetch<OpsStaffListResponse>(`/api/operation/staff`),
+    staleTime: 60_000,
+    retry: false,
+    ...opts,
+  });
+}
+
+/** Upsert one account's pool membership / availability (MC toggle). */
+export function useUpdateStaffSetting(
+  opts?: Partial<
+    UseMutationOptions<
+      { ok: boolean; pooled: boolean },
+      ApiError,
+      { userId: string } & UpdateOpsStaffSettingInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; pooled: boolean },
+    ApiError,
+    { userId: string } & UpdateOpsStaffSettingInput
+  >({
+    mutationFn: ({ userId, ...input }) =>
+      apiFetch<{ ok: boolean; pooled: boolean }>(
+        `/api/operation/staff/${userId}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.staff, exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Set (or clear) one order's staff owner via the generic control PUT — the
+ *  server stamps assigned_by/assigned_at. Plain function so the auto-assign
+ *  sweep + redistribute can batch it; callers invalidate the list once after
+ *  the batch. */
+export function assignOrderStaffRequest(orderId: string, staff: string | null) {
+  return apiFetch<{ control: OpsOrderControl }>(
+    `/api/operation/orders/${orderId}/control`,
+    { method: "PUT", body: JSON.stringify({ assigned_staff: staff }) },
+  );
+}
+
+/** Single-order reassign (the row owner-chip popover). */
+export function useAssignOrderStaff(
+  opts?: Partial<
+    UseMutationOptions<
+      { control: OpsOrderControl },
+      ApiError,
+      { orderId: string; staff: string | null }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { control: OpsOrderControl },
+    ApiError,
+    { orderId: string; staff: string | null }
+  >({
+    mutationFn: ({ orderId, staff }) => assignOrderStaffRequest(orderId, staff),
+    ...opts,
+    onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
