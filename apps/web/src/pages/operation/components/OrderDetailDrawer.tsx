@@ -933,6 +933,9 @@ interface ChaseNowRow {
   /** red dot = overdue (sorts on top) · amber dot = needs attention. */
   urgency: "overdue" | "attention";
   onAct: (tone: "reminder" | "chase") => void;
+  /** Row click → the tab where this chase is WORKED (supplier→Items,
+   *  logistic→Delivery, customer→Balance). Manage▾ stays the chase itself. */
+  onOpen?: () => void;
 }
 
 /** Relative "how long ago" for the chase stamp — short, truncation-proof. */
@@ -981,7 +984,17 @@ function ChaseNowPanel({
         </span>
       ) : (
         rows.map((r) => (
-          <div key={r.key} className="flex items-center gap-2 min-h-9 min-w-0">
+          <div
+            key={r.key}
+            className={`flex items-center gap-2 min-h-9 min-w-0 ${
+              r.onOpen
+                ? "cursor-pointer rounded-[6px] -mx-1 px-1 hover:bg-base-50"
+                : ""
+            }`}
+            onClick={r.onOpen}
+            role={r.onOpen ? "button" : undefined}
+            title={r.onOpen ? "Open where this is worked" : undefined}
+          >
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 r.urgency === "overdue" ? "bg-danger" : "bg-warning"
@@ -1977,6 +1990,7 @@ function DrawerBody({
           { label: p.label, poNo: p.poNos.join(" / "), lines: p.lines },
           tone,
         ),
+      onOpen: () => setTab("items"),
     };
   });
   if (chasePartnerName && !deliveredDone && (!bookedEta || overDeadline)) {
@@ -1989,6 +2003,7 @@ function DrawerBody({
         : `not booked · due ${deadlineLabel}`,
       urgency: overDeadline ? "overdue" : "attention",
       onAct: (tone) => copyChase("logistic", tone),
+      onOpen: () => setTab("delivery"),
     });
   }
   if (balanceOwing) {
@@ -1998,6 +2013,7 @@ function DrawerBody({
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
+      onOpen: () => setTab("balance"),
     });
   }
   chaseRows.sort(
