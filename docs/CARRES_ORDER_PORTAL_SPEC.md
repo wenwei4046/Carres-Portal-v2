@@ -36,12 +36,13 @@ Header 裸条(无卡框无搜索):‹ Orders · #1101(mono 面包屑,黑 badge �
 左栏 260px 固定(可折叠56):顶 Customer 块常驻(头像+名粗 Title Case+黑#1101 badge+状态pill+电话/WhatsApp+区域;收起紧凑,点开看全址;铅笔内联编辑)。下 tab 栏:Items(默认)·Delivery·Balance·Storage·Loan·Activity(icon16+label13+右状态点/计数;active/hover 蓝#DBEAFE/#1E40AF;40px)。数量用计数、告警用红点。
 右栏 flex:顶 3 KPI grid Balance1fr·Stock1.8fr·Delivery1fr 等高(中性灰分类图标+label+右 headline 值)。KPI/阶段点击→跳 tab。下 = tab 内容:表单/文字类内容 max~1000 左对齐(别字段甩两端);数据表(Items/Warehouse)用全宽 + 正式分列。
 
-## 7. KPI = status-chip strip + Chase Now(⭐ 2026-07-18 再改版 — rev14 已实现)
-**最终形态(rev14,Jess 拍板 B):KPI 三个 box → ONE ~48px status-chip strip**(A2 三条 stepper 大 bar 建了半天被 Jess 否掉——不帮读、吃 ~240px 高度;国际操作员 pattern = Shopify 式紧凑 chip,stepper 是给客户看包裹的):
-- 一行三颗可点 chip:[wallet dial+RM Outstanding][package dial+N/M ready+**MS/BF/SOF 小 badge**][truck deadline+partner/booked];dial 贴值旁(§8);chip 点击=跳它的 tab;窄屏 flex-wrap 不叠字。
-- **短 summary 语义保留**:Balance = storage accruing 时并入("RM 1,749 + RM150 storage");Stock badge 如 [MS 0/8][ACC ✓];Delivery = partner + booked 状态。
-- **Delivered = closed**(guardrail #2):chip 绿 "Delivered"、badge 全✓、Items tab 红点/计数静音。
-- 阶段词(Placed→Confirmed→Paid 等,§8 词表)只活在各 tab 内,不再画节点。
+## 7. 无 KPI 区 + Chase Now(⭐ 2026-07-18 最终拍板 — rev15 已实现)
+**最终形态(rev15,Jess):详情页顶部 NO KPI**——A2 三条 stepper(rev11-13)和 chip strip(rev14)同日先后否掉:两者都在复述 tab/Chase Now 已有的信息,还闹双色矛盾(amber "0/1 ready" 旁红 "SOF 0/1")。右栏 tab 内容直接顶到最上(Items 默认)。状态由三层承担,不再画第四层:
+- **左栏 tab 行的红点/计数**(哪个 tab 有事);
+- **Chase Now 面板**(追谁 + 跳 tab);
+- **各 tab 内自己的 §8 状态词/dial**(Balance tab 的 dial/Overdue pill、Items 的 readiness、Delivery 的 overdue)。
+- **Delivered = closed**(guardrail #2)保留:Items tab 红点/计数静音、Chase Now 只剩 owing customer。
+- 阶段词(Placed→Confirmed→Paid 等,§8 词表)只活在各 tab 内。
 - **Chase Now 面板**(左栏 260px,Customer 块下、tab 栏上,是面板不是 tab):逐行=**counterparty**(supplier 按 supplier 合并多 PO,AutoCount PO 经 `suppliers.cat_covered` 唯一覆盖才推名字/logistic/customer 只在 owing 时);红点 overdue 排顶、琥珀 attention;**红标事实行("2 POs · 14d late" / "not booked · 5d late"),名字保持 ink**;Manage▾(Remind/Chase,与 Items Manage▾ 同语言);**行点击=跳对应 tab**(supplier→Items·logistic→Delivery·customer→Balance);全空显 "Nothing to chase ✓";header 右侧灰 "chased Xh ago"(last_chased_at,API deploy 后生效)。
 (以下为历史记录:A2 stepper 布局已被 rev14 chip strip 覆盖;阶段词/dial 语义仍有效:)
 

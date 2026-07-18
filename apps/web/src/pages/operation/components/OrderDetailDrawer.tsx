@@ -780,51 +780,6 @@ function PieDial({
   );
 }
 
-/** StatusChip (rev14, Jess's option B — replaces the A2 ProgressTrack rows):
- *  the three KPI tracks compressed into ONE ~48px strip of clickable chips —
- *  neutral icon + §8 dial + 18px headline value + short summary, Shopify-
- *  style operator chips. Stage detail lives inside each tab; the chip's job
- *  is the NUMBER and the JUMP. */
-function StatusChip({
-  label,
-  icon: Icon,
-  value,
-  summary,
-  onOpen,
-}: {
-  label: string;
-  icon: LucideIcon;
-  /** 18px headline (the §8 dial rides inside, beside the value). */
-  value: ReactNode;
-  /** Inline tail — Balance "+ storage" · Stock category badges · Delivery
-   *  partner + booked state. */
-  summary?: ReactNode;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title={`Open ${label}`}
-      aria-label={label}
-      className="bg-white border border-base-200 rounded-[12px] px-3 min-h-11 py-1.5 flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-left cursor-pointer transition-colors hover:border-base-300"
-    >
-      <Icon
-        size={16}
-        strokeWidth={2}
-        className="text-base-500 shrink-0"
-        aria-hidden="true"
-      />
-      <span className="text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
-      {summary && (
-        <span className="min-w-0 flex flex-wrap items-center gap-1 text-[12px] text-base-500">
-          {summary}
-        </span>
-      )}
-    </button>
-  );
-}
-
 /** One Chase Now row — a counterparty that needs a push right now. */
 interface ChaseNowRow {
   key: string;
@@ -1731,43 +1686,6 @@ function DrawerBody({
   }
   const chaseGroups = [...chaseByPo.values()];
 
-  // ═══ Track summaries (§7) — one short line under each headline. ═══
-  // Balance: the storage fee joins the readout while it accrues.
-  const storageBit = storageOwing
-    ? storageCharge > 0
-      ? `+ ${RM(storageCharge)} storage`
-      : "+ storage accruing"
-    : null;
-  const balanceSummary = storageBit
-    ? balanceOwing
-      ? `${RM(moneyOutstanding)} ${storageBit}`
-      : storageBit
-    : undefined;
-  // Stock: per-category mini badges — [MS 0/8][BF 0/4][ACC ✓].
-  const CAT_CODE = { mattress: "MS", bedframe: "BF", sofa: "SOF", acc: "ACC" } as const;
-  const stockSummary =
-    stockCats.length > 0 ? (
-      <>
-        {stockCats.map((c) => (
-          <MiniBadge
-            key={c.cat}
-            tone={
-              deliveredDone || c.allReady ? "ready" : c.hot ? "nopo" : "waiting"
-            }
-          >
-            {CAT_CODE[c.cat]}{" "}
-            {deliveredDone || c.allReady ? "✓" : `${c.ready}/${c.total}`}
-          </MiniBadge>
-        ))}
-      </>
-    ) : undefined;
-  // Delivery: partner + booked state (the headline already holds the deadline).
-  const deliverySummary = deliveredDone
-    ? (chasePartnerName ?? "Delivered")
-    : `${chasePartnerName ?? "No partner"} · ${
-        bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"
-      }`;
-
   // ═══ Chase Now rows (§7, B2) — one per COUNTERPARTY; overdue on top.
   // A delivered order is CLOSED: no supplier/logistic chasing remains — only
   // an owing customer survives delivery. Lateness reads RELATIVE ("5d late"
@@ -2157,92 +2075,11 @@ function DrawerBody({
           </button>
         </nav>
         </div>
-        {/* RIGHT — the status strip pinned + the tab content below. */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-        {/* ═══ STATUS STRIP (rev14, Jess's option B — supersedes the A2
-            progress-track rows, which ate ~240px narrating what the tabs +
-            Chase Now already say): ONE ~48px row of three clickable chips —
-            money · stock · deadline, dial beside value (§8), chip click =
-            its tab. Stage detail lives inside each tab. */}
-        <div className="shrink-0 flex flex-wrap gap-2.5">
-          <StatusChip
-            label="Balance"
-            icon={Wallet}
-            value={
-              /* §8 — the payment dial sits BESIDE the headline value. */
-              <span className="inline-flex items-center gap-1.5">
-                <PieDial px={20} fraction={payFraction} state={payDialState} />
-                {paidDone ? (
-                  <span className="text-success">Paid</span>
-                ) : balanceOwing ? (
-                  <span className="text-danger">{RM(moneyOutstanding)}</span>
-                ) : totalSet ? (
-                  RM(moneyOutstanding)
-                ) : (
-                  <span className="text-base-400 font-semibold">No total</span>
-                )}
-              </span>
-            }
-            summary={balanceSummary}
-            onOpen={() => setTab("balance")}
-          />
-          <StatusChip
-            label="Stock"
-            icon={Package}
-            value={
-              /* §8 — the stock dial sits BESIDE the headline value. A
-                 delivered order reads green "Delivered" (guardrail #2). */
-              <span className="inline-flex items-center gap-1.5">
-                <PieDial
-                  px={20}
-                  fraction={
-                    deliveredDone ? 1 : goodsN === 0 ? 0 : readyN / goodsN
-                  }
-                  state={
-                    deliveredDone
-                      ? "green"
-                      : goodsN === 0
-                        ? "gray"
-                        : readyN === goodsN
-                          ? "green"
-                          : stockDelayed
-                            ? "red"
-                            : "amber"
-                  }
-                />
-                {deliveredDone ? (
-                  <span className="text-success">Delivered</span>
-                ) : goodsN === 0 ? (
-                  <span className="text-base-400 font-semibold">—</span>
-                ) : readyN === goodsN ? (
-                  <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
-                ) : stockDelayed ? (
-                  <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
-                ) : (
-                  <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
-                )}
-              </span>
-            }
-            summary={stockSummary}
-            onOpen={() => setTab("items")}
-          />
-          <StatusChip
-            label="Delivery"
-            icon={Truck}
-            value={
-              /* The RED colour IS the overdue signal (no " · over" suffix). */
-              <span
-                className={overDeadline && !deliveredDone ? "text-danger" : undefined}
-                title={overDeadline && !deliveredDone ? "Deadline passed" : undefined}
-              >
-                {deadlineLabel}
-              </span>
-            }
-            summary={deliverySummary}
-            onOpen={() => setTab("delivery")}
-          />
-        </div>
-<div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
+        {/* RIGHT — the tab content owns the whole column (rev15, Jess: the
+            KPI strip is GONE — the tab dots, Chase Now panel and each tab's
+            own §8 status vocabulary carry the state; the work surface starts
+            at the top). */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
