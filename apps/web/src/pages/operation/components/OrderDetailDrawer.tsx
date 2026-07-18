@@ -1335,14 +1335,44 @@ function DrawerBody({
   const totalSet = orderTotal > 0;
   const moneyOutstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
   const balanceOwing = totalSet && moneyOutstanding > 0;
-  // Storage is "incurred" when the operator set a From date, OR the Master import
-  // carried a fee (migration 0207, Jess: a Master fee auto-marks incurred → it
-  // enters the collect-before-delivery gate).
+  // ── AUTO storage (Jess 2026-07-18): the machine counts, nobody clicks.
+  // Anchor = (supplier late ? latest goods ETA : deadline) + 7d — a
+  // supplier-late stretch never bills the customer. A manual From date
+  // overrides the anchor; an override of exactly 0 = "No storage" exempt.
+  const storageDeadline = !order.delivery_date_tbd ? order.delivery_date : null;
+  const latestGoodsEta = (() => {
+    let m: string | null = null;
+    for (const l of goodsLines) {
+      const e = form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? null;
+      if (e && (!m || e > m)) m = e;
+    }
+    return m;
+  })();
+  const deliveredForStorage = pipelineStatus === "completed";
+  const supplierLate = !!(
+    storageDeadline &&
+    latestGoodsEta &&
+    latestGoodsEta > storageDeadline &&
+    !deliveredForStorage
+  );
+  const autoStorageAnchor = storageDeadline
+    ? defaultStorageStart(supplierLate ? latestGoodsEta : storageDeadline)
+    : null;
+  const storageExempt = form.storageOverride === 0;
+  const effectiveStorageStart =
+    form.storageFrom ??
+    (!deliveredForStorage &&
+    autoStorageAnchor &&
+    autoStorageAnchor <= todayIso
+      ? autoStorageAnchor
+      : null);
+  // "incurred" = counting (auto or manual) OR a Master-imported fee — it
+  // enters the collect-before-delivery gate. Exempt kills it.
   const storageIncurred =
-    !!(form.control?.storage_from ?? "").trim() ||
-    !!form.draft.storage_from.trim() ||
-    Number(form.control?.storage_fee_msbf ?? 0) > 0 ||
-    Number(form.control?.storage_fee_sof ?? 0) > 0;
+    !storageExempt &&
+    ((hasMsbf || hasSof) && !!effectiveStorageStart ||
+      Number(form.control?.storage_fee_msbf ?? 0) > 0 ||
+      Number(form.control?.storage_fee_sof ?? 0) > 0);
   const storageCleared =
     !!form.control?.storage_collected_at ||
     form.control?.storage_waiver_status === "approved";
@@ -1361,15 +1391,17 @@ function DrawerBody({
   const storageEndEff =
     form.draft.storage_to.trim() || form.draft.logistic_eta.trim() || todayIso;
   const storageAuto = computeStorageFee({
-    startDate: form.storageFrom,
+    startDate: effectiveStorageStart,
     asOf: storageEndEff,
     hasMsbf,
     hasSof,
   });
-  // Effective storage charge: manual override > Master-imported fee > auto.
-  const storageCharge = storageIncurred
-    ? (form.storageOverride ?? (storageFee > 0 ? storageFee : storageAuto.total))
-    : 0;
+  // Effective storage charge: exempt 0 > manual override > Master fee > auto.
+  const storageCharge = storageExempt
+    ? 0
+    : storageIncurred
+      ? (form.storageOverride ?? (storageFee > 0 ? storageFee : storageAuto.total))
+      : 0;
   const storageCollected = ledger
     .filter((p) => p.kind === "storage")
     .reduce((s, p) => s + Number(p.amount || 0), 0);
@@ -2033,7 +2065,9 @@ function DrawerBody({
                           ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
                           : storageIncurred && storageCleared
                             ? "collected"
-                            : "not counting",
+                            : supplierLate
+                              ? "waiting supplier — not counting"
+                              : "not counting",
                       },
                     ]
                   : []),
@@ -3110,7 +3144,13 @@ function DrawerBody({
                 form={form}
                 hasMsbf={hasMsbf}
                 hasSof={hasSof}
-                deadline={!order.delivery_date_tbd ? order.delivery_date : null}
+                deadline={storageDeadline}
+                latestGoodsEta={latestGoodsEta}
+                supplierLate={supplierLate}
+                autoAnchor={autoStorageAnchor}
+                effectiveStart={effectiveStorageStart}
+                exempt={storageExempt}
+                delivered={deliveredForStorage}
               />
               {/* The flows show ONLY when storage is actually in play — a
                   not-storing order ends at the quiet card above (Jess: no
@@ -4497,30 +4537,41 @@ function JourneyCard({
   );
 }
 
-/** StorageCard (Jess 2026-07-18, option A "shape that speaks"): the storage
- *  story as a TIMELINE — green free week → amber charging → red today pin —
- *  with the fee line items + total under it. No instructional sentences; no
- *  "Storage? Yes/No" (a start date = storing) and no "Paid?" dropdown (the
- *  Collect flow below is the single source of truth). Fee priority:
- *  override → Master-imported → auto (§7.5 engine). ~190px tall. */
+/** StorageCard (Jess 2026-07-18, version B): FIVE steps, always the same
+ *  order, the customer's PROMISED DATE first — everything grows from it.
+ *  ① promised delivery ② free week ③ counts from ④ fee so far ⑤ ends.
+ *  Counting is AUTOMATIC (anchor = (supplier-late ? latest goods ETA :
+ *  deadline) + 7d); a supplier-late stretch never bills the customer.
+ *  "No storage" = exemption (override 0). No instructions — facts only. */
 function StorageCard({
   form,
   hasMsbf,
   hasSof,
   deadline,
+  latestGoodsEta,
+  supplierLate,
+  autoAnchor,
+  effectiveStart,
+  exempt,
+  delivered,
 }: {
   form: ReturnType<typeof useOrderControlForm>;
   hasMsbf: boolean;
   hasSof: boolean;
   deadline: string | null;
+  latestGoodsEta: string | null;
+  supplierLate: boolean;
+  autoAnchor: string | null;
+  effectiveStart: string | null;
+  exempt: boolean;
+  delivered: boolean;
 }) {
   const todayIso = new Date().toISOString().slice(0, 10);
   const { draft, set } = form;
-  const start = form.storageFrom;
   const endSet = draft.storage_to.trim();
   const endEff = endSet || draft.logistic_eta.trim() || todayIso;
   const auto = computeStorageFee({
-    startDate: start,
+    startDate: effectiveStart,
     asOf: endEff,
     hasMsbf,
     hasSof,
@@ -4528,253 +4579,279 @@ function StorageCard({
   const impMsbf = form.control?.storage_fee_msbf ?? null;
   const impSof = form.control?.storage_fee_sof ?? null;
   const hasImportedFee = (impMsbf ?? 0) > 0 || (impSof ?? 0) > 0;
-  const effTotal = draft.storage_fee_override.trim()
-    ? Number(draft.storage_fee_override)
-    : hasImportedFee
-      ? (impMsbf ?? 0) + (impSof ?? 0)
-      : auto.total;
+  const overrideSet = draft.storage_fee_override.trim() !== "";
+  const effTotal = exempt
+    ? 0
+    : overrideSet
+      ? Number(draft.storage_fee_override)
+      : hasImportedFee
+        ? (impMsbf ?? 0) + (impSof ?? 0)
+        : auto.total;
   const collectedAt = form.control?.storage_collected_at ?? null;
   const waived = form.control?.storage_waiver_status === "approved";
-  const ext = form.control?.extension_new_date ?? null;
-  const autoStart = defaultStorageStart(deadline);
+  const d2n = (iso: string) =>
+    new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
+  const dayDiff = (a: string, b: string) =>
+    Math.round((d2n(b) - d2n(a)) / 86_400_000);
+  const counting = !exempt && !!effectiveStart && !collectedAt && !waived;
+  const soFar = effectiveStart
+    ? Math.max(0, dayDiff(effectiveStart, endSet || todayIso))
+    : 0;
+  const freeBase = supplierLate && latestGoodsEta ? latestGoodsEta : deadline;
   const [editingFee, setEditingFee] = useState(false);
 
-  const d2n = (iso: string) => new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
-  // "day N" = stored SO FAR (→ today while accruing; → the set end once
-  // frozen). The fee itself may project further (endEff = the planned ETA).
-  const soFarEnd = endSet || todayIso;
-  const dayN = start
-    ? Math.max(0, Math.round((d2n(soFarEnd) - d2n(start)) / 86_400_000))
-    : 0;
-
-  // ── Not storing — one quiet row + the one-click auto start. ──
-  if (!start && !hasImportedFee) {
-    return (
-      <div className="p-3">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <MiniBadge tone="muted">not counting</MiniBadge>
-          <span className="text-[12px] text-base-500">
-            start auto ={" "}
-            <span className="font-mono text-base-700">
-              {autoStart ? fmtDate(autoStart) : "—"}
-            </span>{" "}
-            (deadline + 7d)
-          </span>
-          <span className="flex-1" />
-          <Btn
-            size="sm"
-            icon={Plus}
-            onClick={() => set("storage_from", autoStart ?? todayIso)}
-          >
-            Start storage
-          </Btn>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Collected / waived — frozen one-liner. ──
-  if (collectedAt || waived) {
-    return (
-      <div className="p-3 flex items-center gap-2.5 flex-wrap">
-        <span className="text-[12px] text-base-500">
-          {start ? fmtDate(start) : "—"} → {fmtDate(endEff)}
-          {dayN > 0 ? ` · ${dayN} days` : ""}
+  type StState = "done" | "act" | "wait" | "todo";
+  const Node = ({ n, state }: { n: number; state: StState }) => (
+    <span
+      className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
+        state === "done"
+          ? "bg-base-800 text-white"
+          : state === "act"
+            ? "bg-error-soft text-danger ring-2 ring-danger"
+            : state === "wait"
+              ? "bg-warning-soft text-warning"
+              : "bg-white border-2 border-base-300 text-base-400"
+      }`}
+    >
+      {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
+    </span>
+  );
+  const Row = ({
+    n,
+    state,
+    title,
+    children,
+    last,
+  }: {
+    n: number;
+    state: StState;
+    title: string;
+    children: ReactNode;
+    last?: boolean;
+  }) => (
+    <div className={`relative flex items-start gap-2.5 ${last ? "" : "pb-3"}`}>
+      {!last && (
+        <span
+          aria-hidden="true"
+          className={`absolute left-[11px] top-7 bottom-0 w-0.5 ${
+            state === "done" ? "bg-base-800" : "bg-base-200"
+          }`}
+        />
+      )}
+      <Node n={n} state={state} />
+      <div className="min-w-0 flex-1">
+        <span className="block text-[13px] font-semibold text-base-900">
+          {title}
         </span>
-        {collectedAt ? (
-          <span className="pill pill-confirmed">
-            ✓ {RM(effTotal)} collected · {fmtDate(collectedAt.slice(0, 10))}
-          </span>
-        ) : (
-          <span className="pill bg-base-100 text-base-500">waived</span>
-        )}
-        <span className="flex-1" />
-        <span className="text-[12px] text-base-400">
-          {hasMsbf ? `MS/BF ${auto.msbfMonths} mth × 150` : ""}
-          {hasMsbf && hasSof ? " · " : ""}
-          {hasSof ? "Sofa flat 200" : ""}
-        </span>
+        <div className="text-[12px] text-base-500">{children}</div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── Storing — timeline + fee lines. ──
-  const t0 = deadline && start && deadline < start ? deadline : start ?? todayIso;
-  const rawEnd = [endEff, ext ?? "", start ?? ""].filter(Boolean).sort().at(-1) ?? endEff;
-  const span = Math.max(86_400_000 * 7, d2n(rawEnd) - d2n(t0));
-  const pct = (iso: string) =>
-    Math.min(100, Math.max(0, ((d2n(iso) - d2n(t0)) / span) * 100));
-  const startPct = start ? pct(start) : 0;
-  const nowPct = pct(endSet || todayIso);
-  const accruing = !endSet;
-  const freeSofEnd = auto.freeUntilSof;
+  const deadlinePassed = !!deadline && deadline < todayIso;
+  const overdueDays = deadline ? Math.max(0, dayDiff(deadline, todayIso)) : 0;
 
   return (
     <div className="p-3">
-      {/* header — facts + the two window dates, editable in place */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="t4-label">Storage · day {dayN}</span>
-        {effTotal > 0 ? (
-          <span className="pill pill-overdue">{RM(effTotal)} unpaid</span>
+      {/* ① the anchor — the customer's promised date, ALWAYS first */}
+      <Row
+        n={1}
+        state={delivered ? "done" : deadlinePassed ? "act" : "wait"}
+        title="Promised delivery"
+      >
+        {deadline ? (
+          <>
+            <span className="font-mono font-semibold text-base-800">
+              {fmtDate(deadline)}
+            </span>
+            {delivered ? (
+              " · delivered"
+            ) : deadlinePassed ? (
+              <span className="font-semibold text-danger">
+                {" "}
+                · passed {overdueDays}d
+              </span>
+            ) : (
+              ` · in ${-dayDiff(todayIso, deadline) * -1}d`
+            )}
+          </>
         ) : (
-          <span className="pill pill-confirmed">RM 0 · free</span>
+          "no date yet (TBD)"
         )}
-        <span className="flex-1" />
-        <label className="inline-flex items-center gap-1 text-[11px] text-base-400">
-          start
+      </Row>
+
+      {/* ② the free week — restarts on a supplier-late stretch */}
+      <Row
+        n={2}
+        state={
+          !freeBase
+            ? "todo"
+            : autoAnchor && autoAnchor <= todayIso && !delivered
+              ? "done"
+              : "wait"
+        }
+        title="Free week"
+      >
+        {freeBase && autoAnchor ? (
+          <>
+            <span className="font-mono">{fmtDate(freeBase)}</span> →{" "}
+            <span className="font-mono">{fmtDate(autoAnchor)}</span>
+            {supplierLate && latestGoodsEta && (
+              <span className="font-medium text-warning">
+                {" "}
+                · restarted — supplier late (ETA {fmtDate(latestGoodsEta)})
+              </span>
+            )}
+          </>
+        ) : (
+          "—"
+        )}
+      </Row>
+
+      {/* ③ counting from — auto, a manual date overrides */}
+      <Row
+        n={3}
+        state={exempt ? "todo" : counting ? "done" : "todo"}
+        title="Counts from"
+      >
+        <span className="inline-flex items-center gap-2 flex-wrap">
+          {exempt ? (
+            "exempted"
+          ) : effectiveStart ? (
+            <>
+              <span className="font-mono font-semibold text-base-800">
+                {fmtDate(effectiveStart)}
+              </span>
+              {form.storageFrom ? " · manual" : " · auto"}
+            </>
+          ) : autoAnchor ? (
+            <>
+              will start{" "}
+              <span className="font-mono font-semibold text-base-800">
+                {fmtDate(autoAnchor)}
+              </span>{" "}
+              if undelivered
+            </>
+          ) : (
+            "—"
+          )}
           <input
             type="date"
             value={draft.storage_from}
             onChange={(e) => set("storage_from", e.target.value)}
-            aria-label="Storage start"
+            aria-label="Manual storage start (overrides auto)"
+            title="Manual start — overrides the auto anchor"
             className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
           />
-        </label>
-        <label className="inline-flex items-center gap-1 text-[11px] text-base-400">
-          end
-          <input
-            type="date"
-            value={draft.storage_to}
-            onChange={(e) => set("storage_to", e.target.value)}
-            aria-label="Storage end (blank = follows delivery)"
-            title="Blank = follows delivery"
-            className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
-          />
-        </label>
-      </div>
+        </span>
+      </Row>
 
-      {/* timeline — green free ground → amber charging → today pin */}
-      <div className="mt-3">
-        <div className="relative h-3 rounded-full bg-base-200 overflow-visible">
-          {startPct > 0 && (
-            <span
-              className="absolute top-0 bottom-0 left-0 rounded-l-full bg-success-soft"
-              style={{ width: `${startPct}%` }}
-            />
-          )}
-          <span
-            className="absolute top-0 bottom-0 bg-warning-soft"
-            style={{ left: `${startPct}%`, width: `${Math.max(0, nowPct - startPct)}%` }}
-          />
-          <span
-            className={`absolute -top-0.5 -bottom-0.5 w-0.5 rounded ${accruing ? "bg-danger" : "bg-base-800"}`}
-            style={{ left: `${nowPct}%` }}
-            title={accruing ? "today — still counting" : "storage ended"}
-          />
-          {ext && (
-            <span
-              className="absolute -top-0.5 -bottom-0.5 w-0.5 rounded bg-base-400"
-              style={{ left: `${pct(ext)}%` }}
-              title={`extended to ${fmtDate(ext)}`}
-            />
-          )}
-        </div>
-        <div className="relative h-8 mt-1 text-[11px] text-base-500">
-          {deadline && deadline < (start ?? todayIso) && (
-            <span className="absolute" style={{ left: 0 }}>
-              <span className="block font-semibold text-base-800 text-[12px]">
-                {fmtDate(deadline)}
-              </span>
-              deadline
-            </span>
-          )}
-          {start && Math.abs(nowPct - startPct) > 14 && (
-            <span
-              className="absolute -translate-x-1/2 text-center"
-              style={{ left: `${Math.max(8, Math.min(80, startPct))}%` }}
-            >
-              <span className="block font-semibold text-base-800 text-[12px]">
-                {fmtDate(start)}
-              </span>
-              start
-            </span>
-          )}
-          {hasSof && !auto.sofCharged && freeSofEnd && (
-            <span
-              className="absolute -translate-x-1/2 text-center"
-              style={{ left: `${Math.max(16, Math.min(86, pct(freeSofEnd)))}%` }}
-            >
-              <span className="block font-semibold text-success text-[12px]">
-                {fmtDate(freeSofEnd)}
-              </span>
-              sofa free ends
-            </span>
-          )}
-          <span
-            className="absolute -translate-x-1/2 text-center"
-            style={{ left: `${Math.max(20, Math.min(96, nowPct))}%` }}
-          >
-            <span
-              className={`block font-semibold text-[12px] ${accruing ? "text-danger" : "text-base-800"}`}
-            >
-              {fmtDate(endSet || todayIso)}
-            </span>
-            {accruing ? "today" : "end"}
+      {/* ④ the money */}
+      <Row
+        n={4}
+        state={
+          collectedAt || waived
+            ? "done"
+            : exempt
+              ? "todo"
+              : counting && effTotal > 0
+                ? "act"
+                : "todo"
+        }
+        title="Fee so far"
+      >
+        {collectedAt ? (
+          <span className="pill pill-confirmed">
+            ✓ collected · {fmtDate(String(collectedAt).slice(0, 10))}
           </span>
-        </div>
-      </div>
-
-      {/* fee line items + total (+ inline override) */}
-      <div className="flex items-baseline gap-4 flex-wrap mt-1">
-        {hasMsbf && (
-          <span className="text-[12px] text-base-500">
-            MS/BF{" "}
-            <span className="font-mono font-semibold text-base-800">
-              {impMsbf != null
-                ? `${impMsbf.toLocaleString()}`
-                : `${auto.msbfMonths} mth × 150 = ${auto.msbf}`}
+        ) : waived ? (
+          <span className="pill bg-base-100 text-base-500">waived</span>
+        ) : exempt ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="pill bg-base-100 text-base-500">
+              No storage · exempted
             </span>
-            {impMsbf != null && (
-              <span className="ml-1 text-[11px] font-bold text-primary border border-current rounded px-1">
-                MASTER
-              </span>
-            )}
-          </span>
-        )}
-        {hasSof && (
-          <span className="text-[12px] text-base-500">
-            Sofa{" "}
-            <span className="font-mono font-semibold text-base-800">
-              {impSof != null
-                ? `${impSof.toLocaleString()}`
-                : auto.sofCharged
-                  ? "flat 200"
-                  : "0 · in free window"}
-            </span>
-            {impSof != null && (
-              <span className="ml-1 text-[11px] font-bold text-primary border border-current rounded px-1">
-                MASTER
-              </span>
-            )}
-          </span>
-        )}
-        <span className="ml-auto inline-flex items-center gap-2">
-          {editingFee || draft.storage_fee_override.trim() ? (
-            <input
-              type="number"
-              min={0}
-              autoFocus={editingFee}
-              value={draft.storage_fee_override}
-              onChange={(e) => set("storage_fee_override", e.target.value)}
-              onBlur={() => setEditingFee(false)}
-              placeholder={`auto ${effTotal}`}
-              aria-label="Override storage fee"
-              className="w-24 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white"
-            />
-          ) : (
             <button
               type="button"
-              onClick={() => setEditingFee(true)}
-              title="Override the fee"
-              aria-label="Override the storage fee"
-              className="text-base-400 hover:text-base-700"
+              onClick={() => set("storage_fee_override", "")}
+              className="text-[12px] text-base-500 hover:text-base-800 underline"
             >
-              <Pencil size={14} />
+              undo
             </button>
+          </span>
+        ) : counting ? (
+          <span className="inline-flex items-center gap-2 flex-wrap">
+            <span>
+              day {soFar}
+              {hasMsbf &&
+                ` · MS/BF ${impMsbf != null ? impMsbf.toLocaleString() : `${auto.msbfMonths} mth × 150`}`}
+              {hasSof &&
+                ` · Sofa ${impSof != null ? impSof.toLocaleString() : auto.sofCharged ? "flat 200" : "free"}`}
+            </span>
+            <span
+              className={`font-mono font-bold text-[13px] ${effTotal > 0 ? "text-danger" : "text-base-800"}`}
+            >
+              {RM(effTotal)}
+            </span>
+            {effTotal > 0 && (
+              <span className="font-semibold text-danger">unpaid</span>
+            )}
+            {editingFee || overrideSet ? (
+              <input
+                type="number"
+                min={0}
+                autoFocus={editingFee}
+                value={draft.storage_fee_override}
+                onChange={(e) => set("storage_fee_override", e.target.value)}
+                onBlur={() => setEditingFee(false)}
+                placeholder={`auto ${auto.total}`}
+                aria-label="Override storage fee"
+                className="w-20 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingFee(true)}
+                title="Override the fee"
+                aria-label="Override the storage fee"
+                className="text-base-400 hover:text-base-700"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => set("storage_fee_override", "0")}
+              className="text-[12px] text-base-500 hover:text-base-800 underline"
+            >
+              No storage
+            </button>
+          </span>
+        ) : (
+          "—"
+        )}
+      </Row>
+
+      {/* ⑤ when it stops */}
+      <Row n={5} state={delivered ? "done" : "todo"} title="Ends" last>
+        <span className="inline-flex items-center gap-2">
+          {delivered ? (
+            <>delivered · {fmtDate(endEff)}</>
+          ) : (
+            <>
+              on delivery / collection
+              <input
+                type="date"
+                value={draft.storage_to}
+                onChange={(e) => set("storage_to", e.target.value)}
+                aria-label="Storage end (blank = follows delivery)"
+                title="Blank = follows delivery"
+                className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
+              />
+            </>
           )}
-          <Money value={effTotal} tone="hero" className="text-base-900" />
         </span>
-      </div>
+      </Row>
     </div>
   );
 }
