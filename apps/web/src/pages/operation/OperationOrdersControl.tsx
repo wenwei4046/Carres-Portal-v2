@@ -1773,15 +1773,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }),
     });
 
-  // PO-day banner (Mon/Thu) + urgent bypass (any day) — shown to the duty
-  // holder + management only; other staff's day is unchanged. Speaks the
-  // C-vocab queue words (Order PO / Chase supplier), same as QUEUES + NEXT.
+  // PO-day banner (Mon/Thu) + urgent bypass (any day) — shown to the WHOLE
+  // operation team (Jess 2026-07-19: the duty roster is a notice board, not a
+  // private message — everyone must see whose month it is and that today is
+  // PO day). Only the ACTION is gated: the Raise PO button renders for the
+  // holder + management. Speaks the C-vocab queue words, same as QUEUES+NEXT.
   const orderPoCount = nextCounts.get("Order PO") ?? 0;
   const chaseSupplierCount = nextCounts.get("Chase supplier") ?? 0;
   const showPoBanner =
-    !!poDutyHolderShown &&
-    (isManager || authUserId === poDutyHolderShown.userId) &&
-    (poDayPreview || isPoDayMYT() || urgentPoCount > 0);
+    !!poDutyHolderShown && (poDayPreview || isPoDayMYT() || urgentPoCount > 0);
   const poBanner = showPoBanner && poDutyHolderShown ? (
     <div
       className="w-full flex items-center gap-2 rounded-xl border border-base-200 bg-white px-3 py-1.5 text-[12px]"
