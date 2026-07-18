@@ -1567,11 +1567,8 @@ function DrawerBody({
 
   // ═══ Track signals (A2) — shared by the stage arrays + Chase Now. ═══
   const deliveredDone = pipelineStatus === "completed";
-  const paidDone = totalSet && moneyOutstanding <= 0;
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
-  const stockDelayed =
-    readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
 
   // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
   // N/M ready + that category's supplier status + its OWN PO-led chase.
