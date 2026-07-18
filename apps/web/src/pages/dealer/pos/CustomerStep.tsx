@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
   minDeliveryDateISO,
@@ -11,6 +11,7 @@ import {
 } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
+import { useStaffSession } from "@/lib/staff";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
 import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
@@ -147,6 +148,48 @@ export default function CustomerStep({
   const visibleSPs = draft.outletId
     ? salespersons.filter((sp) => sp.outletId === draft.outletId)
     : salespersons;
+
+  // ── 0233 staff PIN session — attribute the order to the signed-in person ────
+  // No token (principal on-behalf / dormant store) → `staff` is null and this is
+  // wholly inert (byte-identical to before). With a token: the outlet is locked
+  // to the working outlet for manager/salesperson (principal free); the
+  // salesperson is locked to self for a salesperson, or defaults to self with a
+  // 代记 pick among the outlet's active staff for manager/principal.
+  const staff = useStaffSession((s) => s.staff);
+  const sessionOutletId = useStaffSession((s) => s.sessionOutletId);
+  const outletLockedByStaff = !!staff && staff.tier !== "principal";
+  const salespersonLockedByStaff = staff?.tier === "salesperson";
+  const staffSalesOptions = useMemo(() => {
+    if (!staff) return null;
+    const active = salespersons.filter((sp) => sp.active !== false);
+    if (staff.tier === "salesperson") return active.filter((sp) => sp.id === staff.sid);
+    if (staff.tier === "principal") return active;
+    // manager — the outlet's active staff (+ outlet-less floaters), per the server.
+    return active.filter((sp) => sp.outletId === sessionOutletId || sp.outletId === null);
+  }, [staff, salespersons, sessionOutletId]);
+
+  useEffect(() => {
+    if (!staff) return;
+    const patch: Partial<WizardDraft> = {};
+    // Prefill/lock the outlet to the working outlet.
+    if (
+      sessionOutletId &&
+      draft.outletId !== sessionOutletId &&
+      (outletLockedByStaff || !draft.outletId)
+    ) {
+      patch.outletId = sessionOutletId;
+    }
+    // Salesperson: lock to self (salesperson tier) or default to self.
+    if (salespersonLockedByStaff && staff.sid && draft.salespersonId !== staff.sid) {
+      patch.salespersonId = staff.sid;
+    } else if (staff.sid && !draft.salespersonId) {
+      patch.salespersonId = staff.sid;
+    }
+    if (Object.keys(patch).length > 0) onChange({ ...draft, ...patch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, sessionOutletId, draft.outletId, draft.salespersonId]);
+
+  const spOptions = staffSalesOptions ?? visibleSPs;
 
   const dealerPending = !!dealerPick && !dealerPick.value;
   // Same "today" source as the Step3Delivery pickers (shared helper — keeps
@@ -292,7 +335,12 @@ export default function CustomerStep({
                 <div className="form-grid">
                   <div className="field">
                     <span className="field__label">Outlet *</span>
-                    <select value={draft.outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
+                    <select
+                      value={draft.outletId ?? ""}
+                      onChange={(e) => setOutlet(e.target.value)}
+                      disabled={outletLockedByStaff}
+                      data-testid="pos-outlet-select"
+                    >
                       <option value="">— pick outlet —</option>
                       {outlets.map((o) => (
                         <option key={o.id} value={o.id}>
@@ -308,14 +356,15 @@ export default function CustomerStep({
                       onChange={(e) =>
                         onChange({ ...draft, salespersonId: e.target.value || null })
                       }
-                      disabled={visibleSPs.length === 0}
+                      disabled={salespersonLockedByStaff || spOptions.length === 0}
+                      data-testid="pos-salesperson-select"
                     >
                       <option value="">
-                        {visibleSPs.length === 0
+                        {spOptions.length === 0
                           ? "— none in this outlet —"
                           : "— pick salesperson —"}
                       </option>
-                      {visibleSPs.map((sp) => (
+                      {spOptions.map((sp) => (
                         <option key={sp.id} value={sp.id}>
                           {sp.name}
                         </option>

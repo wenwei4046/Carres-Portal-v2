@@ -940,6 +940,10 @@ export const salespersonSchema = z.object({
   name: z.string(),
   phone: z.string().nullable(),
   userId: z.string().uuid().nullable(),
+  // 0233 staff PIN login — defaulted so pre-0233 payloads/mocks stay valid.
+  staffRole: z.enum(["principal", "manager", "salesperson"]).default("salesperson"),
+  color: z.string().nullable().default(null),
+  active: z.boolean().default(true),
 });
 export type SalespersonDto = z.infer<typeof salespersonSchema>;
 

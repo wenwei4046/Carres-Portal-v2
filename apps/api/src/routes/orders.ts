@@ -21,11 +21,14 @@ import {
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
+  STAFF_SESSION_REQUIRED,
   topUpOrderInputSchema,
   updateOrderInputSchema,
   type AutocountImportResult,
+  type StaffTierDto,
 } from "@carres/shared";
 import { userClient, adminClient } from "../lib/supabase";
+import { getStaffContext, isStoreActivated } from "../lib/staff-token";
 import {
   getOrderSkus,
   validateDeliveryLeadTime,
@@ -118,6 +121,79 @@ type SalesOrderData = {
 
 const ordersRouter = new Hono<AppEnv>();
 
+// ---------------------------------------------------------------------------
+// 0233 staff PIN login — orders scoping. ADDITIVE + DORMANT until a store sets
+// its first PIN. Applies ONLY to dealer/showroom/salesperson; internal roles
+// (principal on-behalf, operation/finance/bd) are fully exempt. Once activated,
+// a request without a valid staff token is refused; with one, reads/writes are
+// narrowed to the person's tier (salesperson = self · manager = own outlet +
+// legacy null-outlet rows · principal = whole store). RLS (JWT dealer scope)
+// still bounds everything — this is a workflow layer on top, not the security
+// wall. `create_order` + `orders` schema stay UNTOUCHED.
+// ---------------------------------------------------------------------------
+const STAFF_SCOPED_ROLES = new Set<string>(["dealer", "showroom", "salesperson"]);
+
+type StaffScope =
+  | { kind: "exempt" } // internal role — no staff layer
+  | { kind: "dormant" } // dealer-family, store not activated, no token → today's behaviour
+  | { kind: "required" } // dealer-family, store activated, no valid token → 403
+  | { kind: "scoped"; tier: StaffTierDto; sid: string | null; oid: string | null };
+
+async function resolveStaffScope(c: Context<AppEnv>): Promise<StaffScope> {
+  const auth = c.var.auth;
+  if (!STAFF_SCOPED_ROLES.has(auth.role)) return { kind: "exempt" };
+  const staff = await getStaffContext(c);
+  if (staff) return { kind: "scoped", tier: staff.tier, sid: staff.sid, oid: staff.oid };
+  // A salesperson-ROLE login is already a person-level credential (their own
+  // email+password), so no PIN token is demanded: derive the scope server-side
+  // from the salespersons.user_id link. Unlinked → dormant (pre-0233
+  // behaviour), never a lockout.
+  if (auth.role === "salesperson") {
+    const { data } = await userClient(c.env, auth.jwt)
+      .from("salespersons")
+      .select("id, outlet_id, staff_role")
+      .eq("user_id", auth.id)
+      .maybeSingle();
+    if (data) {
+      const sp = data as { id: string; outlet_id: string | null; staff_role: StaffTierDto };
+      return { kind: "scoped", tier: sp.staff_role, sid: sp.id, oid: sp.outlet_id };
+    }
+    return { kind: "dormant" };
+  }
+  // No valid token — the store's activation state decides refuse-vs-passthrough.
+  if (auth.dealerId && (await isStoreActivated(c.env, auth.dealerId))) {
+    return { kind: "required" };
+  }
+  return { kind: "dormant" };
+}
+
+/**
+ * A write-time staff attribution must resolve to a real, active staff member of
+ * this dealer. Manager writes additionally require the target sit in the
+ * manager's own outlet (or a legacy null outlet); principal writes accept any
+ * outlet in the dealer. Returns false (→ 403) on any miss — RLS also hides a
+ * cross-dealer row, so this is defence-in-depth over the JWT scope.
+ */
+async function isWritableStaff(
+  sb: ReturnType<typeof userClient>,
+  dealerId: string,
+  salespersonId: string,
+  requiredOutletId: string | null | undefined,
+): Promise<boolean> {
+  const { data, error } = await sb
+    .from("salespersons")
+    .select("id, dealer_id, outlet_id, active")
+    .eq("id", salespersonId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const row = data as { dealer_id: string; outlet_id: string | null; active: boolean };
+  if (row.dealer_id !== dealerId || row.active === false) return false;
+  if (requiredOutletId !== undefined && row.outlet_id !== requiredOutletId && row.outlet_id !== null) {
+    return false;
+  }
+  return true;
+}
+
 const listQuerySchema = z.object({
   status: orderStatusSchema.optional(),
   outletId: z.string().uuid().optional(),
@@ -134,6 +210,13 @@ ordersRouter.get("/", async (c) => {
     throw new HTTPException(400, { message: "Invalid query: " + parsed.error.issues[0]?.message });
   }
   const { status, outletId, salespersonId, dealerId } = parsed.data;
+
+  // 0233 — staff scoping. Activated store + no valid token → refuse. Dormant /
+  // internal → passthrough (byte-identical to pre-0233).
+  const scope = await resolveStaffScope(c);
+  if (scope.kind === "required") {
+    return c.json({ error: STAFF_SESSION_REQUIRED }, 403);
+  }
 
   const sb = userClient(c.env, auth.jwt);
   // PostgREST: select.eq*.order — .order() ends the chain (returns awaitable).
@@ -159,6 +242,17 @@ ordersRouter.get("/", async (c) => {
       auth.role === "bd")
   ) {
     q = q.eq("dealer_id", dealerId);
+  }
+
+  // 0233 — tier narrowing on top of the RLS dealer scope.
+  if (scope.kind === "scoped") {
+    if (scope.tier === "salesperson" && scope.sid) {
+      q = q.eq("salesperson_id", scope.sid);
+    } else if (scope.tier === "manager" && scope.oid) {
+      // Own outlet + legacy/AutoCount rows that carry no outlet.
+      q = q.or(`outlet_id.eq.${scope.oid},outlet_id.is.null`);
+    }
+    // principal tier — whole store, no narrowing.
   }
 
   const { data, error } = await q.order("placed_at", { ascending: false });
@@ -370,6 +464,51 @@ ordersRouter.post("/", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+
+  // 0233 — staff scoping for order attribution. Activated store + no valid token
+  // → refuse. With a token, the salesperson_id + outlet_id stamped on the order
+  // are SERVER-decided per tier: a salesperson can only file under themselves; a
+  // manager under any active staff of THEIR outlet, forced to that outlet; a
+  // principal under any active staff of the store (代记), outlet unforced.
+  // Dormant / internal → the client-sent values stand (byte-identical).
+  const staffScope = await resolveStaffScope(c);
+  if (staffScope.kind === "required") {
+    return c.json({ error: STAFF_SESSION_REQUIRED }, 403);
+  }
+  let attributedSalespersonId = parsed.data.salespersonId;
+  let attributedOutletId: string | null = parsed.data.outletId;
+  if (staffScope.kind === "scoped") {
+    if (staffScope.tier === "salesperson") {
+      attributedSalespersonId = staffScope.sid ?? parsed.data.salespersonId;
+      attributedOutletId = staffScope.oid ?? parsed.data.outletId;
+    } else if (staffScope.tier === "manager") {
+      const ok = await isWritableStaff(sb, effectiveDealerId, parsed.data.salespersonId, staffScope.oid);
+      if (!ok) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "staff_scope_violation",
+            message: "That salesperson is not an active member of your outlet",
+          },
+          403,
+        );
+      }
+      attributedOutletId = staffScope.oid ?? parsed.data.outletId;
+    } else {
+      // principal tier — any active staff of the store; outlet not narrowed.
+      const ok = await isWritableStaff(sb, effectiveDealerId, parsed.data.salespersonId, undefined);
+      if (!ok) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "staff_scope_violation",
+            message: "That salesperson is not part of this store",
+          },
+          403,
+        );
+      }
+    }
+  }
 
   // 0219 — config-driven payment methods. The DB whitelist is gone; the key
   // must match an ACTIVE method from order_entry_config (code defaults incl.
@@ -718,6 +857,9 @@ ordersRouter.post("/", async (c) => {
   const payload = Adapters.orderInputToRpcPayload(
     {
       ...parsed.data,
+      // 0233 — server-decided staff attribution (see the scope block above).
+      salespersonId: attributedSalespersonId,
+      outletId: attributedOutletId ?? parsed.data.outletId,
       lines: finalLines,
       addons: [...clientAddons, ...deliveryRecompute.addons],
     },
@@ -2643,6 +2785,12 @@ ordersRouter.get("/:id", async (c) => {
   const idCheck = z.string().uuid().safeParse(id);
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
+  // 0233 — staff scoping (same gate as the list; dormant/internal passthrough).
+  const scope = await resolveStaffScope(c);
+  if (scope.kind === "required") {
+    return c.json({ error: STAFF_SESSION_REQUIRED }, 403);
+  }
+
   const sb = userClient(c.env, auth.jwt);
   // PostgREST nested syntax: 1 round-trip pulls order + lines + addons + history.
   // Each child table has its own RLS policy that mirrors the parent — so child
@@ -2657,6 +2805,24 @@ ordersRouter.get("/:id", async (c) => {
   // Same message whether the row genuinely doesn't exist or is RLS-hidden — we
   // never reveal which.
   if (!data) throw new HTTPException(404, { message: "Order not found" });
+
+  // 0233 — tier detail predicate. A salesperson may open only their own order;
+  // a manager only their outlet's (or a legacy null-outlet) order. Same opaque
+  // 404 as an RLS miss — we never reveal a foreign order exists.
+  if (scope.kind === "scoped") {
+    const orow = data as { salesperson_id: string | null; outlet_id: string | null };
+    if (scope.tier === "salesperson" && scope.sid && orow.salesperson_id !== scope.sid) {
+      throw new HTTPException(404, { message: "Order not found" });
+    }
+    if (
+      scope.tier === "manager" &&
+      scope.oid &&
+      orow.outlet_id !== scope.oid &&
+      orow.outlet_id !== null
+    ) {
+      throw new HTTPException(404, { message: "Order not found" });
+    }
+  }
 
   const row = data as DB.OrderRow & {
     order_lines?: DB.OrderLineRow[];

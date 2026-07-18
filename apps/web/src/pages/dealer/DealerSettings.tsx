@@ -1,34 +1,56 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import type { StaffDto, StaffTierDto } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import {
   useCreateOutlet,
-  useCreateSalesperson,
   useDealerSelf,
-  useDeleteSalesperson,
   useOutlets,
-  useSalespersons,
+  usePatchStaff,
+  useStaffList,
 } from "@/lib/queries";
+import { useStaffSession } from "@/lib/staff";
+import {
+  AddStaffModal,
+  allowedCreateTiers,
+  SetPinModal,
+  StaffAvatar,
+  TierBadge,
+} from "./staff/staff-ui";
 
 /**
- * Phase 2D — Dealer/Showroom self-service Settings.
+ * Dealer/Showroom self-service Settings.
  *
- * V1 scope: list + add salespersons + outlets. Default outlet is principal-
- * seeded at dealer-create time (apps/api/src/routes/principal/accounts.ts);
- * additional outlets get added here when a dealer opens a second branch.
- * Edit / delete of outlets is deferred — historical orders reference outlet
- * ids, so destructive ops need a "soft delete" treatment we haven't
- * designed yet.
+ * Staff (0233): tier badges + colour avatar + PIN status, per-row Set/Reset PIN
+ * and a deactivate toggle (the FK-unsafe hard delete is gone from the UI —
+ * orders reference salesperson_id, so a referenced row can't be deleted; we
+ * deactivate instead). The section is hidden entirely for a salesperson-tier
+ * session; a manager sees only their own outlet's salespersons + can add
+ * salespersons; the Outlets section is principal-tier only.
  */
 export default function DealerSettings() {
   const dealer = useDealerSelf();
   const outletsQ = useOutlets();
-  const salespersonsQ = useSalespersons();
+  const staffQ = useStaffList();
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const callerTier: StaffTierDto = useStaffSession((s) => s.staff?.tier ?? "salesperson");
+  const callerOutletId = useStaffSession((s) => s.staff?.outletId ?? null);
+
+  const [showAddStaff, setShowAddStaff] = useState(false);
   const [showAddOutletModal, setShowAddOutletModal] = useState(false);
+
+  const storeKind = staffQ.data?.storeKind ?? "dealer";
+  const outlets = outletsQ.data?.outlets ?? [];
+  const canManageStaff = callerTier === "principal" || callerTier === "manager";
+  const canAddStaff = allowedCreateTiers(callerTier, storeKind).length > 0;
+
+  // Manager sees only their own outlet's salespersons; principal sees everyone.
+  const roster: StaffDto[] = (staffQ.data?.staff ?? []).filter((s) => {
+    if (callerTier === "principal") return true;
+    return s.outletId === callerOutletId || s.outletId === null;
+  });
 
   return (
     <div className="p-9">
@@ -61,107 +83,188 @@ export default function DealerSettings() {
         </dl>
       </section>
 
-      <section className="rounded-md border border-border bg-card p-5 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-            Outlets
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowAddOutletModal(true)}
-            data-testid="add-outlet"
-            className="btn-primary text-[12px] py-1.5 px-3"
-          >
-            + Add outlet
-          </button>
-        </div>
-        {outletsQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
-        {outletsQ.error && (
-          <p className="text-sm text-destructive">Couldn&apos;t load: {outletsQ.error.message}</p>
-        )}
-        {outletsQ.data && outletsQ.data.outlets.length === 0 && (
-          <p className="text-sm text-muted-foreground italic">
-            No outlets yet. Add one to start creating orders.
-          </p>
-        )}
-        {outletsQ.data && outletsQ.data.outlets.length > 0 && (
-          <ul className="divide-y divide-border">
-            {outletsQ.data.outlets.map((o, idx) => (
-              <li
-                key={o.id}
-                className="py-2.5 flex items-start justify-between gap-3"
-                data-testid={`outlet-row-${o.id}`}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{o.name}</span>
-                    {idx === 0 && (
-                      <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground bg-base-100 px-1.5 py-0.5 rounded">
-                        Default
-                      </span>
-                    )}
+      {/* Outlets — principal tier only (a manager is bound to one outlet). */}
+      {callerTier === "principal" && (
+        <section className="rounded-md border border-border bg-card p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+              Outlets
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowAddOutletModal(true)}
+              data-testid="add-outlet"
+              className="btn-primary text-[12px] py-1.5 px-3"
+            >
+              + Add outlet
+            </button>
+          </div>
+          {outletsQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {outletsQ.error && (
+            <p className="text-sm text-destructive">Couldn&apos;t load: {outletsQ.error.message}</p>
+          )}
+          {outletsQ.data && outlets.length === 0 && (
+            <p className="text-sm text-muted-foreground italic">
+              No outlets yet. Add one to start creating orders.
+            </p>
+          )}
+          {outlets.length > 0 && (
+            <ul className="divide-y divide-border">
+              {outlets.map((o, idx) => (
+                <li
+                  key={o.id}
+                  className="py-2.5 flex items-start justify-between gap-3"
+                  data-testid={`outlet-row-${o.id}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{o.name}</span>
+                      {idx === 0 && (
+                        <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground bg-base-100 px-1.5 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">{o.address}</div>
                   </div>
-                  <div className="text-[12px] text-muted-foreground mt-0.5">{o.address}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
-      <section className="rounded-md border border-border bg-card p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-            Salespersons
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            data-testid="add-salesperson"
-            className="btn-primary text-[12px] py-1.5 px-3"
-          >
-            + Add salesperson
-          </button>
-        </div>
+      {/* Staff — hidden entirely for a salesperson-tier session. */}
+      {canManageStaff && (
+        <section className="rounded-md border border-border bg-card p-5" data-testid="staff-section">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+              Staff &amp; PINs
+            </h2>
+            {canAddStaff && (
+              <button
+                type="button"
+                onClick={() => setShowAddStaff(true)}
+                data-testid="add-staff"
+                className="btn-primary text-[12px] py-1.5 px-3"
+              >
+                + Add staff
+              </button>
+            )}
+          </div>
 
-        {salespersonsQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
-        {salespersonsQ.error && (
-          <p className="text-sm text-destructive">Couldn&apos;t load: {salespersonsQ.error.message}</p>
-        )}
-        {salespersonsQ.data && salespersonsQ.data.salespersons.length === 0 && (
-          <p className="text-sm text-muted-foreground italic">
-            No salespersons yet. Add one to start creating orders.
-          </p>
-        )}
-        {salespersonsQ.data && salespersonsQ.data.salespersons.length > 0 && (
-          <ul className="divide-y divide-border">
-            {salespersonsQ.data.salespersons.map((sp) => {
-              const outletName =
-                outletsQ.data?.outlets.find((o) => o.id === sp.outletId)?.name ?? "—";
-              return <SalespersonRow key={sp.id} sp={sp} outletName={outletName} />;
-            })}
-          </ul>
-        )}
-      </section>
+          {staffQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {staffQ.error && (
+            <p className="text-sm text-destructive">Couldn&apos;t load: {staffQ.error.message}</p>
+          )}
+          {staffQ.data && roster.length === 0 && (
+            <p className="text-sm text-muted-foreground italic">
+              No staff yet. Add one so they can sign in with a PIN.
+            </p>
+          )}
+          {roster.length > 0 && (
+            <ul className="divide-y divide-border">
+              {roster.map((s) => {
+                const outletName =
+                  outlets.find((o) => o.id === s.outletId)?.name ?? "All outlets";
+                return (
+                  <StaffRow key={s.id} staff={s} outletName={outletName} callerTier={callerTier} />
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
 
-      {showAddModal && (
-        <AddSalespersonModal
-          outlets={outletsQ.data?.outlets ?? []}
-          onClose={() => setShowAddModal(false)}
+      {showAddStaff && (
+        <AddStaffModal
+          callerTier={callerTier}
+          storeKind={storeKind}
+          outlets={outlets}
+          callerOutletId={callerOutletId}
+          onClose={() => setShowAddStaff(false)}
         />
       )}
-      {showAddOutletModal && (
-        <AddOutletModal onClose={() => setShowAddOutletModal(false)} />
-      )}
+      {showAddOutletModal && <AddOutletModal onClose={() => setShowAddOutletModal(false)} />}
     </div>
   );
 }
 
+function StaffRow({
+  staff,
+  outletName,
+  callerTier,
+}: {
+  staff: StaffDto;
+  outletName: string;
+  callerTier: StaffTierDto;
+}) {
+  const [showPin, setShowPin] = useState(false);
+  const patch = usePatchStaff();
+
+  // A manager may only touch salespersons; a principal may touch anyone.
+  const canEdit = callerTier === "principal" || staff.staffRole === "salesperson";
+
+  function toggleActive() {
+    const next = !staff.active;
+    if (!next && !confirm(`Deactivate ${staff.name}? They won't be able to sign in. Their past orders stay.`)) {
+      return;
+    }
+    patch.mutate(
+      { id: staff.id, patch: { active: next } },
+      {
+        onSuccess: () => toast.success(next ? `Reactivated ${staff.name}` : `Deactivated ${staff.name}`),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not update"),
+      },
+    );
+  }
+
+  return (
+    <li className="py-2.5 flex items-center justify-between gap-3" data-testid={`staff-row-${staff.id}`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <StaffAvatar color={staff.color} name={staff.name} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`font-medium text-sm truncate ${staff.active ? "" : "text-muted-foreground line-through"}`}>
+              {staff.name}
+            </span>
+            <TierBadge tier={staff.staffRole} />
+          </div>
+          <div className="text-[12px] text-muted-foreground">
+            {outletName} · {staff.hasPin ? "PIN set" : "未设 PIN · no PIN"}
+            {!staff.active && " · inactive"}
+          </div>
+        </div>
+      </div>
+      {canEdit && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowPin(true)}
+            data-testid={`staff-setpin-${staff.id}`}
+            className="text-[12px] font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1"
+          >
+            {staff.hasPin ? "Reset PIN" : "Set PIN"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleActive}
+            disabled={patch.isPending}
+            data-testid={`staff-toggle-${staff.id}`}
+            className={`text-[12px] font-semibold rounded px-2 py-1 hover:bg-base-100 disabled:opacity-50 ${staff.active ? "text-destructive" : "text-success"}`}
+          >
+            {staff.active ? "Deactivate" : "Reactivate"}
+          </button>
+        </div>
+      )}
+      {showPin && <SetPinModal staff={staff} onClose={() => setShowPin(false)} />}
+    </li>
+  );
+}
+
 /**
- * 2026-05-22 (Loo) — modal for dealer-side outlet create. Reuses
- * MYAddressFields (the same cascading Line 1/2 → state → city → postcode
- * picker used for SO customer address + Principal dealer-create) so the
- * dealer's two flows for entering an address feel identical.
+ * 2026-05-22 (Loo) — dealer-side outlet create. Reuses MYAddressFields (the same
+ * cascading picker used for SO customer address + Principal dealer-create).
  */
 function AddOutletModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
@@ -259,164 +362,6 @@ function AddOutletModal({ onClose }: { onClose: () => void }) {
             className="btn-primary disabled:opacity-50"
           >
             {create.isPending ? "Adding…" : "Add outlet"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-interface SpRow {
-  id:       string;
-  name:     string;
-  phone:    string | null;
-  outletId: string | null;
-}
-
-function SalespersonRow({ sp, outletName }: { sp: SpRow; outletName: string }) {
-  const del = useDeleteSalesperson();
-  async function onDelete() {
-    if (!confirm(`Remove "${sp.name}"? Past orders attributed to them stay but lose the link.`)) {
-      return;
-    }
-    try {
-      await del.mutateAsync(sp.id);
-      toast.success(`Removed ${sp.name}`);
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not remove");
-    }
-  }
-  return (
-    <li className="py-2.5 flex items-center justify-between gap-3" data-testid={`sp-row-${sp.id}`}>
-      <div className="min-w-0">
-        <div className="font-medium text-sm truncate">{sp.name}</div>
-        <div className="text-[12px] text-muted-foreground">
-          {outletName} · {sp.phone ?? "no phone"}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={del.isPending}
-        className="text-[12px] text-destructive hover:underline px-2 py-1"
-      >
-        Remove
-      </button>
-    </li>
-  );
-}
-
-function AddSalespersonModal({
-  outlets,
-  onClose,
-}: {
-  outlets: { id: string; name: string }[];
-  onClose: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  // If dealer has only 1 outlet, auto-pick it. Otherwise default to first.
-  const [outletId, setOutletId] = useState<string>(outlets[0]?.id ?? "");
-  const create = useCreateSalesperson();
-
-  const valid = name.trim().length >= 2;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!valid) return;
-    try {
-      await create.mutateAsync({
-        name:     name.trim(),
-        phone:    phone.trim() ? phone.trim() : null,
-        outletId: outletId || null,
-      });
-      toast.success(`Added ${name.trim()}`);
-      onClose();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not create");
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 cursor-pointer border-0 p-0"
-      />
-      <form
-        onSubmit={submit}
-        className="relative bg-white rounded-md p-6 w-[420px] max-w-[92vw] shadow-xl"
-      >
-        <h3 className="font-display text-xl font-semibold mb-4">Add salesperson</h3>
-
-        <label className="block mb-3">
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-            Full name <span className="text-destructive">*</span>
-          </span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            data-testid="sp-name"
-            className="w-full mt-1 px-2.5 py-2 border border-border rounded text-sm outline-none"
-            placeholder="e.g. Aisha Rahman"
-            autoFocus
-          />
-        </label>
-
-        <label className="block mb-3">
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-            Phone (optional)
-          </span>
-          <input
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            data-testid="sp-phone"
-            className="w-full mt-1 px-2.5 py-2 border border-border rounded text-sm outline-none"
-            placeholder="012-3456789"
-          />
-        </label>
-
-        {outlets.length > 1 && (
-          <label className="block mb-4">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Outlet
-            </span>
-            <select
-              value={outletId}
-              onChange={(e) => setOutletId(e.target.value)}
-              data-testid="sp-outlet"
-              className="w-full mt-1 px-2.5 py-2 border border-border rounded text-sm outline-none bg-white"
-            >
-              <option value="">— none —</option>
-              {outlets.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <div className="flex justify-end gap-2 mt-5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={create.isPending}
-            className="btn-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!valid || create.isPending}
-            data-testid="sp-submit"
-            className="btn-primary"
-          >
-            {create.isPending ? "Adding…" : "Add"}
           </button>
         </div>
       </form>

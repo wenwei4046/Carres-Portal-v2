@@ -61,6 +61,8 @@ import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
+// 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
+import staffRouter from "./routes/staff";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
@@ -121,6 +123,7 @@ api.route("/principal/dashboard", principalDashboardRouter);
 api.route("/principal/dealers", principalDealersRouter);
 api.route("/principal/partners", principalPartnersRouter);
 api.route("/salespersons", salespersonsRouter);
+api.route("/staff", staffRouter);
 api.route("/operation/badges", operationBadgesRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/movements", operationMovementsRouter);

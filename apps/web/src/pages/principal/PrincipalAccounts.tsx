@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
+import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -227,12 +228,18 @@ function UserRow({ user }: { user: AccountRow }) {
 
   const setStatus = useSetAccountStatus(user.id);
   const [showReset, setShowReset] = useState(false);
+  const [showStaff, setShowStaff] = useState(false);
 
   const disable = () => {
     if (!confirm(`Disable ${user.name}? They will be signed out.`)) return;
     setStatus.mutate({ status: "disabled" });
   };
   const enable = () => setStatus.mutate({ status: "active" });
+
+  // 0233 — HQ manages a store's PIN staff. Only dealer/showroom accounts have a
+  // staff roster (they own a `dealers` row).
+  const canManageStaff =
+    (user.role === "dealer" || user.role === "showroom") && !!user.dealerId;
 
   return (
     <tr className="border-t border-base-100">
@@ -270,6 +277,9 @@ function UserRow({ user }: { user: AccountRow }) {
         {user.lastSeenAt ? user.lastSeenAt.slice(0, 10) : "—"}
       </td>
       <td className="px-4 py-2.5 text-right whitespace-nowrap">
+        {canManageStaff && (
+          <RowAction onClick={() => setShowStaff(true)}>Staff</RowAction>
+        )}
         {user.status === "active" && (
           <>
             <RowAction onClick={() => setShowReset(true)}>Reset password</RowAction>
@@ -285,6 +295,14 @@ function UserRow({ user }: { user: AccountRow }) {
         )}
         {showReset && (
           <ResetPasswordModal user={user} onClose={() => setShowReset(false)} />
+        )}
+        {showStaff && user.dealerId && (
+          <PrincipalStaffDrawer
+            dealerId={user.dealerId}
+            storeKind={user.role === "showroom" ? "showroom" : "dealer"}
+            orgName={user.orgName ?? user.name}
+            onClose={() => setShowStaff(false)}
+          />
         )}
       </td>
     </tr>
