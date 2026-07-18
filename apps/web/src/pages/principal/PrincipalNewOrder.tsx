@@ -885,22 +885,15 @@ export default function PrincipalNewOrder() {
                 </span>
               </div>
               {/* Inline variants — options come OUT under the row when the
-                  picked product has any (2990s SOFA VARIANTS parity). */}
+                  picked product has any (2990s SOFA VARIANTS parity). Specs
+                  only: the panel never touches the operator's price. */}
               {rowSku && rowModel && catalog && (
                 <RawLineOptions
                   line={l}
                   model={rowModel}
                   sku={rowSku}
                   catalog={catalog}
-                  onPatch={(patch) => {
-                    // A panel change re-derives the suggested price — drop any
-                    // in-progress manual price string so the row shows it.
-                    setPriceDrafts((p) => {
-                      const { [l.localId]: _drop, ...rest } = p;
-                      return rest;
-                    });
-                    patchLine(l.localId, patch);
-                  }}
+                  onPatch={(patch) => patchLine(l.localId, patch)}
                 />
               )}
               </div>
