@@ -3,6 +3,8 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { RequireRole } from "@/lib/require-role";
+import { roleAllowedOnPortal } from "@/lib/portal";
+import WrongPortal from "@/components/WrongPortal";
 import Login from "@/pages/Login";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
@@ -28,6 +30,9 @@ function HomeRedirect() {
     );
   }
   if (!session) return <Navigate to="/login" replace />;
+  // POS/ERP domain split (2026-07-18): wrong-domain roles get the signpost
+  // before any role-home navigation. pages.dev/localhost stay ungated.
+  if (role && !roleAllowedOnPortal(role)) return <WrongPortal role={role} />;
   if (role === "principal") return <Navigate to="/principal" replace />;
   if (role === "operation") return <Navigate to="/operation" replace />;
   if (role === "partner") return <Navigate to="/delivery-partner" replace />;
