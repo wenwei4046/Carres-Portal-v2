@@ -1,5 +1,13 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Plus, Trash2, ShieldCheck, Receipt } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
+  ShieldCheck,
+  Receipt,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -923,6 +931,18 @@ export function StorageControlFields({
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
+  // S1 (Jess 2026-07-18, thin inputs): waiver + extension fold away by
+  // default — they auto-open only when one is already in play.
+  const hasWaiverOrExt =
+    (form.control?.storage_waiver_status ?? "none") !== "none" ||
+    form.control?.storage_collected_at != null ||
+    (form.control?.extension_count ?? 0) > 0;
+  const [moreOpen, setMoreOpen] = useState(hasWaiverOrExt);
+  // The control row loads async — pop the fold open once data shows a live
+  // waiver / extension (never auto-closes).
+  useEffect(() => {
+    if (hasWaiverOrExt) setMoreOpen(true);
+  }, [hasWaiverOrExt]);
   // End of the storage window: explicit storage_to (the actual delivery /
   // collection), else the logistic's committed ETA, else today (still
   // accruing). Auto-shown but editable — set it to freeze the fee.
@@ -1125,20 +1145,40 @@ export function StorageControlFields({
             </select>
           </FieldRow>
           {orderId && (
-            <StorageCollectWaiver
-              orderId={orderId}
-              control={form.control}
-              charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : effAutoTotal}
-            />
-          )}
-          {orderId && (
-            <StorageExtensionRow
-              orderId={orderId}
-              control={form.control}
-              hasMsbf={hasMsbf}
-              hasSof={hasSof}
-              meta={meta}
-            />
+            <>
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                className="flex items-center gap-1 text-[12px] text-base-500 hover:text-base-700 px-1 py-0.5"
+              >
+                {moreOpen ? (
+                  <ChevronDown size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={2} />
+                )}
+                Waiver &amp; extension
+              </button>
+              {moreOpen && (
+                <>
+                  <StorageCollectWaiver
+                    orderId={orderId}
+                    control={form.control}
+                    charge={
+                      draft.storage_fee_override.trim()
+                        ? Number(draft.storage_fee_override)
+                        : effAutoTotal
+                    }
+                  />
+                  <StorageExtensionRow
+                    orderId={orderId}
+                    control={form.control}
+                    hasMsbf={hasMsbf}
+                    hasSof={hasSof}
+                    meta={meta}
+                  />
+                </>
+              )}
+            </>
           )}
         </>
       )}

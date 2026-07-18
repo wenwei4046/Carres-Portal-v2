@@ -66,7 +66,7 @@ function LoanSwapBar({ loan }: { loan: SofaLoanDto }) {
           {pieceLabel}
         </span>
         <span
-          className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+          className={`text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
             isSupplier
               ? "bg-[#FEF3C7] text-[#92400E]"
               : "bg-[#DCFCE7] text-[#166534]"
@@ -100,7 +100,7 @@ function LoanSwapBar({ loan }: { loan: SofaLoanDto }) {
         <OriginIcon className="w-3.5 h-3.5 shrink-0 text-base-400" strokeWidth={2} />
       </div>
       {owedBack && swapped && (
-        <div className="mt-1.5 text-[10px] text-[#92400E] flex items-center gap-1">
+        <div className="mt-1.5 text-[11px] text-[#92400E] flex items-center gap-1">
           <CornerUpLeft className="w-3 h-3" strokeWidth={2} /> owe{" "}
           {originLabel} 1 piece back
         </div>
@@ -260,7 +260,7 @@ export default function LoanPanel({
       {/* Warehouse path: same-category free units → pick → Lend out. */}
       {source === "warehouse" && (
         <div className="rounded-md border border-base-200 p-2 space-y-1">
-          <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-base-500">
+          <div className="text-[11px] uppercase tracking-[0.04em] font-semibold text-base-500">
             Free stock · same category
           </div>
           {lendable.length === 0 && (
@@ -285,7 +285,7 @@ export default function LoanPanel({
                 onClick={() => onLend?.(u.id, u.sku)}
                 disabled={!onLend}
                 title="Issue a loan DO + mark this unit on-loan to the order"
-                className="btn-secondary text-[10px] py-0.5 px-2 shrink-0"
+                className="btn-secondary text-[11px] py-0.5 px-2 shrink-0"
               >
                 Lend out
               </button>
@@ -297,7 +297,7 @@ export default function LoanPanel({
       {/* Supplier path: supplier + piece + category → Borrow + loan out. */}
       {source === "supplier" && (
         <div className="rounded-md border border-base-200 p-2 space-y-1.5">
-          <div className="text-[10px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
+          <div className="text-[11px] uppercase tracking-[0.04em] font-semibold text-[#8C877D]">
             Borrow from supplier
           </div>
           <select

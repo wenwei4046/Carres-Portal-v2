@@ -23,6 +23,7 @@ import {
   ExternalLink,
   FileText,
   Flag,
+  Info,
   MapPin,
   MoreVertical,
   Package,
@@ -1549,6 +1550,12 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // S4 (2026-07-18) — ‹prev/next› keeps the drawer mounted, so `tab` carries
+  // across orders; if the new order doesn't offer the current tab (Storage
+  // hides without MS/BF/SOF goods), fall back to Items instead of a blank pane.
+  useEffect(() => {
+    if (tab === "storage" && !(hasMsbf || hasSof)) setTab("items");
+  }, [tab, hasMsbf, hasSof]);
   // Item-listing groups (Jess 2026-07-18): Ready collapsible; category groups
   // remember manual toggles (default: all-reserved groups start collapsed).
   const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
@@ -3046,10 +3053,18 @@ function DrawerBody({
                       const from =
                         form.control?.storage_from ?? form.draft.storage_from;
                       if (from && from.trim()) {
+                        // S2 — the meter stops at the window END (actual
+                        // delivery / collection, else the logistic ETA);
+                        // "today" only while still accruing.
+                        const end =
+                          form.draft.storage_to.trim() ||
+                          form.draft.logistic_eta.trim() ||
+                          new Date().toISOString().slice(0, 10);
                         const days = Math.max(
                           0,
                           Math.round(
-                            (Date.now() - new Date(`${from}T00:00:00`).getTime()) /
+                            (new Date(`${end}T00:00:00`).getTime() -
+                              new Date(`${from}T00:00:00`).getTime()) /
                               86_400_000,
                           ),
                         );
@@ -3064,14 +3079,16 @@ function DrawerBody({
               }
             >
               <div className="p-3 space-y-2">
-                {/* §7.5 — the locked rule (replaces the wrong RM/day placeholder):
-                    fee runs START→END; START auto = the next same weekday after
-                    the deadline; MS/BF RM150/month · Sofa 14 days free then RM200. */}
-                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[12px] text-base-500">
-                  Starts the same weekday the week AFTER the deadline · MS/BF{" "}
-                  <span className="font-mono text-base-700">RM150</span>/month ·
-                  sofa free 14 days then{" "}
-                  <span className="font-mono text-base-700">RM200</span>
+                {/* S3 — zero permanent explanation text (rev17 law): the §7.5
+                    rate rule lives in the ⓘ tooltip, not a standing card. */}
+                <div className="flex justify-end">
+                  <span
+                    title="Storage rule — starts the same weekday the week AFTER the deadline · MS/BF RM150/month · sofa free 14 days then RM200 (one-time)"
+                    className="inline-flex items-center gap-1 text-[12px] text-base-400 cursor-help"
+                  >
+                    <Info size={14} strokeWidth={2} />
+                    rates
+                  </span>
                 </div>
                 <StorageControlFields
                   form={form}
