@@ -107,7 +107,7 @@ import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import { StopsEditor } from "./RouteJourneyBar";
+import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -1005,6 +1005,9 @@ function DrawerBody({
   // Route "Option D" — which item's journey legs are expanded in-place (one at a
   // time; the heavy detail stays inside the drawer so the list never gets busy).
   const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
+  // rev18 — the Stock ETA column edits IN PLACE (click the date → input);
+  // the expander no longer repeats it.
+  const [etaEditSku, setEtaEditSku] = useState<string | null>(null);
   // §7.6 — the Delivery card's multi-leg "Carriers / route" block is HIDDEN by
   // default (the Logistic dropdown is the default route); it expands behind
   // "+ Add stop" and stays open once the order actually has legs.
@@ -2153,17 +2156,18 @@ function DrawerBody({
                 {/* rev15c (Jess) — no grey base under the column headers:
                     white sticky row + a hairline keeps the separation. */}
                 <thead className="sticky top-0 z-10">
-                  {/* rev16 (Jess: option A) — back to the v3 SIX-column diet
-                      (alert-first: STATUS leads; SKU folds into the Item
-                      sub-line; LOCATION lives in the route expander) so a
-                      MacBook sees the FULL table with no horizontal cut. */}
+                  {/* rev18 (Jess's final format): STATUS · STOCK ETA · QTY ·
+                      ITEM · PO · ARRIVED. Alert-first; SKU folds into the
+                      Item sub-line; ARRIVED (goods-in / GRN — the words
+                      "Received"/"Book in" are dead) is its own column, fully
+                      separate from the route expander; ETA edits in place. */}
                   <tr className="bg-white text-base-500 border-b border-base-100">
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Status</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">Stock ETA</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
                     <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">PO</th>
-                    <th className="text-center text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-36">Action</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-32">Arrived</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2219,11 +2223,14 @@ function DrawerBody({
                           ? null
                           : rd === "reserved"
                             ? {
-                                t: "Reserved",
+                                /* rev18 — "Ready", the layman word (v3
+                                   vocab); "Reserved" collided with
+                                   "Received" for weak-English staff. */
+                                t: "Ready",
                                 c: "pill-confirmed",
                                 hint: isAcc
                                   ? "Accessory — always in the Klang warehouse"
-                                  : "Reserved to this SO",
+                                  : "A unit is locked to this order",
                               }
                             : rd === "to_reserve"
                               ? {
@@ -2261,39 +2268,75 @@ function DrawerBody({
                             className={`cursor-pointer h-[52px] transition-opacity ${
                               l.sku === activeLineSku
                                 ? "bg-[#e6f1fb]"
-                                : `${
-                                    rd && rd !== "reserved"
-                                      ? "bg-info-soft/40 hover:bg-info-soft/60"
-                                      : "hover:bg-base-50"
-                                  } ${
+                                : `hover:bg-base-50 ${
                                     activeLineSku ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
                           >
-                            {/* rev16 columns (v3 diet, alert-first) — STATUS ·
-                                STOCK ETA · ITEM (chevron + thumb + name/size ·
-                                SKU) · QTY · PO · ACTION (must-do + Manage ▾).
-                                Location lives in the route expander. */}
-                            {/* STATUS — auto-derived pill (dial vocabulary). */}
+                            {/* rev18 columns (Jess's final format) — STATUS ·
+                                STOCK ETA (click-to-edit) · QTY · ITEM (no
+                                thumb; sub = size · SKU; mini route bar when a
+                                special multi-stop route exists) · PO ·
+                                ARRIVED (goods-in count + [+ Arrived] GRN).
+                                Rows stay WHITE — colour lives in the pills
+                                and the red dates only (Jess: row tints made
+                                the listing unreadable). */}
+                            {/* STATUS — auto-derived pill; an amber "Need N"
+                                IS the reserve action (click → picker). */}
                             <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {pill ? (
-                                <span
-                                  title={pill.hint}
-                                  className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
-                                >
-                                  {rd === "reserved" && (
-                                    <Check size={14} strokeWidth={2.5} aria-hidden="true" />
-                                  )}
-                                  {pill.t}
-                                </span>
+                                rd === "to_reserve" ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPickerSku(l.sku);
+                                      setPickerOpen(true);
+                                      document
+                                        .getElementById("warehouse-stock-panel")
+                                        ?.scrollIntoView({
+                                          block: "start",
+                                          behavior: "smooth",
+                                        });
+                                    }}
+                                    title="Matching stock is free — click to reserve a unit to this order"
+                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
+                                  >
+                                    {pill.t}
+                                  </button>
+                                ) : (
+                                  <span
+                                    title={pill.hint}
+                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                  >
+                                    {rd === "reserved" && (
+                                      <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                                    )}
+                                    {pill.t}
+                                  </span>
+                                )
                               ) : (
                                 <span className="text-base-300 text-[12px]">—</span>
                               )}
                             </td>
-                            {/* STOCK ETA — red alert when late / missing. */}
+                            {/* STOCK ETA — red alert when late / missing;
+                                click the date to edit IN PLACE (the expander
+                                no longer repeats it). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService || isAcc || rd === "reserved" ? (
                                 <span className="text-base-300 text-[12px]">—</span>
+                              ) : etaEditSku === l.sku ? (
+                                <input
+                                  type="date"
+                                  autoFocus
+                                  value={etaValue}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    form.setLineEta(l.sku, e.target.value)
+                                  }
+                                  onBlur={() => setEtaEditSku(null)}
+                                  className="border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[12px] focus:border-primary focus:outline-none w-full"
+                                />
                               ) : etaValue ? (
                                 <span
                                   className={`inline-flex items-center gap-1 text-[12px] tabular-nums ${
@@ -2320,21 +2363,39 @@ function DrawerBody({
                                       etaValue > order.delivery_date)) && (
                                     <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
                                   )}
-                                  {fmtDate(etaValue).split(",")[0]}
+                                  <span
+                                    className="border-b border-dashed border-base-300 cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEtaEditSku(l.sku);
+                                    }}
+                                    title="Click to change the stock ETA"
+                                  >
+                                    {fmtDate(etaValue).split(",")[0]}
+                                  </span>
                                 </span>
                               ) : (
                                 <span
-                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-danger"
-                                  title="No stock ETA — chase the supplier"
+                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-danger cursor-pointer"
+                                  title="No stock ETA — click to set it (or chase the supplier)"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEtaEditSku(l.sku);
+                                  }}
                                 >
                                   <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
                                   no ETA
                                 </span>
                               )}
                             </td>
-                            {/* ITEM — chevron (route/GRN expander) + thumb +
-                                name; sub-line = size · SKU code (the old SKU
-                                column folded in here). */}
+                            {/* QTY — the bare number (§9: no "QTY" word). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
+                              {l.qty}
+                            </td>
+                            {/* ITEM — chevron (route expander) + name; sub =
+                                size · SKU; a special multi-stop route draws
+                                the always-visible mini numbered bar (no thumb
+                                icon — Jess). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               <div className="flex items-center gap-2 min-w-0">
                                 {!isService && (
@@ -2346,7 +2407,7 @@ function DrawerBody({
                                         cur === l.sku ? null : l.sku,
                                       );
                                     }}
-                                    title="Details — receiving (GRN), route / transfer"
+                                    title="Route / special transfer"
                                     aria-expanded={routeOpen}
                                     className="shrink-0 text-base-500 hover:text-base-800"
                                   >
@@ -2357,9 +2418,6 @@ function DrawerBody({
                                     )}
                                   </button>
                                 )}
-                                <span className="size-[42px] rounded-[8px] bg-base-100 grid place-items-center shrink-0 text-base-400">
-                                  <CatIcon cat={lineCategory(l.sku)} />
-                                </span>
                                 <span className="min-w-0 flex-1">
                                   <span
                                     className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
@@ -2386,12 +2444,16 @@ function DrawerBody({
                                       ) : null}
                                     </span>
                                   )}
+                                  {stops.length > 1 && (
+                                    <span className="block mt-0.5">
+                                      <MiniStopsBar
+                                        stops={stops}
+                                        names={stops.map(shortSite).join(" → ")}
+                                      />
+                                    </span>
+                                  )}
                                 </span>
                               </div>
-                            </td>
-                            {/* QTY — the bare number (§9: no "QTY" word). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
-                              {l.qty}
                             </td>
                             {/* PO — In stock / PO#### */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
@@ -2405,130 +2467,60 @@ function DrawerBody({
                                 <span className="text-[12px] text-base-600">In stock</span>
                               )}
                             </td>
-                            {/* ACTION — the must-do action directly + Manage ▾
-                                for the rest; Reserved rows read "—" (§9). */}
-                            <td className="border-b border-base-100 px-1.5 py-1 text-center align-middle">
-                              {isService || rd === "reserved" ? (
+                            {/* ARRIVED — goods-in count (GRN; "Received" and
+                                "Book in" are dead words). The count is the
+                                quiet fact; [+ Arrived] records an arrival. */}
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
+                              {isService || isAcc || !poNo ? (
                                 <span className="text-base-300 text-[12px]">—</span>
                               ) : (
-                                <span className="inline-flex items-center gap-1">
-                                  {rd === "to_reserve" && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span
+                                    className={`text-[12px] tabular-nums ${
+                                      lineReceivedOf(l.sku) >= l.qty
+                                        ? "text-base-900 font-semibold"
+                                        : "text-base-500"
+                                    }`}
+                                    title="Units arrived at the warehouse"
+                                  >
+                                    {lineReceivedOf(l.sku)}/{l.qty}
+                                  </span>
+                                  {lineReceivedOf(l.sku) < l.qty && (
                                     <Btn
                                       size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setPickerSku(l.sku);
-                                        setPickerOpen(true);
-                                        document
-                                          .getElementById("warehouse-stock-panel")
-                                          ?.scrollIntoView({
-                                            block: "start",
-                                            behavior: "smooth",
-                                          });
+                                        setReceiveLine({
+                                          sku: l.sku,
+                                          qty: l.qty,
+                                          received: lineReceivedOf(l.sku),
+                                        });
                                       }}
-                                      title="Open the warehouse picker filtered to this line"
+                                      title="Goods arrived at the warehouse — record how many"
                                     >
-                                      Reserve
+                                      + Arrived
                                     </Btn>
                                   )}
-                                  <RowManageMenu
-                                    items={[
-                                      {
-                                        label: "Reserve stock",
-                                        onClick: () => {
-                                          setPickerSku(l.sku);
-                                          setPickerOpen(true);
-                                          document
-                                            .getElementById("warehouse-stock-panel")
-                                            ?.scrollIntoView({
-                                              block: "start",
-                                              behavior: "smooth",
-                                            });
-                                        },
-                                      },
-                                      {
-                                        label: "Loan a substitute",
-                                        onClick: () => setTab("loan"),
-                                      },
-                                      {
-                                        label: "Change route",
-                                        onClick: () => setRouteOpenSku(l.sku),
-                                      },
-                                    ]}
-                                  />
                                 </span>
                               )}
                             </td>
                           </tr>
                           {!isService && routeOpen && (
-                            /* rev17 (Jess: option A) — the expander is ONE
-                               horizontal strip, wordless: Stock ETA · Received
-                               n/m [Book in] · route chips (place → place → +).
-                               The chips ARE the journey and the editor — the
-                               old explanation sentence, journey bar and
-                               vertical numbered list said the same route three
-                               ways and stacked 5 rows tall. */
+                            /* rev18 — the expander is the ROUTE ONLY (Jess:
+                               don't mix goods-in with the special handling —
+                               ETA edits in its column, Arrived has its own
+                               column). Chips ARE the journey and the editor. */
                             <tr className="bg-base-50">
                               <td
                                 colSpan={6}
                                 className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
-                                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                                  {!isAcc && (
-                                    <>
-                                      <label className="flex items-center gap-1.5 text-[12px] text-base-500">
-                                        Stock ETA
-                                        <input
-                                          type="date"
-                                          value={etaValue}
-                                          onClick={(e) => e.stopPropagation()}
-                                          onChange={(e) =>
-                                            form.setLineEta(l.sku, e.target.value)
-                                          }
-                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[12px] focus:border-primary focus:outline-none"
-                                        />
-                                      </label>
-                                      {/* Received count = quiet FACT; Book in =
-                                          the ACTION beside it (split — the old
-                                          text+icon+text single button read as
-                                          one confusing word-lump). */}
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <span
-                                          className={`text-[12px] tabular-nums ${
-                                            lineReceivedOf(l.sku) >= l.qty
-                                              ? "text-base-900 font-semibold"
-                                              : "text-base-500"
-                                          }`}
-                                        >
-                                          Received {lineReceivedOf(l.sku)}/{l.qty}
-                                        </span>
-                                        {lineReceivedOf(l.sku) < l.qty && (
-                                          <Btn
-                                            size="sm"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setReceiveLine({
-                                                sku: l.sku,
-                                                qty: l.qty,
-                                                received: lineReceivedOf(l.sku),
-                                              });
-                                            }}
-                                            title="Record units that arrived at the warehouse (GRN)"
-                                          >
-                                            <PackagePlus size={14} strokeWidth={2} />
-                                            Book in
-                                          </Btn>
-                                        )}
-                                      </span>
-                                    </>
-                                  )}
-                                  <StopsEditor
-                                    stops={savedLoc ?? (locValue ? [locValue] : [])}
-                                    onChange={(s) =>
-                                      form.setLineLocation(l.sku, s)
-                                    }
-                                  />
-                                </div>
+                                <StopsEditor
+                                  stops={savedLoc ?? (locValue ? [locValue] : [])}
+                                  onChange={(s) =>
+                                    form.setLineLocation(l.sku, s)
+                                  }
+                                />
                               </td>
                             </tr>
                           )}

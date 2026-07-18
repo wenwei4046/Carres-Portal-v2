@@ -213,6 +213,46 @@ export function stopsToDisplay(stops: string[]): RouteLeg[] {
 const LEG_PLACES = [...STOCK_LOCATIONS] as const;
 
 /**
+ * MiniStopsBar (rev18, Jess Option 3 — the freight-tracker pattern she picked
+ * in v3 "Option D"): an ALWAYS-VISIBLE numbered route bar under the item name,
+ * drawn ONLY when a special multi-stop route is authored (standard single-stop
+ * items stay quiet — her no-noise rule). Stop 1 = filled (where the item sits
+ * now); later stops = numbered rings; short site names after. No words beyond
+ * the place names.
+ */
+export function MiniStopsBar({
+  stops,
+  names,
+}: {
+  stops: string[];
+  /** Pre-shortened site names ("Klang → AL"). */
+  names: string;
+}) {
+  if (stops.length < 2) return null;
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      {stops.map((_, i) => (
+        <span key={i} className="inline-flex items-center gap-1 shrink-0">
+          {i > 0 && (
+            <span className="w-4 h-0.5 bg-base-200 rounded-full" aria-hidden="true" />
+          )}
+          <span
+            className={`w-4 h-4 rounded-full grid place-items-center text-[11px] font-bold leading-none ${
+              i === 0
+                ? "bg-base-700 text-white"
+                : "bg-white border border-base-300 text-base-400"
+            }`}
+          >
+            {i + 1}
+          </span>
+        </span>
+      ))}
+      <span className="text-[11px] text-base-500 truncate min-w-0">{names}</span>
+    </span>
+  );
+}
+
+/**
  * The in-place route STOPS editor — HORIZONTAL chips (rev17, Jess: routes are
  * horizontal things; the old vertical numbered list + explanation sentence +
  * separate journey bar said the same route three ways and still read as a

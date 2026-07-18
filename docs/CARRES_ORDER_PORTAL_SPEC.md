@@ -60,9 +60,15 @@ Checklist mark(Logistic):Done=circle-check-filled绿·Waiting=clock琥珀·Block
 Dial 一律贴 KPI headline 值旁,不放在阶段行上。
 阶段用词(全 portal 统一,list NEXT 对齐):Balance Placed下单→Confirmed确认单→Paid收齐(类别名=Balance 不用 Money);Stock PO raised→ETA set→Goods ready;Logistic Assigned→Booked(partner 已联系客人并约好 slot)→Delivered。NEXT verb=完成当前 pending 阶段的动作(Order PO/Chase supplier/Book logistic/Chase logistic/Record payment/Confirm)。(“Record payment” verb 属 List 阶段 §14,详情页现阶段不加。)
 
-## 9. Items ordered tab(⭐ 2026-07-18 rev16 — 回到 v3 六列瘦身,Jess 拍板 A)
-**六列 table-fixed(alert-first,MacBook 一屏看全,~840px):STATUS(pill 打头:Reserved绿/Need N琥珀/On PO灰/Delayed红,与dial同词)·STOCK ETA(晚于deadline/无ETA→红alert)·ITEM(chevron+thumb42+名粗,副行=size · SKU mono 小字——独立 SKU 列已并入)·QTY(纯数字)·PO(In stock/PO####)·ACTION(必做动作直显如 Reserve + Manage▾:Reserve/Loan/Change route…)。** LOCATION 独立列删除——位置住在 chevron 展开的 route 行里。面板保留 DELIVERY 式横带(标题+收合+readiness pill+⋮,rev15c);列头行白底无灰 base;表格无内部限高,整栏滚动。(8 列宽版〔+SKU/SOURCE/LOCATION 独立列〕是 2026-07-18 office 大屏版,MacBook 装不下,作废。)
-**展开行(rev17,Jess A)= 一条横向 strip,零解释文字**:`Stock ETA [date] · Received n/m [Book in] · route chips`。route chips **本身就是编辑器**(地点 icon+select 装在 pill 里,chip 间 → 箭头,多站才出 🗑,圆形 + 加站)——旧版的说明句+journey bar+竖排编号列表(同一条路线画三次、叠 5 层)作废。Received=灰事实,Book in=旁边独立按钮(GRN)。**小单(≤5 行)平铺无组头**(行的 Status pill 就是 message,Chase-Now 式);>5 行才按 category 分组。readiness pill 文案:全齐 "All ready ✓"·全无 "N needs stock"·混合 "x ready · y needs stock"(绝不以 0 开头)。
+## 9. Items ordered tab(⭐ 2026-07-18 rev18 — Jess 最终格式)
+**六列 table-fixed:`STATUS · STOCK ETA · QTY · ITEM · PO · ARRIVED`**(alert-first,MacBook 一屏看全):
+- **STATUS** pill:**Ready绿**("Reserved" 作废——跟 Received 撞脸)/Need N琥珀(**pill 可点=直接开 warehouse picker 锁货**)/On PO灰/Delayed红/No PO。
+- **STOCK ETA**:晚于 deadline/无 ETA→红 alert;**点日期就地变输入框编辑**(只此一处,不再在展开行重复)。
+- **ITEM**:chevron+名粗(**无 icon 缩图**,Jess),副行=size · SKU mono;**特殊多站 route 时名字下常驻 MiniStopsBar**(编号节点:站1实心=货现在的位置,后站灰圈,短站名 "Klang → AL";单站不画=无噪音)。
+- **QTY** 纯数字(在 ITEM 前,Jess 指定顺序)。**PO**:In stock/PO####。
+- **ARRIVED**(**"Received"/"Book in" 两词作废**——Received 与 Reserved 撞脸、Book in 是英式仓库行话):`n/m` 灰数字=到仓件数,未齐时旁边 **[+ Arrived]** 按钮=记录到货(GRN);acc/service/无 PO → "—"。
+- **Row 全白**——彩色只住 pill 和红日期(needs-action 蓝底 tint 作废,Jess:底色让表难读);点选中的行才蓝 wash。
+**展开行(chevron)= 只剩 route chips**(goods-in 与 special handling 彻底分开):地点 icon+select 装 pill、chip 间 →、多站 🗑、圆 + 加站;零解释文字。**小单(≤5 行)平铺无组头**;>5 行按 category 分组(组头保留 "N need stock" 提示)。readiness pill 文案:全齐 "All ready ✓"·全无 "N needs stock"·混合 "x ready · y needs stock"(绝不以 0 开头)。ACTION 列作废(Reserve=Need pill 点击;Loan 在 Loan tab;Change route=chevron)。
 Route 平时藏,chevron 展开一行:site→carrier→customer,单件特殊挂 special·direct 可编辑。
 件多→按 category 分组(组图标+计数+"N need stock",needs-action 行蓝底,全 reserved 组自动收起);件少≤5 扁平。
 Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reserved 行 STATUS 绿,Action=—(绿勾不放 Action 列)。
