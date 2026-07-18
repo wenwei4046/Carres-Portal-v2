@@ -5,7 +5,7 @@ export type Bindings = {
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_JWT_SECRET: string;
-  // 0232 staff PIN login — HS256 secret the Hono routes sign/verify the
+  // 0233 staff PIN login — HS256 secret the Hono routes sign/verify the
   // short-lived staff session token with. Worker secret (`wrangler secret put`);
   // never reaches the browser bundle.
   STAFF_SESSION_SECRET: string;

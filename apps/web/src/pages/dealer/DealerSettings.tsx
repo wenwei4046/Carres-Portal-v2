@@ -23,7 +23,7 @@ import {
 /**
  * Dealer/Showroom self-service Settings.
  *
- * Staff (0232): tier badges + colour avatar + PIN status, per-row Set/Reset PIN
+ * Staff (0233): tier badges + colour avatar + PIN status, per-row Set/Reset PIN
  * and a deactivate toggle (the FK-unsafe hard delete is gone from the UI —
  * orders reference salesperson_id, so a referenced row can't be deleted; we
  * deactivate instead). The section is hidden entirely for a salesperson-tier

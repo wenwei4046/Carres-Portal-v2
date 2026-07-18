@@ -349,7 +349,7 @@ export default function OrderStatusPage({
    *  picked dealer's behalf (undefined = the caller's own JWT scope). */
   dealerId?: string;
 }) {
-  // Staff PIN login (0232): once a staff PIN is verified the identity is already
+  // Staff PIN login (0233): once a staff PIN is verified the identity is already
   // proven, so the legacy 6-digit passcode gate is skipped. A salesperson-tier
   // session is server-scoped to its own orders, so the per-person compare chips
   // are hidden (there's no one else to compare against). No token (principal

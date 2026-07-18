@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api";
 import { useCreateStaff, useSetStaffPin } from "@/lib/queries";
 
 /**
- * Shared staff-admin UI (0232) — the bilingual tier labels, colour avatar,
+ * Shared staff-admin UI (0233) — the bilingual tier labels, colour avatar,
  * STAFF_COLORS dot picker, and the Set-PIN + Add-staff modals. Reused by the
  * dealer/showroom Settings staff section AND the principal Accounts staff
  * drawer so both surfaces create/manage staff identically. UI-KIT v4 surfaces

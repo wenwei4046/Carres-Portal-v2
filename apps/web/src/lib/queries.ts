@@ -118,7 +118,7 @@ import {
   type SalespersonCreateInput,
   type AddOrderLinesInput,
   type SalespersonsListResponse,
-  // 0232 — Staff PIN login (tiers + PIN identity on salespersons rows).
+  // 0233 — Staff PIN login (tiers + PIN identity on salespersons rows).
   type StaffListResponse,
   type StaffSessionResponse,
   type VerifyPinInput,
@@ -170,7 +170,7 @@ export const qk = {
   catalogConfigHistory: (section: string) => ["catalog", "config-history", section] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
-  /** 0232 — staff PIN roster (GET /api/staff). Principal may scope to another
+  /** 0233 — staff PIN roster (GET /api/staff). Principal may scope to another
    *  store via dealerId; own-store reads pass none. Kept off the `salespersons`
    *  prefix so staff mutations that flip hasPin invalidate distinctly. */
   staff:        (dealerId?: string) => ["staff", dealerId ?? null] as const,
@@ -1414,7 +1414,7 @@ export function useDeleteSalesperson(
 }
 
 // ---------------------------------------------------------------------------
-// 0232 — Staff PIN login (Loo 2026-07-18)
+// 0233 — Staff PIN login (Loo 2026-07-18)
 //
 // Read the staff roster + tier/PIN state, and the four token-minting /
 // roster-mutating calls. Verify-pin / reauth / self-token return a signed staff

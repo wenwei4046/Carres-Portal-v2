@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import type { OutletDto } from "@carres/shared";
 
 /**
- * OutletPicker (0232) — shown only when an activated store has MORE THAN ONE
+ * OutletPicker (0233) — shown only when an activated store has MORE THAN ONE
  * outlet; a single-outlet store auto-selects and never sees this. The chosen
  * outlet scopes the PIN screen's staff tiles and prefills the CUSTOMER step's
  * outlet field for the session.

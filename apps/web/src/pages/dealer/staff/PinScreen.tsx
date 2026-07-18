@@ -8,7 +8,7 @@ import PinPad from "../pos/PinPad";
 import { staffColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
 
 /**
- * PinScreen (0232) — the tap-your-name + 6-digit PIN sign-in for an activated
+ * PinScreen (0233) — the tap-your-name + 6-digit PIN sign-in for an activated
  * store. Two panes: a tile grid (colour avatar + name + tier; PIN-less tiles
  * disabled with a "未设 PIN" badge; outlet-filtered) and, once a tile is
  * tapped, the shared PinPad keypad. A verified PIN mints the staff token

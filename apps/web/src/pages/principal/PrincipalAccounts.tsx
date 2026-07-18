@@ -236,7 +236,7 @@ function UserRow({ user }: { user: AccountRow }) {
   };
   const enable = () => setStatus.mutate({ status: "active" });
 
-  // 0232 — HQ manages a store's PIN staff. Only dealer/showroom accounts have a
+  // 0233 — HQ manages a store's PIN staff. Only dealer/showroom accounts have a
   // staff roster (they own a `dealers` row).
   const canManageStaff =
     (user.role === "dealer" || user.role === "showroom") && !!user.dealerId;

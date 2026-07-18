@@ -149,7 +149,7 @@ export default function CustomerStep({
     ? salespersons.filter((sp) => sp.outletId === draft.outletId)
     : salespersons;
 
-  // ── 0232 staff PIN session — attribute the order to the signed-in person ────
+  // ── 0233 staff PIN session — attribute the order to the signed-in person ────
   // No token (principal on-behalf / dormant store) → `staff` is null and this is
   // wholly inert (byte-identical to before). With a token: the outlet is locked
   // to the working outlet for manager/salesperson (principal free); the

@@ -61,7 +61,7 @@ import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
-// 0232 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
+// 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.

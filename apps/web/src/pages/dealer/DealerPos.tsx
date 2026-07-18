@@ -161,7 +161,7 @@ export default function DealerPos({
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
   const userEmail = useAuth((s) => s.user?.email ?? "");
-  // 0232 — the PIN-verified staff member (null for principal on-behalf / dormant
+  // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
   // stores). When present the top-bar chip becomes a "换人 / switch" button.
   const staffMember = useStaffSession((s) => s.staff);
   const createOrder = useCreateOrder();

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { salespersonSchema } from "./catalog";
 
 /**
- * 0232 — Staff PIN login (Loo 2026-07-18).
+ * 0233 — Staff PIN login (Loo 2026-07-18).
  *
  * One store login (email+password, unchanged) → outlet pick (only when the
  * dealer has >1 outlet) → 6-digit PIN identifies the STAFF MEMBER. Three

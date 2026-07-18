@@ -59,7 +59,7 @@ describe("staffTokenPayloadSchema", () => {
 });
 
 describe("staffDtoSchema", () => {
-  it("defaults tier/active/hasPin for pre-0232 payloads", () => {
+  it("defaults tier/active/hasPin for pre-0233 payloads", () => {
     const dto = staffDtoSchema.parse({
       id: UUID,
       dealerId: UUID,

@@ -10,7 +10,7 @@ import {
 } from "@/pages/dealer/staff/staff-ui";
 
 /**
- * PrincipalStaffDrawer (0232) — Carres HQ manages a dealer/showroom store's
+ * PrincipalStaffDrawer (0233) — Carres HQ manages a dealer/showroom store's
  * staff: list, create (tier options respect storeKind — a showroom caps at
  * manager), and reset PINs. Reuses the same Add-staff + Set-PIN modals as the
  * store's own Settings. The internal principal JWT is treated as principal-tier

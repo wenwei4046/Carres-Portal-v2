@@ -3,7 +3,7 @@ import { useStaffSession } from "@/lib/staff";
 import { staffColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
 
 /**
- * Current-staff chip (0232) shown in the POS top bar and the back-office chrome.
+ * Current-staff chip (0233) shown in the POS top bar and the back-office chrome.
  * Renders the signed-in staff member (colour avatar + name + tier) as a
  * "换人 / switch" button: clicking clears the staff token — keeping the working
  * outlet — which drops StaffGate back to the PIN screen. Returns null when

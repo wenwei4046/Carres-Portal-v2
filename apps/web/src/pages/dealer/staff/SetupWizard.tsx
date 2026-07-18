@@ -9,7 +9,7 @@ import PinPad from "../pos/PinPad";
 import { staffColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
 
 /**
- * SetupWizard (0232) — the one-time forced activation an un-activated store is
+ * SetupWizard (0233) — the one-time forced activation an un-activated store is
  * pushed through on next login. Three steps:
  *   1. Re-prove the store email + password (reauth) → owner-mode token, so the
  *      creates below are authorised.

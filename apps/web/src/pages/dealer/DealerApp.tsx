@@ -12,7 +12,7 @@ import StaffGate from "./staff/StaffGate";
  * chrome via a layout route. The legacy `?new=1` modal wizard is gone — opening
  * the POS is just navigating to `/dealer`.
  *
- * Everything is wrapped in <StaffGate> (0232): after the store login, a
+ * Everything is wrapped in <StaffGate> (0233): after the store login, a
  * dealer/showroom either runs the one-time setup wizard or taps a name + PIN
  * before the app renders; a salesperson auto-signs-in from its linked row. The
  * principal on-behalf POS is exempt — PrincipalApp mounts DealerPos directly,

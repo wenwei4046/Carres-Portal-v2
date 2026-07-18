@@ -19,7 +19,7 @@ import { getStaffContext, mintStaffToken } from "../lib/staff-token";
 import type { AppEnv } from "../types";
 
 /**
- * /api/staff — 0232 staff PIN login (Loo 2026-07-18).
+ * /api/staff — 0233 staff PIN login (Loo 2026-07-18).
  *
  * A store logs in once (email+password, unchanged). This surface adds the
  * per-person layer on top: a 6-digit PIN identifies WHO is at the POS, three

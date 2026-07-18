@@ -1,4 +1,4 @@
--- 0232_staff_pin_login.sql
+-- 0233_staff_pin_login.sql
 -- Staff PIN login (Loo 2026-07-18): dealer/showroom POS gains outlet-pick +
 -- 6-digit-PIN staff identity. Three tiers on salespersons (principal/manager/
 -- salesperson) + a deny-all PIN ledger verified only inside SECURITY DEFINER

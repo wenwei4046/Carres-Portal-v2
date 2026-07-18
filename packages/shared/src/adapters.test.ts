@@ -1151,7 +1151,7 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
   });
 });
 
-describe("salespersonFromRow (0232 staff PIN login)", () => {
+describe("salespersonFromRow (0233 staff PIN login)", () => {
   const row: SalespersonRow = {
     id: "22222222-2222-4222-8222-222222222222",
     dealer_id: DEALER_ID,
@@ -1165,14 +1165,14 @@ describe("salespersonFromRow (0232 staff PIN login)", () => {
     active: true,
   };
 
-  it("maps the 0232 tier/color/active columns", () => {
+  it("maps the 0233 tier/color/active columns", () => {
     const d = salespersonFromRow(row);
     expect(d.staffRole).toBe("manager");
     expect(d.color).toBe("ocean");
     expect(d.active).toBe(true);
   });
 
-  it("tolerates pre-0232 rows (mocks) missing the new columns", () => {
+  it("tolerates pre-0233 rows (mocks) missing the new columns", () => {
     const legacy = { ...row } as unknown as SalespersonRow;
     delete (legacy as Partial<SalespersonRow>).staff_role;
     delete (legacy as Partial<SalespersonRow>).color;

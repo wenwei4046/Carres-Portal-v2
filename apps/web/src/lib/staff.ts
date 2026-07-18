@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { StaffTierDto } from "@carres/shared";
 
 /**
- * 0232 — Staff PIN login (Loo 2026-07-18). The per-tab staff identity proven by
+ * 0233 — Staff PIN login (Loo 2026-07-18). The per-tab staff identity proven by
  * a 6-digit PIN (or an owner-mode password reauth). One store login (email +
  * password) still gates first; this rides ON TOP of it and identifies the
  * PERSON so every order is attributed to them.

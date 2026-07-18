@@ -10,7 +10,7 @@ import { adminClient } from "./supabase";
 import type { AppEnv, Bindings } from "../types";
 
 /**
- * 0232 staff PIN login — the per-request STAFF identity token.
+ * 0233 staff PIN login — the per-request STAFF identity token.
  *
  * A store logs in once with email+password (unchanged). After a 6-digit PIN
  * verifies, the API mints a short-lived HS256 token (secret `STAFF_SESSION_SECRET`,

@@ -9,7 +9,7 @@ import PinScreen from "./PinScreen";
 import SetupWizard from "./SetupWizard";
 
 /**
- * StaffGate (0232) — wraps DealerApp (dealer / showroom / salesperson logins
+ * StaffGate (0233) — wraps DealerApp (dealer / showroom / salesperson logins
  * only). The store email+password is still gate #1; this adds the per-person
  * PIN identity ON TOP. Mounted INSIDE DealerApp so it never touches the
  * principal on-behalf POS (PrincipalApp mounts DealerPos directly, bypassing

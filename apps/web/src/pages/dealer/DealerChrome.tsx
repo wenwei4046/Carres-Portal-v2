@@ -28,7 +28,7 @@ export default function DealerChrome() {
     <div className="flex min-h-screen bg-background text-foreground">
       <DealerSidebar dealerName={dealer.data?.name ?? "—"} initials={initials} />
       <main className="ml-[220px] flex-1 min-w-0">
-        {/* 0232 — current-staff chip; clicking switches (→ PIN screen). Only
+        {/* 0233 — current-staff chip; clicking switches (→ PIN screen). Only
             shown when a PIN session is active (a linked salesperson's back-office
             or a dealer/showroom after PIN). */}
         {staffMember && (

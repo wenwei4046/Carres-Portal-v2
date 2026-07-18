@@ -13,7 +13,7 @@ import { userClient, adminClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
 const KID = "test-kid-staff";
-const STAFF_SESSION_SECRET = "test-staff-secret-0232-abcdef";
+const STAFF_SESSION_SECRET = "test-staff-secret-0233-abcdef";
 
 const env = {
   SUPABASE_URL,
@@ -75,7 +75,7 @@ function mockUser(cfg: {
   inserted?: unknown;
   updated?: unknown;
   appUsersShowroom?: boolean;
-  /** dealer_id the outlets-table lookup reports (0232 outlet-ownership guard). */
+  /** dealer_id the outlets-table lookup reports (0233 outlet-ownership guard). */
   outletDealer?: string;
   captureInsert?: (row: Record<string, unknown>) => void;
   captureUpdate?: (row: Record<string, unknown>) => void;
@@ -599,7 +599,7 @@ describe("POST /api/staff (create)", () => {
     expect(captured?.staff_role).toBe("manager");
   });
 
-  // 0232 owner-mode (sid null, minted only by /reauth): the showroom
+  // 0233 owner-mode (sid null, minted only by /reauth): the showroom
   // bootstrap path — a password-proven store credential creates its manager.
   it("owner-mode manager token (sid null) creates a MANAGER → 201 (showroom bootstrap)", async () => {
     let captured: Record<string, unknown> | undefined;
@@ -722,7 +722,7 @@ describe("POST /api/staff/:id/pin", () => {
     expect(res.status).toBe(403);
   });
 
-  // 0232 owner-mode: showroom forgot-PIN recovery — the password-proven
+  // 0233 owner-mode: showroom forgot-PIN recovery — the password-proven
   // store credential may reset the MANAGER's PIN.
   it("owner-mode manager token (sid null) resets a manager's PIN → 200", async () => {
     const res = await callWithToken(
@@ -818,7 +818,7 @@ describe("PATCH /api/staff/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  // 0232 owner-mode: the showroom store credential may rename/deactivate any
+  // 0233 owner-mode: the showroom store credential may rename/deactivate any
   // staff of its store (tier/outlet still principal-only).
   it("owner-mode manager token (sid null) renames the MANAGER row → 200", async () => {
     let captured: Record<string, unknown> | undefined;

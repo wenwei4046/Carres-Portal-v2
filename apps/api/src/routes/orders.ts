@@ -122,7 +122,7 @@ type SalesOrderData = {
 const ordersRouter = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
-// 0232 staff PIN login — orders scoping. ADDITIVE + DORMANT until a store sets
+// 0233 staff PIN login — orders scoping. ADDITIVE + DORMANT until a store sets
 // its first PIN. Applies ONLY to dealer/showroom/salesperson; internal roles
 // (principal on-behalf, operation/finance/bd) are fully exempt. Once activated,
 // a request without a valid staff token is refused; with one, reads/writes are
@@ -146,7 +146,7 @@ async function resolveStaffScope(c: Context<AppEnv>): Promise<StaffScope> {
   if (staff) return { kind: "scoped", tier: staff.tier, sid: staff.sid, oid: staff.oid };
   // A salesperson-ROLE login is already a person-level credential (their own
   // email+password), so no PIN token is demanded: derive the scope server-side
-  // from the salespersons.user_id link. Unlinked → dormant (pre-0232
+  // from the salespersons.user_id link. Unlinked → dormant (pre-0233
   // behaviour), never a lockout.
   if (auth.role === "salesperson") {
     const { data } = await userClient(c.env, auth.jwt)
@@ -211,8 +211,8 @@ ordersRouter.get("/", async (c) => {
   }
   const { status, outletId, salespersonId, dealerId } = parsed.data;
 
-  // 0232 — staff scoping. Activated store + no valid token → refuse. Dormant /
-  // internal → passthrough (byte-identical to pre-0232).
+  // 0233 — staff scoping. Activated store + no valid token → refuse. Dormant /
+  // internal → passthrough (byte-identical to pre-0233).
   const scope = await resolveStaffScope(c);
   if (scope.kind === "required") {
     return c.json({ error: STAFF_SESSION_REQUIRED }, 403);
@@ -244,7 +244,7 @@ ordersRouter.get("/", async (c) => {
     q = q.eq("dealer_id", dealerId);
   }
 
-  // 0232 — tier narrowing on top of the RLS dealer scope.
+  // 0233 — tier narrowing on top of the RLS dealer scope.
   if (scope.kind === "scoped") {
     if (scope.tier === "salesperson" && scope.sid) {
       q = q.eq("salesperson_id", scope.sid);
@@ -465,7 +465,7 @@ ordersRouter.post("/", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
 
-  // 0232 — staff scoping for order attribution. Activated store + no valid token
+  // 0233 — staff scoping for order attribution. Activated store + no valid token
   // → refuse. With a token, the salesperson_id + outlet_id stamped on the order
   // are SERVER-decided per tier: a salesperson can only file under themselves; a
   // manager under any active staff of THEIR outlet, forced to that outlet; a
@@ -857,7 +857,7 @@ ordersRouter.post("/", async (c) => {
   const payload = Adapters.orderInputToRpcPayload(
     {
       ...parsed.data,
-      // 0232 — server-decided staff attribution (see the scope block above).
+      // 0233 — server-decided staff attribution (see the scope block above).
       salespersonId: attributedSalespersonId,
       outletId: attributedOutletId ?? parsed.data.outletId,
       lines: finalLines,
@@ -2497,7 +2497,7 @@ ordersRouter.get("/:id", async (c) => {
   const idCheck = z.string().uuid().safeParse(id);
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
-  // 0232 — staff scoping (same gate as the list; dormant/internal passthrough).
+  // 0233 — staff scoping (same gate as the list; dormant/internal passthrough).
   const scope = await resolveStaffScope(c);
   if (scope.kind === "required") {
     return c.json({ error: STAFF_SESSION_REQUIRED }, 403);
@@ -2518,7 +2518,7 @@ ordersRouter.get("/:id", async (c) => {
   // never reveal which.
   if (!data) throw new HTTPException(404, { message: "Order not found" });
 
-  // 0232 — tier detail predicate. A salesperson may open only their own order;
+  // 0233 — tier detail predicate. A salesperson may open only their own order;
   // a manager only their outlet's (or a legacy null-outlet) order. Same opaque
   // 404 as an RLS miss — we never reveal a foreign order exists.
   if (scope.kind === "scoped") {

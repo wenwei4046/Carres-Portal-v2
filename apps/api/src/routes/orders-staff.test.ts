@@ -13,7 +13,7 @@ import { userClient, adminClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
 const KID = "test-kid-ostaff";
-const STAFF_SESSION_SECRET = "test-staff-secret-orders-0232";
+const STAFF_SESSION_SECRET = "test-staff-secret-orders-0233";
 
 const env = {
   SUPABASE_URL,
@@ -64,7 +64,7 @@ function buildStorage() {
 }
 
 /** Records .eq()/.or() then resolves rows at .order() — GET list. `selfLink`
- *  answers the salespersons-by-user_id probe (0232 salesperson-ROLE fallback). */
+ *  answers the salespersons-by-user_id probe (0233 salesperson-ROLE fallback). */
 function mockList(rows: unknown[], selfLink: unknown | null = null) {
   const eqs: Array<[string, unknown]> = [];
   const ors: string[] = [];
@@ -348,7 +348,7 @@ describe("GET /api/orders — staff scoping", () => {
     expect(sb._ors.length).toBe(0);
   });
 
-  // 0232 T4 fix — a salesperson-ROLE login is a person-level credential: the
+  // 0233 T4 fix — a salesperson-ROLE login is a person-level credential: the
   // server derives the scope from salespersons.user_id, no PIN token needed.
   it("salesperson ROLE (no token, linked) → scoped server-side by user_id", async () => {
     const sb = mockList([], { id: SP1, outlet_id: OUTLET_1, staff_role: "salesperson" });

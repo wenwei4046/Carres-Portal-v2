@@ -26,7 +26,7 @@ Design constraints (non-negotiable):
 - No new npm deps (jose already present). No secrets in code (STAFF_SESSION_SECRET is a
   Worker secret; `.dev.vars` local only).
 
-## Data model — migration `0232_staff_pin_login.sql`
+## Data model — migration `0233_staff_pin_login.sql`
 (0230 already applied by a parallel session; 0231 claimed by the order-add-product
 initiative per memory — re-verify the prod tail again right before applying.)
 
