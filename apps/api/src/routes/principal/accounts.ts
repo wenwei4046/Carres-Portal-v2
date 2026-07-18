@@ -199,16 +199,65 @@ principalAccountsRouter.post("/", async (c) => {
         dealer_id: dealerId,
         name: (body.outletName?.trim() || body.companyName)!,
         address: body.address!,
-      });
-    if (outletInsert.error) {
+      })
+      .select("id")
+      .single();
+    if (outletInsert.error || !outletInsert.data) {
       return c.json(
         {
           error: "rpc_failed",
           code: "outlets_insert_failed",
-          message: outletInsert.error.message ?? "default outlet insert failed",
+          message: outletInsert.error?.message ?? "default outlet insert failed",
         },
         500,
       );
+    }
+    const defaultOutletId = outletInsert.data.id as string;
+
+    // 2026-07-18 (Loo) — the FIRST staff identity + PIN provisioned right at
+    // account creation, so the store is born ACTIVATED: its first login lands
+    // straight on the PIN screen (no setup wizard). A Dealer-Principal tier is
+    // store-wide (null outlet); manager/salesperson land in the default
+    // outlet. zod already caps showroom at manager.
+    if (body.initialStaff) {
+      const st = body.initialStaff;
+      const staffInsert = await sb
+        .from("salespersons")
+        .insert({
+          dealer_id: dealerId,
+          outlet_id: st.staffRole === "principal" ? null : defaultOutletId,
+          name: st.name,
+          staff_role: st.staffRole,
+          active: true,
+        })
+        .select("id")
+        .single();
+      if (staffInsert.error || !staffInsert.data) {
+        await sb.from("dealers").delete().eq("id", dealerId);
+        return c.json(
+          {
+            error: "rpc_failed",
+            code: "staff_insert_failed",
+            message: staffInsert.error?.message ?? "initial staff insert failed",
+          },
+          500,
+        );
+      }
+      const pinRes = await sb.rpc("staff_set_pin", {
+        p_salesperson_id: staffInsert.data.id,
+        p_pin: st.pin,
+      });
+      if (pinRes.error) {
+        await sb.from("dealers").delete().eq("id", dealerId);
+        return c.json(
+          {
+            error: "rpc_failed",
+            code: "staff_pin_failed",
+            message: pinRes.error.message,
+          },
+          500,
+        );
+      }
     }
   } else if (body.role === "supplier") {
     const dpInsert = await sb

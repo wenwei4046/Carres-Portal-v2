@@ -7,9 +7,11 @@ import {
   type AccountRow,
   type AppRole,
 } from "@/lib/queries";
+import type { CreatableAppRole, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
+import { tierLabel } from "@/pages/dealer/staff/staff-ui";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -31,10 +33,12 @@ import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
  * Closes `phase-10-rotate-alpha-test-passwords` HIGH carry-forward.
  */
 
-const ROLE_OPTIONS: { value: AppRole; label: string; hint: string }[] = [
+// 2026-07-18 (Loo) — the standalone Salesperson tile is GONE: floor staff are
+// PIN identities provisioned inside a dealer/showroom store, not portal
+// logins. Store-side choices = Dealer + Showroom only.
+const ROLE_OPTIONS: { value: CreatableAppRole; label: string; hint: string }[] = [
   { value: "principal",   label: "Principal",     hint: "HQ · full access" },
   { value: "dealer",      label: "Dealer",        hint: "Owner · places orders" },
-  { value: "salesperson", label: "Salesperson",   hint: "Outlet rep · places orders" },
   { value: "showroom",    label: "Showroom",      hint: "Retail floor staff" },
   { value: "operation",   label: "Operations",    hint: "Warehouse + procurement" },
   { value: "supplier",    label: "Supplier",      hint: "External factory portal" },
@@ -429,9 +433,16 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
   const [draft, setDraft] = useState({
     name: "",
     email: "",
-    role: "dealer" as AppRole,
+    role: "dealer" as CreatableAppRole,
     title: "",
     companyName: "",
+    // 2026-07-18 (Loo) — the store's FIRST staff identity + 6-digit PIN,
+    // provisioned right here so the store is born ACTIVATED (first login
+    // lands straight on the PIN screen). Dealer ladder defaults to Dealer
+    // Principal; showroom caps at Sales Manager.
+    staffName: "",
+    staffRole: "principal" as StaffTierDto,
+    staffPin: "",
     // 2026-05-22 (Loo) — region dropped from the form (structured address
     // below carries state/city; region was a free-text duplicate). The DB
     // column stays — existing dealers retain their value; new creations get
@@ -474,7 +485,16 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
   });
 
   function set<K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) {
-    setDraft((d) => ({ ...d, [k]: v }));
+    setDraft((d) => {
+      const next = { ...d, [k]: v };
+      // Keep the initial-staff tier valid for the picked store kind: showrooms
+      // have no principal tier; switching back to dealer restores the default.
+      if (k === "role") {
+        if (v === "showroom" && next.staffRole === "principal") next.staffRole = "manager";
+        if (v === "dealer" && d.role !== "dealer") next.staffRole = "principal";
+      }
+      return next;
+    });
     if (errors[k as string]) setErrors((e) => ({ ...e, [k as string]: "" }));
   }
 
@@ -510,6 +530,10 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
       if (draft.contactName.trim().length < 2) e.contactName = "Required";
       if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+      // 2026-07-18 (Loo) — first staff + PIN are part of store creation; the
+      // PIN format is hard-gated to exactly 6 digits.
+      if (!draft.staffName.trim()) e.staffName = "Required";
+      if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
     }
     if (draft.tempPassword.length < 8) e.tempPassword = "Min 8 chars";
     setErrors(e);
@@ -550,6 +574,9 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       contactName: dealerLike ? draft.contactName.trim() : undefined,
       contactPhone: dealerLike ? draft.contactPhone.trim() : undefined,
       tempPassword: draft.tempPassword,
+      initialStaff: dealerLike
+        ? { name: draft.staffName.trim(), staffRole: draft.staffRole, pin: draft.staffPin }
+        : undefined,
     });
   }
 
@@ -720,6 +747,59 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
               <div className="text-[11px] text-base-500 leading-relaxed">
                 A new {draft.role} record will be created and this user will be the owner.
               </div>
+            </div>
+          )}
+
+          {/* 2026-07-18 (Loo) — first staff identity + 6-digit PIN, provisioned
+              with the store so it opens ACTIVATED (first login = PIN screen).
+              Dealer ladder: Dealer Principal / Manager / Sales Person.
+              Showroom ladder: Sales Manager / Sales Executive (no principal —
+              that's Carres itself). */}
+          {dealerLike && (
+            <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+                First staff · PIN sign-in
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Staff name" error={errors.staffName}>
+                  <Input
+                    value={draft.staffName}
+                    onChange={(v) => set("staffName", v)}
+                    placeholder={draft.contactName || "e.g. Aisha Rahman"}
+                  />
+                </Field>
+                <Field label="Position">
+                  <select
+                    value={draft.staffRole}
+                    onChange={(e) => set("staffRole", e.target.value as StaffTierDto)}
+                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                    data-testid="acct-staff-tier"
+                  >
+                    {(draft.role === "showroom"
+                      ? (["manager", "salesperson"] as StaffTierDto[])
+                      : (["principal", "manager", "salesperson"] as StaffTierDto[])
+                    ).map((t) => {
+                      const l = tierLabel(t, draft.role === "showroom" ? "showroom" : "dealer");
+                      return (
+                        <option key={t} value={t}>
+                          {l.en} · {l.zh}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Field>
+              </div>
+              <Field
+                label="PIN code"
+                hint="Exactly 6 digits · unlocks the POS staff screen after the store login"
+                error={errors.staffPin}
+              >
+                <Input
+                  value={draft.staffPin}
+                  onChange={(v) => set("staffPin", v.replace(/[^0-9]/g, "").slice(0, 6))}
+                  placeholder="e.g. 224466"
+                />
+              </Field>
             </div>
           )}
 

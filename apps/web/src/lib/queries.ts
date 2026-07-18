@@ -2095,6 +2095,9 @@ export function useCreateAccount(
         contactName?: string;
         contactPhone?: string;
         tempPassword: string;
+        // 2026-07-18 (Loo) — first staff identity + 6-digit PIN provisioned
+        // with a dealer/showroom store (see createAccountInput.initialStaff).
+        initialStaff?: { name: string; staffRole: "principal" | "manager" | "salesperson"; pin: string };
       }
     >
   >,
