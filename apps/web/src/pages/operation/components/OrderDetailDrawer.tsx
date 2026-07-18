@@ -2146,21 +2146,26 @@ function DrawerBody({
             }
           >
             <div className="overflow-x-auto min-h-0 mt-1">
-              <table className="w-full border-collapse">
+              {/* table-fixed — the w-* column widths are REAL and the long
+                  item name truncates (auto layout let it blow past a
+                  MacBook's card width). */}
+              <table className="w-full border-collapse table-fixed">
                 {/* §9 — formal columns across the FULL width (data tables are
                     exempt from the ~1000 forms cap). */}
                 {/* rev15c (Jess) — no grey base under the column headers:
                     white sticky row + a hairline keeps the separation. */}
                 <thead className="sticky top-0 z-10">
+                  {/* rev16 (Jess: option A) — back to the v3 SIX-column diet
+                      (alert-first: STATUS leads; SKU folds into the Item
+                      sub-line; LOCATION lives in the route expander) so a
+                      MacBook sees the FULL table with no horizontal cut. */}
                   <tr className="bg-white text-base-500 border-b border-base-100">
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Status</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">Stock ETA</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-44">SKU</th>
                     <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Source</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-20">Location</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Stock ETA</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-36">Status</th>
-                    <th className="text-center text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-40">Action</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">PO</th>
+                    <th className="text-center text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-36">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2268,82 +2273,25 @@ function DrawerBody({
                                   }`
                             }`}
                           >
-                            {/* §9 columns — ITEM (chevron + thumb + name/size)
-                                · SKU · QTY · SOURCE · LOCATION · STOCK ETA ·
-                                STATUS · ACTION (must-do + Manage ▾). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {!isService && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setRouteOpenSku((cur) =>
-                                        cur === l.sku ? null : l.sku,
-                                      );
-                                    }}
-                                    title="Details — receiving (GRN), route / transfer"
-                                    aria-expanded={routeOpen}
-                                    className="shrink-0 text-base-500 hover:text-base-800"
-                                  >
-                                    {routeOpen ? (
-                                      <ChevronDown size={14} />
-                                    ) : (
-                                      <ChevronRight size={14} />
-                                    )}
-                                  </button>
-                                )}
-                                <span className="size-[42px] rounded-[8px] bg-base-100 grid place-items-center shrink-0 text-base-400">
-                                  <CatIcon cat={lineCategory(l.sku)} />
-                                </span>
-                                <span className="min-w-0 flex-1">
-                                  <span
-                                    className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
-                                    title={l.sku}
-                                  >
-                                    {l.sku}
-                                  </span>
-                                  {lineSize(l.sku) && (
-                                    <span className="block text-[12px] text-base-500 leading-tight truncate">
-                                      {lineSize(l.sku) === "K"
-                                        ? "King"
-                                        : lineSize(l.sku) === "Q"
-                                          ? "Queen"
-                                          : "Single"}
-                                    </span>
+                            {/* rev16 columns (v3 diet, alert-first) — STATUS ·
+                                STOCK ETA · ITEM (chevron + thumb + name/size ·
+                                SKU) · QTY · PO · ACTION (must-do + Manage ▾).
+                                Location lives in the route expander. */}
+                            {/* STATUS — auto-derived pill (dial vocabulary). */}
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
+                              {pill ? (
+                                <span
+                                  title={pill.hint}
+                                  className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
+                                >
+                                  {rd === "reserved" && (
+                                    <Check size={14} strokeWidth={2.5} aria-hidden="true" />
                                   )}
-                                </span>
-                              </div>
-                            </td>
-                            {/* SKU — the raw code (mono; today the name IS the
-                                sku — splits when a catalog lands). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              <span
-                                className="block font-mono text-[11px] text-base-500 truncate max-w-[170px]"
-                                title={l.sku}
-                              >
-                                {skuCode(l.sku)}
-                              </span>
-                            </td>
-                            {/* QTY — the bare number (§9: no "QTY" word). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
-                              {l.qty}
-                            </td>
-                            {/* SOURCE — In stock / PO#### */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              {isService ? (
-                                <span className="text-base-300 text-[12px]">—</span>
-                              ) : poNo ? (
-                                <span className="font-mono text-[12px] text-base-700 truncate block max-w-[110px]" title={poNo}>
-                                  {poNo}
+                                  {pill.t}
                                 </span>
                               ) : (
-                                <span className="text-[12px] text-base-600">In stock</span>
+                                <span className="text-base-300 text-[12px]">—</span>
                               )}
-                            </td>
-                            {/* LOCATION — site short name. */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle text-[12px] text-base-600">
-                              {isService ? "—" : shortSite(locValue || "Carres Klang")}
                             </td>
                             {/* STOCK ETA — red alert when late / missing. */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
@@ -2387,20 +2335,77 @@ function DrawerBody({
                                 </span>
                               )}
                             </td>
-                            {/* STATUS — auto-derived pill (dial vocabulary). */}
-                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
-                              {pill ? (
-                                <span
-                                  title={pill.hint}
-                                  className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
-                                >
-                                  {rd === "reserved" && (
-                                    <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                            {/* ITEM — chevron (route/GRN expander) + thumb +
+                                name; sub-line = size · SKU code (the old SKU
+                                column folded in here). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {!isService && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRouteOpenSku((cur) =>
+                                        cur === l.sku ? null : l.sku,
+                                      );
+                                    }}
+                                    title="Details — receiving (GRN), route / transfer"
+                                    aria-expanded={routeOpen}
+                                    className="shrink-0 text-base-500 hover:text-base-800"
+                                  >
+                                    {routeOpen ? (
+                                      <ChevronDown size={14} />
+                                    ) : (
+                                      <ChevronRight size={14} />
+                                    )}
+                                  </button>
+                                )}
+                                <span className="size-[42px] rounded-[8px] bg-base-100 grid place-items-center shrink-0 text-base-400">
+                                  <CatIcon cat={lineCategory(l.sku)} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span
+                                    className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
+                                    title={l.sku}
+                                  >
+                                    {l.sku}
+                                  </span>
+                                  {(lineSize(l.sku) || skuCode(l.sku) !== "—") && (
+                                    <span className="block text-[12px] text-base-500 leading-tight truncate">
+                                      {lineSize(l.sku) === "K"
+                                        ? "King"
+                                        : lineSize(l.sku) === "Q"
+                                          ? "Queen"
+                                          : lineSize(l.sku) === "S"
+                                            ? "Single"
+                                            : null}
+                                      {lineSize(l.sku) && skuCode(l.sku) !== "—"
+                                        ? " · "
+                                        : null}
+                                      {skuCode(l.sku) !== "—" ? (
+                                        <span className="font-mono text-[11px]">
+                                          {skuCode(l.sku)}
+                                        </span>
+                                      ) : null}
+                                    </span>
                                   )}
-                                  {pill.t}
+                                </span>
+                              </div>
+                            </td>
+                            {/* QTY — the bare number (§9: no "QTY" word). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
+                              {l.qty}
+                            </td>
+                            {/* PO — In stock / PO#### */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              {isService ? (
+                                <span className="text-base-300 text-[12px]">—</span>
+                              ) : poNo ? (
+                                <span className="font-mono text-[12px] text-base-700 truncate block max-w-[110px]" title={poNo}>
+                                  {poNo}
                                 </span>
                               ) : (
-                                <span className="text-base-300 text-[12px]">—</span>
+                                <span className="text-[12px] text-base-600">In stock</span>
                               )}
                             </td>
                             {/* ACTION — the must-do action directly + Manage ▾
@@ -2461,7 +2466,7 @@ function DrawerBody({
                           {!isService && routeOpen && (
                             <tr className="bg-base-50">
                               <td
-                                colSpan={8}
+                                colSpan={6}
                                 className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
                                 <div className="space-y-2">
@@ -2551,7 +2556,7 @@ function DrawerBody({
                       onToggle: () => void,
                     ) => (
                       <tr key={`grp-${key}`}>
-                        <td colSpan={8} className="border-b border-base-100 p-0">
+                        <td colSpan={6} className="border-b border-base-100 p-0">
                           <button
                             type="button"
                             onClick={onToggle}

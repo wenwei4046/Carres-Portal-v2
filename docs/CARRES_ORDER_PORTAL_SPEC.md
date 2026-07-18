@@ -60,8 +60,8 @@ Checklist mark(Logistic):Done=circle-check-filled绿·Waiting=clock琥珀·Block
 Dial 一律贴 KPI headline 值旁,不放在阶段行上。
 阶段用词(全 portal 统一,list NEXT 对齐):Balance Placed下单→Confirmed确认单→Paid收齐(类别名=Balance 不用 Money);Stock PO raised→ETA set→Goods ready;Logistic Assigned→Booked(partner 已联系客人并约好 slot)→Delivered。NEXT verb=完成当前 pending 阶段的动作(Order PO/Chase supplier/Book logistic/Chase logistic/Record payment/Confirm)。(“Record payment” verb 属 List 阶段 §14,详情页现阶段不加。)
 
-## 9. Items ordered tab
-列摊满宽度:chevron·thumb44·ITEM(名粗+size)·SKU·QTY(纯数字无"QTY"字)·SOURCE(In stock/PO####)·LOCATION(site 短名 Klang/NETS)·STOCK ETA(晚于deadline/无ETA→红alert)·STATUS(pill:Reserved绿/Need N琥珀/On PO灰/Delayed红,与dial同词)·ACTION(Manage▾多动作:Reserve/Loan/Change route…;当前必做动作直接显如 Reserve)。
+## 9. Items ordered tab(⭐ 2026-07-18 rev16 — 回到 v3 六列瘦身,Jess 拍板 A)
+**六列 table-fixed(alert-first,MacBook 一屏看全,~840px):STATUS(pill 打头:Reserved绿/Need N琥珀/On PO灰/Delayed红,与dial同词)·STOCK ETA(晚于deadline/无ETA→红alert)·ITEM(chevron+thumb42+名粗,副行=size · SKU mono 小字——独立 SKU 列已并入)·QTY(纯数字)·PO(In stock/PO####)·ACTION(必做动作直显如 Reserve + Manage▾:Reserve/Loan/Change route…)。** LOCATION 独立列删除——位置住在 chevron 展开的 route 行里。面板保留 DELIVERY 式横带(标题+收合+readiness pill+⋮,rev15c);列头行白底无灰 base;表格无内部限高,整栏滚动。(8 列宽版〔+SKU/SOURCE/LOCATION 独立列〕是 2026-07-18 office 大屏版,MacBook 装不下,作废。)
 Route 平时藏,chevron 展开一行:site→carrier→customer,单件特殊挂 special·direct 可编辑。
 件多→按 category 分组(组图标+计数+"N need stock",needs-action 行蓝底,全 reserved 组自动收起);件少≤5 扁平。
 Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reserved 行 STATUS 绿,Action=—(绿勾不放 Action 列)。
