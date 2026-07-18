@@ -1287,49 +1287,33 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return { counts, none };
   }, [tabFiltered]);
 
-  // AUTO-ASSIGN sweep (Jess 2026-07-18): every OPEN order without an owner is
-  // distributed to the least-loaded AVAILABLE pool member — runs once per page
-  // load, assign-at-entry only (existing owners are never silently moved; MC/
-  // resign moves go through the explicit Team-popover redistribute). No pool →
-  // no-op, so the layer is inert until Jess opts staff in.
+  // AUTO-ASSIGN sweep — SERVER-SIDE (Jess go-live feedback 2026-07-18): ONE
+  // POST per page load from ANY operation session. The server stamps the
+  // caller's presence first, then distributes every open unassigned order to
+  // the pool members seen today — so a staff member receives their orders the
+  // moment THEY open the portal, no manager session required. (Manual assign
+  // stays management-only; this is system behaviour.) Fails soft on an old
+  // Worker (404 → nothing happens).
   const sweepDone = useRef(false);
   useEffect(() => {
     if (sweepDone.current) return;
-    // Management sessions only — staff can't write assignments (API 403s
-    // anyway); the presence-RPC upgrade may widen this later.
-    if (!isManager) return;
-    const all = data?.orders;
-    if (!all || !staffQ.data) return;
-    // Available = in the pool + not manually away + SEEN TODAY (0235: opened
-    // the portal = came to work; MC/no-show auto-skipped, zero clicks).
-    const avail = staffQ.data.staff.filter(
-      (s) => s.pooled && s.available && seenTodayMYT(s.last_seen_at),
-    );
-    if (avail.length === 0) return;
-    const open = all.filter((o) => controlTabOf(o) !== "completed");
-    const unassigned = open.filter((o) => !ownerOf(o));
+    if (!staffQ.data) return; // wait until the staff route proved to exist
+    if (!staffQ.data.staff.some((s) => s.pooled)) return; // empty pool → inert
     sweepDone.current = true;
-    if (unassigned.length === 0) return;
-    const loads = avail.map((s) => ({
-      userId: s.user_id,
-      openCount: open.filter((o) => ownerOf(o) === s.user_id).length,
-    }));
-    const plan = distributeOrders(unassigned.map((o) => o.id), loads);
-    void (async () => {
-      let ok = 0;
-      for (let i = 0; i < plan.length; i += 8) {
-        const chunk = plan.slice(i, i + 8);
-        const results = await Promise.allSettled(
-          chunk.map((p) => assignOrderStaffRequest(p.orderId, p.userId)),
-        );
-        ok += results.filter((r) => r.status === "fulfilled").length;
-      }
-      if (ok > 0) {
-        toast.success(`Auto-assigned ${ok} order${ok === 1 ? "" : "s"}`);
-        void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      }
-    })();
-  }, [data, staffQ.data, qc, isManager]);
+    void apiFetch<{ assigned: number }>(`/api/operation/staff/auto-assign`, {
+      method: "POST",
+    })
+      .then((r) => {
+        if (r.assigned > 0) {
+          toast.success(
+            `Auto-assigned ${r.assigned} order${r.assigned === 1 ? "" : "s"}`,
+          );
+          void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+          void qc.invalidateQueries({ queryKey: ["operation", "staff"] });
+        }
+      })
+      .catch(() => {});
+  }, [staffQ.data, qc]);
 
   // Redistribute ONE member's open orders across the other available members
   // (the resign / long-MC one-click; Team popover).
@@ -1937,7 +1921,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 <KanbanGroup
                   title="STAFF"
                   testid="filter-staff"
-                  total={tabFiltered.length}
+                  /* NO total — the order count next to a people icon read as
+                     "169 staff" (Jess go-live feedback 2026-07-18). */
                   collapsed={collapsedGroups.has("STAFF")}
                   onToggle={() => toggleGroup("STAFF")}
                   headerRight={
@@ -1986,6 +1971,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
                     }
                   />
+                  {/* Why-nothing-happened explainer (Jess go-live feedback):
+                      pool has members but NOBODY has opened the portal today →
+                      the sweep is waiting, say so instead of sitting silent. */}
+                  {staffEntries.none > 0 &&
+                    poolStaff.length > 0 &&
+                    !poolStaff.some(
+                      (s) => s.available && seenTodayMYT(s.last_seen_at),
+                    ) && (
+                      <div className="px-2.5 py-1 text-[11px] leading-snug text-base-400">
+                        Orders hand out automatically when a staff opens the
+                        portal today.
+                      </div>
+                    )}
                 </KanbanGroup>
               )}
 
