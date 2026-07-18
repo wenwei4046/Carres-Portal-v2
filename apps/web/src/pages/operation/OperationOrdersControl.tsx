@@ -2419,6 +2419,10 @@ function TeamPopover({
   onRedistribute: (userId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // FIXED positioning: the facet column is an overflow-auto scroller, so an
+  // absolutely-positioned panel gets clipped at its edge — anchor to the
+  // viewport off the button rect instead.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const mut = useUpdateStaffSetting({
     onError: (e) => toast.error(`Team update failed — ${e.message}`),
@@ -2432,20 +2436,30 @@ function TeamPopover({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   return (
-    <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         aria-label="Manage team"
         title="Manage team — who receives auto-assigned orders"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setPos({
+            top: r.bottom + 4,
+            left: Math.max(8, Math.min(r.left, window.innerWidth - 296)),
+          });
+          setOpen((v) => !v);
+        }}
         className="p-0.5 rounded text-base-500 hover:text-base-800 hover:bg-base-100"
       >
         <Users size={14} strokeWidth={2} />
       </button>
-      {open && (
-        <div className="absolute z-40 mt-1 right-0 w-72 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
+      {open && pos && (
+        <div
+          className="fixed z-40 w-72 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">
             Auto-assign pool
           </div>
@@ -2597,6 +2611,9 @@ function OwnerChip({
   onAssignStaff: (orderId: string, staff: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // FIXED positioning — the table lives in an overflow-auto scroller, so an
+  // absolute menu would clip at the container edge (esp. bottom rows).
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -2611,7 +2628,7 @@ function OwnerChip({
   // No pool at all (feature dormant) → render nothing.
   if (poolStaff.length === 0 && !member) return null;
   return (
-    <div className="relative shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
+    <div className="shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign staff"}
@@ -2620,7 +2637,14 @@ function OwnerChip({
             ? `${member.name ?? member.email} — click to reassign`
             : "Unassigned — click to assign"
         }
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setPos({
+            top: Math.min(r.bottom + 4, window.innerHeight - 240),
+            left: Math.max(8, Math.min(r.left, window.innerWidth - 184)),
+          });
+          setOpen((v) => !v);
+        }}
         className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
           member
             ? "bg-base-200 text-base-700 hover:bg-base-300"
@@ -2629,8 +2653,11 @@ function OwnerChip({
       >
         {member ? staffInitials(member) : "+"}
       </button>
-      {open && (
-        <div className="absolute z-40 mt-1 left-0 w-44 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
+      {open && pos && (
+        <div
+          className="fixed z-40 w-44 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
           {poolStaff.map((s) => (
             <button
               key={s.user_id}
