@@ -1134,6 +1134,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
+  // ?poday=1 — MANAGER-ONLY preview of the PO-day surfaces (Jess 2026-07-19:
+  // "you can't let me wait the day to see"): forces the banner + duty badge
+  // on ANY day, using the real holder when 0236 is live, else the first pool
+  // member as a stand-in labeled "demo". Staff sessions and normal URLs are
+  // byte-identical. Use it live in the Wed-22-Jul team briefing.
+  const poDayPreview =
+    isManager &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("poday");
   const staffQ = useOperationStaff();
   const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
   const staffById = useMemo(
@@ -1155,6 +1164,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
       ),
     [staffList],
   );
+  // Preview stand-in: the badge/banner need a holder to draw; before 0236 is
+  // live the first pool member plays the part (marked demo, never gates).
+  const poDutyHolderShown =
+    poDutyHolder ??
+    (poDayPreview && poolStaff[0]
+      ? {
+          userId: poolStaff[0].user_id,
+          email: poolStaff[0].email,
+          name: poolStaff[0].name,
+          assignedBy: null,
+        }
+      : null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
   // Owing queue filter (B rebuild) — orders with money outstanding, closed
   // ones included (§7: owing survives Delivered).
@@ -1758,16 +1779,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const orderPoCount = nextCounts.get("Order PO") ?? 0;
   const chaseSupplierCount = nextCounts.get("Chase supplier") ?? 0;
   const showPoBanner =
-    !!poDutyHolder &&
-    (isManager || authUserId === poDutyHolder.userId) &&
-    (isPoDayMYT() || urgentPoCount > 0);
-  const poBanner = showPoBanner && poDutyHolder ? (
+    !!poDutyHolderShown &&
+    (isManager || authUserId === poDutyHolderShown.userId) &&
+    (poDayPreview || isPoDayMYT() || urgentPoCount > 0);
+  const poBanner = showPoBanner && poDutyHolderShown ? (
     <div
       className="w-full flex items-center gap-2 rounded-xl border border-base-200 bg-white px-3 py-1.5 text-[12px]"
       data-testid="po-day-banner"
     >
       <PackagePlus size={14} className="text-base-500" strokeWidth={2} />
-      {urgentPoCount > 0 ? (
+      {urgentPoCount > 0 && !poDayPreview ? (
         <span className="font-semibold text-destructive">
           {urgentPoCount} urgent — deadline inside the stock window, don&rsquo;t wait for PO day
         </span>
@@ -1775,10 +1796,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
         <span className="text-base-700">
           <span className="font-semibold">PO day</span> — Order PO {orderPoCount} · Chase
           supplier {chaseSupplierCount}
+          {urgentPoCount > 0 && (
+            <span className="font-semibold text-destructive"> · {urgentPoCount} urgent</span>
+          )}
         </span>
       )}
       <span className="text-base-400">
-        PO duty: {poDutyHolder.name ?? poDutyHolder.email}
+        PO duty: {poDutyHolderShown.name ?? poDutyHolderShown.email}
+        {!poDutyHolder && " · demo"}
       </span>
       {canRaise && (
         <button
@@ -2130,7 +2155,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         ? `${staffLabel(s)} · not in`
                         : staffLabel(s);
                     // PO duty badge (0236) — the month's PO controller.
-                    const isDuty = poDutyHolder?.userId === s.user_id;
+                    const isDuty = poDutyHolderShown?.userId === s.user_id;
                     const baseTitle = !s.available
                       ? `${s.email} — marked away (planned leave); their orders shift to the others`
                       : !seenTodayMYT(s.last_seen_at)
@@ -2156,7 +2181,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   {/* Not-yet-onboarded staff — visible in the roster before
                       day one; first login auto-activates (round-4). */}
                   {pendingStaff.map((s) => {
-                    const isDuty = poDutyHolder?.userId === s.user_id;
+                    const isDuty = poDutyHolderShown?.userId === s.user_id;
                     return (
                       <KanbanRow
                         key={s.user_id}
