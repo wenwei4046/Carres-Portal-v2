@@ -1,11 +1,24 @@
 /**
- * AddProductOverlay (0231 add-product P1) — pins the P2 exclusion (sofa models
- * offering compartments are hidden) and the 0089 mutex lock against the
- * order's existing lines.
+ * AddProductOverlay (0231/0232 add-product P1+P2) — pins the surface routing
+ * (mattress/bedframe → PosConfigurePage, offered-compartment sofa →
+ * SofaConfigurePage, rest → ConfigureDrawer), the 0089 mutex lock against the
+ * order's existing lines, and the error banner. The heavy configure surfaces
+ * are stubbed — their own behavior is covered by their own suites.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import type { CatalogResponse, Order } from "@carres/shared";
+
+vi.mock("./SofaConfigurePage", () => ({
+  default: () => <div data-testid="stub-sofa-page" />,
+}));
+vi.mock("./PosConfigurePage", () => ({
+  default: () => <div data-testid="stub-pos-page" />,
+}));
+vi.mock("./ConfigureDrawer", () => ({
+  default: () => <div data-testid="stub-drawer" />,
+}));
+
 import AddProductOverlay from "./AddProductOverlay";
 
 const M_MATTRESS = "00000000-0000-0000-0000-00000000m001";
@@ -26,7 +39,7 @@ const CATALOG = {
   sofaFabrics: [],
   addons: [],
   floorConfig: { id: 1, freeUpToFloor: 3, perFloorPerItem: 20 },
-  // MODULARSOFA offers compartments → the visual-builder path → hidden in P1.
+  // MODULARSOFA offers compartments → the visual-builder path (P2: allowed).
   modelSofaCompartments: [{ modelId: M_SOFA_BUILD, compartmentId: "c1", priceOverride: null }],
 } as unknown as CatalogResponse;
 
@@ -41,13 +54,13 @@ function order(lines: Array<{ sku: string }> = []): Order {
   } as unknown as Order;
 }
 
-function renderOverlay(o: Order) {
+function renderOverlay(o: Order, error: string | null = null) {
   render(
     <AddProductOverlay
       order={o}
       catalog={CATALOG}
       busy={false}
-      error={null}
+      error={error}
       onPick={vi.fn()}
       onClose={vi.fn()}
     />,
@@ -55,32 +68,33 @@ function renderOverlay(o: Order) {
 }
 
 describe("AddProductOverlay", () => {
-  it("hides sofa models that offer compartments (build path = P2), keeps flat sofa", () => {
+  it("P2 — offered-compartment sofa models SHOW and open SofaConfigurePage", () => {
     renderOverlay(order());
-    expect(screen.queryByTestId("pos-card-MODULARSOFA")).toBeNull();
-    expect(screen.getByTestId("pos-card-FLATSOFA")).toBeTruthy();
-    expect(screen.getByTestId("pos-card-CLOUD")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("pos-card-MODULARSOFA"));
+    expect(screen.getByTestId("stub-sofa-page")).toBeTruthy();
   });
 
-  it("locks the sofa card when the order already holds a mattress (0089 mutex)", () => {
+  it("mattress opens PosConfigurePage (wizard surface convention)", () => {
+    renderOverlay(order());
+    fireEvent.click(screen.getByTestId("pos-card-CLOUD"));
+    expect(screen.getByTestId("stub-pos-page")).toBeTruthy();
+  });
+
+  it("a flat (no-compartment) sofa opens the ConfigureDrawer", () => {
+    renderOverlay(order());
+    fireEvent.click(screen.getByTestId("pos-card-FLATSOFA"));
+    expect(screen.getByTestId("stub-drawer")).toBeTruthy();
+  });
+
+  it("locks the sofa cards when the order already holds a mattress (0089 mutex)", () => {
     renderOverlay(order([{ sku: "SKU-M" }]));
-    const sofaCard = screen.getByTestId("pos-card-FLATSOFA") as HTMLButtonElement;
-    expect(sofaCard.disabled).toBe(true);
-    const mattressCard = screen.getByTestId("pos-card-CLOUD") as HTMLButtonElement;
-    expect(mattressCard.disabled).toBe(false);
+    expect((screen.getByTestId("pos-card-FLATSOFA") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("pos-card-MODULARSOFA") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("pos-card-CLOUD") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows the error banner when an add failed", () => {
-    render(
-      <AddProductOverlay
-        order={order()}
-        catalog={CATALOG}
-        busy={false}
-        error="Sofa can't mix with mattress / bed frame in one order."
-        onPick={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    );
+    renderOverlay(order(), "Sofa can't mix with mattress / bed frame in one order.");
     expect(screen.getByTestId("pos-add-error").textContent).toContain("can't mix");
   });
 });

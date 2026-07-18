@@ -72,6 +72,12 @@ export interface DeliveryRecomputeContext {
   crossCategorySourceSo: string | null;
   /** The new order's customer phone (the same-customer identity half). */
   customerPhone: string | null;
+  /** 0232 (add-product P2) — when RE-running the recompute for an EXISTING
+   *  order (adding lines), its OWN persisted DELIVERY addon already records the
+   *  cross-category link; without this exclusion the single-use backstop would
+   *  see it and reject the order's own link as "already used". Absent for the
+   *  create path (the order doesn't exist yet). */
+  excludeOrderId?: string;
 }
 
 export type DeliveryRecomputeOutcome =
@@ -228,7 +234,13 @@ export async function recomputeDeliveryFee(
   let sourceSoLabel: string | null = null;
   const rawLink = (ctx.crossCategorySourceSo ?? "").trim();
   if (rawLink) {
-    const elig = await checkCrossCategorySource(sb, rawLink, ctx.customerPhone, newCategories);
+    const elig = await checkCrossCategorySource(
+      sb,
+      rawLink,
+      ctx.customerPhone,
+      newCategories,
+      ctx.excludeOrderId ?? null,
+    );
     if (elig.status === "server_error") return elig;
     if (elig.status === "invalid") {
       return { status: "bad_request", message: elig.message };
@@ -473,6 +485,9 @@ async function checkCrossCategorySource(
   rawLink: string,
   newPhone: string | null,
   newCategories: ReadonlySet<string>,
+  /** 0232 — the order being RE-computed (add-lines); its own recorded link is
+   *  not "another order's use". Null on the create path. */
+  excludeOrderId: string | null = null,
 ): Promise<CrossCatResult> {
   const soNum = Number((rawLink.match(/\d+/) ?? [""])[0]);
   if (!Number.isFinite(soNum) || soNum <= 0) {
@@ -504,12 +519,14 @@ async function checkCrossCategorySource(
   }
 
   // Single-use backstop: has any DELIVERY addon already linked this source SO?
-  const usedR = await sb
+  // 0232 — the recomputed order's OWN link row is excluded (add-lines re-run).
+  let usedQ = sb
     .from("order_addons")
     .select("id")
     .eq("addon_key", DELIVERY_ADDON)
-    .eq("attrs->>cross_category_source_so", soLabel)
-    .limit(1);
+    .eq("attrs->>cross_category_source_so", soLabel);
+  if (excludeOrderId) usedQ = usedQ.neq("order_id", excludeOrderId);
+  const usedR = await usedQ.limit(1);
   if (usedR.error) {
     return { status: "server_error", message: usedR.error.message };
   }

@@ -2005,14 +2005,27 @@ ordersRouter.post("/:id/address", (c) =>
   }),
 );
 
-/** POST /api/orders/:id/lines — Add-product P1 (0231, design 2026-07-18):
- *  append products to a PLACE-lane order. Server catalog price authority —
- *  the client sends sku/qty/attrs ONLY; unitPrice = fresh `product_skus.price`
- *  + the special-addon and option-pick recomputes (the SAME trust gates the
- *  create route runs). Sofa BUILDS (attrs.sofa_build) are 409'd until P2;
- *  promo/free markers (pwp / free_gift / free_item) are server-exclusive and
- *  rejected. The `add_order_lines` RPC re-checks the place-lane status gate +
- *  the 0089 merged-cart mutex and appends — existing rows never change. */
+/** The 0184 server-exclusive trip-fee addon keys the add-lines delivery
+ *  recompute replaces (mirrors the create route's strip set). */
+const ADD_LINES_DELIVERY_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+
+/** POST /api/orders/:id/lines — Add-product P1+P2 (0231/0232, design
+ *  2026-07-18): append products to a PLACE-lane order through the SAME engine
+ *  pipeline the create route runs, over the MERGED cart (persisted rows ∪ new
+ *  lines):
+ *    · PWP (code-less claims only) — merged-cart eligibility; a voucher-CODED
+ *      claim is 409'd (the 0187 claim/stamp lifecycle is create-scoped);
+ *    · sofa recompute + explode — a new BUILD line is drift-gated (±0.5% vs
+ *      the client preview unitPrice) then exploded into per-compartment rows;
+ *    · special-addon + option-pick trust gates on the new lines;
+ *    · default free gifts — per-TRIGGERING-LINE semantics, so resolving over
+ *      ONLY the new lines yields exactly their entitlement (no diff needed);
+ *    · delivery fee — recomputed over the merged cart (operator inputs
+ *      recovered from the persisted DELIVERY* rows) → atomic replace-set.
+ *  Flat lines stay fully server-priced (fresh `product_skus.price` + the
+ *  recomputes); free markers are always rejected. The `add_order_lines` RPC
+ *  re-checks the place-lane gate + the 0089 merged-cart mutex and APPENDS —
+ *  existing rows never change. */
 ordersRouter.post("/:id/lines", async (c) => {
   const auth = c.var.auth;
   const idCheck = z.string().uuid().safeParse(c.req.param("id"));
@@ -2045,31 +2058,149 @@ ordersRouter.post("/:id/lines", async (c) => {
     });
   }
 
-  // Engine-exclusive markers are rejected up front: sofa builds need the P2
-  // merged-cart recompute; pwp/free markers are minted server-side only.
+  // Marker guards: free markers are minted server-side only; a voucher-CODED
+  // pwp claim is wizard-scoped (0187's claim → stamp → sweep lifecycle exists
+  // only around create) — code-less stateless claims flow to the recompute.
+  // A build line must carry its preview unitPrice for the drift gate.
   for (const line of parsed.data.lines) {
     const attrs = (line.attrs ?? {}) as Record<string, unknown>;
-    if (attrs.sofa_build) {
+    if (attrs.free_gift || attrs.free_item) {
+      throw new HTTPException(400, {
+        message: "free markers are not allowed on added lines",
+      });
+    }
+    const pwpAttr = attrs.pwp as { code?: unknown } | undefined;
+    if (pwpAttr && typeof pwpAttr === "object" && pwpAttr.code) {
       return c.json(
         {
           error: "rule_violation",
-          code: "sofa_build_add_not_supported",
-          message: "Sofa builds can't be added to an existing order yet — place a new order.",
+          code: "pwp_voucher_add_not_supported",
+          message:
+            "A voucher-coded PWP claim can't ride an added line — apply the voucher on a new order.",
         },
         409,
       );
     }
-    if (attrs.pwp || attrs.free_gift || attrs.free_item) {
+    if (attrs.sofa_build && typeof line.unitPrice !== "number") {
       throw new HTTPException(400, {
-        message: "promo / free markers are not allowed on added lines",
+        message: "a sofa build line must carry its preview unitPrice for the drift gate",
       });
     }
   }
 
   const sb = userClient(c.env, auth.jwt);
 
+  // 0232 — the order + its persisted rows: the merged cart is the eligibility
+  // context (PWP allowance integrity + delivery), and the persisted DELIVERY*
+  // rows carry the recompute's operator inputs. RLS scopes the reads.
+  const orderR = await sb
+    .from("orders")
+    .select("id, status, operation_stage, source_system, customer_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (orderR.error) throw new HTTPException(500, { message: orderR.error.message });
+  const ord = orderR.data as {
+    id: string;
+    status: string;
+    operation_stage: string | null;
+    source_system: string | null;
+    customer_phone: string | null;
+  } | null;
+  if (!ord) throw new HTTPException(404, { message: "Order not found" });
+  // Early friendly gate (the RPC re-checks authoritatively).
+  if (ord.status !== "place" || ord.operation_stage !== null || ord.source_system === "autocount") {
+    return c.json(
+      {
+        error: "add_lines_blocked",
+        code: "wrong_status",
+        message: "Products can only be added while the order is in Order placed",
+      },
+      422,
+    );
+  }
+  const exLinesR = await sb
+    .from("order_lines")
+    .select("sku, qty, attrs, unit_price")
+    .eq("order_id", id);
+  if (exLinesR.error) throw new HTTPException(500, { message: exLinesR.error.message });
+  const existingLines = (
+    (exLinesR.data ?? []) as Array<{
+      sku: string;
+      qty: number;
+      attrs: Record<string, unknown> | null;
+      unit_price: number | string;
+    }>
+  ).map((r) => ({ sku: r.sku, qty: r.qty, attrs: r.attrs, unitPrice: Number(r.unit_price) }));
+  const exAddonsR = await sb
+    .from("order_addons")
+    .select("addon_key, qty, unit_price, attrs")
+    .eq("order_id", id);
+  if (exAddonsR.error) throw new HTTPException(500, { message: exAddonsR.error.message });
+  const existingAddons = (exAddonsR.data ?? []) as Array<{
+    addon_key: string;
+    qty: number;
+    unit_price: number | string;
+    attrs: Record<string, unknown> | null;
+  }>;
+
+  // ── adversarial-review fixes (P2 findings #1/#2) ─────────────────────────
+  // #2 — the slice invariant below requires every EXISTING row to be a
+  // non-build pass-through. POS-created orders always are (builds explode at
+  // create), but the ops raw-create door can persist an un-exploded
+  // attrs.sofa_build line — re-running the sofa engine over it would
+  // drift-reject the add or RE-explode it (duplicating compartments). Fail
+  // CLOSED: such an order can't take adds.
+  if (
+    existingLines.some((l) => Boolean((l.attrs as Record<string, unknown> | null)?.sofa_build))
+  ) {
+    return c.json(
+      {
+        error: "add_lines_blocked",
+        code: "existing_build_unsupported",
+        message:
+          "This order carries a raw (un-exploded) sofa build — products can't be added to it. Place a new order.",
+      },
+      422,
+    );
+  }
+  // #1 — existing persisted PWP reward lines must NOT re-validate as fresh
+  // claims (a since-deactivated rule / re-priced reward / exploded sofa
+  // reward would spuriously 409 the whole add). Policy: ONE promo application
+  // per order via add — a NEW claim is only accepted when the order has no
+  // pwp lines (blocking the same-rule double-dip outright); otherwise the
+  // existing markers are STRIPPED to plain context lines for the pwp/sofa
+  // stages (their persisted prices are discarded from the write-set anyway).
+  const existingHasPwp = existingLines.some((l) =>
+    Boolean((l.attrs as Record<string, unknown> | null)?.pwp),
+  );
+  const newHasPwp = parsed.data.lines.some((l) =>
+    Boolean((l.attrs as Record<string, unknown> | null | undefined)?.pwp),
+  );
+  if (existingHasPwp && newHasPwp) {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "pwp_add_conflict",
+        message:
+          "This order already has a promo applied — place a new order to claim another promo price.",
+      },
+      409,
+    );
+  }
+  const pipelineExisting = existingHasPwp
+    ? existingLines.map((l) => {
+        const attrs = l.attrs as Record<string, unknown> | null;
+        if (!attrs?.pwp) return l;
+        const { pwp: _pwp, ...rest } = attrs;
+        return { ...l, attrs: Object.keys(rest).length > 0 ? rest : null };
+      })
+    : existingLines;
+
   // Fresh sku rows — server price authority + the POS-visibility gate (an
   // added product must be currently sellable, same bar as the catalog grid).
+  // A BUILD line's representative sofa sku is gated on EXISTENCE only — its
+  // exploded compartment skus are pos_active=false by design (P5), and the
+  // sofa recompute re-prices the build against the fresh catalog anyway.
   const skuList = [...new Set(parsed.data.lines.map((l) => l.sku))];
   const skuR = await sb
     .from("product_skus")
@@ -2083,7 +2214,8 @@ ordersRouter.post("/:id/lines", async (c) => {
   );
   for (const l of parsed.data.lines) {
     const s = skuBySku.get(l.sku);
-    if (!s || s.pos_active === false || s.discontinued_at) {
+    const isBuild = Boolean((l.attrs as Record<string, unknown> | null | undefined)?.sofa_build);
+    if (!s || (!isBuild && (s.pos_active === false || s.discontinued_at))) {
       return c.json(
         {
           error: "rule_violation",
@@ -2095,15 +2227,27 @@ ordersRouter.post("/:id/lines", async (c) => {
     }
   }
 
-  // Base = fresh catalog price. The client's attrs preview totals
-  // (specials_total / options_total) are folded in as PREVIEWS so the two
-  // recomputes below can nudge them to server-canonical figures (or 422 on
-  // drift) — exactly the create-route contract; the base itself is never
-  // client-influenced.
-  const lines = parsed.data.lines.map((l) => {
+  // Base pricing for the NEW lines. Flat: fresh catalog price + the client's
+  // attrs preview totals (specials_total / options_total) folded in ONLY so
+  // the recomputes below can nudge them to server-canonical figures (or 422
+  // on drift) — the base itself is never client-influenced. Build: the client
+  // preview unitPrice rides to the sofa recompute's drift gate, which then
+  // OVERWRITES it with the authoritative server figure.
+  const newLines = parsed.data.lines.map((l) => {
     const attrs = (l.attrs ?? null) as Record<string, unknown> | null;
-    const previewOf = (key: string): number => {
-      const v = attrs?.[key];
+    if (attrs?.sofa_build) {
+      return { sku: l.sku, qty: l.qty, attrs, unitPrice: l.unitPrice ?? 0 };
+    }
+    // Review fix #3 — a preview total is folded ONLY when its picks array is
+    // present (the recomputes skip pick-less lines, so an orphan total would
+    // otherwise inject an unvalidated delta straight into the base).
+    const previewOf = (
+      totalKey: "specials_total" | "options_total",
+      arrKey: "specials" | "options",
+    ): number => {
+      const arr = attrs?.[arrKey];
+      if (!Array.isArray(arr) || arr.length === 0) return 0;
+      const v = attrs?.[totalKey];
       return typeof v === "number" && Number.isFinite(v) ? v : 0;
     };
     return {
@@ -2111,9 +2255,61 @@ ordersRouter.post("/:id/lines", async (c) => {
       qty: l.qty,
       attrs,
       unitPrice:
-        Number(skuBySku.get(l.sku)!.price) + previewOf("specials_total") + previewOf("options_total"),
+        Number(skuBySku.get(l.sku)!.price) +
+        previewOf("specials_total", "specials") +
+        previewOf("options_total", "options"),
     };
   });
+
+  // ── merged engine pipeline (create-route order: pwp → sofa → specials →
+  //    options → gifts → delivery) ─────────────────────────────────────────
+  const existingCount = existingLines.length;
+
+  // PWP — merged context so a new claim sees existing triggers. Existing pwp
+  // markers were stripped above (finding #1: never re-validated as claims;
+  // same-rule double-dip is blocked by the pwp_add_conflict 409). Existing
+  // lines' re-priced outputs are DISCARDED below (rows are never rewritten);
+  // the voucher claim stage is NOT run (code-less only — codes 409'd above).
+  const pwp = await recomputePwpLines(sb, [...pipelineExisting, ...newLines]);
+  if (pwp.status === "server_error") {
+    throw new HTTPException(500, { message: pwp.message });
+  }
+  if (pwp.status === "bad_request") {
+    return c.json({ error: "rule_violation", code: pwp.code, message: pwp.message }, 409);
+  }
+
+  // Sofa — the SAME merged array (sofaRewardCombosByIndex is index-aligned).
+  // Existing rows are already exploded per-compartment lines (no
+  // attrs.sofa_build) → they pass through verbatim at positions
+  // 0..existingCount-1; only the new build lines explode after them.
+  const sofaRecompute = await recomputeAndExplodeSofaBuildLines(
+    sb,
+    pwp.lines,
+    undefined,
+    pwp.sofaRewardCombosByIndex,
+  );
+  if (sofaRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: sofaRecompute.message });
+  }
+  if (sofaRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: sofaRecompute.message });
+  }
+  if (sofaRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "sofa_price_drift",
+        message:
+          `Sofa price mismatch on '${sofaRecompute.drift.lineSku}': client RM ` +
+          `${sofaRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${sofaRecompute.drift.serverTotal.toFixed(2)}. Please rebuild and retry.`,
+        clientTotal: sofaRecompute.drift.clientTotal,
+        serverTotal: sofaRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+  const lines = sofaRecompute.lines.slice(existingCount);
 
   const specialRecompute = await recomputeSpecialAddonLines(sb, lines);
   if (specialRecompute.status === "bad_request") {
@@ -2161,9 +2357,69 @@ ordersRouter.post("/:id/lines", async (c) => {
     );
   }
 
+  // 0185 gifts — per-TRIGGERING-LINE semantics (free-gift.ts): a new line's
+  // entitlement depends only on itself, so resolving over ONLY the new lines
+  // yields exactly their gifts — existing lines earned theirs at create (no
+  // diff, no double-grant). Fail-SOFT on a misconfigured gift (resolver
+  // contract); fail-CLOSED on a read error.
+  const giftResult = await resolveDefaultFreeGiftLines(sb, optionsRecompute.lines);
+  if (giftResult.status === "server_error") {
+    throw new HTTPException(500, { message: giftResult.message });
+  }
+  const finalNewLines = [...optionsRecompute.lines, ...giftResult.lines];
+
+  // 0184 delivery — an ORDER-level trip fee → recomputed over the MERGED cart.
+  // The operator inputs are recovered from the persisted DELIVERY* rows
+  // (DELIVERY_ADD = the free-form additional fee; the DELIVERY row's attrs
+  // carry the cross-order link), and the order's own recorded link is excluded
+  // from the single-use backstop (excludeOrderId). DORMANT config + no
+  // existing rows → replace-set stays null (byte-identical to P1).
+  const exDelivery = existingAddons.filter((a) => ADD_LINES_DELIVERY_KEYS.has(a.addon_key));
+  const additionalFee = exDelivery
+    .filter((a) => a.addon_key === "DELIVERY_ADD")
+    .reduce((s, a) => s + Number(a.unit_price) * a.qty, 0);
+  const sourceSoAttr = exDelivery.find((a) => a.addon_key === "DELIVERY")?.attrs as
+    | { cross_category_source_so?: unknown }
+    | null
+    | undefined;
+  const sourceSo =
+    typeof sourceSoAttr?.cross_category_source_so === "string"
+      ? sourceSoAttr.cross_category_source_so
+      : null;
+  // NOTE: delivery reads the ORIGINAL existing lines (markers intact) — a
+  // persisted promo line's `pwp.type === "promo"` keeps it excluded from the
+  // charged-category set (isFreeLine); the delivery engine only READS attrs,
+  // it never re-validates claims.
+  const deliveryRecompute = await recomputeDeliveryFee(
+    sb,
+    [...existingLines, ...finalNewLines],
+    {
+      additionalDeliveryFee: additionalFee,
+      crossCategorySourceSo: sourceSo,
+      customerPhone: ord.customer_phone,
+      excludeOrderId: id,
+    },
+  );
+  if (deliveryRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: deliveryRecompute.message });
+  }
+  if (deliveryRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: deliveryRecompute.message });
+  }
+  // Churn guard: only send a replace-set when there IS or WAS a delivery row.
+  const addonsReplace =
+    deliveryRecompute.addons.length > 0 || exDelivery.length > 0
+      ? deliveryRecompute.addons.map((a) => ({
+          addon_key: a.addonKey,
+          qty: a.qty,
+          unit_price: a.unitPrice,
+          attrs: a.attrs ?? null,
+        }))
+      : null;
+
   const { error: rpcError } = await sb.rpc("add_order_lines", {
     p_order_id: id,
-    p_lines: optionsRecompute.lines.map((l) => ({
+    p_lines: finalNewLines.map((l) => ({
       sku: l.sku,
       qty: l.qty,
       attrs: l.attrs,
@@ -2171,6 +2427,7 @@ ordersRouter.post("/:id/lines", async (c) => {
     })),
     p_source: "direct",
     p_change_request_id: null,
+    p_addons_replace: addonsReplace,
   });
   if (rpcError) {
     const sqlstate = rpcError.code;
