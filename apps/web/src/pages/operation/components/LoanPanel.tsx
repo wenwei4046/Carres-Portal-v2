@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, Plus } from "lucide-react";
+import Segmented from "@/components/Segmented";
+import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import type { SofaLoanDto } from "@carres/shared";
 import {
@@ -264,27 +266,6 @@ export default function LoanPanel({
 
   return (
     <div className="p-3 space-y-2.5">
-      {/* header — the quiet fact + the ONE action */}
-      <div className="flex items-center gap-2">
-        {visible.length === 0 ? (
-          <span className={SOFT}>no loaner</span>
-        ) : (
-          <span className={SOFT}>
-            {visible.length} loaner{visible.length === 1 ? "" : "s"}
-          </span>
-        )}
-        <span className="flex-1" />
-        {!lending && (
-          <button
-            type="button"
-            onClick={() => setLending(true)}
-            className="btn-secondary text-[12px] py-1 px-2.5 inline-flex items-center gap-1"
-          >
-            <Plus size={14} /> Lend
-          </button>
-        )}
-      </div>
-
       {visible.map((loan) => (
         <LoanSteps
           key={loan.id}
@@ -312,45 +293,42 @@ export default function LoanPanel({
         />
       ))}
 
-      {/* lend flow — two framed sources, one open at a time */}
+      {!lending && (
+        <Btn
+          size="sm"
+          icon={Plus}
+          onClick={() => {
+            setLending(true);
+            setSource("warehouse");
+          }}
+        >
+          Lend a loaner
+        </Btn>
+      )}
+
+      {/* lend flow — KIT Segmented source toggle inside ONE framed box */}
       {lending && (
         <div className="rounded-[10px] border border-base-200/70 p-2.5 space-y-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setSource("warehouse")}
-              aria-pressed={source === "warehouse"}
-              className={`text-[12px] font-semibold px-2.5 py-1 rounded-full border ${
-                source === "warehouse"
-                  ? "bg-base-900 text-white border-base-900"
-                  : "bg-white text-base-700 border-base-200"
-              }`}
-            >
-              Warehouse · {lendable.length}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSource("supplier")}
-              aria-pressed={source === "supplier"}
-              className={`text-[12px] font-semibold px-2.5 py-1 rounded-full border ${
-                source === "supplier"
-                  ? "bg-base-900 text-white border-base-900"
-                  : "bg-white text-base-700 border-base-200"
-              }`}
-            >
-              Borrow from supplier
-            </button>
-            <span className="flex-1" />
-            <button
-              type="button"
+          <div className="flex items-center gap-2 flex-wrap">
+            <Segmented
+              ariaLabel="Loaner source"
+              options={[
+                { value: "warehouse", label: `Warehouse · ${lendable.length}` },
+                { value: "supplier", label: "Borrow from supplier" },
+              ]}
+              value={source === "" ? "warehouse" : source}
+              onChange={(v) => setSource(v)}
+            />
+            <Btn
+              size="sm"
+              variant="ghost"
               onClick={() => {
                 setLending(false);
                 setSource("");
               }}
-              className="btn-ghost text-[12px] py-0.5 px-2"
             >
               Cancel
-            </button>
+            </Btn>
           </div>
 
           {source === "warehouse" && (
