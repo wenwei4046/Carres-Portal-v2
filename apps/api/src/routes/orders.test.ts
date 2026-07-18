@@ -1883,6 +1883,10 @@ function buildSbForProceed(opts: {
    *  `getOrderSkus`. Empty array (default) means the lead-time validator
    *  short-circuits at the "no SKUs" branch (fail-open). */
   orderLineSkus?: string[];
+  /** 0232 (add-lines P2) — FULL order_lines rows (sku/qty/attrs/unit_price)
+   *  for the route's existing-lines fetch. Takes precedence over
+   *  orderLineSkus when set. */
+  orderLineRows?: Array<Record<string, unknown>>;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
@@ -1897,7 +1901,7 @@ function buildSbForProceed(opts: {
       // still composes via .order/.maybeSingle so we keep returning chain.
       if (currentTable === "order_lines") {
         return Promise.resolve({
-          data: (opts.orderLineSkus ?? []).map((sku) => ({ sku })),
+          data: opts.orderLineRows ?? (opts.orderLineSkus ?? []).map((sku) => ({ sku })),
           error: null,
         });
       }
@@ -2311,9 +2315,12 @@ describe("POST /api/orders/:id/top-up", () => {
 });
 
 // =============================================================================
-// POST /api/orders/:id/lines — add-product P1 (0231): append server-priced
-// lines to a Place-lane order. The mock's generic `.in()` slot doubles as the
-// product_skus fetch; recompute helpers short-circuit (no specials/options).
+// POST /api/orders/:id/lines — add-product P1+P2 (0231/0232): append
+// server-priced lines to a Place-lane order. The mock's generic `.in()` slot
+// doubles as the product_skus fetch; the engines short-circuit on their
+// dormant paths (no pwp markers / no builds / no specials / dormant delivery
+// config), per the same mock-limitation precedent as the create-route tests
+// (§17.5 delivery-route-configured-test).
 // =============================================================================
 
 const addLinesUrl = `http://t/api/orders/${PROCEED_ID}/lines`;
@@ -2322,13 +2329,19 @@ function addSkuRow(over: Record<string, unknown> = {}) {
   return { sku: "SKU-ADD-1", price: 250, pos_active: true, discontinued_at: null, ...over };
 }
 
+/** A place-lane order row the 0232 pre-fetch gate accepts. */
+function addOrderRow(over: Record<string, unknown> = {}) {
+  return makeOrderRow({
+    signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+    terms_accepted: true,
+    ...over,
+  });
+}
+
 describe("POST /api/orders/:id/lines", () => {
   it("200 — prices from the FRESH catalog (client price ignored) and calls add_order_lines", async () => {
     const sb = buildSbForProceed({
-      fetchedRow: makeOrderRow({
-        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
-        terms_accepted: true,
-      }),
+      fetchedRow: addOrderRow(),
       productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
         product_models: { category: string } | null;
       }>,
@@ -2339,8 +2352,8 @@ describe("POST /api/orders/:id/lines", () => {
       new Request(addLinesUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        // The client-sent unitPrice is an unknown key — zod strips it; the
-        // server prices from product_skus.price (250), never this 1.
+        // A client unitPrice on a FLAT line is parsed but ignored — the server
+        // prices from product_skus.price (250), never this 1.
         body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 2, attrs: null, unitPrice: 1 }] }),
       }),
       env,
@@ -2350,6 +2363,8 @@ describe("POST /api/orders/:id/lines", () => {
     const args = sb._rpcCalls[0].args as Record<string, unknown>;
     expect(args.p_source).toBe("direct");
     expect(args.p_change_request_id).toBeNull();
+    // Dormant delivery + no persisted DELIVERY* rows → no addon replace-set.
+    expect(args.p_addons_replace).toBeNull();
     const lines = args.p_lines as Array<Record<string, unknown>>;
     expect(lines).toHaveLength(1);
     expect(lines[0].sku).toBe("SKU-ADD-1");
@@ -2357,7 +2372,7 @@ describe("POST /api/orders/:id/lines", () => {
     expect(lines[0].unit_price).toBe(250);
   });
 
-  it("409 sofa_build_add_not_supported when a line carries attrs.sofa_build (P2 turf)", async () => {
+  it("400 when a sofa BUILD line lacks the preview unitPrice (drift-gate input)", async () => {
     const sb = buildSbForProceed({});
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
@@ -2371,17 +2386,35 @@ describe("POST /api/orders/:id/lines", () => {
       }),
       env,
     );
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as { code?: string };
-    expect(body.code).toBe("sofa_build_add_not_supported");
+    expect(res.status).toBe(400);
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
-  it("400 when a line carries a server-exclusive promo/free marker", async () => {
+  it("409 pwp_voucher_add_not_supported when attrs.pwp carries a voucher code", async () => {
     const sb = buildSbForProceed({});
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
-    for (const attrs of [{ pwp: { ruleId: "r" } }, { free_gift: true }, { free_item: true }]) {
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "SKU-ADD-1", qty: 1, attrs: { pwp: { ruleId: "r", code: "PWP-123" } } }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("pwp_voucher_add_not_supported");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("400 when a line carries a server-exclusive free marker", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    for (const attrs of [{ free_gift: true }, { free_item: true }]) {
       const res = await app.fetch(
         new Request(addLinesUrl, {
           method: "POST",
@@ -2395,8 +2428,33 @@ describe("POST /api/orders/:id/lines", () => {
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
+  it("422 wrong_status from the early gate when the order already proceeded", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow({ status: "proceed_order" }),
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(body.error).toBe("add_lines_blocked");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
   it("422 unknown_or_inactive_sku when the sku is missing from the catalog", async () => {
     const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
       productSkuCategoryRows: [] as unknown as Array<{
         product_models: { category: string } | null;
       }>,
@@ -2419,6 +2477,7 @@ describe("POST /api/orders/:id/lines", () => {
 
   it("422 unknown_or_inactive_sku when the sku is pos_active=false", async () => {
     const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
       productSkuCategoryRows: [addSkuRow({ pos_active: false })] as unknown as Array<{
         product_models: { category: string } | null;
       }>,
@@ -2437,8 +2496,107 @@ describe("POST /api/orders/:id/lines", () => {
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
+  it("409 pwp_add_conflict when the order already has a promo line and a NEW claim rides in", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [{ sku: "OLD-REWARD", qty: 1, attrs: { pwp: { ruleId: "r1" } }, unit_price: 50 }],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "SKU-ADD-1", qty: 1, attrs: { pwp: { ruleId: "r2" } } }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("pwp_add_conflict");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("200 — an existing promo line does NOT block a plain (no-claim) add (markers stripped)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [{ sku: "OLD-REWARD", qty: 1, attrs: { pwp: { ruleId: "r1" } }, unit_price: 50 }],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("add_order_lines");
+  });
+
+  it("422 existing_build_unsupported when a raw un-exploded sofa build sits on the order", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [{ sku: "RAW-SOFA", qty: 1, attrs: { sofa_build: { cells: [] } }, unit_price: 5000 }],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("existing_build_unsupported");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("an orphan specials_total (no picks array) can NOT skew the server price (review fix #3)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "SKU-ADD-1", qty: 1, attrs: { specials_total: -250 } }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const lines = (sb._rpcCalls[0].args as Record<string, unknown>).p_lines as Array<
+      Record<string, unknown>
+    >;
+    expect(lines[0].unit_price).toBe(250); // catalog price intact
+  });
+
   it("422 passthrough of the RPC's mixed_category_lines / wrong_status details", async () => {
     const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
       productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
         product_models: { category: string } | null;
       }>,

@@ -39,14 +39,24 @@ describe("updateOrderInputSchema.customer.email (0220)", () => {
   });
 });
 
-// 0231 — add-product P1: sku/qty/attrs only; the server prices from the catalog.
-describe("addOrderLinesInputSchema (0231)", () => {
-  it("parses a minimal line and STRIPS a client-sent unitPrice", () => {
-    const parsed = addOrderLinesInputSchema.parse({
-      lines: [{ sku: "MEMORY-PILLOW", qty: 2, attrs: null, unitPrice: 1 }],
+// 0231/0232 — add-product: sku/qty/attrs (+ optional PREVIEW unitPrice, which
+// the route only reads for the sofa-build drift gate — flat lines stay
+// server-priced regardless of what the client sends).
+describe("addOrderLinesInputSchema (0231/0232)", () => {
+  it("parses a minimal line; unitPrice is optional and carried as a preview", () => {
+    const bare = addOrderLinesInputSchema.parse({
+      lines: [{ sku: "MEMORY-PILLOW", qty: 2, attrs: null }],
     });
-    expect(parsed.lines[0]).toEqual({ sku: "MEMORY-PILLOW", qty: 2, attrs: null });
-    expect("unitPrice" in parsed.lines[0]).toBe(false);
+    expect(bare.lines[0]).toEqual({ sku: "MEMORY-PILLOW", qty: 2, attrs: null });
+    expect(bare.lines[0].unitPrice).toBeUndefined();
+    const withPreview = addOrderLinesInputSchema.parse({
+      lines: [{ sku: "SOFA-1", qty: 1, attrs: { sofa_build: {} }, unitPrice: 3200 }],
+    });
+    expect(withPreview.lines[0].unitPrice).toBe(3200);
+    expect(
+      addOrderLinesInputSchema.safeParse({ lines: [{ sku: "S", qty: 1, unitPrice: -1 }] })
+        .success,
+    ).toBe(false);
   });
 
   it("attrs is optional and may carry configurator selections", () => {

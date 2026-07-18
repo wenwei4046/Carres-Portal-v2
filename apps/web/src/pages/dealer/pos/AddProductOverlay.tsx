@@ -8,31 +8,38 @@ import type {
 } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import type { DraftLine } from "../new-order/draft";
-import { lockedCategoriesFor } from "../new-order/configurators";
+import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
 import { buildCatalogIndex } from "./catalog-index";
 import ConfigureDrawer from "./ConfigureDrawer";
+import PosConfigurePage from "./PosConfigurePage";
 import ProductCard from "./ProductCard";
+import SofaConfigurePage from "./SofaConfigurePage";
 
 /**
- * AddProductOverlay — Add-product P1 (0231, design 2026-07-18 §4). Full-screen
- * catalog picker for appending products to a PLACE-lane order from the POS
- * order-detail drawer. Reuses the POS card grid + ConfigureDrawer (every
- * category configures in the drawer here — the full-page wizard surfaces stay
- * wizard-only). The emitted DraftLine goes to the parent, which POSTs
- * sku/qty/attrs ONLY — the server prices from the fresh catalog.
+ * AddProductOverlay — Add-product P1+P2 (0231/0232, design 2026-07-18 §4).
+ * Full-screen catalog picker for appending products to a PLACE-lane order
+ * from the POS order-detail drawer. Mirrors CatalogStep's surface convention:
+ * mattress/bedframe → PosConfigurePage, offered-compartment sofa →
+ * SofaConfigurePage (P2: builds + quick picks emit `attrs.sofa_build` lines,
+ * server drift-gated + exploded), everything else → ConfigureDrawer.
  *
- * Exclusions:
- *   · sofa models with OFFERED COMPARTMENTS (the visual-builder path) are
- *     hidden until P2 — the server 409s attrs.sofa_build as backstop (the
- *     compartment props are also withheld from ConfigureDrawer so no build
- *     entry can render);
- *   · categories locked by the 0089 mutex against the ORDER's existing lines
- *     dim out (same ProductCard `locked` affordance as the wizard).
+ * The emitted DraftLine goes to the parent, which POSTs sku/qty/attrs (+ the
+ * preview unitPrice for BUILD lines only — the sofa drift gate needs it; flat
+ * lines stay fully server-priced).
+ *
+ * PWP: the ORDER's persisted lines ride in as `cartLines` so the configurator
+ * previews eligibility against the merged cart — but the VOUCHER props
+ * (pwpReservedCodes / pwpClaimGroup / customerPhone / onApplyVoucherCode) are
+ * deliberately withheld, so only CODE-LESS stateless claims can be emitted
+ * (the 0187 voucher lifecycle is wizard-scoped; the server 409s coded claims).
+ *
+ * Mutex: categories locked by 0089 against the order's existing lines dim out
+ * (same ProductCard `locked` affordance as the wizard).
  *
  * z-index: the POS detail drawer sits at z-100 (`.os-detail-overlay`) while
- * ConfigureDrawer is a fixed z-60 — so everything here nests in ONE z-[110]
- * container, creating a stacking context in which the drawer's own z-60
- * still paints above the grid.
+ * the configure surfaces are fixed z-60 — so everything nests in ONE z-[110]
+ * container, creating a stacking context in which their own z still paints
+ * above the grid.
  */
 export default function AddProductOverlay({
   order,
@@ -67,31 +74,43 @@ export default function AddProductOverlay({
     return lockedCategoriesFor(pseudo, index.skuToCategory);
   }, [order.lines, index]);
 
-  // Sofa models offering compartments = the build path → hidden until P2.
-  const buildOnlyModelIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const mc of catalog.modelSofaCompartments ?? []) ids.add(mc.modelId);
-    return ids;
-  }, [catalog.modelSofaCompartments]);
+  // The persisted rows as pseudo-DraftLines — PWP eligibility previews inside
+  // the configurators run against the MERGED cart (existing triggers count).
+  const cartLines = useMemo<DraftLine[]>(
+    () =>
+      (order.lines ?? []).map((l) => ({
+        localId: l.id ?? newLocalId(),
+        sku: l.sku,
+        qty: l.qty,
+        attrs: l.attrs,
+        unitPrice: l.unitPrice,
+        label: l.sku,
+      })),
+    [order.lines],
+  );
 
   const models = useMemo(() => {
     const q = search.trim().toLowerCase();
     return index.productModels.filter((m) => {
-      if (m.category === "sofa" && buildOnlyModelIds.has(m.id)) return false;
       if (cat !== "all" && m.category !== cat) return false;
       if (q && !(index.meta.get(m.id)?.searchBlob ?? "").includes(q)) return false;
       return true;
     });
-  }, [index, cat, search, buildOnlyModelIds]);
+  }, [index, cat, search]);
 
   const cats = useMemo(() => {
     const present = new Set<ProductCategory>();
-    for (const m of index.productModels) {
-      if (m.category === "sofa" && buildOnlyModelIds.has(m.id)) continue;
-      present.add(m.category);
-    }
+    for (const m of index.productModels) present.add(m.category);
     return [...present];
-  }, [index, buildOnlyModelIds]);
+  }, [index]);
+
+  const offeredForConfigure = useMemo(
+    () =>
+      configureModel
+        ? (catalog.modelSofaCompartments ?? []).filter((mc) => mc.modelId === configureModel.id)
+        : [],
+    [catalog.modelSofaCompartments, configureModel],
+  );
 
   return (
     <div className="fixed inset-0 z-[110]" data-testid="pos-add-product-overlay">
@@ -172,22 +191,71 @@ export default function AddProductOverlay({
         </div>
       </div>
 
-      {configureModel && (
-        <ConfigureDrawer
-          model={configureModel}
-          meta={index.meta.get(configureModel.id)}
-          skus={index.skusByModel.get(configureModel.id) ?? []}
-          fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
-          fabricTierConfig={catalog.fabricTierConfig}
-          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-          specialAddons={catalog.specialAddons}
-          onAdd={(line) => {
+      {configureModel &&
+        (() => {
+          const emit = (line: DraftLine) => {
             setConfigureModel(null);
             onPick(line);
-          }}
-          onClose={() => setConfigureModel(null)}
-        />
-      )}
+          };
+          const close = () => setConfigureModel(null);
+          // Mirror CatalogStep's surface convention (2026-07-04): mattress +
+          // bed frame go full page; an offered-compartment sofa opens the
+          // sofa page (P2: builds allowed); the rest keep the drawer.
+          if (configureModel.category === "mattress" || configureModel.category === "bedframe") {
+            return (
+              <PosConfigurePage
+                key={configureModel.id}
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                specialAddons={catalog.specialAddons}
+                optionPools={catalog.optionPools}
+                fabrics={catalog.fabrics}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                catalog={catalog}
+                cartLines={cartLines}
+                onAdd={emit}
+                onClose={close}
+              />
+            );
+          }
+          if (configureModel.category === "sofa" && offeredForConfigure.length > 0) {
+            return (
+              <SofaConfigurePage
+                key={configureModel.id}
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+                masterFabrics={catalog.fabrics}
+                optionPools={catalog.optionPools}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                sofaCompartments={catalog.sofaCompartments ?? []}
+                modelCompartments={offeredForConfigure}
+                sofaCombos={catalog.sofaCombos ?? []}
+                catalog={catalog}
+                cartLines={cartLines}
+                onAdd={emit}
+                onClose={close}
+              />
+            );
+          }
+          return (
+            <ConfigureDrawer
+              model={configureModel}
+              meta={index.meta.get(configureModel.id)}
+              skus={index.skusByModel.get(configureModel.id) ?? []}
+              fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+              fabricTierConfig={catalog.fabricTierConfig}
+              modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+              specialAddons={catalog.specialAddons}
+              onAdd={emit}
+              onClose={close}
+            />
+          );
+        })()}
     </div>
   );
 }

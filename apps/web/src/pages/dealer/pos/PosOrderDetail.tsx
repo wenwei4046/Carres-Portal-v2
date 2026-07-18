@@ -125,7 +125,7 @@ function proceedErrorCopy(e: unknown): string {
   return e instanceof Error ? e.message : "Request failed.";
 }
 
-/** 0231 — add-product failure copy, keyed on the route/RPC error codes. */
+/** 0231/0232 — add-product failure copy, keyed on the route/RPC error codes. */
 function addErrorCopy(e: unknown): string {
   const code = errCode(e);
   if (code === "mixed_category_lines")
@@ -134,8 +134,12 @@ function addErrorCopy(e: unknown): string {
     return "Products can only be added while the order is in Order placed.";
   if (code === "unknown_or_inactive_sku")
     return "This product is no longer available — refresh and retry.";
-  if (code === "sofa_build_add_not_supported")
-    return "Sofa builds can't be added to an existing order yet — place a new order.";
+  if (code === "pwp_voucher_add_not_supported")
+    return "Voucher codes can't be redeemed on an added line — place a new order to use the voucher.";
+  if (code && code.startsWith("pwp_"))
+    return "This promo price isn't eligible on this order — reconfigure and retry.";
+  if (code === "sofa_price_drift")
+    return "The sofa price changed since this screen loaded — rebuild and retry.";
   if (code === "special_price_drift" || code === "options_price_drift")
     return "Prices changed since this screen loaded — reopen the product and reconfigure.";
   return e instanceof Error ? e.message : "Could not add the product.";
@@ -251,11 +255,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   async function handleAddProduct(line: DraftLine) {
     setAddErr(null);
     try {
-      // Only sku/qty/attrs go up — the client preview price stays local
-      // (server catalog authority; the attrs preview totals feed the trust
-      // gates exactly like create).
+      // sku/qty/attrs go up — the client preview price stays local (server
+      // catalog authority) EXCEPT on a sofa BUILD line, whose preview
+      // unitPrice feeds the server drift gate (±0.5%, create-route contract).
+      const isBuild = Boolean((line.attrs as Record<string, unknown> | null)?.sofa_build);
       await addLinesMut.mutateAsync({
-        lines: [{ sku: line.sku, qty: line.qty, attrs: line.attrs ?? null }],
+        lines: [
+          {
+            sku: line.sku,
+            qty: line.qty,
+            attrs: line.attrs ?? null,
+            ...(isBuild ? { unitPrice: line.unitPrice } : {}),
+          },
+        ],
       });
       setAddOpen(false);
     } catch (e) {
