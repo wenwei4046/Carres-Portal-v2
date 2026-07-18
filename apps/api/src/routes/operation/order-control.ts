@@ -235,6 +235,38 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
         orderByRef.set(String(ref).trim().toUpperCase(), o.id as string);
       }
     }
+    // Combined-ref aware resolver for balances: a Master "Ref" may be a combined
+    // string ("CR1127 + TCF0477" — one physical order under several AutoCount refs).
+    // Split into tokens and pick the order whose source_ref set best matches (most
+    // shared tokens, then closest cardinality) so a combined-ref row lands on ITS
+    // own order, not a same-token standalone order.
+    const ordersForMatch = (orderData ?? []).map((o) => ({
+      id: o.id as string,
+      refs: ((o.source_ref as string[] | null) ?? []).map((r) =>
+        String(r).trim().toUpperCase(),
+      ),
+    }));
+    const bestOrderForRef = (ref: string): string | undefined => {
+      const tokens = ref
+        .split(/[+\s]+/)
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      if (tokens.length === 0) return undefined;
+      let best: { id: string; overlap: number; card: number } | undefined;
+      for (const o of ordersForMatch) {
+        const overlap = o.refs.filter((r) => tokens.includes(r)).length;
+        if (overlap === 0) continue;
+        const card = Math.abs(o.refs.length - tokens.length);
+        if (
+          !best ||
+          overlap > best.overlap ||
+          (overlap === best.overlap && card < best.card)
+        ) {
+          best = { id: o.id, overlap, card };
+        }
+      }
+      return best?.id;
+    };
     for (const f of storageAgg) {
       const orderId = orderByRef.get(f.ref.trim().toUpperCase());
       if (!orderId) {
@@ -247,13 +279,15 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       feeByOrder.set(orderId, cur);
     }
     for (const b of balanceAgg) {
-      const orderId = orderByRef.get(b.ref.trim().toUpperCase());
+      const orderId = bestOrderForRef(b.ref);
       if (!orderId) {
         balanceUnmatched += 1;
         continue;
       }
       const cur = balanceByOrder.get(orderId) ?? {};
-      if (b.owing !== undefined) cur.owing = b.owing;
+      // SUM when two distinct Master refs resolve to ONE physical order (e.g. two
+      // combined-ref rows for the same customer) — both are money owed on that order.
+      if (b.owing !== undefined) cur.owing = (cur.owing ?? 0) + b.owing;
       if (b.payStatus) cur.payStatus = b.payStatus;
       balanceByOrder.set(orderId, cur);
     }

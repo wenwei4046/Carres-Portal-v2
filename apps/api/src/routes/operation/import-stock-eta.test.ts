@@ -195,4 +195,68 @@ describe("POST /api/operation/orders/import-stock-eta", () => {
     expect(arg[0].line_stock_status?.["1013Jager/King/COL:PC15"]).toBe("ready");
     expect(arg[0].line_etas).toBeUndefined();
   });
+
+  it("resolves combined-ref balances by token + sums two refs onto one order", async () => {
+    const jwt = await makeJwt("operation");
+    const orders = [
+      { id: "oa", source_ref: ["CR1127", "TCF0477"] }, // Calvin — one physical order
+      { id: "ob", source_ref: ["CR0925"] }, // Lim standalone
+      { id: "oc", source_ref: ["CR0925", "TCF0393", "TCF0394"] }, // Lim combined order
+    ];
+    const upserts: unknown[] = [];
+    const upsert = vi.fn((rows: unknown) => {
+      upserts.push(rows);
+      return Promise.resolve({ error: null });
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderLines: any = {
+      select: vi.fn(() => orderLines),
+      not: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ordersTbl: any = {
+      select: vi.fn(() => Promise.resolve({ data: orders, error: null })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const control: any = {
+      select: vi.fn(() => control),
+      in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      upsert,
+    };
+    const from = vi.fn((t: string) =>
+      t === "order_lines" ? orderLines : t === "orders" ? ordersTbl : control,
+    );
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          rows: [{ po: "PO/NONE", sku: "NO-MATCH" }],
+          balances: [
+            { ref: "CR1127 + TCF0477", owing: 1923 },
+            { ref: "TCF0477 + CR1127", owing: 1568 },
+            { ref: "CR0925", owing: 1748 },
+            { ref: "TCF0394 + TCF0393 + CR0925", owing: 4193 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const { result } = (await res.json()) as {
+      result: { balanceOrders: number; balanceWritten: number; balanceUnmatched: number };
+    };
+    expect(result.balanceUnmatched).toBe(0);
+    expect(result.balanceOrders).toBe(3);
+    expect(result.balanceWritten).toBe(3);
+    // The balance upsert is the row-set carrying a `balance` field.
+    const balRows = upserts.find(
+      (u): u is { order_id: string; balance?: number }[] =>
+        Array.isArray(u) && u.some((r) => (r as { balance?: number }).balance !== undefined),
+    )!;
+    const byId = Object.fromEntries(balRows.map((r) => [r.order_id, r.balance]));
+    expect(byId).toEqual({ oa: 3491, ob: 1748, oc: 4193 });
+  });
 });
