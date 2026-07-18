@@ -331,6 +331,7 @@ export function RoutingFields({
   opsAssignedLogistic,
   form,
   hideRegion = false,
+  hideDeadline = false,
 }: {
   orderId: string;
   customerAddress: string | null;
@@ -344,6 +345,11 @@ export function RoutingFields({
   /** Delivery card shows the region once in its header — hide the duplicate
    *  Region row here (Jess: no repeated region). */
   hideRegion?: boolean;
+  /** rev23 (Jess): the deadline is auto-filled by the AutoCount/Master import
+   *  and read-only in the Delivery tab — the caller renders its own read-only
+   *  row (with the Postponed affordance), so this component skips its editable
+   *  Deadline input. */
+  hideDeadline?: boolean;
 }) {
   const { data: partnersData } = useDeliveryPartners();
   const partners = useMemo(
@@ -411,24 +417,26 @@ export function RoutingFields({
         </div>
       </FieldRow>
 
-      <FieldRow label="Deadline">
-        <input
-          type="date"
-          defaultValue={deliveryDate ?? ""}
-          disabled={setDate.isPending}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (ISO_DATE.test(v) && v !== deliveryDate) {
-              // Phase 11.1: set_order_date requires a proceed date <= the
-              // delivery date. Keep the existing proceed date when still valid;
-              // otherwise default it to the new delivery date.
-              const pd = proceedDate && proceedDate <= v ? proceedDate : v;
-              setDate.mutate({ date: v, proceedDate: pd });
-            }
-          }}
-          className={CELL}
-        />
-      </FieldRow>
+      {!hideDeadline && (
+        <FieldRow label="Deadline">
+          <input
+            type="date"
+            defaultValue={deliveryDate ?? ""}
+            disabled={setDate.isPending}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (ISO_DATE.test(v) && v !== deliveryDate) {
+                // Phase 11.1: set_order_date requires a proceed date <= the
+                // delivery date. Keep the existing proceed date when still valid;
+                // otherwise default it to the new delivery date.
+                const pd = proceedDate && proceedDate <= v ? proceedDate : v;
+                setDate.mutate({ date: v, proceedDate: pd });
+              }
+            }}
+            className={CELL}
+          />
+        </FieldRow>
+      )}
       {area === "Outstation" && (
         <FieldRow label="Call before PO">
           <select
@@ -1190,7 +1198,7 @@ export function StorageControlFields({
  *  Extension Google Forms, Jess 2026-06-30). Operation may record ONE extension;
  *  a 2nd needs a principal (the route 403s `extension_used`). The free storage
  *  window recomputes from the snapshotted original delivery date. */
-function StorageExtensionRow({
+export function StorageExtensionRow({
   orderId,
   control,
   hasMsbf = false,
