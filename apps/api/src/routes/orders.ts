@@ -1919,6 +1919,11 @@ async function dispatchOrderMutation<TBody>(
   return c.json(await fetchAndShapeOrder(sb, id));
 }
 
+/** Legacy proto method keys the top-up path accepted before 0230 (the old
+ *  TopUpDepositModal vocab). Kept valid forever so pre-0230 clients and
+ *  historical retry flows never 422. */
+const LEGACY_TOPUP_METHOD_KEYS = ["cash", "bank", "cheque", "online", "card"];
+
 /** POST /api/orders/:id/top-up — record a partial payment toward an order's
  *  total. Photos uploaded to Storage by the dealer before this call; we
  *  validate paths live inside the dealer folder and pass them through to the
@@ -1932,6 +1937,33 @@ ordersRouter.post("/:id/top-up", (c) =>
       for (const p of body.photoPaths) {
         assertDealerOwnedPath(p, dealerId, "photoPaths[]");
       }
+    },
+    // 0230 — the manual-payment panel offers the SAME configurable methods as
+    // checkout: the key must be an ACTIVE order_entry_config method (code
+    // defaults when the config is empty) or a legacy proto key. A config READ
+    // error degrades to the defaults — a config hiccup never blocks a payment.
+    asyncPreFlight: async (body, ctx) => {
+      const cfgR = await ctx.sb
+        .from("order_entry_config")
+        .select("payment_methods, form_fields")
+        .eq("id", true)
+        .maybeSingle();
+      const entryCfg = parseOrderEntryConfigRow(cfgR && !cfgR.error ? cfgR.data : null);
+      const allowed = new Set([
+        ...resolvePaymentMethods(entryCfg).map((m) => m.key),
+        ...LEGACY_TOPUP_METHOD_KEYS,
+      ]);
+      if (!allowed.has(body.method)) {
+        return c.json(
+          {
+            error: "top_up_blocked",
+            code: "invalid_payment_method",
+            message: `payment method "${body.method}" is not an active configured method`,
+          },
+          422,
+        );
+      }
+      return null;
     },
     rpcArgs: (body) => ({
       p_order_id: c.req.param("id"),
@@ -1958,6 +1990,9 @@ ordersRouter.post("/:id/address", (c) =>
       p_address: body.address,
       p_billing: body.billing,
       p_billing_same: body.billingSame,
+      // 0230 — structured parts stored alongside the composed string (null =
+      // legacy flat write; the RPC clears previously-stored parts then).
+      p_parts: body.parts ?? null,
     }),
   }),
 );
@@ -2057,6 +2092,13 @@ ordersRouter.patch("/:id", async (c) => {
     if ("email" in cust) flat.customer_email = cust.email ?? "";
     if ("address" in cust) flat.customer_address = cust.address ?? "";
     if ("addressUnknown" in cust) flat.customer_address_unknown = cust.addressUnknown;
+    // 0230 — structured parts. The RPC enforces "parts only ride WITH the
+    // composed address" and clears stored parts on a flat-only address write.
+    if ("addressLine1" in cust) flat.customer_address_line1 = cust.addressLine1 ?? "";
+    if ("addressLine2" in cust) flat.customer_address_line2 = cust.addressLine2 ?? "";
+    if ("addressState" in cust) flat.customer_address_state = cust.addressState ?? "";
+    if ("addressCity" in cust) flat.customer_address_city = cust.addressCity ?? "";
+    if ("addressPostcode" in cust) flat.customer_address_postcode = cust.addressPostcode ?? "";
     if ("billing" in cust) flat.customer_billing = cust.billing ?? "";
     if ("billingSame" in cust) flat.customer_billing_same = cust.billingSame;
     if ("emergency" in cust) flat.customer_emergency = cust.emergency ?? "";

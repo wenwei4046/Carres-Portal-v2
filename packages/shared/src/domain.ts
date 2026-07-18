@@ -606,6 +606,13 @@ export interface Order {
     race: string | null;
     gender: string | null;
     birthday: string | null;
+    /** 0230 — structured MY address parts (always match the composed
+     *  `address`; null on legacy/flat-written orders). */
+    addressLine1: string | null;
+    addressLine2: string | null;
+    addressState: string | null;
+    addressCity: string | null;
+    addressPostcode: string | null;
   };
 
   delivery: {

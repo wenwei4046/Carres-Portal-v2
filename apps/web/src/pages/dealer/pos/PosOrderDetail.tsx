@@ -19,11 +19,14 @@ import {
   isProceedBlockerCode,
   maxLeadDaysFor,
   minDeliveryDateISO,
+  resolvePaymentMethods,
   type Order,
   type OrderLine,
   type TopUpOrderInput,
   type UpdateOrderInput,
 } from "@carres/shared";
+import MYAddressFields from "@/components/MYAddressFields";
+import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
 import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
 import {
@@ -63,14 +66,6 @@ interface Props {
   staffName: string | null;
   onClose: () => void;
 }
-
-const METHODS: Array<{ key: TopUpOrderInput["method"]; label: string }> = [
-  { key: "cash", label: "Cash" },
-  { key: "bank", label: "Bank transfer" },
-  { key: "online", label: "Online (FPX/eWallet)" },
-  { key: "cheque", label: "Cheque" },
-  { key: "card", label: "Card / terminal" },
-];
 
 /** 0184 — delivery trip-fee addons appended by the Hono recompute (same
  *  labels DealerOrderDetail uses). */
@@ -140,17 +135,35 @@ interface Edited {
   name: string;
   phone: string;
   email: string;
-  address: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressState: string;
+  addressCity: string;
+  addressPostcode: string;
   deliveryDate: string;
   proceedDate: string;
 }
 
 function seedEdited(o: Order): Edited {
+  // 0230 — the stored structured parts seed the cascading picker (same form
+  // as the wizard). A legacy composed-only order seeds Line 1 with the whole
+  // saved string so nothing is lost; picking State/City/Postcode on the next
+  // edit upgrades it to the structured format.
+  const hasParts = !!(
+    o.customer.addressLine1 &&
+    o.customer.addressState &&
+    o.customer.addressCity &&
+    o.customer.addressPostcode
+  );
   return {
     name: o.customer.name,
     phone: o.customer.phone ?? "",
     email: o.customer.email ?? "",
-    address: o.customer.address ?? "",
+    addressLine1: hasParts ? (o.customer.addressLine1 ?? "") : (o.customer.address ?? ""),
+    addressLine2: hasParts ? (o.customer.addressLine2 ?? "") : "",
+    addressState: hasParts ? (o.customer.addressState ?? "") : "",
+    addressCity: hasParts ? (o.customer.addressCity ?? "") : "",
+    addressPostcode: hasParts ? (o.customer.addressPostcode ?? "") : "",
     deliveryDate: o.delivery.date ?? "",
     proceedDate: o.delivery.proceedDate ?? "",
   };
@@ -181,6 +194,20 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   // ── record-payment form state ─────────────────────────────────────────────
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<TopUpOrderInput["method"]>("cash");
+  // 0230 — the manual-payment chips mirror checkout: the ACTIVE configured
+  // methods from order_entry_config (code defaults when empty). Stripe is NOT
+  // a chip — it stays the dedicated "Collect online" button above the divider.
+  const payMethods = useMemo(
+    () => resolvePaymentMethods(catalog?.orderEntryConfig),
+    [catalog?.orderEntryConfig],
+  );
+  // Keep the selected chip valid against the configured list (e.g. the
+  // operator removed "cash", or the catalog loads after mount).
+  useEffect(() => {
+    if (payMethods.length > 0 && !payMethods.some((m) => m.key === method)) {
+      setMethod(payMethods[0].key);
+    }
+  }, [payMethods, method]);
   // 0223 — Stripe collect-online modal (QR / WhatsApp link).
   const [stripeOpen, setStripeOpen] = useState(false);
   const [approvalCode, setApprovalCode] = useState("");
@@ -260,7 +287,48 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   // balance remains.
   const pct = total <= 0 ? 0 : paid >= total ? 100 : Math.min(99, Math.floor((paid / total) * 100));
   const customerInfoOk = !!(edited?.name.trim() && edited?.phone.trim() && edited?.email.trim());
-  const addressOk = !!edited?.address.trim();
+  // 0230 — structured address gating (wizard rules: Line 1 ≥5 chars + the
+  // full State/City/Postcode cascade). An UNTOUCHED legacy order (composed
+  // string, no parts) stays "Set"; once the picker is touched the full
+  // cascade is required before the address saves.
+  const seed = order ? seedEdited(order) : null;
+  const structuredComplete = !!(
+    edited &&
+    edited.addressLine1.trim().length >= 5 &&
+    edited.addressState &&
+    edited.addressCity &&
+    edited.addressPostcode
+  );
+  const addressDirty = !!(
+    edited &&
+    seed &&
+    (edited.addressLine1 !== seed.addressLine1 ||
+      edited.addressLine2 !== seed.addressLine2 ||
+      edited.addressState !== seed.addressState ||
+      edited.addressCity !== seed.addressCity ||
+      edited.addressPostcode !== seed.addressPostcode)
+  );
+  const addressEmpty = !!(
+    edited &&
+    !edited.addressLine1.trim() &&
+    !edited.addressLine2.trim() &&
+    !edited.addressState &&
+    !edited.addressCity &&
+    !edited.addressPostcode
+  );
+  /** Order saved before 0230 (or by a flat writer): composed string without
+   *  the structured parts — Line 1 was seeded with the whole string. */
+  const legacyFallback = !!(
+    order?.customer.address &&
+    !(
+      order.customer.addressLine1 &&
+      order.customer.addressState &&
+      order.customer.addressCity &&
+      order.customer.addressPostcode
+    )
+  );
+  const addressOk =
+    structuredComplete || (!addressDirty && !!(order?.customer.address ?? "").trim());
   const dateOk = !!edited?.deliveryDate;
   const proceedDateOk = !!edited?.proceedDate;
   const allOk = customerInfoOk && addressOk && dateOk && paidOk && proceedDateOk;
@@ -276,11 +344,32 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     if (edited.phone !== (order.customer.phone ?? "") && edited.phone.trim() !== "")
       customer.phone = edited.phone.trim();
     if (edited.email !== (order.customer.email ?? "")) customer.email = edited.email.trim() || null;
-    if (edited.address !== (order.customer.address ?? "")) {
-      customer.address = edited.address.trim() || null;
-      // addressUnknown is implied by the composed address (design §1).
-      const impliedUnknown = !edited.address.trim();
-      if (impliedUnknown !== order.customer.addressUnknown) customer.addressUnknown = impliedUnknown;
+    // 0230 — the address saves as the full structured set + its composition
+    // (the RPC keeps both representations in lockstep). A PARTIAL cascade is
+    // never saved (the pill shows Missing); clearing every field clears the
+    // address back to addressUnknown.
+    if (addressDirty && structuredComplete) {
+      customer.address = composeAddress({
+        line1: edited.addressLine1,
+        line2: edited.addressLine2,
+        state: edited.addressState,
+        city: edited.addressCity,
+        postcode: edited.addressPostcode,
+      });
+      customer.addressLine1 = edited.addressLine1.trim();
+      customer.addressLine2 = edited.addressLine2.trim() || null;
+      customer.addressState = edited.addressState;
+      customer.addressCity = edited.addressCity;
+      customer.addressPostcode = edited.addressPostcode;
+      if (order.customer.addressUnknown) customer.addressUnknown = false;
+    } else if (addressDirty && addressEmpty) {
+      customer.address = null;
+      customer.addressLine1 = null;
+      customer.addressLine2 = null;
+      customer.addressState = null;
+      customer.addressCity = null;
+      customer.addressPostcode = null;
+      if (!order.customer.addressUnknown) customer.addressUnknown = true;
     }
     const delivery: NonNullable<UpdateOrderInput["delivery"]> = {};
     if (scope.editablePlaced) {
@@ -345,9 +434,12 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   }
 
   // ── record payment ────────────────────────────────────────────────────────
-  // Proof rule (2990s paymentProofRequired): non-cash needs the slip AND the
-  // approval code before Record enables.
-  const slipRequired = amount > 0 && method !== "cash";
+  // Proof rule — 0230 config-driven: a method whose config demands an approval
+  // code demands the slip with it (finance reconciles both together). Unknown
+  // key (config still loading) falls back to the 2990s non-cash heuristic.
+  const methodCfg = payMethods.find((m) => m.key === method);
+  const slipRequired =
+    amount > 0 && (methodCfg ? methodCfg.approvalCodeRequired : method !== "cash");
   const canRecord =
     !!order &&
     amount > 0 &&
@@ -383,7 +475,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
         ];
         setUploading(false);
       }
-      const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
+      const methodLabel = payMethods.find((m) => m.key === method)?.label ?? method;
       await topUpMut.mutateAsync({
         amount,
         method,
@@ -642,17 +734,32 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 </span>
               )}
             </h4>
-            <div className="os-grid">
-              <label className="os-field os-field--span">
-                <span>Delivery address</span>
-                <textarea
-                  value={edited.address}
-                  onChange={(e) => set("address", e.target.value)}
-                  placeholder="Unit, street, area"
-                  disabled={!scope.canEditDetails}
-                  data-testid="pos-od-address"
-                />
-              </label>
+            {/* 0230 — same cascading MY address picker as the wizard (the two
+                forms are ONE format now). Legacy composed-only orders seed
+                Line 1 with the saved string. */}
+            <fieldset
+              disabled={!scope.canEditDetails}
+              style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+              data-testid="pos-od-address-fields"
+            >
+              <MYAddressFields
+                data={{
+                  addressLine1: edited.addressLine1,
+                  addressLine2: edited.addressLine2,
+                  addressState: edited.addressState,
+                  addressCity: edited.addressCity,
+                  addressPostcode: edited.addressPostcode,
+                }}
+                onChange={(patch) => setEdited((prev) => (prev ? { ...prev, ...patch } : prev))}
+              />
+            </fieldset>
+            {legacyFallback && !addressDirty && (
+              <p className="t-tiny" style={{ color: "var(--fg-muted)", marginTop: 8 }}>
+                Saved as free text — pick State / City / Postcode to upgrade it to the
+                structured format.
+              </p>
+            )}
+            <div className="os-grid" style={{ marginTop: 12 }}>
               <label className="os-field">
                 <span>Delivery date</span>
                 <input
@@ -737,7 +844,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                   <div className="os-field">
                     <span>Payment method</span>
                     <div className="os-paychips">
-                      {METHODS.map((m) => (
+                      {payMethods.map((m) => (
                         <button
                           key={m.key}
                           type="button"
