@@ -49,6 +49,47 @@ bdDealersRouter.get("/", async (c) => {
   return c.json({ dealers });
 });
 
+// ---------- GET /activity — recent dealer-touching audit events ----------
+// MUST register before /:id: Hono matches in registration order, and the
+// param route would swallow the literal segment ("activity" → uuid cast 500 —
+// exactly what happened from Phase 8 until 2026-07-18).
+bdDealersRouter.get("/activity", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const limitRaw = Number.parseInt(c.req.query("limit") ?? "12", 10);
+  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 12, 1), 50);
+
+  const auditRes = await sb
+    .from("audit_log")
+    .select("id, role, actor_text, action, dealer_id, ref, occurred_at")
+    .not("dealer_id", "is", null)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  if (auditRes.error) {
+    const m = mapPgError(auditRes.error);
+    return c.json(m.body, m.status);
+  }
+
+  const dealerIds = Array.from(
+    new Set((auditRes.data ?? []).map((a) => a.dealer_id).filter(Boolean) as string[]),
+  );
+  const dealerMap = new Map<string, string>();
+  if (dealerIds.length) {
+    const dRes = await sb.from("dealers").select("id, name").in("id", dealerIds);
+    (dRes.data ?? []).forEach((d) => dealerMap.set(d.id, d.name));
+  }
+
+  const rows = (auditRes.data ?? []).map((a) => ({
+    id: a.id,
+    role: a.role,
+    actor: a.actor_text,
+    action: a.action,
+    dealerId: a.dealer_id,
+    dealerName: a.dealer_id ? dealerMap.get(a.dealer_id) ?? null : null,
+    occurredAt: a.occurred_at,
+  }));
+  return c.json({ rows });
+});
+
 // ---------- GET /:id ----------
 bdDealersRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
@@ -118,44 +159,6 @@ bdDealersRouter.get("/:id", async (c) => {
   });
 
   return c.json({ dealer, orders });
-});
-
-// ---------- GET /activity — recent dealer-touching audit events ----------
-bdDealersRouter.get("/activity", async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const limitRaw = Number.parseInt(c.req.query("limit") ?? "12", 10);
-  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 12, 1), 50);
-
-  const auditRes = await sb
-    .from("audit_log")
-    .select("id, role, actor_text, action, dealer_id, ref, occurred_at")
-    .not("dealer_id", "is", null)
-    .order("occurred_at", { ascending: false })
-    .limit(limit);
-  if (auditRes.error) {
-    const m = mapPgError(auditRes.error);
-    return c.json(m.body, m.status);
-  }
-
-  const dealerIds = Array.from(
-    new Set((auditRes.data ?? []).map((a) => a.dealer_id).filter(Boolean) as string[]),
-  );
-  const dealerMap = new Map<string, string>();
-  if (dealerIds.length) {
-    const dRes = await sb.from("dealers").select("id, name").in("id", dealerIds);
-    (dRes.data ?? []).forEach((d) => dealerMap.set(d.id, d.name));
-  }
-
-  const rows = (auditRes.data ?? []).map((a) => ({
-    id: a.id,
-    role: a.role,
-    actor: a.actor_text,
-    action: a.action,
-    dealerId: a.dealer_id,
-    dealerName: a.dealer_id ? dealerMap.get(a.dealer_id) ?? null : null,
-    occurredAt: a.occurred_at,
-  }));
-  return c.json({ rows });
 });
 
 // ---------- GET /orders/:so ----------
