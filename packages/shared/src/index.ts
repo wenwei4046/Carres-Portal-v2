@@ -969,6 +969,22 @@ export {
   type StockEtaImportResult,
 } from "./stock-eta-import";
 
+// Master append — "sheet has it, portal doesn't" reconcile (Option A,
+// 2026-07-18): pure missing-line detector + zod shared by the Master-import
+// result screen and POST /api/operation/orders/append-missing-lines.
+export {
+  normalizeRefTokens,
+  detectMissingLines,
+  masterAppendRowSchema,
+  appendMissingLinesInput,
+  type MasterAppendRow,
+  type MasterAppendRowParsed,
+  type AppendOrderRef,
+  type MissingLineCandidate,
+  type AppendMissingLinesInput,
+  type AppendMissingLinesResult,
+} from "./master-append";
+
 // On Hand C+ P3 — parse the "Klg Warehouse" ready-stock sheet into
 // ops_stock_items import rows (shared by the ImportStockDialog preview + the
 // /api/ops/stock/import endpoint).

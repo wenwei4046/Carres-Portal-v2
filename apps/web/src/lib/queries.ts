@@ -25,6 +25,8 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type AppendMissingLinesInput,
+  type AppendMissingLinesResult,
   type StorageFeeImportRow,
   type BalanceImportRow,
   type StockEtaImportResult,
@@ -5562,6 +5564,25 @@ export function useImportStockEta() {
     }) =>
       apiFetch<{ result: StockEtaImportResult }>(
         "/api/operation/orders/import-stock-eta",
+        catalogJson("POST", input),
+      ).then((r) => r.result),
+    onSuccess: (_res, vars) => {
+      if (!vars.dryRun) void qc.invalidateQueries({ queryKey: ["operation"] });
+    },
+  });
+}
+
+// Master reconcile append (Option A, 2026-07-18) — after a Master import, the
+// sheet can carry a line an EXISTING AutoCount order is missing (0214 re-import
+// is create-only). dryRun detects the candidates for the result-screen
+// tick-list; the commit call sends ONLY the ticked rows and appends via the
+// 0237 RPC (raw sku, unit_price 0, items_edited flips).
+export function useAppendMissingLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AppendMissingLinesInput) =>
+      apiFetch<{ result: AppendMissingLinesResult }>(
+        "/api/operation/orders/append-missing-lines",
         catalogJson("POST", input),
       ).then((r) => r.result),
     onSuccess: (_res, vars) => {

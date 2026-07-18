@@ -13,9 +13,15 @@ import {
   type StockEtaImportResult,
   type AutocountImportRow,
   type AutocountImportResponse,
+  type MasterAppendRow,
+  type MissingLineCandidate,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useImportStockEta, useImportOrders } from "@/lib/queries";
+import {
+  useImportStockEta,
+  useImportOrders,
+  useAppendMissingLines,
+} from "@/lib/queries";
 import { Modal } from "./Modal";
 
 /**
@@ -83,9 +89,26 @@ async function readMaster(file: File): Promise<Parsed> {
   };
 }
 
+/** The candidate key the tick-list is stored under (a row is unique enough by
+ *  order + PO + name). */
+const candKey = (c: MissingLineCandidate) => `${c.orderId}|${c.po}|${c.detail}`;
+
+/** Map the parsed order rows to the append-scan shape (the detector ignores
+ *  PO-less rows, so no client-side filtering beyond the parse). */
+function toAppendRows(rows: AutocountImportRow[]): MasterAppendRow[] {
+  return rows.slice(0, 2000).map((r) => ({
+    ref: r.ref,
+    itemGroup: r.itemGroup,
+    qty: r.qty,
+    detail: r.detailDescription,
+    po: r.poDocNo ?? "",
+  }));
+}
+
 export default function ImportStockEtaDialog({ onClose }: { onClose: () => void }) {
   const importOrders = useImportOrders();
   const importEta = useImportStockEta();
+  const appendLines = useAppendMissingLines();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [stage, setStage] = useState<Stage>("pick");
@@ -100,6 +123,11 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
   const [ordersResult, setOrdersResult] = useState<AutocountImportResponse | null>(null);
   const [stockResult, setStockResult] = useState<StockEtaImportResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  // Master reconcile append (Option A): candidates the scan found, the tick
+  // state (defaults follow candidate.clean), and how many lines were appended.
+  const [candidates, setCandidates] = useState<MissingLineCandidate[]>([]);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [appendedCount, setAppendedCount] = useState<number | null>(null);
 
   const busy = importOrders.isPending || importEta.isPending;
 
@@ -152,6 +180,22 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       });
       setStockResult(stk);
       setStage("result");
+      // 3) Reconcile scan (dry): sheet rows whose PO is on NO line of their
+      //    existing order = lines the portal is missing (0214 keeps re-import
+      //    create-only, so this tick-list is the only add path). Fails soft —
+      //    an old Worker without the route just hides the section.
+      if (parsed.orderRows.length > 0) {
+        try {
+          const scan = await appendLines.mutateAsync({
+            rows: toAppendRows(parsed.orderRows),
+            dryRun: true,
+          });
+          setCandidates(scan.candidates);
+          setTicked(new Set(scan.candidates.filter((x) => x.clean).map(candKey)));
+        } catch {
+          setCandidates([]);
+        }
+      }
       toast.success(
         `${ord ? `${ord.created} order(s) created · ` : ""}${stk.written} stock line(s) set${
           stk.storageWritten > 0 ? ` · ${stk.storageWritten} storage fee(s)` : ""
@@ -159,6 +203,30 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       );
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Import failed");
+    }
+  }
+
+  // Commit the ticked candidates. Sends ONLY the ticked rows; the server
+  // re-detects before appending (a line that appeared meanwhile won't dup).
+  async function doAppend() {
+    const rows = candidates
+      .filter((x) => ticked.has(candKey(x)))
+      .map((x) => ({
+        ref: x.ref,
+        itemGroup: x.itemGroup,
+        qty: x.qty,
+        detail: x.detail,
+        po: x.po,
+      }));
+    if (rows.length === 0) return;
+    try {
+      const res = await appendLines.mutateAsync({ rows });
+      setAppendedCount(res.appended);
+      toast.success(
+        `${res.appended} line(s) appended across ${res.orders} order(s)`,
+      );
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Append failed");
     }
   }
 
@@ -353,6 +421,83 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 ))}
               </ul>
             </details>
+          )}
+          {candidates.length > 0 && (
+            <div
+              className="rounded-[4px] border border-base-200 px-3 py-2.5"
+              data-testid="append-missing-section"
+            >
+              <div className="t-small font-semibold text-base-900 mb-1">
+                Sheet has it — portal doesn't ({candidates.length})
+              </div>
+              {appendedCount === null ? (
+                <>
+                  <p className="t-tiny text-base-500 mb-2">
+                    These sheet lines carry a PO that exists on no line of their order.
+                    Ticked = safe to append. Unticked rows: the order also holds a line
+                    the sheet doesn't have (model changed / PO re-raised?) — check before
+                    ticking.
+                  </p>
+                  <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {candidates.map((cand) => {
+                      const key = candKey(cand);
+                      return (
+                        <li key={key} className="t-tiny text-base-700">
+                          <label className="flex items-start gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5"
+                              checked={ticked.has(key)}
+                              data-testid={`append-tick-${cand.so}`}
+                              onChange={(e) => {
+                                setTicked((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(key);
+                                  else next.delete(key);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span className="min-w-0">
+                              <span className="font-mono font-semibold">SO-{cand.so}</span>{" "}
+                              <span className="text-base-900">{cand.detail}</span>{" "}
+                              <span className="text-base-500">
+                                · {cand.qty}× · <span className="font-mono">{cand.po}</span>
+                              </span>
+                              {!cand.clean && cand.portalUnaccounted.length > 0 && (
+                                <span className="block text-amber-700">
+                                  order already has:{" "}
+                                  {cand.portalUnaccounted
+                                    .map((l) => `${l.sku}${l.sourcePo ? ` · ${l.sourcePo}` : " · no PO"}`)
+                                    .join(" / ")}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      className="btn-primary text-[12px] disabled:opacity-40"
+                      disabled={appendLines.isPending || ticked.size === 0}
+                      onClick={() => void doAppend()}
+                      data-testid="append-missing-confirm"
+                    >
+                      {appendLines.isPending
+                        ? "Appending…"
+                        : `Append ${ticked.size} line(s)`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="t-small text-green-700" data-testid="append-missing-done">
+                  {appendedCount} line(s) appended — the orders now match the Master.
+                </p>
+              )}
+            </div>
           )}
           <div className="flex justify-end">
             <button type="button" className="btn-primary text-[12px]" onClick={onClose} data-testid="eta-import-done">
