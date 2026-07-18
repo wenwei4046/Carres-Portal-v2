@@ -1,6 +1,18 @@
-import { useMemo } from "react";
-import { useOperationPoDuty } from "@/lib/queries";
-import { monthKeyMYT, nextPoDayMYT } from "@carres/shared";
+import { useMemo, useState } from "react";
+import { Pencil } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useOperationPoDuty,
+  useOperationStaff,
+  useUpdatePoDuty,
+} from "@/lib/queries";
+import {
+  monthKeyMYT,
+  nextPoDayMYT,
+  isOpsManager,
+  isOpsGenericAccount,
+} from "@carres/shared";
+import { useAuth } from "@/lib/auth";
 import { fmtDateShort } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
@@ -31,11 +43,76 @@ function fmtMonth(month: string): string {
 const VERB_CHIP =
   "text-[11px] leading-4 border border-base-300 rounded-full px-2 py-0.5 text-base-800 bg-white whitespace-nowrap";
 
+/** Inline holder picker (Jess option A, 2026-07-19): the month's name turns
+ *  into a select of plain-staff candidates; picking saves immediately (the
+ *  server stamps assigned_by = the manager). Managers only ever see this. */
+function DutySelect({
+  month,
+  currentUserId,
+  candidates,
+  onDone,
+}: {
+  month: string;
+  currentUserId: string;
+  candidates: { user_id: string; name: string | null; email: string }[];
+  onDone: () => void;
+}) {
+  const mut = useUpdatePoDuty({
+    onSuccess: (r) => {
+      toast.success(`PO duty updated — ${fmtMonth(r.month)}`);
+      onDone();
+    },
+    onError: (e) => {
+      toast.error(`PO duty update failed — ${e.message}`);
+      onDone();
+    },
+  });
+  return (
+    <select
+      autoFocus
+      defaultValue={currentUserId}
+      disabled={mut.isPending}
+      onChange={(e) => {
+        if (e.target.value !== currentUserId)
+          mut.mutate({ month, userId: e.target.value });
+        else onDone();
+      }}
+      onBlur={() => {
+        if (!mut.isPending) onDone();
+      }}
+      className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900"
+      aria-label={`PO duty holder for ${fmtMonth(month)}`}
+    >
+      {candidates.map((s) => (
+        <option key={s.user_id} value={s.user_id}>
+          {personLabel(s.name, s.email)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export default function TeamPanel() {
   const dutyQ = useOperationPoDuty();
   const holder = dutyQ.data?.holder ?? null;
   const currentMonth = dutyQ.data?.month ?? monthKeyMYT();
   const nextUp = (dutyQ.data?.roster ?? []).filter((r) => r.month > currentMonth);
+
+  // Manager-only inline roster edit (Jess option A): hover ✎ on the hero /
+  // click a NEXT UP entry → the name becomes a candidate select; staff never
+  // see the affordance (the API 403s them anyway — two layers, one rule).
+  const authRole = useAuth((s) => s.role);
+  const authEmail = useAuth((s) => s.user?.email ?? null);
+  const isManager = isOpsManager(authRole, authEmail);
+  const staffQ = useOperationStaff({ enabled: isManager });
+  const candidates = useMemo(
+    () =>
+      (staffQ.data?.staff ?? []).filter(
+        (s) => !isOpsManager("operation", s.email) && !isOpsGenericAccount(s.email),
+      ),
+    [staffQ.data],
+  );
+  const [editingMonth, setEditingMonth] = useState<string | null>(null);
 
   // Handover date = the last day of the duty month ("until 31 Jul 26").
   const untilLabel = useMemo(() => {
@@ -78,7 +155,7 @@ export default function TeamPanel() {
   return (
     <div className="flex flex-col" data-testid="team-panel">
       <div className="t-micro text-base-500 mb-1.5">PO DUTY</div>
-      <div className="rounded-lg border border-base-200 bg-base-50 p-3">
+      <div className="group rounded-lg border border-base-200 bg-base-50 p-3">
         <div className="flex items-center gap-2.5">
           <span
             className="relative w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold leading-none shrink-0"
@@ -91,14 +168,34 @@ export default function TeamPanel() {
               aria-hidden
             />
           </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-semibold text-base-900 truncate">
-              {personLabel(holder.name, holder.email)}
+          {editingMonth === currentMonth ? (
+            <DutySelect
+              month={currentMonth}
+              currentUserId={holder.userId}
+              candidates={candidates}
+              onDone={() => setEditingMonth(null)}
+            />
+          ) : (
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-base-900 truncate">
+                {personLabel(holder.name, holder.email)}
+              </span>
+              <span className="block text-[11px] text-base-500">
+                on PO duty · until {untilLabel}
+              </span>
             </span>
-            <span className="block text-[11px] text-base-500">
-              on PO duty · until {untilLabel}
-            </span>
-          </span>
+          )}
+          {isManager && editingMonth !== currentMonth && (
+            <button
+              type="button"
+              onClick={() => setEditingMonth(currentMonth)}
+              title="Change this month's PO duty holder"
+              aria-label="Change this month's PO duty holder"
+              className="ml-auto p-1 rounded text-base-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-base-800 hover:bg-base-100"
+            >
+              <Pencil size={14} strokeWidth={2} />
+            </button>
+          )}
         </div>
         <div className="flex gap-1.5 mt-2">
           <span className={VERB_CHIP} title="Raises every consolidated PO — the one voice to suppliers">
@@ -145,16 +242,46 @@ export default function TeamPanel() {
           <div className="flex items-center gap-1.5 flex-wrap rounded-lg border border-base-200 bg-white px-2.5 h-9 text-[12px] text-base-700">
             {nextUp.map((r, i) => {
               const rc = avatarColor(r.userId);
-              return (
-                <span key={r.month} className="inline-flex items-center gap-1.5">
-                  {i > 0 && <span className="text-base-300">·</span>}
+              if (editingMonth === r.month) {
+                return (
+                  <span key={r.month} className="inline-flex items-center gap-1.5">
+                    {i > 0 && <span className="text-base-300">·</span>}
+                    <span className="text-base-500">{fmtMonth(r.month)} —</span>
+                    <DutySelect
+                      month={r.month}
+                      currentUserId={r.userId}
+                      candidates={candidates}
+                      onDone={() => setEditingMonth(null)}
+                    />
+                  </span>
+                );
+              }
+              const entry = (
+                <>
                   <span
-                    className="w-[15px] h-[15px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+                    className="w-[15px] h-[15px] rounded-full flex items-center justify-center font-bold leading-none shrink-0"
                     style={{ background: rc.bg, color: rc.fg, fontSize: 9 }}
                   >
                     {personInitials(r.name, r.email)}
                   </span>
                   {fmtMonth(r.month)} — {personLabel(r.name, r.email)}
+                </>
+              );
+              return (
+                <span key={r.month} className="inline-flex items-center gap-1.5">
+                  {i > 0 && <span className="text-base-300">·</span>}
+                  {isManager ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditingMonth(r.month)}
+                      title={`Change ${fmtMonth(r.month)}'s PO duty holder`}
+                      className="inline-flex items-center gap-1.5 rounded hover:bg-base-50 px-0.5"
+                    >
+                      {entry}
+                    </button>
+                  ) : (
+                    entry
+                  )}
                 </span>
               );
             })}

@@ -3348,6 +3348,37 @@ export function useOperationPoDuty(
   });
 }
 
+/** Manager override of a month's PO-duty holder (0236, PUT — API 403s
+ *  non-management). Invalidates the duty query so every surface (title chip,
+ *  queue chips, Team board) flips together. */
+export function useUpdatePoDuty(
+  opts?: Partial<
+    UseMutationOptions<
+      { ok: boolean; month: string },
+      ApiError,
+      { userId: string; month?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; month: string },
+    ApiError,
+    { userId: string; month?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ ok: boolean; month: string }>(`/api/operation/po-duty`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.poDuty, exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export function useOperationStaff(
   opts?: Partial<UseQueryOptions<OpsStaffListResponse>>,
 ) {
