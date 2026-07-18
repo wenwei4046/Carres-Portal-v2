@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { updateOrderInputSchema } from "./orders";
+import { addOrderLinesInputSchema, updateOrderInputSchema } from "./orders";
 
 // 0220 — POS proceed-lane edits: customer.email joins the editable set.
 describe("updateOrderInputSchema.customer.email (0220)", () => {
@@ -36,5 +36,41 @@ describe("updateOrderInputSchema.customer.email (0220)", () => {
     const long = `${"a".repeat(315)}@x.com`; // 321 chars
     const res = updateOrderInputSchema.safeParse({ customer: { email: long } });
     expect(res.success).toBe(false);
+  });
+});
+
+// 0231 — add-product P1: sku/qty/attrs only; the server prices from the catalog.
+describe("addOrderLinesInputSchema (0231)", () => {
+  it("parses a minimal line and STRIPS a client-sent unitPrice", () => {
+    const parsed = addOrderLinesInputSchema.parse({
+      lines: [{ sku: "MEMORY-PILLOW", qty: 2, attrs: null, unitPrice: 1 }],
+    });
+    expect(parsed.lines[0]).toEqual({ sku: "MEMORY-PILLOW", qty: 2, attrs: null });
+    expect("unitPrice" in parsed.lines[0]).toBe(false);
+  });
+
+  it("attrs is optional and may carry configurator selections", () => {
+    const parsed = addOrderLinesInputSchema.parse({
+      lines: [{ sku: "SKU-1", qty: 1, attrs: { specials: [{ code: "X" }], specials_total: 20 } }],
+    });
+    expect(parsed.lines[0].attrs).toEqual({ specials: [{ code: "X" }], specials_total: 20 });
+  });
+
+  it("rejects an empty list, >10 lines, qty out of 1..99, and a blank sku", () => {
+    expect(addOrderLinesInputSchema.safeParse({ lines: [] }).success).toBe(false);
+    expect(
+      addOrderLinesInputSchema.safeParse({
+        lines: Array.from({ length: 11 }, (_, i) => ({ sku: `S-${i}`, qty: 1 })),
+      }).success,
+    ).toBe(false);
+    expect(
+      addOrderLinesInputSchema.safeParse({ lines: [{ sku: "S", qty: 0 }] }).success,
+    ).toBe(false);
+    expect(
+      addOrderLinesInputSchema.safeParse({ lines: [{ sku: "S", qty: 100 }] }).success,
+    ).toBe(false);
+    expect(
+      addOrderLinesInputSchema.safeParse({ lines: [{ sku: "  ", qty: 1 }] }).success,
+    ).toBe(false);
   });
 });

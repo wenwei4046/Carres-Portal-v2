@@ -65,6 +65,15 @@ export default function AddAddressModal({ order, onClose }: Props) {
       address: composed,
       billing: billingSame ? null : billing.trim(),
       billingSame,
+      // 0230 — persist the structured parts alongside the composed string so
+      // the POS detail drawer can repopulate its cascading picker.
+      parts: {
+        line1: addressLine1.trim(),
+        ...(addressLine2.trim() ? { line2: addressLine2.trim() } : {}),
+        state: addressState,
+        city: addressCity,
+        postcode: addressPostcode,
+      },
     });
   }
 

@@ -568,6 +568,12 @@ export const orderFromRow = (
     race: r.customer_race ?? null,
     gender: r.customer_gender ?? null,
     birthday: r.customer_birthday ?? null,
+    // 0230 — structured MY address parts (`?? null` for pre-0230 rows).
+    addressLine1: r.customer_address_line1 ?? null,
+    addressLine2: r.customer_address_line2 ?? null,
+    addressState: r.customer_address_state ?? null,
+    addressCity: r.customer_address_city ?? null,
+    addressPostcode: r.customer_address_postcode ?? null,
   },
   delivery: {
     date: r.delivery_date,
@@ -768,6 +774,13 @@ export const orderInputToRpcPayload = (
   customer_phone: input.customer.phone,
   customer_address: input.customer.addressUnknown ? null : input.customer.address,
   customer_address_unknown: input.customer.addressUnknown,
+  // 0230 — structured parts ride with the composed string; an address-unknown
+  // order carries none (the wizard wipes them when "fill in later" is on).
+  customer_address_line1: input.customer.addressUnknown ? null : (input.customer.addressLine1 ?? null),
+  customer_address_line2: input.customer.addressUnknown ? null : (input.customer.addressLine2 ?? null),
+  customer_address_state: input.customer.addressUnknown ? null : (input.customer.addressState ?? null),
+  customer_address_city: input.customer.addressUnknown ? null : (input.customer.addressCity ?? null),
+  customer_address_postcode: input.customer.addressUnknown ? null : (input.customer.addressPostcode ?? null),
   customer_billing: input.customer.billingSame ? null : input.customer.billing,
   customer_billing_same: input.customer.billingSame,
   customer_emergency: input.customer.emergency,

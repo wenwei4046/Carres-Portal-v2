@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   topUpMutateAsync: vi.fn(async () => ({})),
   proceedMutateAsync: vi.fn(async () => ({})),
   unproceedMutateAsync: vi.fn(async () => ({})),
+  addLinesMutateAsync: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -24,6 +25,8 @@ vi.mock("@/lib/queries", () => ({
   useTopUpOrder: () => ({ mutateAsync: h.topUpMutateAsync, isPending: false }),
   useProceedOrder: () => ({ mutateAsync: h.proceedMutateAsync, isPending: false }),
   useUnproceedOrder: () => ({ mutateAsync: h.unproceedMutateAsync, isPending: false }),
+  // 0231 — add-product P1.
+  useAddOrderLines: () => ({ mutateAsync: h.addLinesMutateAsync, isPending: false }),
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",
@@ -202,7 +205,8 @@ describe("proceed lane", () => {
     renderDrawer(proceedOrder());
     expect((screen.getByTestId("pos-od-name") as HTMLInputElement).disabled).toBe(false);
     expect((screen.getByTestId("pos-od-email") as HTMLInputElement).disabled).toBe(false);
-    expect((screen.getByTestId("pos-od-address") as HTMLTextAreaElement).disabled).toBe(false);
+    // 0230 — the address fieldset (cascading picker) stays editable in proceed.
+    expect((screen.getByTestId("pos-od-address-fields") as HTMLFieldSetElement).disabled).toBe(false);
     expect((screen.getByTestId("pos-od-ddate") as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByTestId("pos-od-pdate") as HTMLInputElement).disabled).toBe(true);
     // outstanding 1500 > 0 → the record-payment form shows in the proceed lane.
@@ -257,7 +261,7 @@ describe("delivered lane", () => {
   it("is fully read-only with the delivered info strip", () => {
     renderDrawer(order({ status: "delivered", paid: 3000 }));
     expect((screen.getByTestId("pos-od-name") as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByTestId("pos-od-address") as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByTestId("pos-od-address-fields") as HTMLFieldSetElement).disabled).toBe(true);
     expect((screen.getByTestId("pos-od-ddate") as HTMLInputElement).disabled).toBe(true);
     expect(screen.queryByTestId("pos-od-payform")).toBeNull();
     expect(screen.queryByTestId("pos-od-checklist")).toBeNull();
@@ -288,9 +292,97 @@ describe("record payment", () => {
     );
   });
 
-  it("non-cash requires a slip before Record enables", () => {
+  it("an approval-code method (config-driven) requires a slip before Record enables", () => {
     renderDrawer(order());
-    fireEvent.click(screen.getByTestId("pos-od-method-bank"));
+    // 0230 — chips come from order_entry_config (code defaults here):
+    // online / credit / installment / cash. Credit demands approval code+slip.
+    fireEvent.click(screen.getByTestId("pos-od-method-credit"));
     expect((screen.getByTestId("pos-od-record") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("renders the configured default method chips (no legacy hardcoded list)", () => {
+    renderDrawer(order());
+    for (const key of ["online", "credit", "installment", "cash"]) {
+      expect(screen.getByTestId(`pos-od-method-${key}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("pos-od-method-bank")).toBeNull();
+  });
+});
+
+describe("add product (0231)", () => {
+  it("place lane shows + Add product and opens the catalog overlay", () => {
+    renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-add-product"));
+    expect(screen.getByTestId("pos-add-product-overlay")).toBeTruthy();
+    // The CLOUD mattress card renders from the catalog mock.
+    expect(screen.getByTestId("pos-card-CLOUD")).toBeTruthy();
+  });
+
+  it("proceed and delivered lanes hide the Add product button", () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
+    expect(screen.queryByTestId("pos-od-add-product")).toBeNull();
+  });
+});
+
+describe("structured address (0230)", () => {
+  it("seeds the cascading picker from the stored parts", () => {
+    renderDrawer(
+      order({
+        customer: {
+          ...order().customer,
+          address: "8 Jalan PP50A, Seri Kembangan 43300, Selangor",
+          addressLine1: "8 Jalan PP50A",
+          addressLine2: null,
+          addressState: "Selangor",
+          addressCity: "Seri Kembangan",
+          addressPostcode: "43300",
+        },
+      }),
+    );
+    expect((screen.getByLabelText("Address Line 1 *") as HTMLInputElement).value).toBe(
+      "8 Jalan PP50A",
+    );
+    expect((screen.getByLabelText("State *") as HTMLSelectElement).value).toBe("Selangor");
+    expect((screen.getByLabelText("City / Town *") as HTMLSelectElement).value).toBe(
+      "Seri Kembangan",
+    );
+    expect((screen.getByLabelText("Postcode *") as HTMLSelectElement).value).toBe("43300");
+  });
+
+  it("legacy composed-only order seeds Line 1, stays 'Set' untouched; completing the cascade saves composed + parts", async () => {
+    renderDrawer(order()); // address "12 Jalan Test, KL", no parts
+    const line1 = screen.getByLabelText("Address Line 1 *") as HTMLInputElement;
+    expect(line1.value).toBe("12 Jalan Test, KL");
+    // Untouched legacy address still counts as Set → proceed stays enabled.
+    expect((screen.getByTestId("pos-od-proceed") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.change(line1, { target: { value: "8 Jalan PP50A" } });
+    fireEvent.change(screen.getByLabelText("State *"), { target: { value: "Selangor" } });
+    fireEvent.change(screen.getByLabelText("City / Town *"), {
+      target: { value: "Seri Kembangan" },
+    });
+    fireEvent.change(screen.getByLabelText("Postcode *"), { target: { value: "43300" } });
+    fireEvent.click(screen.getByTestId("pos-od-save"));
+    await waitFor(() =>
+      expect(h.updateMutateAsync).toHaveBeenCalledWith({
+        customer: {
+          address: "8 Jalan PP50A, Seri Kembangan 43300, Selangor",
+          addressLine1: "8 Jalan PP50A",
+          addressLine2: null,
+          addressState: "Selangor",
+          addressCity: "Seri Kembangan",
+          addressPostcode: "43300",
+        },
+      }),
+    );
+  });
+
+  it("a PARTIAL cascade blocks both Save and Move to Proceed", () => {
+    renderDrawer(order());
+    fireEvent.change(screen.getByLabelText("State *"), { target: { value: "Selangor" } });
+    // Dirty but incomplete → the address never enters the payload (Save has
+    // nothing to send) and the checklist address chip fails.
+    expect((screen.getByTestId("pos-od-save") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("pos-od-proceed") as HTMLButtonElement).disabled).toBe(true);
   });
 });
