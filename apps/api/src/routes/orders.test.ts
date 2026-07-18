@@ -2310,6 +2310,189 @@ describe("POST /api/orders/:id/top-up", () => {
   });
 });
 
+// =============================================================================
+// POST /api/orders/:id/lines — add-product P1 (0231): append server-priced
+// lines to a Place-lane order. The mock's generic `.in()` slot doubles as the
+// product_skus fetch; recompute helpers short-circuit (no specials/options).
+// =============================================================================
+
+const addLinesUrl = `http://t/api/orders/${PROCEED_ID}/lines`;
+
+function addSkuRow(over: Record<string, unknown> = {}) {
+  return { sku: "SKU-ADD-1", price: 250, pos_active: true, discontinued_at: null, ...over };
+}
+
+describe("POST /api/orders/:id/lines", () => {
+  it("200 — prices from the FRESH catalog (client price ignored) and calls add_order_lines", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // The client-sent unitPrice is an unknown key — zod strips it; the
+        // server prices from product_skus.price (250), never this 1.
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 2, attrs: null, unitPrice: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("add_order_lines");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_source).toBe("direct");
+    expect(args.p_change_request_id).toBeNull();
+    const lines = args.p_lines as Array<Record<string, unknown>>;
+    expect(lines).toHaveLength(1);
+    expect(lines[0].sku).toBe("SKU-ADD-1");
+    expect(lines[0].qty).toBe(2);
+    expect(lines[0].unit_price).toBe(250);
+  });
+
+  it("409 sofa_build_add_not_supported when a line carries attrs.sofa_build (P2 turf)", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "SOFA-1", qty: 1, attrs: { sofa_build: { cells: [] } } }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("sofa_build_add_not_supported");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("400 when a line carries a server-exclusive promo/free marker", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    for (const attrs of [{ pwp: { ruleId: "r" } }, { free_gift: true }, { free_item: true }]) {
+      const res = await app.fetch(
+        new Request(addLinesUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1, attrs }] }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(400);
+    }
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 unknown_or_inactive_sku when the sku is missing from the catalog", async () => {
+    const sb = buildSbForProceed({
+      productSkuCategoryRows: [] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "GONE-SKU", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("unknown_or_inactive_sku");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 unknown_or_inactive_sku when the sku is pos_active=false", async () => {
+    const sb = buildSbForProceed({
+      productSkuCategoryRows: [addSkuRow({ pos_active: false })] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 passthrough of the RPC's mixed_category_lines / wrong_status details", async () => {
+    const sb = buildSbForProceed({
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+      rpcError: {
+        code: "22023",
+        message: "sofa cannot mix with mattress or bedframe in the same order",
+        details: "mixed_category_lines",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("mixed_category_lines");
+    expect(body.error).toBe("add_lines_blocked");
+  });
+
+  it("400 on invalid body (empty lines)", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("401 without Authorization header", async () => {
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "S", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("POST /api/orders/:id/address", () => {
   it("200 — calls set_order_address RPC", async () => {
     const sb = buildSbForProceed({

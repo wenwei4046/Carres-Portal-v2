@@ -444,6 +444,26 @@ export const topUpOrderInputSchema = z.object({
 });
 export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
 
+/** 0231 — Add-product P1 (design 2026-07-18): append products to a PLACE-lane
+ *  order. NO client price — the route prices from the FRESH catalog (server
+ *  authority, Loo default #2) and re-runs the special-addon + option-pick
+ *  trust gates. `attrs` carries the configurator selections (size / fabric /
+ *  specials / options with their client preview totals). Sofa BUILDS and
+ *  promo/free markers are rejected by the route until P2. */
+export const addOrderLinesInputSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        sku: z.string().trim().min(1),
+        qty: z.number().int().min(1).max(99),
+        attrs: z.record(z.unknown()).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+export type AddOrderLinesInput = z.infer<typeof addOrderLinesInputSchema>;
+
 export const setOrderAddressInputSchema = z.object({
   /** Composed address string the wizard would have written. The RPC stores
    *  it as-is; the `MYAddressFields` cascade is unmounted on submit. */

@@ -10,6 +10,7 @@ import {
   Info,
   PackageCheck,
   Paperclip,
+  Plus,
   QrCode,
   Save,
   X,
@@ -30,6 +31,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
 import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
 import {
+  useAddOrderLines,
   useCatalog,
   useOrder,
   useProceedOrder,
@@ -39,6 +41,8 @@ import {
 } from "@/lib/queries";
 import { groupSofaBuildLines } from "@/lib/sofa-build-display";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
+import type { DraftLine } from "../new-order/draft";
+import AddProductOverlay from "./AddProductOverlay";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
 import StripeCollectModal from "./StripeCollectModal";
 
@@ -119,6 +123,22 @@ function proceedErrorCopy(e: unknown): string {
   const code = errCode(e);
   if (code && isProceedBlockerCode(code)) return PROCEED_BLOCKER_LABEL[code];
   return e instanceof Error ? e.message : "Request failed.";
+}
+
+/** 0231 — add-product failure copy, keyed on the route/RPC error codes. */
+function addErrorCopy(e: unknown): string {
+  const code = errCode(e);
+  if (code === "mixed_category_lines")
+    return "Sofa can't mix with mattress / bed frame in one order.";
+  if (code === "wrong_status")
+    return "Products can only be added while the order is in Order placed.";
+  if (code === "unknown_or_inactive_sku")
+    return "This product is no longer available — refresh and retry.";
+  if (code === "sofa_build_add_not_supported")
+    return "Sofa builds can't be added to an existing order yet — place a new order.";
+  if (code === "special_price_drift" || code === "options_price_drift")
+    return "Prices changed since this screen loaded — reopen the product and reconfigure.";
+  return e instanceof Error ? e.message : "Could not add the product.";
 }
 
 function unproceedErrorCopy(e: unknown): string {
@@ -223,6 +243,25 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const topUpMut = useTopUpOrder(id);
   const proceedMut = useProceedOrder();
   const unproceedMut = useUnproceedOrder(id);
+  // 0231 — add-product P1 (place lane only; server prices from the catalog).
+  const addLinesMut = useAddOrderLines(id);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addErr, setAddErr] = useState<string | null>(null);
+
+  async function handleAddProduct(line: DraftLine) {
+    setAddErr(null);
+    try {
+      // Only sku/qty/attrs go up — the client preview price stays local
+      // (server catalog authority; the attrs preview totals feed the trust
+      // gates exactly like create).
+      await addLinesMut.mutateAsync({
+        lines: [{ sku: line.sku, qty: line.qty, attrs: line.attrs ?? null }],
+      });
+      setAddOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
 
   // Escape closes; body scroll locked while open (2990s parity).
   useEffect(() => {
@@ -666,6 +705,24 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 {rm(total)}
               </span>
             </div>
+            {/* 0231 — add-product P1: place lane only; the proceed lane gets
+                the P3 submission flow instead. */}
+            {scope.canAddProduct && (
+              <div className="os-detail__cta" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setAddErr(null);
+                    setAddOpen(true);
+                  }}
+                  data-testid="pos-od-add-product"
+                >
+                  <Plus size={16} />
+                  Add product
+                </button>
+              </div>
+            )}
           </section>
 
           {/* Customer */}
@@ -1049,6 +1106,17 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             customerName={order.customer.name}
             customerPhone={order.customer.phone ?? null}
             onClose={() => setStripeOpen(false)}
+          />
+        )}
+
+        {addOpen && catalog && (
+          <AddProductOverlay
+            order={order}
+            catalog={catalog}
+            busy={addLinesMut.isPending}
+            error={addErr}
+            onPick={handleAddProduct}
+            onClose={() => setAddOpen(false)}
           />
         )}
       </aside>

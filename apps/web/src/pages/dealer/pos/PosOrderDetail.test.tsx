@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   topUpMutateAsync: vi.fn(async () => ({})),
   proceedMutateAsync: vi.fn(async () => ({})),
   unproceedMutateAsync: vi.fn(async () => ({})),
+  addLinesMutateAsync: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -24,6 +25,8 @@ vi.mock("@/lib/queries", () => ({
   useTopUpOrder: () => ({ mutateAsync: h.topUpMutateAsync, isPending: false }),
   useProceedOrder: () => ({ mutateAsync: h.proceedMutateAsync, isPending: false }),
   useUnproceedOrder: () => ({ mutateAsync: h.unproceedMutateAsync, isPending: false }),
+  // 0231 — add-product P1.
+  useAddOrderLines: () => ({ mutateAsync: h.addLinesMutateAsync, isPending: false }),
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",
@@ -303,6 +306,21 @@ describe("record payment", () => {
       expect(screen.getByTestId(`pos-od-method-${key}`)).toBeTruthy();
     }
     expect(screen.queryByTestId("pos-od-method-bank")).toBeNull();
+  });
+});
+
+describe("add product (0231)", () => {
+  it("place lane shows + Add product and opens the catalog overlay", () => {
+    renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-add-product"));
+    expect(screen.getByTestId("pos-add-product-overlay")).toBeTruthy();
+    // The CLOUD mattress card renders from the catalog mock.
+    expect(screen.getByTestId("pos-card-CLOUD")).toBeTruthy();
+  });
+
+  it("proceed and delivered lanes hide the Add product button", () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
+    expect(screen.queryByTestId("pos-od-add-product")).toBeNull();
   });
 });
 
