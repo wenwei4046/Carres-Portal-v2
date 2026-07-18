@@ -118,7 +118,12 @@ export default function GenerateInvoiceOverlay({
       : [
           {
             sku: `SO-${so}`,
-            description: "Goods total (as keyed)",
+            // International style: the item names ride the DESCRIPTION of the
+            // one priced line (an invoice line always carries money); the
+            // per-piece breakdown belongs to the DO.
+            description: merged.length
+              ? merged.map((m) => `${m.sku} ×${m.qty}`).join("; ")
+              : "Goods total (as keyed)",
             qty: 1,
             unit: "lot",
             unit_price: +orderTotal.toFixed(2),

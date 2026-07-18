@@ -3,7 +3,6 @@ import {
   type MutableRefObject,
   Fragment,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -1153,9 +1152,6 @@ function DrawerBody({
   const [addingPayment, setAddingPayment] = useState(false);
   // §10 Generate invoice — the full-screen charges + live-preview overlay.
   const [invoiceOverlayOpen, setInvoiceOverlayOpen] = useState(false);
-  // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
-  // Outstanding-only state carries no Total row, so ⋮ is the way back in).
-  const balanceEditTotalRef = useRef<(() => void) | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
@@ -3151,17 +3147,8 @@ function DrawerBody({
                       toast.success("Outstanding copied");
                     },
                   },
-                  // Keyed totals only — a line-priced (native) total is summed
-                  // from the items and can't be hand-edited.
-                  ...(!hasLineTotal
-                    ? [
-                        {
-                          label: "Edit total",
-                          icon: <Pencil size={14} />,
-                          onClick: () => balanceEditTotalRef.current?.(),
-                        },
-                      ]
-                    : []),
+                  // (fix #3) "Edit total" dropped — the inline Goods box is
+                  // THE one entry point for the keyed total.
                 ]}
               />
             }
@@ -3240,7 +3227,8 @@ function DrawerBody({
                   copyChase("customer", deliveryEveLabel ? "final" : "reminder")
                 }
                 lastChasedAt={form.control?.last_chased_at ?? null}
-                startEditTotalRef={balanceEditTotalRef}
+                onShowItems={() => setTab("items")}
+                onGenerateInvoice={() => setInvoiceOverlayOpen(true)}
               />
             </div>
           </Panel>
@@ -4622,7 +4610,6 @@ function ChargeRow({
  */
 function MoneyCard({
   orderId,
-  so,
   form,
   hasLineTotal,
   orderTotal,
@@ -4639,7 +4626,8 @@ function MoneyCard({
   deliveryEve,
   onRemind,
   lastChasedAt,
-  startEditTotalRef,
+  onShowItems,
+  onGenerateInvoice,
 }: {
   orderId: string;
   so: number;
@@ -4670,8 +4658,10 @@ function MoneyCard({
   onRemind: () => void;
   /** Shared chase log — the same last_chased_at every chase button stamps. */
   lastChasedAt: string | null;
-  /** Lets the panel ⋮ re-open the keyed-total entry. */
-  startEditTotalRef?: MutableRefObject<(() => void) | null>;
+  /** Jump to the Items tab (the imported-order "N items" link). */
+  onShowItems: () => void;
+  /** Open the §10 Generate-invoice overlay (the ONE invoice path). */
+  onGenerateInvoice: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
@@ -4684,7 +4674,6 @@ function MoneyCard({
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
   });
-  if (startEditTotalRef) startEditTotalRef.current = () => setEditingTotal(true);
 
   // CHARGES — merge same-SKU lines; per-line amounts only exist on a
   // line-priced (native) order. "<model> · <size> ×<qty>".
@@ -4712,7 +4701,15 @@ function MoneyCard({
         min={0}
         step="0.01"
         autoFocus={editingTotal}
-        value={form.draft.balance}
+        // Unset shows an EMPTY box — a resting "0" here reads as "total =
+        // RM 0"; the raw draft only appears while actually editing.
+        value={
+          editingTotal
+            ? form.draft.balance
+            : Number(form.draft.balance || 0) > 0
+              ? form.draft.balance
+              : ""
+        }
         onChange={(e) => form.set("balance", e.target.value)}
         onFocus={() => setEditingTotal(true)}
         onBlur={() => setEditingTotal(false)}
@@ -4748,30 +4745,39 @@ function MoneyCard({
       <div className="min-w-0">
         <div className="t4-label mb-1">Charges</div>
         <div className="rounded-[8px] border border-base-200/70 bg-white px-3 divide-y divide-base-100">
-          {merged.map((m, i) => (
-            <ChargeRow
-              key={m.sku}
-              num={i + 1}
-              label={m.sku}
-              sub={`${sizeWord(m.sku) ? `· ${sizeWord(m.sku)} ` : ""}×${m.qty}`}
-              amount={
-                hasLineTotal ? (
+          {/* International rule (option A, 2026-07-18): an invoice line always
+              carries money. Native orders list their priced item rows; an
+              IMPORTED order (no per-line prices) collapses goods into ONE
+              keyed line — the item detail lives in the Items tab + on the DO,
+              never as amount-less invoice rows. */}
+          {hasLineTotal ? (
+            merged.map((m, i) => (
+              <ChargeRow
+                key={m.sku}
+                num={i + 1}
+                label={m.sku}
+                sub={`${sizeWord(m.sku) ? `· ${sizeWord(m.sku)} ` : ""}×${m.qty}`}
+                amount={
                   <Money value={m.amount} tone="row" className="text-base-900" />
-                ) : (
-                  <span
-                    className="text-[12px] text-base-300"
-                    title="Imported order — no per-line prices; the keyed goods total below carries the amount"
-                  >
-                    —
-                  </span>
-                )
-              }
-            />
-          ))}
-          {/* Imported orders carry ONE keyed goods figure instead of line
-              prices — settable INLINE right here (no modal). */}
-          {!hasLineTotal && (
-            <ChargeRow label="Goods total" sub="· keyed" amount={keyedTotalNode} />
+                }
+              />
+            ))
+          ) : (
+            <div className="flex items-center justify-between gap-3 py-1.5">
+              <span className="min-w-0 truncate text-[13px] text-base-800">
+                Goods
+                <button
+                  type="button"
+                  onClick={onShowItems}
+                  title="See every item in the Items tab"
+                  className="text-base-400 hover:text-info hover:underline"
+                >
+                  {" "}
+                  · {merged.length} item{merged.length === 1 ? "" : "s"}
+                </button>
+              </span>
+              <span className="shrink-0 text-right">{keyedTotalNode}</span>
+            </div>
           )}
           {/* The storage FEE flows in as a charge (no number); the Storage tab
               owns the detail (STATUS-STANDARD §7.5 rule). */}
@@ -4928,7 +4934,9 @@ function MoneyCard({
             Receipt · Remind (WhatsApp green outline; final tone on
             delivery-eve, hot fill past collect-by). */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Btn icon={FileText} onClick={() => void openInvoicePdf(orderId, so)}>
+          {/* ONE invoice path (fix #4): both this button and the panel ⋮ open
+              the §10 overlay — the old direct-PDF route 422'd pre-dispatch. */}
+          <Btn icon={FileText} onClick={onGenerateInvoice}>
             Invoice
           </Btn>
           <Btn
