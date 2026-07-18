@@ -1320,9 +1320,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const all = data?.orders ?? [];
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const mine = open.filter((o) => ownerOf(o) === userId);
+    // Presence never gates assignment (Jess round-2) — away is the only out.
     const others = poolStaff.filter(
-      (s) =>
-        s.available && seenTodayMYT(s.last_seen_at) && s.user_id !== userId,
+      (s) => s.available && s.user_id !== userId,
     );
     if (mine.length === 0 || others.length === 0) {
       toast.error(
@@ -1989,9 +1989,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       active={staffFilter === s.user_id}
                       title={
                         !s.available
-                          ? `${s.email} — marked away (MC/leave); new orders skip them`
+                          ? `${s.email} — marked away (MC/leave); their orders shift to the others`
                           : !seenTodayMYT(s.last_seen_at)
-                            ? `${s.email} — hasn't opened the portal today; new orders skip them until they do`
+                            ? `${s.email} — hasn't opened the portal today (info only; their share is already assigned)`
                             : s.email
                       }
                       onClick={() =>
@@ -2010,19 +2010,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
                     }
                   />
-                  {/* Why-nothing-happened explainer (Jess go-live feedback):
-                      pool has members but NOBODY has opened the portal today →
-                      the sweep is waiting, say so instead of sitting silent. */}
-                  {staffEntries.none > 0 &&
-                    poolStaff.length > 0 &&
-                    !poolStaff.some(
-                      (s) => s.available && seenTodayMYT(s.last_seen_at),
-                    ) && (
-                      <div className="px-2.5 py-1 text-[11px] leading-snug text-base-400">
-                        Orders hand out automatically when a staff opens the
-                        portal today.
-                      </div>
-                    )}
+                  {/* (Round-2: the "waits for login" explainer died with the
+                      presence gate — assignment is immediate on Add now.) */}
                 </KanbanGroup>
               )}
 
@@ -2614,8 +2603,26 @@ function TeamPopover({
   // viewport off the button rect instead.
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const qc = useQueryClient();
   const mut = useUpdateStaffSetting({
     onError: (e) => toast.error(`Team update failed — ${e.message}`),
+    // Any pool change re-splits IMMEDIATELY (Jess round-2: never wait for a
+    // login) — Add Li Ching tonight, she owns her share tonight.
+    onSuccess: () => {
+      void apiFetch<{ assigned: number }>(`/api/operation/staff/auto-assign`, {
+        method: "POST",
+      })
+        .then((r) => {
+          if (r.assigned > 0)
+            toast.success(
+              `Re-split ${r.assigned} order${r.assigned === 1 ? "" : "s"}`,
+            );
+        })
+        .catch(() => {})
+        .finally(() => {
+          void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+        });
+    },
   });
   useEffect(() => {
     if (!open) return;
