@@ -57,7 +57,9 @@ export default function StaffGate({ children }: { children: ReactNode }) {
     return <SalespersonGate>{children}</SalespersonGate>;
   }
 
-  return <DealerShowroomGate role={role}>{children}</DealerShowroomGate>;
+  // Mounted only while there is NO staff session — every branch it renders
+  // (wizard / outlet picker / PIN) replaces the app, so it takes no children.
+  return <DealerShowroomGate />;
 }
 
 /** Salesperson logins mint their own token from the linked staff row. */
@@ -104,13 +106,7 @@ function SalespersonGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function DealerShowroomGate({
-  role,
-  children,
-}: {
-  role: "dealer" | "showroom";
-  children: ReactNode;
-}) {
+function DealerShowroomGate() {
   const navigate = useNavigate();
   const authDealerId = useAuth((s) => s.dealerId);
   const userEmail = useAuth((s) => s.user?.email ?? "");

@@ -51,7 +51,6 @@ export default function PinScreen({
     return (
       <StaffKeypad
         staff={picked}
-        dealerId={dealerId}
         onBack={() => setPicked(null)}
         onVerified={(token, s) =>
           setSession(
@@ -121,13 +120,11 @@ export default function PinScreen({
 
 function StaffKeypad({
   staff,
-  dealerId,
   onBack,
   onVerified,
   onForgotPin,
 }: {
   staff: StaffDto;
-  dealerId: string | null;
   onBack: () => void;
   onVerified: (token: string, staff: StaffDto | null) => void;
   onForgotPin: () => void;
