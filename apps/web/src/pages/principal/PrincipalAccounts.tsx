@@ -1,12 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   usePrincipalAccounts,
   useCreateAccount,
+  useCreateStaff,
+  usePrincipalDealers,
   useSetAccountStatus,
   useResetAccountPassword,
+  useStaffList,
   type AccountRow,
   type AppRole,
 } from "@/lib/queries";
+import { ApiError } from "@/lib/api";
 import type { CreatableAppRole, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -485,6 +490,38 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     onSuccess: () => onClose(),
   });
 
+  // 2026-07-18 (Loo) — "existing organisation" mode: pick a store that already
+  // exists and ONLY add a staff identity (Manager / Sales Person / Dealer
+  // Principal) + PIN to it — no login, no re-entering address/SSM/contact.
+  // Rides the principal staff-create endpoint (?dealerId=), zero new API.
+  const [orgMode, setOrgMode] = useState<"new" | "existing">("new");
+  const [existingDealerId, setExistingDealerIdRaw] = useState("");
+  const existingMode = dealerLike && orgMode === "existing";
+  const dealersQ = usePrincipalDealers({}, { enabled: existingMode });
+  const existingStaffQ = useStaffList(existingDealerId || undefined, {
+    enabled: existingMode && !!existingDealerId,
+  });
+  // The picked store's kind comes from the server (the dealers list carries no
+  // channel); until it resolves, fall back to the clicked role tile.
+  const staffKind: "dealer" | "showroom" = existingMode
+    ? (existingStaffQ.data?.storeKind ?? (draft.role === "showroom" ? "showroom" : "dealer"))
+    : draft.role === "showroom"
+      ? "showroom"
+      : "dealer";
+  const createStaff = useCreateStaff();
+
+  function setExistingDealerId(id: string) {
+    setExistingDealerIdRaw(id);
+    if (errors.existingDealer) setErrors((e) => ({ ...e, existingDealer: "" }));
+  }
+
+  // A showroom pick can invalidate a previously chosen principal tier.
+  useEffect(() => {
+    if (staffKind === "showroom" && draft.staffRole === "principal") {
+      setDraft((d) => ({ ...d, staffRole: "manager" }));
+    }
+  }, [staffKind, draft.staffRole]);
+
   function set<K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) {
     setDraft((d) => {
       const next = { ...d, [k]: v };
@@ -515,6 +552,15 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
 
   function validate() {
     const e: Record<string, string> = {};
+    // Existing-organisation mode: only the store pick + staff identity matter.
+    if (existingMode) {
+      if (!existingDealerId) e.existingDealer = "Pick a store";
+      if (!draft.staffName.trim()) e.staffName = "Required";
+      if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
+      else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    }
     if (!draft.name.trim()) e.name = "Required";
     if (!draft.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) e.email = "Invalid email";
@@ -544,6 +590,25 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
 
   function submit() {
     if (!validate()) return;
+    if (existingMode) {
+      createStaff.mutate(
+        {
+          dealerId: existingDealerId,
+          name: draft.staffName.trim(),
+          staffRole: draft.staffRole,
+          pin: draft.staffPin,
+        },
+        {
+          onSuccess: (s) => {
+            toast.success(`Staff added · ${s.name}`);
+            onClose();
+          },
+          onError: (err) =>
+            toast.error(err instanceof ApiError ? err.message : "Could not add staff"),
+        },
+      );
+      return;
+    }
     // Dealer address: flatten the 5 structured fields into the single string
     // dealers.address stores (mirrors how composeAddress is used for the SO
     // customer_address path).
@@ -637,25 +702,85 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Full name" error={errors.name}>
-              <Input value={draft.name} onChange={(v) => set("name", v)} placeholder="e.g. Lily Ong" />
-            </Field>
-            <Field label="Email address" error={errors.email}>
-              <Input
-                type="email"
-                value={draft.email}
-                onChange={(v) => set("email", v)}
-                placeholder="name@company.com"
-              />
-            </Field>
-          </div>
+          {/* 2026-07-18 (Loo) — dealer/showroom can either open a NEW store or
+              pick an EXISTING one and only add staff (no address/SSM re-entry,
+              no new login). */}
+          {dealerLike && (
+            <div className="flex gap-2">
+              {(["new", "existing"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setOrgMode(m)}
+                  data-testid={`acct-orgmode-${m}`}
+                  className={`px-3 py-2 rounded border-[1.5px] text-[12px] font-semibold cursor-pointer transition-colors ${
+                    orgMode === m
+                      ? "border-base-900 bg-base-900 text-white"
+                      : "border-base-200 bg-white text-base-600 hover:bg-base-50"
+                  }`}
+                >
+                  {m === "new" ? "New organisation" : "Existing organisation · add staff only"}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <Field label="Job title" hint="Optional · shown in audit log + sidebar profile">
-            <Input value={draft.title} onChange={(v) => set("title", v)} placeholder="e.g. Owner, Warehouse Manager" />
-          </Field>
+          {existingMode && (
+            <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+                Existing organisation
+              </div>
+              <Field
+                label="Store"
+                hint="Company / SSM / address stay untouched — you're only adding a staff identity + PIN"
+                error={errors.existingDealer}
+              >
+                <select
+                  value={existingDealerId}
+                  onChange={(e) => setExistingDealerId(e.target.value)}
+                  data-testid="acct-existing-store"
+                  className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                >
+                  <option value="">— pick a store —</option>
+                  {(dealersQ.data?.dealers ?? []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {existingDealerId && existingStaffQ.data && (
+                <div className="text-[11px] text-base-500">
+                  {existingStaffQ.data.storeKind === "showroom" ? "Showroom" : "Dealer"} ·{" "}
+                  {existingStaffQ.data.staff.filter((s) => s.active).length} existing staff
+                </div>
+              )}
+            </div>
+          )}
 
-          {needsOrg && (
+          {!existingMode && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Full name" error={errors.name}>
+                  <Input value={draft.name} onChange={(v) => set("name", v)} placeholder="e.g. Lily Ong" />
+                </Field>
+                <Field label="Email address" error={errors.email}>
+                  <Input
+                    type="email"
+                    value={draft.email}
+                    onChange={(v) => set("email", v)}
+                    placeholder="name@company.com"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Job title" hint="Optional · shown in audit log + sidebar profile">
+                <Input value={draft.title} onChange={(v) => set("title", v)} placeholder="e.g. Owner, Warehouse Manager" />
+              </Field>
+            </>
+          )}
+
+          {needsOrg && !existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
                 New{" "}
@@ -760,7 +885,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           {dealerLike && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-                First staff · PIN sign-in
+                {existingMode ? "New staff · PIN sign-in" : "First staff · PIN sign-in"}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Staff name" error={errors.staffName}>
@@ -777,11 +902,11 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                     className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
                     data-testid="acct-staff-tier"
                   >
-                    {(draft.role === "showroom"
+                    {(staffKind === "showroom"
                       ? (["manager", "salesperson"] as StaffTierDto[])
                       : (["principal", "manager", "salesperson"] as StaffTierDto[])
                     ).map((t) => {
-                      const l = tierLabel(t, draft.role === "showroom" ? "showroom" : "dealer");
+                      const l = tierLabel(t, staffKind);
                       return (
                         <option key={t} value={t}>
                           {l.en} · {l.zh}
@@ -821,6 +946,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {!existingMode && (
           <Field label="Temporary password" hint="Give this to the user directly. They can change it after first login.">
             <div className="flex items-center gap-2 px-3 py-2 bg-base-50 border border-base-200 rounded">
               <code className="flex-1 font-mono text-[13px] text-base-900 tracking-[0.05em]">
@@ -838,8 +964,9 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
               <div className="text-[11px] text-primary mt-1">{errors.tempPassword}</div>
             )}
           </Field>
+          )}
 
-          {create.isError && (
+          {!existingMode && create.isError && (
             <div className="text-[12px] text-primary">
               {create.error?.message ?? "Account creation failed"}
             </div>
@@ -849,17 +976,23 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-4 border-t border-base-100 bg-base-50 flex justify-end gap-2">
           <button
             onClick={onClose}
-            disabled={create.isPending}
+            disabled={create.isPending || createStaff.isPending}
             className="px-4 py-[9px] text-[13px] font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={submit}
-            disabled={create.isPending}
+            disabled={create.isPending || createStaff.isPending}
             className="px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
           >
-            {create.isPending ? "Creating…" : "Create account"}
+            {existingMode
+              ? createStaff.isPending
+                ? "Adding…"
+                : "Add staff"
+              : create.isPending
+                ? "Creating…"
+                : "Create account"}
           </button>
         </div>
       </div>
