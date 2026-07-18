@@ -96,6 +96,8 @@ From–End 同一行;费用 roll 进 Balance 当一条 charge line。
 ## 12. Delivery/物流(LOCKED — 调货引擎另开专门 chat;tab 定稿 rev21 2026-07-18)
 **Delivery tab chip 真相阶梯(1A,Jess)**:Delivered ✓绿 › on hold红(balance/storage hold 第一次上 Delivery 面)› overdue红(过 deadline 未送)› booked <date>绿(logistic_eta)› not booked琥珀(有 carrier 没约,93% 常态,不准报忧)› no carrier灰。已送达永不告警(guardrail #2:chip+chase 行都闭嘴)。
 **保存模型(2A)**:Delivery tab 全字段改了就存(sparse save + Saved toast),像 Excel cell;顶部 Save bar 与本 tab 无关。Time slot 字段撤下(0/162 死田,数据模型保留)。
+**步骤布局(rev22,Jess 选 A)**:panel = 工作单三段 band `1 ARRANGE(Logistic·Deadline)› 2 BOOK(Logistic ETA·Customer confirmed·催人闹钟小字)› 3 NOTES(Customer request)`,band 用 Items 组头同语言;全部行统一 FieldRow 长相(蓝告警条/灰假按钮死);表单限宽 560px;右侧空出宽度放一句状态话(chip 同词阶梯,如 "Overdue 9d — Chase NETS by 6 Jul to book the customer")。Customer confirmed = operation 在 partner 跟客人约好后手动打勾,纯记录。
+**工具教训(rev22)**:根 tsconfig 是 references-only,`npx tsc --noEmit` 在 apps/web 是橡皮图章——真闸门 = `tsc -p tsconfig.app.json`(或 `tsc -b`);rev22 起体检用真闸门。
 **Multi-leg(3A)**:入口收进 ⋮ "Multi-leg route…";有 delivery_stops 时区块自动显示;DeliveryChain 组件重刷等调货引擎 chat。
 Sites:Carres 仓(Aman Perdana Klang,default 收货)·NETS(仓+物流,~97%,来 Klang 收再送)·AL(Sungai Buloh)·HOUZS(Balakong)·NF(Nice Future 床垫供应商)。
 地区:Klang Valley 首选 NETS 备 HOUZS/AL;外坡/东海岸 首选 AL 备 HOUZS。
