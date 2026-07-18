@@ -36,13 +36,14 @@ Header 裸条(无卡框无搜索):‹ Orders · #1101(mono 面包屑,黑 badge �
 左栏 260px 固定(可折叠56):顶 Customer 块常驻(头像+名粗 Title Case+黑#1101 badge+状态pill+电话/WhatsApp+区域;收起紧凑,点开看全址;铅笔内联编辑)。下 tab 栏:Items(默认)·Delivery·Balance·Storage·Loan·Activity(icon16+label13+右状态点/计数;active/hover 蓝#DBEAFE/#1E40AF;40px)。数量用计数、告警用红点。
 右栏 flex:顶 3 KPI grid Balance1fr·Stock1.8fr·Delivery1fr 等高(中性灰分类图标+label+右 headline 值)。KPI/阶段点击→跳 tab。下 = tab 内容:表单/文字类内容 max~1000 左对齐(别字段甩两端);数据表(Items/Warehouse)用全宽 + 正式分列。
 
-## 7. KPI 三 track(⭐ 2026-07-18 改版决定 — A2 已拍板,未实现,下个 chat 动工)
-**KPI 三个 box → 三条全宽 progress line(A2 节点+阶段词式)**:
-- 每 track 一条长 bar 摊满右栏宽:label + 编号节点线(done=灰实心✓·当前=状态色圈带编号/红clock·pending=灰空圈带编号)+ 节点下阶段词 + 右侧 headline 值。
-- 每条 bar 带**短 summary**:Balance = Outstanding(**storage 在 accruing 时并入显示**,如 "RM 1,749 + RM150 storage");Stock = N/M ready + **MS/BF/SOF 小 badge**(每类 ready 状况,如 [MS 0/8][BF 0/4][ACC ✓]);Delivery = deadline + partner。
-- Reminder/Chase 从 KPI 卡移除 → **Chase Now 面板**(左栏 260px,Customer 块下、tab 栏上,是面板不是 tab):逐行=追谁(supplier PO/logistic/customer)+ 红点overdue/琥珀attention + Manage▾(Remind/Chase,B2 式,与 Items 列 Manage▾ 同语言);逾期排顶;全空显 "Nothing to chase ✓";customer 行只在 owing 时出现。
-- Stock 的 category 明细行从 KPI 卡撤走 → badge(概览)+ Chase Now(追人)+ Items tab(全量)。
-(以下为旧版记录,布局被上面覆盖,阶段词/dial 语义仍有效:)
+## 7. KPI = status-chip strip + Chase Now(⭐ 2026-07-18 再改版 — rev14 已实现)
+**最终形态(rev14,Jess 拍板 B):KPI 三个 box → ONE ~48px status-chip strip**(A2 三条 stepper 大 bar 建了半天被 Jess 否掉——不帮读、吃 ~240px 高度;国际操作员 pattern = Shopify 式紧凑 chip,stepper 是给客户看包裹的):
+- 一行三颗可点 chip:[wallet dial+RM Outstanding][package dial+N/M ready+**MS/BF/SOF 小 badge**][truck deadline+partner/booked];dial 贴值旁(§8);chip 点击=跳它的 tab;窄屏 flex-wrap 不叠字。
+- **短 summary 语义保留**:Balance = storage accruing 时并入("RM 1,749 + RM150 storage");Stock badge 如 [MS 0/8][ACC ✓];Delivery = partner + booked 状态。
+- **Delivered = closed**(guardrail #2):chip 绿 "Delivered"、badge 全✓、Items tab 红点/计数静音。
+- 阶段词(Placed→Confirmed→Paid 等,§8 词表)只活在各 tab 内,不再画节点。
+- **Chase Now 面板**(左栏 260px,Customer 块下、tab 栏上,是面板不是 tab):逐行=**counterparty**(supplier 按 supplier 合并多 PO,AutoCount PO 经 `suppliers.cat_covered` 唯一覆盖才推名字/logistic/customer 只在 owing 时);红点 overdue 排顶、琥珀 attention;**红标事实行("2 POs · 14d late" / "not booked · 5d late"),名字保持 ink**;Manage▾(Remind/Chase,与 Items Manage▾ 同语言);**行点击=跳对应 tab**(supplier→Items·logistic→Delivery·customer→Balance);全空显 "Nothing to chase ✓";header 右侧灰 "chased Xh ago"(last_chased_at,API deploy 后生效)。
+(以下为历史记录:A2 stepper 布局已被 rev14 chip strip 覆盖;阶段词/dial 语义仍有效:)
 
 Balance:值=Outstanding(或 No total/Paid),**dial 贴在 headline 值旁**(小盘+值)。阶段 Placed→Confirmed→Paid。无款隐藏 Reminder/Chase。
 Stock(1.8宽,按 category 拆):行=分类(Mattress/Bedframe/Sofa/Accessory)+N/M(绿全齐/琥珀部分/红逾期)+该类供应商状态+Chase;全齐=Ready✓;多供应商→Chase(N) popover 按 supplier 归组(PO 打头,逾期上)。**库存 dial 贴在 headline 值旁**(Stock 卡身是 category 行,没有阶段清单)。
