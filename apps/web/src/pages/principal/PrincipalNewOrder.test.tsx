@@ -63,6 +63,17 @@ function catalog(): CatalogResponse {
         gaps: null,
         sofaMode: null,
       },
+      {
+        id: "m-sofa",
+        category: "sofa",
+        modelKey: "booqit",
+        name: "Booqit",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofaMode: "preset",
+        allowedOptions: { fabrics: ["CG-001"] },
+      },
     ],
     skus: [
       {
@@ -96,10 +107,38 @@ function catalog(): CatalogResponse {
         cost: null,
         supplierId: null,
       },
+      {
+        id: "s4",
+        modelId: "m-sofa",
+        sku: "5539-L(RHF)",
+        variant: "L(RHF)",
+        variantKind: "preset",
+        price: 2000,
+        cost: null,
+        supplierId: null,
+        pricesBySize: { '24"': 2000, '26"': 2100 },
+      },
     ],
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    // Maintenance pools + master fabrics — the inline row-variants sources.
+    optionPools: [
+      { id: "p1", pool: "sofa_size", value: '24"', active: true, sortOrder: 1 },
+      { id: "p2", pool: "sofa_size", value: '26"', active: true, sortOrder: 2 },
+      { id: "p3", pool: "sofa_leg_height", value: '6"', surcharge: 30, active: true, sortOrder: 1 },
+    ],
+    fabrics: [
+      {
+        id: "f1",
+        fabricCode: "CG-001",
+        description: "CG-001 Pearl",
+        series: "CG",
+        active: true,
+        sofaTier: "PRICE_1",
+        bedframeTier: "PRICE_1",
+      },
+    ],
   } as unknown as CatalogResponse;
 }
 
@@ -191,6 +230,32 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     expect(screen.queryByTestId("pos-configure-page")).toBeNull();
     expect((firstSkuInput() as HTMLInputElement).value).toBe("CLOUD-QUEEN");
+  });
+
+  it("a sofa pick brings its VARIANTS out under the row — seat height / fabric / leg height reprice inline", () => {
+    wrap();
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "5539" } });
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-5539-L(RHF)"));
+    // No page jump — the options came OUT under the row instead.
+    expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    const seat = screen.getByLabelText("Seat height");
+    const fabric = screen.getByLabelText("Fabric");
+    const leg = screen.getByLabelText("Leg height");
+    expect(seat).toBeTruthy();
+    expect(fabric).toBeTruthy();
+    expect(leg).toBeTruthy();
+
+    // Leg 6" carries a +RM30 pool surcharge → suggested price re-derives.
+    fireEvent.change(leg, { target: { value: '6"' } });
+    expect(screen.getAllByText("RM 2,030.00").length).toBeGreaterThan(0);
+    // Seat height 26" reads the sku's per-size price (2100) + leg 30.
+    fireEvent.change(seat, { target: { value: '26"' } });
+    expect(screen.getAllByText("RM 2,130.00").length).toBeGreaterThan(0);
+    // Modular-ticked master fabric is offered; PRICE_1 adds nothing.
+    fireEvent.change(fabric, { target: { value: "cf:CG-001" } });
+    expect((fabric as HTMLSelectElement).value).toBe("cf:CG-001");
+    expect(screen.getAllByText("RM 2,130.00").length).toBeGreaterThan(0);
   });
 
   it("prices stay editable after a pick (raw override)", () => {
