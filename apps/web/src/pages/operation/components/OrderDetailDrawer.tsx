@@ -927,21 +927,52 @@ interface ChaseNowRow {
   key: string;
   label: string;
   sub: string;
+  /** Hover detail when the sub is abbreviated (e.g. the full PO list behind
+   *  a "2 POs" count). Falls back to the sub itself. */
+  subTitle?: string;
   /** red dot = overdue (sorts on top) · amber dot = needs attention. */
   urgency: "overdue" | "attention";
   onAct: (tone: "reminder" | "chase") => void;
 }
 
+/** Relative "how long ago" for the chase stamp — short, truncation-proof. */
+function agoWord(iso: string): string {
+  const mins = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
 /** Chase Now (MASTER SPEC §7, B2) — the left-rail panel that owns ALL the
- *  chasing (Reminder/Chase left the KPI tracks): one row per counterparty —
- *  supplier PO / logistic / owing customer — red dot overdue on top, amber
- *  attention below, Manage▾ (Reminder/Chase — the same language as the Items
- *  rows' Manage▾). Empty = "Nothing to chase ✓". */
-function ChaseNowPanel({ rows }: { rows: ChaseNowRow[] }) {
+ *  chasing (Reminder/Chase left the KPI tracks): one row per COUNTERPARTY —
+ *  supplier (POs merged per supplier, §13) / logistic / owing customer.
+ *  Colour discipline: the DOT + the overdue FACT line carry the red; the
+ *  counterparty name stays ink (red marks what's wrong, not who). Overdue
+ *  sorts on top; Manage▾ = Reminder/Chase (same language as the Items rows'
+ *  Manage▾). Empty = "Nothing to chase ✓". `lastChasedAt` = the shared
+ *  order-level chase stamp (0221; populates once the API deploys). */
+function ChaseNowPanel({
+  rows,
+  lastChasedAt,
+}: {
+  rows: ChaseNowRow[];
+  lastChasedAt: string | null;
+}) {
   return (
     <div className="kpi-box shrink-0">
-      <span className="block text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-1">
-        Chase now
+      <span className="flex items-baseline gap-2 mb-1">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
+          Chase now
+        </span>
+        {rows.length > 0 && lastChasedAt && (
+          <span
+            className="ml-auto text-[12px] text-base-400 whitespace-nowrap"
+            title={`Last chase copied ${fmtDate(lastChasedAt)}`}
+          >
+            chased {agoWord(lastChasedAt)}
+          </span>
+        )}
       </span>
       {rows.length === 0 ? (
         <span className="flex items-center gap-1.5 min-h-9 text-[12px] font-medium text-success">
@@ -952,7 +983,7 @@ function ChaseNowPanel({ rows }: { rows: ChaseNowRow[] }) {
         rows.map((r) => (
           <div key={r.key} className="flex items-center gap-2 min-h-9 min-w-0">
             <span
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 r.urgency === "overdue" ? "bg-danger" : "bg-warning"
               }`}
               title={r.urgency === "overdue" ? "Overdue" : "Needs attention"}
@@ -960,14 +991,19 @@ function ChaseNowPanel({ rows }: { rows: ChaseNowRow[] }) {
             />
             <span className="min-w-0 flex-1">
               <span
-                className={`block text-[13px] font-medium leading-tight truncate ${
-                  r.urgency === "overdue" ? "text-danger" : "text-base-900"
-                }`}
+                className="block text-[13px] font-medium leading-tight truncate text-base-900"
                 title={r.label}
               >
                 {r.label}
               </span>
-              <span className="block text-[12px] text-base-500 truncate" title={r.sub}>
+              <span
+                className={`block text-[12px] truncate ${
+                  r.urgency === "overdue"
+                    ? "text-danger font-medium"
+                    : "text-base-500"
+                }`}
+                title={r.subTitle ?? r.sub}
+              >
                 {r.sub}
               </span>
             </span>
@@ -1650,6 +1686,22 @@ function DrawerBody({
     sofa: "Sofa",
     acc: "Accessory",
   } as const;
+  // An AutoCount source PO carries no supplier id — infer the name from the
+  // supplier master ONLY when exactly one supplier covers the category
+  // (`cat_covered`, the same convention Create-PO's auto-detect uses).
+  // Ambiguous / unmaintained master → keep the PO number, never guess.
+  const CAT_COVER_WORD = {
+    mattress: "mattress",
+    bedframe: "bedframe",
+    sofa: "sofa",
+    acc: "accessory",
+  } as const;
+  const uniqueSupplierFor = (cat: keyof typeof CAT_COVER_WORD): string | null => {
+    const covers = (suppliersData?.suppliers ?? []).filter((s) =>
+      (s.cat_covered ?? []).includes(CAT_COVER_WORD[cat]),
+    );
+    return covers.length === 1 ? covers[0].name : null;
+  };
   const stockCats: StockCat[] = (
     ["mattress", "bedframe", "sofa", "acc"] as const
   ).flatMap((cat) => {
@@ -1671,7 +1723,7 @@ function DrawerBody({
       const supName = portalPo
         ? (suppliersData?.suppliers.find((sp) => sp.id === portalPo.supplier_id)
             ?.name ?? null)
-        : null;
+        : uniqueSupplierFor(cat);
       const eta =
         form.draft.line_etas[l.sku] ??
         poEtaBySku.get(l.sku) ??
@@ -1718,7 +1770,10 @@ function DrawerBody({
   // A PO-led supplier chase for ONE group — the category rows + popover use
   // this (fixes the old popover copying the generic first-PO template no
   // matter which supplier was picked).
-  const copySupplierChaseFor = (g: ChaseGroup, tone: "reminder" | "chase") => {
+  const copySupplierChaseFor = (
+    g: { label: string; poNo: string; lines: { sku: string; qty: number }[] },
+    tone: "reminder" | "chase",
+  ) => {
     const text = (tone === "reminder" ? buildSupplierReminder : buildSupplierChase)({
       poNo: g.poNo,
       ref: orderRef,
@@ -1863,31 +1918,74 @@ function DrawerBody({
         bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"
       }`;
 
-  // ═══ Chase Now rows (§7, B2) — one per counterparty; overdue on top.
+  // ═══ Chase Now rows (§7, B2) — one per COUNTERPARTY; overdue on top.
   // A delivered order is CLOSED: no supplier/logistic chasing remains — only
-  // an owing customer survives delivery. ═══
-  const chaseRows: ChaseNowRow[] = deliveredDone
-    ? []
-    : chaseGroups.map((g) => {
-        const etaBit = g.eta
-          ? `ETA ${fmtDate(g.eta).split(",")[0]}${g.overdue ? " — over" : ""}`
-          : "no ETA";
-        return {
-          key: `sup-${g.key}`,
+  // an owing customer survives delivery. Lateness reads RELATIVE ("5d late"
+  // beats a truncated absolute date). ═══
+  const daysLateOf = (iso: string) =>
+    Math.max(1, Math.round((Date.parse(todayIso) - Date.parse(iso)) / 86_400_000));
+  // Same-supplier POs collapse into ONE row (§13: one counterparty, one
+  // message) — a resolved name groups by name; an anonymous AutoCount PO
+  // stays its own row (can't prove two POs share a supplier).
+  const byParty = new Map<
+    string,
+    { label: string; named: boolean; poNos: string[]; lines: { sku: string; qty: number }[]; eta: string | null; overdue: boolean }
+  >();
+  if (!deliveredDone) {
+    for (const g of chaseGroups) {
+      const named = g.label !== g.poNo;
+      const key = named ? `name:${g.label}` : `po:${g.poNo}`;
+      const prev = byParty.get(key);
+      if (prev) {
+        prev.poNos.push(g.poNo);
+        prev.lines = [...prev.lines, ...g.lines];
+        if (g.eta && (!prev.eta || g.eta < prev.eta)) prev.eta = g.eta;
+        prev.overdue = prev.overdue || g.overdue;
+      } else {
+        byParty.set(key, {
           label: g.label,
-          // An AutoCount PO has no supplier name → the label IS the PO
-          // number; don't repeat it on the sub line.
-          sub: g.label === g.poNo ? etaBit : `${g.poNo} · ${etaBit}`,
-          urgency: g.overdue ? ("overdue" as const) : ("attention" as const),
-          onAct: (tone: "reminder" | "chase") => copySupplierChaseFor(g, tone),
-        };
-      });
+          named,
+          poNos: [g.poNo],
+          lines: [...g.lines],
+          eta: g.eta,
+          overdue: g.overdue,
+        });
+      }
+    }
+  }
+  const chaseRows: ChaseNowRow[] = [...byParty.entries()].map(([key, p]) => {
+    const lateBit = p.overdue
+      ? `${daysLateOf(p.eta!)}d late`
+      : p.eta
+        ? `ETA ${fmtDate(p.eta).split(",")[0]}`
+        : "no ETA";
+    return {
+      key: `sup-${key}`,
+      label: p.label,
+      // Named row: the sub keeps the PO reference so a mis-inferred name is
+      // always cross-checkable — one PO shows its number, several show a
+      // count (the full list rides the title tooltip; the LATE bit must
+      // never truncate). Anonymous row: the PO IS the title — the sub says
+      // what KIND it is instead.
+      sub: p.named
+        ? `${p.poNos.length === 1 ? p.poNos[0] : `${p.poNos.length} POs`} · ${lateBit}`
+        : `Supplier · ${lateBit}`,
+      subTitle: `${p.poNos.join(" · ")} · ${lateBit}`,
+      urgency: p.overdue ? ("overdue" as const) : ("attention" as const),
+      onAct: (tone: "reminder" | "chase") =>
+        copySupplierChaseFor(
+          { label: p.label, poNo: p.poNos.join(" / "), lines: p.lines },
+          tone,
+        ),
+    };
+  });
   if (chasePartnerName && !deliveredDone && (!bookedEta || overDeadline)) {
+    const lateDays = daysToDelivery !== null && daysToDelivery < 0 ? -daysToDelivery : null;
     chaseRows.push({
       key: "logistic",
       label: chasePartnerName,
-      sub: bookedEta
-        ? `booked ${fmtDate(bookedEta).split(",")[0]} — over`
+      sub: overDeadline
+        ? `${bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"} · ${lateDays}d late`
         : `not booked · due ${deadlineLabel}`,
       urgency: overDeadline ? "overdue" : "attention",
       onAct: (tone) => copyChase("logistic", tone),
@@ -2080,7 +2178,12 @@ function DrawerBody({
           {/* Chase Now (MASTER SPEC §7) — a PANEL (not a tab) between the
               Customer block and the tab rail; hides with the collapsed rail
               (the tab dots still carry the alerts). */}
-          {!railCollapsed && <ChaseNowPanel rows={chaseRows} />}
+          {!railCollapsed && (
+            <ChaseNowPanel
+              rows={chaseRows}
+              lastChasedAt={form.control?.last_chased_at ?? null}
+            />
+          )}
           <nav
           className={"flex-1 flex flex-col gap-1 min-h-0 overflow-y-auto no-scrollbar"}
           aria-label="Order sections"
