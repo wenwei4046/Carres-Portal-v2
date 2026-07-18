@@ -42,7 +42,7 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -1069,6 +1069,35 @@ function DrawerBody({
   // units too, so max() avoids double counting while surviving either path).
   const reservedCountOf = (sku: string, lineReceived: number) =>
     Math.max(lineReceived, reservedToSoByKey.get(stockMatchKey(sku)) ?? 0);
+  // rev20 (Jess) — UNRESERVE: put a picked unit back to free stock and choose
+  // again. Two-step inline confirm on the ✓ Ready pill (no browser dialog):
+  // first click arms "↩ Unreserve?", second click releases ONE unit reserved
+  // to this SO for that line (POST /api/ops/stock/release — the same endpoint
+  // the Stock page uses).
+  const [unreserveSku, setUnreserveSku] = useState<string | null>(null);
+  const releaseStock = useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch("/api/ops/stock/release", {
+        method: "POST",
+        body: JSON.stringify({ itemId }),
+      }),
+    onSuccess: () => {
+      toast.success("Unreserved — the unit is back in free stock");
+      setUnreserveSku(null);
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+    },
+    onError: (e: Error) => {
+      setUnreserveSku(null);
+      toast.error(`Couldn't unreserve — ${e.message}`);
+    },
+  });
+  const reservedUnitIdFor = (sku: string): string | null =>
+    (reservedUnitsQuery.data?.items ?? []).find(
+      (u) =>
+        u.reservedRef === soRef &&
+        stockMatchKey(u.sku) === stockMatchKey(sku),
+    )?.id ?? null;
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
@@ -2168,7 +2197,9 @@ function DrawerBody({
                     <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">PO</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-32">Arrived</th>
+                    {/* rev20 (Jess 1-B) — ONE word everywhere: the column, the
+                        count and the button all say GRN (her AutoCount doc). */}
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-32" title="Goods arrived at the warehouse (GRN)">GRN</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2288,8 +2319,10 @@ function DrawerBody({
                                 Rows stay WHITE — colour lives in the pills
                                 and the red dates only (Jess: row tints made
                                 the listing unreadable). */}
-                            {/* STATUS — auto-derived pill; an amber "Need N"
-                                IS the reserve action (click → picker). */}
+                            {/* STATUS — the pill IS the row's action door
+                                (rev20): amber "Need N ›" → warehouse picker;
+                                green "✓ Ready" → two-step "↩ Unreserve?"
+                                (release the unit back to free stock). */}
                             <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {pill ? (
                                 rd === "to_reserve" ? (
@@ -2307,10 +2340,47 @@ function DrawerBody({
                                         });
                                     }}
                                     title="Matching stock is free — click to reserve a unit to this order"
-                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
+                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-90`}
                                   >
                                     {pill.t}
+                                    <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
                                   </button>
+                                ) : rd === "reserved" && !isAcc && !isService ? (
+                                  unreserveSku === l.sku ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const itemId = reservedUnitIdFor(l.sku);
+                                        if (!itemId) {
+                                          toast.error(
+                                            "No reserved unit found for this line",
+                                          );
+                                          setUnreserveSku(null);
+                                          return;
+                                        }
+                                        releaseStock.mutate(itemId);
+                                      }}
+                                      disabled={releaseStock.isPending}
+                                      title="Click again to put the unit back into free stock"
+                                      className="inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap pill-overdue hover:brightness-95 disabled:opacity-50"
+                                    >
+                                      ↩ Unreserve?
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setUnreserveSku(l.sku);
+                                      }}
+                                      title="A unit is locked to this order — click to unreserve it"
+                                      className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
+                                    >
+                                      <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                                      {pill.t}
+                                    </button>
+                                  )
                                 ) : (
                                   <span
                                     title={pill.hint}
