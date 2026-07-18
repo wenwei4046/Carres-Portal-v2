@@ -24,7 +24,7 @@ function scope(over: Partial<Parameters<typeof getOrderEditScope>[0]> = {}) {
 }
 
 describe("getOrderEditScope", () => {
-  it("place lane — everything editable, no unproceed", () => {
+  it("place lane — everything editable (incl. add product), no unproceed", () => {
     const s = scope();
     expect(s).toEqual({
       isDeliveredLane: false,
@@ -32,6 +32,7 @@ describe("getOrderEditScope", () => {
       editableProceed: false,
       canEditDetails: true,
       canUnproceed: false,
+      canAddProduct: true,
     });
   });
 
@@ -41,6 +42,8 @@ describe("getOrderEditScope", () => {
     expect(s.editableProceed).toBe(true);
     expect(s.canEditDetails).toBe(true);
     expect(s.canUnproceed).toBe(true);
+    // 0231 — direct add is place-lane only; proceed goes through P3 approval.
+    expect(s.canAddProduct).toBe(false);
   });
 
   it("proceed_order + confirmed — canUnproceed with today / future proceedDate", () => {
@@ -77,6 +80,8 @@ describe("getOrderEditScope", () => {
     expect(s.editableProceed).toBe(true);
     expect(s.canEditDetails).toBe(true);
     expect(s.canUnproceed).toBe(false);
+    // 0231 — an AutoCount import can never take a direct add.
+    expect(s.canAddProduct).toBe(false);
   });
 
   it("place already picked up by ops (stage set) — proceed lane, no unproceed", () => {
@@ -94,6 +99,7 @@ describe("getOrderEditScope", () => {
       editableProceed: false,
       canEditDetails: false,
       canUnproceed: false,
+      canAddProduct: false,
     });
   });
 

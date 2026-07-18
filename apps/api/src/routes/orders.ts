@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Adapters,
   DB,
+  addOrderLinesInputSchema,
   autocountImportInput,
   autocountImportResponseSchema,
   cancelOrderInputSchema,
@@ -1950,6 +1951,193 @@ ordersRouter.post("/:id/address", (c) =>
     }),
   }),
 );
+
+/** POST /api/orders/:id/lines — Add-product P1 (0231, design 2026-07-18):
+ *  append products to a PLACE-lane order. Server catalog price authority —
+ *  the client sends sku/qty/attrs ONLY; unitPrice = fresh `product_skus.price`
+ *  + the special-addon and option-pick recomputes (the SAME trust gates the
+ *  create route runs). Sofa BUILDS (attrs.sofa_build) are 409'd until P2;
+ *  promo/free markers (pwp / free_gift / free_item) are server-exclusive and
+ *  rejected. The `add_order_lines` RPC re-checks the place-lane status gate +
+ *  the 0089 merged-cart mutex and appends — existing rows never change. */
+ordersRouter.post("/:id/lines", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  if (!idCheck.success || !idCheck.data) {
+    throw new HTTPException(404, { message: "Order not found" });
+  }
+  const id: string = idCheck.data;
+
+  if (
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
+    auth.role !== "finance" && auth.role !== "bd"
+  ) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = addOrderLinesInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+
+  // Engine-exclusive markers are rejected up front: sofa builds need the P2
+  // merged-cart recompute; pwp/free markers are minted server-side only.
+  for (const line of parsed.data.lines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    if (attrs.sofa_build) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "sofa_build_add_not_supported",
+          message: "Sofa builds can't be added to an existing order yet — place a new order.",
+        },
+        409,
+      );
+    }
+    if (attrs.pwp || attrs.free_gift || attrs.free_item) {
+      throw new HTTPException(400, {
+        message: "promo / free markers are not allowed on added lines",
+      });
+    }
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // Fresh sku rows — server price authority + the POS-visibility gate (an
+  // added product must be currently sellable, same bar as the catalog grid).
+  const skuList = [...new Set(parsed.data.lines.map((l) => l.sku))];
+  const skuR = await sb
+    .from("product_skus")
+    .select("sku, price, pos_active, discontinued_at")
+    .in("sku", skuList);
+  if (skuR.error) throw new HTTPException(500, { message: skuR.error.message });
+  const skuBySku = new Map(
+    ((skuR.data ?? []) as Array<{ sku: string; price: number | string; pos_active: boolean | null; discontinued_at: string | null }>).map(
+      (s) => [s.sku, s] as const,
+    ),
+  );
+  for (const l of parsed.data.lines) {
+    const s = skuBySku.get(l.sku);
+    if (!s || s.pos_active === false || s.discontinued_at) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "unknown_or_inactive_sku",
+          message: `SKU ${l.sku} is not available for sale`,
+        },
+        422,
+      );
+    }
+  }
+
+  // Base = fresh catalog price. The client's attrs preview totals
+  // (specials_total / options_total) are folded in as PREVIEWS so the two
+  // recomputes below can nudge them to server-canonical figures (or 422 on
+  // drift) — exactly the create-route contract; the base itself is never
+  // client-influenced.
+  const lines = parsed.data.lines.map((l) => {
+    const attrs = (l.attrs ?? null) as Record<string, unknown> | null;
+    const previewOf = (key: string): number => {
+      const v = attrs?.[key];
+      return typeof v === "number" && Number.isFinite(v) ? v : 0;
+    };
+    return {
+      sku: l.sku,
+      qty: l.qty,
+      attrs,
+      unitPrice:
+        Number(skuBySku.get(l.sku)!.price) + previewOf("specials_total") + previewOf("options_total"),
+    };
+  });
+
+  const specialRecompute = await recomputeSpecialAddonLines(sb, lines);
+  if (specialRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "special_price_drift",
+        message:
+          `Special add-on price mismatch on '${specialRecompute.drift.lineSku}': client RM ` +
+          `${specialRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${specialRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: specialRecompute.drift.clientTotal,
+        serverTotal: specialRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
+  const optionsRecompute = await recomputeOptionPickLines(sb, specialRecompute.lines);
+  if (optionsRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "options_price_drift",
+        message:
+          `Option price mismatch on '${optionsRecompute.drift.lineSku}': client RM ` +
+          `${optionsRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${optionsRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: optionsRecompute.drift.clientTotal,
+        serverTotal: optionsRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
+  const { error: rpcError } = await sb.rpc("add_order_lines", {
+    p_order_id: id,
+    p_lines: optionsRecompute.lines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: l.attrs,
+      unit_price: l.unitPrice,
+    })),
+    p_source: "direct",
+    p_change_request_id: null,
+  });
+  if (rpcError) {
+    const sqlstate = rpcError.code;
+    if (sqlstate === "42501") throw new HTTPException(403, { message: "Forbidden" });
+    if (sqlstate === "42P01") throw new HTTPException(404, { message: "Order not found" });
+    if (sqlstate === "22023" || sqlstate === "P0001") {
+      return c.json(
+        {
+          error: "add_lines_blocked",
+          code: rpcError.details ?? null,
+          message: rpcError.message ?? "Unprocessable entity",
+        },
+        422,
+      );
+    }
+    throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
 
 /** POST /api/orders/:id/date — confirm a TBD delivery date. Mirrors
  *  ConfirmDateModal in proto. The lead-time floor (mattress/bedframe 14d,
