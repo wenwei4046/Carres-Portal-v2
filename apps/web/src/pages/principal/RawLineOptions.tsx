@@ -9,14 +9,12 @@ import type {
 import {
   allowedFabricsFor,
   allowedPoolValues,
-  fabricTierFor,
   gatedSofaSizes,
-  resolveFabricDelta,
   resolveSpecialsTotal,
 } from "@carres/shared";
+import type { SpecialAddonDto } from "@carres/shared";
 import type { DraftLine } from "../dealer/new-order/draft";
 import {
-  SpecialAddonsPicker,
   offeredSpecialsFor,
   optionsFromAttrs,
   specialsFromAttrs,
@@ -36,22 +34,18 @@ import {
  *
  * Option sources = the SAME Modular config the POS uses: `allowed_options`
  * ticks ∩ Maintenance pools (`sofa_size` / `sofa_leg_height` / `divan_height`
- * / `gap` / `bedframe_leg_height`), master Fabrics ticks (tier-priced) +
- * legacy per-model sofa fabrics, and `offeredSpecialsFor` (0181).
+ * / `gap` / `bedframe_leg_height`), master Fabrics ticks + legacy per-model
+ * sofa fabrics, and `offeredSpecialsFor` (0181).
  *
- * Fully CONTROLLED off `line.attrs` (no local state): each change rebuilds the
- * attrs slice in the POS conventions (attrs.options[] + options_total ·
- * attrs.gap · attrs.seat_height · flat fabric_* for sofa · attrs.specials +
- * specials_total) and re-derives the SUGGESTED unit price (per-seat-height
- * base + surcharges) — which the row's price input can still override after.
+ * NO MONEY ANYWHERE (Loo 2026-07-18, second pass): the dropdowns show NO
+ * price hints, a selection NEVER touches the row's unit price (the operator's
+ * typed figure is the only price), and the attrs written to the sales order
+ * carry ONLY the spec choices (kind/value/label) — no surcharge / total
+ * figures ride the API. Fully CONTROLLED off `line.attrs` (no local state).
  */
 
 const SEL_CLS =
   "w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-small outline-none focus:border-primary";
-
-function num(v: unknown): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : 0;
-}
 
 export default function RawLineOptions({
   line,
@@ -76,6 +70,7 @@ export default function RawLineOptions({
     if (!isSofa) return [];
     const gated = gatedSofaSizes(model, pools);
     if (gated.length > 0) return gated;
+    // Fallback AXIS only (never prices): the sku's own per-size keys.
     return Object.keys(sku.pricesBySize ?? {});
   }, [isSofa, model, pools, sku.pricesBySize]);
   const sofaLegOpts = useMemo(
@@ -114,8 +109,6 @@ export default function RawLineOptions({
     () => offeredSpecialsFor(model, catalog.specialAddons),
     [model, catalog.specialAddons],
   );
-  const fabricTierOverride =
-    (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
 
   // ── Current values (read off attrs — the panel owns no state) ────────────
   const options = optionsFromAttrs(line.attrs);
@@ -132,32 +125,13 @@ export default function RawLineOptions({
     .filter((s): s is { code: string; choiceLabels?: string[] } => typeof s.code === "string")
     .map((s) => ({ code: s.code, choiceLabels: s.choiceLabels ?? [] }));
 
-  // ── Write-back: rebuild attrs + re-derive the SUGGESTED unit price ────────
+  /** Write attrs back — SPECS ONLY, never money, never the unit price. */
   function apply(next: Record<string, unknown>) {
-    const opts = Array.isArray(next.options)
-      ? (next.options as Array<{ surcharge?: number }>)
-      : [];
-    if (opts.length > 0) {
-      next.options_total = Math.round(opts.reduce((s, o) => s + num(o.surcharge), 0) * 100) / 100;
-    } else {
-      delete next.options;
-      delete next.options_total;
-    }
-    const nextSeat = typeof next.seat_height === "string" ? next.seat_height : "";
-    const perSeat = nextSeat ? sku.pricesBySize?.[nextSeat] : null;
-    const base = perSeat ?? sku.price ?? 0;
-    const suggested =
-      Math.round(
-        (base + num(next.options_total) + num(next.fabric_surcharge) + num(next.specials_total)) *
-          100,
-      ) / 100;
+    if (Array.isArray(next.options) && next.options.length === 0) delete next.options;
     const cleaned = Object.fromEntries(
       Object.entries(next).filter(([, v]) => v !== "" && v !== undefined && v !== null),
     );
-    onPatch({
-      attrs: Object.keys(cleaned).length > 0 ? cleaned : null,
-      unitPrice: Math.max(0, suggested),
-    });
+    onPatch({ attrs: Object.keys(cleaned).length > 0 ? cleaned : null });
   }
 
   function setPoolOption(kind: string, value: string, list: CatalogOptionPoolDto[]) {
@@ -165,15 +139,7 @@ export default function RawLineOptions({
     const next: Record<string, unknown> = { ...attrs };
     if (value) {
       const row = list.find((r) => r.value === value);
-      next.options = [
-        ...others,
-        {
-          kind,
-          value,
-          ...(row?.label ? { label: row.label } : {}),
-          surcharge: num(row?.surcharge),
-        },
-      ];
+      next.options = [...others, { kind, value, ...(row?.label ? { label: row.label } : {}) }];
     } else {
       next.options = others;
     }
@@ -204,16 +170,9 @@ export default function RawLineOptions({
     if (key) {
       const f = sofaFabrics.find((x) => x.key === key);
       if (f) {
-        const delta = resolveFabricDelta(
-          f.tier,
-          fabricTierOverride,
-          catalog.fabricTierConfig ?? null,
-        );
         if (f.id) next.fabric_id = f.id;
         if (f.code) next.fabric_code = f.code;
         next.fabric_name = f.name;
-        next.fabric_tier = f.tier;
-        next.fabric_surcharge = delta;
       }
     }
     apply(next);
@@ -225,18 +184,12 @@ export default function RawLineOptions({
     if (code) {
       const f = bedFabrics.find((x) => x.fabricCode === code);
       if (f) {
-        const delta = resolveFabricDelta(
-          fabricTierFor("bedframe", f),
-          fabricTierOverride,
-          catalog.fabricTierConfig ?? null,
-        );
         next.options = [
           ...others,
           {
             kind: "fabric",
             value: f.fabricCode,
             label: fabricDisplayName(f.fabricCode, f.description),
-            surcharge: delta,
           },
         ];
       }
@@ -248,15 +201,21 @@ export default function RawLineOptions({
 
   function setPicks(p: SpecialAddonPick[]) {
     const defsByCode = new Map(offered.map((d) => [d.code, d]));
-    const { total, lines } = resolveSpecialsTotal(p, defsByCode);
+    // Resolver used for canonical labels/descriptions ONLY — the money it
+    // returns is dropped (raw lines carry no option prices).
+    const { lines } = resolveSpecialsTotal(p, defsByCode);
     const next: Record<string, unknown> = { ...attrs };
     if (p.length > 0) {
-      next.specials = lines;
-      next.specials_total = total;
+      next.specials = lines.map(({ code, label, soDescription, choiceLabels }) => ({
+        code,
+        label,
+        ...(soDescription ? { soDescription } : {}),
+        ...(choiceLabels && choiceLabels.length > 0 ? { choiceLabels } : {}),
+      }));
     } else {
       delete next.specials;
-      delete next.specials_total;
     }
+    delete next.specials_total;
     apply(next);
   }
 
@@ -287,15 +246,11 @@ export default function RawLineOptions({
                 className={SEL_CLS}
               >
                 <option value="">KIV · to confirm</option>
-                {seatSizes.map((s) => {
-                  const p = sku.pricesBySize?.[s];
-                  return (
-                    <option key={s} value={s}>
-                      {s}
-                      {p != null ? ` · RM ${p.toLocaleString("en-MY")}` : ""}
-                    </option>
-                  );
-                })}
+                {seatSizes.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </MiniField>
           )}
@@ -308,19 +263,11 @@ export default function RawLineOptions({
                 className={SEL_CLS}
               >
                 <option value="">KIV · to confirm</option>
-                {sofaFabrics.map((f) => {
-                  const delta = resolveFabricDelta(
-                    f.tier,
-                    fabricTierOverride,
-                    catalog.fabricTierConfig ?? null,
-                  );
-                  return (
-                    <option key={f.key} value={f.key}>
-                      {f.name}
-                      {delta > 0 ? ` · +RM ${delta.toLocaleString("en-MY")}` : ""}
-                    </option>
-                  );
-                })}
+                {sofaFabrics.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.name}
+                  </option>
+                ))}
               </select>
             </MiniField>
           )}
@@ -336,7 +283,6 @@ export default function RawLineOptions({
                 {sofaLegOpts.map((o) => (
                   <option key={o.id} value={o.value}>
                     {o.value}
-                    {num(o.surcharge) !== 0 ? ` · +RM ${num(o.surcharge).toLocaleString("en-MY")}` : ""}
                   </option>
                 ))}
               </select>
@@ -351,19 +297,11 @@ export default function RawLineOptions({
                 className={SEL_CLS}
               >
                 <option value="">KIV · to confirm</option>
-                {bedFabrics.map((f) => {
-                  const delta = resolveFabricDelta(
-                    fabricTierFor("bedframe", f),
-                    fabricTierOverride,
-                    catalog.fabricTierConfig ?? null,
-                  );
-                  return (
-                    <option key={f.fabricCode} value={f.fabricCode}>
-                      {fabricDisplayName(f.fabricCode, f.description)}
-                      {delta > 0 ? ` · +RM ${delta.toLocaleString("en-MY")}` : ""}
-                    </option>
-                  );
-                })}
+                {bedFabrics.map((f) => (
+                  <option key={f.fabricCode} value={f.fabricCode}>
+                    {fabricDisplayName(f.fabricCode, f.description)}
+                  </option>
+                ))}
               </select>
             </MiniField>
           )}
@@ -379,7 +317,6 @@ export default function RawLineOptions({
                 {divanOpts.map((o) => (
                   <option key={o.id} value={o.value}>
                     {o.value}
-                    {num(o.surcharge) !== 0 ? ` · +RM ${num(o.surcharge).toLocaleString("en-MY")}` : ""}
                   </option>
                 ))}
               </select>
@@ -415,7 +352,6 @@ export default function RawLineOptions({
                 {bedLegOpts.map((o) => (
                   <option key={o.id} value={o.value}>
                     {o.value}
-                    {num(o.surcharge) !== 0 ? ` · +RM ${num(o.surcharge).toLocaleString("en-MY")}` : ""}
                   </option>
                 ))}
               </select>
@@ -429,10 +365,79 @@ export default function RawLineOptions({
             Special orders ({picks.length} selected)
           </summary>
           <div className="mt-2">
-            <SpecialAddonsPicker defs={offered} value={picks} onChange={setPicks} />
+            <RawSpecialsPicker defs={offered} value={picks} onChange={setPicks} />
           </div>
         </details>
       )}
+    </div>
+  );
+}
+
+/** Price-FREE twin of the POS `SpecialAddonsPicker` (same toggle + follow-up
+ *  behaviour, but no +RM anywhere — raw lines carry no option money). */
+function RawSpecialsPicker({
+  defs,
+  value,
+  onChange,
+}: {
+  defs: SpecialAddonDto[];
+  value: SpecialAddonPick[];
+  onChange: (next: SpecialAddonPick[]) => void;
+}) {
+  const byCode = new Map(value.map((p) => [p.code, p]));
+
+  function toggle(def: SpecialAddonDto) {
+    if (byCode.has(def.code)) onChange(value.filter((p) => p.code !== def.code));
+    else onChange([...value, { code: def.code, choiceLabels: def.optionGroups.map(() => "") }]);
+  }
+  function setChoice(code: string, gi: number, label: string) {
+    onChange(
+      value.map((p) =>
+        p.code === code
+          ? { ...p, choiceLabels: p.choiceLabels.map((c, i) => (i === gi ? label : c)) }
+          : p,
+      ),
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {defs.map((def) => {
+        const pick = byCode.get(def.code);
+        const on = !!pick;
+        return (
+          <div key={def.code} className="border border-base-200 rounded-md p-2.5">
+            <label className="flex items-center gap-2 t-small cursor-pointer">
+              <input
+                type="checkbox"
+                checked={on}
+                onChange={() => toggle(def)}
+                data-testid={`raw-special-${def.code}`}
+              />
+              <span className="text-base-800 font-medium">{def.label}</span>
+            </label>
+            {on &&
+              def.optionGroups.map((g, gi) => (
+                <div key={gi} className="mt-2 ml-6">
+                  <span className="t-tiny text-base-500 block mb-0.5">{g.label}</span>
+                  <select
+                    value={pick!.choiceLabels[gi] ?? ""}
+                    onChange={(e) => setChoice(def.code, gi, e.target.value)}
+                    className={SEL_CLS}
+                    data-testid={`raw-special-choice-${def.code}-${gi}`}
+                  >
+                    <option value="">— select —</option>
+                    {g.choices.map((c) => (
+                      <option key={c.label} value={c.label}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
