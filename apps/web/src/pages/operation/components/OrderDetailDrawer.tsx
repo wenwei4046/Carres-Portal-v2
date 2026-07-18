@@ -118,6 +118,7 @@ import {
   RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
+  FieldRow,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
@@ -707,6 +708,20 @@ function MiniBadge({
 function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
   const I = cat === "mattress" ? BedDouble : cat === "bedframe" ? Bed : cat === "sofa" ? Sofa : Package;
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
+}
+
+/** Delivery step band (Option A, Jess 2026-07-18) — the tab reads as the real
+ *  work order: 1 Arrange › 2 Book › 3 Notes. Same visual language as the Items
+ *  category band (base-100 wash, 12/700 caps), number first. */
+function DeliveryStepBand({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 bg-base-100/70 rounded-[4px] px-2 py-1 mt-2.5 first:mt-0 mb-1">
+      <span className="text-[12px] font-bold tabular-nums text-base-400">{n}</span>
+      <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-base-600">
+        {label}
+      </span>
+    </div>
+  );
 }
 
 /** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
@@ -1579,11 +1594,8 @@ function DrawerBody({
 
   // ═══ Track signals (A2) — shared by the stage arrays + Chase Now. ═══
   const deliveredDone = pipelineStatus === "completed";
-  const paidDone = totalSet && moneyOutstanding <= 0;
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
-  const stockDelayed =
-    readyN < goodsN && pos.some((p) => !!p.eta_date && p.eta_date < todayIso);
 
   // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
   // N/M ready + that category's supplier status + its OWN PO-led chase.
@@ -3184,97 +3196,103 @@ function DrawerBody({
               })()
             }
           >
-            <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
-              {/* Round 1A: ONE full-width column — label left / input right,
-                  nothing truncated (the old two-column split squeezed each input
-                  to ~140px). Field order: Logistic · Deadline · Logistic ETA ·
-                  Time slot · Call window · Customer request. */}
-              <FieldGrid>
-                <RoutingFields
-                  orderId={order.id}
-                  customerAddress={order.customer_address ?? null}
-                  deliveryDate={order.delivery_date}
-                  proceedDate={order.proceed_date ?? null}
-                  opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-                  form={form}
-                  hideRegion
-                />
-                {/* 2A (Jess): Delivery fields save the moment they change —
-                    like a spreadsheet cell; no hidden Save bar dependency. */}
-                <LogisticEtaField
-                  form={form}
-                  onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
-                />
-              </FieldGrid>
-              {/* Chase window (§7.6 — renamed from "Call customer by"): a MANUAL
-                  reminder to chase the PARTNER N days before the deadline. It
-                  feeds the list's next-action engine, it does NOT auto-message. */}
-              {/* D2 — a delivered order has nobody left to chase. */}
-              {!deliveredDone && contactByLabel && (
-                <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                  <span className="flex items-center gap-1 text-[12px] font-medium text-info min-w-0">
-                    <Phone size={14} strokeWidth={2.25} className="shrink-0" />
-                    <span className="truncate">Chase partner by {contactByLabel}</span>
-                  </span>
-                  <span className="flex items-center gap-0.5 text-[12px] text-info/70 whitespace-nowrap shrink-0">
-                    <span>−</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={60}
-                      value={form.draft.contact_by_days}
-                      onChange={(e) => form.set("contact_by_days", e.target.value)}
-                      onBlur={(e) => {
-                        // 2A instant-save — commit on leave, only if changed.
-                        const v = e.target.value.trim();
-                        const saved =
-                          form.control?.contact_by_days != null
-                            ? String(form.control.contact_by_days)
-                            : "";
-                        if (v !== saved)
-                          quickSave.mutate({
-                            contact_by_days: v ? Number(v) : null,
-                          });
-                      }}
-                      placeholder="3"
-                      aria-label="Chase window — days before the deadline to chase the partner"
-                      title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
-                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+            <div className="p-3 min-h-0 overflow-auto flex-1">
+              {/* Option A (Jess 2026-07-18): the panel reads as the REAL work
+                  order — 1 ARRANGE › 2 BOOK › 3 NOTES step bands, one uniform
+                  FieldRow look (the blue alert-strip + grey pseudo-button are
+                  dead), form capped ~560px (a date box needs no kilometre),
+                  and the freed width carries ONE status sentence in the chip's
+                  vocabulary telling the operator what to do next. */}
+              <div className="flex items-start gap-5">
+                <div className="w-full max-w-[560px] shrink-0">
+                  <DeliveryStepBand n={1} label="Arrange" />
+                  <FieldGrid>
+                    <RoutingFields
+                      orderId={order.id}
+                      customerAddress={order.customer_address ?? null}
+                      deliveryDate={order.delivery_date}
+                      proceedDate={order.proceed_date ?? null}
+                      opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                      form={form}
+                      hideRegion
                     />
-                    <span>d</span>
-                  </span>
-                </div>
-              )}
-              {/* Customer confirmed (0220) — a FIELD inside Delivery per UI-KIT
-                  §5.1 (moved out of the old header banner). Same quick sparse-
-                  save; the list stays unaffected. */}
-              <label className="flex items-center justify-between gap-2 rounded-md bg-base-50 px-2 py-1 cursor-pointer select-none">
-                <span className="text-[12px] text-base-500">
-                  Customer confirmed
-                </span>
-                <input
-                  type="checkbox"
-                  checked={customerConfirmed}
-                  disabled={quickSave.isPending}
-                  onChange={() =>
-                    quickSave.mutate({ customer_confirmed: !customerConfirmed })
-                  }
-                  className="cursor-pointer accent-primary"
-                />
-              </label>
-              <div className="border-t border-base-100 pt-2">
-                <FieldGrid>
-                  <RemarkControlField
-                    form={form}
-                    field="customer_request"
-                    label="Customer request"
-                    placeholder="e.g. postponed to end of May"
-                    onCommit={(v) =>
-                      quickSave.mutate({ customer_request: v.trim() || null })
-                    }
-                  />
-                </FieldGrid>
-              </div>
+                  </FieldGrid>
+                  <DeliveryStepBand n={2} label="Book" />
+                  <FieldGrid>
+                    {/* 2A: fields save the moment they change — spreadsheet cell. */}
+                    <LogisticEtaField
+                      form={form}
+                      onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
+                    />
+                    {/* Customer confirmed (0220) — operation ticks it AFTER the
+                        partner has agreed the slot with the customer. Record
+                        only; triggers nothing. */}
+                    <FieldRow label="Customer confirmed">
+                      <input
+                        type="checkbox"
+                        checked={customerConfirmed}
+                        disabled={quickSave.isPending}
+                        onChange={() =>
+                          quickSave.mutate({ customer_confirmed: !customerConfirmed })
+                        }
+                        aria-label="Customer confirmed — the partner has agreed the delivery slot with the customer"
+                        className="cursor-pointer accent-primary"
+                      />
+                    </FieldRow>
+                  </FieldGrid>
+                  {/* Chase window — a REMINDER date (deadline − N days), not a
+                      form field: if the partner still hasn't booked by this
+                      date, chase them. No auto-message. Hidden once delivered. */}
+                  {!deliveredDone && contactByLabel && (
+                    <div className="flex items-center justify-between gap-2 px-1 py-1">
+                      <span className="flex items-center gap-1 text-[12px] text-base-500 min-w-0">
+                        <Phone size={14} strokeWidth={2.25} className="shrink-0 text-base-400" />
+                        <span className="truncate">
+                          If not booked, chase {chasePartnerName ?? "partner"} by{" "}
+                          {contactByLabel}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-0.5 text-[12px] text-base-400 whitespace-nowrap shrink-0">
+                        <span>−</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={form.draft.contact_by_days}
+                          onChange={(e) => form.set("contact_by_days", e.target.value)}
+                          onBlur={(e) => {
+                            // 2A instant-save — commit on leave, only if changed.
+                            const v = e.target.value.trim();
+                            const saved =
+                              form.control?.contact_by_days != null
+                                ? String(form.control.contact_by_days)
+                                : "";
+                            if (v !== saved)
+                              quickSave.mutate({
+                                contact_by_days: v ? Number(v) : null,
+                              });
+                          }}
+                          placeholder="3"
+                          aria-label="Chase window — days before the deadline to chase the partner"
+                          title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
+                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+                        />
+                        <span>d</span>
+                      </span>
+                    </div>
+                  )}
+                  <DeliveryStepBand n={3} label="Notes" />
+                  <FieldGrid>
+                    <RemarkControlField
+                      form={form}
+                      field="customer_request"
+                      label="Customer request"
+                      placeholder="e.g. postponed to end of May"
+                      onCommit={(v) =>
+                        quickSave.mutate({ customer_request: v.trim() || null })
+                      }
+                    />
+                  </FieldGrid>
               {/* Carriers / route (§7.6) — HIDDEN by default: the Logistic
                   dropdown above IS the standard single-carrier route, so the
                   multi-leg bar only renders when the order actually has legs,
@@ -3283,7 +3301,7 @@ function DrawerBody({
                   block renders only when the order HAS legs, or after the ⋮
                   "Multi-leg route…" opens it. */}
               {((order.delivery_stops?.length ?? 0) > 0 || showRouteBlock) && (
-                <div className="border-t border-base-100 pt-2">
+                <div className="border-t border-base-100 pt-2 mt-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] text-base-400">
                       Carriers / route
@@ -3303,6 +3321,58 @@ function DrawerBody({
                   />
                 </div>
               )}
+                </div>
+                {/* Status column — the freed width says WHERE this order is +
+                    the ONE next action, same truth ladder + §8 words as the
+                    header chip. Text only; colour = status word (§2). */}
+                <div className="flex-1 min-w-0 pt-1.5">
+                  {(() => {
+                    const eta = form.control?.logistic_eta ?? null;
+                    const late = daysToDelivery !== null && daysToDelivery < 0;
+                    let word: string;
+                    let toneCls = "text-base-500";
+                    let next: string | null = null;
+                    if (deliveredDone) {
+                      word = "Delivered ✓";
+                      toneCls = "text-success";
+                      next = "Nothing left to do";
+                    } else if (balanceGate === "hold" || storageGate === "hold") {
+                      word = "On hold";
+                      toneCls = "text-danger";
+                      next = "Collect the balance / storage fee before dispatch";
+                    } else if (eta) {
+                      word = `Booked ${fmtDate(eta).split(", ")[0]}`;
+                      toneCls = "text-success";
+                      next = late
+                        ? "Past the deadline — confirm the slot with the partner"
+                        : "Waiting for delivery";
+                    } else if (order.ops_assigned_logistic) {
+                      word = late
+                        ? `Overdue ${daysToDelivery === null ? "" : -daysToDelivery}d`
+                        : "Assigned · not booked";
+                      toneCls = late ? "text-danger" : "text-warning";
+                      next = `Chase ${chasePartnerName ?? "the partner"}${
+                        contactByLabel ? ` by ${contactByLabel}` : ""
+                      } to book the customer`;
+                    } else {
+                      word = "No carrier";
+                      next = "Pick a carrier in step 1";
+                    }
+                    return (
+                      <>
+                        <div className={`text-[13px] font-semibold ${toneCls}`}>
+                          {word}
+                        </div>
+                        {next && (
+                          <div className="text-[12px] text-base-500 mt-0.5">
+                            {next}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           </Panel>
           </SectionCard>
