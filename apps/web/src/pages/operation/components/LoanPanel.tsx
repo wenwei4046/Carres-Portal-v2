@@ -27,6 +27,15 @@ import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
 type StepState = "done" | "act" | "wait" | "todo";
 
+/** Same labels + pill tones as the rev20 stock picker — one vocabulary. */
+const CONDITION_LABEL: Record<string, string> = {
+  new: "New",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
+  damaged: "Damaged",
+};
+
 const CHIP =
   "inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-200 rounded-[6px] px-1.5 py-0.5 bg-white";
 const SOFT = "pill bg-base-100 text-base-500";
@@ -331,38 +340,54 @@ export default function LoanPanel({
             </Btn>
           </div>
 
-          {source === "warehouse" && (
-            <div className="space-y-1">
-              {lendable.length === 0 && <span className={SOFT}>no free unit</span>}
-              {lendable.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center gap-2 text-[12px] border-b border-base-100 last:border-b-0 py-1"
-                >
-                  <span
-                    className="font-mono text-base-900 truncate flex-1"
-                    title={u.sku}
-                  >
-                    {u.sku}
-                  </span>
-                  {u.dateIn && (
-                    <span className={SOFT}>
-                      in {fmtDate(u.dateIn).split(", ")[0]}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onLend?.(u.id, u.sku)}
-                    disabled={!onLend}
-                    title="Issue a loan DO + mark this unit on-loan to the order"
-                    className="btn-secondary text-[12px] py-0.5 px-2 shrink-0"
-                  >
-                    Lend out
-                  </button>
+          {source === "warehouse" &&
+            (lendable.length === 0 ? (
+              <span className={SOFT}>no free unit</span>
+            ) : (
+              <div>
+                {/* §9 data-table law: formal columns get HEADERS; the item is
+                    a product NAME → Inter (mono = codes only, §11b). */}
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-1 pb-1 border-b border-base-100 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-500">
+                  <span>Item</span>
+                  <span>Condition</span>
+                  <span>Arrived</span>
+                  <span aria-hidden="true" />
                 </div>
-              ))}
-            </div>
-          )}
+                {lendable.map((u) => (
+                  <div
+                    key={u.id}
+                    className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-1 py-1 border-b border-base-100 last:border-b-0 text-[12px]"
+                  >
+                    <span
+                      className="font-semibold text-base-900 truncate"
+                      title={u.sku}
+                    >
+                      {u.sku}
+                    </span>
+                    <span
+                      className={`pill ${
+                        u.condition === "exhibition"
+                          ? "pill-warning"
+                          : "pill-confirmed"
+                      }`}
+                    >
+                      {CONDITION_LABEL[u.condition] ?? u.condition}
+                    </span>
+                    <span className="font-mono tabular-nums text-base-800">
+                      {u.dateIn ? fmtDate(u.dateIn) : "—"}
+                    </span>
+                    <Btn
+                      size="sm"
+                      onClick={() => onLend?.(u.id, u.sku)}
+                      disabled={!onLend}
+                      title="Issue a loan DO + mark this unit on-loan to the order"
+                    >
+                      Lend out
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            ))}
 
           {source === "supplier" && (
             <div className="space-y-1.5">
