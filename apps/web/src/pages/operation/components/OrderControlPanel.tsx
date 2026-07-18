@@ -123,6 +123,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // focus — clean but structured.
 const CELL =
   "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
+/** CELL without the rubber-band w-full (rev25, Jess: fields are FIXED-width
+ *  boxes like the approved mock — a date box needs no kilometre). Pair with an
+ *  explicit width class at the call site. */
+export const CELL_FIT = CELL.replace("w-full ", "");
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -393,7 +397,7 @@ export function RoutingFields({
             onChange={(e) =>
               setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
             }
-            className={`${CELL} flex-1 min-w-[150px] disabled:opacity-50`}
+            className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
             <option value="">— pick carrier —</option>
             {partners.map((p) => (
@@ -478,7 +482,7 @@ export function LogisticEtaField({
           form.set("logistic_eta", v);
           if (onCommit && (v === "" || ISO_DATE.test(v))) onCommit(v);
         }}
-        className={`${CELL} min-w-[150px]`}
+        className={`${CELL_FIT} w-[170px]`}
       />
     </FieldRow>
   );

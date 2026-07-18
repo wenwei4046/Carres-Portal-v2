@@ -804,9 +804,11 @@ function DeliveryNotesLog({
   const add = () => {
     const text = draft.trim();
     if (!text) return;
+    // Date law (Jess rev25): every shown date = "31 Jul 26".
     const stamp = new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
+      year: "2-digit",
     });
     onCommit([`${stamp} · ${text}`, ...entries].join("\n"));
     setDraft("");
@@ -1144,6 +1146,9 @@ function DrawerBody({
   // rev23 — "Postponed? →" reveals the one-time formal extension recorder
   // (0196); casual date chatter goes to the NOTES log instead.
   const [postponeOpen, setPostponeOpen] = useState(false);
+  // rev25 — the auto-reminder −Nd tuner hides behind a click (0/162 ever
+  // changed it; the 0197 cron fires the task by itself).
+  const [editingChaseDays, setEditingChaseDays] = useState(false);
   // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
   // Customer identity lives in the header strip now (Jess 2026-07-15): the
@@ -1337,13 +1342,14 @@ function DrawerBody({
   const contactByDays = form.draft.contact_by_days.trim()
     ? Number(form.draft.contact_by_days)
     : form.control?.contact_by_days ?? 3;
+  // Date law (Jess rev25): shown dates are "31 Jul 26" — no weekday tail.
   const contactByLabel =
     !order.delivery_date_tbd && order.delivery_date
       ? fmtDate(
           new Date(new Date(order.delivery_date).getTime() - contactByDays * 86_400_000)
             .toISOString()
             .slice(0, 10),
-        )
+        ).split(", ")[0]
       : null;
   // Collect-before-delivery reminder dates (Jess): ideal collect ≥7 days before the
   // logistic ETA (delivery date); last-call at ETA−1 (after which delivery holds).
@@ -1564,7 +1570,6 @@ function DrawerBody({
     onSuccess: () => toast.success("Saved"),
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
-  const customerConfirmed = form.control?.customer_confirmed ?? false;
   // Chase-event stamp (0221, deploy-gated) — SILENT on error so a not-yet-
   // deployed API never blocks the chase itself (the copy already happened).
   const chaseStamp = useSaveOrderControl(order.id);
@@ -3373,21 +3378,9 @@ function DrawerBody({
                  no carrier). "booked" = logistic_eta; assigned-but-unbooked
                  is the 93% normal state and must NOT read as failure. A
                  delivered order never alarms (pre-golive guardrail #2). */
+              /* rev25 (Jess): badge FIRST, no "deadline" word, the date stays
+                 BLACK — red lives only inside the badge. */
               <span className="flex items-center gap-2 min-w-0">
-                {deadlineLabel !== "—" && (
-                  <span className="text-[11px] text-base-400 whitespace-nowrap">
-                    deadline{" "}
-                    <span
-                      className={`text-[13px] font-semibold tabular-nums ${
-                        overDeadline && !deliveredDone
-                          ? "text-danger"
-                          : "text-base-900"
-                      }`}
-                    >
-                      {deadlineLabel}
-                    </span>
-                  </span>
-                )}
                 {(() => {
                   if (deliveredDone)
                     return <MiniBadge tone="ready">Delivered ✓</MiniBadge>;
@@ -3418,6 +3411,11 @@ function DrawerBody({
                     return <MiniBadge tone="waiting">not booked</MiniBadge>;
                   return <MiniBadge tone="muted">no carrier</MiniBadge>;
                 })()}
+                {deadlineLabel !== "—" && (
+                  <span className="text-[13px] font-semibold tabular-nums text-base-900 whitespace-nowrap">
+                    {deadlineLabel}
+                  </span>
+                )}
               </span>
             }
           >
@@ -3488,13 +3486,9 @@ function DrawerBody({
                         >
                           {deadlineLabel}
                         </span>
-                        {(form.control?.extension_count ?? 0) > 0 &&
-                        form.control?.extension_new_date ? (
-                          <span className="text-[12px] text-base-500 whitespace-nowrap">
-                            → {fmtDate(form.control.extension_new_date).split(", ")[0]}{" "}
-                            (postponed)
-                          </span>
-                        ) : (
+                        {/* paint-once: with an extension recorded, the row
+                            right below already says "→ 31 Jul 26 …". */}
+                        {(form.control?.extension_count ?? 0) === 0 && (
                           <button
                             type="button"
                             onClick={() => setPostponeOpen((v) => !v)}
@@ -3597,61 +3591,63 @@ function DrawerBody({
                     </div>
                   )}
                   <FieldGrid>
-                    {/* 2A: fields save the moment they change — spreadsheet cell. */}
+                    {/* 2A: fields save the moment they change — spreadsheet cell.
+                        (Customer confirmed checkbox REMOVED rev25 — Jess: "we
+                        don't mark"; the 0220 column stays, no UI.) */}
                     <LogisticEtaField
                       form={form}
                       onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
                     />
-                    {/* Customer confirmed (0220) — operation ticks it AFTER the
-                        partner has agreed the slot with the customer. Record
-                        only; triggers nothing. */}
-                    <FieldRow label="Customer confirmed">
-                      <input
-                        type="checkbox"
-                        checked={customerConfirmed}
-                        disabled={quickSave.isPending}
-                        onChange={() =>
-                          quickSave.mutate({ customer_confirmed: !customerConfirmed })
-                        }
-                        aria-label="Customer confirmed — the partner has agreed the delivery slot with the customer"
-                        className="cursor-pointer accent-primary"
-                      />
-                    </FieldRow>
                   </FieldGrid>
-                  {/* Chase window — deadline − N days; feeds the reminder
-                      task, no auto-message. Hidden once delivered. */}
+                  {/* Auto-reminder line (rev25) — the 0197 cron creates the
+                      chase task by ITSELF on deadline−N; nothing to press.
+                      N defaults to 3 (0/162 ever changed it) — click "−3d"
+                      to reveal the tuner, Items-ETA click-to-edit style. */}
                   {!deliveredDone && contactByLabel && (
-                    <div className="flex items-center justify-between gap-1 py-0.5 text-[12px] text-base-400">
+                    <div className="flex items-center gap-1 py-0.5 text-[12px] text-base-400">
                       <span className="truncate">
-                        if not booked, chase by {contactByLabel}
+                        if not booked, auto-reminder {contactByLabel}
                       </span>
-                      <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
-                        <span>−</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={60}
-                          value={form.draft.contact_by_days}
-                          onChange={(e) =>
-                            form.set("contact_by_days", e.target.value)
-                          }
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            const saved =
-                              form.control?.contact_by_days != null
-                                ? String(form.control.contact_by_days)
-                                : "";
-                            if (v !== saved)
-                              quickSave.mutate({
-                                contact_by_days: v ? Number(v) : null,
-                              });
-                          }}
-                          placeholder="3"
-                          aria-label="Chase window — days before the deadline to chase the partner"
-                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
-                        />
-                        <span>d</span>
-                      </span>
+                      {editingChaseDays ? (
+                        <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
+                          <span>−</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={60}
+                            autoFocus
+                            value={form.draft.contact_by_days}
+                            onChange={(e) =>
+                              form.set("contact_by_days", e.target.value)
+                            }
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              const saved =
+                                form.control?.contact_by_days != null
+                                  ? String(form.control.contact_by_days)
+                                  : "";
+                              if (v !== saved)
+                                quickSave.mutate({
+                                  contact_by_days: v ? Number(v) : null,
+                                });
+                              setEditingChaseDays(false);
+                            }}
+                            placeholder="3"
+                            aria-label="Days before the deadline for the automatic chase reminder"
+                            className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+                          />
+                          <span>d</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingChaseDays(true)}
+                          title="Automatic — a task is created by itself this many days before the deadline. Click to change."
+                          className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
+                        >
+                          · −{contactByDays}d auto
+                        </button>
+                      )}
                     </div>
                   )}
                     </DeliveryStep>
