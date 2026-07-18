@@ -9,6 +9,8 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
+import { useStaffSession } from "@/lib/staff";
+import StaffSwitchChip from "./staff/StaffSwitchChip";
 import {
   useCancelOrder,
   useCatalog,
@@ -159,6 +161,9 @@ export default function DealerPos({
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
   const userEmail = useAuth((s) => s.user?.email ?? "");
+  // 0232 — the PIN-verified staff member (null for principal on-behalf / dormant
+  // stores). When present the top-bar chip becomes a "换人 / switch" button.
+  const staffMember = useStaffSession((s) => s.staff);
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
 
@@ -860,22 +865,26 @@ export default function DealerPos({
               {itemCount} item{itemCount === 1 ? "" : "s"} · {rm(cartTotal)}
             </button>
           )}
-          <Link
-            to="/me"
-            title="Profile · Sign out"
-            data-testid="pos-topbar-staff"
-            style={{ textDecoration: "none", color: "inherit" }}
-          >
-            <span className="pos-staff-chip">
-              <span className="pos-staff-chip__avatar">{initials}</span>
-              <span>
-                {displayName}
-                <span className="pos-staff-chip__role" style={{ display: "block" }}>
-                  {roleLabel}
+          {staffMember ? (
+            <StaffSwitchChip variant="pos" />
+          ) : (
+            <Link
+              to="/me"
+              title="Profile · Sign out"
+              data-testid="pos-topbar-staff"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <span className="pos-staff-chip">
+                <span className="pos-staff-chip__avatar">{initials}</span>
+                <span>
+                  {displayName}
+                  <span className="pos-staff-chip__role" style={{ display: "block" }}>
+                    {roleLabel}
+                  </span>
                 </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleExit}

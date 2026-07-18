@@ -117,6 +117,15 @@ import {
   type SalespersonDto,
   type SalespersonCreateInput,
   type SalespersonsListResponse,
+  // 0232 — Staff PIN login (tiers + PIN identity on salespersons rows).
+  type StaffListResponse,
+  type StaffSessionResponse,
+  type VerifyPinInput,
+  type StaffReauthInput,
+  type CreateStaffInput,
+  type UpdateStaffInput,
+  type SetStaffPinInput,
+  type StaffDto,
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
@@ -160,6 +169,10 @@ export const qk = {
   catalogConfigHistory: (section: string) => ["catalog", "config-history", section] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
+  /** 0232 — staff PIN roster (GET /api/staff). Principal may scope to another
+   *  store via dealerId; own-store reads pass none. Kept off the `salespersons`
+   *  prefix so staff mutations that flip hasPin invalidate distinctly. */
+  staff:        (dealerId?: string) => ["staff", dealerId ?? null] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
    *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
    *  this so the rail re-reads the live RESERVED set after a trigger change. */
@@ -1369,6 +1382,135 @@ export function useDeleteSalesperson(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["salespersons"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0232 — Staff PIN login (Loo 2026-07-18)
+//
+// Read the staff roster + tier/PIN state, and the four token-minting /
+// roster-mutating calls. Verify-pin / reauth / self-token return a signed staff
+// token (StaffSessionResponse) the caller stores in `useStaffSession`; the
+// central fetcher then echoes it on every subsequent request. Roster mutations
+// invalidate BOTH `staff` (hasPin/tier) and `salespersons` (the POS dropdowns
+// read the same rows).
+// ---------------------------------------------------------------------------
+
+/** GET /api/staff — the store's staff roster + `activated`/`selfStaffId`/`storeKind`.
+ *  A principal passes another store's `dealerId` (RLS-read-all for internal roles);
+ *  own-store reads pass none. */
+export function useStaffList(
+  dealerId?: string,
+  opts?: Partial<UseQueryOptions<StaffListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.staff(dealerId),
+    queryFn: () =>
+      apiFetch<StaffListResponse>(
+        dealerId ? `/api/staff?dealerId=${dealerId}` : "/api/staff",
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** POST /api/staff/verify-pin — tap-a-tile PIN verify. Success mints a token;
+ *  errors surface via ApiError.body (bad_pin{remaining} 401 · pin_locked{lockedUntil}
+ *  423 · no_pin 409) for the keypad to render. */
+export function useVerifyPin(
+  opts?: Partial<UseMutationOptions<StaffSessionResponse, ApiError, VerifyPinInput>>,
+) {
+  return useMutation<StaffSessionResponse, ApiError, VerifyPinInput>({
+    mutationFn: (input) =>
+      apiFetch<StaffSessionResponse>("/api/staff/verify-pin", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+  });
+}
+
+/** POST /api/staff/reauth — re-prove the STORE email+password to mint an
+ *  owner-mode token (setup wizard + "Forgot PIN"). */
+export function useStaffReauth(
+  opts?: Partial<UseMutationOptions<StaffSessionResponse, ApiError, StaffReauthInput>>,
+) {
+  return useMutation<StaffSessionResponse, ApiError, StaffReauthInput>({
+    mutationFn: (input) =>
+      apiFetch<StaffSessionResponse>("/api/staff/reauth", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+  });
+}
+
+/** POST /api/staff/self-token — a salesperson-role login mints its own token
+ *  from the linked salespersons row (409 when unlinked). */
+export function useStaffSelfToken(
+  opts?: Partial<UseMutationOptions<StaffSessionResponse, ApiError, void>>,
+) {
+  return useMutation<StaffSessionResponse, ApiError, void>({
+    mutationFn: () => apiFetch<StaffSessionResponse>("/api/staff/self-token", { method: "POST" }),
+    ...opts,
+  });
+}
+
+/** POST /api/staff — create a staff member (tier gating is server-side). A
+ *  principal provisioning ANOTHER store passes `dealerId` (query param, like the
+ *  GET); own-store creates omit it and the JWT's dealer wins. */
+export function useCreateStaff(
+  opts?: Partial<UseMutationOptions<StaffDto, ApiError, CreateStaffInput & { dealerId?: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<StaffDto, ApiError, CreateStaffInput & { dealerId?: string }>({
+    mutationFn: ({ dealerId, ...input }) =>
+      apiFetch<StaffDto>(`/api/staff${dealerId ? `?dealerId=${dealerId}` : ""}`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["staff"] });
+      await qc.invalidateQueries({ queryKey: ["salespersons"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** PATCH /api/staff/:id — edit name/color/outlet/tier/active (server tier-gates). */
+export function usePatchStaff(
+  opts?: Partial<UseMutationOptions<StaffDto, ApiError, { id: string; patch: UpdateStaffInput }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<StaffDto, ApiError, { id: string; patch: UpdateStaffInput }>({
+    mutationFn: ({ id, patch }) =>
+      apiFetch<StaffDto>(`/api/staff/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["staff"] });
+      await qc.invalidateQueries({ queryKey: ["salespersons"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST /api/staff/:id/pin — set/reset a member's 6-digit PIN (server scope-gates). */
+export function useSetStaffPin(
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, { id: string } & SetStaffPinInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: true }, ApiError, { id: string } & SetStaffPinInput>({
+    mutationFn: ({ id, pin }) =>
+      apiFetch<{ ok: true }>(`/api/staff/${id}/pin`, {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["staff"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

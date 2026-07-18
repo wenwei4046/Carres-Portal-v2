@@ -1,7 +1,9 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
+import { useStaffSession } from "@/lib/staff";
 import { useDealerSelf } from "@/lib/queries";
+import StaffSwitchChip from "./staff/StaffSwitchChip";
 
 /**
  * Back-office chrome for the dealer role — fixed left sidebar + scrollable
@@ -20,11 +22,20 @@ export default function DealerChrome() {
   const dealer = useDealerSelf();
   const userEmail = useAuth((s) => s.user?.email ?? "");
   const initials = (dealer.data?.name ?? userEmail).slice(0, 2).toUpperCase();
+  const staffMember = useStaffSession((s) => s.staff);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <DealerSidebar dealerName={dealer.data?.name ?? "—"} initials={initials} />
       <main className="ml-[220px] flex-1 min-w-0">
+        {/* 0232 — current-staff chip; clicking switches (→ PIN screen). Only
+            shown when a PIN session is active (a linked salesperson's back-office
+            or a dealer/showroom after PIN). */}
+        {staffMember && (
+          <div className="sticky top-0 z-20 flex justify-end px-6 py-2.5 bg-background/90 backdrop-blur border-b border-border">
+            <StaffSwitchChip variant="kit" />
+          </div>
+        )}
         <Outlet />
       </main>
     </div>
