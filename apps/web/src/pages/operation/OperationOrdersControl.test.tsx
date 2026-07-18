@@ -652,17 +652,17 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.getByText(/Loading more… \(30 of 120\)/)).toBeInTheDocument();
   });
 
-  it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
+  it("surfaces a No-logistic queue (no-carrier count) and filters on click", () => {
     wrap(<OperationOrdersControl />);
-    // Count over the full set (the default Open tab hides the completed 1007).
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
-    // 7 orders; D has a carrier via the partner map (NETS), E has TEOW joined →
-    // the other 5 have no carrier. The Unassigned chip lives in CHASE NOW
-    // (Jess 2026-07-10: moved there from LOGISTIC — no carrier ⇒ chase).
-    const chip = screen.getByRole("button", { name: /Unassigned/ });
-    expect(chip).toHaveTextContent("5");
+    // 7 orders, 1 completed (excluded — queue counts are open-only); D has a
+    // carrier via the partner map (NETS), E has TEOW joined → 4 open orders
+    // with no carrier. B rebuild (Jess 2026-07-18): the row lives in QUEUES
+    // as "No logistic" ("Unassigned" retired — it collided with No PIC).
+    const chip = screen.getByRole("button", { name: /No logistic/ });
+    expect(chip).toHaveTextContent("4");
     fireEvent.click(chip);
-    expect(screen.getAllByTestId("order-row")).toHaveLength(5);
+    expect(screen.getAllByTestId("order-row")).toHaveLength(4);
   });
 
   it("gives each status chip a plain-English tooltip (legend)", () => {

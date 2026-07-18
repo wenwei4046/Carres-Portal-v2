@@ -370,13 +370,8 @@ export function slackDays(o: operationOrderListRow): number {
  *  Completed / TBD / undated orders sit in NO bucket (only "All" shows them). */
 const DUE_BUCKETS = ["Overdue", "Urgent", "Attention", "Upcoming", "Later"] as const;
 type DueBucket = (typeof DUE_BUCKETS)[number];
-const DUE_DESC: Record<DueBucket, string> = {
-  Overdue: "Past the delivery date",
-  Urgent: "Due today or tomorrow (≤1 day)",
-  Attention: "Due in 2–3 days",
-  Upcoming: "Due in 4–7 days",
-  Later: "More than 7 days away",
-};
+// (B rebuild 2026-07-18: the ladder's only rail surface is the Overdue queue —
+// the per-bucket DUE_DESC strings retired with the Urgent row.)
 function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (controlTabOf(o) === "completed") return null;
   const diff = daysToDue(o);
@@ -1010,7 +1005,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [kanbanOpen, setKanbanOpen] = useState(true);
   // GMAIL_FINAL C3 — per-group collapse; CATEGORY starts collapsed at the bottom.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    () => new Set(["CATEGORY"]),
+    // B rebuild: the dimension taxonomy starts folded — queues + team lead.
+    () => new Set(["FILTERS", "FIX DATA", "CATEGORY"]),
   );
   const toggleGroup = (k: string) =>
     setCollapsedGroups((prev) => {
@@ -1093,6 +1089,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const poolStaff = useMemo(() => staffList.filter((s) => s.pooled), [staffList]);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  // Owing queue filter (B rebuild) — orders with money outstanding, closed
+  // ones included (§7: owing survives Delivered).
+  const [owingOnly, setOwingOnly] = useState(false);
   const assignStaffMut = useAssignOrderStaff({
     onSuccess: () => toast.success("Reassigned"),
     onError: (e) => toast.error(`Reassign failed — ${e.message}`),
@@ -1178,26 +1177,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return c;
   }, [orders]);
 
-  // AT A GLANCE (locked spec) — the facet's top health summary, computed over the
-  // WHOLE live book (stable headline, not reactive to the status tab):
-  //   • Outstanding = Σ money customers still owe HQ (ops_order_control.balance > 0)
-  //   • At-risk     = open orders past the safe line (slackDays < 0 — the frozen
-  //                   engine's deadline+stock danger score; reused, no new logic)
-  //   • On-time     = open orders still with buffer (slackDays ≥ 0)
-  const glance = useMemo(() => {
-    let outstanding = 0;
-    let atRisk = 0;
-    let onTime = 0;
-    for (const o of orders) {
-      const bal = Number(ovlOf(o)?.balance ?? 0);
-      if (bal > 0) outstanding += bal;
-      if (controlTabOf(o) === "completed") continue;
-      if (slackDays(o) < 0) atRisk += 1;
-      else onTime += 1;
-    }
-    return { outstanding, atRisk, onTime };
-  }, [orders]);
-
   // Status-tab filter first; the Urgent chip + region pills layer on top (all
   // stackable). The chip/region counts are computed over the tab-filtered set
   // so they reflect the current view.
@@ -1205,12 +1184,32 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
     [orders, tab],
   );
-  const flaggedCount = useMemo(() => tabFiltered.filter(hasOpenTask).length, [tabFiltered, tasksByOrder]);
-  const escalateCount = useMemo(() => tabFiltered.filter(hasEscalatedTask).length, [tabFiltered, tasksByOrder]);
-  const etaCount = useMemo(() => tabFiltered.filter(needsEta).length, [tabFiltered]);
+  // LIVE scope (B rebuild, Jess 2026-07-18): every facet count runs over OPEN
+  // orders only — the 104 delivered stopped inflating Ready/NETS/KV etc.
+  const liveScope = useMemo(
+    () => tabFiltered.filter((o) => controlTabOf(o) !== "completed"),
+    [tabFiltered],
+  );
+  // Owing queue — the ONE count that deliberately spans closed orders too
+  // (§7: the owing customer is the chase that survives Delivered).
+  const owing = useMemo(() => {
+    let n = 0;
+    let rm = 0;
+    for (const o of orders) {
+      const b = Number(ovlOf(o)?.balance ?? 0);
+      if (b > 0) {
+        n += 1;
+        rm += b;
+      }
+    }
+    return { n, rm };
+  }, [orders]);
+  const flaggedCount = useMemo(() => liveScope.filter(hasOpenTask).length, [liveScope, tasksByOrder]);
+  const escalateCount = useMemo(() => liveScope.filter(hasEscalatedTask).length, [liveScope, tasksByOrder]);
+  const etaCount = useMemo(() => liveScope.filter(needsEta).length, [liveScope]);
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
-    for (const o of tabFiltered) {
+    for (const o of liveScope) {
       const b = dueBucketOf(o);
       if (b) m.set(b, (m.get(b) ?? 0) + 1);
     }
@@ -1218,10 +1217,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
       bucket: b,
       count: m.get(b) ?? 0,
     }));
-  }, [tabFiltered]);
+  }, [liveScope]);
   const regionEntries = useMemo(() => {
     const m = new Map<string, number>();
-    for (const o of tabFiltered) {
+    for (const o of liveScope) {
       const b = regionBucket(o.customer_address ?? null);
       m.set(b, (m.get(b) ?? 0) + 1);
     }
@@ -1233,10 +1232,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
       return a.localeCompare(b);
     });
     return keys.map((k) => ({ region: k, count: m.get(k) ?? 0 }));
-  }, [tabFiltered]);
+  }, [liveScope]);
   const stockEntries = useMemo(() => {
     const m = new Map<StockBucket, number>();
-    for (const o of tabFiltered) {
+    for (const o of liveScope) {
       const b = stockBucketOf(o, availableBySku);
       m.set(b, (m.get(b) ?? 0) + 1);
     }
@@ -1244,11 +1243,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
       bucket: b,
       count: m.get(b) ?? 0,
     }));
-  }, [tabFiltered, availableBySku]);
+  }, [liveScope, availableBySku]);
 
   const logisticEntries = useMemo(() => {
     const m = new Map<string, number>();
-    for (const o of tabFiltered) {
+    for (const o of liveScope) {
       const key = logisticOf(o, partnerName) ?? NO_CARRIER;
       m.set(key, (m.get(key) ?? 0) + 1);
     }
@@ -1261,16 +1260,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
         return b[1] - a[1];
       })
       .map(([carrier, count]) => ({ carrier, count }));
-  }, [tabFiltered, partnerName]);
+  }, [liveScope, partnerName]);
 
   const categoryEntries = useMemo(
     () =>
       CATEGORY_OPTS.map((opt) => ({
         key: opt.key,
         label: opt.label,
-        count: tabFiltered.filter(opt.match).length,
+        count: liveScope.filter(opt.match).length,
       })),
-    [tabFiltered],
+    [liveScope],
   );
 
   // STAFF facet counts — per pool member + "No PIC", over the current tab.
@@ -1279,13 +1278,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const staffEntries = useMemo(() => {
     const counts = new Map<string, number>();
     let none = 0;
-    for (const o of tabFiltered) {
+    for (const o of liveScope) {
       const owner = ownerOf(o);
       if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1);
       else if (controlTabOf(o) !== "completed") none += 1;
     }
     return { counts, none };
-  }, [tabFiltered]);
+  }, [liveScope]);
 
   // AUTO-ASSIGN sweep — SERVER-SIDE (Jess go-live feedback 2026-07-18): ONE
   // POST per page load from ANY operation session. The server stamps the
@@ -1352,6 +1351,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   const visible = useMemo(() => {
     let r = tabFiltered;
+    // B rebuild consistency rule: facet counts are OPEN-only (liveScope), so
+    // an active facet filter must return exactly those rows — completed
+    // orders drop out while any facet (except Owing, which deliberately
+    // spans closed orders) is engaged. Delivered history = the Delivered tab.
+    const facetActive =
+      flaggedOnly ||
+      escalateOnly ||
+      etaOnly ||
+      !!dueFilter ||
+      !!regionFilter ||
+      !!stockFilter ||
+      !!logisticFilter ||
+      !!staffFilter ||
+      categoryFilter.size > 0;
+    if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
     if (flaggedOnly) r = r.filter(hasOpenTask);
     if (escalateOnly) r = r.filter(hasEscalatedTask);
     if (etaOnly) r = r.filter(needsEta);
@@ -1364,12 +1378,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) =>
         staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
       );
+    if (owingOnly) r = r.filter((o) => Number(ovlOf(o)?.balance ?? 0) > 0);
     if (categoryFilter.size > 0) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareBySlack);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1578,6 +1593,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     !!stockFilter ||
     !!logisticFilter ||
     !!staffFilter ||
+    owingOnly ||
     !!regionFilter ||
     !!dueFilter ||
     categoryFilter.size > 0 ||
@@ -1590,6 +1606,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     setStockFilter(null);
     setLogisticFilter(null);
     setStaffFilter(null);
+    setOwingOnly(false);
     setRegionFilter(null);
     setDueFilter(null);
     setCategoryFilter(new Set());
@@ -1623,6 +1640,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             })()}`,
       onClear: () => setStaffFilter(null),
     });
+  if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
   if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
   if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
   if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
@@ -1765,6 +1783,42 @@ export default function OperationOrdersControl({ onImport }: Props) {
             </div>
           </>
         }
+        toolbarSecondary={
+          /* PIC tabs on the RIGHT listing too (Jess 2026-07-18: "every staff
+             and no pic … as tab, can click to see total list of them") — the
+             SAME staffFilter the left TEAM rows drive; click either side. */
+          poolStaff.length > 0 ? (
+            <div className="w-full flex items-center gap-1.5 justify-start overflow-x-auto no-scrollbar">
+              <StaffChip
+                label="Everyone"
+                count={liveScope.length}
+                active={!staffFilter}
+                onClick={() => setStaffFilter(null)}
+              />
+              {poolStaff.map((s) => (
+                <StaffChip
+                  key={s.user_id}
+                  label={staffLabel(s)}
+                  count={staffEntries.counts.get(s.user_id) ?? 0}
+                  active={staffFilter === s.user_id}
+                  avatar={{ text: staffInitials(s), ...avatarColor(s.user_id) }}
+                  title={s.email}
+                  onClick={() =>
+                    setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
+                  }
+                />
+              ))}
+              <StaffChip
+                label="No PIC"
+                count={staffEntries.none}
+                active={staffFilter === NO_STAFF}
+                onClick={() =>
+                  setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
+                }
+              />
+            </div>
+          ) : undefined
+        }
         bulkBar={
           selected.size > 0 ? (
             <OrdersBulkBar
@@ -1810,12 +1864,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
              scroll container is owned by <ListPageShell>. Token classes only
              (design-standard: no raw hex in new code). */
           <SectionCard>
-              {/* SUMMARY — whole-book health (Outstanding · at-risk · on-time). The
-                  ‹ on its title bar collapses the entire filter panel. */}
+              {/* QUEUES — Jess's daily questions as clickable work queues (B
+                  rebuild 2026-07-18, Gmail-label pattern): 谁欠钱 · 过期未送 ·
+                  该约车 · 等货 · 没物流. Zero rows auto-hide; NO group total
+                  (heterogeneous buckets overlap). Word law: "Not booked"/"To
+                  book" = the §12 truth-ladder word; "Urgent/At-risk" retired —
+                  ONE urgency word (Overdue). */}
               <KanbanGroup
-                title="SUMMARY"
-                collapsed={collapsedGroups.has("SUMMARY")}
-                onToggle={() => toggleGroup("SUMMARY")}
+                title="QUEUES"
+                danger
+                collapsed={collapsedGroups.has("QUEUES")}
+                onToggle={() => toggleGroup("QUEUES")}
                 headerRight={
                   <button
                     type="button"
@@ -1828,101 +1887,82 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   </button>
                 }
               >
-                {[
-                  {
-                    label: "Outstanding",
-                    value: `RM ${Math.round(glance.outstanding).toLocaleString("en-MY")}`,
-                    cls: glance.outstanding > 0 ? "text-danger" : "text-base-600",
-                  },
-                  { label: "At-risk", value: String(glance.atRisk), cls: glance.atRisk > 0 ? "text-warning" : "text-base-600" },
-                  { label: "On-time", value: String(glance.onTime), cls: "text-success" },
-                ].map((s) => (
-                  <div key={s.label} className="flex items-center justify-between px-2.5 py-1">
-                    <span className="text-[13px] text-base-700">{s.label}</span>
-                    <span className={`text-[13px] font-bold tabular-nums ${s.cls}`}>{s.value}</span>
-                  </div>
-                ))}
+                {owing.n > 0 && (
+                  <KanbanRow
+                    label="Owing"
+                    count={owing.n}
+                    valueText={`RM ${Math.round(owing.rm).toLocaleString("en-MY")}`}
+                    tone="danger"
+                    active={owingOnly}
+                    title={`${owing.n} orders still owe money (delivered included)`}
+                    onClick={() => setOwingOnly((v) => !v)}
+                  />
+                )}
+                {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
+                  <KanbanRow
+                    label="Overdue"
+                    count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
+                    tone="danger"
+                    active={dueFilter === "Overdue"}
+                    title="Past the delivery date and not delivered yet"
+                    onClick={() => setDueFilter((r) => (r === "Overdue" ? null : "Overdue"))}
+                  />
+                )}
+                {etaCount > 0 && (
+                  <KanbanRow
+                    label="To book"
+                    count={etaCount}
+                    tone="warning"
+                    active={etaOnly}
+                    title="Carrier assigned but no delivery booked and the deadline is near — call the logistic"
+                    onClick={() => setEtaOnly((v) => !v)}
+                  />
+                )}
+                {(stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0) > 0 && (
+                  <KanbanRow
+                    label="Waiting stock"
+                    count={stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0}
+                    active={stockFilter === "Waiting"}
+                    title="Goods not all in yet — PO open / awaiting arrival"
+                    onClick={() => setStockFilter((r) => (r === "Waiting" ? null : "Waiting"))}
+                  />
+                )}
+                {(logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0) > 0 && (
+                  <KanbanRow
+                    label="No logistic"
+                    count={logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0}
+                    active={logisticFilter === NO_CARRIER}
+                    title="No delivery partner assigned yet"
+                    onClick={() => setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))}
+                  />
+                )}
+                {flaggedCount > 0 && (
+                  <KanbanRow
+                    label="Follow-up"
+                    count={flaggedCount}
+                    active={flaggedOnly}
+                    title="Orders with an open follow-up note for the next operator"
+                    onClick={() => setFlaggedOnly((v) => !v)}
+                  />
+                )}
+                {escalateCount > 0 && (
+                  <KanbanRow
+                    label="For Jess"
+                    count={escalateCount}
+                    active={escalateOnly}
+                    title="Escalated to Jess — orders needing the boss's action"
+                    onClick={() => setEscalateOnly((v) => !v)}
+                  />
+                )}
               </KanbanGroup>
 
-              {/* CHASE NOW — the triage lane (title reads dark red). */}
-              <KanbanGroup
-                title="CHASE NOW"
-                danger
-                total={
-                  etaCount +
-                  (stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) +
-                  (logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0) +
-                  (regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0) +
-                  (dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0) +
-                  flaggedCount +
-                  escalateCount
-                }
-                collapsed={collapsedGroups.has("CHASE NOW")}
-                onToggle={() => toggleGroup("CHASE NOW")}
-              >
-                <KanbanRow
-                  label="No ETA"
-                  count={etaCount}
-                  active={etaOnly}
-                  title="Logistic hasn't given an ETA + deadline near (≤7d) — chase them"
-                  onClick={() => setEtaOnly((v) => !v)}
-                />
-                <KanbanRow
-                  label="No PO"
-                  count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
-                  active={stockFilter === "No PO"}
-                  onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
-                />
-                {/* Unassigned (no carrier) moved here from LOGISTIC — no carrier
-                    yet ⇒ needs chasing (Jess 2026-07-10). */}
-                <KanbanRow
-                  label="Unassigned"
-                  count={logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0}
-                  active={logisticFilter === NO_CARRIER}
-                  title="No logistic partner assigned yet — assign / chase"
-                  onClick={() => setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))}
-                />
-                {/* "No region" = region couldn't be read from the address (was the
-                    vague "Others" under REGION) — surfaced here to fix (Jess). */}
-                <KanbanRow
-                  label="No region"
-                  count={regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0}
-                  active={regionFilter === OTHERS_LABEL}
-                  title="Delivery region couldn't be read from the address — check it"
-                  onClick={() => setRegionFilter((r) => (r === OTHERS_LABEL ? null : OTHERS_LABEL))}
-                />
-                <KanbanRow
-                  label="Urgent"
-                  count={dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0}
-                  active={dueFilter === "Urgent"}
-                  title={DUE_DESC.Urgent}
-                  onClick={() => setDueFilter((r) => (r === "Urgent" ? null : "Urgent"))}
-                />
-                <KanbanRow
-                  label="Follow-up"
-                  count={flaggedCount}
-                  active={flaggedOnly}
-                  title="Orders with an open follow-up note for the next operator"
-                  onClick={() => setFlaggedOnly((v) => !v)}
-                />
-                <KanbanRow
-                  label="For Jess"
-                  count={escalateCount}
-                  active={escalateOnly}
-                  title="Escalated to Jess — orders needing the boss's action"
-                  onClick={() => setEscalateOnly((v) => !v)}
-                />
-              </KanbanGroup>
-
-              {/* STAFF — 每人一个 tab (Jess 2026-07-18): pool members + Unassigned.
+              {/* TEAM — 每人手上几张 (B rebuild): pool members + No PIC.
                   ⚙ Team manages membership / MC availability / redistribute.
                   Hidden entirely while the staff route is absent (old Worker). */}
               {staffList.length > 0 && (
                 <KanbanGroup
-                  title="STAFF"
+                  title="TEAM"
                   testid="filter-staff"
-                  /* NO total — the order count next to a people icon read as
-                     "169 staff" (Jess go-live feedback 2026-07-18). */
                   collapsed={collapsedGroups.has("STAFF")}
                   onToggle={() => toggleGroup("STAFF")}
                   headerRight={
@@ -1987,98 +2027,125 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </KanbanGroup>
               )}
 
+              {/* FILTERS — the dimension taxonomy DEMOTED (B rebuild): one
+                  collapsed fold holding Stock / Logistic / Region / Category.
+                  Group totals deleted (165/164/167 answered nothing); counts
+                  are open-only via liveScope; zero rows hidden. */}
               <KanbanGroup
-                title="STOCK"
-                total={stockEntries
-                  .filter((e) => e.bucket !== "No PO")
-                  .reduce((s, e) => s + e.count, 0)}
-                collapsed={collapsedGroups.has("STOCK")}
-                onToggle={() => toggleGroup("STOCK")}
+                title="FILTERS"
+                collapsed={collapsedGroups.has("FILTERS")}
+                onToggle={() => toggleGroup("FILTERS")}
               >
-                {/* "No PO" lives in CHASE NOW — not repeated here (Jess 2026-07-10). */}
-                {stockEntries
-                  .filter((e) => e.bucket !== "No PO")
-                  .map((e) => (
-                    <KanbanRow
-                      key={e.bucket}
-                      label={e.bucket}
-                      count={e.count}
-                      active={stockFilter === e.bucket}
-                      onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-                    />
-                  ))}
+                <KanbanGroup
+                  title="STOCK"
+                  collapsed={collapsedGroups.has("STOCK")}
+                  onToggle={() => toggleGroup("STOCK")}
+                >
+                  {/* "No PO" lives in FIX DATA — not repeated here. */}
+                  {stockEntries
+                    .filter((e) => e.bucket !== "No PO" && e.count > 0)
+                    .map((e) => (
+                      <KanbanRow
+                        key={e.bucket}
+                        label={e.bucket}
+                        count={e.count}
+                        active={stockFilter === e.bucket}
+                        onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+                      />
+                    ))}
+                </KanbanGroup>
+                <KanbanGroup
+                  title="LOGISTIC"
+                  testid="filter-logistic"
+                  collapsed={collapsedGroups.has("LOGISTIC")}
+                  onToggle={() => toggleGroup("LOGISTIC")}
+                >
+                  {/* "No logistic" lives in QUEUES — here only real carriers. */}
+                  {logisticEntries
+                    .filter((e) => e.carrier !== NO_CARRIER && e.count > 0)
+                    .map((e) => (
+                      <KanbanRow
+                        key={e.carrier}
+                        label={e.carrier}
+                        count={e.count}
+                        active={logisticFilter === e.carrier}
+                        onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+                      />
+                    ))}
+                </KanbanGroup>
+                <KanbanGroup
+                  title="REGION"
+                  collapsed={collapsedGroups.has("REGION")}
+                  onToggle={() => toggleGroup("REGION")}
+                >
+                  {/* "Others" (no region) lives in FIX DATA — here real regions. */}
+                  {regionEntries
+                    .filter((e) => e.region !== OTHERS_LABEL && e.count > 0)
+                    .map((e) => (
+                      <KanbanRow
+                        key={e.region}
+                        label={e.region}
+                        count={e.count}
+                        active={regionFilter === e.region}
+                        onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                      />
+                    ))}
+                </KanbanGroup>
+                <KanbanGroup
+                  title="CATEGORY"
+                  collapsed={collapsedGroups.has("CATEGORY")}
+                  onToggle={() => toggleGroup("CATEGORY")}
+                >
+                  {categoryEntries
+                    .filter((e) => e.count > 0)
+                    .map((e) => (
+                      <KanbanRow
+                        key={e.key}
+                        label={e.label}
+                        count={e.count}
+                        active={categoryFilter.has(e.key)}
+                        onClick={() =>
+                          setCategoryFilter((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(e.key)) next.delete(e.key);
+                            else next.add(e.key);
+                            return next;
+                          })
+                        }
+                      />
+                    ))}
+                </KanbanGroup>
               </KanbanGroup>
 
-              <KanbanGroup
-                title="LOGISTIC"
-                testid="filter-logistic"
-                total={logisticEntries
-                  .filter((e) => e.carrier !== NO_CARRIER)
-                  .reduce((s, e) => s + e.count, 0)}
-                collapsed={collapsedGroups.has("LOGISTIC")}
-                onToggle={() => toggleGroup("LOGISTIC")}
-              >
-                {/* Unassigned moved to CHASE NOW — here only real carriers (Jess). */}
-                {logisticEntries
-                  .filter((e) => e.carrier !== NO_CARRIER)
-                  .map((e) => (
+              {/* FIX DATA — broken records to repair, NOT people to chase (B
+                  rebuild): unreadable region + missing PO. Hidden when clean. */}
+              {((regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0) > 0 ||
+                (stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) > 0) && (
+                <KanbanGroup
+                  title="FIX DATA"
+                  collapsed={collapsedGroups.has("FIX DATA")}
+                  onToggle={() => toggleGroup("FIX DATA")}
+                >
+                  {(regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0) > 0 && (
                     <KanbanRow
-                      key={e.carrier}
-                      label={e.carrier}
-                      count={e.count}
-                      active={logisticFilter === e.carrier}
-                      onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+                      label="No region"
+                      count={regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0}
+                      active={regionFilter === OTHERS_LABEL}
+                      title="Delivery region couldn't be read from the address — fix the address"
+                      onClick={() => setRegionFilter((r) => (r === OTHERS_LABEL ? null : OTHERS_LABEL))}
                     />
-                  ))}
-              </KanbanGroup>
-
-              <KanbanGroup
-                title="REGION"
-                total={regionEntries
-                  .filter((e) => e.region !== OTHERS_LABEL)
-                  .reduce((s, e) => s + e.count, 0)}
-                collapsed={collapsedGroups.has("REGION")}
-                onToggle={() => toggleGroup("REGION")}
-              >
-                {/* "Others" (no region) moved to CHASE NOW as "No region" — here
-                    only real regions (Jess 2026-07-10). */}
-                {regionEntries
-                  .filter((e) => e.region !== OTHERS_LABEL)
-                  .map((e) => (
+                  )}
+                  {(stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) > 0 && (
                     <KanbanRow
-                      key={e.region}
-                      label={e.region}
-                      count={e.count}
-                      active={regionFilter === e.region}
-                      onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                      label="No PO"
+                      count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
+                      active={stockFilter === "No PO"}
+                      title="No purchase order raised yet — open the order to raise it"
+                      onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
                     />
-                  ))}
-              </KanbanGroup>
-
-              {/* CATEGORY — its own group at the bottom, collapsed by default.
-                  No total (category matches overlap → the sum misleads). */}
-              <KanbanGroup
-                title="CATEGORY"
-                collapsed={collapsedGroups.has("CATEGORY")}
-                onToggle={() => toggleGroup("CATEGORY")}
-              >
-                {categoryEntries.map((e) => (
-                  <KanbanRow
-                    key={e.key}
-                    label={e.label}
-                    count={e.count}
-                    active={categoryFilter.has(e.key)}
-                    onClick={() =>
-                      setCategoryFilter((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(e.key)) next.delete(e.key);
-                        else next.add(e.key);
-                        return next;
-                      })
-                    }
-                  />
-                ))}
-              </KanbanGroup>
+                  )}
+                </KanbanGroup>
+              )}
           </SectionCard>
         }
       >
@@ -2387,13 +2454,26 @@ function KanbanRow({
   active,
   onClick,
   title,
+  valueText,
+  tone,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
   title?: string;
+  /** Override the count display (e.g. the Owing queue shows RM, not a count). */
+  valueText?: string;
+  /** Queue severity colour on the value (B rebuild): danger red · warning amber. */
+  tone?: "danger" | "warning";
 }) {
+  const valueColor = active
+    ? "#0B0B0B"
+    : tone === "danger"
+      ? "#A32D2D"
+      : tone === "warning"
+        ? "#854F0B"
+        : "#5F6368";
   return (
     <button
       type="button"
@@ -2413,9 +2493,9 @@ function KanbanRow({
       </span>
       <span
         className="text-[13px] tabular-nums shrink-0"
-        style={{ color: active ? "#0B0B0B" : "#5F6368", fontWeight: active ? 700 : 400 }}
+        style={{ color: valueColor, fontWeight: active || tone ? 700 : 400 }}
       >
-        {count}
+        {valueText ?? count}
       </span>
     </button>
   );
@@ -2465,6 +2545,51 @@ function KanbanGroup({
       />
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
+  );
+}
+
+/** PIC tab chip — the right-side per-person tabs above the table (Jess
+ *  2026-07-18). Mirrors the left TEAM rows: same staffFilter, blue =
+ *  selection. */
+function StaffChip({
+  label,
+  count,
+  active,
+  onClick,
+  avatar,
+  title,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  avatar?: { text: string; bg: string; fg: string };
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] whitespace-nowrap transition-colors ${
+        active
+          ? "border-transparent font-bold text-[#0B0B0B]"
+          : "border-base-200 bg-white text-base-700 hover:border-base-400"
+      }`}
+      style={active ? { backgroundColor: "#C2E7FF" } : undefined}
+    >
+      {avatar && (
+        <span
+          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+          style={{ background: avatar.bg, color: avatar.fg }}
+        >
+          {avatar.text}
+        </span>
+      )}
+      {label}
+      <span className="tabular-nums text-[11px] text-base-500">{count}</span>
+    </button>
   );
 }
 
