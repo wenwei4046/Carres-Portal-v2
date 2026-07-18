@@ -13,7 +13,6 @@ import {
   Bell,
   Check,
   CheckCircle2,
-  Clock3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -712,98 +711,73 @@ function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
 }
 
-/** Delivery step band (rev23, Jess) — VERB bands: 1 Assign logistic › 2 Call
- *  customer › 3 Notes. `who` names the owner of that step (word law: bands =
- *  actions, the left rail = states). Same visual language as the Items
- *  category band (base-100 wash, 12/700 caps). NO status pill here — state is
- *  painted ONCE, on the rail. */
-function DeliveryStepBand({
+/** One step of the Delivery tab timeline (rev24, Jess Option A — 合体: the
+ *  progress line IS the step header, fields live under their own step). Node
+ *  grammar = the SAME approved JourneyCard sample (done = ink-filled ✓ · the
+ *  ONE step needing work is the only coloured node: red = act now / amber =
+ *  waiting on someone · not-yet = pale ring · connector darkens over done
+ *  ground). One column, one vocabulary — nothing to cross-reference. */
+type DeliveryStepState = "done" | "act" | "wait" | "todo";
+function DeliveryStep({
   n,
-  label,
+  state,
+  title,
   who,
+  right,
+  last = false,
+  children,
 }: {
   n: number;
-  label: string;
+  state: DeliveryStepState;
+  title: string;
   who?: string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5 bg-base-100/70 rounded-[4px] px-2 py-1 mt-2.5 first:mt-0 mb-1">
-      <span className="text-[12px] font-bold tabular-nums text-base-400">{n}</span>
-      <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-base-600">
-        {label}
-      </span>
-      {who && <span className="text-[11px] text-base-400">· {who}</span>}
-    </div>
-  );
-}
-
-/** One node of the Delivery progress rail (rev23) — §8 checklist marks:
- *  done = green filled ✓ · wait = amber clock ring · part = amber n/m ·
- *  todo = grey empty ring. STATE words only; verbs live on the bands. */
-function RailNode({
-  state,
-  partText,
-  label,
-  sub,
-  subTone = "muted",
-  last = false,
-  onSubClick,
-}: {
-  state: "done" | "wait" | "part" | "todo";
-  /** the n/m readout inside a `part` dot */
-  partText?: string;
-  label: string;
-  sub?: ReactNode;
-  subTone?: "muted" | "warn" | "danger" | "ok";
+  /** header-right slot (chase buttons / open-Items link) */
+  right?: ReactNode;
   last?: boolean;
-  onSubClick?: () => void;
+  children?: ReactNode;
 }) {
-  const dot =
-    state === "done" ? (
-      <span className="w-5 h-5 rounded-full bg-success text-white flex items-center justify-center shrink-0">
-        <Check size={14} strokeWidth={3} />
-      </span>
-    ) : state === "wait" ? (
-      <span className="w-5 h-5 rounded-full bg-warning-soft text-warning border-2 border-warning flex items-center justify-center shrink-0">
-        <Clock3 size={14} strokeWidth={2.5} />
-      </span>
-    ) : state === "part" ? (
-      <span className="w-5 h-5 rounded-full bg-warning-soft text-warning border-2 border-warning flex items-center justify-center shrink-0 text-[11px] font-bold tabular-nums">
-        {partText}
-      </span>
-    ) : (
-      <span className="w-5 h-5 rounded-full bg-white border-2 border-base-300 shrink-0" />
-    );
-  const SUB_TONE: Record<string, string> = {
-    muted: "text-base-400",
-    warn: "text-warning font-semibold",
-    danger: "text-danger font-semibold",
-    ok: "text-success",
-  };
   return (
-    <div className="flex gap-2.5">
-      <div className="flex flex-col items-center">
-        {dot}
-        {!last && (
+    <div className="relative flex items-start gap-2.5 pb-3 last:pb-0">
+      {!last && (
+        <span
+          aria-hidden="true"
+          className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
+            state === "done" ? "bg-base-800" : "bg-base-200"
+          }`}
+        />
+      )}
+      <span
+        className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
+          state === "done"
+            ? "bg-base-800 text-white"
+            : state === "act"
+              ? "bg-error-soft text-danger ring-2 ring-danger"
+              : state === "wait"
+                ? "bg-warning-soft text-warning"
+                : "bg-white border-2 border-base-300 text-base-400"
+        }`}
+      >
+        {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-h-6">
           <span
-            className={`w-0.5 flex-1 my-0.5 ${state === "done" ? "bg-success" : "bg-base-200"}`}
-          />
-        )}
-      </div>
-      <div className={last ? "" : "pb-3"}>
-        <div
-          className={`text-[13px] font-semibold ${state === "todo" ? "text-base-400" : "text-base-700"}`}
-        >
-          {label}
-        </div>
-        {sub && (
-          <div
-            className={`text-[12px] ${SUB_TONE[subTone]} ${onSubClick ? "cursor-pointer" : ""}`}
-            onClick={onSubClick}
+            className={`text-[13px] font-semibold ${
+              state === "todo" ? "text-base-400" : "text-base-900"
+            }`}
           >
-            {sub}
-          </div>
-        )}
+            {title}
+          </span>
+          {who && (
+            <span className="text-[11px] text-base-400 truncate">· {who}</span>
+          )}
+          {right && (
+            <span className="ml-auto flex items-center gap-1.5 shrink-0">
+              {right}
+            </span>
+          )}
+        </div>
+        {children}
       </div>
     </div>
   );
@@ -3394,237 +3368,100 @@ function DrawerBody({
               />
             }
             summary={
-              /* 1A (2026-07-18, Jess) — the chip reads what's REALLY known, in
-                 truth order: Delivered ✓ › on hold › overdue › booked › not
-                 booked › no carrier. "booked" = logistic_eta (the partner's
-                 committed date, 1/162 filled); assigned-but-unbooked is the
-                 93% normal state and must NOT read as failure. A delivered
-                 order never alarms (pre-golive guardrail #2). */
-              (() => {
-                if (deliveredDone)
-                  return <MiniBadge tone="ready">Delivered ✓</MiniBadge>;
-                if (balanceGate === "hold" || storageGate === "hold")
-                  return (
+              /* rev24 header (Jess): DEADLINE readout + the truth-ladder chip
+                 (Delivered ✓ › on hold › overdue Nd › booked › not booked ›
+                 no carrier). "booked" = logistic_eta; assigned-but-unbooked
+                 is the 93% normal state and must NOT read as failure. A
+                 delivered order never alarms (pre-golive guardrail #2). */
+              <span className="flex items-center gap-2 min-w-0">
+                {deadlineLabel !== "—" && (
+                  <span className="text-[11px] text-base-400 whitespace-nowrap">
+                    deadline{" "}
                     <span
-                      title="Delivery on hold — collect the balance / storage fee before dispatch"
-                      className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
+                      className={`text-[13px] font-semibold tabular-nums ${
+                        overDeadline && !deliveredDone
+                          ? "text-danger"
+                          : "text-base-900"
+                      }`}
                     >
-                      <AlertCircle size={14} strokeWidth={2.5} />
-                      on hold
+                      {deadlineLabel}
                     </span>
-                  );
-                if (daysToDelivery !== null && daysToDelivery < 0)
-                  return (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
-                      overdue
-                    </span>
-                  );
-                const eta = form.control?.logistic_eta ?? null;
-                if (eta)
-                  return (
-                    <MiniBadge tone="ready">
-                      booked {fmtDate(eta).split(", ")[0]}
-                    </MiniBadge>
-                  );
-                if (order.ops_assigned_logistic)
-                  return <MiniBadge tone="waiting">not booked</MiniBadge>;
-                return <MiniBadge tone="muted">no carrier</MiniBadge>;
-              })()
+                  </span>
+                )}
+                {(() => {
+                  if (deliveredDone)
+                    return <MiniBadge tone="ready">Delivered ✓</MiniBadge>;
+                  if (balanceGate === "hold" || storageGate === "hold")
+                    return (
+                      <span
+                        title="Delivery on hold — collect the balance / storage fee before dispatch"
+                        className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
+                      >
+                        <AlertCircle size={14} strokeWidth={2.5} />
+                        on hold
+                      </span>
+                    );
+                  if (daysToDelivery !== null && daysToDelivery < 0)
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
+                        overdue {-daysToDelivery}d
+                      </span>
+                    );
+                  const eta = form.control?.logistic_eta ?? null;
+                  if (eta)
+                    return (
+                      <MiniBadge tone="ready">
+                        booked {fmtDate(eta).split(", ")[0]}
+                      </MiniBadge>
+                    );
+                  if (order.ops_assigned_logistic)
+                    return <MiniBadge tone="waiting">not booked</MiniBadge>;
+                  return <MiniBadge tone="muted">no carrier</MiniBadge>;
+                })()}
+              </span>
             }
           >
             <div className="p-3 min-h-0 overflow-auto flex-1">
-              {/* rev23 (Jess, V2 revised): LEFT vertical progress rail (STATE
-                  words, §8 marks, top-to-bottom — incl the read-only Stock node
-                  so the logistic sees goods readiness before calling) + next-
-                  action card with the chase buttons; RIGHT = the verb bands
-                  1 ASSIGN LOGISTIC › 2 CALL CUSTOMER › 3 NOTES. State paints
-                  ONCE (rail); a delivered order collapses the rail. */}
-              <div className="flex items-start gap-6">
-                <div className="w-[230px] shrink-0">
-                  {deliveredDone ? (
-                    /* Journey over — no dead 4-dot furniture (intl pattern:
-                       completed rails collapse). */
-                    <div className="flex items-center gap-2 text-[13px] font-semibold text-success pt-1">
-                      <span className="w-5 h-5 rounded-full bg-success text-white flex items-center justify-center shrink-0">
-                        <Check size={14} strokeWidth={3} />
-                      </span>
-                      Delivered
-                    </div>
-                  ) : (
-                    <>
-                      <RailNode
-                        state={order.ops_assigned_logistic ? "done" : "wait"}
-                        label="Assigned"
-                        sub={
-                          order.ops_assigned_logistic
-                            ? (chasePartnerName ?? "carrier set")
-                            : "pick a carrier"
-                        }
-                        subTone={order.ops_assigned_logistic ? "muted" : "warn"}
-                      />
-                      {goodsN > 0 && (
-                        <RailNode
-                          state={readyN === goodsN ? "done" : "part"}
-                          partText={`${readyN}/${goodsN}`}
-                          label="Stock ready"
-                          sub={
-                            readyN === goodsN ? (
-                              "all ready"
-                            ) : (
-                              <>
-                                {stockCats.find((c) => !c.allReady)?.status ?? ""}
-                                {" · "}
-                                <span className="text-info">open Items ›</span>
-                              </>
-                            )
-                          }
-                          subTone={readyN === goodsN ? "muted" : "warn"}
-                          onSubClick={
-                            readyN === goodsN ? undefined : () => setTab("items")
-                          }
-                        />
-                      )}
-                      <RailNode
-                        state={
-                          form.control?.logistic_eta
-                            ? "done"
-                            : order.ops_assigned_logistic
-                              ? "wait"
-                              : "todo"
-                        }
-                        label="Booked"
-                        sub={
-                          form.control?.logistic_eta
-                            ? fmtDate(form.control.logistic_eta).split(", ")[0]
-                            : "not booked"
-                        }
-                        subTone={form.control?.logistic_eta ? "muted" : "warn"}
-                      />
-                      <RailNode
-                        state="todo"
-                        label="Delivered"
-                        sub={
-                          daysToDelivery !== null && daysToDelivery < 0
-                            ? `Overdue ${-daysToDelivery}d`
-                            : deadlineLabel !== "—"
-                              ? `deadline ${deadlineLabel}`
-                              : undefined
-                        }
-                        subTone={
-                          daysToDelivery !== null && daysToDelivery < 0
-                            ? "danger"
-                            : "muted"
-                        }
-                        last
-                      />
-                      {/* Next-action card — the ONE place that says what to do
-                          now + the chase window + the real chase buttons. */}
-                      <div className="mt-3 rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-2">
-                        {(() => {
-                          const eta = form.control?.logistic_eta ?? null;
-                          const late =
-                            daysToDelivery !== null && daysToDelivery < 0;
-                          if (balanceGate === "hold" || storageGate === "hold")
-                            return (
-                              <div className="text-[12px] text-base-600">
-                                <span className="text-[13px] font-semibold text-danger block">
-                                  On hold
-                                </span>
-                                Collect the balance / storage fee before dispatch
-                              </div>
-                            );
-                          if (!order.ops_assigned_logistic)
-                            return (
-                              <div className="text-[12px] text-base-600">
-                                <span className="text-[13px] font-semibold text-base-700 block">
-                                  No carrier
-                                </span>
-                                Pick a carrier in step 1
-                              </div>
-                            );
-                          if (!eta)
-                            return (
-                              <div className="text-[12px] text-base-600">
-                                <span
-                                  className={`text-[13px] font-semibold block ${late ? "text-danger" : "text-warning"}`}
-                                >
-                                  {late
-                                    ? `Overdue ${daysToDelivery === null ? "" : -daysToDelivery}d`
-                                    : "Not booked"}
-                                </span>
-                                Chase {chasePartnerName ?? "the partner"} to book
-                                the customer
-                              </div>
-                            );
-                          return (
-                            <div className="text-[12px] text-base-600">
-                              <span className="text-[13px] font-semibold text-success block">
-                                Booked {fmtDate(eta).split(", ")[0]}
-                              </span>
-                              {late
-                                ? "Past the deadline — confirm the slot"
-                                : "Waiting for delivery"}
-                            </div>
-                          );
-                        })()}
-                        {contactByLabel && (
-                          <div className="flex items-center justify-between gap-1 mt-1.5 text-[12px] text-base-400">
-                            <span className="truncate">chase by {contactByLabel}</span>
-                            <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
-                              <span>−</span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={60}
-                                value={form.draft.contact_by_days}
-                                onChange={(e) =>
-                                  form.set("contact_by_days", e.target.value)
-                                }
-                                onBlur={(e) => {
-                                  const v = e.target.value.trim();
-                                  const saved =
-                                    form.control?.contact_by_days != null
-                                      ? String(form.control.contact_by_days)
-                                      : "";
-                                  if (v !== saved)
-                                    quickSave.mutate({
-                                      contact_by_days: v ? Number(v) : null,
-                                    });
-                                }}
-                                placeholder="3"
-                                aria-label="Chase window — days before the deadline to chase the partner"
-                                className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
-                              />
-                              <span>d</span>
-                            </span>
-                          </div>
-                        )}
-                        {order.ops_assigned_logistic && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            <Btn
-                              variant="ghost"
-                              size="sm"
-                              icon={Bell}
-                              onClick={() => copyChase("logistic", "reminder")}
-                            >
-                              Remind
-                            </Btn>
-                            <Btn
-                              variant="box"
-                              size="sm"
-                              icon={MessageCircle}
-                              onClick={() => copyChase("logistic", "chase")}
-                            >
-                              Chase
-                            </Btn>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="w-full max-w-[620px] min-w-0">
-                  <DeliveryStepBand n={1} label="Assign logistic" who="you" />
+              {/* rev24 (Jess Option A — 合体): ONE column, ONE vocabulary — the
+                  progress line IS the step header and each step's fields live
+                  under their own node. Node grammar = the approved JourneyCard
+                  sample (ink ✓ done · ONE coloured current node: red act /
+                  amber waiting · pale ring not-yet). Stock is a read-only step
+                  so the logistic sees goods readiness before calling. */}
+              {(() => {
+                const eta = form.control?.logistic_eta ?? null;
+                const late = daysToDelivery !== null && daysToDelivery < 0;
+                const hasStockStep = goodsN > 0;
+                // done-flags in step order; the FIRST not-done step is the one
+                // coloured node (red when the order is already late).
+                const doneFlags = [
+                  !!order.ops_assigned_logistic,
+                  ...(hasStockStep ? [readyN === goodsN] : []),
+                  !!eta,
+                  deliveredDone,
+                ];
+                const current = doneFlags.findIndex((d) => !d);
+                const stepState = (
+                  idx: number,
+                  tone: "act" | "wait",
+                ): DeliveryStepState =>
+                  doneFlags[idx]
+                    ? "done"
+                    : idx === current
+                      ? late
+                        ? "act"
+                        : tone
+                      : "todo";
+                const nCall = hasStockStep ? 3 : 2;
+                const nDeliv = hasStockStep ? 4 : 3;
+                return (
+                  <div className="max-w-[700px]">
+                    <DeliveryStep
+                      n={1}
+                      state={stepState(0, "act")}
+                      title="Assign logistic"
+                      who="you"
+                    >
                   <FieldGrid>
                     <RoutingFields
                       orderId={order.id}
@@ -3684,44 +3521,79 @@ function DrawerBody({
                       />
                     )}
                   </FieldGrid>
-                  <DeliveryStepBand
-                    n={2}
-                    label="Call customer"
-                    who="NETS — keyed by us for now"
-                  />
-                  {/* The call briefing — what the logistic must know BEFORE
-                      dialling: goods readiness (SAME stockCats the Items tab
-                      derives from) + the outstanding balance (SAME balanceDue
-                      the Balance tab shows; hidden when no total is set — we
-                      never show a wrong RM0 to someone on the phone). */}
-                  {!deliveredDone && (
-                    <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 mb-1">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 mb-0.5">
-                        Before the call
-                      </div>
-                      <div className="text-[12px] text-base-700 leading-relaxed">
-                        {stockCats.map((c, i) => (
-                          <span key={c.cat}>
-                            {i > 0 && " · "}
-                            {c.label} {c.ready}/{c.total}
-                            {c.allReady ? (
-                              " ✓"
-                            ) : (
-                              <span className="text-warning"> — {c.status}</span>
-                            )}
-                          </span>
-                        ))}
-                        {totalSet && balanceDue > 0 && (
+                    </DeliveryStep>
+                    {/* Stock — READ-ONLY (guardrail: the work lives in Items);
+                        here so the logistic knows what to tell the customer.
+                        SAME stockCats the Items tab derives from. */}
+                    {hasStockStep && (
+                      <DeliveryStep
+                        n={2}
+                        state={stepState(1, "wait")}
+                        title={`Stock ready ${readyN}/${goodsN}`}
+                        who="read-only — work in Items"
+                        right={
+                          <button
+                            type="button"
+                            onClick={() => setTab("items")}
+                            className="text-[12px] text-info hover:underline whitespace-nowrap"
+                          >
+                            open Items ›
+                          </button>
+                        }
+                      >
+                        <div className="text-[12px] text-base-700 leading-relaxed py-0.5">
+                          {stockCats.map((c, i) => (
+                            <span key={c.cat}>
+                              {i > 0 && " · "}
+                              {c.label} {c.ready}/{c.total}
+                              {c.allReady ? (
+                                " ✓"
+                              ) : (
+                                <span className="text-warning"> — {c.status}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </DeliveryStep>
+                    )}
+                    <DeliveryStep
+                      n={nCall}
+                      state={stepState(hasStockStep ? 2 : 1, "wait")}
+                      title="Call customer"
+                      who="NETS — keyed by us for now"
+                      right={
+                        order.ops_assigned_logistic && !deliveredDone ? (
                           <>
-                            {stockCats.length > 0 && " · "}
-                            balance{" "}
-                            <span className="font-semibold text-danger">
-                              {RM(balanceDue)}
-                            </span>{" "}
-                            to collect
+                            <Btn
+                              variant="ghost"
+                              size="sm"
+                              icon={Bell}
+                              onClick={() => copyChase("logistic", "reminder")}
+                            >
+                              Remind
+                            </Btn>
+                            <Btn
+                              variant="box"
+                              size="sm"
+                              icon={MessageCircle}
+                              onClick={() => copyChase("logistic", "chase")}
+                            >
+                              Chase
+                            </Btn>
                           </>
-                        )}
-                      </div>
+                        ) : undefined
+                      }
+                    >
+                  {/* Money the caller must mention — SAME balanceDue the
+                      Balance tab shows; hidden when no total is set (never a
+                      wrong RM0 on the phone). Stock already told in step 2. */}
+                  {!deliveredDone && totalSet && balanceDue > 0 && (
+                    <div className="text-[12px] text-base-700 py-0.5">
+                      collect{" "}
+                      <span className="font-semibold text-danger">
+                        {RM(balanceDue)}
+                      </span>{" "}
+                      before delivery
                     </div>
                   )}
                   <FieldGrid>
@@ -3746,14 +3618,69 @@ function DrawerBody({
                       />
                     </FieldRow>
                   </FieldGrid>
-                  <DeliveryStepBand n={3} label="Notes" who="auto-dated" />
-                  <DeliveryNotesLog
-                    value={form.draft.customer_request}
-                    onCommit={(next) => {
-                      form.set("customer_request", next);
-                      quickSave.mutate({ customer_request: next || null });
-                    }}
-                  />
+                  {/* Chase window — deadline − N days; feeds the reminder
+                      task, no auto-message. Hidden once delivered. */}
+                  {!deliveredDone && contactByLabel && (
+                    <div className="flex items-center justify-between gap-1 py-0.5 text-[12px] text-base-400">
+                      <span className="truncate">
+                        if not booked, chase by {contactByLabel}
+                      </span>
+                      <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
+                        <span>−</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={form.draft.contact_by_days}
+                          onChange={(e) =>
+                            form.set("contact_by_days", e.target.value)
+                          }
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            const saved =
+                              form.control?.contact_by_days != null
+                                ? String(form.control.contact_by_days)
+                                : "";
+                            if (v !== saved)
+                              quickSave.mutate({
+                                contact_by_days: v ? Number(v) : null,
+                              });
+                          }}
+                          placeholder="3"
+                          aria-label="Chase window — days before the deadline to chase the partner"
+                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+                        />
+                        <span>d</span>
+                      </span>
+                    </div>
+                  )}
+                    </DeliveryStep>
+                    {/* Bare on purpose — "overdue Nd" lives ONCE, in the
+                        header (state paints once). */}
+                    <DeliveryStep
+                      n={nDeliv}
+                      state={stepState(hasStockStep ? 3 : 2, "wait")}
+                      title="Delivered"
+                      last
+                    />
+                    {/* NOTES — not a stage: the auto-dated customer log. */}
+                    <div className="border-t border-base-100 mt-2.5 pt-2">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-base-600">
+                          Notes
+                        </span>
+                        <span className="text-[11px] text-base-400">
+                          · auto-dated
+                        </span>
+                      </div>
+                      <DeliveryNotesLog
+                        value={form.draft.customer_request}
+                        onCommit={(next) => {
+                          form.set("customer_request", next);
+                          quickSave.mutate({ customer_request: next || null });
+                        }}
+                      />
+                    </div>
               {/* Carriers / route (§7.6) — HIDDEN by default: the Logistic
                   dropdown above IS the standard single-carrier route, so the
                   multi-leg bar only renders when the order actually has legs,
@@ -3782,8 +3709,9 @@ function DrawerBody({
                   />
                 </div>
               )}
-                </div>
-              </div>
+                  </div>
+                );
+              })()}
             </div>
           </Panel>
           </SectionCard>
