@@ -2158,10 +2158,12 @@ function DrawerBody({
             own §8 status vocabulary carry the state; the work surface starts
             at the top). */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
-          <div className={tab === "items" ? "min-h-full" : "hidden"}>
-          {/* 0233 (add-product P3) — dealer-submitted product change awaiting
-              approval; auto-hides when none is pending. */}
+          {/* 0233/0234 (add-product P3) — dealer-submitted product change
+              awaiting approval. ABOVE the tab gate so it shows on EVERY tab
+              (Loo live-test 2026-07-18: ops couldn't find it); auto-hides
+              when none is pending. */}
           <ChangeRequestsPanel orderId={order.id} />
+          <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
               fixed 56/44 split — NO responsive reflow, the layout is identical

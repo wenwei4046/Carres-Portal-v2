@@ -2768,6 +2768,99 @@ ordersRouter.post("/:id/change-requests", async (c) => {
   });
 });
 
+/** GET /api/orders/change-requests/pending — the ops list badge (0234):
+ *  every PENDING change request, internal roles only (the grid marks matching
+ *  rows). Static path — Hono's router prefers it over GET /:id. */
+ordersRouter.get("/change-requests/pending", async (c) => {
+  const auth = c.var.auth;
+  if (
+    auth.role !== "principal" && auth.role !== "operation" &&
+    auth.role !== "finance" && auth.role !== "bd"
+  ) {
+    throw new HTTPException(403, { message: "Internal roles only" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const r = await sb
+    .from("order_change_requests")
+    .select("id, order_id, requested_at")
+    .eq("status", "pending")
+    .order("requested_at", { ascending: false });
+  if (r.error) throw new HTTPException(500, { message: r.error.message });
+  return c.json({
+    requests: ((r.data ?? []) as Array<{ id: string; order_id: string; requested_at: string }>).map(
+      (row) => ({ id: row.id, orderId: row.order_id, requestedAt: row.requested_at }),
+    ),
+  });
+});
+
+/** POST /api/orders/:id/change-requests/:reqId/edit — 0234: replace a PENDING
+ *  request's payload in place (View request → Edit). Same zod + marker gates
+ *  as submit; the RPC owns dealer-scope + pending-only. */
+ordersRouter.post("/:id/change-requests/:reqId/edit", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  const reqCheck = z.string().uuid().safeParse(c.req.param("reqId"));
+  if (!idCheck.success || !reqCheck.success) {
+    throw new HTTPException(404, { message: "Not found" });
+  }
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = addOrderLinesInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+  for (const line of parsed.data.lines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    if (attrs.free_gift || attrs.free_item) {
+      throw new HTTPException(400, { message: "free markers are not allowed on submitted lines" });
+    }
+    const pwpAttr = attrs.pwp as { code?: unknown } | undefined;
+    if (pwpAttr && typeof pwpAttr === "object" && pwpAttr.code) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "pwp_voucher_add_not_supported",
+          message:
+            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
+        },
+        409,
+      );
+    }
+    if (attrs.sofa_build && typeof line.unitPrice !== "number") {
+      throw new HTTPException(400, {
+        message: "a sofa build line must carry its preview unitPrice for the drift gate",
+      });
+    }
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { error: rpcError } = await sb.rpc("update_order_change_request", {
+    p_request_id: reqCheck.data,
+    p_payload: { lines: parsed.data.lines },
+  });
+  const errRes = addLinesRpcError(c, rpcError, "edit_blocked");
+  if (errRes) return errRes;
+  const rowR = await sb
+    .from("order_change_requests")
+    .select("*")
+    .eq("id", reqCheck.data)
+    .maybeSingle();
+  return c.json({
+    request:
+      !rowR.error && rowR.data
+        ? Adapters.orderChangeRequestFromRow(rowR.data as DB.OrderChangeRequestRow)
+        : null,
+  });
+});
+
 /** POST /api/orders/:id/change-requests/:reqId/cancel — requester side:
  *  pending → cancelled (the RPC owns the dealer-scope + status checks). */
 ordersRouter.post("/:id/change-requests/:reqId/cancel", async (c) => {

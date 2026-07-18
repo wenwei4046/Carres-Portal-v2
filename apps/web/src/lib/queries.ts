@@ -948,6 +948,36 @@ export function useCancelOrderChangeRequest(orderId: string) {
   });
 }
 
+/** 0234 — P3.1: replace a PENDING request's payload in place (View → Edit). */
+export function useUpdateOrderChangeRequest(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { request: OrderChangeRequestDto | null },
+    ApiError,
+    { requestId: string; input: AddOrderLinesInput }
+  >({
+    mutationFn: ({ requestId, input }) =>
+      apiFetch(`/api/orders/${orderId}/change-requests/${requestId}/edit`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["orders", orderId, "change-requests"] });
+    },
+  });
+}
+
+/** 0234 — the ops grid badge: ALL pending change requests (internal only). */
+export function useAllPendingChangeRequests() {
+  return useQuery<
+    { requests: Array<{ id: string; orderId: string; requestedAt: string }> },
+    ApiError
+  >({
+    queryKey: ["change-requests", "pending"],
+    queryFn: () => apiFetch(`/api/orders/change-requests/pending`),
+  });
+}
+
 /** 0233 — P3 ops decide: APPROVE applies the lines through the full engine
  *  pipeline (fresh prices) + stamps the request; REJECT stamps with a note.
  *  Response = the re-shaped order (same cache discipline as useTopUpOrder). */
