@@ -2682,19 +2682,22 @@ function TeamPopover({
                 </div>
               </div>
               {!s.pooled ? (
+                /* Round-4: joining is AUTOMATIC on first login — the button
+                   is only an optional head-start (deals her a share today). */
                 <button
                   type="button"
-                  className="btn-secondary text-[11px] py-0.5 px-2"
+                  className="btn-ghost text-[11px] py-0.5 px-2 text-base-500"
                   disabled={mut.isPending}
+                  title="She joins automatically the first time she logs in — click only to deal her a share before that"
                   onClick={() => mut.mutate({ userId: s.user_id, pooled: true })}
                 >
-                  Add
+                  joins on first login
                 </button>
               ) : (
                 <>
                   <label
                     className="flex items-center gap-1 text-[11px] text-base-600 cursor-pointer"
-                    title="Away (MC / leave) — new orders skip them; existing orders stay until shifted"
+                    title="Planned leave — orders shift to the others while checked (day-to-day MC is automatic, no click needed)"
                   >
                     <input
                       type="checkbox"
@@ -2720,22 +2723,14 @@ function TeamPopover({
                       Shift {openCounts.get(s.user_id)}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="btn-ghost text-[11px] py-0.5 px-1.5 text-base-500"
-                    disabled={mut.isPending}
-                    title="Remove from the pool (their assigned orders keep the name until shifted)"
-                    onClick={() => mut.mutate({ userId: s.user_id, pooled: false })}
-                  >
-                    ✕
-                  </button>
                 </>
               )}
             </div>
           ))}
           <div className="t-micro text-base-400 px-3 pt-1.5 pb-1">
-            New orders auto-assign to the least-loaded member. Everyone still
-            sees every order.
+            New staff join automatically on their first login. No-show after
+            10:00 → their orders shift for the day. Leaving staff → disable
+            the account (Principal · Accounts).
           </div>
         </div>
       )}
