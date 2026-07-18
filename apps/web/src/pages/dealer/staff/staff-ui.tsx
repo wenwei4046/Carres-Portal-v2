@@ -8,7 +8,7 @@ import {
   type StaffTierDto,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useCreateStaff, useSetStaffPin } from "@/lib/queries";
+import { useCreateStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
 
 /**
  * Shared staff-admin UI (0233) — the bilingual tier labels, colour avatar,
@@ -268,6 +268,156 @@ export function SetPinModal({
 
 /** Create a staff member. `callerTier` + `storeKind` limit the offered tiers;
  *  a manager caller has the outlet forced (server enforces it too). */
+/**
+ * Self-service PIN change (Loo 2026-07-18) — EVERY tier, including the bottom
+ * one (which has no Settings access), can rotate its own PIN from the staff
+ * chip. The old PIN is verified first (same lockout as the sign-in keypad:
+ * 5 fails → 15 min), then the new PIN is saved via the self-scoped set-pin
+ * route.
+ */
+export function ChangeMyPinModal({
+  sid,
+  name,
+  onClose,
+}: {
+  sid: string;
+  name: string;
+  onClose: () => void;
+}) {
+  const [current, setCurrent] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr] = useState("");
+  const verify = useVerifyPin();
+  const setStaffPin = useSetStaffPin();
+
+  const busy = verify.isPending || setStaffPin.isPending;
+  const valid =
+    staffPinSchema.safeParse(current).success &&
+    staffPinSchema.safeParse(pin).success &&
+    pin === confirm &&
+    pin !== current;
+
+  function digits(v: string) {
+    return v.replace(/\D/g, "").slice(0, 6);
+  }
+
+  function describeVerifyError(e: unknown): string {
+    if (e instanceof ApiError) {
+      const body = e.body as { error?: string; remaining?: number } | null;
+      if (body?.error === "bad_pin") {
+        return `旧 PIN 不对 · Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
+      }
+      if (body?.error === "pin_locked") {
+        return "试太多次,已锁定 15 分钟 · Locked, try again later";
+      }
+      return e.message;
+    }
+    return "Could not verify the current PIN";
+  }
+
+  function submit() {
+    if (!valid || busy) return;
+    setErr("");
+    verify.mutate(
+      { salespersonId: sid, pin: current },
+      {
+        onSuccess: () => {
+          setStaffPin.mutate(
+            { id: sid, pin },
+            {
+              onSuccess: () => {
+                toast.success("PIN updated · 新 PIN 已生效");
+                onClose();
+              },
+              onError: (e) =>
+                setErr(e instanceof ApiError ? e.message : "Could not save the new PIN"),
+            },
+          );
+        },
+        onError: (e) => setErr(describeVerifyError(e)),
+      },
+    );
+  }
+
+  const pinInputCls =
+    "w-full px-3 py-2.5 border border-base-200 rounded text-[15px] tracking-[0.4em] font-mono bg-white outline-none focus:border-base-700";
+
+  return (
+    <ModalShell
+      title="Change my PIN"
+      subtitle={`${name} — verify your current PIN, then pick a new 6-digit one.`}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={busy} className={btnGhost}>
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!valid || busy}
+            className={btnSolid}
+            data-testid="changepin-save"
+          >
+            {busy ? "Saving…" : "Update PIN"}
+          </button>
+        </>
+      }
+    >
+      <label className="flex flex-col gap-1.5">
+        <Label>Current PIN · 旧 PIN</Label>
+        <input
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={current}
+          onChange={(e) => setCurrent(digits(e.target.value))}
+          data-testid="changepin-current"
+          className={pinInputCls}
+          placeholder="••••••"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <Label>New PIN · 新 PIN</Label>
+        <input
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={pin}
+          onChange={(e) => setPin(digits(e.target.value))}
+          data-testid="changepin-new"
+          className={pinInputCls}
+          placeholder="••••••"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <Label>Confirm new PIN · 再输一次</Label>
+        <input
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={confirm}
+          onChange={(e) => setConfirm(digits(e.target.value))}
+          data-testid="changepin-confirm"
+          className={pinInputCls}
+          placeholder="••••••"
+        />
+      </label>
+      {pin.length === 6 && confirm.length === 6 && pin !== confirm && (
+        <div className="text-[12px] text-destructive">PINs don't match.</div>
+      )}
+      {pin.length === 6 && pin === current && (
+        <div className="text-[12px] text-destructive">New PIN must differ from the current one.</div>
+      )}
+      {err && (
+        <div className="text-[12px] text-destructive" data-testid="changepin-error">
+          {err}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
 export function AddStaffModal({
   callerTier,
   storeKind,
