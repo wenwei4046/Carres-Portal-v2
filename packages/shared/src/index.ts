@@ -610,6 +610,8 @@ export {
   OPS_DAY_CUTOFF_HOUR_MYT,
   isOpsManager,
   OPS_MANAGER_EMAILS,
+  OPS_GENERIC_EMAILS,
+  isOpsGenericAccount,
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,

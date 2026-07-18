@@ -39,6 +39,7 @@ import {
   seenTodayMYT,
   countsAsInToday,
   isOpsManager,
+  isOpsGenericAccount,
   canRaisePo,
   isPoDayMYT,
   poUrgentBypass,
@@ -1127,6 +1128,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [staffList],
   );
   const poolStaff = useMemo(() => staffList.filter((s) => s.pooled), [staffList]);
+  // Not-yet-onboarded staff (Jess 2026-07-19: "show Chow first, like LC") —
+  // account created but not pooled yet. Shown greyed in TEAM so the roster
+  // reads complete BEFORE day one; her FIRST LOGIN auto-enrolls + deals her a
+  // share (round-4), no admin step. Managers + generic accounts excluded.
+  const pendingStaff = useMemo(
+    () =>
+      staffList.filter(
+        (s) =>
+          !s.pooled &&
+          !isOpsManager("operation", s.email) &&
+          !isOpsGenericAccount(s.email),
+      ),
+    [staffList],
+  );
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
   // Owing queue filter (B rebuild) — orders with money outstanding, closed
   // ones included (§7: owing survives Delivered).
@@ -2108,6 +2123,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
                             ? `${baseTitle} — controls POs this month (PO duty)`
                             : baseTitle
                         }
+                        onClick={() =>
+                          setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
+                        }
+                      />
+                    );
+                  })}
+                  {/* Not-yet-onboarded staff — visible in the roster before
+                      day one; first login auto-activates (round-4). */}
+                  {pendingStaff.map((s) => {
+                    const isDuty = poDutyHolder?.userId === s.user_id;
+                    return (
+                      <KanbanRow
+                        key={s.user_id}
+                        label={
+                          isDuty
+                            ? `${staffLabel(s)} · joins on first login · PO duty`
+                            : `${staffLabel(s)} · joins on first login`
+                        }
+                        count={0}
+                        active={staffFilter === s.user_id}
+                        title={`${s.email} — account ready; her first login auto-joins the pool and deals her a share (no admin step)`}
                         onClick={() =>
                           setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
                         }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   updateOpsStaffSettingInput,
   isOpsManager,
+  isOpsGenericAccount,
   distributeOrders,
   countsAsInToday,
   type OpsStaffMember,
@@ -96,6 +97,9 @@ async function autoEnroll(
 ) {
   if (auth.role !== "operation") return;
   if (isOpsManager(auth.role, auth.email)) return;
+  // Generic (non-person) accounts never auto-join — a login on logistics@
+  // must not start swallowing orders (round-4 intent made explicit).
+  if (isOpsGenericAccount(auth.email)) return;
   const { data: existing } = await sb
     .from("ops_staff_settings")
     .select("user_id")

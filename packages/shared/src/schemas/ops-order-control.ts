@@ -616,6 +616,17 @@ export const OPS_MANAGER_EMAILS = [
   "operation@carres.com",
   "jess@carres.com",
 ] as const;
+
+/** GENERIC (non-person) operation accounts — never auto-join the assignment
+ *  pool and never appear as a person in the TEAM rail. Round-4's "generic
+ *  accounts never auto-join" intent, made explicit: auto-enroll previously
+ *  only excluded managers, so a login on logistics@ would have silently
+ *  enrolled it and started swallowing orders. */
+export const OPS_GENERIC_EMAILS = ["logistics@carres.com"] as const;
+export function isOpsGenericAccount(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return (OPS_GENERIC_EMAILS as readonly string[]).includes(email.toLowerCase());
+}
 export function isOpsManager(
   role: string | null | undefined,
   email: string | null | undefined,
