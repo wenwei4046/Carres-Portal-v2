@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { RefreshCw, ChevronRight, ChevronDown } from "lucide-react";
 import {
   PAYMENT_STATUSES,
-  STORAGE_RATES,
   computeStorageFee,
   summarizePayments,
   type PaymentKind,

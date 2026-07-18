@@ -1516,7 +1516,6 @@ function DrawerBody({
   // Balance panel STATUS pill + status-strip Money cell (batch 2): the ledger
   // Outstanding drives them all, so pill / strip / header sticker never disagree.
   const isOwing = balanceOwing;
-  const owingAmt = moneyOutstanding;
   // Delivery-eve (page-rebuild §3.2): owing AND delivery is today/tomorrow →
   // the Balance panel shows the red flag, Outstanding reads danger, and Remind
   // switches to the final-reminder tone.
@@ -4628,7 +4627,6 @@ function MoneyCard({
   hasLineTotal,
   orderTotal,
   totalSet,
-  collected,
   lines,
   storageCharge,
   storageIncurred,

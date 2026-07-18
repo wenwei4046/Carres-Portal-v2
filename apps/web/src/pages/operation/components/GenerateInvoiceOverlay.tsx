@@ -239,7 +239,7 @@ export default function GenerateInvoiceOverlay({
     if (!no) return;
     // Customer-facing tone (§13): friendly, REF-first, never a delivery date.
     const text = [
-      `Hi ${salutationOf(customerName)},`,
+      `Hi ${salutationOf(null, customerName)},`,
       "",
       `Here is your invoice for order REF: SO-${so}.`,
       "",
@@ -260,7 +260,7 @@ export default function GenerateInvoiceOverlay({
     if (!no) return;
     const subject = `Invoice ${no} — Carres (SO-${so})`;
     const body = [
-      `Hi ${salutationOf(customerName)},`,
+      `Hi ${salutationOf(null, customerName)},`,
       "",
       `Please find your invoice details for order SO-${so}:`,
       "",
