@@ -88,12 +88,13 @@ interface Props {
   bare?: boolean;
 }
 
-// §7.8 columns (2026-07-13): ☐ · Item (model) · Size · Location · Cond ·
-// Age (days in) · PO · a per-row Reserve action. One grid for both the
-// same-model view and the loan view (the Item column shows the model either
-// way; old-ref stays searchable but is no longer a column).
-const GRID = "26px minmax(200px,2.2fr) 58px 90px 84px 50px 90px 72px"; // Item widened (Jess rev 6 — no truncation)
-const COL_LABELS = ["Item", "Size", "Location", "Cond", "Age", "PO", ""];
+// rev20 columns (Jess — the 44%-wide picker clipped Cond/Age/PO on a
+// MacBook): ☐ · Item · Size · Cond · Age · PO · Reserve. LOCATION column
+// removed — every unit sits in the ONE warehouse today (85/85), so the cell
+// was the same word forever; Cond (100% filled, the pick-deciding fact) now
+// always visible. One grid for both the same-model view and the loan view.
+const GRID = "26px minmax(130px,2fr) 54px 80px 44px 80px 64px";
+const COL_LABELS = ["Item", "Size", "Cond", "Age", "PO", ""];
 
 /** `bare` wrapper — a plain section stack slot (band + body) inside the
  *  caller's shared SectionCard. Module-level so its identity is stable across
@@ -337,7 +338,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       </div>
 
       <div className="overflow-auto" style={{ maxHeight: 268 }}>
-        <div className="min-w-[560px]">
+        <div className="min-w-[460px]">
           {/* header — §7.8 columns; neutral base-50 (the cream is the band's). */}
           <div
             className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[12px] font-bold"
@@ -386,12 +387,6 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   {r.sku}
                 </div>
                 <div className="px-2 py-1 text-[#1A1A1A] truncate">{r.size}</div>
-                <div
-                  className="px-2 py-1 text-[#1A1A1A] truncate"
-                  title={r.location ?? ""}
-                >
-                  {r.location ?? "—"}
-                </div>
                 <div className="px-2 py-1">
                   <span className={`pill ${r.condition === "exhibition" ? "pill-warning" : "pill-confirmed"}`}>
                     {r.cond}

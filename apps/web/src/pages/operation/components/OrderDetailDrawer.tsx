@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Copy,
   MessageCircle,
   Plus,
@@ -42,11 +41,12 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   computeStorageFee,
   normalizeSkuKey,
+  STOCK_LOCATIONS,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OrderPaymentMethod,
@@ -107,11 +107,7 @@ import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import {
-  RouteJourneyBar,
-  StopsEditor,
-  stopsToDisplay,
-} from "./RouteJourneyBar";
+import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -716,18 +712,7 @@ function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-/** A2 track stages (MASTER SPEC §7, 2026-07-18) — each KPI track is a
- *  full-width progress LINE of numbered nodes with the stage word under
- *  each node. done = grey (Jess's stepper reference: grey when finished). */
-type StageState = "done" | "current" | "pending";
-type TrackStage = {
-  word: string;
-  state: StageState;
-  /** Time-based lateness (ETA / deadline passed) — the CURRENT node shows a
-   *  red CLOCK instead of its number (§7: Booked 逾期未约 = 红 clock). */
-  clock?: boolean;
-};
-/** Track tone — colours the CURRENT node + its stage word. */
+/** Track tone — drives the tab-rail alert dots. */
 type KpiTone = "success" | "warning" | "danger" | "neutral";
 
 /** Dial states (MASTER SPEC §8) — NO blue: Unpaid/No-stock = gray · Deposit/
@@ -792,136 +777,6 @@ function PieDial({
   );
 }
 
-/** The CURRENT node's fill per track tone (A2) — "状态色圈带编号". A healthy
- *  current stage reads green, a warning amber, a blocker red; neutral (e.g.
- *  no total set yet) stays a quiet bold ring. */
-const CURRENT_NODE_CLS: Record<KpiTone, string> = {
-  success: "bg-success text-white",
-  warning: "bg-warning text-white",
-  danger: "bg-danger text-white",
-  neutral: "bg-white border-[1.5px] border-base-400 text-base-600",
-};
-
-/** One A2 node — 24px numbered circle: done = GREY filled ✓ · current =
- *  tone-colour circle with the number (red CLOCK when time-overdue) ·
- *  pending = grey empty ring with the number. */
-function StageNode({ n, stage, tone }: { n: number; stage: TrackStage; tone: KpiTone }) {
-  if (stage.state === "done")
-    return (
-      <span className="w-6 h-6 rounded-full grid place-items-center bg-base-400 text-white shrink-0">
-        <Check size={14} strokeWidth={2.5} aria-label={`${stage.word} — done`} />
-      </span>
-    );
-  if (stage.state === "current")
-    return (
-      <span
-        className={`w-6 h-6 rounded-full grid place-items-center shrink-0 text-[12px] font-bold ${
-          stage.clock ? "bg-danger text-white" : CURRENT_NODE_CLS[tone]
-        }`}
-      >
-        {stage.clock ? (
-          <Clock size={14} strokeWidth={2.5} aria-label={`${stage.word} — overdue`} />
-        ) : (
-          n
-        )}
-      </span>
-    );
-  return (
-    <span
-      className="w-6 h-6 rounded-full grid place-items-center bg-white border-[1.5px] border-base-300 text-base-400 shrink-0 text-[12px] font-semibold"
-      aria-label={`${stage.word} — pending`}
-    >
-      {n}
-    </span>
-  );
-}
-
-/** ProgressTrack (A2, MASTER SPEC §7 — replaces PartyCard): ONE full-width
- *  progress line per KPI track — neutral icon + label · numbered node line
- *  with the stage word under each node · right = 18px headline value (dial
- *  beside it, §8) + a SHORT summary. Chasing moved to the left-rail Chase
- *  Now panel; clicking the track opens its tab. */
-function ProgressTrack({
-  label,
-  icon: Icon,
-  stages,
-  tone,
-  value,
-  summary,
-  onOpen,
-}: {
-  label: string;
-  icon: LucideIcon;
-  stages: TrackStage[];
-  tone: KpiTone;
-  /** 18px headline (the §8 dial rides inside, beside the value). */
-  value: ReactNode;
-  /** One line under the headline — Balance "+ storage" · Stock category
-   *  badges · Delivery partner + booked state. */
-  summary?: ReactNode;
-  onOpen: () => void;
-}) {
-  return (
-    <div
-      className="kpi-box cursor-pointer transition-colors hover:border-base-300 !flex-row items-center gap-4 min-w-0"
-      onClick={onOpen}
-      role="button"
-    >
-      <span className="flex items-center gap-2 w-[120px] shrink-0">
-        <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-          <Icon size={16} strokeWidth={2} aria-hidden="true" />
-        </span>
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
-          {label}
-        </span>
-      </span>
-      {/* Node line — connectors flex between fixed stage columns; a connector
-          reads "filled" (dark) once the node BEFORE it is done. mt aligns the
-          2px line with the 24px node's centre. */}
-      <div className="flex-1 min-w-0 flex items-start px-1">
-        {stages.map((s, i) => (
-          <Fragment key={s.word}>
-            {i > 0 && (
-              <span
-                className={`flex-1 h-0.5 rounded-full mt-[11px] min-w-4 ${
-                  stages[i - 1].state === "done" ? "bg-base-400" : "bg-base-200"
-                }`}
-                aria-hidden="true"
-              />
-            )}
-            <span className="flex flex-col items-center gap-1 shrink-0 px-1.5">
-              <StageNode n={i + 1} stage={s} tone={tone} />
-              <span
-                className={`text-[12px] whitespace-nowrap ${
-                  s.state === "current"
-                    ? s.clock || tone === "danger"
-                      ? "text-danger font-semibold"
-                      : tone === "warning"
-                        ? "text-warning font-semibold"
-                        : "text-base-900 font-semibold"
-                    : s.state === "done"
-                      ? "text-base-500"
-                      : "text-base-400"
-                }`}
-              >
-                {s.word}
-              </span>
-            </span>
-          </Fragment>
-        ))}
-      </div>
-      <span className="shrink-0 text-right">
-        <span className="block text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
-        {summary && (
-          <span className="mt-0.5 flex items-center justify-end gap-1 text-[12px] text-base-500 whitespace-nowrap">
-            {summary}
-          </span>
-        )}
-      </span>
-    </div>
-  );
-}
-
 /** One Chase Now row — a counterparty that needs a push right now. */
 interface ChaseNowRow {
   key: string;
@@ -933,6 +788,9 @@ interface ChaseNowRow {
   /** red dot = overdue (sorts on top) · amber dot = needs attention. */
   urgency: "overdue" | "attention";
   onAct: (tone: "reminder" | "chase") => void;
+  /** Row click → the tab where this chase is WORKED (supplier→Items,
+   *  logistic→Delivery, customer→Balance). Manage▾ stays the chase itself. */
+  onOpen?: () => void;
 }
 
 /** Relative "how long ago" for the chase stamp — short, truncation-proof. */
@@ -981,7 +839,17 @@ function ChaseNowPanel({
         </span>
       ) : (
         rows.map((r) => (
-          <div key={r.key} className="flex items-center gap-2 min-h-9 min-w-0">
+          <div
+            key={r.key}
+            className={`flex items-center gap-2 min-h-9 min-w-0 ${
+              r.onOpen
+                ? "cursor-pointer rounded-[6px] -mx-1 px-1 hover:bg-base-50"
+                : ""
+            }`}
+            onClick={r.onOpen}
+            role={r.onOpen ? "button" : undefined}
+            title={r.onOpen ? "Open where this is worked" : undefined}
+          >
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 r.urgency === "overdue" ? "bg-danger" : "bg-warning"
@@ -1138,6 +1006,9 @@ function DrawerBody({
   // Route "Option D" — which item's journey legs are expanded in-place (one at a
   // time; the heavy detail stays inside the drawer so the list never gets busy).
   const [routeOpenSku, setRouteOpenSku] = useState<string | null>(null);
+  // rev18 — the Stock ETA column edits IN PLACE (click the date → input);
+  // the expander no longer repeats it.
+  const [etaEditSku, setEtaEditSku] = useState<string | null>(null);
   // §7.6 — the Delivery card's multi-leg "Carriers / route" block is HIDDEN by
   // default (the Logistic dropdown is the default route); it expands behind
   // "+ Add stop" and stays open once the order actually has legs.
@@ -1197,6 +1068,35 @@ function DrawerBody({
   // units too, so max() avoids double counting while surviving either path).
   const reservedCountOf = (sku: string, lineReceived: number) =>
     Math.max(lineReceived, reservedToSoByKey.get(stockMatchKey(sku)) ?? 0);
+  // rev20 (Jess) — UNRESERVE: put a picked unit back to free stock and choose
+  // again. Two-step inline confirm on the ✓ Ready pill (no browser dialog):
+  // first click arms "↩ Unreserve?", second click releases ONE unit reserved
+  // to this SO for that line (POST /api/ops/stock/release — the same endpoint
+  // the Stock page uses).
+  const [unreserveSku, setUnreserveSku] = useState<string | null>(null);
+  const releaseStock = useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch("/api/ops/stock/release", {
+        method: "POST",
+        body: JSON.stringify({ itemId }),
+      }),
+    onSuccess: () => {
+      toast.success("Unreserved — the unit is back in free stock");
+      setUnreserveSku(null);
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+    },
+    onError: (e: Error) => {
+      setUnreserveSku(null);
+      toast.error(`Couldn't unreserve — ${e.message}`);
+    },
+  });
+  const reservedUnitIdFor = (sku: string): string | null =>
+    (reservedUnitsQuery.data?.items ?? []).find(
+      (u) =>
+        u.reservedRef === soRef &&
+        stockMatchKey(u.sku) === stockMatchKey(sku),
+    )?.id ?? null;
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
@@ -1646,7 +1546,6 @@ function DrawerBody({
   const [tab, setTab] = useState<DrawerTab>("items");
   // Item-listing groups (Jess 2026-07-18): Ready collapsible; category groups
   // remember manual toggles (default: all-reserved groups start collapsed).
-  const [readyCollapsed, setReadyCollapsed] = useState(false);
   const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
   // Vertical tab rail (Jess 2026-07-17 rev 5) — collapsible to icon-only.
   const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
@@ -1795,17 +1694,6 @@ function DrawerBody({
             ? "warning"
             : "success";
 
-  // ═══ A2 stage arrays (MASTER SPEC §7/§8) — stage words per §8, sequential:
-  // the CURRENT node is the first not-done stage; clock = time-overdue. ═══
-  const confirmedDone = customerConfirmed || deliveredDone;
-  const balanceStages: TrackStage[] = [
-    { word: "Placed", state: "done" },
-    { word: "Confirmed", state: confirmedDone ? "done" : "current" },
-    {
-      word: "Paid",
-      state: paidDone ? "done" : confirmedDone ? "current" : "pending",
-    },
-  ];
   // Chase groups merged ACROSS categories by PO (a PO spanning two categories
   // is one counterparty) — un-ready categories only.
   const chaseByPo = new Map<string, ChaseGroup>();
@@ -1823,98 +1711,6 @@ function DrawerBody({
     }
   }
   const chaseGroups = [...chaseByPo.values()];
-  const stockAllReady = goodsN > 0 && readyN === goodsN;
-  // "PO raised" = every un-reserved line is covered by a PO; "ETA set" =
-  // every open PO carries an ETA (vacuously true for in-stock goods that
-  // just await reserving — the current stage then reads "Goods ready").
-  const poRaisedDone = stockAllReady || (goodsN > 0 && nopoN === 0);
-  const etaSetDone =
-    stockAllReady || (poRaisedDone && chaseGroups.every((g) => g.eta));
-  const stockStages: TrackStage[] =
-    deliveredDone
-      ? /* Delivered = closed — the goods went out; nothing left to shout
-           (pre-golive guardrail #2: no red on delivered orders). */
-        [
-          { word: "PO raised", state: "done" },
-          { word: "ETA set", state: "done" },
-          { word: "Goods ready", state: "done" },
-        ]
-      : goodsN === 0
-      ? [
-          { word: "PO raised", state: "pending" },
-          { word: "ETA set", state: "pending" },
-          { word: "Goods ready", state: "pending" },
-        ]
-      : [
-          { word: "PO raised", state: poRaisedDone ? "done" : "current" },
-          {
-            word: "ETA set",
-            state: etaSetDone ? "done" : poRaisedDone ? "current" : "pending",
-          },
-          {
-            word: "Goods ready",
-            state: stockAllReady ? "done" : etaSetDone ? "current" : "pending",
-            clock: stockDelayed,
-          },
-        ];
-  const deliveryStages: TrackStage[] = [
-    {
-      word: "Assigned",
-      state: assignedLogisticName || deliveredDone ? "done" : "current",
-    },
-    {
-      word: "Booked",
-      state:
-        bookedEta || deliveredDone
-          ? "done"
-          : assignedLogisticName
-            ? "current"
-            : "pending",
-      clock: overDeadline,
-    },
-    {
-      word: "Delivered",
-      state: deliveredDone ? "done" : bookedEta ? "current" : "pending",
-      clock: overDeadline,
-    },
-  ];
-
-  // ═══ Track summaries (§7) — one short line under each headline. ═══
-  // Balance: the storage fee joins the readout while it accrues.
-  const storageBit = storageOwing
-    ? storageCharge > 0
-      ? `+ ${RM(storageCharge)} storage`
-      : "+ storage accruing"
-    : null;
-  const balanceSummary = storageBit
-    ? balanceOwing
-      ? `${RM(moneyOutstanding)} ${storageBit}`
-      : storageBit
-    : undefined;
-  // Stock: per-category mini badges — [MS 0/8][BF 0/4][ACC ✓].
-  const CAT_CODE = { mattress: "MS", bedframe: "BF", sofa: "SOF", acc: "ACC" } as const;
-  const stockSummary =
-    stockCats.length > 0 ? (
-      <>
-        {stockCats.map((c) => (
-          <MiniBadge
-            key={c.cat}
-            tone={
-              deliveredDone || c.allReady ? "ready" : c.hot ? "nopo" : "waiting"
-            }
-          >
-            {CAT_CODE[c.cat]}{" "}
-            {deliveredDone || c.allReady ? "✓" : `${c.ready}/${c.total}`}
-          </MiniBadge>
-        ))}
-      </>
-    ) : undefined;
-  // Delivery: partner + booked state (the headline already holds the deadline).
-  const deliverySummary = deliveredDone
-    ? (chasePartnerName ?? "Delivered")
-    : `${chasePartnerName ?? "No partner"} · ${
-        bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"
-      }`;
 
   // ═══ Chase Now rows (§7, B2) — one per COUNTERPARTY; overdue on top.
   // A delivered order is CLOSED: no supplier/logistic chasing remains — only
@@ -1975,6 +1771,7 @@ function DrawerBody({
           { label: p.label, poNo: p.poNos.join(" / "), lines: p.lines },
           tone,
         ),
+      onOpen: () => setTab("items"),
     };
   });
   if (chasePartnerName && !deliveredDone && (!bookedEta || overDeadline)) {
@@ -1987,6 +1784,7 @@ function DrawerBody({
         : `not booked · due ${deadlineLabel}`,
       urgency: overDeadline ? "overdue" : "attention",
       onAct: (tone) => copyChase("logistic", tone),
+      onOpen: () => setTab("delivery"),
     });
   }
   if (balanceOwing) {
@@ -1996,6 +1794,7 @@ function DrawerBody({
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
+      onOpen: () => setTab("balance"),
     });
   }
   chaseRows.sort(
@@ -2302,98 +2101,11 @@ function DrawerBody({
           </button>
         </nav>
         </div>
-        {/* RIGHT — A2 progress tracks pinned + the tab content below. */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-        {/* ═══ A2 PROGRESS TRACKS (MASTER SPEC §7, 2026-07-18) — the three
-            KPI boxes became three FULL-WIDTH progress lines: numbered nodes
-            + stage words + right headline (dial beside the value, §8) + a
-            short summary. All chasing lives in the left-rail Chase Now
-            panel; clicking a track opens its tab. */}
-        <div className="shrink-0 flex flex-col gap-2.5">
-          <ProgressTrack
-            label="Balance"
-            icon={Wallet}
-            stages={balanceStages}
-            tone={moneyTone}
-            value={
-              /* §8 — the payment dial sits BESIDE the headline value. */
-              <span className="inline-flex items-center gap-1.5">
-                <PieDial px={20} fraction={payFraction} state={payDialState} />
-                {paidDone ? (
-                  <span className="text-success">Paid</span>
-                ) : balanceOwing ? (
-                  <span className="text-danger">{RM(moneyOutstanding)}</span>
-                ) : totalSet ? (
-                  RM(moneyOutstanding)
-                ) : (
-                  <span className="text-base-400 font-semibold">No total</span>
-                )}
-              </span>
-            }
-            summary={balanceSummary}
-            onOpen={() => setTab("balance")}
-          />
-          <ProgressTrack
-            label="Stock"
-            icon={Package}
-            stages={stockStages}
-            tone={stockTone}
-            value={
-              /* §8 — the stock dial sits BESIDE the headline value. A
-                 delivered order reads green "Delivered" (guardrail #2). */
-              <span className="inline-flex items-center gap-1.5">
-                <PieDial
-                  px={20}
-                  fraction={
-                    deliveredDone ? 1 : goodsN === 0 ? 0 : readyN / goodsN
-                  }
-                  state={
-                    deliveredDone
-                      ? "green"
-                      : goodsN === 0
-                        ? "gray"
-                        : readyN === goodsN
-                          ? "green"
-                          : stockDelayed
-                            ? "red"
-                            : "amber"
-                  }
-                />
-                {deliveredDone ? (
-                  <span className="text-success">Delivered</span>
-                ) : goodsN === 0 ? (
-                  <span className="text-base-400 font-semibold">—</span>
-                ) : readyN === goodsN ? (
-                  <span className="text-success">{`${readyN}/${goodsN} ready`}</span>
-                ) : stockDelayed ? (
-                  <span className="text-danger">{`${readyN}/${goodsN} ready`}</span>
-                ) : (
-                  <span className="text-warning">{`${readyN}/${goodsN} ready`}</span>
-                )}
-              </span>
-            }
-            summary={stockSummary}
-            onOpen={() => setTab("items")}
-          />
-          <ProgressTrack
-            label="Delivery"
-            icon={Truck}
-            stages={deliveryStages}
-            tone={logisticTone}
-            value={
-              /* The RED colour IS the overdue signal (no " · over" suffix). */
-              <span
-                className={overDeadline && !deliveredDone ? "text-danger" : undefined}
-                title={overDeadline && !deliveredDone ? "Deadline passed" : undefined}
-              >
-                {deadlineLabel}
-              </span>
-            }
-            summary={deliverySummary}
-            onOpen={() => setTab("delivery")}
-          />
-        </div>
-<div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
+        {/* RIGHT — the tab content owns the whole column (rev15, Jess: the
+            KPI strip is GONE — the tab dots, Chase Now panel and each tab's
+            own §8 status vocabulary carry the state; the work surface starts
+            at the top). */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
@@ -2407,25 +2119,29 @@ function DrawerBody({
             }
           >
           <SectionCard className="shrink-0">
-          {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
-              Ready), counted over the goods lines. Dark-slate pinned header;
-              only the rows scroll (up to ~8, then inside the box). */}
+          {/* rev15c (Jess) — the DELIVERY-style band STAYS ("can see where
+              we are" + hide/expand); what goes is the grey base under the
+              column-header row and the 268px inner scroll cap (the table
+              runs full length; the tab column scrolls). */}
           <Panel
             title="Items ordered"
             summary={
               /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
                  needs stock", from the SAME shared lineReadiness the row pills
                  use — ready = reserved-to-this-SO only (strict). */
+              /* rev17 copy — never lead with a zero: all ready → "All
+                 ready ✓" · none ready → "N needs stock" · mixed → both. */
               goodsLines.length === 0 ? (
                 <MiniBadge tone="muted">no goods</MiniBadge>
+              ) : readyN === goodsLines.length ? (
+                <MiniBadge tone="ready">All ready ✓</MiniBadge>
+              ) : readyN === 0 ? (
+                <MiniBadge tone="waiting">
+                  {goodsLines.length} needs stock
+                </MiniBadge>
               ) : (
-                <MiniBadge
-                  tone={readyN === goodsLines.length ? "ready" : "waiting"}
-                >
-                  {readyN} ready
-                  {goodsLines.length - readyN > 0
-                    ? ` · ${goodsLines.length - readyN} needs stock`
-                    : ""}
+                <MiniBadge tone="waiting">
+                  {readyN} ready · {goodsLines.length - readyN} needs stock
                 </MiniBadge>
               )
             }
@@ -2458,22 +2174,30 @@ function DrawerBody({
               />
             }
           >
-            {/* §7.7 — the white table sits APART from the cream band (a gap +
-                a neutral base-50 header row, not another cream strip). */}
-            <div className="overflow-auto min-h-0 mt-1.5" style={{ maxHeight: 268 }}>
-              <table className="w-full border-collapse">
+            <div className="overflow-x-auto min-h-0 mt-1">
+              {/* table-fixed — the w-* column widths are REAL and the long
+                  item name truncates (auto layout let it blow past a
+                  MacBook's card width). */}
+              <table className="w-full border-collapse table-fixed">
                 {/* §9 — formal columns across the FULL width (data tables are
                     exempt from the ~1000 forms cap). */}
+                {/* rev15c (Jess) — no grey base under the column headers:
+                    white sticky row + a hairline keeps the separation. */}
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-base-50 text-base-500">
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-44">SKU</th>
+                  {/* rev18 (Jess's final format): STATUS · STOCK ETA · QTY ·
+                      ITEM · PO · ARRIVED. Alert-first; SKU folds into the
+                      Item sub-line; ARRIVED (goods-in / GRN — the words
+                      "Received"/"Book in" are dead) is its own column, fully
+                      separate from the route expander; ETA edits in place. */}
+                  <tr className="bg-white text-base-500 border-b border-base-100">
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Status</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">Stock ETA</th>
                     <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Source</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-20">Location</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-28">Stock ETA</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-36">Status</th>
-                    <th className="text-center text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-40">Action</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-24">PO</th>
+                    {/* rev20 (Jess 1-B) — ONE word everywhere: the column, the
+                        count and the button all say GRN (her AutoCount doc). */}
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-32" title="Goods arrived at the warehouse (GRN)">GRN</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2517,7 +2241,6 @@ function DrawerBody({
                       const locValue = stops[0] ?? "";
                       const etaValue =
                         form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                      const hasSpecialRoute = stops.length > 1;
                       const routeOpen = routeOpenSku === l.sku;
                       // AUTO-derived status (§7.7 — the manual dropdown is gone;
                       // reserving stock is what flips a line green).
@@ -2530,11 +2253,14 @@ function DrawerBody({
                           ? null
                           : rd === "reserved"
                             ? {
-                                t: "Reserved",
+                                /* rev18 — "Ready", the layman word (v3
+                                   vocab); "Reserved" collided with
+                                   "Received" for weak-English staff. */
+                                t: "Ready",
                                 c: "pill-confirmed",
                                 hint: isAcc
                                   ? "Accessory — always in the Klang warehouse"
-                                  : "Reserved to this SO",
+                                  : "A unit is locked to this order",
                               }
                             : rd === "to_reserve"
                               ? {
@@ -2570,98 +2296,122 @@ function DrawerBody({
                           <tr
                             onClick={() => setPickerSku(l.sku)}
                             className={`cursor-pointer h-[52px] transition-opacity ${
-                              l.sku === activeLineSku
-                                ? "bg-[#e6f1fb]"
-                                : `${
-                                    rd && rd !== "reserved"
-                                      ? "bg-info-soft/40 hover:bg-info-soft/60"
-                                      : "hover:bg-base-50"
-                                  } ${
-                                    activeLineSku ? "opacity-60 hover:opacity-100" : ""
+                              /* rev19 (Jess: option A colour states) — ONE
+                                 blue family, three strengths: idle = white ·
+                                 hover = whisper blue (the old base-50 grey
+                                 was invisible) · selected (picker open for
+                                 this line) = blue wash + 3px blue left bar.
+                                 Hover previews selection — same colour story. */
+                              pickerOpen && l.sku === activeLineSku
+                                ? "bg-info-soft/60 shadow-[inset_3px_0_0_hsl(var(--info))]"
+                                : `hover:bg-info-soft/25 ${
+                                    pickerOpen ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
                           >
-                            {/* §9 columns — ITEM (chevron + thumb + name/size)
-                                · SKU · QTY · SOURCE · LOCATION · STOCK ETA ·
-                                STATUS · ACTION (must-do + Manage ▾). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {!isService && (
+                            {/* rev18 columns (Jess's final format) — STATUS ·
+                                STOCK ETA (click-to-edit) · QTY · ITEM (no
+                                thumb; sub = size · SKU; mini route bar when a
+                                special multi-stop route exists) · PO ·
+                                ARRIVED (goods-in count + [+ Arrived] GRN).
+                                Rows stay WHITE — colour lives in the pills
+                                and the red dates only (Jess: row tints made
+                                the listing unreadable). */}
+                            {/* STATUS — the pill IS the row's action door
+                                (rev20): amber "Need N ›" → warehouse picker;
+                                green "✓ Ready" → two-step "↩ Unreserve?"
+                                (release the unit back to free stock). */}
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
+                              {pill ? (
+                                rd === "to_reserve" ? (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setRouteOpenSku((cur) =>
-                                        cur === l.sku ? null : l.sku,
-                                      );
+                                      setPickerSku(l.sku);
+                                      setPickerOpen(true);
+                                      document
+                                        .getElementById("warehouse-stock-panel")
+                                        ?.scrollIntoView({
+                                          block: "start",
+                                          behavior: "smooth",
+                                        });
                                     }}
-                                    title="Details — receiving (GRN), route / transfer"
-                                    aria-expanded={routeOpen}
-                                    className="shrink-0 text-base-500 hover:text-base-800"
+                                    title="Matching stock is free — click to reserve a unit to this order"
+                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-90`}
                                   >
-                                    {routeOpen ? (
-                                      <ChevronDown size={14} />
-                                    ) : (
-                                      <ChevronRight size={14} />
-                                    )}
+                                    {pill.t}
+                                    <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
                                   </button>
-                                )}
-                                <span className="size-[42px] rounded-[8px] bg-base-100 grid place-items-center shrink-0 text-base-400">
-                                  <CatIcon cat={lineCategory(l.sku)} />
-                                </span>
-                                <span className="min-w-0 flex-1">
+                                ) : rd === "reserved" && !isAcc && !isService ? (
+                                  unreserveSku === l.sku ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const itemId = reservedUnitIdFor(l.sku);
+                                        if (!itemId) {
+                                          toast.error(
+                                            "No reserved unit found for this line",
+                                          );
+                                          setUnreserveSku(null);
+                                          return;
+                                        }
+                                        releaseStock.mutate(itemId);
+                                      }}
+                                      disabled={releaseStock.isPending}
+                                      title="Click again to put the unit back into free stock"
+                                      className="inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap pill-overdue hover:brightness-95 disabled:opacity-50"
+                                    >
+                                      ↩ Unreserve?
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setUnreserveSku(l.sku);
+                                      }}
+                                      title="A unit is locked to this order — click to unreserve it"
+                                      className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
+                                    >
+                                      <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                                      {pill.t}
+                                    </button>
+                                  )
+                                ) : (
                                   <span
-                                    className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
-                                    title={l.sku}
+                                    title={pill.hint}
+                                    className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
                                   >
-                                    {l.sku}
+                                    {rd === "reserved" && (
+                                      <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                                    )}
+                                    {pill.t}
                                   </span>
-                                  {lineSize(l.sku) && (
-                                    <span className="block text-[12px] text-base-500 leading-tight truncate">
-                                      {lineSize(l.sku) === "K"
-                                        ? "King"
-                                        : lineSize(l.sku) === "Q"
-                                          ? "Queen"
-                                          : "Single"}
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            </td>
-                            {/* SKU — the raw code (mono; today the name IS the
-                                sku — splits when a catalog lands). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              <span
-                                className="block font-mono text-[11px] text-base-500 truncate max-w-[170px]"
-                                title={l.sku}
-                              >
-                                {skuCode(l.sku)}
-                              </span>
-                            </td>
-                            {/* QTY — the bare number (§9: no "QTY" word). */}
-                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
-                              {l.qty}
-                            </td>
-                            {/* SOURCE — In stock / PO#### */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
-                              {isService ? (
-                                <span className="text-base-300 text-[12px]">—</span>
-                              ) : poNo ? (
-                                <span className="font-mono text-[12px] text-base-700 truncate block max-w-[110px]" title={poNo}>
-                                  {poNo}
-                                </span>
+                                )
                               ) : (
-                                <span className="text-[12px] text-base-600">In stock</span>
+                                <span className="text-base-300 text-[12px]">—</span>
                               )}
                             </td>
-                            {/* LOCATION — site short name. */}
-                            <td className="border-b border-base-100 px-2 py-1.5 align-middle text-[12px] text-base-600">
-                              {isService ? "—" : shortSite(locValue || "Carres Klang")}
-                            </td>
-                            {/* STOCK ETA — red alert when late / missing. */}
+                            {/* STOCK ETA — red alert when late / missing;
+                                click the date to edit IN PLACE (the expander
+                                no longer repeats it). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService || isAcc || rd === "reserved" ? (
                                 <span className="text-base-300 text-[12px]">—</span>
+                              ) : etaEditSku === l.sku ? (
+                                <input
+                                  type="date"
+                                  autoFocus
+                                  value={etaValue}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    form.setLineEta(l.sku, e.target.value)
+                                  }
+                                  onBlur={() => setEtaEditSku(null)}
+                                  className="border border-base-300 rounded-[3px] bg-white px-1 py-0.5 text-[12px] focus:border-primary focus:outline-none w-full"
+                                />
                               ) : etaValue ? (
                                 <span
                                   className={`inline-flex items-center gap-1 text-[12px] tabular-nums ${
@@ -2688,159 +2438,168 @@ function DrawerBody({
                                       etaValue > order.delivery_date)) && (
                                     <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
                                   )}
-                                  {fmtDate(etaValue).split(",")[0]}
+                                  <span
+                                    className="border-b border-dashed border-base-300 cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEtaEditSku(l.sku);
+                                    }}
+                                    title="Click to change the stock ETA"
+                                  >
+                                    {fmtDate(etaValue).split(",")[0]}
+                                  </span>
                                 </span>
                               ) : (
                                 <span
-                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-danger"
-                                  title="No stock ETA — chase the supplier"
+                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-danger cursor-pointer"
+                                  title="No stock ETA — click to set it (or chase the supplier)"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEtaEditSku(l.sku);
+                                  }}
                                 >
                                   <AlertCircle size={14} strokeWidth={2.5} className="shrink-0" />
                                   no ETA
                                 </span>
                               )}
                             </td>
-                            {/* STATUS — auto-derived pill (dial vocabulary). */}
-                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
-                              {pill ? (
-                                <span
-                                  title={pill.hint}
-                                  className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c}`}
-                                >
-                                  {rd === "reserved" && (
-                                    <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                            {/* QTY — the bare number (§9: no "QTY" word). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 text-right align-middle text-[13px] tabular-nums">
+                              {l.qty}
+                            </td>
+                            {/* ITEM — chevron (route expander) + name; sub =
+                                size · SKU; a special multi-stop route draws
+                                the always-visible mini numbered bar (no thumb
+                                icon — Jess). */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {!isService && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRouteOpenSku((cur) =>
+                                        cur === l.sku ? null : l.sku,
+                                      );
+                                    }}
+                                    title="Route / special transfer"
+                                    aria-expanded={routeOpen}
+                                    className="shrink-0 text-base-500 hover:text-base-800"
+                                  >
+                                    {routeOpen ? (
+                                      <ChevronDown size={14} />
+                                    ) : (
+                                      <ChevronRight size={14} />
+                                    )}
+                                  </button>
+                                )}
+                                <span className="min-w-0 flex-1">
+                                  <span
+                                    className="block text-[13px] font-semibold text-[#1A1A1A] leading-tight truncate"
+                                    title={l.sku}
+                                  >
+                                    {l.sku}
+                                  </span>
+                                  {(lineSize(l.sku) || skuCode(l.sku) !== "—") && (
+                                    <span className="block text-[12px] text-base-500 leading-tight truncate">
+                                      {lineSize(l.sku) === "K"
+                                        ? "King"
+                                        : lineSize(l.sku) === "Q"
+                                          ? "Queen"
+                                          : lineSize(l.sku) === "S"
+                                            ? "Single"
+                                            : null}
+                                      {lineSize(l.sku) && skuCode(l.sku) !== "—"
+                                        ? " · "
+                                        : null}
+                                      {skuCode(l.sku) !== "—" ? (
+                                        <span className="font-mono text-[11px]">
+                                          {skuCode(l.sku)}
+                                        </span>
+                                      ) : null}
+                                    </span>
                                   )}
-                                  {pill.t}
+                                  {stops.length > 1 && (
+                                    <span className="block mt-0.5">
+                                      <MiniStopsBar
+                                        stops={stops}
+                                        names={stops.map(shortSite).join(" → ")}
+                                      />
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </td>
+                            {/* PO — In stock / PO#### */}
+                            <td className="border-b border-base-100 px-2 py-1.5 align-middle">
+                              {isService ? (
+                                <span className="text-base-300 text-[12px]">—</span>
+                              ) : poNo ? (
+                                <span className="font-mono text-[12px] text-base-700 truncate block max-w-[110px]" title={poNo}>
+                                  {poNo}
                                 </span>
                               ) : (
-                                <span className="text-base-300 text-[12px]">—</span>
+                                <span className="text-[12px] text-base-600">In stock</span>
                               )}
                             </td>
-                            {/* ACTION — the must-do action directly + Manage ▾
-                                for the rest; Reserved rows read "—" (§9). */}
-                            <td className="border-b border-base-100 px-1.5 py-1 text-center align-middle">
-                              {isService || rd === "reserved" ? (
+                            {/* ARRIVED — goods-in count (GRN; "Received" and
+                                "Book in" are dead words). The count is the
+                                quiet fact; [+ Arrived] records an arrival. */}
+                            <td className="border-b border-base-100 px-1.5 py-1 align-middle">
+                              {isService || isAcc || !poNo ? (
                                 <span className="text-base-300 text-[12px]">—</span>
                               ) : (
-                                <span className="inline-flex items-center gap-1">
-                                  {rd === "to_reserve" && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span
+                                    className={`text-[12px] tabular-nums ${
+                                      lineReceivedOf(l.sku) >= l.qty
+                                        ? "text-base-900 font-semibold"
+                                        : "text-base-500"
+                                    }`}
+                                    title="Units arrived at the warehouse"
+                                  >
+                                    {lineReceivedOf(l.sku)}/{l.qty}
+                                  </span>
+                                  {lineReceivedOf(l.sku) < l.qty && (
+                                    /* "+ GRN" — Jess's own AutoCount word for
+                                       a goods-received entry ("+ Arrived"
+                                       read as a state, not an action). */
                                     <Btn
                                       size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setPickerSku(l.sku);
-                                        setPickerOpen(true);
-                                        document
-                                          .getElementById("warehouse-stock-panel")
-                                          ?.scrollIntoView({
-                                            block: "start",
-                                            behavior: "smooth",
-                                          });
+                                        setReceiveLine({
+                                          sku: l.sku,
+                                          qty: l.qty,
+                                          received: lineReceivedOf(l.sku),
+                                        });
                                       }}
-                                      title="Open the warehouse picker filtered to this line"
+                                      title="Goods arrived at the warehouse — record a GRN"
                                     >
-                                      Reserve
+                                      + GRN
                                     </Btn>
                                   )}
-                                  <RowManageMenu
-                                    items={[
-                                      {
-                                        label: "Reserve stock",
-                                        onClick: () => {
-                                          setPickerSku(l.sku);
-                                          setPickerOpen(true);
-                                          document
-                                            .getElementById("warehouse-stock-panel")
-                                            ?.scrollIntoView({
-                                              block: "start",
-                                              behavior: "smooth",
-                                            });
-                                        },
-                                      },
-                                      {
-                                        label: "Loan a substitute",
-                                        onClick: () => setTab("loan"),
-                                      },
-                                      {
-                                        label: "Change route",
-                                        onClick: () => setRouteOpenSku(l.sku),
-                                      },
-                                    ]}
-                                  />
                                 </span>
                               )}
                             </td>
                           </tr>
                           {!isService && routeOpen && (
+                            /* rev18 — the expander is the ROUTE ONLY (Jess:
+                               don't mix goods-in with the special handling —
+                               ETA edits in its column, Arrived has its own
+                               column). Chips ARE the journey and the editor. */
                             <tr className="bg-base-50">
                               <td
-                                colSpan={8}
+                                colSpan={6}
                                 className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
-                                <div className="space-y-2">
-                                  {!isAcc && (
-                                    <div className="flex items-center gap-4 flex-wrap">
-                                      <label className="flex items-center gap-1.5 text-[12px] text-base-500">
-                                        Stock ETA
-                                        <input
-                                          type="date"
-                                          value={etaValue}
-                                          onClick={(e) => e.stopPropagation()}
-                                          onChange={(e) =>
-                                            form.setLineEta(l.sku, e.target.value)
-                                          }
-                                          className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[12px] focus:border-primary focus:outline-none"
-                                        />
-                                      </label>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setReceiveLine({
-                                            sku: l.sku,
-                                            qty: l.qty,
-                                            received: lineReceivedOf(l.sku),
-                                          });
-                                        }}
-                                        title="Book in received units (GRN)"
-                                        className={`inline-flex items-center gap-1 text-[12px] tabular-nums px-1.5 py-0.5 rounded ${
-                                          lineReceivedOf(l.sku) >= l.qty
-                                            ? /* v4 — complete count is CONTENT: dark, not green. */
-                                              "text-base-900 font-semibold"
-                                            : "text-base-700 hover:text-base-900 hover:bg-base-50"
-                                        }`}
-                                      >
-                                        Received {lineReceivedOf(l.sku)}/{l.qty}
-                                        {lineReceivedOf(l.sku) < l.qty && (
-                                          <>
-                                            <PackagePlus size={14} strokeWidth={2} />
-                                            Book in
-                                          </>
-                                        )}
-                                      </button>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div className="text-[12px] font-semibold text-base-500 mb-1">
-                                      Route — stop 1 is where the item sits; add
-                                      a stop for a special transfer. Delivery to
-                                      the customer is set in the Delivery panel.
-                                    </div>
-                                    {hasSpecialRoute && (
-                                      <div className="max-w-[280px] mb-1">
-                                        <RouteJourneyBar
-                                          legs={stopsToDisplay(stops)}
-                                        />
-                                      </div>
-                                    )}
-                                    <StopsEditor
-                                      stops={savedLoc ?? (locValue ? [locValue] : [])}
-                                      onChange={(s) =>
-                                        form.setLineLocation(l.sku, s)
-                                      }
-                                    />
-                                  </div>
-                                </div>
+                                <StopsEditor
+                                  stops={savedLoc ?? (locValue ? [locValue] : [])}
+                                  onChange={(s) =>
+                                    form.setLineLocation(l.sku, s)
+                                  }
+                                  onDone={() => setRouteOpenSku(null)}
+                                />
                               </td>
                             </tr>
                           )}
@@ -2864,7 +2623,7 @@ function DrawerBody({
                       onToggle: () => void,
                     ) => (
                       <tr key={`grp-${key}`}>
-                        <td colSpan={8} className="border-b border-base-100 p-0">
+                        <td colSpan={6} className="border-b border-base-100 p-0">
                           <button
                             type="button"
                             onClick={onToggle}
@@ -2890,37 +2649,13 @@ function DrawerBody({
                         </td>
                       </tr>
                     );
+                    // rev17 (Jess) — a SMALL order (≤5 lines) reads FLAT: no
+                    // "Needs action 1" band over a single row (the counters
+                    // said one thing three times); the row's own Status pill
+                    // IS the message, Chase-Now style. Groups are for BIG
+                    // orders only.
                     if (orderedLines.length <= 5) {
-                      const needs = orderedLines.filter(needsLine);
-                      const needSet = new Set(needs.map((l) => l.sku));
-                      const rest = orderedLines.filter((l) => !needSet.has(l.sku));
-                      if (needs.length === 0)
-                        return orderedLines.map(renderRow);
-                      return (
-                        <>
-                          {groupHeader(
-                            "needs",
-                            "Needs action",
-                            null,
-                            needs.length,
-                            needs.length,
-                            true,
-                            () => {},
-                          )}
-                          {needs.map(renderRow)}
-                          {rest.length > 0 &&
-                            groupHeader(
-                              "ready",
-                              "Ready",
-                              null,
-                              rest.length,
-                              0,
-                              !readyCollapsed,
-                              () => setReadyCollapsed((v) => !v),
-                            )}
-                          {!readyCollapsed && rest.map(renderRow)}
-                        </>
-                      );
+                      return orderedLines.map(renderRow);
                     }
                     const CATS: {
                       key: "mattress" | "bedframe" | "sofa" | "acc";
@@ -3561,17 +3296,19 @@ function ReceiveLineModal({
       {
         onSuccess: (r) => {
           toast.success(
-            `Booked ${r.received} unit(s) — ${r.lineReceived}/${r.lineQty}${r.ready ? " · Ready" : ""}`,
+            `GRN saved — ${r.lineReceived}/${r.lineQty} arrived${r.ready ? " · Ready" : ""}`,
           );
           onClose();
         },
-        onError: (e) => toast.error(`Couldn't book — ${e.message}`),
+        onError: (e) => toast.error(`Couldn't save the GRN — ${e.message}`),
       },
     );
   }
 
   return (
-    <Modal title="Book in received stock" onClose={onClose}>
+    /* rev19b — GRN is Jess's OWN word (the AutoCount doc her team lives in);
+       "Book in" (UK warehouse slang) is dead. */
+    <Modal title="GRN — goods arrived" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-[12px] text-base-600">
           <span className="font-semibold text-[12px] text-[#1A1A1A]">{sku}</span>
@@ -3609,12 +3346,19 @@ function ReceiveLineModal({
         </label>
         <label className="block">
           <span className="t-tiny text-base-500">Location (optional)</span>
-          <input
+          {/* Dropdown of real sites (Jess) — free text bred typos. */}
+          <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Carres Klang"
             className={field}
-          />
+          >
+            <option value="">—</option>
+            {STOCK_LOCATIONS.filter((s) => s !== "at-supplier").map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="t-tiny text-base-500">DO / receipt # (optional)</span>
@@ -3631,7 +3375,7 @@ function ReceiveLineModal({
           </Btn>
           {/* The modal's own hero (a modal is its own surface — v4 §2). */}
           <Btn variant="hero" onClick={submit} disabled={!valid || receive.isPending}>
-            {receive.isPending ? "Booking…" : "Book in"}
+            {receive.isPending ? "Saving…" : "Save GRN"}
           </Btn>
         </div>
       </div>

@@ -3,11 +3,19 @@
 > 唯一真相。冲突以本文件为准(UI-KIT.md / STATUS-STANDARD.md 是它的实现细则,
 > 抵触处以本文件覆盖)。存档 2026-07-18。
 
-## 0. 工作规则
-1. COO 级 critical advisor,先想清 solution 才建议。
-2. 我截图 → 你主动 top-to-toe 列问题,不等提醒、用脑。
-3. 每个 proposal 给 3 个 option(画图也 3 个)。
-4. 华语回。 5. 我 agree 才给 code/下一步。 6. 不 deploy 除非我说。分支 feat/orders-drawer。1000 单/月,单一操作者 Jess,全外包。
+## 0. 工作规则(⭐ 2026-07-18 扩充 — 新 chat 开场必读并照做)
+1. **COO 级 critical international advisor**,先想清 solution 才建议;引用国际同行 pattern(Shopify/Linear/DHL 等)佐证,但结论要贴 Carres 的现实。
+2. 我截图 → 你主动 **top-to-toe 列问题**(由上到下、标 🔴🟡 严重度),不等提醒、用脑;我抓到的问题先认,再给修法。
+3. 每个 proposal 给 **3 个 option**(画图/mock 也 3 个,可用临时 HTML mock 开在 preview 里给我挑),**标注你推荐哪个+为什么**;我回一个字母你才动手。
+4. 华语回,English 技术词保留;我说"primary student"就用白话+生意比喻重讲。
+5. 我 agree 才给 code/下一步;**已拍板的决定不准翻案**(除非我自己开口)。
+6. **不 deploy 除非我说**;deploy 前必查 `git log HEAD..origin/main`(空才能出,phase-11 教训)+ dist 扫 SERVICE_ROLE;web/API 有配对依赖要一起出。
+7. **动手前查 memory + 本 SPEC**——之前拍板过的格式/词汇/数据教训都在里面,别重新发明(rev9 没查 v3 把 MacBook 弄爆就是反例)。
+8. **提 UI 之前先查数据填充率**(SQL 数一下),空字段不上桌;引用数字讲话。
+9. 每个 approved rev:改完 → tsc+lint+tests(16 个旧 fail 是基线,别追)→ **preview 实测截图证明** → commit+push → 同步更新本 SPEC + memory。宁可十几个小 commit,不要一个大的。
+10. **词汇法**:一个概念一个词、用员工/AutoCount 的词(GRN 对,Book in 错);状态词≠动作词;颜色只讲四件事(蓝=selection·flame=action·绿琥珀红=status·其余黑灰白);"colour+icon+position, words last resort"。
+11. MacBook(~1000px 内容宽)必须一屏看全为准;表格 table-fixed;别拉橡皮筋摊宽。
+分支 feat/orders-drawer。1000 单/月,单一操作者 Jess,全外包。
 
 ## 1. 分层
 页面 cream #F5F1EA;Panel 白 #FFFFFF + 1px 中性边框 #E5E7EB(冷灰,~#E4DECF 作废)浮在 cream 上;Section band cream ~#F1EFE8 在白卡内。cream 只用页面+标题带,绝不 cream 叠 cream。任何地方不用彩色/红色边框。
@@ -36,13 +44,15 @@ Header 裸条(无卡框无搜索):‹ Orders · #1101(mono 面包屑,黑 badge �
 左栏 260px 固定(可折叠56):顶 Customer 块常驻(头像+名粗 Title Case+黑#1101 badge+状态pill+电话/WhatsApp+区域;收起紧凑,点开看全址;铅笔内联编辑)。下 tab 栏:Items(默认)·Delivery·Balance·Storage·Loan·Activity(icon16+label13+右状态点/计数;active/hover 蓝#DBEAFE/#1E40AF;40px)。数量用计数、告警用红点。
 右栏 flex:顶 3 KPI grid Balance1fr·Stock1.8fr·Delivery1fr 等高(中性灰分类图标+label+右 headline 值)。KPI/阶段点击→跳 tab。下 = tab 内容:表单/文字类内容 max~1000 左对齐(别字段甩两端);数据表(Items/Warehouse)用全宽 + 正式分列。
 
-## 7. KPI 三 track(⭐ 2026-07-18 改版决定 — A2 已拍板,未实现,下个 chat 动工)
-**KPI 三个 box → 三条全宽 progress line(A2 节点+阶段词式)**:
-- 每 track 一条长 bar 摊满右栏宽:label + 编号节点线(done=灰实心✓·当前=状态色圈带编号/红clock·pending=灰空圈带编号)+ 节点下阶段词 + 右侧 headline 值。
-- 每条 bar 带**短 summary**:Balance = Outstanding(**storage 在 accruing 时并入显示**,如 "RM 1,749 + RM150 storage");Stock = N/M ready + **MS/BF/SOF 小 badge**(每类 ready 状况,如 [MS 0/8][BF 0/4][ACC ✓]);Delivery = deadline + partner。
-- Reminder/Chase 从 KPI 卡移除 → **Chase Now 面板**(左栏 260px,Customer 块下、tab 栏上,是面板不是 tab):逐行=追谁(supplier PO/logistic/customer)+ 红点overdue/琥珀attention + Manage▾(Remind/Chase,B2 式,与 Items 列 Manage▾ 同语言);逾期排顶;全空显 "Nothing to chase ✓";customer 行只在 owing 时出现。
-- Stock 的 category 明细行从 KPI 卡撤走 → badge(概览)+ Chase Now(追人)+ Items tab(全量)。
-(以下为旧版记录,布局被上面覆盖,阶段词/dial 语义仍有效:)
+## 7. 无 KPI 区 + Chase Now(⭐ 2026-07-18 最终拍板 — rev15 已实现)
+**最终形态(rev15,Jess):详情页顶部 NO KPI**——A2 三条 stepper(rev11-13)和 chip strip(rev14)同日先后否掉:两者都在复述 tab/Chase Now 已有的信息,还闹双色矛盾(amber "0/1 ready" 旁红 "SOF 0/1")。右栏 tab 内容直接顶到最上(Items 默认)。状态由三层承担,不再画第四层:
+- **左栏 tab 行的红点/计数**(哪个 tab 有事);
+- **Chase Now 面板**(追谁 + 跳 tab);
+- **各 tab 内自己的 §8 状态词/dial**(Balance tab 的 dial/Overdue pill、Items 的 readiness、Delivery 的 overdue)。
+- **Delivered = closed**(guardrail #2)保留:Items tab 红点/计数静音、Chase Now 只剩 owing customer。
+- 阶段词(Placed→Confirmed→Paid 等,§8 词表)只活在各 tab 内。
+- **Chase Now 面板**(左栏 260px,Customer 块下、tab 栏上,是面板不是 tab):逐行=**counterparty**(supplier 按 supplier 合并多 PO,AutoCount PO 经 `suppliers.cat_covered` 唯一覆盖才推名字/logistic/customer 只在 owing 时);红点 overdue 排顶、琥珀 attention;**红标事实行("2 POs · 14d late" / "not booked · 5d late"),名字保持 ink**;Manage▾(Remind/Chase,与 Items Manage▾ 同语言);**行点击=跳对应 tab**(supplier→Items·logistic→Delivery·customer→Balance);全空显 "Nothing to chase ✓";header 右侧灰 "chased Xh ago"(last_chased_at,API deploy 后生效)。
+(以下为历史记录:A2 stepper 布局已被 rev14 chip strip 覆盖;阶段词/dial 语义仍有效:)
 
 Balance:值=Outstanding(或 No total/Paid),**dial 贴在 headline 值旁**(小盘+值)。阶段 Placed→Confirmed→Paid。无款隐藏 Reminder/Chase。
 Stock(1.8宽,按 category 拆):行=分类(Mattress/Bedframe/Sofa/Accessory)+N/M(绿全齐/琥珀部分/红逾期)+该类供应商状态+Chase;全齐=Ready✓;多供应商→Chase(N) popover 按 supplier 归组(PO 打头,逾期上)。**库存 dial 贴在 headline 值旁**(Stock 卡身是 category 行,没有阶段清单)。
@@ -58,8 +68,15 @@ Checklist mark(Logistic):Done=circle-check-filled绿·Waiting=clock琥珀·Block
 Dial 一律贴 KPI headline 值旁,不放在阶段行上。
 阶段用词(全 portal 统一,list NEXT 对齐):Balance Placed下单→Confirmed确认单→Paid收齐(类别名=Balance 不用 Money);Stock PO raised→ETA set→Goods ready;Logistic Assigned→Booked(partner 已联系客人并约好 slot)→Delivered。NEXT verb=完成当前 pending 阶段的动作(Order PO/Chase supplier/Book logistic/Chase logistic/Record payment/Confirm)。(“Record payment” verb 属 List 阶段 §14,详情页现阶段不加。)
 
-## 9. Items ordered tab
-列摊满宽度:chevron·thumb44·ITEM(名粗+size)·SKU·QTY(纯数字无"QTY"字)·SOURCE(In stock/PO####)·LOCATION(site 短名 Klang/NETS)·STOCK ETA(晚于deadline/无ETA→红alert)·STATUS(pill:Reserved绿/Need N琥珀/On PO灰/Delayed红,与dial同词)·ACTION(Manage▾多动作:Reserve/Loan/Change route…;当前必做动作直接显如 Reserve)。
+## 9. Items ordered tab(⭐ 2026-07-18 rev18 — Jess 最终格式)
+**六列 table-fixed:`STATUS · STOCK ETA · QTY · ITEM · PO · ARRIVED`**(alert-first,MacBook 一屏看全):
+- **STATUS** pill:**Ready绿**("Reserved" 作废——跟 Received 撞脸)/Need N琥珀(**pill 可点=直接开 warehouse picker 锁货**)/On PO灰/Delayed红/No PO。
+- **STOCK ETA**:晚于 deadline/无 ETA→红 alert;**点日期就地变输入框编辑**(只此一处,不再在展开行重复)。
+- **ITEM**:chevron+名粗(**无 icon 缩图**,Jess),副行=size · SKU mono;**特殊多站 route 时名字下常驻 MiniStopsBar**(编号节点:站1实心=货现在的位置,后站灰圈,短站名 "Klang → AL";单站不画=无噪音)。
+- **QTY** 纯数字(在 ITEM 前,Jess 指定顺序)。**PO**:In stock/PO####。
+- **ARRIVED**(**"Received"/"Book in" 两词作废**——Received 与 Reserved 撞脸、Book in 是英式仓库行话):`n/m` 灰数字=到仓件数(状态);未齐时旁边 **[+ GRN]** 按钮(动作——**GRN 是 Jess 团队 AutoCount 里的正式单据词**;"+ Arrived" 会被读成状态)→ modal "GRN — goods arrived"(Arrived now 数量 · Condition · **Location dropdown**〔STOCK_LOCATIONS 去 at-supplier,自由文字会打错〕· DO# · Save GRN);部分到货天生支持(0/8→3/8→8/8 变黑粗体按钮消失);acc/service/无 PO → "—"。**词汇法:状态词 = Ready / Arrived n·m;动作词 = + GRN;死词 = Reserved · Received · Book in。**
+- **Row 全白**——彩色只住 pill 和红日期(needs-action 蓝底 tint 作废,Jess:底色让表难读);点选中的行才蓝 wash。
+**展开行(chevron)= 只剩 route chips**(goods-in 与 special handling 彻底分开):地点 icon+select 装 pill、chip 间 →、多站 🗑、圆 + 加站;零解释文字。**小单(≤5 行)平铺无组头**;>5 行按 category 分组(组头保留 "N need stock" 提示)。readiness pill 文案:全齐 "All ready ✓"·全无 "N needs stock"·混合 "x ready · y needs stock"(绝不以 0 开头)。ACTION 列作废(Reserve=Need pill 点击;Loan 在 Loan tab;Change route=chevron)。
 Route 平时藏,chevron 展开一行:site→carrier→customer,单件特殊挂 special·direct 可编辑。
 件多→按 category 分组(组图标+计数+"N need stock",needs-action 行蓝底,全 reserved 组自动收起);件少≤5 扁平。
 Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reserved 行 STATUS 绿,Action=—(绿勾不放 Action 列)。

@@ -10,7 +10,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // Honour a harness-assigned port (Claude Code preview autoPort) so
+    // parallel chats never fight over one port; default stays 5173.
+    port: Number(process.env.PORT) || 5173,
     open: false,
   },
 });
