@@ -348,11 +348,20 @@ staffRouter.post("/", async (c) => {
   // Tier authority.
   let outletId: string | null = input.outletId ?? null;
   if (caller.tier === "manager") {
-    if (input.staffRole !== "salesperson") {
-      throw new HTTPException(403, { message: "Managers can only create salespersons" });
+    // sid === null ⇔ owner-mode: the password-proven store credential minted
+    // by /reauth (showroom bootstrap + forgot-PIN recovery). It acts as the
+    // store's admin — may create managers too, never a store principal.
+    if (caller.sid === null) {
+      if (input.staffRole === "principal") {
+        throw new HTTPException(403, { message: "Showroom stores cannot have a store principal" });
+      }
+    } else {
+      if (input.staffRole !== "salesperson") {
+        throw new HTTPException(403, { message: "Managers can only create salespersons" });
+      }
+      // A manager's staff always land in the manager's own outlet.
+      outletId = caller.oid;
     }
-    // A manager's staff always land in the manager's own outlet.
-    outletId = caller.oid;
   } else {
     // principal-tier — showrooms have no store-principal (Carres is theirs).
     if (input.staffRole === "principal") {
@@ -364,6 +373,21 @@ staffRouter.post("/", async (c) => {
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // An outlet reference must belong to THIS store — the bare FK would accept
+  // any dealer's outlet.
+  if (outletId) {
+    const { data: outletRow, error: outletErr } = await sb
+      .from("outlets")
+      .select("id, dealer_id")
+      .eq("id", outletId)
+      .maybeSingle();
+    if (outletErr) throw new HTTPException(500, { message: outletErr.message });
+    if (!outletRow || (outletRow as { dealer_id: string }).dealer_id !== caller.dealerId) {
+      throw new HTTPException(422, { message: "Outlet does not belong to this store" });
+    }
+  }
+
   const { data, error } = await sb
     .from("salespersons")
     .insert({
@@ -425,13 +449,31 @@ staffRouter.patch("/:id", async (c) => {
   const target = existing as DB.SalespersonRow;
 
   if (caller.tier === "manager") {
-    // Managers touch only name/color/active, and only on salespersons in their
-    // own outlet. Tier + outlet moves are principal-only.
+    // Managers touch only name/color/active. Tier + outlet moves are
+    // principal-only (for showrooms that means the Carres principal).
     if (patch.staffRole !== undefined || patch.outletId !== undefined) {
       throw new HTTPException(403, { message: "Only a principal can change tier or outlet" });
     }
-    if (target.staff_role !== "salesperson" || target.outlet_id !== caller.oid) {
+    // Real managers reach only their own outlet's salespersons; owner-mode
+    // (sid null, password-proven via /reauth) reaches the whole store.
+    if (
+      caller.sid !== null &&
+      (target.staff_role !== "salesperson" || target.outlet_id !== caller.oid)
+    ) {
       throw new HTTPException(403, { message: "Managers can only edit their own outlet's salespersons" });
+    }
+  }
+
+  // An outlet move must stay inside THIS store (same guard as create).
+  if (caller.tier === "principal" && patch.outletId) {
+    const { data: outletRow, error: outletErr } = await sb
+      .from("outlets")
+      .select("id, dealer_id")
+      .eq("id", patch.outletId)
+      .maybeSingle();
+    if (outletErr) throw new HTTPException(500, { message: outletErr.message });
+    if (!outletRow || (outletRow as { dealer_id: string }).dealer_id !== caller.dealerId) {
+      throw new HTTPException(422, { message: "Outlet does not belong to this store" });
     }
   }
 
@@ -493,13 +535,14 @@ staffRouter.post("/:id/pin", async (c) => {
   }
   const target = existing as DB.SalespersonRow;
 
-  // Scope: principal → anyone; manager → own-outlet salespersons + self;
-  // salesperson → self only.
+  // Scope: principal → anyone; manager → own-outlet salespersons + self
+  // (owner-mode manager, sid null from /reauth, reaches the whole store —
+  // that's the showroom forgot-PIN recovery path); salesperson → self only.
   const isSelf = caller.sid !== null && caller.sid === target.id;
   if (caller.tier === "manager") {
     const ownOutletSalesperson =
       target.staff_role === "salesperson" && target.outlet_id === caller.oid;
-    if (!ownOutletSalesperson && !isSelf) {
+    if (caller.sid !== null && !ownOutletSalesperson && !isSelf) {
       throw new HTTPException(403, { message: "Managers can only set their own outlet's PINs" });
     }
   } else if (caller.tier === "salesperson") {

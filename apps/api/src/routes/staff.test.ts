@@ -75,6 +75,8 @@ function mockUser(cfg: {
   inserted?: unknown;
   updated?: unknown;
   appUsersShowroom?: boolean;
+  /** dealer_id the outlets-table lookup reports (0232 outlet-ownership guard). */
+  outletDealer?: string;
   captureInsert?: (row: Record<string, unknown>) => void;
   captureUpdate?: (row: Record<string, unknown>) => void;
 }) {
@@ -97,6 +99,10 @@ function mockUser(cfg: {
         return { data: cfg.list ?? [], error: null };
       },
       maybeSingle: async () => {
+        if (table === "outlets") {
+          const eqVal = eqs[eqs.length - 1]?.[1];
+          return { data: { id: eqVal, dealer_id: cfg.outletDealer ?? DEALER_A }, error: null };
+        }
         const last = eqs[eqs.length - 1]?.[0];
         if (last === "user_id") return { data: cfg.byUserId ?? null, error: null };
         return { data: cfg.byId ?? null, error: null };
@@ -525,6 +531,7 @@ describe("POST /api/staff (create)", () => {
     vi.mocked(userClient).mockReturnValue(
       mockUser({
         appUsersShowroom: false,
+        outletDealer: DEALER_B,
         inserted: spRow({ id: SP2, dealer_id: DEALER_B, staff_role: "manager" }),
         captureInsert: (r) => (captured = r),
       }),
@@ -542,6 +549,66 @@ describe("POST /api/staff (create)", () => {
     expect(res.status).toBe(201);
     expect(captured?.dealer_id).toBe(DEALER_B);
     expect(captured?.staff_role).toBe("manager");
+  });
+
+  // 0232 owner-mode (sid null, minted only by /reauth): the showroom
+  // bootstrap path — a password-proven store credential creates its manager.
+  it("owner-mode manager token (sid null) creates a MANAGER → 201 (showroom bootstrap)", async () => {
+    let captured: Record<string, unknown> | undefined;
+    vi.mocked(userClient).mockReturnValue(
+      mockUser({
+        inserted: spRow({ id: SP2, staff_role: "manager", outlet_id: OUTLET_1 }),
+        captureInsert: (r) => (captured = r),
+      }),
+    );
+    vi.mocked(adminClient).mockReturnValue(mockAdmin());
+    const jwt = await makeJwt("showroom", DEALER_A);
+    const token = await mintStaffToken(env, { sid: null, did: DEALER_A, oid: null, tier: "manager" });
+    const res = await app.fetch(
+      new Request("http://t/api/staff", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+          "X-Staff-Token": token,
+        },
+        body: JSON.stringify({ name: "Showroom Mgr", staffRole: "manager", outletId: OUTLET_1, pin: "135790" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(captured?.staff_role).toBe("manager");
+    expect(captured?.outlet_id).toBe(OUTLET_1);
+  });
+
+  it("owner-mode manager token creating a store PRINCIPAL → 403", async () => {
+    vi.mocked(userClient).mockReturnValue(mockUser({}));
+    vi.mocked(adminClient).mockReturnValue(mockAdmin());
+    const jwt = await makeJwt("showroom", DEALER_A);
+    const token = await mintStaffToken(env, { sid: null, did: DEALER_A, oid: null, tier: "manager" });
+    const res = await app.fetch(
+      new Request("http://t/api/staff", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+          "X-Staff-Token": token,
+        },
+        body: JSON.stringify({ name: "Owner", staffRole: "principal" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("create with an outlet belonging to ANOTHER dealer → 422", async () => {
+    const res = await callWithToken(
+      "principal",
+      null,
+      { name: "Fay", staffRole: "salesperson", outletId: OUTLET_2 },
+      mockUser({ outletDealer: DEALER_B }),
+    );
+    expect(res.status).toBe(422);
   });
 });
 
@@ -605,6 +672,19 @@ describe("POST /api/staff/:id/pin", () => {
   it("salesperson cannot set another's PIN → 403", async () => {
     const res = await callWithToken("salesperson", OUTLET_1, SP1, SP2, spRow({ id: SP2 }));
     expect(res.status).toBe(403);
+  });
+
+  // 0232 owner-mode: showroom forgot-PIN recovery — the password-proven
+  // store credential may reset the MANAGER's PIN.
+  it("owner-mode manager token (sid null) resets a manager's PIN → 200", async () => {
+    const res = await callWithToken(
+      "manager",
+      null,
+      null,
+      MGR,
+      spRow({ id: MGR, staff_role: "manager", outlet_id: OUTLET_1 }),
+    );
+    expect(res.status).toBe(200);
   });
 });
 
@@ -688,5 +768,60 @@ describe("PATCH /api/staff/:id", () => {
       spRow({ id: SP1, dealer_id: DEALER_B }),
     );
     expect(res.status).toBe(404);
+  });
+
+  // 0232 owner-mode: the showroom store credential may rename/deactivate any
+  // staff of its store (tier/outlet still principal-only).
+  it("owner-mode manager token (sid null) renames the MANAGER row → 200", async () => {
+    let captured: Record<string, unknown> | undefined;
+    vi.mocked(userClient).mockReturnValue(
+      mockUser({
+        byId: spRow({ id: SP1, staff_role: "manager", outlet_id: OUTLET_1 }),
+        updated: spRow({ id: SP1, staff_role: "manager", name: "Renamed" }),
+        captureUpdate: (r) => (captured = r),
+      }),
+    );
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ pinById: null }));
+    const jwt = await makeJwt("showroom", DEALER_A);
+    const token = await mintStaffToken(env, { sid: null, did: DEALER_A, oid: null, tier: "manager" });
+    const res = await app.fetch(
+      new Request(`http://t/api/staff/${SP1}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+          "X-Staff-Token": token,
+        },
+        body: JSON.stringify({ name: "Renamed" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(captured?.name).toBe("Renamed");
+  });
+
+  it("principal moving staff to ANOTHER dealer's outlet → 422", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      mockUser({
+        byId: spRow({ id: SP1 }),
+        outletDealer: DEALER_B,
+      }),
+    );
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ pinById: null }));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const token = await mintStaffToken(env, { sid: MGR, did: DEALER_A, oid: null, tier: "principal" });
+    const res = await app.fetch(
+      new Request(`http://t/api/staff/${SP1}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+          "X-Staff-Token": token,
+        },
+        body: JSON.stringify({ outletId: OUTLET_2 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
   });
 });
