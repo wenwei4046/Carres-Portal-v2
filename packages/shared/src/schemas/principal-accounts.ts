@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { staffPinSchema, staffTierSchema } from "./staff";
 
 /**
  * Phase 10 — Principal Accounts admin schemas.
@@ -32,11 +33,44 @@ export const APP_ROLES = [
 ] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 
+/**
+ * 2026-07-18 (Loo) — standalone `salesperson` LOGINS are retired: floor staff
+ * are PIN identities inside a dealer/showroom store (0233), not portal
+ * accounts. The role stays in APP_ROLES for legacy display, but the create
+ * door no longer offers it.
+ */
+export const CREATABLE_APP_ROLES = [
+  "principal",
+  "dealer",
+  "showroom",
+  "operation",
+  "supplier",
+  "partner",
+  "finance",
+  "bd",
+] as const;
+export type CreatableAppRole = (typeof CREATABLE_APP_ROLES)[number];
+
+/**
+ * 2026-07-18 (Loo) — the account-create form provisions the store's FIRST
+ * staff identity + 6-digit PIN in one go, so a new store is born ACTIVATED
+ * (first login lands straight on the PIN screen — no setup wizard).
+ * Dealer ladder: principal (Dealer Principal) / manager / salesperson
+ * (Sales Person). Showroom ladder caps at manager (labelled Sales Manager;
+ * salesperson is labelled Sales Executive) — its principal is Carres.
+ */
+export const initialStaffInput = z.object({
+  name: z.string().trim().min(1).max(120),
+  staffRole: staffTierSchema,
+  pin: staffPinSchema,
+});
+export type InitialStaffInput = z.infer<typeof initialStaffInput>;
+
 export const createAccountInput = z
   .object({
     name: z.string().trim().min(1).max(120),
     email: z.string().trim().toLowerCase().email().max(160),
-    role: z.enum(APP_ROLES),
+    role: z.enum(CREATABLE_APP_ROLES),
     title: z.string().trim().max(120).optional().nullable(),
     companyName: z.string().trim().max(200).optional(),
     region: z.string().trim().max(80).optional(),
@@ -61,8 +95,23 @@ export const createAccountInput = z
     contactName: z.string().trim().max(120).optional(),
     contactPhone: z.string().trim().max(40).optional(),
     tempPassword: z.string().min(8).max(72),
+    initialStaff: initialStaffInput.optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.initialStaff && v.role !== "dealer" && v.role !== "showroom") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["initialStaff"],
+        message: "initialStaff is only for dealer/showroom accounts",
+      });
+    }
+    if (v.role === "showroom" && v.initialStaff?.staffRole === "principal") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["initialStaff", "staffRole"],
+        message: "Showroom staff cap at Sales Manager — its principal is Carres",
+      });
+    }
     if ((v.role === "dealer" || v.role === "showroom" || v.role === "supplier" || v.role === "partner") && !v.companyName) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

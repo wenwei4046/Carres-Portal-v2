@@ -88,9 +88,19 @@ import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
 
+// POS/ERP domain split (2026-07-18) — CORS narrowed from "*" (the Phase 9
+// signed-off risk, now closed): only the two portal domains, the two Pages
+// projects (hash previews included), and local dev may call from a browser.
+// Server-to-server callers (Stripe webhook, cron) send no Origin header and
+// are untouched — CORS is browser-enforced only.
+// X-Staff-Token joined allowHeaders with the 0233 staff sessions: without it
+// browsers reject PIN-authenticated calls at preflight.
+const ALLOWED_BROWSER_ORIGIN =
+  /^https:\/\/((pos|erp)\.carresofficial\.com|([a-z0-9-]+\.)?(carres-portal|carres-pos)\.pages\.dev)$|^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 app.use("*", cors({
-  origin: "*",
-  allowHeaders: ["Content-Type", "Authorization"],
+  origin: (origin) => (ALLOWED_BROWSER_ORIGIN.test(origin) ? origin : null),
+  allowHeaders: ["Content-Type", "Authorization", "X-Staff-Token"],
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   maxAge: 600,
 }));
