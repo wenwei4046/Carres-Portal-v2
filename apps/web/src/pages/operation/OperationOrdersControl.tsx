@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
@@ -27,6 +27,7 @@ import {
   lineKind,
 } from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
+import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
@@ -42,6 +43,7 @@ import {
   isOpsGenericAccount,
   canRaisePo,
   isPoDayMYT,
+  nextPoDayMYT,
   poUrgentBypass,
   type OpsTask,
   type OpsTasksListResponse,
@@ -530,36 +532,13 @@ const NO_STAFF = "__none" as const;
 function ownerOf(o: operationOrderListRow): string | null {
   return ovlOf(o)?.assigned_staff ?? null;
 }
-/** The calling-name as keyed in app_users.name ("Shasha" / "Khor Yee" /
- *  "Li Ching") — the facet tab label. Falls back to the email local-part. */
+/** Identity label/initials/colour — shared with the right-rail Team panel
+ *  via @/lib/staff-avatar (one person = one look everywhere). */
 function staffLabel(m: OpsStaffMember): string {
-  const n = (m.name ?? "").trim();
-  return n || m.email.split("@")[0] || m.email;
+  return personLabel(m.name, m.email);
 }
-/** Avatar code (Jess round-3, 2026-07-18): first letter of each WORD of the
- *  name, MAX 2 letters — "Khor Yee"→KY · "Li Ching"→LC; a single-word name
- *  takes its first two letters — "Shasha"→SH. */
 function staffInitials(m: OpsStaffMember): string {
-  const words = staffLabel(m).split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
-  return (words[0] ?? m.email).slice(0, 2).toUpperCase();
-}
-
-/** Per-person identity colour for the PIC avatar — a fixed muted palette that
- *  deliberately AVOIDS the status hues (green/amber/red), flame (action) and
- *  selection blue, so identity never reads as state. Stable by user id. */
-const AVATAR_COLORS: { bg: string; fg: string }[] = [
-  { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
-  { bg: "#CCFBF1", fg: "#115E59" }, // teal
-  { bg: "#FCE7F3", fg: "#9D174D" }, // rose
-  { bg: "#EDE9FE", fg: "#5B21B6" }, // violet
-  { bg: "#CFFAFE", fg: "#155E75" }, // cyan
-  { bg: "#E7E5E4", fg: "#44403C" }, // stone
-];
-function avatarColor(userId: string): { bg: string; fg: string } {
-  let h = 0;
-  for (let i = 0; i < userId.length; i++) h = (h + userId.charCodeAt(i)) % 997;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+  return personInitials(m.name, m.email);
 }
 
 function ovlOf(o: operationOrderListRow) {
@@ -1780,32 +1759,70 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // holder + management. Speaks the C-vocab queue words, same as QUEUES+NEXT.
   const orderPoCount = nextCounts.get("Order PO") ?? 0;
   const chaseSupplierCount = nextCounts.get("Chase supplier") ?? 0;
-  const showPoBanner =
-    !!poDutyHolderShown && (poDayPreview || isPoDayMYT() || urgentPoCount > 0);
-  const poBanner = showPoBanner && poDutyHolderShown ? (
-    <div
-      className="w-full flex items-center gap-2 rounded-xl border border-base-200 bg-white px-3 py-1.5 text-[12px]"
-      data-testid="po-day-banner"
+  // Quiet chip = every day (whole team, zero clicks): holder avatar + next PO
+  // day. Hot state = Mon/Thu, urgent, or ?poday preview: the SAME slot grows
+  // the action chip (+ Raise PO for holder/management). One announce home.
+  const poHot = poDayPreview || isPoDayMYT() || urgentPoCount > 0;
+  const nextPoIso = nextPoDayMYT();
+  const nextPoLabel = `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`;
+  // Queue-row owner adornments (B+C): goods queues carry the duty holder's
+  // avatar, PIC queues a grey tag — who does what, visible in the rail itself.
+  const dutyQueueChip = poDutyHolderShown ? (
+    <span
+      className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+      style={{
+        background: avatarColor(poDutyHolderShown.userId).bg,
+        color: avatarColor(poDutyHolderShown.userId).fg,
+      }}
+      title={`${personLabel(poDutyHolderShown.name, poDutyHolderShown.email)}'s queue — PO duty this month`}
     >
-      <PackagePlus size={14} className="text-base-500" strokeWidth={2} />
-      {urgentPoCount > 0 && !poDayPreview ? (
-        <span className="font-semibold text-destructive">
-          {urgentPoCount} urgent — deadline inside the stock window, don&rsquo;t wait for PO day
+      {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
+    </span>
+  ) : undefined;
+  const picQueueChip = (
+    <span
+      className="shrink-0 text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
+      title="Each PIC chases their own orders"
+    >
+      PIC
+    </span>
+  );
+  const poDutyTitleChips = poDutyHolderShown ? (
+    <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full border border-base-200 bg-white px-2 py-0.5 text-[11px] text-base-500 whitespace-nowrap"
+        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls Order PO + Chase supplier (the one voice to suppliers). Full roster: right rail → Team.`}
+      >
+        <span
+          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+          style={{
+            background: avatarColor(poDutyHolderShown.userId).bg,
+            color: avatarColor(poDutyHolderShown.userId).fg,
+          }}
+        >
+          {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
         </span>
-      ) : (
-        <span className="text-base-700">
-          <span className="font-semibold">PO day</span> — Order PO {orderPoCount} · Chase
-          supplier {chaseSupplierCount}
-          {urgentPoCount > 0 && (
-            <span className="font-semibold text-destructive"> · {urgentPoCount} urgent</span>
+        PO duty{!poDutyHolder && " · demo"} · next {nextPoLabel}
+      </span>
+      {poHot && (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${
+            urgentPoCount > 0 && !(poDayPreview || isPoDayMYT())
+              ? "bg-destructive/10 text-destructive"
+              : "bg-warning-soft text-warning"
+          }`}
+          data-testid="po-day-chip"
+        >
+          <PackagePlus size={14} strokeWidth={2} />
+          {poDayPreview || isPoDayMYT()
+            ? `PO day — Order PO ${orderPoCount} · Chase supplier ${chaseSupplierCount}`
+            : `${urgentPoCount} urgent — inside the stock window`}
+          {(poDayPreview || isPoDayMYT()) && urgentPoCount > 0 && (
+            <span className="text-destructive">· {urgentPoCount} urgent</span>
           )}
         </span>
       )}
-      <span className="text-base-400">
-        PO duty: {poDutyHolderShown.name ?? poDutyHolderShown.email}
-        {!poDutyHolder && " · demo"}
-      </span>
-      {canRaise && (
+      {poHot && canRaise && (
         <button
           type="button"
           onClick={() =>
@@ -1813,13 +1830,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
               liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
             )
           }
-          className="ml-auto btn-secondary text-[12px] py-0.5 px-2"
+          className="btn-secondary text-[11px] py-0.5 px-2 whitespace-nowrap"
         >
           Raise PO
         </button>
       )}
     </div>
-  ) : null;
+  ) : undefined;
 
   return (
     <>
@@ -1853,6 +1870,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             )}
           </span>
         }
+        titleRight={poDutyTitleChips}
         actions={
           /* Header right cluster (ONE white header surface): search → Bell →
              HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
@@ -1952,10 +1970,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           /* PIC tabs on the RIGHT listing too (Jess 2026-07-18: "every staff
              and no pic … as tab, can click to see total list of them") — the
              SAME staffFilter the left TEAM rows drive; click either side. */
-          poBanner || poolStaff.length > 0 ? (
-            <div className="w-full flex flex-col gap-1.5">
-              {poBanner}
-              {poolStaff.length > 0 && (
+          poolStaff.length > 0 ? (
             <div className="w-full flex items-center gap-1.5 justify-start overflow-x-auto no-scrollbar">
               <StaffChip
                 label="Everyone"
@@ -1983,8 +1998,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
                 }
               />
-            </div>
-              )}
             </div>
           ) : undefined
         }
@@ -2085,6 +2098,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     valueText={`RM ${Math.round(owing.rm).toLocaleString("en-MY")}`}
                     tone="danger"
                     active={owingOnly}
+                    chip={picQueueChip}
                     title={`${owing.n} orders still owe money (delivered included)`}
                     onClick={() => setOwingOnly((v) => !v)}
                   />
@@ -2103,6 +2117,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                             : undefined
                       }
                       active={nextFilter === v}
+                      chip={
+                        v === "Order PO" || v === "Chase supplier"
+                          ? dutyQueueChip
+                          : picQueueChip
+                      }
                       title={NEXT_QUEUE_DESC[v]}
                       onClick={() => setNextFilter((f) => (f === v ? null : v))}
                     />
@@ -2676,6 +2695,7 @@ function KanbanRow({
   title,
   valueText,
   tone,
+  chip,
 }: {
   label: string;
   count: number;
@@ -2686,6 +2706,9 @@ function KanbanRow({
   valueText?: string;
   /** Queue severity colour on the value (B rebuild): danger red · warning amber. */
   tone?: "danger" | "warning";
+  /** Owner adornment between label and value (B+C 2026-07-19): the duty
+   *  holder's avatar on the goods queues, a grey PIC tag on the PIC queues. */
+  chip?: ReactNode;
 }) {
   const valueColor = active
     ? "#0B0B0B"
@@ -2711,6 +2734,7 @@ function KanbanRow({
       >
         {label}
       </span>
+      {chip}
       <span
         className="text-[13px] tabular-nums shrink-0"
         style={{ color: valueColor, fontWeight: active || tone ? 700 : 400 }}

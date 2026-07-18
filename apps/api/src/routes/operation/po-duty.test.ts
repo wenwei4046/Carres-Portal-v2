@@ -142,9 +142,10 @@ describe("GET /api/operation/po-duty", () => {
           ],
         },
         app_users: {
-          single: [
-            { data: { id: HOLDER, email: "shasha@carres.com", name: "Shasha" }, error: null },
-          ],
+          list: {
+            data: [{ id: HOLDER, email: "shasha@carres.com", name: "Shasha" }],
+            error: null,
+          },
         },
       }) as any,
     );
@@ -154,9 +155,49 @@ describe("GET /api/operation/po-duty", () => {
     const body = (await res.json()) as {
       month: string;
       holder: { userId: string; name: string | null };
+      roster?: unknown[];
     };
     expect(body.month).toBe("2026-07");
     expect(body.holder).toMatchObject({ userId: HOLDER, name: "Shasha" });
+  });
+
+  it("returns the forward roster for the DUTY board", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeSb({
+        ops_po_duty: {
+          single: [
+            { data: { month: "2026-07", user_id: HOLDER, assigned_by: null }, error: null },
+          ],
+          list: {
+            data: [
+              { month: "2026-07", user_id: HOLDER },
+              { month: "2026-08", user_id: OTHER },
+            ],
+            error: null,
+          },
+        },
+        app_users: {
+          list: {
+            data: [
+              { id: HOLDER, email: "shasha@carres.com", name: "Shasha" },
+              { id: OTHER, email: "liching@carres.com", name: "Li Ching" },
+            ],
+            error: null,
+          },
+        },
+      }) as any,
+    );
+    const jwt = await makeJwt("operation");
+    const res = await req("/api/operation/po-duty", "GET", jwt);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      roster: { month: string; name: string | null }[];
+    };
+    expect(body.roster).toEqual([
+      expect.objectContaining({ month: "2026-07", name: "Shasha" }),
+      expect.objectContaining({ month: "2026-08", name: "Li Ching" }),
+    ]);
   });
 
   it("lazily fills a missing month from the pool rotation (deterministic)", async () => {

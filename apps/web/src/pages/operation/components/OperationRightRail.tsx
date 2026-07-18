@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Lightbulb, Flag, ScrollText, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Users, Flag, ScrollText, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useActiveOrder } from "@/lib/active-order";
-import type { OpsNote, OpsTask } from "@carres/shared";
+import type { OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
-import KeepPanel from "./rail/KeepPanel";
+import TeamPanel from "./rail/TeamPanel";
 import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
 import GlobalActivity from "./GlobalActivity";
@@ -18,13 +18,15 @@ import GlobalActivity from "./GlobalActivity";
  * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
  * the same ops_tasks data the Orders list flag column drives.
  */
-type Panel = "calendar" | "keep" | "tasks" | "activity";
-// Calendar (blue) · Notes (amber) · Follow-ups — the Follow-ups rail is the SAME
-// flag system as the Orders list flag column (both ops_tasks), so it uses the
-// Flag icon + the flag's amber, reading as one feature (Jess 2026-06-29).
+type Panel = "calendar" | "team" | "tasks" | "activity";
+// Calendar (blue) · Team (green — the duty board) · Follow-ups — the
+// Follow-ups rail is the SAME flag system as the Orders list flag column
+// (both ops_tasks), so it uses the Flag icon + amber (Jess 2026-06-29).
+// Team REPLACED Notes (Jess 2026-07-19): Keep notes shipped 6/12 and held
+// exactly ONE note ever — dead slot, repurposed as the DUTY & ROLES board.
 const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
-  { key: "keep", label: "Notes", icon: Lightbulb, active: "bg-warning-soft text-warning" },
+  { key: "team", label: "Team", icon: Users, active: "bg-success-soft text-success" },
   { key: "tasks", label: "Follow-ups", icon: Flag, active: "bg-warning-soft text-warning" },
   // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
   // page into the rail, after the flag). Shows only when an order is open.
@@ -51,19 +53,10 @@ export default function OperationRightRail() {
   );
   const myOverdue = myTasks.filter((t) => t.overdue).length;
 
-  // Active-notes count — shares the KeepPanel "active" cache; badges the Keep
-  // icon with how many notes you've got (Jess ask).
-  const { data: notesData } = useQuery<{ notes: OpsNote[] }>({
-    queryKey: ["ops", "notes", "active"],
-    queryFn: () => apiFetch("/api/ops/notes"),
-  });
-  const notesCount = (notesData?.notes ?? []).length;
-
-  // Per-tab badge: Tasks = overdue (red alert), Keep = note count (neutral).
+  // Per-tab badge: Tasks = my open follow-ups (red when any overdue).
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {
     if (key === "tasks" && myTasks.length > 0)
       return { n: myTasks.length, tone: myOverdue > 0 ? "bg-danger" : "bg-base-700" };
-    if (key === "keep" && notesCount > 0) return { n: notesCount, tone: "bg-base-700" };
     return null;
   };
 
@@ -87,7 +80,7 @@ export default function OperationRightRail() {
           </div>
           <div className="flex-1 overflow-auto p-3.5 min-h-0">
             {active === "calendar" && <CalendarPanel />}
-            {active === "keep" && <KeepPanel />}
+            {active === "team" && <TeamPanel />}
             {active === "tasks" && <TasksPanel />}
             {active === "activity" &&
               (activeOrderId ? (

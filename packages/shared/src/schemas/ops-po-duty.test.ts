@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   monthKeyMYT,
   isPoDayMYT,
+  nextPoDayMYT,
   poStockLeadDaysFor,
   poUrgentBypass,
   pickNextDutyHolder,
@@ -33,6 +34,17 @@ describe("isPoDayMYT", () => {
   it("other days are not — and the MYT shift decides the weekday", () => {
     expect(isPoDayMYT(TUE_MYT)).toBe(false);
     expect(isPoDayMYT(SUN_LATE_MYT)).toBe(false); // Sun 23:00 MYT (Sun 15:00Z)
+  });
+});
+
+describe("nextPoDayMYT", () => {
+  it("today when today is a PO day (MYT)", () => {
+    expect(nextPoDayMYT(MON_MYT)).toBe("2026-07-20");
+    expect(nextPoDayMYT(THU_MYT)).toBe("2026-07-23");
+  });
+  it("rolls forward to the next Mon/Thu otherwise", () => {
+    expect(nextPoDayMYT(TUE_MYT)).toBe("2026-07-23"); // Tue → Thu
+    expect(nextPoDayMYT(SUN_LATE_MYT)).toBe("2026-07-20"); // Sun 23:00 MYT → Mon
   });
 });
 

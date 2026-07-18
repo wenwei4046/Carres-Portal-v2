@@ -98,19 +98,41 @@ poDutyRouter.get("/", async (c) => {
     const body: OpsPoDutyResponse = { month, holder: null };
     return c.json(body);
   }
-  const user = await sb
-    .from("app_users")
-    .select("id, email, name")
-    .eq("id", duty.user_id)
-    .maybeSingle();
+
+  // DUTY board roster (Jess 2026-07-19): this month + every future month
+  // already written (0236 seeds Jul/Aug/Sep) — the whole team sees the
+  // rotation, not just today's holder. One name-enrichment round-trip.
+  const rosterRows = await sb
+    .from("ops_po_duty")
+    .select("month, user_id")
+    .gte("month", month)
+    .order("month")
+    .limit(6);
+  const rows = (rosterRows.data ?? []) as { month: string; user_id: string }[];
+  const ids = [...new Set([duty.user_id, ...rows.map((r) => r.user_id)])];
+  const users = await sb.from("app_users").select("id, email, name").in("id", ids);
+  const byId = new Map(
+    (users.data ?? []).map((u) => [
+      u.id as string,
+      { email: (u.email as string) ?? "", name: (u.name as string | null) ?? null },
+    ]),
+  );
+
+  const holderUser = byId.get(duty.user_id);
   const body: OpsPoDutyResponse = {
     month: duty.month,
     holder: {
       userId: duty.user_id,
-      email: (user.data?.email as string | undefined) ?? "",
-      name: (user.data?.name as string | null | undefined) ?? null,
+      email: holderUser?.email ?? "",
+      name: holderUser?.name ?? null,
       assignedBy: duty.assigned_by,
     },
+    roster: rows.map((r) => ({
+      month: r.month,
+      userId: r.user_id,
+      email: byId.get(r.user_id)?.email ?? "",
+      name: byId.get(r.user_id)?.name ?? null,
+    })),
   };
   return c.json(body);
 });

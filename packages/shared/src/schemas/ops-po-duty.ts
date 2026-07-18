@@ -69,6 +69,22 @@ export function poUrgentBypass(
   return windows.some((w) => daysLeft <= w);
 }
 
+/** Next PO day (Mon/Thu MYT) as an ISO date — TODAY if today is one. Feeds
+ *  the DUTY board footer ("next: Thu 23 Jul 26"). */
+export function nextPoDayMYT(now: Date = new Date()): string {
+  const myt = new Date(now.getTime() + 8 * 3_600_000);
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(myt.getTime() + i * 86_400_000);
+    if (PO_DUTY_DAYS_MYT.includes(d.getUTCDay())) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+  }
+  return ""; // unreachable — 7 consecutive days always contain a Mon
+}
+
 /** One month's duty row. assigned_by null = auto-rotation picked it. */
 export const opsPoDutySchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/),
@@ -78,7 +94,16 @@ export const opsPoDutySchema = z.object({
 export type OpsPoDuty = z.infer<typeof opsPoDutySchema>;
 
 /** GET /api/operation/po-duty — current month's holder (enriched), or
- *  holder:null while the pool is empty / feature dormant. */
+ *  holder:null while the pool is empty / feature dormant. `roster` = the
+ *  DUTY board (Jess 2026-07-19 "duty roster clear on board"): this month +
+ *  every future month already written (0236 seeds Jul/Aug/Sep). */
+export const opsPoDutyRosterEntrySchema = z.object({
+  month: z.string(),
+  userId: z.string().uuid(),
+  email: z.string(),
+  name: z.string().nullable(),
+});
+export type OpsPoDutyRosterEntry = z.infer<typeof opsPoDutyRosterEntrySchema>;
 export const opsPoDutyResponseSchema = z.object({
   month: z.string(),
   holder: z
@@ -89,6 +114,7 @@ export const opsPoDutyResponseSchema = z.object({
       assignedBy: z.string().uuid().nullable(),
     })
     .nullable(),
+  roster: z.array(opsPoDutyRosterEntrySchema).optional(),
 });
 export type OpsPoDutyResponse = z.infer<typeof opsPoDutyResponseSchema>;
 

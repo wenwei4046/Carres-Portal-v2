@@ -43,6 +43,9 @@ interface Props {
   breadcrumb?: ReactNode;
   /** Optional right-aligned meta on the breadcrumb row (freshness stamp / refresh). */
   meta?: ReactNode;
+  /** Right-aligned cluster on the TITLE row (Jess 2026-07-19) — ambient status
+   *  chips / announcements in the title row's dead space (no banner row). */
+  titleRight?: ReactNode;
   /** Facet-panel content (240px aside). Omit for a facet-less list. */
   facet?: ReactNode;
   /** Facet collapse state (owned by the page so it can persist). */
@@ -75,6 +78,7 @@ export default function ListPageShell({
   actions,
   breadcrumb,
   meta,
+  titleRight,
   facet,
   facetOpen = true,
   onFacetToggle,
@@ -111,6 +115,14 @@ export default function ListPageShell({
           {meta && (
             <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
               {meta}
+            </div>
+          )}
+          {/* Right cluster on the TITLE row (Jess 2026-07-19): ambient status
+              chips / announcements live in the title row's dead space instead
+              of a dedicated banner row — saves a full row on a MacBook. */}
+          {titleRight && (
+            <div className="shrink-0 ml-auto self-center flex items-center gap-1.5 min-w-0">
+              {titleRight}
             </div>
           )}
         </div>
