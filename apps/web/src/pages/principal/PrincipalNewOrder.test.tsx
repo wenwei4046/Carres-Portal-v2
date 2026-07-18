@@ -1,24 +1,21 @@
 /**
- * PrincipalNewOrder — the POS-structure-parity raw creator (Loo 2026-07-18).
+ * PrincipalNewOrder — the single-page RAW key-in form (Loo 2026-07-18, the
+ * 2990s Backend "New Sales Order" shape — NOT the POS wizard).
  *
  * What matters here:
- *  1. SKU-search-first product entry: a search hit opens the SAME configure
- *     surface the POS card would, with the variant PRESELECTED, and the
- *     emitted DraftLine (attrs included) lands as an editable Items row.
- *  2. The raw contract survives the new flow: prices stay editable, custom
- *     lines allowed, and the submit maps the full draft (attrs, customer
- *     block, dealer) onto RawCreateOrderInput for POST /api/orders/raw.
+ *  1. Line rows are pick-or-type comboboxes: a configurable catalog pick opens
+ *     the product's OWN configure surface (specs follow the product) and fills
+ *     the row; free text stays a custom "OTHERS" line; prices stay editable.
+ *  2. Nothing gates: dealer + customer name + ≥1 keyed line is ALL the form
+ *     requires — dates optional (past OK, empty = TBD), payment optional.
+ *  3. Submit maps the whole form onto RawCreateOrderInput (attrs, structured
+ *     address, custom fields) for POST /api/orders/raw.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse, Order } from "@carres/shared";
-import {
-  RAW_DRAFT_STORAGE_KEY,
-  emptyDraft,
-  type WizardDraft,
-} from "../dealer/new-order/draft";
 import PrincipalNewOrder from "./PrincipalNewOrder";
 
 const DEALER_ID = "00000000-0000-0000-0000-0000000000d1";
@@ -33,7 +30,6 @@ const { mockRawCreate, mockHooks } = vi.hoisted(() => {
       useSalespersons: vi.fn(),
       useCatalog: vi.fn(),
       useRawCreateOrder: vi.fn(() => ({ mutateAsync: mockRawCreate, isPending: false })),
-      useCustomerSearch: vi.fn(() => ({ data: undefined })),
     },
   };
 });
@@ -124,7 +120,6 @@ function setHookDefaults() {
     mutateAsync: mockRawCreate,
     isPending: false,
   });
-  mockHooks.useCustomerSearch.mockReturnValue({ data: undefined });
 }
 
 function wrap() {
@@ -138,6 +133,11 @@ function wrap() {
   );
 }
 
+/** The first (auto-seeded) row's sku combobox input. */
+function firstSkuInput() {
+  return screen.getAllByLabelText("Product SKU or description")[0]!;
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   setHookDefaults();
@@ -147,172 +147,136 @@ afterEach(() => {
   mockRawCreate.mockReset();
 });
 
-describe("PrincipalNewOrder — SKU-search-first Items step", () => {
-  it("search hit opens the POS configure page with the variant PRESELECTED; adding lands an editable row", () => {
+describe("PrincipalNewOrder — single-page raw form", () => {
+  it("renders every section on ONE page (no wizard steps)", () => {
     wrap();
+    expect(screen.getByText("Sale info")).toBeTruthy();
+    expect(screen.getByText("Customer")).toBeTruthy();
+    expect(screen.getByText("Order info")).toBeTruthy();
+    expect(screen.getByText("Emergency contact")).toBeTruthy();
+    expect(screen.getByText("Delivery address")).toBeTruthy();
+    expect(screen.getByText(/^Line items/)).toBeTruthy();
+    expect(screen.getByText("Payment")).toBeTruthy();
+    expect(screen.getByTestId("raw-submit")).toBeTruthy();
+  });
 
-    fireEvent.change(screen.getByTestId("raw-picker"), { target: { value: "cloud" } });
+  it("row combobox: a configurable catalog pick opens the configure page preselected, Add fills the row", () => {
+    wrap();
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "cloud" } });
     // Deactivated skus surface too (raw path reaches the full admin bundle).
     expect(screen.getByTestId("raw-pick-CLOUD-KING").textContent).toContain("POS off");
 
-    fireEvent.click(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
-    // The POS full-page configurator opens ALREADY configured to Queen — the
-    // live total shows its price without another click.
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
+    // The POS full-page configurator opens ALREADY configured to Queen.
     expect(screen.getByTestId("pos-configure-page")).toBeTruthy();
     expect(screen.getByTestId("cfg-live-total").textContent).toContain("2,890");
 
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
-    // Back on Items with the line staged; Next unlocks.
     expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    // The ROW got filled (not appended) — sku input now holds the pick.
+    expect((firstSkuInput() as HTMLInputElement).value).toBe("CLOUD-QUEEN");
     expect(screen.getByText("Carres Cloud · Queen")).toBeTruthy();
-    expect(screen.getByTestId("raw-items-next")).toHaveProperty("disabled", false);
   });
 
   it("prices stay editable after configuration (raw override)", () => {
     wrap();
-    fireEvent.change(screen.getByTestId("raw-picker"), { target: { value: "queen" } });
-    fireEvent.click(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "queen" } });
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
 
-    fireEvent.change(screen.getByLabelText("Unit price (RM)"), { target: { value: "1000" } });
-    // Topbar count reflects the overridden total.
-    expect(screen.getByTestId("raw-topbar-count").textContent).toContain("1,000.00");
+    fireEvent.change(screen.getAllByLabelText("Unit price (RM)")[0]!, {
+      target: { value: "1000" },
+    });
+    // Line total + Subtotal + footer Total all show the overridden figure.
+    expect(screen.getAllByText("RM 1,000.00").length).toBeGreaterThan(0);
   });
 
-  it("a service sku adds a plain line directly — no configurator hop", () => {
+  it("a service sku fills the row directly — no configurator hop", () => {
     wrap();
-    fireEvent.change(screen.getByTestId("raw-picker"), { target: { value: "svc" } });
-    fireEvent.click(screen.getByTestId("raw-pick-SVC-ASSEMBLY"));
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "svc" } });
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-SVC-ASSEMBLY"));
     expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    expect((firstSkuInput() as HTMLInputElement).value).toBe("SVC-ASSEMBLY");
     expect(screen.getByText("Services · Assembly")).toBeTruthy();
   });
 
-  it("custom line stays supported (free-text sku + price)", () => {
-    wrap();
-    expect(screen.getByTestId("raw-items-next")).toHaveProperty("disabled", true);
-    fireEvent.click(screen.getByText("Custom line"));
-    // Empty sku keeps Next gated until typed.
-    expect(screen.getByTestId("raw-items-next")).toHaveProperty("disabled", true);
-    fireEvent.change(screen.getByLabelText("Custom line description"), {
-      target: { value: "CUSTOM DELIVERY SURCHARGE" },
-    });
-    expect(screen.getByTestId("raw-items-next")).toHaveProperty("disabled", false);
-  });
-
-  it("Next lands on the POS CustomerStep with the in-flow dealer card", () => {
-    wrap();
-    fireEvent.change(screen.getByTestId("raw-picker"), { target: { value: "queen" } });
-    fireEvent.click(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
-    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
-    fireEvent.click(screen.getByTestId("raw-items-next"));
-    // The POS customer step (dealer pick card + step pills) is mounted.
-    expect(screen.getByTestId("pos-dealer-pick")).toBeTruthy();
-    expect(screen.getByTestId("pos-customer-chip-1")).toBeTruthy();
-  });
-});
-
-describe("PrincipalNewOrder — raw submit mapping", () => {
-  /** A COMPLETE restored draft so the CustomerStep gates pass without UI
-   *  keystrokes — the test walks Next×4 → Confirm → Create. */
-  function completeDraft(): WizardDraft {
-    const d = emptyDraft();
-    return {
-      ...d,
-      actingDealerId: DEALER_ID,
-      actingDealerName: "Dealer One",
-      outletId: "o1",
-      salespersonId: "sp1",
-      customer: {
-        ...d.customer,
-        name: "Raw Customer",
-        phone: "0123456789",
-        email: "raw@example.com",
-        race: "Chinese",
-        gender: "Female",
-        birthday: "1990-04-01",
-        addressLine1: "12 Jalan A",
-        addressState: "Kuala Lumpur",
-        addressCity: "Kuala Lumpur",
-        addressPostcode: "50000",
-        emergencyName: "Alice",
-        emergencyPhone: "0129988776",
-        emergencyRelationship: "Spouse",
-      },
-      // Raw dates: TBD off + EMPTY dates would fail the POS gate — here the
-      // rawDates prop lets it pass (no date rules on this path).
-      delivery: { ...d.delivery, dateTbd: false, date: "", proceedDate: "" },
-      lines: [
-        {
-          localId: "l1",
-          sku: "CLOUD-QUEEN",
-          qty: 1,
-          attrs: { options: [{ kind: "bedframe_leg_height", value: "15cm" }] },
-          unitPrice: 2890,
-          label: "Carres Cloud · Queen",
-        },
-      ],
-      payment: { ...d.payment, method: "" },
-      paid: 500,
-    };
-  }
-
-  it("Create maps the draft onto RawCreateOrderInput — attrs, customer block, dealer, no payment", async () => {
-    sessionStorage.setItem(RAW_DRAFT_STORAGE_KEY, JSON.stringify(completeDraft()));
+  it("free text stays a custom OTHERS line and can submit", async () => {
     mockRawCreate.mockResolvedValue({
       id: "o-raw-1",
       so: 1301,
       customer: { name: "Raw Customer" },
       lines: [{ id: "ol1" }],
     } as unknown as Order);
-
     wrap();
-    fireEvent.click(screen.getByTestId("raw-items-next"));
-    // CustomerStep sub-steps: Customer → Address → Emergency → Target date.
-    for (let i = 0; i < 4; i++) {
-      fireEvent.click(screen.getByTestId("pos-customer-next"));
-    }
-    // Confirm — everything optional; Create fires the raw door.
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    fireEvent.change(firstSkuInput(), { target: { value: "CUSTOM DELIVERY SURCHARGE" } });
+    expect(screen.getByText(/OTHERS · custom line/)).toBeTruthy();
+    fireEvent.change(screen.getAllByLabelText("Unit price (RM)")[0]!, {
+      target: { value: "150.5" },
+    });
+
     fireEvent.click(screen.getByTestId("raw-submit"));
     await screen.findByText("Order SO-1301 created");
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.lines).toEqual([
+      { sku: "CUSTOM DELIVERY SURCHARGE", qty: 1, unitPrice: 150.5, attrs: null },
+    ]);
+  });
 
-    expect(mockRawCreate).toHaveBeenCalledTimes(1);
+  it("nothing gates beyond dealer + name + one line: dates/payment empty submit as TBD/nulls; remarks + attrs ride", async () => {
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-2",
+      so: 1302,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
+    wrap();
+
+    // Submit disabled until the three raw floors are met.
+    expect(screen.getByTestId("raw-submit")).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    // Configure a catalog line (attrs flow through the row).
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "queen" } });
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    // Row remark → attrs.remark.
+    fireEvent.change(screen.getAllByLabelText("Line remarks")[0]!, {
+      target: { value: "backfill from AutoCount" },
+    });
+    // A PAST delivery date — the raw path accepts it untouched.
+    fireEvent.change(screen.getByTestId("raw-delivery-date"), {
+      target: { value: "2024-01-15" },
+    });
+    fireEvent.change(screen.getByTestId("raw-paid"), { target: { value: "500" } });
+
+    expect(screen.getByTestId("raw-submit")).toHaveProperty("disabled", false);
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    await screen.findByText("Order SO-1302 created");
+
     const input = mockRawCreate.mock.calls[0][0];
     expect(input.dealerId).toBe(DEALER_ID);
-    expect(input.outletId).toBe("o1");
-    expect(input.salespersonId).toBe("sp1");
-    expect(input.customer).toMatchObject({
-      name: "Raw Customer",
-      phone: "0123456789",
-      email: "raw@example.com",
-      race: "Chinese",
-      gender: "Female",
-      birthday: "1990-04-01",
-      addressUnknown: false,
-      billingSame: true,
-      emergency: "Alice · 0129988776 · Spouse",
-      // 0230 — structured parts ride alongside the composed string.
-      addressLine1: "12 Jalan A",
-      addressState: "Kuala Lumpur",
-      addressCity: "Kuala Lumpur",
-      addressPostcode: "50000",
-    });
-    expect(input.customer.address).toContain("12 Jalan A");
-    // Raw dates: empty (not TBD-ticked) still submits as no-date (TBD).
-    expect(input.deliveryDate).toBeNull();
+    expect(input.customer.name).toBe("Raw Customer");
+    expect(input.deliveryDate).toBe("2024-01-15"); // past date, saved as entered
     expect(input.proceedDate).toBeNull();
-    // The configured spec attrs ride the line.
+    expect(input.paymentMethod).toBeNull(); // payment optional
+    expect(input.paid).toBe(500);
     expect(input.lines).toEqual([
       {
         sku: "CLOUD-QUEEN",
         qty: 1,
         unitPrice: 2890,
-        attrs: { options: [{ kind: "bedframe_leg_height", value: "15cm" }] },
+        attrs: { remark: "backfill from AutoCount" },
       },
     ]);
-    expect(input.paid).toBe(500);
-    // No payment recorded → nulls (optional on this path).
-    expect(input.paymentMethod).toBeNull();
-    expect(input.signaturePath).toBeNull();
-    expect(input.termsAccepted).toBe(false);
   });
 });

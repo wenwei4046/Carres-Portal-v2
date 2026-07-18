@@ -25,9 +25,7 @@ import "./date-keyin.css";
 interface Props {
   value: string; // ISO yyyy-mm-dd or ""
   onChange: (iso: string) => void;
-  /** Selectable floor. OMIT for no floor (Maintain → New Order raw dates —
-   *  backfill may pick past days); the view then opens at value/today. */
-  minIso?: string;
+  minIso: string;
   maxIso?: string;
   todayIso: string;
   placeholder?: string;
@@ -55,7 +53,7 @@ export default function CalendarDateField({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   function openCal() {
-    const base = partsFromIso(value) ?? partsFromIso(minIso ?? "") ?? partsFromIso(todayIso);
+    const base = partsFromIso(value) ?? partsFromIso(minIso) ?? partsFromIso(todayIso);
     if (!base) return;
     setView({ y: base.y, m: base.m });
     setOpen(true);
@@ -90,10 +88,10 @@ export default function CalendarDateField({
     });
   }
 
-  const inRange = (iso: string) => (!minIso || iso >= minIso) && (!maxIso || iso <= maxIso);
+  const inRange = (iso: string) => iso >= minIso && (!maxIso || iso <= maxIso);
   // Month nav is capped where no selectable day can exist beyond it.
   const prevOk =
-    open && (!minIso || isoFromParts({ y: view.m === 0 ? view.y - 1 : view.y, m: (view.m + 11) % 12, d: daysInMonth(view.m === 0 ? view.y - 1 : view.y, (view.m + 11) % 12) }) >= minIso);
+    open && isoFromParts({ y: view.m === 0 ? view.y - 1 : view.y, m: (view.m + 11) % 12, d: daysInMonth(view.m === 0 ? view.y - 1 : view.y, (view.m + 11) % 12) }) >= minIso;
   const nextOk =
     open && (!maxIso || isoFromParts({ y: view.m === 11 ? view.y + 1 : view.y, m: (view.m + 1) % 12, d: 1 }) <= maxIso);
 
