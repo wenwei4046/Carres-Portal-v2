@@ -863,7 +863,7 @@ function ProgressTrack({
 }) {
   return (
     <div
-      className="kpi-box cursor-pointer transition-colors hover:border-base-300 !flex-row items-center gap-4 min-w-0"
+      className="kpi-box cursor-pointer transition-colors hover:border-base-300 !flex-row flex-wrap items-center gap-x-4 gap-y-1 min-w-0"
       onClick={onOpen}
       role="button"
     >
@@ -875,15 +875,18 @@ function ProgressTrack({
           {label}
         </span>
       </span>
-      {/* Node line — connectors flex between fixed stage columns; a connector
-          reads "filled" (dark) once the node BEFORE it is done. mt aligns the
-          2px line with the 24px node's centre. */}
-      <div className="flex-1 min-w-0 flex items-start px-1">
+      {/* COMPACT stepper (international pattern — Stripe/DHL-style): the
+          node cluster hugs together on FIXED short connectors instead of
+          stretching to fill the row, so the right value column always keeps
+          its own clean space (no overlap at narrow widths). A connector
+          reads "filled" (dark) once the node BEFORE it is done; mt aligns
+          the 2px line with the 24px node's centre. */}
+      <div className="shrink-0 flex items-start">
         {stages.map((s, i) => (
           <Fragment key={s.word}>
             {i > 0 && (
               <span
-                className={`flex-1 h-0.5 rounded-full mt-[11px] min-w-4 ${
+                className={`w-5 h-0.5 rounded-full mt-[11px] shrink-0 ${
                   stages[i - 1].state === "done" ? "bg-base-400" : "bg-base-200"
                 }`}
                 aria-hidden="true"
@@ -910,10 +913,14 @@ function ProgressTrack({
           </Fragment>
         ))}
       </div>
-      <span className="shrink-0 text-right">
+      {/* ml-auto right-aligns the value on WHATEVER line it lands: one line
+          when the card is wide (office 1920), naturally wrapping to its own
+          right-aligned second line when narrow — the three tracks' values
+          always read as ONE right column (B, Jess 2026-07-18). */}
+      <span className="ml-auto shrink-0 text-right min-w-0 max-w-[300px]">
         <span className="block text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
         {summary && (
-          <span className="mt-0.5 flex items-center justify-end gap-1 text-[12px] text-base-500 whitespace-nowrap">
+          <span className="mt-0.5 flex flex-wrap items-center justify-end gap-1 text-[12px] text-base-500">
             {summary}
           </span>
         )}
