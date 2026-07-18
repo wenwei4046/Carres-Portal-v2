@@ -2522,4 +2522,55 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   });
 });
 
+/**
+ * POST /api/orders/:id/issue-invoice — Balance tab §10 "Generate invoice"
+ * (Jess 2026-07-18).
+ *
+ * Issues the Sales Invoice ON DEMAND (before dispatch) via the 0229
+ * `issue_order_invoice` RPC — idempotent, same INV-YYYY-{so} formula as the
+ * 0098 dispatch auto-issue, so the two paths can never mint two numbers for
+ * one order. Body carries the Balance tab's invoice total (goods + storage)
+ * because AutoCount-imported orders have no per-line prices; a native order
+ * may omit it and the RPC falls back to the line+addon sum.
+ *
+ * Roles: operation / finance / principal (same internal-doc gate as
+ * invoice-pdf-data; RPC re-checks server-side).
+ */
+ordersRouter.post("/:id/issue-invoice", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(String(auth.role))) {
+    throw new HTTPException(403, { message: "Issuing invoices not available for this role" });
+  }
+  const id = c.req.param("id");
+  const idCheck = z.string().uuid().safeParse(id);
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const body = z
+    .object({ amount: z.number().nonnegative().optional() })
+    .parse(await c.req.json().catch(() => ({})));
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("issue_order_invoice", {
+    p_order_id: id,
+    p_amount: body.amount ?? null,
+  });
+  if (error) {
+    if (error.code === "42501") {
+      throw new HTTPException(403, { message: "Not allowed to issue invoices" });
+    }
+    if (error.code === "P0002") {
+      throw new HTTPException(404, { message: "Order not found" });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d: any = data;
+  return c.json({
+    invoice_no: String(d.invoice_no),
+    issued_at: String(d.issued_at),
+    amount: Number(d.amount ?? 0),
+    already_issued: Boolean(d.already_issued),
+  });
+});
+
 export default ordersRouter;
