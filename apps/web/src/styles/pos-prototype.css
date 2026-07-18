@@ -144,6 +144,15 @@
   background: var(--c-burnt);
 }
 .pos-staff-chip__role { font-size: 11px; color: var(--fg-muted); font-weight: 500; }
+/* 0233 — the chip becomes a "换人 / switch staff" button when a PIN session is
+   active. Clicking clears the staff token → back to the PIN screen. */
+.pos-staff-chip--btn { cursor: pointer; border: 1.5px solid transparent; transition: 120ms ease; }
+.pos-staff-chip--btn:hover { border-color: var(--c-burnt); }
+.pos-staff-chip__switch {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 700;
+  color: var(--c-burnt); margin-left: 4px;
+}
 
 .topbar-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -3490,6 +3499,121 @@
 .pin-gate__key--util { background: transparent; border-color: transparent; color: var(--fg-muted); font-size: 12px; letter-spacing: 0.06em; }
 .pin-gate__key svg { width: 18px; height: 18px; }
 .pin-gate__hint { font-size: 11px; color: var(--fg-muted); letter-spacing: 0.04em; }
+
+/* ============================================================
+   STAFF PIN LOGIN (0233) — outlet picker · staff tiles · setup wizard
+   Full-screen gate that sits ON the POS look, in front of DealerApp.
+   ============================================================ */
+.staff-gate {
+  position: fixed; inset: 0; z-index: 60;
+  background: var(--pos-bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+  animation: pageEnter 220ms cubic-bezier(0.22,1,0.36,1) both;
+}
+.staff-gate__card {
+  position: relative;
+  width: 640px; max-width: 100%;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  background: var(--pos-panel, #fff);
+  border-radius: 24px;
+  padding: 36px 40px 32px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.16), 0 0 0 1px var(--line-strong);
+  text-align: center;
+}
+.staff-gate__card--narrow { width: 460px; }
+.staff-gate__eyebrow {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt);
+  margin-bottom: 6px;
+}
+.staff-gate__title {
+  font-family: var(--font-title); font-weight: 900; font-size: 26px;
+  letter-spacing: -0.01em; margin-bottom: 6px;
+}
+.staff-gate__sub {
+  font-size: 13px; color: var(--fg-muted); line-height: 1.5;
+  max-width: 44ch; margin: 0 auto 24px;
+}
+
+/* ----- Staff tile grid ----- */
+.staff-tiles {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 8px;
+}
+.staff-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 20px 14px 16px;
+  background: var(--pos-bg, #fff);
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  cursor: pointer; transition: 120ms ease;
+  text-align: center;
+}
+.staff-tile:hover:not(:disabled) { border-color: var(--c-orange); transform: translateY(-2px); }
+.staff-tile:disabled { opacity: 0.55; cursor: not-allowed; }
+.staff-tile__avatar {
+  width: 52px; height: 52px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-family: var(--font-button); font-size: 18px; font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.staff-tile__name { font-size: 14px; font-weight: 600; line-height: 1.2; }
+.staff-tile__tier { font-size: 11px; color: var(--fg-muted); font-weight: 500; }
+.staff-tile__badge {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--c-burnt);
+  background: color-mix(in oklab, var(--c-orange) 12%, transparent);
+  border-radius: 999px; padding: 2px 8px;
+}
+.staff-gate__link {
+  display: inline-block; margin-top: 18px;
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; background: none; border: none;
+}
+.staff-gate__link:hover { color: var(--c-burnt); }
+
+/* ----- Outlet picker rows ----- */
+.staff-outlets { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.staff-outlet {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 18px;
+  background: var(--pos-bg, #fff);
+  border: 1.5px solid var(--line); border-radius: 14px;
+  cursor: pointer; transition: 120ms ease; text-align: left;
+}
+.staff-outlet:hover { border-color: var(--c-orange); }
+.staff-outlet__name { font-size: 15px; font-weight: 600; }
+.staff-outlet__addr { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+
+/* ----- Setup wizard bits ----- */
+.staff-wiz__field { text-align: left; margin-bottom: 18px; }
+.staff-wiz__label {
+  display: block; font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  margin-bottom: 6px;
+}
+.staff-wiz__input {
+  width: 100%; padding: 11px 14px;
+  background: var(--pos-bg, #fff);
+  border: 1.5px solid var(--line); border-radius: 12px;
+  font-size: 15px; color: var(--fg); outline: none;
+}
+.staff-wiz__input:focus { border-color: var(--c-orange); }
+.staff-dots { display: flex; flex-wrap: wrap; gap: 10px; }
+.staff-dot {
+  width: 30px; height: 30px; border-radius: 999px; border: 2px solid transparent;
+  cursor: pointer; transition: 100ms ease;
+}
+.staff-dot.is-on { border-color: var(--c-ink); transform: scale(1.12); }
+.staff-gate__err {
+  font-size: 12px; color: #B8331F; margin-top: 6px; min-height: 16px;
+}
+.staff-gate__notice {
+  font-size: 12px; color: var(--fg-muted); margin-top: 14px;
+  background: var(--pos-rail); border-radius: 12px; padding: 10px 14px;
+}
 
 /* ---------- Top-bar pill: active state ---------- */
 .topbar-pill.is-active {

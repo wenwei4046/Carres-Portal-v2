@@ -1312,9 +1312,9 @@ export function StorageExtensionRow({
             )}
           </div>
           {!isPrincipal && (
-            <div className="mt-0.5 text-[12px] text-base-400">
-              One-time extension used — a further extension needs principal approval.
-            </div>
+            <span className="mt-0.5 inline-block pill bg-base-100 text-base-500">
+              1/1 used
+            </span>
           )}
         </div>
       </FieldRow>
@@ -1421,7 +1421,7 @@ export function StorageExtensionRow({
  *  receipt → open the delivery gate. A waiver is the principal-approved
  *  alternative. Reads the gate state off the loaded overlay row (form.control).
  *  Jess IS the principal, so this never gates him — it's the operator guardrail. */
-function StorageCollectWaiver({
+export function StorageCollectWaiver({
   orderId,
   control,
   charge,
@@ -1478,10 +1478,6 @@ function StorageCollectWaiver({
   return (
     <FieldRow label="Collect">
       <div className="px-1.5 py-1.5 w-full space-y-1.5">
-        <div className="text-[12px] text-warning font-medium">
-          Storage fee must be collected (or waived) before dispatch.
-        </div>
-
         {/* Collect */}
         {collecting ? (
           <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">

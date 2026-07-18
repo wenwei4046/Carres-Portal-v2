@@ -33,6 +33,7 @@ describe("getOrderEditScope", () => {
       canEditDetails: true,
       canUnproceed: false,
       canAddProduct: true,
+      canSubmitLineChange: false,
     });
   });
 
@@ -44,6 +45,7 @@ describe("getOrderEditScope", () => {
     expect(s.canUnproceed).toBe(true);
     // 0231 — direct add is place-lane only; proceed goes through P3 approval.
     expect(s.canAddProduct).toBe(false);
+    expect(s.canSubmitLineChange).toBe(true);
   });
 
   it("proceed_order + confirmed — canUnproceed with today / future proceedDate", () => {
@@ -100,6 +102,7 @@ describe("getOrderEditScope", () => {
       canEditDetails: false,
       canUnproceed: false,
       canAddProduct: false,
+      canSubmitLineChange: false,
     });
   });
 

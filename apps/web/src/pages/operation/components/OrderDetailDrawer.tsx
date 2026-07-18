@@ -23,7 +23,6 @@ import {
   ExternalLink,
   FileText,
   Flag,
-  Info,
   MapPin,
   MoreVertical,
   Package,
@@ -38,8 +37,6 @@ import {
   Undo2,
   Upload,
   User,
-  Wallet,
-  Warehouse,
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +44,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   computeStorageFee,
+  defaultStorageStart,
   normalizeSkuKey,
   STOCK_LOCATIONS,
   updateOrderInputSchema,
@@ -114,12 +112,12 @@ import {
   useOrderControlForm,
   RoutingFields,
   LogisticEtaField,
-  StorageControlFields,
+  StorageCollectWaiver,
+  StorageExtensionRow,
   RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
   FieldRow,
-  StorageExtensionRow,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
@@ -135,6 +133,7 @@ import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import ReceivePOModal from "./ReceivePOModal";
 import AnnotationTimeline from "./AnnotationTimeline";
+import ChangeRequestsPanel from "./ChangeRequestsPanel";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -2115,12 +2114,14 @@ function DrawerBody({
               lastChasedAt={form.control?.last_chased_at ?? null}
             />
           )}
-          {/* "Where this order is" — deposit → goods → balance → deliver,
-              real numbers on every step (sample grammar: ✓ filled · ONE
-              coloured node · pale not-yet). */}
-          {!railCollapsed && (
+          {/* THE SPINE — nav + progress + status in one (Jess 2026-07-18):
+              deposit → goods → balance → storage (when storing categories
+              exist) → deliver. Collapsed rail shows nodes only. */}
+          {(
             <JourneyCard
               onGo={setTab}
+              activeTab={tab}
+              collapsed={railCollapsed}
               steps={[
                 {
                   title: "Collect deposit",
@@ -2159,6 +2160,26 @@ function DrawerBody({
                       ? `still owes ${RM(balanceDue)} · before delivery`
                       : "all paid",
                 },
+                ...(hasMsbf || hasSof
+                  ? [
+                      {
+                        title: "Storage",
+                        tab: "storage" as DrawerTab,
+                        state: storageOwing
+                          ? storageGate === "hold"
+                            ? ("act" as const)
+                            : ("wait" as const)
+                          : storageIncurred && storageCleared
+                            ? ("done" as const)
+                            : ("todo" as const),
+                        sub: storageOwing
+                          ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
+                          : storageIncurred && storageCleared
+                            ? "collected"
+                            : "not counting",
+                      },
+                    ]
+                  : []),
                 {
                   title: "Deliver",
                   tab: "delivery",
@@ -2182,83 +2203,9 @@ function DrawerBody({
         >
           {(
             [
-              /* Tab-status law (Jess 2026-07-18, international pattern): the
-                 icon stays GREY always — colour arrives as an 8px corner
-                 badge on the icon (red = act now · amber = waiting) plus the
-                 right-side value/word in the same tone. Never tint the icon
-                 itself. Delivered = closed: no badges (guardrail #2). */
-              {
-                key: "items",
-                label: "Items",
-                icon: Package,
-                tone: deliveredDone
-                  ? undefined
-                  : stockTone === "danger"
-                    ? ("danger" as const)
-                    : readyN < goodsN
-                      ? ("warning" as const)
-                      : undefined,
-                v: goodsN > 0 ? `${readyN}/${goodsN}` : undefined,
-                w: deliveredDone
-                  ? "delivered"
-                  : readyN < goodsN
-                    ? `waiting ${goodsN - readyN}`
-                    : "all ready",
-              },
-              {
-                key: "delivery",
-                label: "Delivery",
-                icon: Truck,
-                tone:
-                  !deliveredDone && logisticTone === "danger"
-                    ? ("danger" as const)
-                    : undefined,
-                v: deliveredDone
-                  ? "Done"
-                  : logisticTone === "danger"
-                    ? "not booked"
-                    : undefined,
-                w: deliveredDone
-                  ? undefined
-                  : (assignedLogisticName ?? "no partner"),
-              },
-              {
-                key: "balance",
-                label: "Balance",
-                icon: Wallet,
-                tone:
-                  totalSet && balanceDue > 0 ? ("danger" as const) : undefined,
-                v: totalSet
-                  ? balanceDue > 0
-                    ? RM(balanceDue)
-                    : "Paid"
-                  : undefined,
-                w: totalSet
-                  ? balanceDue > 0
-                    ? "collect before delivery"
-                    : undefined
-                  : "nothing owing",
-              },
-              ...(hasMsbf || hasSof
-                ? [
-                    {
-                      key: "storage" as DrawerTab,
-                      label: "Storage",
-                      icon: Warehouse,
-                      tone: storageOwing
-                        ? storageGate === "hold"
-                          ? ("danger" as const)
-                          : ("warning" as const)
-                        : undefined,
-                      v: storageOwing
-                        ? storageFee > 0
-                          ? RM(storageFee)
-                          : "fee due"
-                        : undefined,
-                      w: storageOwing ? undefined : "not counting",
-                    },
-                  ]
-                : []),
+              /* Items / Delivery / Balance / Storage moved ONTO the spine —
+                 the nav keeps only the non-flow utilities (Jess: demoted,
+                 never hidden). */
               {
                 key: "loan",
                 label: "Loan",
@@ -2353,6 +2300,11 @@ function DrawerBody({
             own §8 status vocabulary carry the state; the work surface starts
             at the top). */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
+          {/* 0233/0234 (add-product P3) — dealer-submitted product change
+              awaiting approval. ABOVE the tab gate so it shows on EVERY tab
+              (Loo live-test 2026-07-18: ops couldn't find it); auto-hides
+              when none is pending. */}
+          <ChangeRequestsPanel orderId={order.id} />
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
@@ -3255,7 +3207,8 @@ function DrawerBody({
             <SectionCard className="shrink-0">
             <Panel
               title="Storage"
-              defaultOpen={false}
+              // Tab context — landing on the Storage TAB shows the card open.
+              defaultOpen
               summary={
                 storageOwing ? (
                   <span
@@ -3305,33 +3258,63 @@ function DrawerBody({
                 )
               }
             >
-              <div className="p-3 space-y-2">
-                {/* S3 — zero permanent explanation text (rev17 law): the §7.5
-                    rate rule lives in the ⓘ tooltip, not a standing card. */}
-                <div className="flex justify-end">
-                  <span
-                    title="Storage rule — starts the same weekday the week AFTER the deadline · MS/BF RM150/month · sofa free 14 days then RM200 (one-time)"
-                    className="inline-flex items-center gap-1 text-[12px] text-base-400 cursor-help"
-                  >
-                    <Info size={14} strokeWidth={2} />
-                    rates
-                  </span>
-                </div>
-                <StorageControlFields
-                  form={form}
-                  hasMsbf={hasMsbf}
-                  hasSof={hasSof}
-                  orderId={order.id}
-                  deadline={
-                    !order.delivery_date_tbd ? order.delivery_date : null
-                  }
-                  meta={{
-                    orderCode: `SO-${order.so}`,
-                    customerName: order.customer_name ?? "",
-                    customerPhone: order.customer_phone ?? "",
-                  }}
-                />
-              </div>
+              {/* Option A "shape that speaks" (Jess 2026-07-18): timeline card
+                  + the working flows. The old rule-box / Storage? / Paid?
+                  controls are retired — the timeline shows the rule, a start
+                  date means storing, and Collect is the only paid-truth. */}
+              <StorageCard
+                form={form}
+                hasMsbf={hasMsbf}
+                hasSof={hasSof}
+                deadline={!order.delivery_date_tbd ? order.delivery_date : null}
+              />
+              {/* The flows show ONLY when storage is actually in play — a
+                  not-storing order ends at the quiet card above (Jess: no
+                  floating collect buttons on orders that never stored). Each
+                  flow sits in its own framed zone. */}
+              {(() => {
+                const waiverState =
+                  form.control?.storage_waiver_status ?? "none";
+                const storageActive =
+                  storageIncurred ||
+                  !!form.control?.storage_collected_at ||
+                  waiverState !== "none";
+                const extActive =
+                  storageActive || (form.control?.extension_count ?? 0) > 0;
+                if (!storageActive && !extActive) return null;
+                return (
+                  <div className="px-3 pb-3 space-y-2">
+                    {storageActive && (
+                      <div className="rounded-[10px] border border-base-200/70">
+                        <StorageCollectWaiver
+                          orderId={order.id}
+                          control={form.control}
+                          charge={
+                            form.draft.storage_fee_override.trim()
+                              ? Number(form.draft.storage_fee_override)
+                              : storageCharge
+                          }
+                        />
+                      </div>
+                    )}
+                    {extActive && (
+                      <div className="rounded-[10px] border border-base-200/70">
+                        <StorageExtensionRow
+                          orderId={order.id}
+                          control={form.control}
+                          hasMsbf={hasMsbf}
+                          hasSof={hasSof}
+                          meta={{
+                            orderCode: `SO-${order.so}`,
+                            customerName: order.customer_name ?? "",
+                            customerPhone: order.customer_phone ?? "",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </Panel>
             </SectionCard>
           )}
@@ -4786,38 +4769,59 @@ async function viewSlip(p: OrderPaymentRow) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
-/** "Where this order is" — the journey card (Jess 2026-07-18, from her
- *  approved timeline sample): 4 FIXED steps in doing order — deposit →
- *  goods → balance → deliver. Sample grammar: done = ink-filled ✓ · the
- *  step needing work = the ONLY coloured node (red = act now, amber =
- *  waiting) · not-yet = pale ring; the connector darkens over completed
- *  ground. Every step carries its real number; clicking jumps to the tab. */
+/** "Where this order is" — the SPINE (Jess 2026-07-18): ONE vertical
+ *  progress line that is ALSO the section nav. Steps in doing order with
+ *  real numbers; clicking a step opens its tab (blue wash = the tab you're
+ *  on). Node grammar per Jess's approved sample: ink-filled ✓ done (the
+ *  connector darkens behind it) · red ring = act now · amber = waiting ·
+ *  pale ring = not yet. The line is a READING order, not a gate — every
+ *  node shows its own live state. The step WORDS are the locked
+ *  vocabulary; numbers may shift when the Storage step is absent.
+ *  Collapsed rail → nodes only. */
 type JourneyState = "done" | "act" | "wait" | "todo";
 function JourneyCard({
   steps,
+  activeTab,
+  collapsed,
   onGo,
 }: {
   steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
+  activeTab: DrawerTab;
+  collapsed: boolean;
   onGo: (t: DrawerTab) => void;
 }) {
   return (
-    <div className="bg-white border border-base-200 rounded-xl p-3 shrink-0">
-      <div className="t4-label mb-2">Where this order is</div>
+    <div
+      className={`bg-white border border-base-200 rounded-xl shrink-0 ${
+        collapsed ? "p-1.5" : "p-3"
+      }`}
+    >
+      {!collapsed && <div className="t4-label mb-2 px-1">Where this order is</div>}
       {steps.map((st, i) => {
         const last = i === steps.length - 1;
         const groundDone = steps.slice(0, i + 1).every((x) => x.state === "done");
+        const active = st.tab === activeTab;
         return (
           <button
             key={st.title}
             type="button"
             onClick={() => onGo(st.tab)}
-            title={`Open ${st.tab}`}
-            className="relative w-full flex items-start gap-2.5 text-left group pb-3 last:pb-0"
+            aria-selected={active}
+            title={`${st.title} — ${st.sub}`}
+            className={`relative w-full flex items-start text-left group rounded-lg ${
+              collapsed
+                ? "justify-center px-0 py-1.5"
+                : "gap-2.5 px-1.5 py-1.5"
+            } ${active ? "bg-info-soft" : "hover:bg-base-50"} ${
+              last ? "" : "pb-3"
+            }`}
           >
             {!last && (
               <span
                 aria-hidden="true"
-                className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
+                className={`absolute ${
+                  collapsed ? "left-1/2 -translate-x-1/2" : "left-[17px]"
+                } top-8 bottom-0 w-0.5 ${
                   groundDone ? "bg-base-800" : "bg-base-200"
                 }`}
               />
@@ -4835,23 +4839,313 @@ function JourneyCard({
             >
               {st.state === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}
             </span>
-            <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-base-900 group-hover:underline">
-                {st.title}
+            {!collapsed && (
+              <span className="min-w-0">
+                <span
+                  className={`block text-[13px] font-semibold group-hover:underline ${
+                    active ? "text-info" : "text-base-900"
+                  }`}
+                >
+                  {st.title}
+                </span>
+                <span
+                  className={`block text-[12px] ${
+                    st.state === "act"
+                      ? "font-semibold text-danger"
+                      : st.state === "wait"
+                        ? "font-medium text-warning"
+                        : "text-base-500"
+                  }`}
+                >
+                  {st.sub}
+                </span>
               </span>
-              <span
-                className={`block text-[12px] ${
-                  st.state === "act"
-                    ? "font-semibold text-danger"
-                    : "text-base-500"
-                }`}
-              >
-                {st.sub}
-              </span>
-            </span>
+            )}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** StorageCard (Jess 2026-07-18, option A "shape that speaks"): the storage
+ *  story as a TIMELINE — green free week → amber charging → red today pin —
+ *  with the fee line items + total under it. No instructional sentences; no
+ *  "Storage? Yes/No" (a start date = storing) and no "Paid?" dropdown (the
+ *  Collect flow below is the single source of truth). Fee priority:
+ *  override → Master-imported → auto (§7.5 engine). ~190px tall. */
+function StorageCard({
+  form,
+  hasMsbf,
+  hasSof,
+  deadline,
+}: {
+  form: ReturnType<typeof useOrderControlForm>;
+  hasMsbf: boolean;
+  hasSof: boolean;
+  deadline: string | null;
+}) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { draft, set } = form;
+  const start = form.storageFrom;
+  const endSet = draft.storage_to.trim();
+  const endEff = endSet || draft.logistic_eta.trim() || todayIso;
+  const auto = computeStorageFee({
+    startDate: start,
+    asOf: endEff,
+    hasMsbf,
+    hasSof,
+  });
+  const impMsbf = form.control?.storage_fee_msbf ?? null;
+  const impSof = form.control?.storage_fee_sof ?? null;
+  const hasImportedFee = (impMsbf ?? 0) > 0 || (impSof ?? 0) > 0;
+  const effTotal = draft.storage_fee_override.trim()
+    ? Number(draft.storage_fee_override)
+    : hasImportedFee
+      ? (impMsbf ?? 0) + (impSof ?? 0)
+      : auto.total;
+  const collectedAt = form.control?.storage_collected_at ?? null;
+  const waived = form.control?.storage_waiver_status === "approved";
+  const ext = form.control?.extension_new_date ?? null;
+  const autoStart = defaultStorageStart(deadline);
+  const [editingFee, setEditingFee] = useState(false);
+
+  const d2n = (iso: string) => new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
+  // "day N" = stored SO FAR (→ today while accruing; → the set end once
+  // frozen). The fee itself may project further (endEff = the planned ETA).
+  const soFarEnd = endSet || todayIso;
+  const dayN = start
+    ? Math.max(0, Math.round((d2n(soFarEnd) - d2n(start)) / 86_400_000))
+    : 0;
+
+  // ── Not storing — one quiet row + the one-click auto start. ──
+  if (!start && !hasImportedFee) {
+    return (
+      <div className="p-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <MiniBadge tone="muted">not counting</MiniBadge>
+          <span className="text-[12px] text-base-500">
+            start auto ={" "}
+            <span className="font-mono text-base-700">
+              {autoStart ? fmtDate(autoStart) : "—"}
+            </span>{" "}
+            (deadline + 7d)
+          </span>
+          <span className="flex-1" />
+          <Btn
+            size="sm"
+            icon={Plus}
+            onClick={() => set("storage_from", autoStart ?? todayIso)}
+          >
+            Start storage
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Collected / waived — frozen one-liner. ──
+  if (collectedAt || waived) {
+    return (
+      <div className="p-3 flex items-center gap-2.5 flex-wrap">
+        <span className="text-[12px] text-base-500">
+          {start ? fmtDate(start) : "—"} → {fmtDate(endEff)}
+          {dayN > 0 ? ` · ${dayN} days` : ""}
+        </span>
+        {collectedAt ? (
+          <span className="pill pill-confirmed">
+            ✓ {RM(effTotal)} collected · {fmtDate(collectedAt.slice(0, 10))}
+          </span>
+        ) : (
+          <span className="pill bg-base-100 text-base-500">waived</span>
+        )}
+        <span className="flex-1" />
+        <span className="text-[12px] text-base-400">
+          {hasMsbf ? `MS/BF ${auto.msbfMonths} mth × 150` : ""}
+          {hasMsbf && hasSof ? " · " : ""}
+          {hasSof ? "Sofa flat 200" : ""}
+        </span>
+      </div>
+    );
+  }
+
+  // ── Storing — timeline + fee lines. ──
+  const t0 = deadline && start && deadline < start ? deadline : start ?? todayIso;
+  const rawEnd = [endEff, ext ?? "", start ?? ""].filter(Boolean).sort().at(-1) ?? endEff;
+  const span = Math.max(86_400_000 * 7, d2n(rawEnd) - d2n(t0));
+  const pct = (iso: string) =>
+    Math.min(100, Math.max(0, ((d2n(iso) - d2n(t0)) / span) * 100));
+  const startPct = start ? pct(start) : 0;
+  const nowPct = pct(endSet || todayIso);
+  const accruing = !endSet;
+  const freeSofEnd = auto.freeUntilSof;
+
+  return (
+    <div className="p-3">
+      {/* header — facts + the two window dates, editable in place */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="t4-label">Storage · day {dayN}</span>
+        {effTotal > 0 ? (
+          <span className="pill pill-overdue">{RM(effTotal)} unpaid</span>
+        ) : (
+          <span className="pill pill-confirmed">RM 0 · free</span>
+        )}
+        <span className="flex-1" />
+        <label className="inline-flex items-center gap-1 text-[11px] text-base-400">
+          start
+          <input
+            type="date"
+            value={draft.storage_from}
+            onChange={(e) => set("storage_from", e.target.value)}
+            aria-label="Storage start"
+            className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
+          />
+        </label>
+        <label className="inline-flex items-center gap-1 text-[11px] text-base-400">
+          end
+          <input
+            type="date"
+            value={draft.storage_to}
+            onChange={(e) => set("storage_to", e.target.value)}
+            aria-label="Storage end (blank = follows delivery)"
+            title="Blank = follows delivery"
+            className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
+          />
+        </label>
+      </div>
+
+      {/* timeline — green free ground → amber charging → today pin */}
+      <div className="mt-3">
+        <div className="relative h-3 rounded-full bg-base-200 overflow-visible">
+          {startPct > 0 && (
+            <span
+              className="absolute top-0 bottom-0 left-0 rounded-l-full bg-success-soft"
+              style={{ width: `${startPct}%` }}
+            />
+          )}
+          <span
+            className="absolute top-0 bottom-0 bg-warning-soft"
+            style={{ left: `${startPct}%`, width: `${Math.max(0, nowPct - startPct)}%` }}
+          />
+          <span
+            className={`absolute -top-0.5 -bottom-0.5 w-0.5 rounded ${accruing ? "bg-danger" : "bg-base-800"}`}
+            style={{ left: `${nowPct}%` }}
+            title={accruing ? "today — still counting" : "storage ended"}
+          />
+          {ext && (
+            <span
+              className="absolute -top-0.5 -bottom-0.5 w-0.5 rounded bg-base-400"
+              style={{ left: `${pct(ext)}%` }}
+              title={`extended to ${fmtDate(ext)}`}
+            />
+          )}
+        </div>
+        <div className="relative h-8 mt-1 text-[11px] text-base-500">
+          {deadline && deadline < (start ?? todayIso) && (
+            <span className="absolute" style={{ left: 0 }}>
+              <span className="block font-semibold text-base-800 text-[12px]">
+                {fmtDate(deadline)}
+              </span>
+              deadline
+            </span>
+          )}
+          {start && Math.abs(nowPct - startPct) > 14 && (
+            <span
+              className="absolute -translate-x-1/2 text-center"
+              style={{ left: `${Math.max(8, Math.min(80, startPct))}%` }}
+            >
+              <span className="block font-semibold text-base-800 text-[12px]">
+                {fmtDate(start)}
+              </span>
+              start
+            </span>
+          )}
+          {hasSof && !auto.sofCharged && freeSofEnd && (
+            <span
+              className="absolute -translate-x-1/2 text-center"
+              style={{ left: `${Math.max(16, Math.min(86, pct(freeSofEnd)))}%` }}
+            >
+              <span className="block font-semibold text-success text-[12px]">
+                {fmtDate(freeSofEnd)}
+              </span>
+              sofa free ends
+            </span>
+          )}
+          <span
+            className="absolute -translate-x-1/2 text-center"
+            style={{ left: `${Math.max(20, Math.min(96, nowPct))}%` }}
+          >
+            <span
+              className={`block font-semibold text-[12px] ${accruing ? "text-danger" : "text-base-800"}`}
+            >
+              {fmtDate(endSet || todayIso)}
+            </span>
+            {accruing ? "today" : "end"}
+          </span>
+        </div>
+      </div>
+
+      {/* fee line items + total (+ inline override) */}
+      <div className="flex items-baseline gap-4 flex-wrap mt-1">
+        {hasMsbf && (
+          <span className="text-[12px] text-base-500">
+            MS/BF{" "}
+            <span className="font-mono font-semibold text-base-800">
+              {impMsbf != null
+                ? `${impMsbf.toLocaleString()}`
+                : `${auto.msbfMonths} mth × 150 = ${auto.msbf}`}
+            </span>
+            {impMsbf != null && (
+              <span className="ml-1 text-[11px] font-bold text-primary border border-current rounded px-1">
+                MASTER
+              </span>
+            )}
+          </span>
+        )}
+        {hasSof && (
+          <span className="text-[12px] text-base-500">
+            Sofa{" "}
+            <span className="font-mono font-semibold text-base-800">
+              {impSof != null
+                ? `${impSof.toLocaleString()}`
+                : auto.sofCharged
+                  ? "flat 200"
+                  : "0 · in free window"}
+            </span>
+            {impSof != null && (
+              <span className="ml-1 text-[11px] font-bold text-primary border border-current rounded px-1">
+                MASTER
+              </span>
+            )}
+          </span>
+        )}
+        <span className="ml-auto inline-flex items-center gap-2">
+          {editingFee || draft.storage_fee_override.trim() ? (
+            <input
+              type="number"
+              min={0}
+              autoFocus={editingFee}
+              value={draft.storage_fee_override}
+              onChange={(e) => set("storage_fee_override", e.target.value)}
+              onBlur={() => setEditingFee(false)}
+              placeholder={`auto ${effTotal}`}
+              aria-label="Override storage fee"
+              className="w-24 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingFee(true)}
+              title="Override the fee"
+              aria-label="Override the storage fee"
+              className="text-base-400 hover:text-base-700"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
+          <Money value={effTotal} tone="hero" className="text-base-900" />
+        </span>
+      </div>
     </div>
   );
 }

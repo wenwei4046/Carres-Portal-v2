@@ -54,6 +54,10 @@ export interface Salesperson {
   name: string;
   phone: string | null;
   userId: string | null;
+  // 0233 staff PIN login
+  staffRole: "principal" | "manager" | "salesperson";
+  color: string | null;
+  active: boolean;
 }
 
 export interface ProductModel {
@@ -582,6 +586,21 @@ export interface OrderHistory {
   text: string;
   byRole: Role | null;
   occurredAt: string;
+}
+
+/** 0231/0233 — the add-product change-request (P3 submission flow). */
+export interface OrderChangeRequest {
+  id: string;
+  orderId: string;
+  kind: "add_lines";
+  payload: { lines: Array<Record<string, unknown>> };
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  requestedBy: string | null;
+  requestedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  appliedAt: string | null;
 }
 
 export interface Order {

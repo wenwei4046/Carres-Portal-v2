@@ -49,6 +49,9 @@ export {
   ordersListResponseSchema,
   dealerSelfSchema,
   addOrderLinesInputSchema,
+  decideOrderChangeRequestInputSchema,
+  orderChangeRequestSchema,
+  orderChangeRequestStatusSchema,
   createOrderInputSchema,
   rawCreateOrderInputSchema,
   topUpOrderInputSchema,
@@ -58,6 +61,8 @@ export {
   cancelOrderInputSchema,
   setOpsAssignedLogisticInputSchema,
   type AddOrderLinesInput,
+  type DecideOrderChangeRequestInput,
+  type OrderChangeRequestDto,
   type Order,
   type OrderLine,
   type OrderAddon,
@@ -1055,3 +1060,7 @@ export {
   type StripeSessionStatus,
   type StripeCheckoutSessionInfo,
 } from "./schemas/stripe-checkout";
+
+// Staff PIN login (0233) — tiers, PIN, staff session token, palette.
+// See docs/superpowers/plans/2026-07-18-staff-pin-login-plan.md.
+export * from "./schemas/staff";

@@ -32,9 +32,13 @@ import { ApiError } from "@/lib/api";
 import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
 import {
   useAddOrderLines,
+  useCancelOrderChangeRequest,
   useCatalog,
   useOrder,
+  useOrderChangeRequests,
   useProceedOrder,
+  useSubmitOrderChangeRequest,
+  useUpdateOrderChangeRequest,
   useTopUpOrder,
   useUnproceedOrder,
   useUpdateOrder,
@@ -125,7 +129,7 @@ function proceedErrorCopy(e: unknown): string {
   return e instanceof Error ? e.message : "Request failed.";
 }
 
-/** 0231 — add-product failure copy, keyed on the route/RPC error codes. */
+/** 0231/0232 — add-product failure copy, keyed on the route/RPC error codes. */
 function addErrorCopy(e: unknown): string {
   const code = errCode(e);
   if (code === "mixed_category_lines")
@@ -134,8 +138,16 @@ function addErrorCopy(e: unknown): string {
     return "Products can only be added while the order is in Order placed.";
   if (code === "unknown_or_inactive_sku")
     return "This product is no longer available — refresh and retry.";
-  if (code === "sofa_build_add_not_supported")
-    return "Sofa builds can't be added to an existing order yet — place a new order.";
+  if (code === "pwp_voucher_add_not_supported")
+    return "Voucher codes can't be redeemed on an added line — place a new order to use the voucher.";
+  if (code === "pending_exists")
+    return "A product change is already pending on this order — cancel it first.";
+  if (code === "use_direct_add")
+    return "This order can still take products directly — use Add product instead.";
+  if (code && code.startsWith("pwp_"))
+    return "This promo price isn't eligible on this order — reconfigure and retry.";
+  if (code === "sofa_price_drift")
+    return "The sofa price changed since this screen loaded — rebuild and retry.";
   if (code === "special_price_drift" || code === "options_price_drift")
     return "Prices changed since this screen loaded — reopen the product and reconfigure.";
   return e instanceof Error ? e.message : "Could not add the product.";
@@ -247,15 +259,93 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const addLinesMut = useAddOrderLines(id);
   const [addOpen, setAddOpen] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
+  // 0233 — P3 proceed-lane submission + pending banner.
+  const changeReqQ = useOrderChangeRequests(id);
+  const submitChangeMut = useSubmitOrderChangeRequest(id);
+  const cancelChangeMut = useCancelOrderChangeRequest(id);
+  const updateChangeMut = useUpdateOrderChangeRequest(id);
+  // 0234 — View request modal + edit-in-place mode for the overlay.
+  const [viewChangeOpen, setViewChangeOpen] = useState(false);
+  const [editingChange, setEditingChange] = useState(false);
+  const changeRequests = changeReqQ.data?.requests ?? [];
+  const pendingChange = changeRequests.find((r) => r.status === "pending") ?? null;
+  const lastRejected = changeRequests.find((r) => r.status === "rejected") ?? null;
+
+  async function handleSubmitChange(line: DraftLine) {
+    setAddErr(null);
+    try {
+      // The preview unitPrice + label ride along for the operator's approval
+      // view; the approval re-prices everything fresh server-side.
+      await submitChangeMut.mutateAsync({
+        lines: [
+          {
+            sku: line.sku,
+            qty: line.qty,
+            attrs: line.attrs ?? null,
+            unitPrice: line.unitPrice,
+            label: line.label,
+          },
+        ],
+      });
+      setAddOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
+
+  async function handleCancelChange() {
+    if (!pendingChange) return;
+    setAddErr(null);
+    try {
+      await cancelChangeMut.mutateAsync(pendingChange.id);
+      setViewChangeOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
+
+  /** 0234 — Edit-in-place: the overlay's pick REPLACES the pending payload. */
+  async function handleEditChange(line: DraftLine) {
+    if (!pendingChange) return;
+    setAddErr(null);
+    try {
+      await updateChangeMut.mutateAsync({
+        requestId: pendingChange.id,
+        input: {
+          lines: [
+            {
+              sku: line.sku,
+              qty: line.qty,
+              attrs: line.attrs ?? null,
+              unitPrice: line.unitPrice,
+              label: line.label,
+            },
+          ],
+        },
+      });
+      setAddOpen(false);
+      setEditingChange(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
 
   async function handleAddProduct(line: DraftLine) {
     setAddErr(null);
     try {
-      // Only sku/qty/attrs go up — the client preview price stays local
-      // (server catalog authority; the attrs preview totals feed the trust
-      // gates exactly like create).
+      // sku/qty/attrs go up — the client preview price stays local (server
+      // catalog authority) EXCEPT on a sofa BUILD line, whose preview
+      // unitPrice feeds the server drift gate (±0.5%, create-route contract).
+      const isBuild = Boolean((line.attrs as Record<string, unknown> | null)?.sofa_build);
       await addLinesMut.mutateAsync({
-        lines: [{ sku: line.sku, qty: line.qty, attrs: line.attrs ?? null }],
+        lines: [
+          {
+            sku: line.sku,
+            qty: line.qty,
+            attrs: line.attrs ?? null,
+            ...(isBuild ? { unitPrice: line.unitPrice } : {}),
+          },
+        ],
       });
       setAddOpen(false);
     } catch (e) {
@@ -723,6 +813,66 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 </button>
               </div>
             )}
+            {/* 0233 — P3: proceed-lane submission (HQ approves before it
+                lands) + the pending banner / rejection note. */}
+            {scope.canSubmitLineChange && !pendingChange && (
+              <div className="os-detail__cta" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setAddErr(null);
+                    setAddOpen(true);
+                  }}
+                  data-testid="pos-od-submit-change"
+                >
+                  <Plus size={16} />
+                  Submit product change
+                </button>
+              </div>
+            )}
+            {pendingChange && (
+              <div
+                style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}
+                data-testid="pos-od-change-pending"
+              >
+                <span className="t-tiny" style={{ color: "var(--fg-muted)" }}>
+                  Product change pending HQ approval ·{" "}
+                  {(pendingChange.payload.lines ?? []).length} item(s)
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setViewChangeOpen(true)}
+                  data-testid="pos-od-change-view"
+                >
+                  View request
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={cancelChangeMut.isPending}
+                  onClick={handleCancelChange}
+                  data-testid="pos-od-change-cancel"
+                >
+                  {cancelChangeMut.isPending ? "Cancelling…" : "Cancel request"}
+                </button>
+              </div>
+            )}
+            {!pendingChange && lastRejected?.decisionNote && (
+              <p
+                className="t-tiny"
+                style={{ color: "var(--fg-muted)", marginTop: 8 }}
+                data-testid="pos-od-change-rejected"
+              >
+                Last product change rejected · {lastRejected.decisionNote}
+              </p>
+            )}
+            {addErr && !addOpen && (
+              <div className="os-detail__err" style={{ marginTop: 8 }}>
+                {addErr}
+              </div>
+            )}
           </section>
 
           {/* Customer */}
@@ -1113,11 +1263,87 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
           <AddProductOverlay
             order={order}
             catalog={catalog}
-            busy={addLinesMut.isPending}
+            busy={addLinesMut.isPending || submitChangeMut.isPending || updateChangeMut.isPending}
             error={addErr}
-            onPick={handleAddProduct}
-            onClose={() => setAddOpen(false)}
+            onPick={
+              scope.canAddProduct
+                ? handleAddProduct
+                : editingChange
+                  ? handleEditChange
+                  : handleSubmitChange
+            }
+            onClose={() => {
+              setAddOpen(false);
+              setEditingChange(false);
+            }}
           />
+        )}
+
+        {/* 0234 — View request: the submitted lines + edit/cancel actions. */}
+        {viewChangeOpen && pendingChange && (
+          <div
+            className="fixed inset-0 z-[120] grid place-items-center bg-base-900/55 p-4"
+            onClick={() => setViewChangeOpen(false)}
+            data-testid="pos-od-change-modal"
+          >
+            <div
+              className="w-full max-w-[440px] bg-white rounded-md shadow-md p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="kicker mb-1">Product change · pending HQ approval</p>
+              {((pendingChange.payload.lines ?? []) as Array<{
+                sku?: string;
+                qty?: number;
+                unitPrice?: number;
+                label?: string;
+              }>).map((l, i) => (
+                <div key={i} className="flex items-center justify-between t-small text-base-800 py-1">
+                  <span>
+                    {l.label ?? l.sku} ×{l.qty ?? 1}
+                  </span>
+                  {typeof l.unitPrice === "number" && (
+                    <span className="font-mono text-base-600">
+                      ≈ RM {l.unitPrice.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              ))}
+              <p className="t-tiny text-base-500 mt-1">
+                Submitted {new Date(pendingChange.requestedAt).toLocaleString()} · final prices
+                re-derive from the live catalog at approval.
+              </p>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setViewChangeOpen(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={cancelChangeMut.isPending}
+                  onClick={handleCancelChange}
+                >
+                  Cancel request
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={() => {
+                    setViewChangeOpen(false);
+                    setEditingChange(true);
+                    setAddErr(null);
+                    setAddOpen(true);
+                  }}
+                  data-testid="pos-od-change-edit"
+                >
+                  Edit request
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </aside>
     </div>

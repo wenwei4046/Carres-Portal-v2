@@ -29,7 +29,10 @@ interface MockOpts {
   sourceOrderLinesError?: { message: string };
 }
 
-function mockSb(opts: MockOpts = {}): SupabaseClient {
+function mockSb(
+  opts: MockOpts = {},
+): SupabaseClient & { _neqCalls: Array<[string, string, unknown]> } {
+  const neqCalls: Array<[string, string, unknown]> = [];
   const td = (table: string): { single: unknown; list: unknown[]; error?: { message: string } } => {
     switch (table) {
       case "delivery_fee_config":
@@ -56,6 +59,11 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {
       eq: () => b,
+      // 0232 — the add-lines re-run excludes the order's own link row.
+      neq: (col: string, val: unknown) => {
+        neqCalls.push([table, col, val]);
+        return b;
+      },
       in: () => listRes(),
       limit: () => listRes(),
       maybeSingle: async () => ({ data: d.error ? null : d.single, error: d.error ?? null }),
@@ -67,7 +75,8 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
   };
   return {
     from: (table: string) => ({ select: () => builder(table) }),
-  } as unknown as SupabaseClient;
+    _neqCalls: neqCalls,
+  } as unknown as SupabaseClient & { _neqCalls: Array<[string, string, unknown]> };
 }
 
 const cfgRow = (over: Record<string, unknown> = {}) => ({
@@ -402,6 +411,42 @@ describe("recomputeDeliveryFee — cross-order follow-up", () => {
       usedAddons: [{ id: "addon-1" }],
     });
     const r = await recomputeDeliveryFee(sb, [line("S1")], ctx({ crossCategorySourceSo: "SO-1042" }));
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.message).toContain("already used");
+    // No excludeOrderId (create path) → the backstop never filters by order.
+    expect(sb._neqCalls).toHaveLength(0);
+  });
+
+  it("0232 — excludeOrderId filters the recomputed order's OWN link row out of the backstop", async () => {
+    const sb = mockSb({
+      config: cfgRow({ base_fee: 500, cross_category_fee: 175 }),
+      skus: [skuRow("M1", "mattress"), skuRow("S-SRC", "sofa")],
+      sourceOrder: { id: "ord-1", so: 1042, status: "place", customer_phone: "012-3456789" },
+      sourceOrderLines: [{ sku: "S-SRC" }],
+      usedAddons: [], // own row filtered upstream by the neq
+    });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [line("M1")],
+      ctx({ crossCategorySourceSo: "SO-1042", excludeOrderId: "ord-self" }),
+    );
+    expect(r.status).toBe("ok");
+    expect(sb._neqCalls).toContainEqual(["order_addons", "order_id", "ord-self"]);
+  });
+
+  it("0232 — ANOTHER order's use still rejects even with excludeOrderId", async () => {
+    const sb = mockSb({
+      config: cfgRow({ base_fee: 500 }),
+      skus: [skuRow("S1", "sofa")],
+      sourceOrder: { id: "ord-1", so: 1042, status: "place", customer_phone: "012-3456789" },
+      usedAddons: [{ id: "addon-other" }], // survives the neq → genuinely another order's link
+    });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [line("S1")],
+      ctx({ crossCategorySourceSo: "SO-1042", excludeOrderId: "ord-self" }),
+    );
     expect(r.status).toBe("bad_request");
     if (r.status !== "bad_request") return;
     expect(r.message).toContain("already used");

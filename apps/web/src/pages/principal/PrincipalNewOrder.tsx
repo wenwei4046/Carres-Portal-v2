@@ -7,11 +7,19 @@ import type {
   ProductSkuDto,
   RawCreateOrderInput,
 } from "@carres/shared";
-import { ORDER_ENTRY_TABS, resolveFormTab, resolvePaymentMethods } from "@carres/shared";
+import {
+  ORDER_ENTRY_TABS,
+  STRIPE_METHOD_KEY,
+  STRIPE_PAYMENT_METHOD,
+  resolveFormTab,
+  resolvePaymentMethods,
+} from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import MYAddressFields from "@/components/MYAddressFields";
+import { toast } from "sonner";
 import {
+  useCancelOrder,
   useCatalog,
   useOutlets,
   usePrincipalDealers,
@@ -32,8 +40,10 @@ import { newLocalId } from "../dealer/new-order/configurators";
 import { RELATIONSHIPS } from "../dealer/pos/customer-autofill";
 import PosConfigurePage from "../dealer/pos/PosConfigurePage";
 import SofaConfigurePage from "../dealer/pos/SofaConfigurePage";
+import StripeCollectModal from "../dealer/pos/StripeCollectModal";
 import { buildCatalogIndex } from "../dealer/pos/catalog-index";
 import { lineEditTarget } from "../dealer/pos/cart";
+import RawLineOptions from "./RawLineOptions";
 
 /**
  * MAINTAIN → New Order — the RAW Sales Order creator, remade 2026-07-18 as a
@@ -90,6 +100,14 @@ export default function PrincipalNewOrder() {
   /** In-progress unit-price edit strings keyed by localId, so partial input
    *  ("2.") doesn't fight the numeric DraftLine value. */
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  /** 0223/0224 — Pay online (Stripe): the created-but-unpaid order whose QR /
+   *  payment link is up. The draft is NOT cleared until the modal closes, so a
+   *  void returns to the form intact. */
+  const [stripeCollect, setStripeCollect] = useState<{ order: Order; amount: number } | null>(
+    null,
+  );
+  const [stripeCollected, setStripeCollected] = useState(0);
+  const cancelPendingOrder = useCancelOrder(stripeCollect?.order.id ?? "");
 
   // Auto-save the raw draft (own sessionStorage slot — never the POS cart's).
   useEffect(() => {
@@ -124,10 +142,13 @@ export default function PrincipalNewOrder() {
     () => ORDER_ENTRY_TABS.flatMap((tab) => resolveFormTab(formCfg, tab).custom),
     [formCfg],
   );
+  // 0224 — "Pay online" (Stripe QR / link) rides along like the POS: a
+  // first-class built-in appended after the configured methods.
   const paymentMethods = useMemo(
-    () => resolvePaymentMethods(catalog?.orderEntryConfig),
+    () => [...resolvePaymentMethods(catalog?.orderEntryConfig), STRIPE_PAYMENT_METHOD],
     [catalog],
   );
+  const isStripe = draft.payment.method === STRIPE_METHOD_KEY;
 
   const dealers = useMemo(
     () => (dealersQ.data?.dealers ?? []).filter((d) => d.status === "active"),
@@ -234,8 +255,23 @@ export default function PrincipalNewOrder() {
         city: c.addressCity,
         postcode: c.addressPostcode,
       });
+      // Billing keys in structured (same MY cascade as delivery) but persists
+      // as the single composed string — `customer_billing` stays text. Legacy
+      // free-text `billing` (old drafts) is the fallback.
+      const composedBilling = composeAddress({
+        line1: c.billingLine1,
+        line2: c.billingLine2,
+        state: c.billingState,
+        city: c.billingCity,
+        postcode: c.billingPostcode,
+      });
       const fields = Object.fromEntries(
         Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
+      );
+      // 0219 — the picked method's follow-up answers (e.g. the Credit/Debit
+      // Bank) ride entry_data.payment, same as the POS submit.
+      const followUps = Object.fromEntries(
+        Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
       );
       const input: RawCreateOrderInput = {
         dealerId,
@@ -252,7 +288,7 @@ export default function PrincipalNewOrder() {
           addressState: c.addressUnknown ? null : c.addressState || null,
           addressCity: c.addressUnknown ? null : c.addressCity || null,
           addressPostcode: c.addressUnknown ? null : c.addressPostcode || null,
-          billing: c.billingSame ? null : c.billing.trim() || null,
+          billing: c.billingSame ? null : composedBilling || c.billing.trim() || null,
           billingSame: c.billingSame,
           emergency: composeEmergency(c) || null,
           email: c.email.trim() || null,
@@ -273,14 +309,30 @@ export default function PrincipalNewOrder() {
           attrs: l.attrs,
         })),
         addons: [],
-        paid: draft.paid,
+        // Pay online (0224): nothing has been received yet — the order creates
+        // with paid 0 and the Stripe RPC moves orders.paid when the customer
+        // completes the link (the server ledger post skips at paid 0 too).
+        paid: isStripe ? 0 : draft.paid,
         paymentMethod: draft.payment.method || null,
-        approvalCode: draft.payment.approvalCode.trim() || null,
+        approvalCode: isStripe ? null : draft.payment.approvalCode.trim() || null,
         installmentMonths:
           draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
-        ...(Object.keys(fields).length > 0 ? { entryData: { fields } } : {}),
+        ...(Object.keys(fields).length > 0 || Object.keys(followUps).length > 0
+          ? {
+              entryData: {
+                ...(Object.keys(followUps).length > 0 ? { payment: followUps } : {}),
+                ...(Object.keys(fields).length > 0 ? { fields } : {}),
+              },
+            }
+          : {}),
       };
       const order = await createRaw.mutateAsync(input);
+      if (isStripe) {
+        // Hold the form: the QR / payment link opens now; the draft is cleared
+        // only when the modal finishes (a void returns to editing intact).
+        setStripeCollect({ order, amount: draft.paid });
+        return;
+      }
       clearDraft(RAW_DRAFT_STORAGE_KEY);
       setSubmitted(order);
     } catch (err) {
@@ -288,10 +340,49 @@ export default function PrincipalNewOrder() {
     }
   }
 
+  /** Pay online finalize — leave the QR for the submitted card. Unpaid close
+   *  confirms first (the link stays payable for 24h; the webhook records it). */
+  function handleStripeClose() {
+    if (!stripeCollect) return;
+    if (
+      stripeCollected <= 0 &&
+      !window.confirm(
+        `Customer hasn't paid yet.\n\nOK — keep order SO-${stripeCollect.order.so} (the payment link stays valid for 24h).\nCancel — stay on the QR.`,
+      )
+    ) {
+      return;
+    }
+    clearDraft(RAW_DRAFT_STORAGE_KEY);
+    setSubmitted(stripeCollect.order);
+    setStripeCollect(null);
+  }
+
+  /** The strict escape hatch — void the unpaid order and return to editing. */
+  async function handleStripeVoid() {
+    if (!stripeCollect) return;
+    if (
+      !window.confirm(
+        `Void order SO-${stripeCollect.order.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at raw entry" });
+      toast.info(`Order SO-${stripeCollect.order.so} voided — nothing was charged.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not void the order");
+      return;
+    }
+    setStripeCollect(null);
+  }
+
   function startAnother() {
     setSubmitted(null);
     setSubmitError(null);
     setPriceDrafts({});
+    setStripeCollect(null);
+    setStripeCollected(0);
     const d = rawEmptyDraft();
     setDraft({
       ...d,
@@ -723,34 +814,37 @@ export default function PrincipalNewOrder() {
           <input
             type="checkbox"
             checked={c.billingSame}
-            onChange={(e) =>
-              setC({
-                billingSame: e.target.checked,
-                billing: e.target.checked
-                  ? composeAddress({
-                      line1: c.addressLine1,
-                      line2: c.addressLine2,
-                      state: c.addressState,
-                      city: c.addressCity,
-                      postcode: c.addressPostcode,
-                    })
-                  : c.billing,
-              })
-            }
+            onChange={(e) => setC({ billingSame: e.target.checked })}
             className="mt-0.5 w-4 h-4"
           />
           <span className="t-body">Billing address same as delivery</span>
         </label>
+        {/* Billing keys in with the SAME MY cascade as delivery (Loo
+            2026-07-18) — a second MYAddressFields mapped onto the billing*
+            fields; composed into the single billing string at submit. */}
         {!c.billingSame && (
-          <div className="mt-3">
-            <Field label="Billing address">
-              <textarea
-                rows={2}
-                value={c.billing}
-                onChange={(e) => setC({ billing: e.target.value })}
-                className={INPUT_CLASS}
-              />
-            </Field>
+          <div className="mt-3" data-testid="raw-billing-fields">
+            <p className="t-tiny uppercase tracking-wide text-base-500 mb-2">Billing address</p>
+            <MYAddressFields
+              data={{
+                addressLine1: c.billingLine1,
+                addressLine2: c.billingLine2,
+                addressState: c.billingState,
+                addressCity: c.billingCity,
+                addressPostcode: c.billingPostcode,
+              }}
+              onChange={(patch) =>
+                setC({
+                  ...(patch.addressLine1 !== undefined ? { billingLine1: patch.addressLine1 } : {}),
+                  ...(patch.addressLine2 !== undefined ? { billingLine2: patch.addressLine2 } : {}),
+                  ...(patch.addressState !== undefined ? { billingState: patch.addressState } : {}),
+                  ...(patch.addressCity !== undefined ? { billingCity: patch.addressCity } : {}),
+                  ...(patch.addressPostcode !== undefined
+                    ? { billingPostcode: patch.addressPostcode }
+                    : {}),
+                })
+              }
+            />
           </div>
         )}
       </Section>
@@ -776,12 +870,15 @@ export default function PrincipalNewOrder() {
             const attrs = (l.attrs ?? {}) as Record<string, unknown>;
             const remark = typeof attrs.remark === "string" ? attrs.remark : "";
             const editable = catalog ? lineEditTarget(l, catalog) !== null : false;
+            const rowSku = skuByCode.get(l.sku);
+            const rowModel = rowSku ? modelById.get(rowSku.modelId) : undefined;
             return (
               <div
                 key={l.localId}
                 data-testid={`raw-line-${l.localId}`}
-                className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start border border-base-200 rounded-md p-2 bg-white"
+                className="border border-base-200 rounded-md p-2 bg-white"
               >
+              <div className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start">
                 <span className="t-tiny text-base-400 pt-2.5 text-center">{i + 1}</span>
                 <div className="min-w-0">
                   <RowSkuPicker
@@ -880,6 +977,19 @@ export default function PrincipalNewOrder() {
                   </button>
                 </span>
               </div>
+              {/* Inline variants — options come OUT under the row when the
+                  picked product has any (2990s SOFA VARIANTS parity). Specs
+                  only: the panel never touches the operator's price. */}
+              {rowSku && rowModel && catalog && (
+                <RawLineOptions
+                  line={l}
+                  model={rowModel}
+                  sku={rowSku}
+                  catalog={catalog}
+                  onPatch={(patch) => patchLine(l.localId, patch)}
+                />
+              )}
+              </div>
             );
           })}
           <button
@@ -900,10 +1010,17 @@ export default function PrincipalNewOrder() {
       {/* ── Payment ── */}
       <Section
         title="Payment"
-        hint="Optional — record the deposit taken at order time; later payments go through Finance / top-up"
+        hint="Optional — a paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
       >
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Paid (RM)">
+          <Field
+            label={isStripe ? "Amount to collect (RM)" : "Paid (RM)"}
+            hint={
+              isStripe
+                ? "The Stripe QR / payment link opens after Create — nothing is charged until the customer pays."
+                : undefined
+            }
+          >
             <input
               type="number"
               min={0}
@@ -935,19 +1052,21 @@ export default function PrincipalNewOrder() {
               ))}
             </select>
           </Field>
-          <Field label="Approval / reference code">
-            <input
-              type="text"
-              value={draft.payment.approvalCode}
-              onChange={(e) =>
-                setPay({
-                  approvalCode: e.target.value.replace(/[^0-9A-Za-z-]/g, "").toUpperCase(),
-                })
-              }
-              placeholder="e.g. FT2026050012345"
-              className={`${INPUT_CLASS} font-mono`}
-            />
-          </Field>
+          {!isStripe && (
+            <Field label="Approval / reference code">
+              <input
+                type="text"
+                value={draft.payment.approvalCode}
+                onChange={(e) =>
+                  setPay({
+                    approvalCode: e.target.value.replace(/[^0-9A-Za-z-]/g, "").toUpperCase(),
+                  })
+                }
+                placeholder="e.g. FT2026050012345"
+                className={`${INPUT_CLASS} font-mono`}
+              />
+            </Field>
+          )}
           {draft.payment.method === "installment" && (
             <Field label="Installment plan">
               <select
@@ -962,11 +1081,46 @@ export default function PrincipalNewOrder() {
               </select>
             </Field>
           )}
+          {/* 0219 — the picked method's Order-Entry-configured follow-ups
+              (e.g. the Credit/Debit "Bank") render here too, POS parity.
+              Optional on this path; answers ride entry_data.payment. */}
+          {paymentMethods
+            .find((m) => m.key === draft.payment.method)
+            ?.followUps.map((fu) => (
+              <Field key={fu.key} label={fu.label}>
+                <select
+                  value={draft.payment.followUps?.[fu.key] ?? ""}
+                  onChange={(e) =>
+                    setPay({
+                      followUps: {
+                        ...(draft.payment.followUps ?? {}),
+                        [fu.key]: e.target.value,
+                      },
+                    })
+                  }
+                  data-testid={`raw-pay-followup-${fu.key}`}
+                  className={INPUT_CLASS}
+                >
+                  <option value="">— select —</option>
+                  {fu.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ))}
         </div>
-        {draft.paid > 0 && subtotal > 0 && (
+        {draft.paid > 0 && subtotal > 0 && !isStripe && (
           <p className="t-small text-base-600 mt-3">
             Deposit {paidPct}% · Balance{" "}
             <span className="font-mono">{rm(Math.max(0, subtotal - draft.paid))}</span>
+          </p>
+        )}
+        {isStripe && (
+          <p className="t-small text-base-600 mt-3" data-testid="raw-stripe-note">
+            No slip or reference code needed — the payment records itself with a Stripe
+            receipt once the customer pays (QR at the counter, or a WhatsApp link).
           </p>
         )}
       </Section>
@@ -1002,6 +1156,26 @@ export default function PrincipalNewOrder() {
       </div>
 
       {overlay}
+
+      {/* 0223/0224 — Pay online: the QR / payment link for the just-created
+          order. pos-proto wrapper supplies the modal's CSS vars. */}
+      {stripeCollect && !submitted && (
+        <div className="pos-proto">
+          <StripeCollectModal
+            orderId={stripeCollect.order.id}
+            so={stripeCollect.order.so}
+            total={subtotal}
+            paid={0}
+            initialAmount={stripeCollect.amount > 0 ? stripeCollect.amount : undefined}
+            lockAmount={stripeCollect.amount > 0}
+            customerName={c.name}
+            customerPhone={c.phone.trim() || null}
+            onPaid={(amt) => setStripeCollected(amt)}
+            onVoidOrder={() => void handleStripeVoid()}
+            onClose={handleStripeClose}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
 import {
+  useAllPendingChangeRequests,
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
@@ -1060,6 +1061,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
+  // 0234 (add-product P3.1) — pending change-request badge set for the rows.
+  const pendingCRQ = useAllPendingChangeRequests();
+  const pendingCROrders = useMemo(
+    () => new Set((pendingCRQ.data?.requests ?? []).map((r) => r.orderId)),
+    [pendingCRQ.data],
+  );
+
   const { data, isLoading, isError, error, refetch } = useOperationOrders({
     search: search.trim() || undefined,
   });
@@ -2180,6 +2188,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   assignStaffMut.mutate({ orderId, staff })
                 }
                 canAssign={isManager}
+                hasPendingChange={pendingCROrders.has(o.id)}
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
@@ -2843,6 +2852,7 @@ function OrderRow({
   poolStaff,
   onAssignStaff,
   canAssign,
+  hasPendingChange,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -2862,6 +2872,8 @@ function OrderRow({
   onAssignStaff: (orderId: string, staff: string | null) => void;
   /** Management-only manual assignment (Jess 2026-07-18). */
   canAssign: boolean;
+  /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
+  hasPendingChange?: boolean;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -2918,6 +2930,17 @@ function OrderRow({
             style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A" }}
           >
             SO-{o.so}
+            {/* 0234 (merged from main) — a dealer product change awaits
+                approval; open the order → the approval card tops the drawer. */}
+            {hasPendingChange && (
+              <span
+                className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-warning-soft text-base-800 border border-warning"
+                title="Product change awaiting approval — open the order to decide"
+                data-testid="oc-change-badge"
+              >
+                Change
+              </span>
+            )}
           </div>
           {ref.length > 0 && (
             <div

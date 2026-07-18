@@ -1,4 +1,6 @@
+import { STAFF_SESSION_REQUIRED, STAFF_TOKEN_HEADER } from "@carres/shared";
 import { useAuth } from "./auth";
+import { useStaffSession } from "./staff";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -9,15 +11,38 @@ export class ApiError extends Error {
   }
 }
 
+/** Attach the store JWT + (when a staff session exists) the staff token.
+ *  Dormant stores never mint a staff token, so this is a no-op there. */
+function applyAuthHeaders(headers: Headers) {
+  const session = useAuth.getState().session;
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  const staffToken = useStaffSession.getState().token;
+  if (staffToken) {
+    headers.set(STAFF_TOKEN_HEADER, staffToken);
+  }
+}
+
+/** An activated store that calls without a valid staff token gets a 403
+ *  {error:'staff_session_required'} — drop the token so the gate re-PINs. */
+function handleStaffSessionExpiry(status: number, body: unknown) {
+  if (
+    status === 403 &&
+    body !== null &&
+    typeof body === "object" &&
+    (body as { error?: unknown }).error === STAFF_SESSION_REQUIRED
+  ) {
+    useStaffSession.getState().clearToken();
+  }
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const session = useAuth.getState().session;
   const headers = new Headers(init.headers);
-  if (session?.access_token) {
-    headers.set("Authorization", `Bearer ${session.access_token}`);
-  }
+  applyAuthHeaders(headers);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -30,6 +55,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
+    handleStaffSessionExpiry(res.status, body);
     const msg =
       typeof body === "string"
         ? body
@@ -52,11 +78,8 @@ export async function apiFetchBlob(
   path: string,
   init: RequestInit = {},
 ): Promise<Blob> {
-  const session = useAuth.getState().session;
   const headers = new Headers(init.headers);
-  if (session?.access_token) {
-    headers.set("Authorization", `Bearer ${session.access_token}`);
-  }
+  applyAuthHeaders(headers);
 
   const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
   if (!res.ok) {
@@ -65,6 +88,7 @@ export async function apiFetchBlob(
     if (text) {
       try { body = JSON.parse(text); } catch { body = text; }
     }
+    handleStaffSessionExpiry(res.status, body);
     const msg =
       typeof body === "string"
         ? body

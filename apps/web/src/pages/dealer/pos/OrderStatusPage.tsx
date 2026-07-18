@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDashed,
-  Delete,
   Inbox,
   Lock,
   MapPin,
@@ -23,7 +22,9 @@ import {
 } from "lucide-react";
 import type { Order } from "@carres/shared";
 import { useOrders, useSalespersons } from "@/lib/queries";
+import { useStaffSession } from "@/lib/staff";
 import { laneOf, type Lane } from "./order-edit-scope";
+import PinPad from "./PinPad";
 import PosOrderDetail from "./PosOrderDetail";
 
 /**
@@ -163,31 +164,7 @@ function PinGate({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () =>
           to continue.
         </p>
 
-        <div className={`pin-gate__dots ${err ? "is-err" : ""}`}>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <span
-              key={i}
-              className={`pin-gate__dot ${err ? "is-err" : pin.length > i ? "is-on" : ""}`}
-            ></span>
-          ))}
-        </div>
-
-        <div className="pin-gate__pad">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => (
-            <button key={k} className="pin-gate__key" onClick={() => press(k)} data-testid={`os-pin-${k}`}>
-              {k}
-            </button>
-          ))}
-          <button className="pin-gate__key pin-gate__key--util" onClick={() => press("clr")}>
-            Clear
-          </button>
-          <button className="pin-gate__key" onClick={() => press("0")} data-testid="os-pin-0">
-            0
-          </button>
-          <button className="pin-gate__key pin-gate__key--util" onClick={() => press("del")} aria-label="Delete">
-            <Delete size={16} strokeWidth={1.75} />
-          </button>
-        </div>
+        <PinPad pin={pin} onKey={press} error={err} testIdPrefix="os-pin" />
 
         <div className="pin-gate__hint">Ask your manager for the passcode</div>
       </div>
@@ -372,7 +349,15 @@ export default function OrderStatusPage({
    *  picked dealer's behalf (undefined = the caller's own JWT scope). */
   dealerId?: string;
 }) {
-  const [unlocked, setUnlocked] = useState(false);
+  // Staff PIN login (0233): once a staff PIN is verified the identity is already
+  // proven, so the legacy 6-digit passcode gate is skipped. A salesperson-tier
+  // session is server-scoped to its own orders, so the per-person compare chips
+  // are hidden (there's no one else to compare against). No token (principal
+  // on-behalf / dormant store) → the legacy gate is unchanged.
+  const staffTier = useStaffSession((s) => s.staff?.tier ?? null);
+  const hasStaffToken = useStaffSession((s) => s.token !== null);
+  const salespersonScoped = hasStaffToken && staffTier === "salesperson";
+  const [unlocked, setUnlocked] = useState(hasStaffToken);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [salesFilter, setSalesFilter] = useState<string>("all"); // salesperson id | 'all'
@@ -454,10 +439,12 @@ export default function OrderStatusPage({
                 <h1 className="os-head__title">My orders</h1>
               </div>
             </div>
-            <button className="os-lockbtn" onClick={() => setUnlocked(false)} data-testid="os-lock">
-              <ShieldCheck size={14} strokeWidth={1.75} />
-              Lock again
-            </button>
+            {!hasStaffToken && (
+              <button className="os-lockbtn" onClick={() => setUnlocked(false)} data-testid="os-lock">
+                <ShieldCheck size={14} strokeWidth={1.75} />
+                Lock again
+              </button>
+            )}
           </div>
 
           {/* Revenue summary */}
@@ -468,17 +455,19 @@ export default function OrderStatusPage({
               rev={showroom}
               count={periodOrders.length}
             />
-            <SummaryCard
-              icon={Users}
-              eyebrow={
-                salesFilter === "all"
-                  ? "Pick a salesperson to compare"
-                  : `${staffById.get(salesFilter) ?? "Salesperson"} · ${period === "range" ? "All time" : monthName}`
-              }
-              rev={salesFilter === "all" ? { products: 0, collected: 0, outstanding: 0, total: 0 } : mine}
-              count={mineOrders.length}
-              muted
-            />
+            {!salespersonScoped && (
+              <SummaryCard
+                icon={Users}
+                eyebrow={
+                  salesFilter === "all"
+                    ? "Pick a salesperson to compare"
+                    : `${staffById.get(salesFilter) ?? "Salesperson"} · ${period === "range" ? "All time" : monthName}`
+                }
+                rev={salesFilter === "all" ? { products: 0, collected: 0, outstanding: 0, total: 0 } : mine}
+                count={mineOrders.length}
+                muted
+              />
+            )}
           </div>
 
           {/* Controls */}
@@ -492,7 +481,7 @@ export default function OrderStatusPage({
                 data-testid="os-search"
               />
             </div>
-            <div className="os-people">
+            <div className="os-people" style={salespersonScoped ? { display: "none" } : undefined}>
               <button className="os-people__btn" onClick={() => setPeopleOpen((o) => !o)}>
                 <Users size={14} strokeWidth={1.75} />
                 <span>
