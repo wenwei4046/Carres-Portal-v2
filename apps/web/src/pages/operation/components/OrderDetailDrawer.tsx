@@ -47,6 +47,7 @@ import { toast } from "sonner";
 import {
   computeStorageFee,
   normalizeSkuKey,
+  STOCK_LOCATIONS,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OrderPaymentMethod,
@@ -2492,6 +2493,9 @@ function DrawerBody({
                                     {lineReceivedOf(l.sku)}/{l.qty}
                                   </span>
                                   {lineReceivedOf(l.sku) < l.qty && (
+                                    /* "+ GRN" — Jess's own AutoCount word for
+                                       a goods-received entry ("+ Arrived"
+                                       read as a state, not an action). */
                                     <Btn
                                       size="sm"
                                       onClick={(e) => {
@@ -2502,9 +2506,9 @@ function DrawerBody({
                                           received: lineReceivedOf(l.sku),
                                         });
                                       }}
-                                      title="Goods arrived at the warehouse — record how many"
+                                      title="Goods arrived at the warehouse — record a GRN"
                                     >
-                                      + Arrived
+                                      + GRN
                                     </Btn>
                                   )}
                                 </span>
@@ -3224,17 +3228,19 @@ function ReceiveLineModal({
       {
         onSuccess: (r) => {
           toast.success(
-            `Booked ${r.received} unit(s) — ${r.lineReceived}/${r.lineQty}${r.ready ? " · Ready" : ""}`,
+            `GRN saved — ${r.lineReceived}/${r.lineQty} arrived${r.ready ? " · Ready" : ""}`,
           );
           onClose();
         },
-        onError: (e) => toast.error(`Couldn't book — ${e.message}`),
+        onError: (e) => toast.error(`Couldn't save the GRN — ${e.message}`),
       },
     );
   }
 
   return (
-    <Modal title="Book in received stock" onClose={onClose}>
+    /* rev19b — GRN is Jess's OWN word (the AutoCount doc her team lives in);
+       "Book in" (UK warehouse slang) is dead. */
+    <Modal title="GRN — goods arrived" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-[12px] text-base-600">
           <span className="font-semibold text-[12px] text-[#1A1A1A]">{sku}</span>
@@ -3272,12 +3278,19 @@ function ReceiveLineModal({
         </label>
         <label className="block">
           <span className="t-tiny text-base-500">Location (optional)</span>
-          <input
+          {/* Dropdown of real sites (Jess) — free text bred typos. */}
+          <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Carres Klang"
             className={field}
-          />
+          >
+            <option value="">—</option>
+            {STOCK_LOCATIONS.filter((s) => s !== "at-supplier").map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="t-tiny text-base-500">DO / receipt # (optional)</span>
@@ -3294,7 +3307,7 @@ function ReceiveLineModal({
           </Btn>
           {/* The modal's own hero (a modal is its own surface — v4 §2). */}
           <Btn variant="hero" onClick={submit} disabled={!valid || receive.isPending}>
-            {receive.isPending ? "Booking…" : "Book in"}
+            {receive.isPending ? "Saving…" : "Save GRN"}
           </Btn>
         </div>
       </div>
