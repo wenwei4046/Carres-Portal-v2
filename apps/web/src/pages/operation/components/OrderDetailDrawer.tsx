@@ -2093,63 +2093,66 @@ function DrawerBody({
             }
           >
           <SectionCard className="shrink-0">
-          {/* rev15b (Jess: option A) — the TAB is the title: no "ITEMS
-              ORDERED" band, no collapse chevron on the tab's only content.
-              One slim toolbar (readiness pill · ⋮ actions), then the table
-              runs its FULL length — the tab column scrolls, no inner 268px
-              box (that height cap was for the multi-panel era). */}
-          <div className="flex items-center gap-1.5 pl-2 pr-1 pt-0.5">
-            {/* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
-                needs stock", from the SAME shared lineReadiness the row
-                pills use — ready = reserved-to-this-SO only (strict). */}
-            {goodsLines.length === 0 ? (
-              <MiniBadge tone="muted">no goods</MiniBadge>
-            ) : (
-              <MiniBadge
-                tone={readyN === goodsLines.length ? "ready" : "waiting"}
-              >
-                {readyN} ready
-                {goodsLines.length - readyN > 0
-                  ? ` · ${goodsLines.length - readyN} needs stock`
-                  : ""}
-              </MiniBadge>
-            )}
-            <span className="flex-1" />
-            <PanelMenu
-              items={[
-                {
-                  label: "Raise PO for shortages",
-                  icon: <PackagePlus size={14} />,
-                  onClick: () => onIssuePOsClick(),
-                },
-                {
-                  label: recheckStock.isPending
-                    ? "Rechecking…"
-                    : "Recheck stock",
-                  icon: <RotateCcw size={14} />,
-                  disabled: recheckStock.isPending,
-                  onClick: () =>
-                    recheckStock.mutate(undefined, {
-                      onSuccess: () => toast.success("Stock rechecked"),
-                      onError: (e) => toast.error(e.message),
-                    }),
-                },
-                {
-                  label: "Export items (CSV)",
-                  icon: <Download size={14} />,
-                  onClick: () => downloadOrderCsv(order, lines),
-                },
-              ]}
-            />
-          </div>
-            {/* §7.7 — the white table sits APART from the toolbar (a gap +
-                a neutral base-50 header row, no cream strip). */}
+          {/* rev15c (Jess) — the DELIVERY-style band STAYS ("can see where
+              we are" + hide/expand); what goes is the grey base under the
+              column-header row and the 268px inner scroll cap (the table
+              runs full length; the tab column scrolls). */}
+          <Panel
+            title="Items ordered"
+            summary={
+              /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
+                 needs stock", from the SAME shared lineReadiness the row pills
+                 use — ready = reserved-to-this-SO only (strict). */
+              goodsLines.length === 0 ? (
+                <MiniBadge tone="muted">no goods</MiniBadge>
+              ) : (
+                <MiniBadge
+                  tone={readyN === goodsLines.length ? "ready" : "waiting"}
+                >
+                  {readyN} ready
+                  {goodsLines.length - readyN > 0
+                    ? ` · ${goodsLines.length - readyN} needs stock`
+                    : ""}
+                </MiniBadge>
+              )
+            }
+            actions={
+              <PanelMenu
+                items={[
+                  {
+                    label: "Raise PO for shortages",
+                    icon: <PackagePlus size={14} />,
+                    onClick: () => onIssuePOsClick(),
+                  },
+                  {
+                    label: recheckStock.isPending
+                      ? "Rechecking…"
+                      : "Recheck stock",
+                    icon: <RotateCcw size={14} />,
+                    disabled: recheckStock.isPending,
+                    onClick: () =>
+                      recheckStock.mutate(undefined, {
+                        onSuccess: () => toast.success("Stock rechecked"),
+                        onError: (e) => toast.error(e.message),
+                      }),
+                  },
+                  {
+                    label: "Export items (CSV)",
+                    icon: <Download size={14} />,
+                    onClick: () => downloadOrderCsv(order, lines),
+                  },
+                ]}
+              />
+            }
+          >
             <div className="overflow-x-auto min-h-0 mt-1">
               <table className="w-full border-collapse">
                 {/* §9 — formal columns across the FULL width (data tables are
                     exempt from the ~1000 forms cap). */}
+                {/* rev15c (Jess) — no grey base under the column headers:
+                    white sticky row + a hairline keeps the separation. */}
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-base-50 text-base-500">
+                  <tr className="bg-white text-base-500 border-b border-base-100">
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5">Item</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-44">SKU</th>
                     <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 w-10">Qty</th>
@@ -2663,6 +2666,7 @@ function DrawerBody({
                 />
               </FieldGrid>
             </div>
+          </Panel>
           </SectionCard>
 
           {pickerOpen && (
