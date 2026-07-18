@@ -615,6 +615,10 @@ Components in `apps/web/src/pages/` are **written from scratch by reading `refer
    OrderDetailDrawer.tsx while Batch 3 is active.
 7. After any bug fix: explain root cause + what else it touches,
    in plain language, before I accept.
+8. MIGRATION DRAFTS: never write draft SQL into
+   supabase/migrations/ before Jess approves — drafts go in chat or
+   docs/. Before numbering any migration, check the remote tracker
+   tail first (shared prod, parallel sessions).
 
 ---
 
