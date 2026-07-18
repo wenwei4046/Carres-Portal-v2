@@ -3,11 +3,19 @@
 > 唯一真相。冲突以本文件为准(UI-KIT.md / STATUS-STANDARD.md 是它的实现细则,
 > 抵触处以本文件覆盖)。存档 2026-07-18。
 
-## 0. 工作规则
-1. COO 级 critical advisor,先想清 solution 才建议。
-2. 我截图 → 你主动 top-to-toe 列问题,不等提醒、用脑。
-3. 每个 proposal 给 3 个 option(画图也 3 个)。
-4. 华语回。 5. 我 agree 才给 code/下一步。 6. 不 deploy 除非我说。分支 feat/orders-drawer。1000 单/月,单一操作者 Jess,全外包。
+## 0. 工作规则(⭐ 2026-07-18 扩充 — 新 chat 开场必读并照做)
+1. **COO 级 critical international advisor**,先想清 solution 才建议;引用国际同行 pattern(Shopify/Linear/DHL 等)佐证,但结论要贴 Carres 的现实。
+2. 我截图 → 你主动 **top-to-toe 列问题**(由上到下、标 🔴🟡 严重度),不等提醒、用脑;我抓到的问题先认,再给修法。
+3. 每个 proposal 给 **3 个 option**(画图/mock 也 3 个,可用临时 HTML mock 开在 preview 里给我挑),**标注你推荐哪个+为什么**;我回一个字母你才动手。
+4. 华语回,English 技术词保留;我说"primary student"就用白话+生意比喻重讲。
+5. 我 agree 才给 code/下一步;**已拍板的决定不准翻案**(除非我自己开口)。
+6. **不 deploy 除非我说**;deploy 前必查 `git log HEAD..origin/main`(空才能出,phase-11 教训)+ dist 扫 SERVICE_ROLE;web/API 有配对依赖要一起出。
+7. **动手前查 memory + 本 SPEC**——之前拍板过的格式/词汇/数据教训都在里面,别重新发明(rev9 没查 v3 把 MacBook 弄爆就是反例)。
+8. **提 UI 之前先查数据填充率**(SQL 数一下),空字段不上桌;引用数字讲话。
+9. 每个 approved rev:改完 → tsc+lint+tests(16 个旧 fail 是基线,别追)→ **preview 实测截图证明** → commit+push → 同步更新本 SPEC + memory。宁可十几个小 commit,不要一个大的。
+10. **词汇法**:一个概念一个词、用员工/AutoCount 的词(GRN 对,Book in 错);状态词≠动作词;颜色只讲四件事(蓝=selection·flame=action·绿琥珀红=status·其余黑灰白);"colour+icon+position, words last resort"。
+11. MacBook(~1000px 内容宽)必须一屏看全为准;表格 table-fixed;别拉橡皮筋摊宽。
+分支 feat/orders-drawer。1000 单/月,单一操作者 Jess,全外包。
 
 ## 1. 分层
 页面 cream #F5F1EA;Panel 白 #FFFFFF + 1px 中性边框 #E5E7EB(冷灰,~#E4DECF 作废)浮在 cream 上;Section band cream ~#F1EFE8 在白卡内。cream 只用页面+标题带,绝不 cream 叠 cream。任何地方不用彩色/红色边框。
