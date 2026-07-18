@@ -25,6 +25,25 @@ export const TIER_LABEL: Record<StaffTierDto, { zh: string; en: string }> = {
   salesperson: { zh: "销售", en: "Salesperson" },
 };
 
+/**
+ * Loo's naming (2026-07-18) — the ladder reads differently per store kind:
+ * dealer = Dealer Principal / Manager / Sales Person; showroom = Sales
+ * Manager / Sales Executive (no principal — that's Carres itself).
+ */
+export function tierLabel(
+  tier: StaffTierDto,
+  storeKind: "dealer" | "showroom",
+): { zh: string; en: string } {
+  if (storeKind === "showroom") {
+    if (tier === "manager") return { zh: "销售经理", en: "Sales Manager" };
+    if (tier === "salesperson") return { zh: "销售专员", en: "Sales Executive" };
+    return TIER_LABEL.principal; // unreachable — showrooms have no principal
+  }
+  if (tier === "principal") return { zh: "店主", en: "Dealer Principal" };
+  if (tier === "manager") return { zh: "经理", en: "Manager" };
+  return { zh: "销售", en: "Sales Person" };
+}
+
 /** Store owner sees the whole tier ladder; a showroom's ladder caps at manager
  *  (its "principal" is Carres itself); a manager may only mint salespersons. */
 export function allowedCreateTiers(
@@ -356,11 +375,14 @@ export function AddStaffModal({
             data-testid="staff-add-role"
             className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
           >
-            {tiers.map((t) => (
-              <option key={t} value={t}>
-                {TIER_LABEL[t].zh} · {TIER_LABEL[t].en}
-              </option>
-            ))}
+            {tiers.map((t) => {
+              const l = tierLabel(t, storeKind);
+              return (
+                <option key={t} value={t}>
+                  {l.en} · {l.zh}
+                </option>
+              );
+            })}
           </select>
         </label>
       )}
