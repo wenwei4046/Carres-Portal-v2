@@ -303,9 +303,20 @@ describe("masterRecordToBalance", () => {
     });
     expect(out).toEqual({ ok: true, row: { ref: "CR0629", owing: 3746, payStatus: "Follow Up" } });
   });
-  it("skips a row with no Ref or no status/balance", () => {
-    expect(masterRecordToBalance({ Balance: "RM100" }).ok).toBe(false);
+  it("blank status + positive Balance → owing = amount, no payStatus", () => {
+    const out = masterRecordToBalance({
+      Ref: "TCF0475",
+      Balance: 3120,
+      "Payment Status": "",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "TCF0475", owing: 3120 } });
+  });
+  it("blank status + zero/blank Balance is still skipped", () => {
     expect(masterRecordToBalance({ Ref: "X", "Payment Status": "", Balance: "" }).ok).toBe(false);
+    expect(masterRecordToBalance({ Ref: "X", "Payment Status": "", Balance: 0 }).ok).toBe(false);
+  });
+  it("skips a row with no Ref", () => {
+    expect(masterRecordToBalance({ Balance: "RM100" }).ok).toBe(false);
   });
 });
 

@@ -120,6 +120,7 @@ import {
   FieldGrid,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
+import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import { type OperationStage } from "./StageChip";
@@ -1021,6 +1022,8 @@ function DrawerBody({
   // Balance band's collapsed "+ Add payment" shortcut must work while the
   // panel body (MoneyCard) is unmounted.
   const [addingPayment, setAddingPayment] = useState(false);
+  // §10 Generate invoice — the full-screen charges + live-preview overlay.
+  const [invoiceOverlayOpen, setInvoiceOverlayOpen] = useState(false);
   // Balance ⋮ "Edit total" → re-opens the MoneyCard total entry (the §3.2
   // Outstanding-only state carries no Total row, so ⋮ is the way back in).
   const balanceEditTotalRef = useRef<(() => void) | null>(null);
@@ -1413,7 +1416,6 @@ function DrawerBody({
   // Balance panel STATUS pill + status-strip Money cell (batch 2): the ledger
   // Outstanding drives them all, so pill / strip / header sticker never disagree.
   const isOwing = balanceOwing;
-  const owingAmt = moneyOutstanding;
   // Delivery-eve (page-rebuild §3.2): owing AND delivery is today/tomorrow →
   // the Balance panel shows the red flag, Outstanding reads danger, and Remind
   // switches to the final-reminder tone.
@@ -2861,25 +2863,11 @@ function DrawerBody({
               <PanelMenu
                 items={[
                   {
+                    // §10 — opens the charges + LIVE-preview overlay (issues
+                    // on demand via 0229; works before dispatch).
                     label: "Generate invoice",
                     icon: <FileText size={14} />,
-                    onClick: () => {
-                      void (async () => {
-                        try {
-                          const dataInv = await apiFetch<InvoiceTemplateData>(
-                            `/api/orders/${order.id}/invoice-pdf-data`,
-                          );
-                          const blob = await renderInvoicePdf(dataInv);
-                          const url = URL.createObjectURL(blob);
-                          window.open(url, "_blank");
-                          setTimeout(() => URL.revokeObjectURL(url), 60_000);
-                        } catch (e) {
-                          const msg =
-                            e instanceof ApiError ? e.message : String(e);
-                          toast.error(`Invoice PDF failed — ${msg}`);
-                        }
-                      })();
-                    },
+                    onClick: () => setInvoiceOverlayOpen(true),
                   },
                   {
                     label: "Print receipt",
@@ -2912,7 +2900,9 @@ function DrawerBody({
                 ]}
               />
             }
-            defaultOpen={false}
+            // Tab context (§10): landing on the Balance TAB should show the
+            // invoice open — the collapsed band was the stacked-card era.
+            defaultOpen
             summary={
               /* Balance v3 header — the payment status PILL from the dial
                  family (STATUS-STANDARD §1): Unpaid / Deposit / Overdue /
@@ -2996,6 +2986,26 @@ function DrawerBody({
             <AddPaymentModal
               orderId={order.id}
               onClose={() => setAddingPayment(false)}
+            />
+          )}
+          {/* §10 Generate invoice — charges + live PDF preview + outputs. */}
+          {invoiceOverlayOpen && (
+            <GenerateInvoiceOverlay
+              orderId={order.id}
+              so={order.so}
+              invoiceNo={order.invoice_no ?? null}
+              customerName={order.customer_name ?? ""}
+              customerPhone={order.customer_phone ?? null}
+              customerAddress={order.customer_address ?? null}
+              lines={lines}
+              hasLineTotal={hasLineTotal}
+              orderTotal={orderTotal}
+              totalSet={totalSet}
+              storageCharge={storageCharge}
+              storageIncurred={storageIncurred}
+              invoiceTotal={invoiceTotal}
+              balanceDue={balanceDue}
+              onClose={() => setInvoiceOverlayOpen(false)}
             />
           )}
           </div>
@@ -4361,7 +4371,6 @@ function MoneyCard({
   hasLineTotal,
   orderTotal,
   totalSet,
-  collected,
   lines,
   storageCharge,
   storageIncurred,
