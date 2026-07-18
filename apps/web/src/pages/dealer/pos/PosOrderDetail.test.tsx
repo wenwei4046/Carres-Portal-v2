@@ -31,6 +31,7 @@ vi.mock("@/lib/queries", () => ({
   useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
   useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",

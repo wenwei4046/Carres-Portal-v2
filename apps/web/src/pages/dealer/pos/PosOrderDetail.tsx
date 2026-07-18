@@ -38,6 +38,7 @@ import {
   useOrderChangeRequests,
   useProceedOrder,
   useSubmitOrderChangeRequest,
+  useUpdateOrderChangeRequest,
   useTopUpOrder,
   useUnproceedOrder,
   useUpdateOrder,
@@ -262,6 +263,10 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const changeReqQ = useOrderChangeRequests(id);
   const submitChangeMut = useSubmitOrderChangeRequest(id);
   const cancelChangeMut = useCancelOrderChangeRequest(id);
+  const updateChangeMut = useUpdateOrderChangeRequest(id);
+  // 0234 — View request modal + edit-in-place mode for the overlay.
+  const [viewChangeOpen, setViewChangeOpen] = useState(false);
+  const [editingChange, setEditingChange] = useState(false);
   const changeRequests = changeReqQ.data?.requests ?? [];
   const pendingChange = changeRequests.find((r) => r.status === "pending") ?? null;
   const lastRejected = changeRequests.find((r) => r.status === "rejected") ?? null;
@@ -293,6 +298,33 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     setAddErr(null);
     try {
       await cancelChangeMut.mutateAsync(pendingChange.id);
+      setViewChangeOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
+
+  /** 0234 — Edit-in-place: the overlay's pick REPLACES the pending payload. */
+  async function handleEditChange(line: DraftLine) {
+    if (!pendingChange) return;
+    setAddErr(null);
+    try {
+      await updateChangeMut.mutateAsync({
+        requestId: pendingChange.id,
+        input: {
+          lines: [
+            {
+              sku: line.sku,
+              qty: line.qty,
+              attrs: line.attrs ?? null,
+              unitPrice: line.unitPrice,
+              label: line.label,
+            },
+          ],
+        },
+      });
+      setAddOpen(false);
+      setEditingChange(false);
     } catch (e) {
       setAddErr(addErrorCopy(e));
     }
@@ -811,6 +843,14 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 <button
                   type="button"
                   className="btn btn--ghost btn--sm"
+                  onClick={() => setViewChangeOpen(true)}
+                  data-testid="pos-od-change-view"
+                >
+                  View request
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
                   disabled={cancelChangeMut.isPending}
                   onClick={handleCancelChange}
                   data-testid="pos-od-change-cancel"
@@ -1223,11 +1263,87 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
           <AddProductOverlay
             order={order}
             catalog={catalog}
-            busy={addLinesMut.isPending || submitChangeMut.isPending}
+            busy={addLinesMut.isPending || submitChangeMut.isPending || updateChangeMut.isPending}
             error={addErr}
-            onPick={scope.canAddProduct ? handleAddProduct : handleSubmitChange}
-            onClose={() => setAddOpen(false)}
+            onPick={
+              scope.canAddProduct
+                ? handleAddProduct
+                : editingChange
+                  ? handleEditChange
+                  : handleSubmitChange
+            }
+            onClose={() => {
+              setAddOpen(false);
+              setEditingChange(false);
+            }}
           />
+        )}
+
+        {/* 0234 — View request: the submitted lines + edit/cancel actions. */}
+        {viewChangeOpen && pendingChange && (
+          <div
+            className="fixed inset-0 z-[120] grid place-items-center bg-base-900/55 p-4"
+            onClick={() => setViewChangeOpen(false)}
+            data-testid="pos-od-change-modal"
+          >
+            <div
+              className="w-full max-w-[440px] bg-white rounded-md shadow-md p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="kicker mb-1">Product change · pending HQ approval</p>
+              {((pendingChange.payload.lines ?? []) as Array<{
+                sku?: string;
+                qty?: number;
+                unitPrice?: number;
+                label?: string;
+              }>).map((l, i) => (
+                <div key={i} className="flex items-center justify-between t-small text-base-800 py-1">
+                  <span>
+                    {l.label ?? l.sku} ×{l.qty ?? 1}
+                  </span>
+                  {typeof l.unitPrice === "number" && (
+                    <span className="font-mono text-base-600">
+                      ≈ RM {l.unitPrice.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              ))}
+              <p className="t-tiny text-base-500 mt-1">
+                Submitted {new Date(pendingChange.requestedAt).toLocaleString()} · final prices
+                re-derive from the live catalog at approval.
+              </p>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setViewChangeOpen(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={cancelChangeMut.isPending}
+                  onClick={handleCancelChange}
+                >
+                  Cancel request
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={() => {
+                    setViewChangeOpen(false);
+                    setEditingChange(true);
+                    setAddErr(null);
+                    setAddOpen(true);
+                  }}
+                  data-testid="pos-od-change-edit"
+                >
+                  Edit request
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </aside>
     </div>
