@@ -284,6 +284,19 @@ export default function PrincipalNewOrder() {
             ? null
             : composedAddress || draft.customer.address.trim() || null,
           addressUnknown: draft.customer.addressUnknown,
+          // 0230 — structured parts ride alongside the composed string (same
+          // as the POS submit). Wiped when address is deferred.
+          addressLine1: draft.customer.addressUnknown
+            ? null
+            : draft.customer.addressLine1.trim() || null,
+          addressLine2: draft.customer.addressUnknown
+            ? null
+            : draft.customer.addressLine2.trim() || null,
+          addressState: draft.customer.addressUnknown ? null : draft.customer.addressState || null,
+          addressCity: draft.customer.addressUnknown ? null : draft.customer.addressCity || null,
+          addressPostcode: draft.customer.addressUnknown
+            ? null
+            : draft.customer.addressPostcode || null,
           billing: draft.customer.billingSame ? null : draft.customer.billing.trim() || null,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer) || null,

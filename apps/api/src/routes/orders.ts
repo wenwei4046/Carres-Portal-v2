@@ -932,6 +932,13 @@ ordersRouter.post("/raw", async (c) => {
     customer_phone: input.customer.phone ?? null,
     customer_address: addressUnknown ? null : input.customer.address ?? null,
     customer_address_unknown: addressUnknown,
+    // 0230 — structured parts ride with the composed string (POS-door parity);
+    // an address-unknown order carries none.
+    customer_address_line1: addressUnknown ? null : input.customer.addressLine1 ?? null,
+    customer_address_line2: addressUnknown ? null : input.customer.addressLine2 ?? null,
+    customer_address_state: addressUnknown ? null : input.customer.addressState ?? null,
+    customer_address_city: addressUnknown ? null : input.customer.addressCity ?? null,
+    customer_address_postcode: addressUnknown ? null : input.customer.addressPostcode ?? null,
     customer_billing: billingSame ? null : input.customer.billing ?? null,
     customer_billing_same: billingSame,
     customer_emergency: input.customer.emergency || null,

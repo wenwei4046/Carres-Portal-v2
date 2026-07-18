@@ -290,6 +290,11 @@ describe("PrincipalNewOrder — raw submit mapping", () => {
       addressUnknown: false,
       billingSame: true,
       emergency: "Alice · 0129988776 · Spouse",
+      // 0230 — structured parts ride alongside the composed string.
+      addressLine1: "12 Jalan A",
+      addressState: "Kuala Lumpur",
+      addressCity: "Kuala Lumpur",
+      addressPostcode: "50000",
     });
     expect(input.customer.address).toContain("12 Jalan A");
     // Raw dates: empty (not TBD-ticked) still submits as no-date (TBD).

@@ -251,6 +251,10 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
         race: "Chinese",
         gender: "Female",
         birthday: "1990-04-01",
+        addressLine1: "12 Jalan A",
+        addressState: "Kuala Lumpur",
+        addressCity: "Kuala Lumpur",
+        addressPostcode: "50000",
       },
       deliveryDate: "2026-08-01",
       proceedDate: "2026-07-20",
@@ -271,6 +275,11 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(res.status).toBe(201);
     const p = sb._rpcCalls[0].payload;
     expect(p.customer_address).toBe("12 Jalan A, KL");
+    // 0230 — structured address parts ride with the composed string.
+    expect(p.customer_address_line1).toBe("12 Jalan A");
+    expect(p.customer_address_state).toBe("Kuala Lumpur");
+    expect(p.customer_address_city).toBe("Kuala Lumpur");
+    expect(p.customer_address_postcode).toBe("50000");
     expect(p.customer_billing).toBe("Suite 8, Menara B");
     expect(p.customer_billing_same).toBe(false);
     expect(p.customer_emergency).toBe("Alice · 012-9988776 · Spouse");

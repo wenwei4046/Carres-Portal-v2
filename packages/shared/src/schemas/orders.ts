@@ -362,6 +362,13 @@ export const rawCreateOrderInputSchema = z.object({
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .nullable()
       .optional(),
+    // 0230 — structured MY address parts, sent alongside the composed
+    // `address` string (same lenient contract as the POS door).
+    addressLine1: z.string().max(200).nullable().optional(),
+    addressLine2: z.string().max(200).nullable().optional(),
+    addressState: z.string().max(60).nullable().optional(),
+    addressCity: z.string().max(120).nullable().optional(),
+    addressPostcode: z.string().max(10).nullable().optional(),
   }),
   /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. No lead-time floor and
    *  no not-in-the-past rule — the raw door accepts any date (backfill). */
