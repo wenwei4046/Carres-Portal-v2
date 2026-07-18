@@ -3117,6 +3117,14 @@ function DrawerBody({
                       toast.success("Address copied");
                     },
                   },
+                  // 3A (Jess 2026-07-18): multi-leg is a 0/179 rarity — it
+                  // lives behind the ⋮, not on the tab face. The block still
+                  // auto-shows whenever an order actually HAS legs.
+                  {
+                    label: "Multi-leg route…",
+                    icon: <Truck size={14} />,
+                    onClick: () => setShowRouteBlock(true),
+                  },
                 ]}
               />
             }
@@ -3254,7 +3262,10 @@ function DrawerBody({
                   dropdown above IS the standard single-carrier route, so the
                   multi-leg bar only renders when the order actually has legs,
                   or after "+ Add stop" opens it. */}
-              {(order.delivery_stops?.length ?? 0) > 0 || showRouteBlock ? (
+              {/* 3A — no permanent multi-leg furniture on the tab face: the
+                  block renders only when the order HAS legs, or after the ⋮
+                  "Multi-leg route…" opens it. */}
+              {((order.delivery_stops?.length ?? 0) > 0 || showRouteBlock) && (
                 <div className="border-t border-base-100 pt-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] text-base-400">
@@ -3273,18 +3284,6 @@ function DrawerBody({
                       order.ops_assigned_logistic ?? order.delivery_partner_id
                     }
                   />
-                </div>
-              ) : (
-                <div className="border-t border-base-100 pt-1.5">
-                  <Btn
-                    variant="ghost"
-                    size="sm"
-                    icon={Plus}
-                    onClick={() => setShowRouteBlock(true)}
-                    title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
-                  >
-                    Add stop (multi-leg)
-                  </Btn>
                 </div>
               )}
             </div>
