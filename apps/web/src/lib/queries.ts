@@ -117,6 +117,7 @@ import {
   type SalespersonDto,
   type SalespersonCreateInput,
   type AddOrderLinesInput,
+  type OrderChangeRequestDto,
   type SalespersonsListResponse,
   type SetOrderAddressInput,
   type SetOrderDateInput,
@@ -887,6 +888,72 @@ export function useTopUpOrder(
       // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 0233 — P3 change requests: the order's submission list (POS pending
+ *  banner + the ops approval panel). RLS scopes the read. */
+export function useOrderChangeRequests(orderId: string) {
+  return useQuery<{ requests: OrderChangeRequestDto[] }, ApiError>({
+    queryKey: ["orders", orderId, "change-requests"],
+    queryFn: () => apiFetch(`/api/orders/${orderId}/change-requests`),
+  });
+}
+
+/** 0233 — P3: file a proceed-lane add-product submission. */
+export function useSubmitOrderChangeRequest(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { request: OrderChangeRequestDto | null },
+    ApiError,
+    AddOrderLinesInput
+  >({
+    mutationFn: (input) =>
+      apiFetch(`/api/orders/${orderId}/change-requests`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["orders", orderId, "change-requests"] });
+    },
+  });
+}
+
+/** 0233 — P3: requester cancels a pending submission. */
+export function useCancelOrderChangeRequest(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, ApiError, string>({
+    mutationFn: (requestId) =>
+      apiFetch(`/api/orders/${orderId}/change-requests/${requestId}/cancel`, {
+        method: "POST",
+        body: "{}",
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["orders", orderId, "change-requests"] });
+    },
+  });
+}
+
+/** 0233 — P3 ops decide: APPROVE applies the lines through the full engine
+ *  pipeline (fresh prices) + stamps the request; REJECT stamps with a note.
+ *  Response = the re-shaped order (same cache discipline as useTopUpOrder). */
+export function useDecideOrderChangeRequest(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    Order,
+    ApiError,
+    { requestId: string; approve: boolean; note?: string | null }
+  >({
+    mutationFn: ({ requestId, approve, note }) =>
+      apiFetch(`/api/orders/${orderId}/change-requests/${requestId}/decide`, {
+        method: "POST",
+        body: JSON.stringify({ approve, note: note ?? null }),
+      }),
+    onSuccess: async (order) => {
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
     },
   });
 }

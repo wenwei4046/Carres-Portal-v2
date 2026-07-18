@@ -132,6 +132,7 @@ import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import ReceivePOModal from "./ReceivePOModal";
 import AnnotationTimeline from "./AnnotationTimeline";
+import ChangeRequestsPanel from "./ChangeRequestsPanel";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -2210,6 +2211,9 @@ function DrawerBody({
             at the top). */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           <div className={tab === "items" ? "min-h-full" : "hidden"}>
+          {/* 0233 (add-product P3) — dealer-submitted product change awaiting
+              approval; auto-hides when none is pending. */}
+          <ChangeRequestsPanel orderId={order.id} />
           {/* Option C (rev 6) + desktop truth (Jess): Items takes FULL width;
               picking a line slides the Warehouse card in from the right at a
               fixed 56/44 split — NO responsive reflow, the layout is identical

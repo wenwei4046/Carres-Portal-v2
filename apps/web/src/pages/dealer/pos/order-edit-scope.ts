@@ -51,6 +51,9 @@ export interface OrderEditScope {
    *  affordance; the proceed lane goes through the P3 submission + operation
    *  approval instead. */
   canAddProduct: boolean;
+  /** 0233 (add-product P3) — "Submit product change" (needs HQ approval) is
+   *  the PROCEED-lane counterpart of canAddProduct. */
+  canSubmitLineChange: boolean;
 }
 
 /** Today in Malaysia (UTC+8) as an ISO yyyy-mm-dd — the un-proceed cutoff
@@ -84,5 +87,6 @@ export function getOrderEditScope(
     canEditDetails: editablePlaced || editableProceed,
     canUnproceed,
     canAddProduct: editablePlaced,
+    canSubmitLineChange: editableProceed,
   };
 }

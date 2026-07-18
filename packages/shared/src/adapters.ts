@@ -755,6 +755,21 @@ export const auditFromRow = (r: DB.AuditLogRow): D.AuditEntry => ({
   occurredAt: r.occurred_at,
 });
 
+/** 0231/0233 — change-request row → DTO (P3 submission/approval flow). */
+export const orderChangeRequestFromRow = (r: DB.OrderChangeRequestRow): D.OrderChangeRequest => ({
+  id: r.id,
+  orderId: r.order_id,
+  kind: r.kind as "add_lines",
+  payload: (r.payload ?? { lines: [] }) as { lines: Array<Record<string, unknown>> },
+  status: r.status as D.OrderChangeRequest["status"],
+  requestedBy: r.requested_by,
+  requestedAt: r.requested_at,
+  decidedBy: r.decided_by,
+  decidedAt: r.decided_at,
+  decisionNote: r.decision_note,
+  appliedAt: r.applied_at,
+});
+
 /**
  * orderInputToRpcPayload — converts the camelCase CreateOrderInput from the
  * web wizard into the snake_case jsonb shape that `public.create_order(jsonb)`

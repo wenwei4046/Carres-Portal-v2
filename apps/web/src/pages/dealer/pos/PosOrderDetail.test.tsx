@@ -27,6 +27,10 @@ vi.mock("@/lib/queries", () => ({
   useUnproceedOrder: () => ({ mutateAsync: h.unproceedMutateAsync, isPending: false }),
   // 0231 — add-product P1.
   useAddOrderLines: () => ({ mutateAsync: h.addLinesMutateAsync, isPending: false }),
+  // 0233 — add-product P3 (submission flow).
+  useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
+  useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",
@@ -321,6 +325,14 @@ describe("add product (0231)", () => {
   it("proceed and delivered lanes hide the Add product button", () => {
     renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
     expect(screen.queryByTestId("pos-od-add-product")).toBeNull();
+    // 0233 — the proceed lane offers the SUBMISSION flow instead.
+    expect(screen.getByTestId("pos-od-submit-change")).toBeTruthy();
+  });
+
+  it("delivered lane offers neither add nor submit", () => {
+    renderDrawer(order({ status: "delivered", paid: 3000 }));
+    expect(screen.queryByTestId("pos-od-add-product")).toBeNull();
+    expect(screen.queryByTestId("pos-od-submit-change")).toBeNull();
   });
 });
 

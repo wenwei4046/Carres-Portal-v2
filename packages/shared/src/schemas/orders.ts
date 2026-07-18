@@ -464,12 +464,47 @@ export const addOrderLinesInputSchema = z.object({
          *  figure (create-route contract). IGNORED on every non-build line —
          *  flat lines stay fully server-priced. */
         unitPrice: z.number().nonnegative().optional(),
+        /** P3 — human-readable line label for the operator's approval view
+         *  (e.g. "Cloud Mattress · Queen"). Display-only: never persisted on
+         *  the order_line (the RPC reads sku/qty/attrs/unit_price only). */
+        label: z.string().max(120).optional(),
       }),
     )
     .min(1)
     .max(10),
 });
 export type AddOrderLinesInput = z.infer<typeof addOrderLinesInputSchema>;
+
+/** 0233 — P3 change-request lifecycle. */
+export const orderChangeRequestStatusSchema = z.enum([
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
+export const orderChangeRequestSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  kind: z.literal("add_lines"),
+  /** The submitted lines verbatim (sku/qty/attrs + preview unitPrice/label). */
+  payload: z.object({ lines: z.array(z.record(z.unknown())) }),
+  status: orderChangeRequestStatusSchema,
+  requestedBy: z.string().uuid().nullable(),
+  requestedAt: z.string(),
+  decidedBy: z.string().uuid().nullable(),
+  decidedAt: z.string().nullable(),
+  decisionNote: z.string().nullable(),
+  appliedAt: z.string().nullable(),
+});
+export type OrderChangeRequestDto = z.infer<typeof orderChangeRequestSchema>;
+
+/** POST /:id/change-requests/:reqId/decide body. `note` is surfaced to the
+ *  dealer on reject (the UI encourages it; the server stays lenient). */
+export const decideOrderChangeRequestInputSchema = z.object({
+  approve: z.boolean(),
+  note: z.string().max(500).nullable().optional(),
+});
+export type DecideOrderChangeRequestInput = z.infer<typeof decideOrderChangeRequestInputSchema>;
 
 export const setOrderAddressInputSchema = z.object({
   /** Composed address string the wizard would have written. The RPC stores
