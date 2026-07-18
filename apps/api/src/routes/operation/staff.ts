@@ -84,8 +84,32 @@ staffRouter.get("/", async (c) => {
   return c.json({ staff });
 });
 
+/** AUTO-ENROLL (Jess round-4, 2026-07-18: "i already created account — once
+ *  she log in - system only detect?"): a plain-staff operation account joins
+ *  the assignment pool automatically on its FIRST login — creating the
+ *  account is the only admin step. Managers (jess@/operation@/principal)
+ *  never auto-join. Row-exists = enrolled; the away toggle handles temporary
+ *  outs; offboarding = disable the account. */
+async function autoEnroll(
+  sb: ReturnType<typeof userClient>,
+  auth: { id: string; role: string; email: string },
+) {
+  if (auth.role !== "operation") return;
+  if (isOpsManager(auth.role, auth.email)) return;
+  const { data: existing } = await sb
+    .from("ops_staff_settings")
+    .select("user_id")
+    .eq("user_id", auth.id)
+    .maybeSingle();
+  if (!existing) {
+    await sb
+      .from("ops_staff_settings")
+      .insert({ user_id: auth.id, available: true });
+  }
+}
+
 // POST /heartbeat — stamp the CALLER's own last_seen_at via the 0235 DEFINER
-// RPC (presence: opened the portal today = available for auto-assign).
+// RPC (presence: opened the portal today = in) + first-login auto-enroll.
 staffRouter.post("/heartbeat", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -95,6 +119,7 @@ staffRouter.post("/heartbeat", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+  await autoEnroll(sb, auth);
   return c.json({ ok: true });
 });
 
@@ -113,8 +138,11 @@ staffRouter.post("/auto-assign", async (c) => {
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
 
-  // 1) The caller counts as present from this very call.
+  // 1) The caller counts as present from this very call — and a first-login
+  //    staff enrolls right here, so her very first page load already deals
+  //    her a share (no race with the heartbeat).
   await sb.rpc("touch_last_seen");
+  await autoEnroll(sb, auth);
 
   // 2) Pool members not marked away, with the CUTOFF rule (Jess round-3 —
   //    fully automatic MC handling, zero clicks):
