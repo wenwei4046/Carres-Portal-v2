@@ -22,10 +22,12 @@ import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
  *
  * Hero = WHO + on PO duty + UNTIL <handover date> (PagerDuty pattern — the
  * decision-ready fact, never the month name) with a green now-dot on the
- * avatar and the duty verbs as chips. Below: a two-week mini calendar with
- * Mon/Thu tinted + the next PO day green; NEXT UP as ONE line; the PIC scope
- * as one chip row. ZERO sentences — explanations live in tooltips. Replaced
- * the dead Notes slot (1 note ever, from build day; Jess sign-off).
+ * avatar and the duty verbs as chips. Succession rows live INSIDE the duty
+ * card (roster list law: avatar+name glued left, "from 1 Aug 26" metadata
+ * right — mirrors the hero's "until"; no dashes). Below: a two-week mini
+ * calendar with Mon/Thu tinted + the next PO day green; the PIC scope as one
+ * chip row. ZERO sentences — explanations live in tooltips. Replaced the
+ * dead Notes slot (1 note ever, from build day; Jess sign-off).
  */
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -157,7 +159,8 @@ export default function TeamPanel() {
   return (
     <div className="flex flex-col" data-testid="team-panel">
       <div className="t-micro text-base-500 mb-1.5">PO DUTY</div>
-      <div className="group rounded-lg border border-base-200 bg-base-50 p-3">
+      <div className="rounded-lg border border-base-200 overflow-hidden">
+      <div className="group bg-base-50 p-3">
         <div className="flex items-center gap-2.5">
           <span
             className="relative w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold leading-none shrink-0"
@@ -208,6 +211,53 @@ export default function TeamPanel() {
           </span>
         </div>
       </div>
+      {/* Succession rows INSIDE the duty card (Jess 2026-07-19: "NEXT UP"
+          answered nothing). Roster list law: avatar + name stay GLUED (the
+          person is the subject, left); the date is metadata, right-aligned;
+          "from 1 Aug 26" mirrors the hero's "until 31 Jul 26". No dashes. */}
+      {nextUp.map((r) => {
+        const rc = avatarColor(r.userId);
+        return (
+          <div
+            key={r.month}
+            className="flex items-center gap-2 px-3 h-9 bg-white border-t border-base-100 text-[12.5px] text-base-800"
+          >
+            {editingMonth === r.month ? (
+              <DutySelect
+                month={r.month}
+                currentUserId={r.userId}
+                candidates={candidates}
+                onDone={() => setEditingMonth(null)}
+              />
+            ) : (
+              <>
+                <span
+                  className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+                  style={{ background: rc.bg, color: rc.fg }}
+                >
+                  {personInitials(r.name, r.email)}
+                </span>
+                {isEditor ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingMonth(r.month)}
+                    title={`Change ${fmtMonth(r.month)}'s PO duty holder`}
+                    className="truncate rounded hover:bg-base-50 px-0.5 text-left"
+                  >
+                    {personLabel(r.name, r.email)}
+                  </button>
+                ) : (
+                  <span className="truncate">{personLabel(r.name, r.email)}</span>
+                )}
+              </>
+            )}
+            <span className="ml-auto text-[11px] text-base-500 tabular-nums shrink-0">
+              from {fmtDateShort(`${r.month}-01`)}
+            </span>
+          </div>
+        );
+      })}
+      </div>
 
       <div className="t-micro text-base-500 mt-3 mb-1.5">PO DAYS · MON &amp; THU</div>
       <div className="grid grid-cols-7 gap-0.5 text-center">
@@ -238,60 +288,7 @@ export default function TeamPanel() {
         next: <span className="text-success font-semibold">{nextPoLabel}</span>
       </div>
 
-      {nextUp.length > 0 && (
-        <>
-          <div className="t-micro text-base-500 mt-3 mb-1.5">NEXT UP</div>
-          <div className="flex items-center gap-1.5 flex-wrap rounded-lg border border-base-200 bg-white px-2.5 h-9 text-[12px] text-base-700">
-            {nextUp.map((r, i) => {
-              const rc = avatarColor(r.userId);
-              if (editingMonth === r.month) {
-                return (
-                  <span key={r.month} className="inline-flex items-center gap-1.5">
-                    {i > 0 && <span className="text-base-300">·</span>}
-                    <span className="text-base-500">{fmtMonth(r.month)} —</span>
-                    <DutySelect
-                      month={r.month}
-                      currentUserId={r.userId}
-                      candidates={candidates}
-                      onDone={() => setEditingMonth(null)}
-                    />
-                  </span>
-                );
-              }
-              const entry = (
-                <>
-                  <span
-                    className="w-[15px] h-[15px] rounded-full flex items-center justify-center font-bold leading-none shrink-0"
-                    style={{ background: rc.bg, color: rc.fg, fontSize: 9 }}
-                  >
-                    {personInitials(r.name, r.email)}
-                  </span>
-                  {fmtMonth(r.month)} — {personLabel(r.name, r.email)}
-                </>
-              );
-              return (
-                <span key={r.month} className="inline-flex items-center gap-1.5">
-                  {i > 0 && <span className="text-base-300">·</span>}
-                  {isEditor ? (
-                    <button
-                      type="button"
-                      onClick={() => setEditingMonth(r.month)}
-                      title={`Change ${fmtMonth(r.month)}'s PO duty holder`}
-                      className="inline-flex items-center gap-1.5 rounded hover:bg-base-50 px-0.5"
-                    >
-                      {entry}
-                    </button>
-                  ) : (
-                    entry
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      <div className="t-micro text-base-500 mt-3 mb-1.5">EVERY PIC · OWN ORDERS</div>
+      <div className="t-micro text-base-500 mt-3 mb-1.5">EVERYONE — YOUR OWN ORDERS</div>
       <div className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9">
         <span
           className="text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
