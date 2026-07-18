@@ -2186,6 +2186,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         label={isDuty ? `${presence} · PO duty` : presence}
                         count={staffEntries.counts.get(s.user_id) ?? 0}
                         active={staffFilter === s.user_id}
+                        chip={
+                          <span
+                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+                            style={{
+                              background: avatarColor(s.user_id).bg,
+                              color: avatarColor(s.user_id).fg,
+                            }}
+                          >
+                            {staffInitials(s)}
+                          </span>
+                        }
                         title={
                           isDuty
                             ? `${baseTitle} — controls POs this month (PO duty)`
@@ -2211,6 +2222,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         }
                         count={0}
                         active={staffFilter === s.user_id}
+                        chip={
+                          <span
+                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0 opacity-60"
+                            style={{
+                              background: avatarColor(s.user_id).bg,
+                              color: avatarColor(s.user_id).fg,
+                            }}
+                          >
+                            {staffInitials(s)}
+                          </span>
+                        }
                         title={`${s.email} — account ready; her first login auto-joins the pool and deals her a share (no admin step)`}
                         onClick={() =>
                           setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
@@ -2728,13 +2750,15 @@ function KanbanRow({
       }`}
       style={{ padding: "6px 10px", backgroundColor: active ? "#C2E7FF" : undefined }}
     >
+      {/* Owner chip LEADS the row (Jess 2026-07-19: "icon at front, avoid all
+          at number there") — identity first, the count column stays clean. */}
+      {chip}
       <span
         className="flex-1 min-w-0 truncate text-[13px]"
         style={{ color: active ? "#0B0B0B" : "#3C4043", fontWeight: active ? 700 : 400 }}
       >
         {label}
       </span>
-      {chip}
       <span
         className="text-[13px] tabular-nums shrink-0"
         style={{ color: valueColor, fontWeight: active || tone ? 700 : 400 }}

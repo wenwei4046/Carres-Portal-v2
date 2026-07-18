@@ -32,7 +32,7 @@ export default function TeamPanel() {
   return (
     <div className="flex flex-col gap-3 p-3" data-testid="team-panel">
       <div>
-        <div className="t-micro text-base-500 mb-1.5">PO DUTY — 货合买</div>
+        <div className="t-micro text-base-500 mb-1.5">PO DUTY</div>
         {roster.length === 0 ? (
           <div className="text-[12px] text-base-400 py-2">
             Duty roster not live yet — it appears once the rotation table is
