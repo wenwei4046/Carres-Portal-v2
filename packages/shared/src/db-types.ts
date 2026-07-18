@@ -641,6 +641,21 @@ export interface StockMovementRow {
   occurred_at: string;
 }
 
+/** 0231/0233 — the add-product change-request ledger (P3 submission flow). */
+export interface OrderChangeRequestRow {
+  id: string;
+  order_id: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  status: string;
+  requested_by: string | null;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  applied_at: string | null;
+}
+
 export interface OrderRow {
   id: string;
   so: number;

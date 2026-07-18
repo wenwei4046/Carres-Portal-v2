@@ -80,6 +80,9 @@ vi.mock("@/lib/queries", async () => {
     useRecheckStockMutation: () => inertMutation(),
     useConfirmProceedRequest: () => inertMutation(),
     useTransferReady: () => inertMutation(),
+    // 0233 (add-product P3) — the drawer's Items tab mounts ChangeRequestsPanel.
+    useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
+    useDecideOrderChangeRequest: () => inertMutation(),
   };
 });
 

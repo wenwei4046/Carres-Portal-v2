@@ -32,9 +32,12 @@ import { ApiError } from "@/lib/api";
 import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
 import {
   useAddOrderLines,
+  useCancelOrderChangeRequest,
   useCatalog,
   useOrder,
+  useOrderChangeRequests,
   useProceedOrder,
+  useSubmitOrderChangeRequest,
   useTopUpOrder,
   useUnproceedOrder,
   useUpdateOrder,
@@ -136,6 +139,10 @@ function addErrorCopy(e: unknown): string {
     return "This product is no longer available — refresh and retry.";
   if (code === "pwp_voucher_add_not_supported")
     return "Voucher codes can't be redeemed on an added line — place a new order to use the voucher.";
+  if (code === "pending_exists")
+    return "A product change is already pending on this order — cancel it first.";
+  if (code === "use_direct_add")
+    return "This order can still take products directly — use Add product instead.";
   if (code && code.startsWith("pwp_"))
     return "This promo price isn't eligible on this order — reconfigure and retry.";
   if (code === "sofa_price_drift")
@@ -251,6 +258,45 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const addLinesMut = useAddOrderLines(id);
   const [addOpen, setAddOpen] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
+  // 0233 — P3 proceed-lane submission + pending banner.
+  const changeReqQ = useOrderChangeRequests(id);
+  const submitChangeMut = useSubmitOrderChangeRequest(id);
+  const cancelChangeMut = useCancelOrderChangeRequest(id);
+  const changeRequests = changeReqQ.data?.requests ?? [];
+  const pendingChange = changeRequests.find((r) => r.status === "pending") ?? null;
+  const lastRejected = changeRequests.find((r) => r.status === "rejected") ?? null;
+
+  async function handleSubmitChange(line: DraftLine) {
+    setAddErr(null);
+    try {
+      // The preview unitPrice + label ride along for the operator's approval
+      // view; the approval re-prices everything fresh server-side.
+      await submitChangeMut.mutateAsync({
+        lines: [
+          {
+            sku: line.sku,
+            qty: line.qty,
+            attrs: line.attrs ?? null,
+            unitPrice: line.unitPrice,
+            label: line.label,
+          },
+        ],
+      });
+      setAddOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
+
+  async function handleCancelChange() {
+    if (!pendingChange) return;
+    setAddErr(null);
+    try {
+      await cancelChangeMut.mutateAsync(pendingChange.id);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
 
   async function handleAddProduct(line: DraftLine) {
     setAddErr(null);
@@ -735,6 +781,58 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 </button>
               </div>
             )}
+            {/* 0233 — P3: proceed-lane submission (HQ approves before it
+                lands) + the pending banner / rejection note. */}
+            {scope.canSubmitLineChange && !pendingChange && (
+              <div className="os-detail__cta" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setAddErr(null);
+                    setAddOpen(true);
+                  }}
+                  data-testid="pos-od-submit-change"
+                >
+                  <Plus size={16} />
+                  Submit product change
+                </button>
+              </div>
+            )}
+            {pendingChange && (
+              <div
+                style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}
+                data-testid="pos-od-change-pending"
+              >
+                <span className="t-tiny" style={{ color: "var(--fg-muted)" }}>
+                  Product change pending HQ approval ·{" "}
+                  {(pendingChange.payload.lines ?? []).length} item(s)
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={cancelChangeMut.isPending}
+                  onClick={handleCancelChange}
+                  data-testid="pos-od-change-cancel"
+                >
+                  {cancelChangeMut.isPending ? "Cancelling…" : "Cancel request"}
+                </button>
+              </div>
+            )}
+            {!pendingChange && lastRejected?.decisionNote && (
+              <p
+                className="t-tiny"
+                style={{ color: "var(--fg-muted)", marginTop: 8 }}
+                data-testid="pos-od-change-rejected"
+              >
+                Last product change rejected · {lastRejected.decisionNote}
+              </p>
+            )}
+            {addErr && !addOpen && (
+              <div className="os-detail__err" style={{ marginTop: 8 }}>
+                {addErr}
+              </div>
+            )}
           </section>
 
           {/* Customer */}
@@ -1125,9 +1223,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
           <AddProductOverlay
             order={order}
             catalog={catalog}
-            busy={addLinesMut.isPending}
+            busy={addLinesMut.isPending || submitChangeMut.isPending}
             error={addErr}
-            onPick={handleAddProduct}
+            onPick={scope.canAddProduct ? handleAddProduct : handleSubmitChange}
             onClose={() => setAddOpen(false)}
           />
         )}

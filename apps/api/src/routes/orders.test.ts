@@ -1887,6 +1887,12 @@ function buildSbForProceed(opts: {
    *  for the route's existing-lines fetch. Takes precedence over
    *  orderLineSkus when set. */
   orderLineRows?: Array<Record<string, unknown>>;
+  /** 0233 (P3) — per-table maybeSingle overrides (e.g. the change-request row
+   *  vs the order row, both fetched via maybeSingle in the decide route). */
+  tables?: Record<string, { single?: unknown }>;
+  /** 0233 (P3) — rows returned by a `.order()`-terminated list read (the
+   *  change-requests list). */
+  orderedRows?: unknown[];
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
@@ -1908,8 +1914,14 @@ function buildSbForProceed(opts: {
       return chain;
     },
     in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
-    order: async () => ({ data: [], error: null }),
-    maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+    order: async () => ({ data: opts.orderedRows ?? [], error: null }),
+    maybeSingle: async () => ({
+      data:
+        currentTable && opts.tables?.[currentTable]?.single !== undefined
+          ? opts.tables[currentTable].single
+          : (opts.fetchedRow ?? null),
+      error: null,
+    }),
   };
   const storage = buildStorageMock();
   return Object.assign(
@@ -2373,7 +2385,7 @@ describe("POST /api/orders/:id/lines", () => {
   });
 
   it("400 when a sofa BUILD line lacks the preview unitPrice (drift-gate input)", async () => {
-    const sb = buildSbForProceed({});
+    const sb = buildSbForProceed({ fetchedRow: addOrderRow() });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     const res = await app.fetch(
@@ -2391,7 +2403,7 @@ describe("POST /api/orders/:id/lines", () => {
   });
 
   it("409 pwp_voucher_add_not_supported when attrs.pwp carries a voucher code", async () => {
-    const sb = buildSbForProceed({});
+    const sb = buildSbForProceed({ fetchedRow: addOrderRow() });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     const res = await app.fetch(
@@ -2411,7 +2423,7 @@ describe("POST /api/orders/:id/lines", () => {
   });
 
   it("400 when a line carries a server-exclusive free marker", async () => {
-    const sb = buildSbForProceed({});
+    const sb = buildSbForProceed({ fetchedRow: addOrderRow() });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     for (const attrs of [{ free_gift: true }, { free_item: true }]) {
@@ -2648,6 +2660,193 @@ describe("POST /api/orders/:id/lines", () => {
       env,
     );
     expect(res.status).toBe(401);
+  });
+});
+
+// =============================================================================
+// Order change requests (P3, 0233) — proceed-lane submission + ops decide.
+// =============================================================================
+
+const changeReqUrl = `http://t/api/orders/${PROCEED_ID}/change-requests`;
+const REQ_ID = "22222222-2222-2222-2222-222222222222";
+
+function requestRow(over: Record<string, unknown> = {}) {
+  return {
+    id: REQ_ID,
+    order_id: PROCEED_ID,
+    kind: "add_lines",
+    payload: { lines: [{ sku: "SKU-ADD-1", qty: 1 }] },
+    status: "pending",
+    requested_by: null,
+    requested_at: "2026-07-18T00:00:00Z",
+    decided_by: null,
+    decided_at: null,
+    decision_note: null,
+    applied_at: null,
+    ...over,
+  };
+}
+
+describe("order change requests (P3, 0233)", () => {
+  it("POST submit — calls submit_order_change_request and returns the created row", async () => {
+    const sb = buildSbForProceed({
+      tables: { order_change_requests: { single: requestRow() } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "SKU-ADD-1", qty: 1, unitPrice: 220, label: "Memory Foam Pillow" }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("submit_order_change_request");
+    const args = sb._rpcCalls[0].args as { p_payload?: { lines?: unknown[] } };
+    expect(args.p_payload?.lines).toHaveLength(1);
+    const body = (await res.json()) as { request?: { id?: string; status?: string } };
+    expect(body.request?.id).toBe(REQ_ID);
+    expect(body.request?.status).toBe("pending");
+  });
+
+  it("submit 422 passthrough — pending_exists / use_direct_add", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "already pending", details: "pending_exists" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: [{ sku: "SKU-ADD-1", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("pending_exists");
+    expect(body.error).toBe("submit_blocked");
+  });
+
+  it("GET list — returns adapted rows (RLS-scoped)", async () => {
+    const sb = buildSbForProceed({ orderedRows: [requestRow()] });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { requests?: Array<{ id?: string; orderId?: string }> };
+    expect(body.requests).toHaveLength(1);
+    expect(body.requests?.[0]?.id).toBe(REQ_ID);
+    expect(body.requests?.[0]?.orderId).toBe(PROCEED_ID);
+  });
+
+  it("cancel — calls cancel_order_change_request", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: "{}",
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("cancel_order_change_request");
+  });
+
+  it("decide REJECT — operation only; calls reject RPC with the note", async () => {
+    const sb = buildSbForProceed({
+      tables: { order_change_requests: { single: requestRow() } },
+      fetchedRow: addOrderRow({ status: "proceed_order" }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: false, note: "no stock" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("reject_order_change_request");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_note).toBe("no stock");
+  });
+
+  it("decide APPROVE — pipeline runs then add_order_lines p_source=change_request", async () => {
+    const sb = buildSbForProceed({
+      tables: {
+        order_change_requests: { single: requestRow() },
+        orders: { single: addOrderRow({ status: "proceed_order" }) },
+      },
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("add_order_lines");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_source).toBe("change_request");
+    expect(args.p_change_request_id).toBe(REQ_ID);
+    const lines = args.p_lines as Array<Record<string, unknown>>;
+    expect(lines[0].unit_price).toBe(250); // fresh catalog price at APPROVAL time
+  });
+
+  it("decide 403 for a dealer JWT", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("decide 422 wrong_status when the request was already decided", async () => {
+    const sb = buildSbForProceed({
+      tables: { order_change_requests: { single: requestRow({ status: "approved" }) } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(sb._rpcCalls).toHaveLength(0);
   });
 });
 
