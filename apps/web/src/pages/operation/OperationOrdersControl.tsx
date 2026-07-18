@@ -917,13 +917,17 @@ interface OrderColDef {
  *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "dots", label: "Status", w: 7 },
+  { key: "dots", label: "Status", w: 5 },
   { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 18 },
+  { key: "customer", label: "Customer", w: 17 },
+  // Deadline right after Customer (Jess 2026-07-18).
+  { key: "deadline", label: "Deadline", w: 13 },
   { key: "stock", label: "Stock", w: 12 },
   { key: "delivery", label: "Delivery", w: 12 },
-  { key: "deadline", label: "Deadline", w: 13 },
-  { key: "next", label: "Next", w: 14 },
+  // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
+  // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
+  { key: "pic", label: "PIC", w: 5 },
+  { key: "next", label: "Next", w: 13 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1582,8 +1586,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
     activeChips.push({
       label:
         staffFilter === NO_STAFF
-          ? "Staff: Unassigned"
-          : `Staff: ${(() => {
+          ? "No PIC"
+          : `PIC: ${(() => {
               const m = staffById.get(staffFilter);
               return m ? staffLabel(m) : staffFilter;
             })()}`,
@@ -1666,18 +1670,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           />
         }
         toolbarRight={
-          /* ONE-row toolbar, right cluster in this exact order:
-             N of M · + Master · + AutoCount · ⋮ (the overflow sits at the far
-             corner; its menu = Show columns, with room for Density/Export). */
+          /* ONE-row toolbar, right cluster: + Master · + AutoCount · ⋮. The
+             "N of M" counter is GONE (Jess 2026-07-18: it floated in the air
+             and duplicated the footer count + the Loading-more sentinel). */
           <>
-            {total > 0 && (
-              <span
-                className="text-[12px] text-base-500 tabular-nums"
-                title="Rows loaded / total in this tab"
-              >
-                {Math.min(shown.length, total)} of {total}
-              </span>
-            )}
             <button
               type="button"
               onClick={() => setEtaImportOpen(true)}
@@ -1918,11 +1914,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       }
                     />
                   ))}
+                  {/* "No PIC", NOT "Unassigned" — that word already means
+                      no-logistic in CHASE NOW (Jess 2026-07-18, word law). */}
                   <KanbanRow
-                    label="Unassigned"
+                    label="No PIC"
                     count={staffEntries.none}
                     active={staffFilter === NO_STAFF}
-                    title="Open orders nobody is watching yet"
+                    title="Orders nobody is watching yet"
                     onClick={() =>
                       setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
                     }
@@ -2089,9 +2087,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
               )}
               {showCol("order") && <Th>Order</Th>}
               {showCol("customer") && <Th>Customer</Th>}
+              {showCol("deadline") && <Th>Deadline</Th>}
               {showCol("stock") && <Th>Stock</Th>}
               {showCol("delivery") && <Th>Delivery</Th>}
-              {showCol("deadline") && <Th>Deadline</Th>}
+              {showCol("pic") && (
+                <Th>
+                  <span title="Person in charge — who's watching this order">PIC</span>
+                </Th>
+              )}
               {showCol("next") && <Th>Next</Th>}
             </tr>
           </thead>
@@ -2563,7 +2566,15 @@ function StatusTabs({
     completed: CheckCircle2,
   };
   return (
-    <div data-testid="filter-status" className="flex items-center gap-1 flex-wrap">
+    /* ONE line always (Jess 2026-07-18: Delivered wrapped to a 2nd row on
+       MacBook) — no wrap; tab icons only show on wide desktops so the six
+       tabs + the import cluster fit ~1000px content width (§0 rule 11). */
+    <div
+      data-testid="filter-status"
+      /* overflow-x scroll = the below-MacBook fallback: tabs stay reachable
+         on a squeezed window instead of clipping Delivered off the row. */
+      className="flex items-center gap-0.5 flex-nowrap min-w-0 overflow-x-auto no-scrollbar"
+    >
       {tabs.map((t) => {
         const on = active === t.key;
         const Icon = TAB_ICON[t.key];
@@ -2573,13 +2584,18 @@ function StatusTabs({
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className={`inline-flex items-center gap-1.5 px-3 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] ${
+            className={`inline-flex items-center gap-1.5 px-2 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] whitespace-nowrap ${
               on
                 ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
                 : "border-transparent text-base-500 font-medium hover:text-base-800"
             }`}
           >
-            <Icon size={16} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+            <Icon
+              size={16}
+              strokeWidth={2}
+              className="shrink-0 hidden min-[1600px]:inline"
+              aria-hidden="true"
+            />
             {t.label}
             <span
               className={`tabular-nums text-[11px] px-1.5 rounded-full ${
@@ -2631,11 +2647,11 @@ function OwnerChip({
     <div className="shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign staff"}
+        aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign PIC"}
         title={
           member
-            ? `${member.name ?? member.email} — click to reassign`
-            : "Unassigned — click to assign"
+            ? `PIC: ${member.name ?? member.email} — click to reassign`
+            : "No PIC — click to assign"
         }
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -2683,7 +2699,7 @@ function OwnerChip({
                 onAssignStaff(o.id, null);
               }}
             >
-              Unassign
+              Clear PIC
             </button>
           )}
         </div>
@@ -2758,26 +2774,19 @@ function OrderRow({
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* 三线点 — Money · Stock · Delivery, the row's ONLY colour channel
-          (§14, C rebuild 2026-07-18) + the staff owner chip (0232). */}
+          (§14, C rebuild 2026-07-18). The staff owner lives in its own PIC
+          column (Jess 2026-07-18). */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        <div className="flex items-center gap-[5px]">
-          <span className="flex items-center gap-[5px]" data-testid="row-dots">
-            {dots.map((d, i) => (
-              <span
-                key={i}
-                title={d.title}
-                className="inline-block w-2 h-2 rounded-full shrink-0"
-                style={{ background: d.color }}
-              />
-            ))}
-          </span>
-          <OwnerChip
-            o={o}
-            staffById={staffById}
-            poolStaff={poolStaff}
-            onAssignStaff={onAssignStaff}
-          />
+        <div className="flex items-center gap-[5px]" data-testid="row-dots">
+          {dots.map((d, i) => (
+            <span
+              key={i}
+              title={d.title}
+              className="inline-block w-2 h-2 rounded-full shrink-0"
+              style={{ background: d.color }}
+            />
+          ))}
         </div>
       </td>
       )}
@@ -2831,42 +2840,6 @@ function OrderRow({
             {loc.label ?? "—"}
           </div>
         </div>
-      </td>
-      )}
-      {/* Stock — facts only (n/m ratio + sub word / supplier ETA); the 货 dot
-          carries the colour. */}
-      {showCol("stock") && (
-      <td className="pl-1 pr-2">
-        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
-      </td>
-      )}
-      {/* Delivery — partner + §12 truth-ladder word. "call now" is DEAD (§14:
-          the red time-window alarm painted every row); call_now/no_date both
-          render "not booked" — the NORMAL state, worded grey because the 送
-          dot carries the colour. */}
-      {showCol("delivery") && (
-      <td className="pl-1 pr-2">
-        {logi.key === "unassigned" ? (
-          <span className="t4-caption text-[13px]">— unassigned</span>
-        ) : (
-          <div style={{ lineHeight: "15px" }}>
-            <div className="t4-row-strong truncate">{logi.partner}</div>
-            {logi.key === "delivered" ? (
-              <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
-                Delivered ✓
-              </div>
-            ) : logi.key === "scheduled" && logi.date ? (
-              <div
-                className="tabular-nums"
-                style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
-              >
-                booked {fmtDate(logi.date).split(", ")[0]}
-              </div>
-            ) : (
-              <div className="t4-caption">not booked</div>
-            )}
-          </div>
-        )}
       </td>
       )}
       {/* Deadline — date + days-left heat pill, OPEN orders only. A delivered
@@ -2935,6 +2908,54 @@ function OrderRow({
         ) : (
           <span className="text-base-300">—</span>
         )}
+      </td>
+      )}
+      {/* Stock — facts only (n/m ratio + sub word / supplier ETA); the 货 dot
+          carries the colour. */}
+      {showCol("stock") && (
+      <td className="pl-1 pr-2">
+        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
+      </td>
+      )}
+      {/* Delivery — partner + §12 truth-ladder word. "call now" is DEAD (§14:
+          the red time-window alarm painted every row); call_now/no_date both
+          render "not booked" — the NORMAL state, worded grey because the 送
+          dot carries the colour. */}
+      {showCol("delivery") && (
+      <td className="pl-1 pr-2">
+        {logi.key === "unassigned" ? (
+          <span className="t4-caption text-[13px]">— unassigned</span>
+        ) : (
+          <div style={{ lineHeight: "15px" }}>
+            <div className="t4-row-strong truncate">{logi.partner}</div>
+            {logi.key === "delivered" ? (
+              <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
+                Delivered ✓
+              </div>
+            ) : logi.key === "scheduled" && logi.date ? (
+              <div
+                className="tabular-nums"
+                style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
+              >
+                booked {fmtDate(logi.date).split(", ")[0]}
+              </div>
+            ) : (
+              <div className="t4-caption">not booked</div>
+            )}
+          </div>
+        )}
+      </td>
+      )}
+      {/* PIC — the staff owner, own column (Jess 2026-07-18): initials chip,
+          click = reassign. Word law: PIC (the team's Issue-Tracker word). */}
+      {showCol("pic") && (
+      <td className="pl-1 pr-1">
+        <OwnerChip
+          o={o}
+          staffById={staffById}
+          poolStaff={poolStaff}
+          onAssignStaff={onAssignStaff}
+        />
       </td>
       )}
       {/* Next action — one plain-text verb (§14: NEXT 文字, pill chrome gone)

@@ -517,9 +517,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Status",
       "Order",
       "Customer",
+      "Deadline", // right after Customer (Jess 2026-07-18)
       "Stock",
       "Delivery",
-      "Deadline",
+      "PIC", // staff owner — its own column (Jess 2026-07-18)
       "Next",
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
@@ -626,12 +627,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is now the 8th cell (index 7: select · flag · Order ID · Ref No ·
-    // Customer · Region · Logistic · Deadline) — the Logistic-ETA column was
-    // removed (Jess spec 2026-07-11). date + weekday.
+    // Deadline sits right after Customer (Jess 2026-07-18): index 5 —
+    // select · flag · Status dots · Order · Customer · Deadline.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[7].textContent).not.toBe("—");
-    expect(cells[7].textContent).toMatch(/\d/);
+    expect(cells[5].textContent).not.toBe("—");
+    expect(cells[5].textContent).toMatch(/\d/);
   });
 
   it("windows to the first 30 rows + shows the load-more sentinel (infinite scroll)", () => {
@@ -645,9 +645,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // the bottom sentinel scrolls into view (IntersectionObserver — not firable
     // in jsdom, so only the initial window is asserted here).
     expect(screen.getAllByTestId("order-row")).toHaveLength(30);
-    expect(screen.getByText("30 of 120")).toBeInTheDocument();
-    // The sentinel row advertises what's left to load.
-    expect(screen.getByText(/Loading more/)).toBeInTheDocument();
+    // The toolbar "N of M" counter is gone (Jess 2026-07-18 — it duplicated
+    // the footer count); the sentinel row advertises what's left to load.
+    expect(screen.getByText(/Loading more… \(30 of 120\)/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {

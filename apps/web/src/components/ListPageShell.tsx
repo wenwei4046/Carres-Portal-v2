@@ -26,7 +26,6 @@
  */
 import type { ReactNode } from "react";
 import { PanelLeft, X } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
 
 export interface ActiveChip {
   /** Chip label, e.g. "Region: KV". */
@@ -96,17 +95,28 @@ export default function ListPageShell({
       className={`h-full flex flex-col bg-background ${className}`}
       data-testid={testId}
     >
-      {/* Header — ONE full-width WHITE surface band (no cream showing above or
-          between): breadcrumb + title + freshness on the left, the page's
-          search/utility cluster on the right, all inside this one strip. */}
-      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2.5">
-        {(breadcrumb || meta) && (
-          <div className="flex items-center justify-between gap-3 text-[12px] text-base-400">
-            <div className="min-w-0 flex items-center gap-1.5">{breadcrumb}</div>
-            {meta && <div className="shrink-0 flex items-center gap-1">{meta}</div>}
-          </div>
-        )}
-        <PageHeader title={title} actions={actions} noBorder />
+      {/* Header — ONE single row (Jess 2026-07-18: breadcrumb + search/help/
+          settings share the row; the big title row is gone — the breadcrumb's
+          last crumb IS the page name, so a separate 56px title bar was pure
+          height). Pages without a breadcrumb keep a compact title instead. */}
+      <div className="shrink-0 bg-white border-b border-base-200 px-6 h-12 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex items-center gap-2.5">
+          {breadcrumb ? (
+            <div className="min-w-0 flex items-center gap-1.5 text-[13px] text-base-500">
+              {breadcrumb}
+            </div>
+          ) : (
+            <div className="min-w-0 truncate text-[15px] font-semibold text-base-900">
+              {title}
+            </div>
+          )}
+          {meta && (
+            <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
+              {meta}
+            </div>
+          )}
+        </div>
+        {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
       </div>
 
       {/* Body split — facet aside (left) + right column (control strip + table),
