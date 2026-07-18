@@ -116,6 +116,7 @@ import {
   type ReservedDrilldownResponse,
   type SalespersonDto,
   type SalespersonCreateInput,
+  type AddOrderLinesInput,
   type SalespersonsListResponse,
   // 0232 — Staff PIN login (tiers + PIN identity on salespersons rows).
   type StaffListResponse,
@@ -897,6 +898,31 @@ export function useTopUpOrder(
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       // List views (kanban / orders tabs) — invalidate so paid pct,
       // status badge, and counts refresh when reopened.
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 0231 — Add-product P1: append server-priced lines to a Place-lane order
+ *  (POST /api/orders/:id/lines). Same cache discipline as useTopUpOrder:
+ *  prime the detail, refetch it, invalidate the lists. */
+export function useAddOrderLines(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, AddOrderLinesInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, AddOrderLinesInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/lines`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

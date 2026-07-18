@@ -194,6 +194,9 @@ export interface WizardDraft {
 }
 
 export const DRAFT_STORAGE_KEY = "carres-order-draft";
+/** Maintain → New Order keeps its own sessionStorage slot — a raw draft in
+ *  progress must never clobber (or restore into) the POS cart draft. */
+export const RAW_DRAFT_STORAGE_KEY = "carres-raw-order-draft";
 
 export function emptyDraft(): WizardDraft {
   return {
@@ -240,18 +243,18 @@ export function emptyDraft(): WizardDraft {
   };
 }
 
-export function saveDraft(draft: WizardDraft): void {
+export function saveDraft(draft: WizardDraft, storageKey: string = DRAFT_STORAGE_KEY): void {
   try {
-    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    sessionStorage.setItem(storageKey, JSON.stringify(draft));
   } catch {
     // Quota or private mode — silently fail. Draft is still in React state for
     // this session; refresh resilience just won't work, no other consequence.
   }
 }
 
-export function loadDraft(): WizardDraft | null {
+export function loadDraft(storageKey: string = DRAFT_STORAGE_KEY): WizardDraft | null {
   try {
-    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+    const raw = sessionStorage.getItem(storageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<WizardDraft>;
     // Shape guard — if structure drifted between deploys we just toss the draft
@@ -321,9 +324,9 @@ export function loadDraft(): WizardDraft | null {
   }
 }
 
-export function clearDraft(): void {
+export function clearDraft(storageKey: string = DRAFT_STORAGE_KEY): void {
   try {
-    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    sessionStorage.removeItem(storageKey);
   } catch {
     // Ignore — sessionStorage write failures aren't actionable here.
   }

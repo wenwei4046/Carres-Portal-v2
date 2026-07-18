@@ -57,6 +57,10 @@ export type ExtensionAgreementTemplateData = {
 };
 
 export type InvoiceTemplateData = {
+  /** Document heading — defaults to "TAX INVOICE"; an imported order's
+   *  statement renders as "PAYMENT REQUEST" (AutoCount holds the tax
+   *  invoice for those). */
+  doc_title?: string;
   invoice_no: string;
   issue_date: string;
   order_id: string;
