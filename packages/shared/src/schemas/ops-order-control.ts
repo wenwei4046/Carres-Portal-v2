@@ -624,3 +624,22 @@ export function isOpsManager(
   if (!email) return false;
   return (OPS_MANAGER_EMAILS as readonly string[]).includes(email.toLowerCase());
 }
+
+/** Working-day cutoff (MYT hour): BEFORE it, a not-yet-logged-in pool member
+ *  keeps their share (late morning ≠ absent); AT/AFTER it, no heartbeat today
+ *  = treated absent TODAY and their system-assigned orders flow to whoever is
+ *  in — fully automatic MC handling (Jess 2026-07-18 round-3: no manual away
+ *  click needed). They log in later → their share flows straight back. */
+export const OPS_DAY_CUTOFF_HOUR_MYT = 10;
+
+/** Does this member count as "in" for auto-assignment right now? */
+export function countsAsInToday(
+  lastSeenIso: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const hourMYT = Math.floor(
+    ((now.getTime() + 8 * 3_600_000) % 86_400_000) / 3_600_000,
+  );
+  if (hourMYT < OPS_DAY_CUTOFF_HOUR_MYT) return true; // morning grace
+  return seenTodayMYT(lastSeenIso, now);
+}

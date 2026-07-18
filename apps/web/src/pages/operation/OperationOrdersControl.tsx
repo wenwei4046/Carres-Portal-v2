@@ -36,6 +36,7 @@ import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
   distributeOrders,
   seenTodayMYT,
+  countsAsInToday,
   isOpsManager,
   type OpsTask,
   type OpsTasksListResponse,
@@ -1320,9 +1321,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const all = data?.orders ?? [];
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const mine = open.filter((o) => ownerOf(o) === userId);
-    // Presence never gates assignment (Jess round-2) — away is the only out.
+    // Same rule as the server sweep: away is out; after the 10:00 MYT cutoff
+    // a member with no heartbeat today is auto-treated absent (Jess round-3).
     const others = poolStaff.filter(
-      (s) => s.available && s.user_id !== userId,
+      (s) =>
+        s.available && countsAsInToday(s.last_seen_at) && s.user_id !== userId,
     );
     if (mine.length === 0 || others.length === 0) {
       toast.error(
@@ -1989,9 +1992,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       active={staffFilter === s.user_id}
                       title={
                         !s.available
-                          ? `${s.email} — marked away (MC/leave); their orders shift to the others`
+                          ? `${s.email} — marked away (planned leave); their orders shift to the others`
                           : !seenTodayMYT(s.last_seen_at)
-                            ? `${s.email} — hasn't opened the portal today (info only; their share is already assigned)`
+                            ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
                             : s.email
                       }
                       onClick={() =>

@@ -11,6 +11,7 @@ import {
   recordStorageExtensionInput,
   distributeOrders,
   seenTodayMYT,
+  countsAsInToday,
 } from "./ops-order-control";
 
 /**
@@ -303,5 +304,23 @@ describe("seenTodayMYT (0235 presence)", () => {
     expect(seenTodayMYT(null, now)).toBe(false);
     expect(seenTodayMYT(undefined, now)).toBe(false);
     expect(seenTodayMYT("not-a-date", now)).toBe(false);
+  });
+});
+
+describe("countsAsInToday (round-3 auto-MC cutoff)", () => {
+  it("before 10:00 MYT everyone counts, logged in or not", () => {
+    // 09:00 MYT = 01:00 UTC.
+    const morning = new Date("2026-07-18T01:00:00Z");
+    expect(countsAsInToday(null, morning)).toBe(true);
+    expect(countsAsInToday("2026-07-10T00:00:00Z", morning)).toBe(true);
+  });
+  it("from 10:00 MYT, no heartbeat today = absent", () => {
+    // 10:00 MYT = 02:00 UTC.
+    const cutoff = new Date("2026-07-18T02:00:00Z");
+    expect(countsAsInToday(null, cutoff)).toBe(false);
+    // stamped yesterday MYT → absent
+    expect(countsAsInToday("2026-07-17T15:00:00Z", cutoff)).toBe(false);
+    // stamped this morning → in
+    expect(countsAsInToday("2026-07-18T00:30:00Z", cutoff)).toBe(true);
   });
 });

@@ -5,6 +5,7 @@ import {
   updateOpsStaffSettingInput,
   isOpsManager,
   distributeOrders,
+  countsAsInToday,
   type OpsStaffMember,
 } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
@@ -115,13 +116,18 @@ staffRouter.post("/auto-assign", async (c) => {
   // 1) The caller counts as present from this very call.
   await sb.rpc("touch_last_seen");
 
-  // 2) Pool members not marked away. PRESENCE DOES NOT GATE ASSIGNMENT
-  //    (Jess 2026-07-18 round-2: "never wait someone to come in — auto split
-  //    to person"): the roster IS the pool; everyone gets their share the
-  //    moment they're added. login stamps stay INFO-only ("· not in");
-  //    MC/absence = the away toggle (anyone flips it → orders shift).
+  // 2) Pool members not marked away, with the CUTOFF rule (Jess round-3 —
+  //    fully automatic MC handling, zero clicks):
+  //      · before 10:00 MYT: everyone keeps their share (late ≠ absent);
+  //      · from 10:00: no heartbeat today = treated absent TODAY → their
+  //        system-assigned orders flow to whoever is in, automatically;
+  //        they log in later → their share flows straight back.
+  //    The away toggle remains an OPTIONAL override for planned leave.
   const [users, settings] = await Promise.all([
-    sb.from("app_users").select("id, status").eq("role", "operation"),
+    sb
+      .from("app_users")
+      .select("id, status, last_seen_at")
+      .eq("role", "operation"),
     sb.from("ops_staff_settings").select("user_id, available"),
   ]);
   if (users.error) {
@@ -138,7 +144,11 @@ staffRouter.post("/auto-assign", async (c) => {
     .map((s) => s.user_id as string)
     .filter((id) => {
       const u = userById.get(id);
-      return !!u && (u.status ?? "active") === "active";
+      return (
+        !!u &&
+        (u.status ?? "active") === "active" &&
+        countsAsInToday(u.last_seen_at as string | null)
+      );
     });
   if (availIds.length === 0) return c.json({ assigned: 0, reason: "no_staff" });
 

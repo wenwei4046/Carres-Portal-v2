@@ -606,6 +606,8 @@ export {
   updateOpsStaffSettingInput,
   distributeOrders,
   seenTodayMYT,
+  countsAsInToday,
+  OPS_DAY_CUTOFF_HOUR_MYT,
   isOpsManager,
   OPS_MANAGER_EMAILS,
   receiveLineInput,
