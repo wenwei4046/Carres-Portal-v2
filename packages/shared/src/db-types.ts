@@ -653,6 +653,14 @@ export interface OrderRow {
   customer_race: string | null;
   customer_gender: string | null;
   customer_birthday: string | null;
+  // 0230 — structured MY address parts (always paired with the composed
+  // customer_address; flat-only writers clear them). Optional so legacy
+  // fixtures/constructors don't break.
+  customer_address_line1?: string | null;
+  customer_address_line2?: string | null;
+  customer_address_state?: string | null;
+  customer_address_city?: string | null;
+  customer_address_postcode?: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   // Phase 11.1 (migration 0165) — salesperson-entered planned production-start

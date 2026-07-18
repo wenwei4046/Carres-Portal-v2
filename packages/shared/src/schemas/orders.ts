@@ -81,6 +81,14 @@ export const orderSchema = z.object({
     race: z.string().nullable().optional(),
     gender: z.string().nullable().optional(),
     birthday: z.string().nullable().optional(),
+    // 0230 — structured MY address parts. Present ⇒ they match the composed
+    // `address` string (flat-only writers clear them). `.optional()` keeps
+    // pre-0230 responses parse-safe.
+    addressLine1: z.string().nullable().optional(),
+    addressLine2: z.string().nullable().optional(),
+    addressState: z.string().nullable().optional(),
+    addressCity: z.string().nullable().optional(),
+    addressPostcode: z.string().nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -198,6 +206,14 @@ export const createOrderInputSchema = z.object({
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .nullable()
       .optional(),
+    // 0230 — structured MY address parts, sent alongside the composed
+    // `address` string by the POS wizard. LENIENT (nullable/optional): non-POS
+    // callers omit them and the order simply has no structured address.
+    addressLine1: z.string().max(200).nullable().optional(),
+    addressLine2: z.string().max(200).nullable().optional(),
+    addressState: z.string().max(60).nullable().optional(),
+    addressCity: z.string().max(120).nullable().optional(),
+    addressPostcode: z.string().max(10).nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -346,8 +362,17 @@ export type RawOrderLineInput = z.infer<typeof rawOrderLineInputSchema>;
 
 export const topUpOrderInputSchema = z.object({
   amount: z.number().positive(),
-  /** Internal method key — matches reference/proto's TopUpDepositModal options. */
-  method: z.enum(["cash", "bank", "cheque", "online", "card"]),
+  /** Internal method key. 0230 — widened from the hardcoded 5-value enum to
+   *  any kebab key so the manual-payment panel can offer the SAME configurable
+   *  methods as checkout (order_entry_config). The route validates the key
+   *  against the active configured methods ∪ the legacy proto keys
+   *  (cash/bank/cheque/online/card) so old clients keep working. */
+  method: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "method must be a kebab-case key"),
   /** Human-readable label captured from the UI so the order_history line reads
    *  "Top-up RM 500 via Bank transfer" without the API needing a label table. */
   methodLabel: z.string().min(1),
@@ -367,6 +392,19 @@ export const setOrderAddressInputSchema = z.object({
   address: z.string().min(5),
   billing: z.string().nullable(),
   billingSame: z.boolean(),
+  /** 0230 — the structured parts the modal's MYAddressFields collected,
+   *  persisted alongside the composed string so the POS detail drawer can
+   *  repopulate its dropdowns. OPTIONAL: absent = legacy flat write (the RPC
+   *  clears any previously-stored parts). */
+  parts: z
+    .object({
+      line1: z.string().max(200),
+      line2: z.string().max(200).optional(),
+      state: z.string().max(60),
+      city: z.string().max(120),
+      postcode: z.string().max(10),
+    })
+    .optional(),
 });
 export type SetOrderAddressInput = z.infer<typeof setOrderAddressInputSchema>;
 
@@ -410,6 +448,14 @@ export const updateOrderInputSchema = z
         ).optional(),
         address: z.string().nullable().optional(),
         addressUnknown: z.boolean().optional(),
+        // 0230 — structured MY address parts. The RPC enforces they only ride
+        // WITH `address` (never alone) and that a flat-only `address` write
+        // clears any stored parts.
+        addressLine1: z.string().max(200).nullable().optional(),
+        addressLine2: z.string().max(200).nullable().optional(),
+        addressState: z.string().max(60).nullable().optional(),
+        addressCity: z.string().max(120).nullable().optional(),
+        addressPostcode: z.string().max(10).nullable().optional(),
         billing: z.string().nullable().optional(),
         billingSame: z.boolean().optional(),
         emergency: z.string().min(1).optional(),

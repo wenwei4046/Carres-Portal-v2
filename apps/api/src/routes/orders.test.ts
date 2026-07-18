@@ -2198,6 +2198,49 @@ describe("POST /api/orders/:id/top-up", () => {
     expect((sb._rpcCalls[0].args as Record<string, unknown>).p_method).toBe("bank");
   });
 
+  // 0230 — the method key is validated against the ACTIVE order_entry_config
+  // methods (code defaults when the config read yields nothing, as here) ∪ the
+  // legacy proto keys. "credit" is a configured default; "gold-plan" is neither.
+  it("200 — a configured (non-legacy) method key passes validation", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validTopUpBody({ method: "credit", methodLabel: "Credit / Debit" })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_method).toBe("credit");
+  });
+
+  it("422 invalid_payment_method for a key that is neither configured nor legacy", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validTopUpBody({ method: "gold-plan", methodLabel: "Gold plan" })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string };
+    expect(body.code).toBe("invalid_payment_method");
+    expect(body.error).toBe("top_up_blocked");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
   it("400 when a photoPath is outside the caller's dealer folder", async () => {
     const sb = buildSbForProceed({});
     vi.mocked(userClient).mockReturnValue(sb);
@@ -2294,6 +2337,43 @@ describe("POST /api/orders/:id/address", () => {
     expect(res.status).toBe(200);
     expect(sb._rpcCalls[0].name).toBe("set_order_address");
     expect((sb._rpcCalls[0].args as Record<string, unknown>).p_address).toBe("123 Jalan Updated, 50000 KL");
+    // 0230 — legacy flat write: no parts in the body → p_parts null (the RPC
+    // clears any previously-stored structured columns).
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_parts).toBeNull();
+  });
+
+  it("forwards the structured parts as p_parts (0230)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        customer_address: "8 Jalan PP50A, Seri Kembangan 43300, Selangor",
+        customer_address_unknown: false,
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const parts = {
+      line1: "8 Jalan PP50A",
+      state: "Selangor",
+      city: "Seri Kembangan",
+      postcode: "43300",
+    };
+    const res = await app.fetch(
+      new Request(addressUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: "8 Jalan PP50A, Seri Kembangan 43300, Selangor",
+          billing: null,
+          billingSame: true,
+          parts,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_parts).toEqual(parts);
   });
 
   it("400 when address is too short", async () => {

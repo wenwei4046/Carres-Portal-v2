@@ -491,6 +491,14 @@ export default function DealerPos({
           phone: draft.customer.phone,
           address: draft.customer.addressUnknown ? null : composedAddress,
           addressUnknown: draft.customer.addressUnknown,
+          // 0230 — the structured parts the wizard collected, persisted
+          // alongside the composed string so the detail drawer's cascading
+          // picker can repopulate. Wiped when address is deferred.
+          addressLine1: draft.customer.addressUnknown ? null : draft.customer.addressLine1.trim() || null,
+          addressLine2: draft.customer.addressUnknown ? null : draft.customer.addressLine2.trim() || null,
+          addressState: draft.customer.addressUnknown ? null : draft.customer.addressState || null,
+          addressCity: draft.customer.addressUnknown ? null : draft.customer.addressCity || null,
+          addressPostcode: draft.customer.addressUnknown ? null : draft.customer.addressPostcode || null,
           billing: draft.customer.billingSame ? null : draft.customer.billing,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
