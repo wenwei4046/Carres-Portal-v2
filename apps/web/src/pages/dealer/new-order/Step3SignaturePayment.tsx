@@ -25,12 +25,6 @@ interface Props {
    *  written to the draft; the parent auto-submits when the draft is ready
    *  (or explains what's still missing). */
   onStripeTap?: () => void;
-  /** Maintain → New Order (raw creation, Loo 2026-07-18): SAME Confirm layout,
-   *  but everything is OPTIONAL ("fill it if you have it") — no Stripe card
-   *  (pay-before-create machinery is POS-only), no delivery-fee inputs (the
-   *  raw door runs no delivery engine), no gift preview (the raw door appends
-   *  none), and a picked method can be un-picked. POS callers omit it. */
-  rawMode?: boolean;
 }
 
 /** Per-method copy for the approval-code field. Known builtin keys keep their
@@ -100,7 +94,7 @@ const SLIP_COPY_GENERIC = {
  * Submit lives in the parent footer. This component is purely presentational
  * + drives the draft mutations that step3Valid() reads.
  */
-export default function Step3SignaturePayment({ draft, onChange, catalog, onStripeTap, rawMode }: Props) {
+export default function Step3SignaturePayment({ draft, onChange, catalog, onStripeTap }: Props) {
   // Lazily mint a wizard session id the first time Step 3 mounts. Stays stable
   // across re-renders so the dealer can edit fields without resetting the
   // Storage folder each keystroke.
@@ -123,11 +117,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
 
   // Default free gifts the server WILL append at submit — the same RM0 preview
   // rows the OrderSummaryRail shows, so the two panes list identical items.
-  // Raw entry appends none (no engine) — don't promise gifts that won't come.
-  const giftRows = useMemo(
-    () => (rawMode ? [] : previewDefaultGifts(draft.lines, catalog)),
-    [rawMode, draft.lines, catalog],
-  );
+  const giftRows = useMemo(() => previewDefaultGifts(draft.lines, catalog), [draft.lines, catalog]);
 
   const total = totals.grand;
   const minDeposit = useMemo(() => Math.round(total * 0.5), [total]);
@@ -144,11 +134,8 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
   // operator-editable): its proof is system-generated, so a config edit can
   // never break or hide it.
   const methods = useMemo(
-    () =>
-      rawMode
-        ? resolvePaymentMethods(catalog.orderEntryConfig)
-        : [...resolvePaymentMethods(catalog.orderEntryConfig), STRIPE_PAYMENT_METHOD],
-    [catalog.orderEntryConfig, rawMode],
+    () => [...resolvePaymentMethods(catalog.orderEntryConfig), STRIPE_PAYMENT_METHOD],
+    [catalog.orderEntryConfig],
   );
   const selectedMethod = methods.find((m) => m.key === draft.payment.method);
   const isStripe = draft.payment.method === STRIPE_METHOD_KEY;
@@ -169,14 +156,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       !missingFollowUp;
   // Stripe submits the order with paid 0 (money moves only when the customer
   // completes Checkout), so it can never auto-qualify for Proceed at submit.
-  // Raw entry: the payment-proof fields don't gate anything, so the Proceed
-  // preview only reads deposit + address + date.
   const willProceed =
     !isStripe &&
     paidPct >= 50 &&
     !draft.customer.addressUnknown &&
     !draft.delivery.dateTbd &&
-    (rawMode || paymentMethodOk);
+    paymentMethodOk;
 
   function paymentBlockerLabel(): string | null {
     if (paymentMethodOk) return null;
@@ -329,9 +314,6 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Delivery fee (0184) ---------- */}
-      {/* Raw entry runs NO delivery engine — these two inputs would silently
-          do nothing, so the section hides (add a custom line for a fee). */}
-      {!rawMode && (
       <Section title="Delivery fee" hint="Server-priced — these two are operator inputs">
         <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
           <FieldLabel label="Additional delivery fee (optional)">
@@ -377,7 +359,6 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           </FieldLabel>
         </div>
       </Section>
-      )}
 
       {/* ---------- Payment received ---------- */}
       <Section title="Payment received" hint="50% required to move to Proceed Order">
@@ -460,7 +441,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 ⚠ Order will sit in <strong>Place</strong> until{" "}
                 {[
                   paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
-                  !rawMode && paymentBlockerLabel(),
+                  paymentBlockerLabel(),
                   draft.customer.addressUnknown && "delivery address is provided",
                   draft.delivery.dateTbd && "delivery date is confirmed",
                 ]
@@ -474,10 +455,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Payment method (0219 — config-driven) ---------- */}
-      <Section
-        title="Payment method"
-        hint={rawMode ? "Optional — tap again to un-pick" : "How the customer is paying"}
-      >
+      <Section title="Payment method" hint="How the customer is paying">
         <div
           className="grid gap-2 mb-3"
           style={{
@@ -492,12 +470,6 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 type="button"
                 aria-pressed={active}
                 onClick={() => {
-                  // Raw entry: method is optional — tapping the active card
-                  // again un-picks it (nothing was taken yet).
-                  if (rawMode && active) {
-                    setPay({ method: "", followUps: {} });
-                    return;
-                  }
                   // Switching methods clears the follow-up answers — a bank
                   // picked for credit must not silently ride along to cash.
                   setPay({ method: m.key, followUps: {} });
@@ -592,7 +564,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 const copy = APPROVAL_COPY[selectedMethod.key] ?? APPROVAL_COPY_GENERIC;
                 return (
                   <ApprovalCodeField
-                    label={rawMode ? copy.label.replace(/\s\*$/, "") : copy.label}
+                    label={copy.label}
                     value={draft.payment.approvalCode}
                     onChange={(v) =>
                       setPay({ approvalCode: v.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() })
@@ -609,7 +581,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               const copy = SLIP_COPY[selectedMethod.key] ?? SLIP_COPY_GENERIC;
               return (
                 <PaymentSlipPicker
-                  label={rawMode ? copy.label.replace(/\s\*$/, "") : copy.label}
+                  label={copy.label}
                   hint={copy.hint}
                   slip={draft.payment.slip}
                   onChange={(slip) => setPay({ slip })}
@@ -621,14 +593,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Signature ---------- */}
-      <Section
-        title={rawMode ? "Customer signature" : "Customer signature *"}
-        hint={
-          rawMode
-            ? "Optional — internal entry; capture it if the customer is present"
-            : "Customer signs with finger or stylus"
-        }
-      >
+      <Section title="Customer signature *" hint="Customer signs with finger or stylus">
         <SignaturePad
           value={draft.signature}
           onChange={(sig) => onChange({ ...draft, signature: sig })}

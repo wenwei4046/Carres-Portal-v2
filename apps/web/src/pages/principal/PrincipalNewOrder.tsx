@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import type {
   Order,
   ProductModelDto,
   ProductSkuDto,
   RawCreateOrderInput,
 } from "@carres/shared";
+import { ORDER_ENTRY_TABS, resolveFormTab, resolvePaymentMethods } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import { extensionForMime, uploadDataUrl } from "@/lib/storage";
+import MYAddressFields from "@/components/MYAddressFields";
 import {
   useCatalog,
   useOutlets,
@@ -28,9 +29,7 @@ import {
   type WizardDraft,
 } from "../dealer/new-order/draft";
 import { newLocalId } from "../dealer/new-order/configurators";
-import Step3SignaturePayment from "../dealer/new-order/Step3SignaturePayment";
-import CustomerStep from "../dealer/pos/CustomerStep";
-import OrderSummaryRail from "../dealer/pos/OrderSummaryRail";
+import { RELATIONSHIPS } from "../dealer/pos/customer-autofill";
 import PosConfigurePage from "../dealer/pos/PosConfigurePage";
 import SofaConfigurePage from "../dealer/pos/SofaConfigurePage";
 import ConfigureDrawer from "../dealer/pos/ConfigureDrawer";
@@ -38,33 +37,31 @@ import { buildCatalogIndex } from "../dealer/pos/catalog-index";
 import { lineEditTarget } from "../dealer/pos/cart";
 
 /**
- * MAINTAIN → New Order — the RAW Sales Order creator, rebuilt 2026-07-18 (Loo)
- * as a POS-STRUCTURE-PARITY flow. Same three steps as the POS Create Order —
- *   01 ITEMS    → SKU-search-first product entry (the ONLY part that differs
- *                 from the POS: type a SKU, the product's OWN configure page
- *                 opens with the variant preselected, so the spec fields —
- *                 fabric / divan / gap / leg height / specials — follow the
- *                 product). Lines stay price-EDITABLE + custom lines allowed.
- *   02 CUSTOMER → the POS CustomerStep VERBATIM (dealer pick, outlet /
- *                 salesperson, name autocomplete, demographics, MY address,
- *                 emergency, target date + add-ons) — with raw dates (no
- *                 lead-time floor, past dates OK, empty = TBD).
- *   03 CONFIRM  → the POS payment + signature layout, everything OPTIONAL
- *                 ("fill it if you have it") — no Stripe, no delivery-engine
- *                 inputs.
- * Submits via POST /api/orders/raw (extended): specs (line attrs), add-ons and
- * the full customer block persist; NO POS engine runs (PWP / free-gift /
- * delivery stay off — that is the point of the raw door).
+ * MAINTAIN → New Order — the RAW Sales Order creator, remade 2026-07-18 as a
+ * SINGLE-PAGE key-in form (Loo: "我要的是从最 raw 的 data 这样子 key in，保持
+ * 最大的权限，什么东西都可以改" — the 2990s Backend "New Sales Order" shape,
+ * NOT the POS step wizard). Every section sits on one scrolling page, nothing
+ * gates anything:
+ *   CUSTOMER · ORDER INFO (+ configured custom fields) · EMERGENCY CONTACT ·
+ *   DELIVERY ADDRESS (MY cascade + billing) · LINE ITEMS · PAYMENT
+ * Line items are pick-or-type comboboxes IN the row (2990s parity): picking a
+ * configurable catalog product opens its OWN configure surface (specs follow
+ * the product — fabric / divan / gap / leg / specials); free text stays a
+ * custom "OTHERS" line. Prices, dates (past OK, empty = TBD), qty — all stay
+ * editable, always. Submits via POST /api/orders/raw; the only requirements
+ * are dealer + customer name + ≥1 line (the server's own floor).
  */
 
-type Step = 1 | 2 | 3;
-
-/** Raw drafts start with NO payment method picked (POS defaults "online" —
- *  here payment is optional, absence must be representable). */
+/** Raw drafts start with NO payment method picked (payment optional here). */
 function rawEmptyDraft(): WizardDraft {
   const d = emptyDraft();
   return { ...d, payment: { ...d.payment, method: "" } };
 }
+
+const INPUT_CLASS =
+  "w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body outline-none focus:border-primary";
+const INPUT_DISABLED =
+  "w-full rounded-md border border-base-200 bg-base-50 text-base-400 px-3 py-2 t-body cursor-not-allowed";
 
 export default function PrincipalNewOrder() {
   const navigate = useNavigate();
@@ -72,24 +69,27 @@ export default function PrincipalNewOrder() {
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
   // Admin bundle — the FULL catalog (deactivated + unpriced + discontinued
-  // models included): raw entry must reach every sku the business ever sold.
+  // included): raw entry must reach every sku the business ever sold.
   const catalogQ = useCatalog({ admin: true });
   const createRaw = useRawCreateOrder();
 
-  const [step, setStep] = useState<Step>(1);
-  const [customerSubStep, setCustomerSubStep] = useState<0 | 3>(0);
-  const [draft, setDraft] = useState<WizardDraft>(
-    () => loadDraft(RAW_DRAFT_STORAGE_KEY) ?? rawEmptyDraft(),
-  );
+  const [draft, setDraft] = useState<WizardDraft>(() => {
+    const d = loadDraft(RAW_DRAFT_STORAGE_KEY) ?? rawEmptyDraft();
+    // The form always shows at least one line row ready to key into.
+    return d.lines.length > 0
+      ? d
+      : { ...d, lines: [{ localId: newLocalId(), sku: "", qty: 1, attrs: null, unitPrice: 0, label: "" }] };
+  });
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [pickerQuery, setPickerQuery] = useState("");
-  /** Configure surface to open: a model + (optionally) the picked sku. */
-  const [configure, setConfigure] = useState<{ modelId: string; skuId: string | null } | null>(
-    null,
-  );
-  const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
+  /** Configure surface to open: the target row + model (+ preselected sku for
+   *  a fresh pick, or edit=true to prefill from the row's stored line). */
+  const [configure, setConfigure] = useState<{
+    rowId: string;
+    modelId: string;
+    skuId: string | null;
+    edit: boolean;
+  } | null>(null);
   /** In-progress unit-price edit strings keyed by localId, so partial input
    *  ("2.") doesn't fight the numeric DraftLine value. */
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
@@ -117,234 +117,187 @@ export default function PrincipalNewOrder() {
     [catalog],
   );
 
-  // In-flow dealer pick (the POS CustomerStep dealer card — principal has no
-  // JWT dealer). Outlet + salesperson lists follow the picked dealer.
-  const pickableDealers = useMemo(
-    () =>
-      (dealersQ.data?.dealers ?? [])
-        .filter((d) => d.status === "active")
-        .map((d) => ({ id: d.id, name: d.name })),
+  // 0219 — the Order Entry config drives which optional builtins render +
+  // which operator-defined custom fields appear. Raw form: `enabled` respected,
+  // `required` ignored — nothing gates on this page.
+  const formCfg = catalog?.orderEntryConfig?.formFields ?? null;
+  const custB = resolveFormTab(formCfg, "customer").builtins;
+  const emergencyEnabled = resolveFormTab(formCfg, "emergency").builtins["emergency"]?.enabled;
+  const customFields = useMemo(
+    () => ORDER_ENTRY_TABS.flatMap((tab) => resolveFormTab(formCfg, tab).custom),
+    [formCfg],
+  );
+  const paymentMethods = useMemo(
+    () => resolvePaymentMethods(catalog?.orderEntryConfig),
+    [catalog],
+  );
+
+  const dealers = useMemo(
+    () => (dealersQ.data?.dealers ?? []).filter((d) => d.status === "active"),
     [dealersQ.data],
   );
-  const actingDealerId = draft.actingDealerId ?? null;
+  const dealerId = draft.actingDealerId ?? "";
   const outlets = useMemo(
-    () =>
-      actingDealerId
-        ? (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === actingDealerId)
-        : [],
-    [outletsQ.data, actingDealerId],
+    () => (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === dealerId),
+    [outletsQ.data, dealerId],
   );
   const salespersons = useMemo(
-    () =>
-      actingDealerId
-        ? (salespersonsQ.data?.salespersons ?? []).filter((s) => s.dealerId === actingDealerId)
-        : [],
-    [salespersonsQ.data, actingDealerId],
+    () => (salespersonsQ.data?.salespersons ?? []).filter((s) => s.dealerId === dealerId),
+    [salespersonsQ.data, dealerId],
   );
 
-  function pickDealer(id: string, name: string) {
+  const c = draft.customer;
+  function setC(patch: Partial<WizardDraft["customer"]>) {
+    setDraft((d) => ({ ...d, customer: { ...d.customer, ...patch } }));
+  }
+  function setDelivery(patch: Partial<WizardDraft["delivery"]>) {
+    setDraft((d) => ({ ...d, delivery: { ...d.delivery, ...patch } }));
+  }
+  function setCustom(key: string, value: string) {
     setDraft((d) => ({
       ...d,
-      actingDealerId: id,
-      actingDealerName: name,
-      outletId: null,
-      salespersonId: null,
+      customer: { ...d.customer, custom: { ...(d.customer.custom ?? {}), [key]: value } },
     }));
   }
-
-  // ── Items — SKU search over the FULL admin bundle ─────────────────────────
-  const pickerResults = useMemo(() => {
-    const q = pickerQuery.trim().toLowerCase();
-    if (!q || !catalog) return [];
-    return catalog.skus
-      .filter((s) => {
-        const model = modelById.get(s.modelId);
-        return (
-          s.sku.toLowerCase().includes(q) ||
-          (model?.name.toLowerCase().includes(q) ?? false) ||
-          (s.variant?.toLowerCase().includes(q) ?? false)
-        );
-      })
-      .slice(0, 10);
-  }, [pickerQuery, catalog, modelById]);
-
-  function addLine(line: DraftLine) {
-    setDraft((d) => ({ ...d, lines: [...d.lines, line] }));
+  function setPay(patch: Partial<WizardDraft["payment"]>) {
+    setDraft((d) => ({ ...d, payment: { ...d.payment, ...patch } }));
   }
 
-  function replaceEditedLine(line: DraftLine) {
-    setDraft((d) => ({
-      ...d,
-      lines: d.lines.map((l) => (l.localId === line.localId ? line : l)),
-    }));
-  }
-
-  /** A search hit opens the SAME configure surface the POS card would — with
-   *  the variant preselected — so the spec fields follow the product. Models
-   *  without spec fields (service / orphan skus) add a plain editable row. */
-  function openForSku(sku: ProductSkuDto) {
-    setPickerQuery("");
-    const model = modelById.get(sku.modelId);
-    if (!model || model.category === "service") {
-      addLine({
-        localId: newLocalId(),
-        sku: sku.sku,
-        qty: 1,
-        attrs: null,
-        unitPrice: sku.price ?? 0,
-        label: model ? `${model.name} · ${sku.variant}` : sku.variant,
-      });
-      return;
-    }
-    setConfigure({ modelId: model.id, skuId: sku.id });
-  }
-
+  // ── Line rows ─────────────────────────────────────────────────────────────
   function patchLine(localId: string, patch: Partial<DraftLine>) {
     setDraft((d) => ({
       ...d,
       lines: d.lines.map((l) => (l.localId === localId ? { ...l, ...patch } : l)),
     }));
   }
-
   function removeLine(localId: string) {
     setDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.localId !== localId) }));
   }
-
-  function addCustomLine() {
-    addLine({ localId: newLocalId(), sku: "", qty: 1, attrs: null, unitPrice: 0, label: "" });
+  function addEmptyLine() {
+    setDraft((d) => ({
+      ...d,
+      lines: [
+        ...d.lines,
+        { localId: newLocalId(), sku: "", qty: 1, attrs: null, unitPrice: 0, label: "" },
+      ],
+    }));
+  }
+  /** Replace a row's content with a configurator-emitted line, keeping the
+   *  row's stable localId. */
+  function fillRow(rowId: string, line: DraftLine) {
+    setDraft((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.localId === rowId ? { ...line, localId: rowId } : l)),
+    }));
   }
 
-  const linesValid =
-    draft.lines.length > 0 &&
-    draft.lines.every((l) => l.sku.trim().length > 0 && l.qty > 0 && l.unitPrice >= 0);
+  /** A row's catalog pick. A model with a configure surface (mattress /
+   *  bedframe / sofa) opens it — specs follow the product; accessory /
+   *  service / orphan skus fill the row directly at catalog price. */
+  function pickSkuForRow(rowId: string, sku: ProductSkuDto) {
+    const model = modelById.get(sku.modelId);
+    if (
+      model &&
+      (model.category === "mattress" ||
+        model.category === "bedframe" ||
+        model.category === "sofa")
+    ) {
+      setConfigure({ rowId, modelId: model.id, skuId: sku.id, edit: false });
+      return;
+    }
+    fillRow(rowId, {
+      localId: rowId,
+      sku: sku.sku,
+      qty: 1,
+      attrs: null,
+      unitPrice: sku.price ?? 0,
+      label: model ? `${model.name} · ${sku.variant}` : sku.variant,
+    });
+  }
 
-  const total =
-    draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0) +
-    draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+  function openEditForRow(row: DraftLine) {
+    const sku = skuByCode.get(row.sku);
+    if (!sku) return;
+    setConfigure({ rowId: row.localId, modelId: sku.modelId, skuId: null, edit: true });
+  }
+
+  /** Rows the operator actually keyed (a fully-empty row is ignored). */
+  const activeLines = useMemo(
+    () => draft.lines.filter((l) => l.sku.trim().length > 0),
+    [draft.lines],
+  );
+  const subtotal = activeLines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  const paidPct = subtotal > 0 ? Math.round((draft.paid / subtotal) * 100) : 0;
 
   const canCreate =
-    !!actingDealerId &&
-    draft.customer.name.trim().length >= 2 &&
-    linesValid &&
-    !createRaw.isPending &&
-    !uploading;
+    !!dealerId &&
+    c.name.trim().length > 0 &&
+    activeLines.length > 0 &&
+    activeLines.every((l) => l.qty > 0 && l.unitPrice >= 0) &&
+    !createRaw.isPending;
 
   // ── Submit — the extended raw door ────────────────────────────────────────
   async function handleCreate() {
-    if (!canCreate || !actingDealerId) return;
+    if (!canCreate) return;
     setSubmitError(null);
     try {
-      // Signature / slip are OPTIONAL here — upload only what was captured.
-      let signaturePath: string | null = null;
-      let paymentSlipPath: string | null = null;
-      if (draft.wizardSessionId && (draft.signature || draft.payment.slip)) {
-        setUploading(true);
-        if (draft.signature) {
-          signaturePath = await uploadDataUrl({
-            dealerId: actingDealerId,
-            wizardSessionId: draft.wizardSessionId,
-            filename: "signature.png",
-            dataUrl: draft.signature,
-          });
-        }
-        if (draft.payment.slip) {
-          paymentSlipPath = await uploadDataUrl({
-            dealerId: actingDealerId,
-            wizardSessionId: draft.wizardSessionId,
-            filename: `payment-slip.${extensionForMime(draft.payment.slip.mime)}`,
-            dataUrl: draft.payment.slip.dataUrl,
-          });
-        }
-        setUploading(false);
-      }
-
       const composedAddress = composeAddress({
-        line1: draft.customer.addressLine1,
-        line2: draft.customer.addressLine2,
-        state: draft.customer.addressState,
-        city: draft.customer.addressCity,
-        postcode: draft.customer.addressPostcode,
+        line1: c.addressLine1,
+        line2: c.addressLine2,
+        state: c.addressState,
+        city: c.addressCity,
+        postcode: c.addressPostcode,
       });
-      const followUps = Object.fromEntries(
-        Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
+      const fields = Object.fromEntries(
+        Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
       );
-      const customFields = Object.fromEntries(
-        Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
-      );
-      const hasEntryData = Object.keys(followUps).length > 0 || Object.keys(customFields).length > 0;
-
       const input: RawCreateOrderInput = {
-        dealerId: actingDealerId,
+        dealerId,
         outletId: draft.outletId,
         salespersonId: draft.salespersonId,
         customer: {
-          name: draft.customer.name.trim(),
-          phone: draft.customer.phone.trim() || null,
-          address: draft.customer.addressUnknown
-            ? null
-            : composedAddress || draft.customer.address.trim() || null,
-          addressUnknown: draft.customer.addressUnknown,
-          // 0230 — structured parts ride alongside the composed string (same
-          // as the POS submit). Wiped when address is deferred.
-          addressLine1: draft.customer.addressUnknown
-            ? null
-            : draft.customer.addressLine1.trim() || null,
-          addressLine2: draft.customer.addressUnknown
-            ? null
-            : draft.customer.addressLine2.trim() || null,
-          addressState: draft.customer.addressUnknown ? null : draft.customer.addressState || null,
-          addressCity: draft.customer.addressUnknown ? null : draft.customer.addressCity || null,
-          addressPostcode: draft.customer.addressUnknown
-            ? null
-            : draft.customer.addressPostcode || null,
-          billing: draft.customer.billingSame ? null : draft.customer.billing.trim() || null,
-          billingSame: draft.customer.billingSame,
-          emergency: composeEmergency(draft.customer) || null,
-          email: draft.customer.email.trim() || null,
-          race: draft.customer.race || null,
-          gender: draft.customer.gender || null,
-          birthday: draft.customer.birthday || null,
+          name: c.name.trim(),
+          phone: c.phone.trim() || null,
+          address: c.addressUnknown ? null : composedAddress || c.address.trim() || null,
+          addressUnknown: c.addressUnknown,
+          // 0230 — structured parts ride alongside the composed string.
+          addressLine1: c.addressUnknown ? null : c.addressLine1.trim() || null,
+          addressLine2: c.addressUnknown ? null : c.addressLine2.trim() || null,
+          addressState: c.addressUnknown ? null : c.addressState || null,
+          addressCity: c.addressUnknown ? null : c.addressCity || null,
+          addressPostcode: c.addressUnknown ? null : c.addressPostcode || null,
+          billing: c.billingSame ? null : c.billing.trim() || null,
+          billingSame: c.billingSame,
+          emergency: composeEmergency(c) || null,
+          email: c.email.trim() || null,
+          race: c.race || null,
+          gender: c.gender || null,
+          birthday: c.birthday || null,
         },
-        deliveryDate: draft.delivery.dateTbd ? null : draft.delivery.date || null,
-        proceedDate: draft.delivery.dateTbd ? null : draft.delivery.proceedDate || null,
+        // Raw dates: empty = TBD, past allowed, saved exactly as entered.
+        deliveryDate: draft.delivery.date || null,
+        proceedDate: draft.delivery.proceedDate || null,
         deliveryFloor: draft.delivery.floor,
         deliveryHasLift: draft.delivery.hasLift,
         deliveryStairItems: draft.delivery.stairItems,
-        lines: draft.lines.map((l) => ({
+        lines: activeLines.map((l) => ({
           sku: l.sku.trim(),
           qty: l.qty,
           unitPrice: l.unitPrice,
           attrs: l.attrs,
         })),
-        addons: draft.addons.map((a) => ({
-          addonKey: a.key,
-          qty: a.qty,
-          unitPrice: a.unitPrice,
-          attrs: a.attrs ?? null,
-        })),
+        addons: [],
         paid: draft.paid,
         paymentMethod: draft.payment.method || null,
         approvalCode: draft.payment.approvalCode.trim() || null,
         installmentMonths:
           draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
-        signaturePath,
-        paymentSlipPath,
-        termsAccepted: draft.termsAccepted,
-        ...(hasEntryData
-          ? {
-              entryData: {
-                ...(Object.keys(followUps).length > 0 ? { payment: followUps } : {}),
-                ...(Object.keys(customFields).length > 0 ? { fields: customFields } : {}),
-              },
-            }
-          : {}),
+        ...(Object.keys(fields).length > 0 ? { entryData: { fields } } : {}),
       };
-
       const order = await createRaw.mutateAsync(input);
       clearDraft(RAW_DRAFT_STORAGE_KEY);
       setSubmitted(order);
     } catch (err) {
-      setUploading(false);
       setSubmitError(err instanceof Error ? err.message : "Order creation failed");
     }
   }
@@ -352,10 +305,12 @@ export default function PrincipalNewOrder() {
   function startAnother() {
     setSubmitted(null);
     setSubmitError(null);
-    setDraft(rawEmptyDraft());
-    setPickerQuery("");
     setPriceDrafts({});
-    setStep(1);
+    const d = rawEmptyDraft();
+    setDraft({
+      ...d,
+      lines: [{ localId: newLocalId(), sku: "", qty: 1, attrs: null, unitPrice: 0, label: "" }],
+    });
   }
 
   // ── Submitted card ────────────────────────────────────────────────────────
@@ -382,60 +337,49 @@ export default function PrincipalNewOrder() {
     );
   }
 
-  // ── Configure overlay routing (same surfaces as the POS CatalogStep) ──────
+  // ── Configure overlay (specs follow the product) ──────────────────────────
   const overlay = (() => {
-    if (!catalog || !index) return null;
-    const editSku = editingLine ? skuByCode.get(editingLine.sku) : null;
-    const editModel = editSku ? modelById.get(editSku.modelId) ?? null : null;
-    const activeModel: ProductModelDto | null = editingLine
-      ? editModel
-      : configure
-        ? modelById.get(configure.modelId) ?? null
-        : null;
-    if (!activeModel) return null;
-    const editing = editingLine ?? undefined;
-    const emitLine = editing ? replaceEditedLine : addLine;
-    const closeConfigure = () => {
-      setConfigure(null);
-      setEditingLine(null);
-    };
+    if (!configure || !catalog || !index) return null;
+    const model = modelById.get(configure.modelId);
+    if (!model) return null;
+    const row = draft.lines.find((l) => l.localId === configure.rowId);
+    const editing = configure.edit && row ? row : undefined;
+    const close = () => setConfigure(null);
+    const emit = (line: DraftLine) => fillRow(configure.rowId, line);
     const offered = (catalog.modelSofaCompartments ?? []).filter(
-      (mc) => mc.modelId === activeModel.id,
+      (mc) => mc.modelId === model.id,
     );
-    const initialSkuId = editing ? undefined : configure?.skuId ?? undefined;
-    // NOTE: no `catalog`/PWP props on these mounts — the raw door runs no PWP
-    // engine, so the voucher rail stays hidden by construction.
-    if (activeModel.category === "mattress" || activeModel.category === "bedframe") {
+    if (model.category === "mattress" || model.category === "bedframe") {
       return (
         <PosConfigurePage
-          key={editing?.localId ?? activeModel.id}
-          model={activeModel}
-          meta={index.meta.get(activeModel.id)}
-          skus={index.skusByModel.get(activeModel.id) ?? []}
+          key={configure.rowId + model.id}
+          model={model}
+          meta={index.meta.get(model.id)}
+          skus={index.skusByModel.get(model.id) ?? []}
           specialAddons={catalog.specialAddons}
           optionPools={catalog.optionPools}
           fabrics={catalog.fabrics}
           fabricTierConfig={catalog.fabricTierConfig}
           modelFabricTierOverrides={catalog.modelFabricTierOverrides}
           editLine={editing}
-          initialSkuId={initialSkuId}
-          onAdd={emitLine}
-          onClose={closeConfigure}
+          initialSkuId={editing ? undefined : configure.skuId ?? undefined}
+          onAdd={emit}
+          onClose={close}
         />
       );
     }
     if (
-      activeModel.category === "sofa" &&
+      model.category === "sofa" &&
       (offered.length > 0 ||
         Boolean(editing && lineEditTarget(editing, catalog) === "sofa_build"))
     ) {
       return (
         <SofaConfigurePage
-          key={editing?.localId ?? activeModel.id}
-          model={activeModel}
-          meta={index.meta.get(activeModel.id)}
-          skus={index.skusByModel.get(activeModel.id) ?? []}
-          fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+          key={configure.rowId + model.id}
+          model={model}
+          meta={index.meta.get(model.id)}
+          skus={index.skusByModel.get(model.id) ?? []}
+          fabrics={index.fabricsByModel.get(model.id) ?? []}
           masterFabrics={catalog.fabrics}
           optionPools={catalog.optionPools}
           fabricTierConfig={catalog.fabricTierConfig}
@@ -444,589 +388,783 @@ export default function PrincipalNewOrder() {
           modelCompartments={offered}
           sofaCombos={catalog.sofaCombos ?? []}
           editLine={editing}
-          onAdd={emitLine}
-          onClose={closeConfigure}
+          onAdd={emit}
+          onClose={close}
         />
       );
     }
     if (editing) return null;
+    // Dropdown sofa (no offered compartments) — the drawer configurator.
     return (
       <ConfigureDrawer
-        model={activeModel}
-        meta={index.meta.get(activeModel.id)}
-        skus={index.skusByModel.get(activeModel.id) ?? []}
-        fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+        model={model}
+        meta={index.meta.get(model.id)}
+        skus={index.skusByModel.get(model.id) ?? []}
+        fabrics={index.fabricsByModel.get(model.id) ?? []}
         fabricTierConfig={catalog.fabricTierConfig}
         modelFabricTierOverrides={catalog.modelFabricTierOverrides}
         sofaCompartments={catalog.sofaCompartments}
         modelSofaCompartments={catalog.modelSofaCompartments}
         sofaCombos={catalog.sofaCombos}
         specialAddons={catalog.specialAddons}
-        initialSkuId={initialSkuId}
-        onAdd={addLine}
-        onClose={closeConfigure}
+        initialSkuId={configure.skuId ?? undefined}
+        onAdd={emit}
+        onClose={close}
       />
     );
   })();
 
-  const STEPS: Array<{ n: Step; label: string }> = [
-    { n: 1, label: "Items" },
-    { n: 2, label: "Customer" },
-    { n: 3, label: "Confirm" },
-  ];
-
   return (
-    <div
-      className="pos-proto flex flex-col"
-      style={{ height: "100vh", background: "var(--pos-bg)" }}
-    >
-      {/* Top bar — POS-parity step strip, portal-shell edition (no wordmark /
-          staff chip: the PortalSidebar is already beside this page). */}
-      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-          <span className="pos-topbar__crumb" style={{ borderLeft: "none", paddingLeft: 0, marginLeft: 0 }}>
-            Maintain · New Sales Order
-          </span>
-          <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>
-            Raw creation — no POS gates; saved exactly as entered
-          </span>
-        </div>
-        <div className="pos-topbar__center">
-          {STEPS.map((s, i) => {
-            const clickable = s.n < step;
-            return (
-              <button
-                key={s.n}
-                type="button"
-                onClick={() => clickable && setStep(s.n)}
-                disabled={!clickable && s.n !== step}
-                aria-current={step === s.n ? "step" : undefined}
-                data-testid={`raw-step-${s.n}`}
-                className={`pos-topbar__step ${step === s.n ? "is-active" : ""}`}
-                style={{ cursor: clickable ? "pointer" : "default" }}
-              >
-                <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="pos-topbar__right">
-          {draft.lines.length > 0 && (
-            <span className="pos-topbar__count" data-testid="raw-topbar-count">
-              {draft.lines.length} line{draft.lines.length === 1 ? "" : "s"} · {rm(total)}
-            </span>
-          )}
-        </div>
+    <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
+      <header>
+        <p className="t-micro text-base-400">Maintain · New order</p>
+        <h1 className="t-h2 mt-1">New Sales Order</h1>
+        <p className="t-small text-base-500 mt-1">
+          Raw creation — no POS gates. Every line, price and date is saved exactly as you
+          enter it.
+        </p>
       </header>
 
-      {/* Body */}
-      <main className="flex-1 min-h-0 overflow-hidden">
-        {!catalog ? (
-          <div className="h-full grid place-items-center">
-            <p className="text-sm text-muted-foreground">
-              {catalogQ.error
-                ? `Couldn't load catalog: ${(catalogQ.error as Error).message}`
-                : "Loading catalog…"}
-            </p>
-          </div>
-        ) : step === 1 ? (
-          <div key={1} className="page-shell h-full overflow-hidden">
-            <div className="handover">
-              <div className="handover__left">
-                <div className="handover__title-row">
-                  <div>
-                    <span className="phase-banner">
-                      <span className="phase-banner__dot" />
-                      Step 1 of 3 · Items
-                    </span>
-                    <h1 className="handover__title">Search SKU</h1>
-                  </div>
-                </div>
-                <p className="handover__sub">
-                  Type a SKU, model or variant — picking a product opens its configure page
-                  (specs follow the product). Prices stay editable; free-text custom lines
-                  allowed.
-                </p>
+      {/* ── Sale info ── */}
+      <Section title="Sale info">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Dealer *">
+            <select
+              value={dealerId}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  actingDealerId: e.target.value || null,
+                  actingDealerName:
+                    dealers.find((x) => x.id === e.target.value)?.name ?? null,
+                  outletId: null,
+                  salespersonId: null,
+                }))
+              }
+              data-testid="raw-dealer"
+              className={INPUT_CLASS}
+            >
+              <option value="">{dealersQ.isLoading ? "Loading…" : "Select a dealer…"}</option>
+              {dealers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Outlet">
+            <select
+              value={draft.outletId ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, outletId: e.target.value || null }))}
+              disabled={!dealerId}
+              className={dealerId ? INPUT_CLASS : INPUT_DISABLED}
+            >
+              <option value="">— optional —</option>
+              {outlets.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Salesperson">
+            <select
+              value={draft.salespersonId ?? ""}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, salespersonId: e.target.value || null }))
+              }
+              disabled={!dealerId}
+              className={dealerId ? INPUT_CLASS : INPUT_DISABLED}
+            >
+              <option value="">— optional —</option>
+              {salespersons.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </Section>
 
-                {/* SKU search */}
-                <div style={{ position: "relative", marginBottom: 22 }}>
-                  <Search
-                    size={15}
-                    strokeWidth={1.75}
-                    style={{
-                      position: "absolute",
-                      left: 14,
-                      top: 13,
-                      color: "var(--fg-muted)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <input
-                    type="search"
-                    value={pickerQuery}
-                    onChange={(e) => setPickerQuery(e.target.value)}
-                    placeholder="Search SKU / model / variant… (includes deactivated + unpriced)"
-                    data-testid="raw-picker"
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px 10px 38px",
-                      borderRadius: 999,
-                      border: "1.5px solid var(--line)",
-                      background: "var(--pos-panel)",
-                      fontSize: 13,
-                      outline: "none",
-                    }}
-                  />
-                  {pickerResults.length > 0 && (
-                    <ul
-                      style={{
-                        position: "absolute",
-                        zIndex: 10,
-                        marginTop: 4,
-                        width: "100%",
-                        background: "var(--pos-panel)",
-                        border: "1px solid var(--line)",
-                        borderRadius: 12,
-                        boxShadow: "0 12px 32px rgba(34,31,32,0.12)",
-                        overflow: "hidden",
-                        listStyle: "none",
-                        padding: 0,
-                      }}
-                    >
-                      {pickerResults.map((s) => {
-                        const model = modelById.get(s.modelId);
-                        return (
-                          <li key={s.id}>
-                            <button
-                              type="button"
-                              onClick={() => openForSku(s)}
-                              data-testid={`raw-pick-${s.sku}`}
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "baseline",
-                                gap: 12,
-                                padding: "9px 14px",
-                                textAlign: "left",
-                                fontSize: 13,
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "var(--pos-rail)")
-                              }
-                              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-                            >
-                              <span
-                                style={{
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 12,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {s.sku}
-                              </span>
-                              <span
-                                style={{
-                                  color: "var(--fg-muted)",
-                                  fontSize: 12,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  flex: 1,
-                                }}
-                              >
-                                {[model?.name, s.variant].filter(Boolean).join(" · ")}
-                              </span>
-                              {s.posActive === false && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase",
-                                    color: "var(--c-burnt)",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  POS off
-                                </span>
-                              )}
-                              <span
-                                style={{
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 12,
-                                  color: "var(--fg-muted)",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {rm(s.price ?? 0)}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                {/* Items list — editable qty / price rows */}
-                {draft.lines.length === 0 ? (
-                  <p
-                    style={{
-                      textAlign: "center",
-                      fontSize: 13,
-                      color: "var(--fg-muted)",
-                      padding: "36px 0",
-                    }}
-                  >
-                    No items yet — search the catalog above, or add a custom line.
-                  </p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {draft.lines.map((l) => {
-                      const isCatalogLine = skuByCode.has(l.sku);
-                      const editTarget = lineEditTarget(l, catalog);
-                      const priceStr = priceDrafts[l.localId] ?? String(l.unitPrice);
-                      return (
-                        <div
-                          key={l.localId}
-                          data-testid={`raw-line-${l.localId}`}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 74px 120px 96px auto",
-                            gap: 10,
-                            alignItems: "center",
-                            padding: "10px 14px",
-                            borderRadius: 12,
-                            border: "1px solid var(--line)",
-                            background: "var(--pos-panel)",
-                          }}
-                        >
-                          <div style={{ minWidth: 0 }}>
-                            {isCatalogLine ? (
-                              <>
-                                <div
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {l.label || l.sku}
-                                </div>
-                                <div
-                                  style={{
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: 11,
-                                    color: "var(--fg-muted)",
-                                  }}
-                                >
-                                  {l.sku}
-                                </div>
-                              </>
-                            ) : (
-                              <input
-                                type="text"
-                                value={l.sku}
-                                onChange={(e) => patchLine(l.localId, { sku: e.target.value })}
-                                placeholder="SKU or free-text description"
-                                aria-label="Custom line description"
-                                style={{
-                                  width: "100%",
-                                  padding: "7px 10px",
-                                  borderRadius: 8,
-                                  border: "1.5px solid var(--line)",
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 12,
-                                  background: "var(--pos-panel)",
-                                  outline: "none",
-                                }}
-                              />
-                            )}
-                          </div>
-                          <input
-                            type="number"
-                            min={1}
-                            value={l.qty}
-                            aria-label="Quantity"
-                            onChange={(e) =>
-                              patchLine(l.localId, {
-                                qty: Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                              })
-                            }
-                            style={{
-                              padding: "7px 10px",
-                              borderRadius: 8,
-                              border: "1.5px solid var(--line)",
-                              fontSize: 13,
-                              background: "var(--pos-panel)",
-                              outline: "none",
-                            }}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={priceStr}
-                            aria-label="Unit price (RM)"
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setPriceDrafts((p) => ({ ...p, [l.localId]: v }));
-                              const n = Number.parseFloat(v);
-                              if (Number.isFinite(n) && n >= 0) {
-                                patchLine(l.localId, { unitPrice: n });
-                              }
-                            }}
-                            onBlur={() =>
-                              setPriceDrafts((p) => {
-                                const { [l.localId]: _drop, ...rest } = p;
-                                return rest;
-                              })
-                            }
-                            style={{
-                              padding: "7px 10px",
-                              borderRadius: 8,
-                              border: "1.5px solid var(--line)",
-                              fontFamily: "var(--font-mono)",
-                              fontSize: 13,
-                              background: "var(--pos-panel)",
-                              outline: "none",
-                            }}
-                          />
-                          <span
-                            style={{
-                              fontFamily: "var(--font-mono)",
-                              fontSize: 13,
-                              textAlign: "right",
-                            }}
-                          >
-                            {rm(l.unitPrice * l.qty)}
-                          </span>
-                          <span style={{ display: "flex", gap: 4 }}>
-                            {editTarget && (
-                              <button
-                                type="button"
-                                onClick={() => setEditingLine(l)}
-                                aria-label="Edit configuration"
-                                title="Re-open the configurator"
-                                data-testid={`raw-edit-${l.localId}`}
-                                style={{
-                                  width: 30,
-                                  height: 30,
-                                  display: "grid",
-                                  placeItems: "center",
-                                  borderRadius: 8,
-                                  color: "var(--fg-muted)",
-                                }}
-                              >
-                                <Pencil size={14} strokeWidth={1.75} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeLine(l.localId)}
-                              aria-label="Remove line"
-                              style={{
-                                width: 30,
-                                height: 30,
-                                display: "grid",
-                                placeItems: "center",
-                                borderRadius: 8,
-                                color: "var(--fg-muted)",
-                              }}
-                            >
-                              <Trash2 size={14} strokeWidth={1.75} />
-                            </button>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div style={{ marginTop: 14 }}>
-                  <button type="button" className="btn btn--ghost" onClick={addCustomLine}>
-                    <Plus size={14} strokeWidth={1.75} />
-                    Custom line
-                  </button>
-                </div>
-
-                {/* Footer nav — mirror CustomerStep's ghost/primary bar */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    marginTop: 32,
-                    paddingTop: 20,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  <span style={{ flex: 1 }} />
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--lg"
-                    disabled={!linesValid}
-                    onClick={() => {
-                      setCustomerSubStep(0);
-                      setStep(2);
-                    }}
-                    data-testid="raw-items-next"
-                  >
-                    Next · Customer info
-                    <ArrowRight size={14} strokeWidth={1.75} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Right: the SAME live summary rail the POS shows */}
-              <OrderSummaryRail draft={draft} catalog={catalog} />
-            </div>
-          </div>
-        ) : step === 2 ? (
-          <div key={2} className="page-shell h-full overflow-hidden">
-            {outletsQ.data && salespersonsQ.data ? (
-              <CustomerStep
-                draft={draft}
-                onChange={setDraft}
-                outlets={outlets}
-                salespersons={salespersons}
-                catalog={catalog}
-                minLeadDays={0}
-                rawDates
-                initialSubStep={customerSubStep}
-                onBackToCart={() => setStep(1)}
-                onProceed={() => setStep(3)}
-                dealerPick={{
-                  dealers: pickableDealers,
-                  loading: dealersQ.isLoading,
-                  value: draft.actingDealerId ?? null,
-                  onPick: pickDealer,
-                }}
+      {/* ── Customer ── */}
+      <Section title="Customer">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Full name *">
+            <input
+              type="text"
+              value={c.name}
+              onChange={(e) => setC({ name: e.target.value })}
+              data-testid="raw-customer-name"
+              placeholder="e.g. Tan Mei Ling"
+              className={INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Phone">
+            <input
+              type="tel"
+              value={c.phone}
+              onChange={(e) => setC({ phone: e.target.value })}
+              placeholder="012-3456789"
+              className={INPUT_CLASS}
+            />
+          </Field>
+          {custB["email"]?.enabled && (
+            <Field label="Email">
+              <input
+                type="email"
+                value={c.email}
+                onChange={(e) => setC({ email: e.target.value })}
+                placeholder="customer@example.com"
+                className={INPUT_CLASS}
               />
-            ) : (
-              <div className="h-full grid place-items-center">
-                <p className="text-sm text-muted-foreground">
-                  {outletsQ.error || salespersonsQ.error
-                    ? `Couldn't load outlets/salespersons: ${
-                        (outletsQ.error ?? salespersonsQ.error)?.message
-                      }`
-                    : "Loading outlets + salespersons…"}
-                </p>
-              </div>
+            </Field>
+          )}
+          {custB["race"]?.enabled && (
+            <Field label="Race">
+              <select
+                value={c.race}
+                onChange={(e) => setC({ race: e.target.value })}
+                className={INPUT_CLASS}
+              >
+                <option value="">—</option>
+                {["Malay", "Chinese", "Indian", "Other"].map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {custB["gender"]?.enabled && (
+            <Field label="Gender">
+              <select
+                value={c.gender}
+                onChange={(e) => setC({ gender: e.target.value })}
+                className={INPUT_CLASS}
+              >
+                <option value="">—</option>
+                {["Female", "Male"].map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {custB["birthday"]?.enabled && (
+            <Field label="Birthday">
+              <input
+                type="date"
+                value={c.birthday}
+                onChange={(e) => setC({ birthday: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </Field>
+          )}
+        </div>
+      </Section>
+
+      {/* ── Order info ── */}
+      <Section title="Order info">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Delivery date" hint="Any date — leave empty = TBD. No lead-time floor.">
+            <input
+              type="date"
+              value={draft.delivery.date}
+              onChange={(e) => setDelivery({ date: e.target.value, dateTbd: false })}
+              data-testid="raw-delivery-date"
+              className={INPUT_CLASS}
+            />
+          </Field>
+          <Field
+            label="Proceed date · production start"
+            hint="Optional — saved only when a delivery date is set."
+          >
+            <input
+              type="date"
+              value={draft.delivery.proceedDate}
+              onChange={(e) => setDelivery({ proceedDate: e.target.value })}
+              className={INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Delivery floor" hint="Stair-carry fee derives from floor config downstream.">
+            <input
+              type="number"
+              min={1}
+              value={draft.delivery.floor}
+              onChange={(e) =>
+                setDelivery({ floor: Math.max(1, Math.floor(Number(e.target.value) || 1)) })
+              }
+              className={INPUT_CLASS}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Has lift">
+              <label className="inline-flex items-center gap-2 py-2.5 cursor-pointer t-body">
+                <input
+                  type="checkbox"
+                  checked={draft.delivery.hasLift}
+                  onChange={(e) => setDelivery({ hasLift: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                Lift access
+              </label>
+            </Field>
+            <Field label="Stair items" hint="Empty = all items">
+              <input
+                type="number"
+                min={0}
+                value={draft.delivery.stairItems ?? ""}
+                onChange={(e) =>
+                  setDelivery({
+                    stairItems:
+                      e.target.value === ""
+                        ? null
+                        : Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                  })
+                }
+                className={INPUT_CLASS}
+              />
+            </Field>
+          </div>
+          {customFields.map((f) => (
+            <Field key={f.key} label={f.label}>
+              {f.type === "select" ? (
+                <select
+                  value={c.custom?.[f.key] ?? ""}
+                  onChange={(e) => setCustom(f.key, e.target.value)}
+                  className={INPUT_CLASS}
+                  data-testid={`raw-custom-${f.key}`}
+                >
+                  <option value="">—</option>
+                  {f.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
+                  value={c.custom?.[f.key] ?? ""}
+                  onChange={(e) => setCustom(f.key, e.target.value)}
+                  className={INPUT_CLASS}
+                  data-testid={`raw-custom-${f.key}`}
+                />
+              )}
+            </Field>
+          ))}
+        </div>
+      </Section>
+
+      {/* ── Emergency contact ── */}
+      {emergencyEnabled && (
+        <Section
+          title="Emergency contact"
+          hint="Used only if we cannot reach the customer on delivery day"
+        >
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Contact name">
+              <input
+                type="text"
+                value={c.emergencyName}
+                onChange={(e) => setC({ emergencyName: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </Field>
+            <Field label="Relationship">
+              <select
+                value={c.emergencyRelationship}
+                onChange={(e) =>
+                  setC({
+                    emergencyRelationship: e.target.value,
+                    emergencyRelationshipOther:
+                      e.target.value === "__OTHER__" ? c.emergencyRelationshipOther : "",
+                  })
+                }
+                className={INPUT_CLASS}
+              >
+                <option value="">—</option>
+                {RELATIONSHIPS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+                <option value="__OTHER__">Others</option>
+              </select>
+            </Field>
+            <Field label="Phone">
+              <input
+                type="tel"
+                value={c.emergencyPhone}
+                onChange={(e) => setC({ emergencyPhone: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </Field>
+            {c.emergencyRelationship === "__OTHER__" && (
+              <Field label="Specify relationship">
+                <input
+                  type="text"
+                  value={c.emergencyRelationshipOther}
+                  onChange={(e) => setC({ emergencyRelationshipOther: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </Field>
             )}
           </div>
-        ) : (
-          <div key={3} className="page-shell h-full overflow-hidden">
-            <div className="handover">
-              <div className="handover__left">
-                <div className="handover__title-row">
-                  <div>
-                    <span className="phase-banner">
-                      <span className="phase-banner__dot" />
-                      Step 3 of 3 · Confirm
-                    </span>
-                    <h1 className="handover__title">Confirm &amp; payment</h1>
-                  </div>
-                </div>
-                <p className="handover__sub">
-                  Internal entry — payment, slip and signature are all optional. Record
-                  whatever you have; the order is saved exactly as entered.
-                </p>
-                <Step3SignaturePayment
-                  draft={draft}
-                  onChange={setDraft}
-                  catalog={catalog}
-                  rawMode
-                />
-              </div>
-              <OrderSummaryRail draft={draft} catalog={catalog} />
-            </div>
+        </Section>
+      )}
+
+      {/* ── Delivery address ── */}
+      <Section title="Delivery address">
+        <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={c.addressUnknown}
+            onChange={(e) =>
+              setC({
+                addressUnknown: e.target.checked,
+                ...(e.target.checked
+                  ? {
+                      addressLine1: "",
+                      addressLine2: "",
+                      addressState: "",
+                      addressCity: "",
+                      addressPostcode: "",
+                    }
+                  : {}),
+              })
+            }
+            className="mt-0.5 w-4 h-4"
+          />
+          <span>
+            <span className="t-body font-semibold block">Fill in address later</span>
+            <span className="t-tiny text-base-500">
+              Customer hasn't confirmed the delivery address yet.
+            </span>
+          </span>
+        </label>
+        {!c.addressUnknown && (
+          <MYAddressFields
+            data={{
+              addressLine1: c.addressLine1,
+              addressLine2: c.addressLine2,
+              addressState: c.addressState,
+              addressCity: c.addressCity,
+              addressPostcode: c.addressPostcode,
+            }}
+            onChange={(patch) => setC(patch)}
+          />
+        )}
+        <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={c.billingSame}
+            onChange={(e) =>
+              setC({
+                billingSame: e.target.checked,
+                billing: e.target.checked
+                  ? composeAddress({
+                      line1: c.addressLine1,
+                      line2: c.addressLine2,
+                      state: c.addressState,
+                      city: c.addressCity,
+                      postcode: c.addressPostcode,
+                    })
+                  : c.billing,
+              })
+            }
+            className="mt-0.5 w-4 h-4"
+          />
+          <span className="t-body">Billing address same as delivery</span>
+        </label>
+        {!c.billingSame && (
+          <div className="mt-3">
+            <Field label="Billing address">
+              <textarea
+                rows={2}
+                value={c.billing}
+                onChange={(e) => setC({ billing: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </Field>
           </div>
         )}
-      </main>
+      </Section>
 
-      {/* Footer — step 3 only (steps 1/2 own their Next buttons) */}
-      {step === 3 && (
-        <footer
-          className="shrink-0"
-          style={{
-            borderTop: "1px solid var(--line)",
-            background: "var(--pos-panel)",
-            padding: "12px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {submitError && (
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--c-burnt)",
-                background: "color-mix(in oklab, var(--c-orange) 8%, transparent)",
-                border: "1px solid var(--line)",
-                borderRadius: 10,
-                padding: "6px 12px",
-              }}
-              data-testid="raw-submit-error"
-            >
-              {submitError}
-            </p>
-          )}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-            }}
-          >
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={uploading || createRaw.isPending}
-              onClick={() => {
-                setCustomerSubStep(3);
-                setStep(2);
-              }}
-            >
-              ← Back
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-                Total{" "}
-                <span
-                  style={{
-                    fontFamily: "var(--font-num)",
-                    fontWeight: 900,
-                    fontSize: 18,
-                    color: "var(--c-burnt)",
-                  }}
-                >
-                  {rm(total)}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={!canCreate}
-                className="btn btn--primary btn--lg"
-                data-testid="raw-submit"
-              >
-                {uploading
-                  ? "Uploading…"
-                  : createRaw.isPending
-                    ? "Creating…"
-                    : "Create order →"}
-              </button>
-            </div>
+      {/* ── Line items ── */}
+      <Section
+        title={`Line items (${activeLines.length})`}
+        hint="Pick from catalog or type free text — specs follow the product; every price stays editable"
+      >
+        <div className="flex flex-col gap-2">
+          <div className="hidden sm:grid grid-cols-[24px_1fr_180px_70px_110px_100px_64px] gap-2 px-1">
+            <span />
+            <span className="t-micro text-base-400">Product — pick or type</span>
+            <span className="t-micro text-base-400">Remarks</span>
+            <span className="t-micro text-base-400">Qty</span>
+            <span className="t-micro text-base-400">Unit price</span>
+            <span className="t-micro text-base-400 text-right">Total</span>
+            <span />
           </div>
-        </footer>
+          {draft.lines.map((l, i) => {
+            const isCatalogLine = skuByCode.has(l.sku);
+            const priceStr = priceDrafts[l.localId] ?? String(l.unitPrice);
+            const attrs = (l.attrs ?? {}) as Record<string, unknown>;
+            const remark = typeof attrs.remark === "string" ? attrs.remark : "";
+            const editable = catalog ? lineEditTarget(l, catalog) !== null : false;
+            return (
+              <div
+                key={l.localId}
+                data-testid={`raw-line-${l.localId}`}
+                className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start border border-base-200 rounded-md p-2 bg-white"
+              >
+                <span className="t-tiny text-base-400 pt-2.5 text-center">{i + 1}</span>
+                <div className="min-w-0">
+                  <RowSkuPicker
+                    line={l}
+                    catalog={catalogQ.data ?? null}
+                    modelById={modelById}
+                    onType={(text) =>
+                      patchLine(l.localId, { sku: text, label: "", attrs: null })
+                    }
+                    onPick={(sku) => pickSkuForRow(l.localId, sku)}
+                  />
+                  {l.label && (
+                    <p className="t-tiny text-base-500 mt-1 px-1 truncate">{l.label}</p>
+                  )}
+                  {!isCatalogLine && l.sku.trim().length > 0 && (
+                    <span className="t-micro text-warning px-1">OTHERS · custom line</span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={remark}
+                  placeholder="Type remarks…"
+                  aria-label="Line remarks"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const next: Record<string, unknown> = { ...attrs };
+                    if (v.trim()) next.remark = v;
+                    else delete next.remark;
+                    patchLine(l.localId, {
+                      attrs: Object.keys(next).length > 0 ? next : null,
+                    });
+                  }}
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-small outline-none focus:border-primary"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={l.qty}
+                  aria-label="Quantity"
+                  onChange={(e) =>
+                    patchLine(l.localId, {
+                      qty: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                    })
+                  }
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-body outline-none focus:border-primary"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={priceStr}
+                  aria-label="Unit price (RM)"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPriceDrafts((p) => ({ ...p, [l.localId]: v }));
+                    const n = Number.parseFloat(v);
+                    if (Number.isFinite(n) && n >= 0) patchLine(l.localId, { unitPrice: n });
+                  }}
+                  onBlur={() =>
+                    setPriceDrafts((p) => {
+                      const { [l.localId]: _drop, ...rest } = p;
+                      return rest;
+                    })
+                  }
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-primary"
+                />
+                <span className="font-mono text-[13px] text-right pt-2">
+                  {rm(l.unitPrice * l.qty)}
+                </span>
+                <span className="flex gap-1 pt-1">
+                  {editable && (
+                    <button
+                      type="button"
+                      onClick={() => openEditForRow(l)}
+                      aria-label="Edit specs"
+                      title="Re-open the product configurator"
+                      data-testid={`raw-edit-${l.localId}`}
+                      className="grid place-items-center w-7 h-7 rounded-md text-base-400 hover:text-base-800 hover:bg-base-100"
+                    >
+                      <Pencil size={14} strokeWidth={1.75} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeLine(l.localId)}
+                    aria-label="Remove line"
+                    className="grid place-items-center w-7 h-7 rounded-md text-base-400 hover:text-destructive hover:bg-destructive/5"
+                  >
+                    <Trash2 size={14} strokeWidth={1.75} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={addEmptyLine}
+            data-testid="raw-add-line"
+            className="border border-dashed border-base-300 rounded-md py-2.5 t-small text-primary hover:bg-base-50 inline-flex items-center justify-center gap-1.5"
+          >
+            <Plus size={14} strokeWidth={1.75} />
+            Add line item
+          </button>
+          <p className="text-right t-body">
+            Subtotal <span className="font-mono font-semibold">{rm(subtotal)}</span>
+          </p>
+        </div>
+      </Section>
+
+      {/* ── Payment ── */}
+      <Section
+        title="Payment"
+        hint="Optional — record the deposit taken at order time; later payments go through Finance / top-up"
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Paid (RM)">
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={draft.paid || ""}
+              placeholder="0.00"
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  paid: Math.max(0, Number.parseFloat(e.target.value) || 0),
+                }))
+              }
+              data-testid="raw-paid"
+              className={`${INPUT_CLASS} font-mono`}
+            />
+          </Field>
+          <Field label="Payment method">
+            <select
+              value={draft.payment.method}
+              onChange={(e) => setPay({ method: e.target.value, followUps: {} })}
+              data-testid="raw-payment-method"
+              className={INPUT_CLASS}
+            >
+              <option value="">— not recorded —</option>
+              {paymentMethods.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Approval / reference code">
+            <input
+              type="text"
+              value={draft.payment.approvalCode}
+              onChange={(e) =>
+                setPay({
+                  approvalCode: e.target.value.replace(/[^0-9A-Za-z-]/g, "").toUpperCase(),
+                })
+              }
+              placeholder="e.g. FT2026050012345"
+              className={`${INPUT_CLASS} font-mono`}
+            />
+          </Field>
+          {draft.payment.method === "installment" && (
+            <Field label="Installment plan">
+              <select
+                value={draft.payment.installmentMonths}
+                onChange={(e) =>
+                  setPay({ installmentMonths: Number(e.target.value) === 12 ? 12 : 6 })
+                }
+                className={INPUT_CLASS}
+              >
+                <option value={6}>6 months</option>
+                <option value={12}>12 months</option>
+              </select>
+            </Field>
+          )}
+        </div>
+        {draft.paid > 0 && subtotal > 0 && (
+          <p className="t-small text-base-600 mt-3">
+            Deposit {paidPct}% · Balance{" "}
+            <span className="font-mono">{rm(Math.max(0, subtotal - draft.paid))}</span>
+          </p>
+        )}
+      </Section>
+
+      {/* ── Footer ── */}
+      {submitError && (
+        <p
+          className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2"
+          data-testid="raw-submit-error"
+        >
+          {submitError}
+        </p>
       )}
+      <div className="flex items-center justify-between pb-10">
+        <span className="t-body text-base-700">
+          Total <span className="font-mono font-semibold text-base-900">{rm(subtotal)}</span>
+          {draft.paid > 0 && (
+            <span className="t-small text-base-500 ml-3">
+              Paid {rm(draft.paid)}
+              {subtotal > 0 && ` · ${paidPct}%`}
+            </span>
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={() => void handleCreate()}
+          disabled={!canCreate}
+          data-testid="raw-submit"
+          className="btn-hero disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {createRaw.isPending ? "Creating…" : "Create order →"}
+        </button>
+      </div>
 
       {overlay}
     </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Row combobox — pick from catalog or type free text (2990s line-item parity)
+// -----------------------------------------------------------------------------
+
+function RowSkuPicker({
+  line,
+  catalog,
+  modelById,
+  onType,
+  onPick,
+}: {
+  line: DraftLine;
+  catalog: { skus: ProductSkuDto[] } | null;
+  modelById: Map<string, ProductModelDto>;
+  onType: (text: string) => void;
+  onPick: (sku: ProductSkuDto) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const q = line.sku.trim().toLowerCase();
+  const results = useMemo(() => {
+    if (!open || !q || !catalog) return [];
+    return catalog.skus
+      .filter((s) => {
+        const model = modelById.get(s.modelId);
+        return (
+          s.sku.toLowerCase().includes(q) ||
+          (model?.name.toLowerCase().includes(q) ?? false) ||
+          (s.variant?.toLowerCase().includes(q) ?? false)
+        );
+      })
+      .slice(0, 8);
+  }, [open, q, catalog, modelById]);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        type="text"
+        value={line.sku}
+        placeholder="Click to pick or type to filter…"
+        aria-label="Product SKU or description"
+        data-testid={`raw-sku-${line.localId}`}
+        onChange={(e) => {
+          onType(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        autoComplete="off"
+        className="w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+      />
+      {results.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full min-w-[320px] bg-white border border-base-200 rounded-lg shadow-md overflow-hidden">
+          {results.map((s) => {
+            const model = modelById.get(s.modelId);
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  data-testid={`raw-pick-${s.sku}`}
+                  // mousedown (not click) — must beat the input's blur.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setOpen(false);
+                    onPick(s);
+                  }}
+                  className="w-full flex items-baseline gap-2.5 px-3 py-2 text-left hover:bg-base-50"
+                >
+                  <span className="font-mono text-[12px] shrink-0">{s.sku}</span>
+                  <span className="t-tiny text-base-500 truncate flex-1">
+                    {[model?.name, s.variant].filter(Boolean).join(" · ")}
+                  </span>
+                  {s.posActive === false && (
+                    <span className="t-micro text-warning shrink-0">POS off</span>
+                  )}
+                  <span className="font-mono text-[12px] text-base-600 shrink-0">
+                    {rm(s.price ?? 0)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Section / Field atoms (v17 card language — same as the rest of the portal)
+// -----------------------------------------------------------------------------
+
+function Section({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
+      <div className="flex items-baseline justify-between mb-4 gap-4">
+        <h2 className="t-h4">{title}</h2>
+        {hint && <p className="t-tiny text-base-500 text-right">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="t-tiny uppercase tracking-wide text-base-500">{label}</span>
+      <div className="mt-1">{children}</div>
+      {hint && <span className="t-tiny text-base-400 mt-1 block">{hint}</span>}
+    </label>
   );
 }
