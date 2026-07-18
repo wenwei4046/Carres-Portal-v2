@@ -147,43 +147,60 @@ staffRouter.post("/auto-assign", async (c) => {
   if (availIds.length === 0) return c.json({ assigned: 0, reason: "no_staff_in" });
 
   // 3) OPEN orders (mirrors the list's controlTabOf: delivered stage/status =
-  //    closed) + their current owner.
+  //    closed) + their current owner AND how they got it.
   const { data: orders, error: ordErr } = await sb
     .from("orders")
-    .select("id, status, operation_stage, ops_order_control(assigned_staff)")
+    .select(
+      "id, status, operation_stage, ops_order_control(assigned_staff, assigned_by)",
+    )
     .neq("status", "cancelled");
   if (ordErr) {
     const m = mapPgError(ordErr);
     return c.json(m.body, m.status);
   }
-  const ownerOf = (o: {
-    ops_order_control?: { assigned_staff?: string | null }[] | { assigned_staff?: string | null } | null;
-  }): string | null => {
+  type Ovl = { assigned_staff?: string | null; assigned_by?: string | null };
+  const ovlOf = (o: { ops_order_control?: Ovl[] | Ovl | null }): Ovl | null => {
     const raw = o.ops_order_control;
-    const ovl = Array.isArray(raw) ? raw[0] : raw;
-    return (ovl?.assigned_staff as string | null) ?? null;
+    return (Array.isArray(raw) ? raw[0] : raw) ?? null;
   };
   const open = (orders ?? []).filter(
     (o) => o.operation_stage !== "delivered" && o.status !== "delivered",
   );
-  const unassigned = open.filter((o) => !ownerOf(o));
-  if (unassigned.length === 0) return c.json({ assigned: 0, reason: "none_open" });
 
-  // 4) Least-loaded plan from current open counts.
+  // 4) REBALANCE, not just fill (Jess 2026-07-18: staff don't log in at the
+  //    same time — first-in must not keep the whole backlog). SYSTEM-assigned
+  //    orders (assigned_by NULL) are pool property: every sweep re-splits
+  //    them + the unassigned evenly across whoever is IN today. An order a
+  //    HUMAN assigned (assigned_by set — Jess's manual call) never moves.
+  //    Deterministic (sorted ids + tie-broken loads): same members → same
+  //    outcome → zero writes on a quiet re-run.
+  const rebalancable = open.filter((o) => {
+    const ovl = ovlOf(o);
+    return !ovl?.assigned_staff || ovl.assigned_by == null;
+  });
+  if (rebalancable.length === 0) return c.json({ assigned: 0, reason: "none_open" });
+  // Base loads = the orders each present member keeps regardless (human-assigned).
   const loads = availIds.map((userId) => ({
     userId,
-    openCount: open.filter((o) => ownerOf(o) === userId).length,
+    openCount: open.filter((o) => {
+      const ovl = ovlOf(o);
+      return ovl?.assigned_staff === userId && ovl.assigned_by != null;
+    }).length,
   }));
   const plan = distributeOrders(
-    unassigned.map((o) => o.id as string),
+    rebalancable.map((o) => o.id as string).sort(),
     loads,
   );
 
-  // 5) Write in chunks; assigned_by NULL = system auto-assign.
+  // 5) Write only the CHANGES; assigned_by NULL = system auto-assign.
+  const currentOwner = new Map(
+    rebalancable.map((o) => [o.id as string, ovlOf(o)?.assigned_staff ?? null]),
+  );
+  const changes = plan.filter((p) => currentOwner.get(p.orderId) !== p.userId);
   const nowIso = new Date().toISOString();
   let assigned = 0;
-  for (let i = 0; i < plan.length; i += 25) {
-    const chunk = plan.slice(i, i + 25);
+  for (let i = 0; i < changes.length; i += 25) {
+    const chunk = changes.slice(i, i + 25);
     const { error } = await sb.from("ops_order_control").upsert(
       chunk.map((p) => ({
         order_id: p.orderId,
