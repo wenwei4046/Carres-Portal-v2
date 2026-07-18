@@ -55,6 +55,7 @@ import {
   LayoutGrid,
   PackageOpen,
   Truck,
+  Warehouse,
   Download,
   CheckCircle2,
   X,
@@ -342,6 +343,14 @@ export function stockEtaOf(o: operationOrderListRow): StockEta {
   const dd = !o.delivery_date_tbd && o.delivery_date ? o.delivery_date : null;
   if (dd && etaIso > addDaysIso(dd, -3)) return { etaIso, waiting: true, state: "late" };
   return { etaIso, waiting: true, state: "on_track" };
+}
+
+/** Supplier-late (Jess 2026-07-18): the goods ETA misses or has passed the
+ *  customer promise and the goods aren't in — the machine's answer to
+ *  "which orders got problem"; a fact, never a submission. */
+export function isSupplierLate(o: operationOrderListRow): boolean {
+  const se = stockEtaOf(o);
+  return se.waiting && (se.state === "late" || se.state === "overdue");
 }
 
 /** Slack (days) = buffer before this order is late; LOWER = more dangerous, so
@@ -1025,6 +1034,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // No-ETA quick-view (Jess 2026-06-25): open orders the logistic hasn't given a
   // delivery ETA for, with a near deadline — the chase list.
   const [etaOnly, setEtaOnly] = useState(false);
+  const [supplierLateOnly, setSupplierLateOnly] = useState(false);
   // Import stock ETA from the Master "Ops" sheet (fills each line's Stock ETA).
   const [etaImportOpen, setEtaImportOpen] = useState(false);
   // Column show/hide (locked §4) — hidden data-column keys (localStorage-persisted)
@@ -1208,6 +1218,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const flaggedCount = useMemo(() => liveScope.filter(hasOpenTask).length, [liveScope, tasksByOrder]);
   const escalateCount = useMemo(() => liveScope.filter(hasEscalatedTask).length, [liveScope, tasksByOrder]);
   const etaCount = useMemo(() => liveScope.filter(needsEta).length, [liveScope]);
+  const supplierLateCount = useMemo(
+    () => liveScope.filter(isSupplierLate).length,
+    [liveScope],
+  );
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of liveScope) {
@@ -1362,6 +1376,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       flaggedOnly ||
       escalateOnly ||
       etaOnly ||
+      supplierLateOnly ||
       !!dueFilter ||
       !!regionFilter ||
       !!stockFilter ||
@@ -1372,6 +1387,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (flaggedOnly) r = r.filter(hasOpenTask);
     if (escalateOnly) r = r.filter(hasEscalatedTask);
     if (etaOnly) r = r.filter(needsEta);
+    if (supplierLateOnly) r = r.filter(isSupplierLate);
     if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
@@ -1387,7 +1403,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareBySlack);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1399,7 +1415,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
     () => setRenderCount(ROWS_PER_BATCH),
-    [tab, search, dueFilter, flaggedOnly, escalateOnly, etaOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, etaOnly, supplierLateOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -1528,6 +1544,32 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
   }
 
+  // Bulk "No storage" (Jess 2026-07-18): exempt the ticked orders from the
+  // auto storage fee (override 0 — same as the drawer's No-storage; undo is
+  // per-order in the Storage tab).
+  async function bulkNoStorage() {
+    const ids = [...selected];
+    const ok = window.confirm(
+      `No storage for ${ids.length} order${ids.length === 1 ? "" : "s"}?\n\nTheir storage fee is set to RM 0 (exempt). Undo per order in its Storage tab.`,
+    );
+    if (!ok) return;
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          apiFetch(`/api/operation/orders/${id}/control`, {
+            method: "PUT",
+            body: JSON.stringify({ storage_fee_override: 0 }),
+          }),
+        ),
+      );
+      toast.success(`${ids.length} order${ids.length === 1 ? "" : "s"} exempted from storage`);
+      clearSel();
+      void refetch();
+    } catch (e) {
+      toast.error(`Bulk No-storage failed — ${(e as Error).message}`);
+    }
+  }
+
   // Full-page order detail (Jess 2026-06-30) — renders IN PLACE of the list,
   // inside the operation shell, so the sidebar + right rail stay visible (no
   // overlay). Close (✕) clears openOrderId → back to the list (filters preserved).
@@ -1601,6 +1643,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     !!dueFilter ||
     categoryFilter.size > 0 ||
     etaOnly ||
+    supplierLateOnly ||
     flaggedOnly ||
     escalateOnly;
 
@@ -1644,6 +1687,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
       onClear: () => setStaffFilter(null),
     });
   if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
+  if (supplierLateOnly)
+    activeChips.push({ label: "Supplier late", onClear: () => setSupplierLateOnly(false) });
   if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
   if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
   if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
@@ -1838,6 +1883,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               onExport={exportSelectedCsv}
               onPrint={printSelected}
               onComplete={bulkMarkCompleted}
+              onNoStorage={bulkNoStorage}
               onClear={clearSel}
               busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
             />
@@ -1927,6 +1973,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     active={stockFilter === "Waiting"}
                     title="Goods not all in yet — PO open / awaiting arrival"
                     onClick={() => setStockFilter((r) => (r === "Waiting" ? null : "Waiting"))}
+                  />
+                )}
+                {supplierLateCount > 0 && (
+                  <KanbanRow
+                    label="Supplier late"
+                    count={supplierLateCount}
+                    tone="danger"
+                    active={supplierLateOnly}
+                    title="The goods ETA misses or has passed the customer promise — the supplier is the problem, not the customer"
+                    onClick={() => setSupplierLateOnly((v) => !v)}
                   />
                 )}
                 {(logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0) > 0 && (
@@ -2296,6 +2352,7 @@ function OrdersBulkBar({
   onExport,
   onPrint,
   onComplete,
+  onNoStorage,
   onClear,
   busy,
 }: {
@@ -2313,6 +2370,7 @@ function OrdersBulkBar({
   onExport: () => void;
   onPrint: () => void;
   onComplete: () => void;
+  onNoStorage: () => void;
   onClear: () => void;
   busy: boolean;
 }) {
@@ -2398,6 +2456,11 @@ function OrdersBulkBar({
               icon={CheckCircle2}
               label={busy ? "Working…" : "Mark delivered"}
               onClick={onComplete}
+            />
+            <BulkMenuItem
+              icon={Warehouse}
+              label="No storage (exempt fee)"
+              onClick={onNoStorage}
             />
           </div>
         )}
