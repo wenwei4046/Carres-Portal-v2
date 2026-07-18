@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { updateOpsStaffSettingInput, type OpsStaffMember } from "@carres/shared";
+import {
+  updateOpsStaffSettingInput,
+  isOpsManager,
+  type OpsStaffMember,
+} from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -78,9 +82,16 @@ staffRouter.get("/", async (c) => {
 });
 
 // PUT /:userId — upsert pool membership. pooled:false deletes the row.
+// MANAGEMENT-ONLY (Jess 2026-07-18): staff sessions read the pool, never
+// manage it.
 staffRouter.put("/:userId", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
+  if (!isOpsManager(auth.role, auth.email)) {
+    throw new HTTPException(403, {
+      message: "Only management can manage the assignment pool",
+    });
+  }
 
   const idCheck = USER_ID.safeParse(c.req.param("userId"));
   if (!idCheck.success) throw new HTTPException(404, { message: "User not found" });

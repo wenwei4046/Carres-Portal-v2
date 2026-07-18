@@ -600,6 +600,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  isOpsManager,
+  OPS_MANAGER_EMAILS,
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,

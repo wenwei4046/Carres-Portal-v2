@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsOrderControlInput,
+  isOpsManager,
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
@@ -115,6 +116,15 @@ orderControlRouter.put("/:id/control", async (c) => {
       },
       422,
     );
+  }
+
+  // Staff owner (0232): MANUAL assignment is management-only (Jess 2026-07-18
+  // — operation@carres.com + principal); staff sessions get a clean 403. The
+  // web hides the controls; this is the enforcement.
+  if ("assigned_staff" in parsed.data && !isOpsManager(auth.role, auth.email)) {
+    throw new HTTPException(403, {
+      message: "Only management can assign or reassign the PIC",
+    });
   }
 
   const sb = userClient(c.env, auth.jwt);

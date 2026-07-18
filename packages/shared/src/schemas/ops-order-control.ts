@@ -587,3 +587,17 @@ export function distributeOrders(
   }
   return plan;
 }
+
+/** Who may MANUALLY assign / reassign / redistribute PIC and manage the pool
+ *  (Jess 2026-07-18: "operation@carres.com — should only me and others
+ *  management only"). Everyone else sees assignments read-only. One rule,
+ *  two consumers: the web hides the controls, the API enforces. */
+export const OPS_MANAGER_EMAILS = ["operation@carres.com"] as const;
+export function isOpsManager(
+  role: string | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  if (role === "principal") return true;
+  if (!email) return false;
+  return (OPS_MANAGER_EMAILS as readonly string[]).includes(email.toLowerCase());
+}

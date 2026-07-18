@@ -34,10 +34,12 @@ import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
   distributeOrders,
+  isOpsManager,
   type OpsTask,
   type OpsTasksListResponse,
   type OpsStaffMember,
 } from "@carres/shared";
+import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
@@ -500,14 +502,30 @@ function staffLabel(m: OpsStaffMember): string {
   if (n) return n.split(/\s+/)[0]!;
   return m.email.split("@")[0] || m.email;
 }
-/** Two-letter initials for the row owner chip. */
+/** Two-letter avatar code: FIRST + LAST letter of the calling-name (Jess
+ *  2026-07-18) — stays distinct where first-two collide (Shasha→SA · Ching→CG
+ *  · Chow→CW · Joy→JY). Falls back to the email local-part. */
 function staffInitials(m: OpsStaffMember): string {
-  const n = (m.name ?? "").trim();
-  if (n) {
-    const parts = n.split(/\s+/);
-    return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? parts[0]?.[1] ?? "")).toUpperCase();
-  }
-  return m.email.slice(0, 2).toUpperCase();
+  const nick = staffLabel(m);
+  if (nick.length >= 2) return (nick[0]! + nick[nick.length - 1]!).toUpperCase();
+  return (nick || m.email.slice(0, 2)).toUpperCase();
+}
+
+/** Per-person identity colour for the PIC avatar — a fixed muted palette that
+ *  deliberately AVOIDS the status hues (green/amber/red), flame (action) and
+ *  selection blue, so identity never reads as state. Stable by user id. */
+const AVATAR_COLORS: { bg: string; fg: string }[] = [
+  { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
+  { bg: "#CCFBF1", fg: "#115E59" }, // teal
+  { bg: "#FCE7F3", fg: "#9D174D" }, // rose
+  { bg: "#EDE9FE", fg: "#5B21B6" }, // violet
+  { bg: "#CFFAFE", fg: "#155E75" }, // cyan
+  { bg: "#E7E5E4", fg: "#44403C" }, // stone
+];
+function avatarColor(userId: string): { bg: string; fg: string } {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h + userId.charCodeAt(i)) % 997;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
 }
 
 function ovlOf(o: operationOrderListRow) {
@@ -1051,6 +1069,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   // Staff assignment pool (0232) — fails soft to an empty list on a Worker
   // that predates the route, keeping the whole assignment layer inert.
+  // MANAGEMENT gate (Jess 2026-07-18): only operation@carres.com + principal
+  // may manually assign / manage the pool / run the sweep; staff read-only.
+  const authRole = useAuth((s) => s.role);
+  const authEmail = useAuth((s) => s.user?.email ?? null);
+  const isManager = isOpsManager(authRole, authEmail);
   const staffQ = useOperationStaff();
   const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
   const staffById = useMemo(
@@ -1259,6 +1282,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const sweepDone = useRef(false);
   useEffect(() => {
     if (sweepDone.current) return;
+    // Management sessions only — staff can't write assignments (API 403s
+    // anyway); the presence-RPC upgrade may widen this later.
+    if (!isManager) return;
     const all = data?.orders;
     if (!all || !staffQ.data) return;
     const avail = staffQ.data.staff.filter((s) => s.pooled && s.available);
@@ -1286,7 +1312,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       }
     })();
-  }, [data, staffQ.data, qc]);
+  }, [data, staffQ.data, qc, isManager]);
 
   // Redistribute ONE member's open orders across the other available members
   // (the resign / long-MC one-click; Team popover).
@@ -1895,11 +1921,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("STAFF")}
                   onToggle={() => toggleGroup("STAFF")}
                   headerRight={
-                    <TeamPopover
-                      staff={staffList}
-                      openCounts={staffEntries.counts}
-                      onRedistribute={(id) => void redistributeStaff(id)}
-                    />
+                    /* Pool management = management only (Jess 2026-07-18). */
+                    isManager ? (
+                      <TeamPopover
+                        staff={staffList}
+                        openCounts={staffEntries.counts}
+                        onRedistribute={(id) => void redistributeStaff(id)}
+                      />
+                    ) : undefined
                   }
                 >
                   {poolStaff.map((s) => (
@@ -2126,6 +2155,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onAssignStaff={(orderId, staff) =>
                   assignStaffMut.mutate({ orderId, staff })
                 }
+                canAssign={isManager}
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
@@ -2620,11 +2650,14 @@ function OwnerChip({
   staffById,
   poolStaff,
   onAssignStaff,
+  canEdit,
 }: {
   o: operationOrderListRow;
   staffById: Map<string, OpsStaffMember>;
   poolStaff: OpsStaffMember[];
   onAssignStaff: (orderId: string, staff: string | null) => void;
+  /** Management only (Jess 2026-07-18) — staff see the avatar read-only. */
+  canEdit: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // FIXED positioning — the table lives in an overflow-auto scroller, so an
@@ -2643,6 +2676,27 @@ function OwnerChip({
   const member = owner ? staffById.get(owner) : undefined;
   // No pool at all (feature dormant) → render nothing.
   if (poolStaff.length === 0 && !member) return null;
+  const av = member ? avatarColor(member.user_id) : null;
+  // Staff = read-only avatar (identity + tooltip, no menu).
+  if (!canEdit) {
+    return member ? (
+      <span
+        className="shrink-0 w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none"
+        style={{ background: av!.bg, color: av!.fg }}
+        title={`PIC: ${member.name ?? member.email}`}
+        aria-label={`Assigned to ${staffLabel(member)}`}
+      >
+        {staffInitials(member)}
+      </span>
+    ) : (
+      <span
+        className="shrink-0 w-[20px] h-[20px] rounded-full border border-dashed border-base-300 flex items-center justify-center text-[11px] text-base-300 leading-none"
+        title="No PIC yet"
+      >
+        —
+      </span>
+    );
+  }
   return (
     <div className="shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
@@ -2661,11 +2715,12 @@ function OwnerChip({
           });
           setOpen((v) => !v);
         }}
-        className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
+        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
           member
-            ? "bg-base-200 text-base-700 hover:bg-base-300"
+            ? "hover:ring-2 hover:ring-base-300"
             : "border border-dashed border-base-300 text-base-300 hover:border-base-500 hover:text-base-500"
         }`}
+        style={member ? { background: av!.bg, color: av!.fg } : undefined}
       >
         {member ? staffInitials(member) : "+"}
       </button>
@@ -2721,6 +2776,7 @@ function OrderRow({
   staffById,
   poolStaff,
   onAssignStaff,
+  canAssign,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -2738,6 +2794,8 @@ function OrderRow({
   staffById: Map<string, OpsStaffMember>;
   poolStaff: OpsStaffMember[];
   onAssignStaff: (orderId: string, staff: string | null) => void;
+  /** Management-only manual assignment (Jess 2026-07-18). */
+  canAssign: boolean;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -2955,6 +3013,7 @@ function OrderRow({
           staffById={staffById}
           poolStaff={poolStaff}
           onAssignStaff={onAssignStaff}
+          canEdit={canAssign}
         />
       </td>
       )}
