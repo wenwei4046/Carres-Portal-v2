@@ -418,14 +418,25 @@ function logisticEtaOf(o: operationOrderListRow): string | null {
   return ovl?.logistic_eta ?? null;
 }
 
-/** Order needs its logistic ETA chased (Jess 2026-06-25, Q3): open + no ETA set
- *  + deadline ≤7 days out. Drives the red "No ETA" alert + the quick-view. */
-function needsEta(o: operationOrderListRow): boolean {
-  if (controlTabOf(o) === "completed") return false;
-  if (logisticEtaOf(o)) return false;
-  const diff = daysToDue(o);
-  return diff !== null && diff <= 7;
-}
+/** C-vocab (Jess 2026-07-19): the QUEUES rows ARE the NEXT verbs — one
+ *  vocabulary across QUEUES · the NEXT column · the drawer's Chase Now. A row
+ *  sits in exactly the queue its NEXT verb names; the counts match by
+ *  construction. State words (Waiting/Ready) live in FILTERS only. The old
+ *  "To book" / "Waiting stock" / "No logistic" queue rows are dead words. */
+const NEXT_QUEUE_VERBS = [
+  "Order PO",
+  "Chase supplier",
+  "Assign logistic",
+  "Chase logistic",
+] as const;
+const NEXT_QUEUE_DESC: Record<string, string> = {
+  "Order PO": "Goods not ordered from any supplier yet — raise the PO",
+  "Chase supplier":
+    "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
+  "Assign logistic": "No delivery partner picked yet — assign one",
+  "Chase logistic":
+    "Partner assigned but no delivery booked with the customer — chase the logistic",
+};
 
 // ─── Next action (C2, 2026-07-08) ────────────────────────────────────────────
 // The single most-urgent NEXT step per order — one lamp per row. PURE: reads
@@ -558,7 +569,10 @@ function ovlOf(o: operationOrderListRow) {
 
 /** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
  *  a stock track ∥ a logistic track, surfaced as the one most-urgent verb —
- *    Order PO → Chase supplier → Book logistic → Chase logistic → Confirm.
+ *    Order PO → Chase supplier → Assign logistic → Chase logistic → Confirm.
+ *  WORD LAW (Jess 2026-07-19, C-vocab): "assign" = WE pick the carrier;
+ *  "booked" = the PARTNER fixed a slot with the customer (a STATE, never our
+ *  verb). "Book logistic" was firing on no-carrier rows — wrong word, dead.
  *  Stock leads while it isn't secured (you don't arrange delivery of goods that
  *  don't exist yet); once Ready the logistic track takes over. Confirm is the
  *  close, and it stays 🔒 LOCKED while a money-hold (unpaid balance / storage) is
@@ -602,7 +616,7 @@ export function nextActionOf(
 
   // LOGISTIC TRACK — stock is in; arrange the delivery.
   if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
-    return { label: "Book logistic", tone: "info" };
+    return { label: "Assign logistic", tone: "info" };
   if (!logisticEtaOf(o)) return { label: "Chase logistic", tone: "info" };
 
   // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate action).
@@ -1045,9 +1059,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Action cell owns flag/resolve via its own useAddAnnotation.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [escalateOnly, setEscalateOnly] = useState(false);
-  // No-ETA quick-view (Jess 2026-06-25): open orders the logistic hasn't given a
-  // delivery ETA for, with a near deadline — the chase list.
-  const [etaOnly, setEtaOnly] = useState(false);
+  // C-vocab verb queue filter (Jess 2026-07-19): one NEXT verb, or null.
+  const [nextFilter, setNextFilter] = useState<string | null>(null);
   // Import stock ETA from the Master "Ops" sheet (fills each line's Stock ETA).
   const [etaImportOpen, setEtaImportOpen] = useState(false);
   // Column show/hide (locked §4) — hidden data-column keys (localStorage-persisted)
@@ -1260,7 +1273,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }, [orders]);
   const flaggedCount = useMemo(() => liveScope.filter(hasOpenTask).length, [liveScope, tasksByOrder]);
   const escalateCount = useMemo(() => liveScope.filter(hasEscalatedTask).length, [liveScope, tasksByOrder]);
-  const etaCount = useMemo(() => liveScope.filter(needsEta).length, [liveScope]);
+  // NEXT-verb counts over OPEN orders — the C-vocab QUEUES rows read these,
+  // so queue numbers equal the NEXT column by construction.
+  const nextVerbOf = (o: operationOrderListRow) =>
+    nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+  const nextCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of liveScope) {
+      const label = nextVerbOf(o);
+      m.set(label, (m.get(label) ?? 0) + 1);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveScope, availableBySku]);
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of liveScope) {
@@ -1427,7 +1452,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const facetActive =
       flaggedOnly ||
       escalateOnly ||
-      etaOnly ||
+      !!nextFilter ||
       !!dueFilter ||
       !!regionFilter ||
       !!stockFilter ||
@@ -1437,7 +1462,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
     if (flaggedOnly) r = r.filter(hasOpenTask);
     if (escalateOnly) r = r.filter(hasEscalatedTask);
-    if (etaOnly) r = r.filter(needsEta);
+    if (nextFilter) r = r.filter((o) => nextVerbOf(o) === nextFilter);
     if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
@@ -1453,7 +1478,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareBySlack);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1465,7 +1491,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
     () => setRenderCount(ROWS_PER_BATCH),
-    [tab, search, dueFilter, flaggedOnly, escalateOnly, etaOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -1666,7 +1692,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     !!regionFilter ||
     !!dueFilter ||
     categoryFilter.size > 0 ||
-    etaOnly ||
+    !!nextFilter ||
     flaggedOnly ||
     escalateOnly;
 
@@ -1679,7 +1705,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     setRegionFilter(null);
     setDueFilter(null);
     setCategoryFilter(new Set());
-    setEtaOnly(false);
+    setNextFilter(null);
     setFlaggedOnly(false);
     setEscalateOnly(false);
   }
@@ -1711,7 +1737,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
     });
   if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
   if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
-  if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
+  if (nextFilter)
+    activeChips.push({ label: `Next: ${nextFilter}`, onClear: () => setNextFilter(null) });
   if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
   if (escalateOnly) activeChips.push({ label: "For Jess", onClear: () => setEscalateOnly(false) });
   for (const key of categoryFilter)
@@ -1726,9 +1753,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     });
 
   // PO-day banner (Mon/Thu) + urgent bypass (any day) — shown to the duty
-  // holder + management only; other staff's day is unchanged.
-  const waitingCount = stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0;
-  const noPoCount = stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0;
+  // holder + management only; other staff's day is unchanged. Speaks the
+  // C-vocab queue words (Order PO / Chase supplier), same as QUEUES + NEXT.
+  const orderPoCount = nextCounts.get("Order PO") ?? 0;
+  const chaseSupplierCount = nextCounts.get("Chase supplier") ?? 0;
   const showPoBanner =
     !!poDutyHolder &&
     (isManager || authUserId === poDutyHolder.userId) &&
@@ -1745,8 +1773,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </span>
       ) : (
         <span className="text-base-700">
-          <span className="font-semibold">PO day</span> — {waitingCount} waiting stock ·{" "}
-          {noPoCount} no PO
+          <span className="font-semibold">PO day</span> — Order PO {orderPoCount} · Chase
+          supplier {chaseSupplierCount}
         </span>
       )}
       <span className="text-base-400">
@@ -2010,6 +2038,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   </button>
                 }
               >
+                {/* C-vocab (Jess 2026-07-19): Overdue (结果) + Owing (钱) on
+                    top, then the NEXT-verb queues — the row's queue IS its
+                    NEXT word, so numbers match the column by construction.
+                    "To book" / "Waiting stock" / "No logistic" = dead words
+                    (states live in FILTERS; no-carrier = Assign logistic). */}
+                {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
+                  <KanbanRow
+                    label="Overdue"
+                    count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
+                    tone="danger"
+                    active={dueFilter === "Overdue"}
+                    title="Past the delivery date and not delivered yet — who to chase = the row's NEXT verb"
+                    onClick={() => setDueFilter((r) => (r === "Overdue" ? null : "Overdue"))}
+                  />
+                )}
                 {owing.n > 0 && (
                   <KanbanRow
                     label="Owing"
@@ -2021,43 +2064,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     onClick={() => setOwingOnly((v) => !v)}
                   />
                 )}
-                {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
-                  <KanbanRow
-                    label="Overdue"
-                    count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
-                    tone="danger"
-                    active={dueFilter === "Overdue"}
-                    title="Past the delivery date and not delivered yet"
-                    onClick={() => setDueFilter((r) => (r === "Overdue" ? null : "Overdue"))}
-                  />
-                )}
-                {etaCount > 0 && (
-                  <KanbanRow
-                    label="To book"
-                    count={etaCount}
-                    tone="warning"
-                    active={etaOnly}
-                    title="Carrier assigned but no delivery booked and the deadline is near — call the logistic"
-                    onClick={() => setEtaOnly((v) => !v)}
-                  />
-                )}
-                {(stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0) > 0 && (
-                  <KanbanRow
-                    label="Waiting stock"
-                    count={stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0}
-                    active={stockFilter === "Waiting"}
-                    title="Goods not all in yet — PO open / awaiting arrival"
-                    onClick={() => setStockFilter((r) => (r === "Waiting" ? null : "Waiting"))}
-                  />
-                )}
-                {(logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0) > 0 && (
-                  <KanbanRow
-                    label="No logistic"
-                    count={logisticEntries.find((e) => e.carrier === NO_CARRIER)?.count ?? 0}
-                    active={logisticFilter === NO_CARRIER}
-                    title="No delivery partner assigned yet"
-                    onClick={() => setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))}
-                  />
+                {NEXT_QUEUE_VERBS.map((v) =>
+                  (nextCounts.get(v) ?? 0) > 0 ? (
+                    <KanbanRow
+                      key={v}
+                      label={v}
+                      count={nextCounts.get(v) ?? 0}
+                      tone={
+                        v === "Order PO"
+                          ? "danger"
+                          : v === "Chase supplier"
+                            ? "warning"
+                            : undefined
+                      }
+                      active={nextFilter === v}
+                      title={NEXT_QUEUE_DESC[v]}
+                      onClick={() => setNextFilter((f) => (f === v ? null : v))}
+                    />
+                  ) : null,
                 )}
                 {flaggedCount > 0 && (
                   <KanbanRow
@@ -2199,7 +2223,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("LOGISTIC")}
                   onToggle={() => toggleGroup("LOGISTIC")}
                 >
-                  {/* "No logistic" lives in QUEUES — here only real carriers. */}
+                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab);
+                      here only real carriers. */}
                   {logisticEntries
                     .filter((e) => e.carrier !== NO_CARRIER && e.count > 0)
                     .map((e) => (

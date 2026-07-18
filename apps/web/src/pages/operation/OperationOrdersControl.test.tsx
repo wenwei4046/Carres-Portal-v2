@@ -652,17 +652,30 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.getByText(/Loading more… \(30 of 120\)/)).toBeInTheDocument();
   });
 
-  it("surfaces a No-logistic queue (no-carrier count) and filters on click", () => {
+  it("QUEUES speaks the NEXT verbs — a verb row filters to exactly its count (C-vocab)", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
-    // 7 orders, 1 completed (excluded — queue counts are open-only); D has a
-    // carrier via the partner map (NETS), E has TEOW joined → 4 open orders
-    // with no carrier. B rebuild (Jess 2026-07-18): the row lives in QUEUES
-    // as "No logistic" ("Unassigned" retired — it collided with No PIC).
-    const chip = screen.getByRole("button", { name: /No logistic/ });
-    expect(chip).toHaveTextContent("4");
-    fireEvent.click(chip);
-    expect(screen.getAllByTestId("order-row")).toHaveLength(4);
+    // C-vocab (Jess 2026-07-19): queue rows ARE the NEXT verbs — one
+    // vocabulary across QUEUES · NEXT · Chase Now. The dead words never
+    // render; a rendered verb row's count = the open rows whose NEXT shows
+    // that verb, and clicking it filters the table to exactly those rows.
+    expect(screen.queryByRole("button", { name: /No logistic/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /To book/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Waiting stock/ })).toBeNull();
+    // Locate queue rows via their unique tooltips (per-row hover actions also
+    // carry an "Assign logistic" accessible name — the title disambiguates).
+    const verbTitles = [
+      "Goods not ordered from any supplier yet — raise the PO",
+      "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
+      "No delivery partner picked yet — assign one",
+      "Partner assigned but no delivery booked with the customer — chase the logistic",
+    ];
+    const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
+    expect(row).toBeTruthy();
+    const count = Number((row!.textContent ?? "").replace(/[^0-9]/g, ""));
+    expect(count).toBeGreaterThan(0);
+    fireEvent.click(row!);
+    expect(screen.getAllByTestId("order-row")).toHaveLength(count);
   });
 
   it("gives each status chip a plain-English tooltip (legend)", () => {
@@ -879,10 +892,10 @@ describe("nextActionOf (C2)", () => {
   });
 
   // ── LOGISTIC TRACK — stock in, arrange delivery ──
-  it("ready + no carrier → Book logistic (blue)", () => {
+  it("ready + no carrier → Assign logistic (blue)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Book logistic",
+      label: "Assign logistic",
       tone: "info",
     });
   });

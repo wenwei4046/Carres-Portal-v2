@@ -85,9 +85,9 @@ export async function runPoDutyCron(env: Bindings): Promise<number> {
   }
 
   const { error } = await sb.from("ops_tasks").insert({
-    title: `PO day — ${waiting} order${waiting === 1 ? "" : "s"} waiting stock`,
+    title: `PO day — ${waiting} order${waiting === 1 ? "" : "s"} short of stock`,
     detail:
-      "Mon/Thu PO batching: open Orders → Waiting stock / No PO, select, Raise PO. Urgent (red) rows must not wait for PO day.",
+      "Mon/Thu PO batching: open Orders → the Order PO / Chase supplier queues, select, Raise PO. Urgent (red) rows must not wait for PO day.",
     created_by: duty.user_id,
     assigned_to: duty.user_id,
     priority: "normal",
