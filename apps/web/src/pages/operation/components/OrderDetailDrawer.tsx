@@ -4411,6 +4411,7 @@ function MoneyCard({
   hasLineTotal,
   orderTotal,
   totalSet,
+  collected,
   lines,
   storageCharge,
   storageIncurred,
@@ -4494,12 +4495,17 @@ function MoneyCard({
   const step: 1 | 2 | 3 = !totalSet ? 1 : balanceDue > 0 ? 2 : 3;
   const stepLabels: [string, string, string] = hasLineTotal
     ? ["Total", "Collect", "Settled"]
-    : ["Set outstanding", "Collect", "Settled"];
+    : ["Key what's owed", "Collect", "Settled"];
+  // Step-1 hint adapts (Jess 2026-07-18): payments already on the ledger
+  // without an owed figure keyed is the confusing case — spell out that the
+  // keyed number is the BEFORE-those-payments figure.
   const stepHint =
     step === 1
       ? hasLineTotal
         ? "The total comes from the priced items below."
-        : "Key the balance owing from your Master / AutoCount. Storage adds on top automatically."
+        : collected > 0
+          ? `${RM(collected)} already recorded — key what the customer owed BEFORE those payments; the system deducts them for you.`
+          : "Key how much this customer owes (from your Master / AutoCount). Key it once — after that, only record payments. Storage adds on top automatically."
       : step === 2
         ? `Collect ${RM(balanceDue)} — record every payment received here, with its slip.`
         : "Fully settled — print the receipt for the customer.";
@@ -4524,7 +4530,7 @@ function MoneyCard({
         onChange={(e) => form.set("balance", e.target.value)}
         onFocus={() => setEditingTotal(true)}
         onBlur={() => setEditingTotal(false)}
-        placeholder={hasLineTotal ? "Set total (RM)" : "Outstanding (RM)"}
+        placeholder={hasLineTotal ? "Set total (RM)" : "Still owes (RM)"}
         aria-label="Order total"
         className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
       />
@@ -4578,7 +4584,7 @@ function MoneyCard({
           ) : (
             <div className="flex items-center justify-between gap-3 py-1.5">
               <span className="min-w-0 truncate text-[13px] text-base-800">
-                Outstanding
+                Customer still owes
                 <button
                   type="button"
                   onClick={onShowItems}
@@ -4616,7 +4622,7 @@ function MoneyCard({
               <span className="text-[12px] text-base-400">
                 {hasLineTotal
                   ? "set the goods total above"
-                  : "key the outstanding above"}
+                  : "key what's owed above"}
               </span>
             )}
           </div>
@@ -4727,7 +4733,7 @@ function MoneyCard({
               <span className="text-[12px] text-base-400">
                 {hasLineTotal
                   ? "Set the goods total to calculate"
-                  : "Key the outstanding to calculate"}
+                  : "Key what's owed to calculate"}
               </span>
             ) : balanceDue > 0 ? (
               <Money value={balanceDue} tone="hero" className="text-danger" />

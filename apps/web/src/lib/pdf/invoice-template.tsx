@@ -119,6 +119,10 @@ function formatMoney(value: number, currency: string): string {
 
 export function InvoiceTemplate(data: InvoiceTemplateData) {
   const { doc_title, invoice_no, issue_date, order_code, customer, dealer, lines, subtotal, tax_amount, total, currency } = data;
+  // A custom doc_title (e.g. "PAYMENT REQUEST" for an imported order's
+  // statement) is NOT a tax document — no SST rows, no tax-invoice
+  // disclaimer, and the total reads "Total due".
+  const isTaxInvoice = !doc_title;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -166,16 +170,20 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
         </View>
 
         <View style={styles.totalsBlock}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Subtotal (excl. SST)</Text>
-            <Text style={styles.totalsValue}>{formatMoney(subtotal, currency)}</Text>
-          </View>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>SST 8%</Text>
-            <Text style={styles.totalsValue}>{formatMoney(tax_amount, currency)}</Text>
-          </View>
+          {isTaxInvoice && (
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Subtotal (excl. SST)</Text>
+              <Text style={styles.totalsValue}>{formatMoney(subtotal, currency)}</Text>
+            </View>
+          )}
+          {isTaxInvoice && (
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>SST 8%</Text>
+              <Text style={styles.totalsValue}>{formatMoney(tax_amount, currency)}</Text>
+            </View>
+          )}
           <View style={styles.totalsRowLast}>
-            <Text style={styles.totalsLabel}>Total</Text>
+            <Text style={styles.totalsLabel}>{isTaxInvoice ? "Total" : "Total due"}</Text>
             <Text style={styles.totalsValueGrand}>{formatMoney(total, currency)}</Text>
           </View>
         </View>
@@ -190,7 +198,9 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
         </View>
 
         <Text style={styles.disclaimer}>
-          This is a tax invoice. Please retain for your records. SST 8% is included in unit prices per LHDN inclusive convention.
+          {isTaxInvoice
+            ? "This is a tax invoice. Please retain for your records. SST 8% is included in unit prices per LHDN inclusive convention."
+            : "This is a statement of balance / payment request — not a tax invoice. The tax invoice for this order is issued separately."}
         </Text>
       </Page>
     </Document>
