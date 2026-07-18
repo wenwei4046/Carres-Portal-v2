@@ -330,25 +330,83 @@ const rawOrderLineInputSchema = z.object({
   sku: z.string().trim().min(1),
   qty: z.number().int().positive(),
   unitPrice: z.number().nonnegative(),
+  /** POS-configurator spec attrs (colour / gap / options / fabric / specials /
+   *  remark…), recorded for downstream display (PO / SO PDF / drawers). OPTIONAL
+   *  — a bare raw line stays attrs-null. The route strips engine-marker keys
+   *  (pwp / free_gift / free_item) so no order-path engine ever recognises a
+   *  raw line as a marker line. */
+  attrs: z.record(z.unknown()).nullable().optional(),
 });
 
 export const rawCreateOrderInputSchema = z.object({
   dealerId: z.string().uuid(),
   outletId: z.string().uuid().nullable().optional(),
   salespersonId: z.string().uuid().nullable().optional(),
+  // POS-structure parity (Loo 2026-07-18) — the raw door now ACCEPTS the full
+  // POS customer block, but everything beyond `name` stays optional/lenient:
+  // this path records exactly what the operator entered, gating nothing.
   customer: z.object({
     name: z.string().trim().min(1),
     phone: z.string().trim().nullable().optional(),
     address: z.string().trim().nullable().optional(),
+    addressUnknown: z.boolean().optional(),
+    billing: z.string().trim().nullable().optional(),
+    billingSame: z.boolean().optional(),
+    /** Composed "name · phone · relationship" string (same as the POS submit). */
+    emergency: z.string().trim().nullable().optional(),
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    // 0230 — structured MY address parts, sent alongside the composed
+    // `address` string (same lenient contract as the POS door).
+    addressLine1: z.string().max(200).nullable().optional(),
+    addressLine2: z.string().max(200).nullable().optional(),
+    addressState: z.string().max(60).nullable().optional(),
+    addressCity: z.string().max(120).nullable().optional(),
+    addressPostcode: z.string().max(10).nullable().optional(),
   }),
-  /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. */
+  /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. No lead-time floor and
+   *  no not-in-the-past rule — the raw door accepts any date (backfill). */
   deliveryDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  /** Production-start date. Persisted only when a deliveryDate is set (the
+   *  create_order pairing); no today-floor on this path. */
+  proceedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  deliveryFloor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
+  deliveryHasLift: z.boolean().optional(),
+  deliveryStairItems: z.number().int().nonnegative().nullable().optional(),
   lines: z.array(rawOrderLineInputSchema).min(1),
+  addons: z.array(orderAddonInputSchema).optional().default([]),
   paid: z.number().nonnegative().default(0),
+  // Payment + signature — the POS Confirm structure, ALL optional ("fill it if
+  // you have it"): a phone/backfill order creates fine with none of these.
+  paymentMethod: z.string().trim().min(1).max(40).nullable().optional(),
+  approvalCode: z.string().trim().nullable().optional(),
+  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable().optional(),
+  signaturePath: z.string().min(1).nullable().optional(),
+  paymentSlipPath: z.string().min(1).nullable().optional(),
+  termsAccepted: z.boolean().optional(),
+  /** 0219 — POS entry extras (payment follow-up answers + custom form-field
+   *  values). Same shape as the POS door. */
+  entryData: z
+    .object({
+      payment: z.record(z.string().max(120)).optional(),
+      fields: z.record(z.string().max(400)).optional(),
+    })
+    .strict()
+    .optional(),
 });
 /** z.input — `paid` stays optional for the POSTing client. */
 export type RawCreateOrderInput = z.input<typeof rawCreateOrderInputSchema>;

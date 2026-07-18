@@ -34,9 +34,13 @@ interface Props {
   onChange: (next: WizardDraft) => void;
   catalog: CatalogResponse;
   minLeadDays: number;
+  /** Maintain → New Order (raw creation, Loo 2026-07-18): SAME layout, but no
+   *  lead-time floor, past dates allowed, and both dates optional — every date
+   *  is saved exactly as entered. POS callers omit it (byte-identical). */
+  rawDates?: boolean;
 }
 
-export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }: Props) {
+export default function Step3Delivery({ draft, onChange, catalog, minLeadDays, rawDates }: Props) {
   const d = draft.delivery;
 
   function setD(patch: Partial<WizardDraft["delivery"]>) {
@@ -69,15 +73,25 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
       <Section
         title="Delivery date"
         hint={
-          minLeadDays > 0
-            ? `Earliest available: ${minDate} (${minLeadDays}-day lead time${
-                hasSofa ? " · sofa production gating" : ""
-              })`
-            : undefined
+          rawDates
+            ? "Raw entry — any date, saved exactly as entered"
+            : minLeadDays > 0
+              ? `Earliest available: ${minDate} (${minLeadDays}-day lead time${
+                  hasSofa ? " · sofa production gating" : ""
+                })`
+              : undefined
         }
       >
         <div className="grid grid-cols-[1fr_auto] gap-3.5 items-end">
-          <Field label={d.dateTbd ? "Delivery date (TBD)" : "Delivery date *"}>
+          <Field
+            label={
+              d.dateTbd
+                ? "Delivery date (TBD)"
+                : rawDates
+                  ? "Delivery date"
+                  : "Delivery date *"
+            }
+          >
             <CalendarDateField
               value={d.date}
               onChange={(iso) =>
@@ -85,12 +99,14 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
                 // auto-proceed against a date the dealer overrode.
                 setD({ date: iso, asap: false })
               }
-              minIso={minDate}
+              minIso={rawDates ? undefined : minDate}
               todayIso={todayIso}
               disabled={d.dateTbd}
               ariaLabel="Pick delivery date"
               footNote={
-                minLeadDays > 0 ? (
+                rawDates ? (
+                  <>Any date — no lead-time floor on this path</>
+                ) : minLeadDays > 0 ? (
                   <>
                     {minLeadDays}-day lead time · earliest <strong>{fmtChipDate(minDate)}</strong>
                   </>
@@ -122,17 +138,33 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             Picked deliberately so we don't pull stock too early for a far-out
             delivery. Bounded today..deliveryDate. Hidden value when TBD. */}
         <div className="mt-3.5">
-          <Field label={d.dateTbd ? "Proceed date · production start (TBD)" : "Proceed date · production start *"}>
+          <Field
+            label={
+              d.dateTbd
+                ? "Proceed date · production start (TBD)"
+                : rawDates
+                  ? "Proceed date · production start"
+                  : "Proceed date · production start *"
+            }
+          >
             <CalendarDateField
               value={d.proceedDate}
               onChange={(iso) => setD({ proceedDate: iso, asap: false })}
-              minIso={todayIso}
+              minIso={rawDates ? undefined : todayIso}
               maxIso={d.date || undefined}
               todayIso={todayIso}
               disabled={d.dateTbd}
               ariaLabel="Pick proceed date"
               footNote={
-                d.date ? (
+                rawDates ? (
+                  d.date ? (
+                    <>
+                      Optional · capped by delivery (<strong>{fmtChipDate(d.date)}</strong>)
+                    </>
+                  ) : (
+                    <>Optional · any date</>
+                  )
+                ) : d.date ? (
                   <>
                     Today → delivery (<strong>{fmtChipDate(d.date)}</strong>)
                   </>
