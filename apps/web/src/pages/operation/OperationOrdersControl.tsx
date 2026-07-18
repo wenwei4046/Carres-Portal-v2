@@ -403,21 +403,79 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-// Next-action pill colours — restored to Jess's original proposal
-// (carres_full_page_final_dateformat.html) so the five action tones read as
-// five DISTINCT colours, not one washed-out red. Each = soft fill + strong
-// ink + a matching border; carried inline so the shared global `.pill` stays put.
-/* v4 §6 hues (tone SEMANTICS unchanged): red/amber/green/grey from the kit;
- * borders dropped (v4 pills are borderless — border mirrors the fill). The
- * blue info tone is the same known legacy as `.pill-sent` (v4 blue =
- * selection) — realigned when the scheduled-tone question is settled. */
-const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
-  danger: { text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" }, // chase / overdue — red
-  warning: { text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" }, // waiting stock — amber
-  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#D3E4FB" }, // call / assign — blue (LEGACY)
-  success: { text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" }, // schedule delivery — green
-  neutral: { text: "#6B7280", bg: "#F3F4F6", border: "#F3F4F6" }, // done — grey
+/** NEXT is plain TEXT in the C rebuild (§14, 2026-07-18) — the pill chrome and
+ *  the legacy info-BLUE are gone (blue = selection only). Red text is reserved
+ *  for the two genuine dangers (past-deadline Chase logistic + Order PO);
+ *  green = Confirm; everything in progress is plain ink; Done is muted. */
+const NEXT_TEXT_COLOR: Record<NextTone, string> = {
+  danger: "#A32D2D",
+  warning: "#374151",
+  info: "#374151",
+  success: "#3B6D11",
+  neutral: "#A8A8A8",
 };
+
+// ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
+// One row = three dots in a FIXED order — Money · Stock · Delivery — sharing
+// the §8 dial hues. The dots are the row's ONLY colour channel; the fact cells
+// (n/m, ETA, partner, ladder word) stay ink/grey. Grey = not applicable.
+const DOT_HEX = {
+  green: "#639922",
+  amber: "#EF9F27",
+  red: "#E24B4A",
+  grey: "#D1D5DB",
+} as const;
+interface RowDot {
+  color: string;
+  title: string;
+}
+export function rowDotsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  se: StockEta,
+  logi: LogisticState,
+): [RowDot, RowDot, RowDot] {
+  const completed = controlTabOf(o) === "completed";
+  const ovl = ovlOf(o);
+  const bal = ovl?.balance == null ? null : Number(ovl.balance);
+  // 钱 — an owing balance stays RED even after delivery (§7: the owing customer
+  // is the one chase that survives Delivered).
+  const money: RowDot =
+    bal == null
+      ? { color: DOT_HEX.grey, title: "Money — no balance data" }
+      : bal > 0
+        ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(bal)} outstanding` }
+        : { color: DOT_HEX.green, title: "Money — settled" };
+  // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
+  let goods: RowDot;
+  if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
+  else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
+    goods = { color: DOT_HEX.green, title: "Stock — all in" };
+  else if (stock.state === "unknown")
+    goods = { color: DOT_HEX.red, title: "Stock — no PO raised yet" };
+  else if (se.state === "overdue" || se.state === "late")
+    goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
+  else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
+  // 送 — guardrail #2: a delivered order never alarms. Open: booked = green,
+  // not booked = amber NORMAL state (truth ladder §12), red only past deadline.
+  let delivery: RowDot;
+  if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
+  else if (logi.key === "scheduled")
+    delivery = { color: DOT_HEX.green, title: "Delivery — booked" };
+  else if (logi.key === "unassigned")
+    delivery = { color: DOT_HEX.grey, title: "Delivery — no carrier yet" };
+  else {
+    const dd = daysToDue(o);
+    delivery =
+      dd !== null && dd < 0
+        ? { color: DOT_HEX.red, title: "Delivery — past deadline, not booked" }
+        : { color: DOT_HEX.amber, title: "Delivery — not booked yet" };
+  }
+  return [money, goods, delivery];
+}
+function fmtRM(n: number): string {
+  return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
+}
 
 function ovlOf(o: operationOrderListRow) {
   const raw = o.ops_order_control;
@@ -821,15 +879,18 @@ interface OrderColDef {
   label: string;
   w: number;
 }
+/** §14 six-col rebuild (Jess picked C, 2026-07-18): dots lead, SO+Ref and
+ *  Customer+Region merge into two-line cells, LOGISTIC→DELIVERY (truth-ladder
+ *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
+ *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "orderId", label: "Order ID", w: 7 },
-  { key: "ref", label: "Ref No", w: 8 },
-  { key: "customer", label: "Customer", w: 14 },
-  { key: "region", label: "Region", w: 8 },
-  { key: "logistic", label: "Logistic", w: 11 },
+  { key: "dots", label: "Status", w: 5 },
+  { key: "order", label: "Order", w: 11 },
+  { key: "customer", label: "Customer", w: 20 },
+  { key: "stock", label: "Stock", w: 12 },
+  { key: "delivery", label: "Delivery", w: 12 },
   { key: "deadline", label: "Deadline", w: 13 },
-  { key: "stock", label: "Stock", w: 13 },
-  { key: "next", label: "Next", w: 20 },
+  { key: "next", label: "Next", w: 14 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1783,22 +1844,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
         className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          /* UI-KIT v4 §8b (LOCKED): rows are 44px FIXED — content adapts to
-             the row, never the reverse. whitespace-nowrap kills the silent
-             row-growers (text WRAPPING inside narrow fixed columns — "SO-1112"
-             at a 31px column folded to 2 lines and pushed rows to 48/57px);
-             stacked multi-DIV cells (ref ≤2 lines, logistic, deadline) still
-             stack, each line just ellipsises. Keep in sync with
-             design-standard.ts ROW.heightPx. */
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
+          /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
+             content adapts to the row, never the reverse. whitespace-nowrap
+             kills the silent row-growers (text WRAPPING inside narrow fixed
+             columns); the two-line cells (Order / Customer / Stock / Delivery)
+             stack at 15px line-height, each line just ellipsises. */
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
               horizontally scrolls on any screen; long content ellipsis-truncates.
-              Data columns take a small share (tight groups); Manage takes the
-              largest (its future multi-line message). Order: ☐ · ⚑ · Order ID ·
-              Ref No · Customer · Region · Logistic · ETA · Deadline · Stock ·
-              Manage. */}
+              Order (C rebuild §14): ☐ · ⚑ · Status dots · Order · Customer ·
+              Stock · Delivery · Deadline · Next. */}
           <colgroup>
             <col style={{ width: "3%" }} />
             <col style={{ width: "3%" }} />
@@ -1817,7 +1874,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 indeterminate dash on a partial tick. */}
             <tr
               className="border-b"
-              style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
+              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild). */
+              style={{ backgroundColor: "#F9FAFB", borderBottomColor: "#E5E7EB" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -1834,13 +1892,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <th className="px-1 py-1.5 text-center" title="Follow-up">
                 <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
               </th>
-              {showCol("orderId") && <Th>Order ID</Th>}
-              {showCol("ref") && <Th>Ref No</Th>}
+              {showCol("dots") && (
+                <Th>
+                  <span title="Money · Stock · Delivery — green OK · amber in progress · red needs action">
+                    Status
+                  </span>
+                </Th>
+              )}
+              {showCol("order") && <Th>Order</Th>}
               {showCol("customer") && <Th>Customer</Th>}
-              {showCol("region") && <Th>Region</Th>}
-              {showCol("logistic") && <Th>Logistic</Th>}
-              {showCol("deadline") && <Th>Deadline</Th>}
               {showCol("stock") && <Th>Stock</Th>}
+              {showCol("delivery") && <Th>Delivery</Th>}
+              {showCol("deadline") && <Th>Deadline</Th>}
               {showCol("next") && <Th>Next</Th>}
             </tr>
           </thead>
@@ -2239,6 +2302,8 @@ function OrderRow({
   const sofaQty = catQty(lines, "sofa");
 
   const logi = logisticStateOf(o, partnerName);
+  const dots = rowDotsOf(o, stock, se, logi);
+  const completed = controlTabOf(o) === "completed";
 
   return (
     <tr
@@ -2261,122 +2326,126 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
-          here; paired tight with the Ref No column to its right. */}
-      {showCol("orderId") && (
-      <td className="pl-1 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
-        <span
-          className="font-mono tabular-nums"
-          style={{ fontSize: "13px", fontWeight: 500, color: "#1A1A1A" }}
-        >
-          SO-{o.so}
-        </span>
+      {/* 三线点 — Money · Stock · Delivery, the row's ONLY colour channel
+          (§14, C rebuild 2026-07-18). Fact cells stay ink/grey. */}
+      {showCol("dots") && (
+      <td className="pl-2 pr-1">
+        <div className="flex items-center gap-[5px]" data-testid="row-dots">
+          {dots.map((d, i) => (
+            <span
+              key={i}
+              title={d.title}
+              className="inline-block w-2 h-2 rounded-full shrink-0"
+              style={{ background: d.color }}
+            />
+          ))}
+        </div>
       </td>
       )}
-      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. v4 §8b:
-          the row is 44px FIXED, so at most 2 refs show (2×16px lines fit);
-          the rest fold to "+N" ON the second line — content adapts to the
-          row, never the other way. Full list stays in the title tooltip. */}
-      {showCol("ref") && (
-      <td className="px-1 py-1.5">
-        {ref.length === 0 ? (
-          <span className="text-base-300">—</span>
-        ) : (
-          /* Closed set: REF = row EMPHASIS (13/600 ink); "+N" = caption. */
-          <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            <div className="truncate tabular-nums t4-row-strong">{ref[0]}</div>
-            {ref.length === 2 ? (
-              <div className="truncate tabular-nums t4-row-strong">{ref[1]}</div>
-            ) : ref.length > 2 ? (
-              <div className="t4-caption">+{ref.length - 1} more</div>
-            ) : null}
-          </div>
-        )}
-      </td>
-      )}
-      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
-      {showCol("customer") && (
-      <td className="pl-1 pr-2 py-2">
-        {o.customer_name ? (
-          /* Closed set: the NAME is row EMPHASIS (the sample's bold company). */
-          <span
-            className={`${cjkClassName(o.customer_name)} t4-row-strong block truncate`}
-            title={o.customer_name}
+      {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
+          caption line ("+N" folds extras; full list in the tooltip). Phone
+          tooltip kept on the cell. */}
+      {showCol("order") && (
+      <td className="pl-1 pr-1" title={o.customer_phone ?? undefined}>
+        <div style={{ lineHeight: "15px" }}>
+          <div
+            className="font-mono tabular-nums truncate"
+            style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A" }}
           >
-            {o.customer_name}
-          </span>
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
+            SO-{o.so}
+          </div>
+          {ref.length > 0 && (
+            <div
+              className="font-mono tabular-nums truncate t4-caption"
+              title={ref.join("\n")}
+            >
+              {ref[0]}
+              {ref.length > 1 ? ` +${ref.length - 1}` : ""}
+            </div>
+          )}
+        </div>
       </td>
       )}
-      {/* Region — its own group; gap before it separates it from the identity trio. */}
-      {showCol("region") && (
-      <td className="pl-4 pr-2 py-2">
-        {loc.label ? (
-          /* Closed set: region = row content, ink (the outstation gold tint
-             was decoration — the tooltip + MiniBadge carry that signal). */
-          <span
-            className="t4-row block truncate"
+      {/* Customer — name (emphasis) + region on the caption line; the
+          outstation warning survives in the tooltip. */}
+      {showCol("customer") && (
+      <td className="pl-1 pr-2">
+        <div style={{ lineHeight: "15px" }}>
+          {o.customer_name ? (
+            <div
+              className={`${cjkClassName(o.customer_name)} t4-row-strong truncate`}
+              title={o.customer_name}
+            >
+              {o.customer_name}
+            </div>
+          ) : (
+            <div className="text-base-300">—</div>
+          )}
+          <div
+            className="t4-caption truncate"
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
                 : loc.label ?? undefined
             }
           >
-            {loc.label}
-          </span>
-        ) : (
-          <span className="text-base-400">—</span>
-        )}
+            {loc.label ?? "—"}
+          </div>
+        </div>
       </td>
       )}
-      {/* Logistic — partner tag + delivery-date state machine (伙伴 + 送货日):
-          — unassigned · no date yet (grey) · call now (red, ≤3d window) ·
-          Deliver <date> (green, booked) · Delivered ✓. Never "by". */}
-      {showCol("logistic") && (
-      <td className="pl-4 pr-1 py-2 whitespace-nowrap leading-[1.25]">
+      {/* Stock — facts only (n/m ratio + sub word / supplier ETA); the 货 dot
+          carries the colour. */}
+      {showCol("stock") && (
+      <td className="pl-1 pr-2">
+        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
+      </td>
+      )}
+      {/* Delivery — partner + §12 truth-ladder word. "call now" is DEAD (§14:
+          the red time-window alarm painted every row); call_now/no_date both
+          render "not booked" — the NORMAL state, worded grey because the 送
+          dot carries the colour. */}
+      {showCol("delivery") && (
+      <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
           <span className="t4-caption text-[13px]">— unassigned</span>
         ) : (
-          <>
-            {/* Closed set: partner name = row content (ink); the sub-line is a
-                STATUS signal so it keeps colour — v4 hues only. */}
-            <span className="t4-row block truncate">{logi.partner}</span>
-            <div style={{ marginTop: 1 }}>
-              {logi.key === "delivered" ? (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
-                  Delivered ✓
-                </span>
-              ) : logi.key === "scheduled" && logi.date ? (
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: "12px", fontWeight: 600, color: "#3B6D11" }}
-                >
-                  Deliver {fmtDate(logi.date).split(", ")[0]}
-                </span>
-              ) : logi.key === "call_now" ? (
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#A32D2D" }}>
-                  call now
-                </span>
-              ) : (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#A8A8A8" }}>
-                  no date yet
-                </span>
-              )}
-            </div>
-          </>
+          <div style={{ lineHeight: "15px" }}>
+            <div className="t4-row-strong truncate">{logi.partner}</div>
+            {logi.key === "delivered" ? (
+              <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
+                Delivered ✓
+              </div>
+            ) : logi.key === "scheduled" && logi.date ? (
+              <div
+                className="tabular-nums"
+                style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
+              >
+                booked {fmtDate(logi.date).split(", ")[0]}
+              </div>
+            ) : (
+              <div className="t4-caption">not booked</div>
+            )}
+          </div>
         )}
       </td>
       )}
-      {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
-          (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
+      {/* Deadline — date + days-left heat pill, OPEN orders only. A delivered
+          order NEVER alarms (guardrail #2): muted date, no pill. */}
       {showCol("deadline") && (
       <td
-        className="pl-1 pr-2 py-2 leading-[1.2] whitespace-nowrap"
+        className="pl-1 pr-2 leading-[1.2]"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
-        {o.delivery_date_tbd ? (
+        {completed ? (
+          o.delivery_date ? (
+            <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
+              {fmtDate(o.delivery_date).split(", ")[0]}
+            </span>
+          ) : (
+            <span className="text-base-300">—</span>
+          )
+        ) : o.delivery_date_tbd ? (
           <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
@@ -2429,30 +2498,20 @@ function OrderRow({
         )}
       </td>
       )}
-      {/* Stock — its own group; gap before it separates it from the logistic trio. */}
-      {showCol("stock") && (
-      <td className="pl-4 pr-2 py-2 whitespace-nowrap">
-        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
-      </td>
-      )}
-      {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
-          actions (open / flag / assign) that appear on row hover (P2 F). */}
+      {/* Next action — one plain-text verb (§14: NEXT 文字, pill chrome gone)
+          + Gmail-style hover actions (open / flag / assign) on row hover. */}
       {showCol("next") && (
-      <td className="pl-2 pr-2 py-2 whitespace-nowrap relative">
+      <td className="pl-2 pr-2 relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
-          const st = NEXT_TONE_STYLE[na.tone];
           return (
             <span
-              className="inline-flex items-center gap-1 rounded-full align-middle max-w-full group-hover:opacity-0 transition-opacity"
+              className="inline-flex items-center gap-1 align-middle max-w-full group-hover:opacity-0 transition-opacity"
               style={{
-                fontSize: "11px",
+                fontSize: "12px",
                 fontWeight: 600,
                 letterSpacing: "0.01em",
-                padding: "2px 9px",
-                color: st.text,
-                background: st.bg,
-                border: `1px solid ${st.border}`,
+                color: NEXT_TEXT_COLOR[na.tone],
               }}
               data-next-action={na.label}
             >
@@ -2547,24 +2606,12 @@ function ActionCell({
   );
 }
 
-// STOCK cell = a 3-state pill (Partial merged into Waiting) + a CORE-only
-// received/total ratio (Loo 2026-07-09). Colours reuse Jess's proposal legend
-// (Ready green / Waiting amber / No PO red).
-const STOCK_PILL: Record<
-  "ready" | "waiting" | "no_po",
-  { label: string; text: string; bg: string; border: string }
-> = {
-  ready: { label: "Ready", text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" },
-  waiting: { label: "Waiting", text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" },
-  no_po: { label: "No PO", text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" },
-};
-
-/** Stock cell — a status pill (Ready / Waiting / No PO, Partial folded into
- *  Waiting) + a CORE-only arrival ratio `received/total`. Denominator = the
- *  order's Mattress+Bedframe+Sofa unit total (accessories don't gate delivery,
- *  so they're excluded). Numerator: Ready = all core, No PO = 0; Waiting shows
- *  "–" because the list payload carries no per-line GRN-received qty (esp.
- *  AutoCount orders). `data-stock-state` kept verbatim for the tests. */
+/** Stock cell (C rebuild §14) — FACTS only, two lines: the CORE arrival ratio
+ *  `n/m` (emphasis) + a grey sub-line (Ready / No PO / supplier ETA). The 货
+ *  dot owns the colour — this cell stays ink/grey (the old Ready/Waiting/No-PO
+ *  pill + the red/amber ETA line are gone). Denominator = Mattress+Bedframe+
+ *  Sofa unit total (accessories don't gate delivery). `data-stock-state` /
+ *  `data-stock-eta` kept verbatim for the tests. */
 function StockDot({
   info,
   coreTotal,
@@ -2600,60 +2647,39 @@ function StockDot({
         break;
     }
   }
-  const S = STOCK_PILL[key];
   const num = key === "ready" ? String(coreTotal) : "0";
 
-  // Supplier ETA line (stock_eta version) — shown only while waiting; coloured
-  // vs the customer deadline: OVERDUE red · LATE orange · on-track grey · no-ETA
-  // faint. Ready shows nothing (no ETA noise once the goods are in).
-  const eta = (() => {
-    if (key === "ready" || se.state === "ready" || se.state === "none") return null;
-    // Colour carries the state (red=overdue · orange=late · grey=on-track), like
-    // the DEADLINE pill — no text suffix, so the line stays short + never clips.
-    if (se.state === "no_eta")
-      return { text: "ETA —", color: "#A8A8A8", tip: "Waiting on stock — no supplier ETA entered yet" };
-    if (!se.etaIso) return null;
+  // Sub-line: Ready / No PO / supplier ETA while waiting. GREY — the tip keeps
+  // the detail (overdue/late), the 货 dot keeps the colour.
+  const sub = (() => {
+    if (key === "ready") return { text: "Ready", tip: title };
+    if (key === "no_po") return { text: "No PO", tip: title };
+    if (se.state === "no_eta" || !se.etaIso)
+      return { text: "ETA —", tip: "Waiting on stock — no supplier ETA entered yet" };
     const d = fmtDate(se.etaIso).split(", ")[0];
-    // v4 hues: red overdue · amber late; on-track is CONTENT (a date) → ink.
     if (se.state === "overdue")
-      return { text: `ETA ${d}`, color: "#A32D2D", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
+      return { text: `ETA ${d}`, tip: "Supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
-      return { text: `ETA ${d}`, color: "#854F0B", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
-    return { text: `ETA ${d}`, color: "#1A1A1A", tip: "Supplier arrival ETA — on track" };
+      return { text: `ETA ${d}`, tip: "Supplier ETA is later than the deadline − 3 days" };
+    return { text: `ETA ${d}`, tip: "Supplier arrival ETA — on track" };
   })();
 
   return (
-    <div className="leading-[1.3]">
-      <span
-        className="inline-flex items-center rounded-full whitespace-nowrap"
-        style={{
-          fontSize: "11px",
-          fontWeight: 600,
-          padding: "1px 9px",
-          color: S.text,
-          background: S.bg,
-          border: `1px solid ${S.border}`,
-        }}
-        title={title}
-        data-stock-state={info.state}
-      >
-        <span>{S.label}</span>
-        {coreTotal > 0 && (
-          <span className="tabular-nums" style={{ marginLeft: 6, fontWeight: 700 }}>
-            {num}/{coreTotal}
-          </span>
-        )}
-      </span>
-      {eta && (
-        <div
-          className="tabular-nums"
-          style={{ fontSize: "10.5px", fontWeight: 600, color: eta.color, marginTop: 1 }}
-          title={eta.tip}
-          data-stock-eta={se.state}
-        >
-          {eta.text}
+    <div style={{ lineHeight: "15px" }} title={title} data-stock-state={info.state}>
+      {coreTotal > 0 ? (
+        <div className="tabular-nums t4-row-strong truncate">
+          {num}/{coreTotal}
         </div>
+      ) : (
+        <div className="text-base-300">—</div>
       )}
+      <div
+        className="tabular-nums t4-caption truncate"
+        title={sub.tip}
+        data-stock-eta={se.state}
+      >
+        {sub.text}
+      </div>
     </div>
   );
 }
@@ -2669,7 +2695,8 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#4A4335", fontSize: "11px", letterSpacing: "0.04em" }}
+      /* v4 header: DARK 12/600 cool ink (warm #4A4335 retired). */
+      style={{ color: "#374151", fontSize: "12px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
