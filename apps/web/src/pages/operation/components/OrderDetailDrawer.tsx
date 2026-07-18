@@ -3112,28 +3112,53 @@ function DrawerBody({
                 hasSof={hasSof}
                 deadline={!order.delivery_date_tbd ? order.delivery_date : null}
               />
-              <div className="px-3 pb-3 space-y-1">
-                <StorageCollectWaiver
-                  orderId={order.id}
-                  control={form.control}
-                  charge={
-                    form.draft.storage_fee_override.trim()
-                      ? Number(form.draft.storage_fee_override)
-                      : storageCharge
-                  }
-                />
-                <StorageExtensionRow
-                  orderId={order.id}
-                  control={form.control}
-                  hasMsbf={hasMsbf}
-                  hasSof={hasSof}
-                  meta={{
-                    orderCode: `SO-${order.so}`,
-                    customerName: order.customer_name ?? "",
-                    customerPhone: order.customer_phone ?? "",
-                  }}
-                />
-              </div>
+              {/* The flows show ONLY when storage is actually in play — a
+                  not-storing order ends at the quiet card above (Jess: no
+                  floating collect buttons on orders that never stored). Each
+                  flow sits in its own framed zone. */}
+              {(() => {
+                const waiverState =
+                  form.control?.storage_waiver_status ?? "none";
+                const storageActive =
+                  storageIncurred ||
+                  !!form.control?.storage_collected_at ||
+                  waiverState !== "none";
+                const extActive =
+                  storageActive || (form.control?.extension_count ?? 0) > 0;
+                if (!storageActive && !extActive) return null;
+                return (
+                  <div className="px-3 pb-3 space-y-2">
+                    {storageActive && (
+                      <div className="rounded-[10px] border border-base-200/70">
+                        <StorageCollectWaiver
+                          orderId={order.id}
+                          control={form.control}
+                          charge={
+                            form.draft.storage_fee_override.trim()
+                              ? Number(form.draft.storage_fee_override)
+                              : storageCharge
+                          }
+                        />
+                      </div>
+                    )}
+                    {extActive && (
+                      <div className="rounded-[10px] border border-base-200/70">
+                        <StorageExtensionRow
+                          orderId={order.id}
+                          control={form.control}
+                          hasMsbf={hasMsbf}
+                          hasSof={hasSof}
+                          meta={{
+                            orderCode: `SO-${order.so}`,
+                            customerName: order.customer_name ?? "",
+                            customerPhone: order.customer_phone ?? "",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </Panel>
             </SectionCard>
           )}
