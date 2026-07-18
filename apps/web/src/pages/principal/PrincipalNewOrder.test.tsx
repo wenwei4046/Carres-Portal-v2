@@ -31,6 +31,14 @@ const { mockRawCreate, mockHooks } = vi.hoisted(() => {
       useSalespersons: vi.fn(),
       useCatalog: vi.fn(),
       useRawCreateOrder: vi.fn(() => ({ mutateAsync: mockRawCreate, isPending: false })),
+      // Pay online (Stripe) — the modal mints a checkout link on mount; keep it
+      // inert in tests (never resolves a session; status query idle).
+      useCancelOrder: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      useCreateStripeCheckout: vi.fn(() => ({
+        mutateAsync: vi.fn(() => new Promise(() => {})),
+        isPending: false,
+      })),
+      useStripeCheckoutStatus: vi.fn(() => ({ data: undefined })),
     },
   };
 });
@@ -369,6 +377,39 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(input.paid).toBe(2000);
     expect(input.paymentMethod).toBe("credit");
     expect(input.entryData).toEqual({ payment: { bank: "Maybank" } });
+  });
+
+  it("Pay online (Stripe) is offered: creates the order UNPAID and opens the QR / link modal", async () => {
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-5",
+      so: 1305,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
+    wrap();
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    fireEvent.change(firstSkuInput(), { target: { value: "CUSTOM LINE" } });
+
+    // The built-in Pay online method rides after the configured list.
+    fireEvent.change(screen.getByTestId("raw-payment-method"), { target: { value: "stripe" } });
+    // Stripe needs no manual proof — the approval/reference field hides.
+    expect(screen.queryByText("Approval / reference code")).toBeNull();
+    expect(screen.getByTestId("raw-stripe-note")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("raw-paid"), { target: { value: "500" } });
+
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    // The order creates with paid 0 (money moves only when Stripe confirms)…
+    await vi.waitFor(() => expect(mockRawCreate).toHaveBeenCalledTimes(1));
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.paid).toBe(0);
+    expect(input.paymentMethod).toBe("stripe");
+    expect(input.approvalCode).toBeNull();
+    // …and the QR / link modal opens instead of the done card.
+    await screen.findByTestId("pos-stripe-modal");
+    expect(screen.queryByText("Order SO-1305 created")).toBeNull();
   });
 
   it("nothing gates beyond dealer + name + one line: dates/payment empty submit as TBD/nulls; remarks + attrs ride", async () => {
