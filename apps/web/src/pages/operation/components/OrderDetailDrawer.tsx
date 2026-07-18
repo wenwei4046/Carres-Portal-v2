@@ -2266,15 +2266,15 @@ function DrawerBody({
                           <tr
                             onClick={() => setPickerSku(l.sku)}
                             className={`cursor-pointer h-[52px] transition-opacity ${
-                              /* rev18b (Jess: "i still see blue?") — the blue
-                                 SELECTION wash shows ONLY while the warehouse
-                                 picker is actually open (activeLineSku
-                                 defaults to the first line, so gating on
-                                 pickerOpen stops a permanent mystery-blue
-                                 first row). */
+                              /* rev19 (Jess: option A colour states) — ONE
+                                 blue family, three strengths: idle = white ·
+                                 hover = whisper blue (the old base-50 grey
+                                 was invisible) · selected (picker open for
+                                 this line) = blue wash + 3px blue left bar.
+                                 Hover previews selection — same colour story. */
                               pickerOpen && l.sku === activeLineSku
-                                ? "bg-[#e6f1fb]"
-                                : `hover:bg-base-50 ${
+                                ? "bg-info-soft/60 shadow-[inset_3px_0_0_hsl(var(--info))]"
+                                : `hover:bg-info-soft/25 ${
                                     pickerOpen ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
