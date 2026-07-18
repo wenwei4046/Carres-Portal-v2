@@ -8,6 +8,7 @@ import {
   useOperationStock,
   useDeliveryPartners,
   useOperationStaff,
+  useOperationPoDuty,
   useUpdateStaffSetting,
   useAssignOrderStaff,
   assignOrderStaffRequest,
@@ -38,10 +39,15 @@ import {
   seenTodayMYT,
   countsAsInToday,
   isOpsManager,
+  canRaisePo,
+  isPoDayMYT,
+  poUrgentBypass,
   type OpsTask,
   type OpsTasksListResponse,
   type OpsStaffMember,
 } from "@carres/shared";
+import RaisePoReview from "./components/RaisePoReview";
+import type { RaisePoOrder } from "./components/raise-po-plan";
 import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
@@ -65,6 +71,7 @@ import {
   Users,
   CircleDollarSign,
   Package,
+  PackagePlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -274,6 +281,21 @@ function openTaskOf(tasks: OpsTask[]): OpsTask | null {
 
 /** Days from today to the customer deadline (negative = overdue); null when the
  *  order carries no actionable date (TBD / undated). */
+/** Row → the pure Raise-PO plan input (0236 consolidated PO review). */
+function toRaisePoOrder(o: operationOrderListRow): RaisePoOrder {
+  return {
+    id: o.id,
+    so: o.so ?? null,
+    deliveryDate: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
+    lines: (o.order_lines ?? []).map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty || 0),
+      sourcePo: (l as { source_po?: string | null }).source_po ?? null,
+      attrs: (l as { attrs?: Record<string, unknown> | null }).attrs ?? null,
+    })),
+  };
+}
+
 function daysToDue(o: operationOrderListRow): number | null {
   if (o.delivery_date_tbd || !o.delivery_date) return null;
   const d = new Date(`${o.delivery_date}T00:00:00`);
@@ -1082,6 +1104,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
   const isManager = isOpsManager(authRole, authEmail);
+  // PO duty (0236, Jess 人分单货合买): this month's PO controller — gates the
+  // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
+  // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
+  // holder null → no gate, no badge, no banner.
+  const authUserId = useAuth((s) => s.user?.id ?? null);
+  const dutyQ = useOperationPoDuty();
+  const poDutyHolder = dutyQ.data?.holder ?? null;
+  const canRaise = canRaisePo(
+    poDutyHolder?.userId ?? null,
+    authUserId,
+    authRole,
+    authEmail,
+    isOpsManager,
+  );
+  // The consolidated Raise-PO review (Option A cards); null = closed.
+  const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
   const staffQ = useOperationStaff();
   const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
   const staffById = useMemo(
@@ -1245,6 +1283,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
       count: m.get(b) ?? 0,
     }));
   }, [liveScope, availableBySku]);
+
+  // URGENT BYPASS (PO duty spec, Jess 2026-07-18): open orders whose deadline
+  // sits inside the stock lead window (MS/BF 7d · sofa 5d) with stock NOT
+  // secured — flagged red ANY day, must not wait for the Mon/Thu PO day.
+  const urgentPoCount = useMemo(
+    () =>
+      liveScope.filter((o) => {
+        if (stockBucketOf(o, availableBySku) === "Ready") return false;
+        const cats = CORE_ORDER.filter((c) => orderHasCore(o, c));
+        return poUrgentBypass(o.delivery_date_tbd ? null : o.delivery_date, cats);
+      }).length,
+    [liveScope, availableBySku],
+  );
 
   const logisticEntries = useMemo(() => {
     const m = new Map<string, number>();
@@ -1659,6 +1710,49 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }),
     });
 
+  // PO-day banner (Mon/Thu) + urgent bypass (any day) — shown to the duty
+  // holder + management only; other staff's day is unchanged.
+  const waitingCount = stockEntries.find((e) => e.bucket === "Waiting")?.count ?? 0;
+  const noPoCount = stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0;
+  const showPoBanner =
+    !!poDutyHolder &&
+    (isManager || authUserId === poDutyHolder.userId) &&
+    (isPoDayMYT() || urgentPoCount > 0);
+  const poBanner = showPoBanner && poDutyHolder ? (
+    <div
+      className="w-full flex items-center gap-2 rounded-xl border border-base-200 bg-white px-3 py-1.5 text-[12px]"
+      data-testid="po-day-banner"
+    >
+      <PackagePlus size={14} className="text-base-500" strokeWidth={2} />
+      {urgentPoCount > 0 ? (
+        <span className="font-semibold text-destructive">
+          {urgentPoCount} urgent — deadline inside the stock window, don&rsquo;t wait for PO day
+        </span>
+      ) : (
+        <span className="text-base-700">
+          <span className="font-semibold">PO day</span> — {waitingCount} waiting stock ·{" "}
+          {noPoCount} no PO
+        </span>
+      )}
+      <span className="text-base-400">
+        PO duty: {poDutyHolder.name ?? poDutyHolder.email}
+      </span>
+      {canRaise && (
+        <button
+          type="button"
+          onClick={() =>
+            setRaisePoOrders(
+              liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
+            )
+          }
+          className="ml-auto btn-secondary text-[12px] py-0.5 px-2"
+        >
+          Raise PO
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
       <ListPageShell
@@ -1790,7 +1884,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           /* PIC tabs on the RIGHT listing too (Jess 2026-07-18: "every staff
              and no pic … as tab, can click to see total list of them") — the
              SAME staffFilter the left TEAM rows drive; click either side. */
-          poolStaff.length > 0 ? (
+          poBanner || poolStaff.length > 0 ? (
+            <div className="w-full flex flex-col gap-1.5">
+              {poBanner}
+              {poolStaff.length > 0 && (
             <div className="w-full flex items-center gap-1.5 justify-start overflow-x-auto no-scrollbar">
               <StaffChip
                 label="Everyone"
@@ -1819,6 +1916,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }
               />
             </div>
+              )}
+            </div>
           ) : undefined
         }
         bulkBar={
@@ -1834,6 +1933,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
               setMenu={setBulkMenu}
               partners={partnersQ.data?.partners ?? []}
               onAssign={bulkAssignLogistic}
+              onRaisePo={() => setRaisePoOrders(selectedOrders)}
+              canRaisePo={canRaise}
+              raisePoTitle={
+                canRaise
+                  ? "Raise consolidated POs — one per supplier — for the selection"
+                  : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
+              }
               onFlag={bulkCreateTasks}
               onExport={exportSelectedCsv}
               onPrint={printSelected}
@@ -1978,30 +2084,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     ) : undefined
                   }
                 >
-                  {poolStaff.map((s) => (
-                    <KanbanRow
-                      key={s.user_id}
-                      label={
-                        !s.available
-                          ? `${staffLabel(s)} · away`
-                          : !seenTodayMYT(s.last_seen_at)
-                            ? `${staffLabel(s)} · not in`
-                            : staffLabel(s)
-                      }
-                      count={staffEntries.counts.get(s.user_id) ?? 0}
-                      active={staffFilter === s.user_id}
-                      title={
-                        !s.available
-                          ? `${s.email} — marked away (planned leave); their orders shift to the others`
-                          : !seenTodayMYT(s.last_seen_at)
-                            ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
-                            : s.email
-                      }
-                      onClick={() =>
-                        setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
-                      }
-                    />
-                  ))}
+                  {poolStaff.map((s) => {
+                    const presence = !s.available
+                      ? `${staffLabel(s)} · away`
+                      : !seenTodayMYT(s.last_seen_at)
+                        ? `${staffLabel(s)} · not in`
+                        : staffLabel(s);
+                    // PO duty badge (0236) — the month's PO controller.
+                    const isDuty = poDutyHolder?.userId === s.user_id;
+                    const baseTitle = !s.available
+                      ? `${s.email} — marked away (planned leave); their orders shift to the others`
+                      : !seenTodayMYT(s.last_seen_at)
+                        ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
+                        : s.email;
+                    return (
+                      <KanbanRow
+                        key={s.user_id}
+                        label={isDuty ? `${presence} · PO duty` : presence}
+                        count={staffEntries.counts.get(s.user_id) ?? 0}
+                        active={staffFilter === s.user_id}
+                        title={
+                          isDuty
+                            ? `${baseTitle} — controls POs this month (PO duty)`
+                            : baseTitle
+                        }
+                        onClick={() =>
+                          setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
+                        }
+                      />
+                    );
+                  })}
                   {/* "No PIC", NOT "Unassigned" — that word already means
                       no-logistic in CHASE NOW (Jess 2026-07-18, word law). */}
                   <KanbanRow
@@ -2260,6 +2372,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </div>
       </ListPageShell>
 
+      {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
+          bar's selection or the PO-day banner's waiting set. */}
+      {raisePoOrders && (
+        <RaisePoReview
+          orders={raisePoOrders.map(toRaisePoOrder)}
+          availableBySku={availableBySku}
+          onClose={() => {
+            setRaisePoOrders(null);
+            clearSel();
+            void refetch();
+          }}
+        />
+      )}
+
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
 
@@ -2292,6 +2418,9 @@ function OrdersBulkBar({
   setMenu,
   partners,
   onAssign,
+  onRaisePo,
+  canRaisePo,
+  raisePoTitle,
   onFlag,
   onExport,
   onPrint,
@@ -2309,6 +2438,9 @@ function OrdersBulkBar({
   setMenu: (m: null | "menu" | "assign") => void;
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
+  onRaisePo: () => void;
+  canRaisePo: boolean;
+  raisePoTitle: string;
   onFlag: () => void;
   onExport: () => void;
   onPrint: () => void;
@@ -2376,6 +2508,17 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
+      {/* Raise PO — consolidated per-supplier review (0236: duty holder +
+          management only; disabled title names whose month it is). */}
+      <button
+        type="button"
+        onClick={onRaisePo}
+        disabled={busy || !canRaisePo}
+        title={raisePoTitle}
+        className={btn}
+      >
+        <PackagePlus size={14} /> Raise PO
+      </button>
       {/* Flag for follow-up (creates a follow-up task per selected order). */}
       <button type="button" onClick={onFlag} disabled={busy} className={btn}>
         <Flag size={14} /> Flag
