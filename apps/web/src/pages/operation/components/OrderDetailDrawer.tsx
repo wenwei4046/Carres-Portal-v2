@@ -4311,6 +4311,62 @@ async function viewSlip(p: OrderPaymentRow) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
+/** Balance workflow strip (Jess 2026-07-18) — the 1·2·3 every operator
+ *  follows: ① amount → ② collect → ③ settled. The current step carries an
+ *  action hint so nobody has to guess what to look at. Ink = current,
+ *  grey ✓ = done (colour discipline — no new hues). */
+function BalanceSteps({
+  step,
+  labels,
+  hint,
+}: {
+  step: 1 | 2 | 3;
+  labels: [string, string, string];
+  hint: string;
+}) {
+  return (
+    <div className="col-span-2">
+      <div className="flex items-center gap-2">
+        {labels.map((l, i) => {
+          const n = (i + 1) as 1 | 2 | 3;
+          const done = n < step;
+          const current = n === step;
+          return (
+            <Fragment key={l}>
+              {i > 0 && <div className="h-0.5 w-6 rounded bg-base-200 shrink-0" />}
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span
+                  className={`w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ${
+                    done
+                      ? "bg-base-300 text-white"
+                      : current
+                        ? "bg-base-900 text-white"
+                        : "border border-base-300 text-base-400"
+                  }`}
+                >
+                  {done ? <Check size={14} strokeWidth={3} /> : n}
+                </span>
+                <span
+                  className={`text-[12px] ${
+                    current
+                      ? "font-bold text-base-900"
+                      : done
+                        ? "text-base-500"
+                        : "text-base-400"
+                  }`}
+                >
+                  {l}
+                </span>
+              </span>
+            </Fragment>
+          );
+        })}
+      </div>
+      <div className="mt-1 text-[12px] text-base-500">{hint}</div>
+    </div>
+  );
+}
+
 /** One charge row of the invoice list — label left, amount right (v4 §3:
  *  words Inter, amounts the ONE money recipe). */
 function ChargeRow({
@@ -4434,6 +4490,20 @@ function MoneyCard({
     return s === "K" ? "King" : s === "Q" ? "Queen" : s === "S" ? "Single" : null;
   };
 
+  // The 1·2·3 workflow state — ① amount keyed ② collecting ③ settled.
+  const step: 1 | 2 | 3 = !totalSet ? 1 : balanceDue > 0 ? 2 : 3;
+  const stepLabels: [string, string, string] = hasLineTotal
+    ? ["Total", "Collect", "Settled"]
+    : ["Set outstanding", "Collect", "Settled"];
+  const stepHint =
+    step === 1
+      ? hasLineTotal
+        ? "The total comes from the priced items below."
+        : "Key the balance owing from your Master / AutoCount. Storage adds on top automatically."
+      : step === 2
+        ? `Collect ${RM(balanceDue)} — record every payment received here, with its slip.`
+        : "Fully settled — print the receipt for the customer.";
+
   // The keyed-total entry — the goods amount on an AutoCount order.
   const keyedTotalNode =
     editingTotal || orderTotal <= 0 ? (
@@ -4454,7 +4524,7 @@ function MoneyCard({
         onChange={(e) => form.set("balance", e.target.value)}
         onFocus={() => setEditingTotal(true)}
         onBlur={() => setEditingTotal(false)}
-        placeholder="Set total (RM)"
+        placeholder={hasLineTotal ? "Set total (RM)" : "Outstanding (RM)"}
         aria-label="Order total"
         className="w-32 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
       />
@@ -4471,6 +4541,8 @@ function MoneyCard({
 
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-x-5 gap-y-2.5 items-start">
+      {/* Follow-the-steps strip — Jess: every staff just follows 1·2·3. */}
+      <BalanceSteps step={step} labels={stepLabels} hint={stepHint} />
       {/* Delivery-eve red flag (§3.2) — spans both columns. */}
       {deliveryEve && (
         <div
@@ -4506,7 +4578,7 @@ function MoneyCard({
           ) : (
             <div className="flex items-center justify-between gap-3 py-1.5">
               <span className="min-w-0 truncate text-[13px] text-base-800">
-                Goods
+                Outstanding
                 <button
                   type="button"
                   onClick={onShowItems}
@@ -4535,12 +4607,16 @@ function MoneyCard({
           />
           {/* Total = goods + storage — top-bordered, bold. */}
           <div className="flex items-center justify-between gap-3 py-2 border-t border-base-200">
-            <span className="text-[13px] font-bold text-base-900">Total</span>
+            <span className="text-[13px] font-bold text-base-900">
+              {hasLineTotal ? "Total" : "To collect"}
+            </span>
             {totalSet ? (
               <Money value={invoiceTotal} tone="row" className="text-base-900" />
             ) : (
               <span className="text-[12px] text-base-400">
-                set the goods total above
+                {hasLineTotal
+                  ? "set the goods total above"
+                  : "key the outstanding above"}
               </span>
             )}
           </div>
@@ -4649,7 +4725,9 @@ function MoneyCard({
             <span className="text-[13px] font-bold text-base-900">Balance due</span>
             {!totalSet ? (
               <span className="text-[12px] text-base-400">
-                Set the goods total to calculate
+                {hasLineTotal
+                  ? "Set the goods total to calculate"
+                  : "Key the outstanding to calculate"}
               </span>
             ) : balanceDue > 0 ? (
               <Money value={balanceDue} tone="hero" className="text-danger" />

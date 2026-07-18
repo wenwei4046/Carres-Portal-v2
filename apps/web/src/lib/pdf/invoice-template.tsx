@@ -118,12 +118,12 @@ function formatMoney(value: number, currency: string): string {
 }
 
 export function InvoiceTemplate(data: InvoiceTemplateData) {
-  const { invoice_no, issue_date, order_code, customer, dealer, lines, subtotal, tax_amount, total, currency } = data;
+  const { doc_title, invoice_no, issue_date, order_code, customer, dealer, lines, subtotal, tax_amount, total, currency } = data;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
-          docTitle="TAX INVOICE"
+          docTitle={doc_title ?? "TAX INVOICE"}
           docMetaRows={[invoice_no, `Date: ${issue_date}`, `Order: ${order_code}`]}
         />
 
