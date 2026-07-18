@@ -532,7 +532,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const orderCell = within(row).getByText("SO-3012").closest("td")!;
     expect(orderCell).toHaveAttribute("title", "012-3456789");
     expect(within(row).getByText("TCF2024/06-461").closest("td")).toBe(orderCell);
-    expect(within(row).getByTestId("row-dots").children).toHaveLength(3);
+    // Option C (round-3): quiet-when-good — the Status cell renders either a
+    // single green ✓ or only the amber/red line icons, never bare dots.
+    expect(within(row).getByTestId("row-dots").children.length).toBeGreaterThan(0);
   });
 
   it("a delivered order NEVER shows the red over pill (guardrail #2)", () => {

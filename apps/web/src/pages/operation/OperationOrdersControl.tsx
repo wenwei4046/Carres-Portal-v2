@@ -60,6 +60,8 @@ import {
   Printer,
   MoreVertical,
   Users,
+  CircleDollarSign,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -496,19 +498,19 @@ const NO_STAFF = "__none" as const;
 function ownerOf(o: operationOrderListRow): string | null {
   return ovlOf(o)?.assigned_staff ?? null;
 }
-/** First name (or the email local-part) — the facet tab label. */
+/** The calling-name as keyed in app_users.name ("Shasha" / "Khor Yee" /
+ *  "Li Ching") — the facet tab label. Falls back to the email local-part. */
 function staffLabel(m: OpsStaffMember): string {
   const n = (m.name ?? "").trim();
-  if (n) return n.split(/\s+/)[0]!;
-  return m.email.split("@")[0] || m.email;
+  return n || m.email.split("@")[0] || m.email;
 }
-/** Two-letter avatar code: FIRST + LAST letter of the calling-name (Jess
- *  2026-07-18) — stays distinct where first-two collide (Shasha→SA · Ching→CG
- *  · Chow→CW · Joy→JY). Falls back to the email local-part. */
+/** Avatar code (Jess round-3, 2026-07-18): first letter of each WORD of the
+ *  name, MAX 2 letters — "Khor Yee"→KY · "Li Ching"→LC; a single-word name
+ *  takes its first two letters — "Shasha"→SH. */
 function staffInitials(m: OpsStaffMember): string {
-  const nick = staffLabel(m);
-  if (nick.length >= 2) return (nick[0]! + nick[nick.length - 1]!).toUpperCase();
-  return (nick || m.email.slice(0, 2)).toUpperCase();
+  const words = staffLabel(m).split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return (words[0] ?? m.email).slice(0, 2).toUpperCase();
 }
 
 /** Per-person identity colour for the PIC avatar — a fixed muted palette that
@@ -1262,14 +1264,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [tabFiltered],
   );
 
-  // STAFF facet counts — per pool member + Unassigned, over the current tab.
+  // STAFF facet counts — per pool member + "No PIC", over the current tab.
+  // A DELIVERED order without a PIC is closed work, not "nobody watching" —
+  // it never counts toward No PIC (guardrail #2 spirit).
   const staffEntries = useMemo(() => {
     const counts = new Map<string, number>();
     let none = 0;
     for (const o of tabFiltered) {
       const owner = ownerOf(o);
       if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1);
-      else none += 1;
+      else if (controlTabOf(o) !== "completed") none += 1;
     }
     return { counts, none };
   }, [tabFiltered]);
@@ -2642,9 +2646,47 @@ function StatusTabs({
 }
 
 
-/** Owner chip (0232) — 18px initials circle on every row; hollow when
- *  unassigned. Click = reassign popover (pool members + Unassign). Grey chrome
- *  only — status colour stays with the dots. */
+/** Row status icons — OPTION C (Jess 2026-07-18 round-3): all quiet → one
+ *  green ✓; otherwise only the amber/red lines appear, each as the icon the
+ *  team already knows: RM$ = money · box = stock · truck = delivery
+ *  (logistic). Grey (no data) stays silent. Tooltips carry the detail. */
+const LINE_ICONS: [LucideIcon, LucideIcon, LucideIcon] = [
+  CircleDollarSign,
+  Package,
+  Truck,
+];
+function RowStatusIcons({ dots }: { dots: [RowDot, RowDot, RowDot] }) {
+  const alerts = dots
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.color === DOT_HEX.amber || d.color === DOT_HEX.red);
+  return (
+    <div className="flex items-center gap-1.5" data-testid="row-dots">
+      {alerts.length === 0 ? (
+        <span title={`All good — ${dots.map((d) => d.title).join(" · ")}`}>
+          <CheckCircle2
+            size={14}
+            strokeWidth={2}
+            style={{ color: DOT_HEX.green }}
+            aria-label="All good"
+          />
+        </span>
+      ) : (
+        alerts.map(({ d, i }) => {
+          const Icon = LINE_ICONS[i]!;
+          return (
+            <span key={i} title={d.title}>
+              <Icon size={14} strokeWidth={2} style={{ color: d.color }} />
+            </span>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/** Owner chip (0232) — 20px initials avatar on every row; hollow when
+ *  unassigned. Click = reassign popover (management only). Identity colour,
+ *  never status colour. */
 function OwnerChip({
   o,
   staffById,
@@ -2831,21 +2873,14 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* 三线点 — Money · Stock · Delivery, the row's ONLY colour channel
-          (§14, C rebuild 2026-07-18). The staff owner lives in its own PIC
-          column (Jess 2026-07-18). */}
+      {/* Status (Jess picked OPTION C, 2026-07-18 round-3): quiet when good —
+          all lines green/grey → ONE green ✓; only the amber/red lines show
+          their recognisable icon (RM$ money · box stock · truck delivery),
+          coloured by state. Replaces the anonymous 三点 (new staff couldn't
+          read them). */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        <div className="flex items-center gap-[5px]" data-testid="row-dots">
-          {dots.map((d, i) => (
-            <span
-              key={i}
-              title={d.title}
-              className="inline-block w-2 h-2 rounded-full shrink-0"
-              style={{ background: d.color }}
-            />
-          ))}
-        </div>
+        <RowStatusIcons dots={dots} />
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the

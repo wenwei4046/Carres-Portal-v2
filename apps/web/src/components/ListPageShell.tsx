@@ -95,28 +95,25 @@ export default function ListPageShell({
       className={`h-full flex flex-col bg-background ${className}`}
       data-testid={testId}
     >
-      {/* Header — ONE single row (Jess 2026-07-18: breadcrumb + search/help/
-          settings share the row; the big title row is gone — the breadcrumb's
-          last crumb IS the page name, so a separate 56px title bar was pure
-          height). Pages without a breadcrumb keep a compact title instead. */}
-      <div className="shrink-0 bg-white border-b border-base-200 px-6 h-12 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex items-center gap-2.5">
-          {breadcrumb ? (
-            <div className="min-w-0 flex items-center gap-1.5 text-[13px] text-base-500">
-              {breadcrumb}
-            </div>
-          ) : (
-            <div className="min-w-0 truncate text-[15px] font-semibold text-base-900">
-              {title}
-            </div>
-          )}
+      {/* Header — TWO rows (Jess 2026-07-18 round-3): row 1 = breadcrumb with
+          the search/utility cluster on the SAME line (her round-2 ask); row 2 =
+          the page title + freshness stamp, KEPT (round-3: "i never ask you
+          removed my 2row header — Order + synced"). */}
+      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-1.5 text-[12px] text-base-400">
+            {breadcrumb}
+          </div>
+          {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
+        </div>
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <div className="min-w-0 truncate t-h2 text-base-900">{title}</div>
           {meta && (
             <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
               {meta}
             </div>
           )}
         </div>
-        {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
       </div>
 
       {/* Body split — facet aside (left) + right column (control strip + table),

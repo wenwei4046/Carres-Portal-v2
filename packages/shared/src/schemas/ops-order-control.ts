@@ -592,7 +592,12 @@ export function distributeOrders(
  *  (Jess 2026-07-18: "operation@carres.com — should only me and others
  *  management only"). Everyone else sees assignments read-only. One rule,
  *  two consumers: the web hides the controls, the API enforces. */
-export const OPS_MANAGER_EMAILS = ["operation@carres.com"] as const;
+/** jess@carres.com pre-listed (2026-07-18): Jess should run on her OWN login
+ *  — the shared operation@ account can't tell the audit trail who acted. */
+export const OPS_MANAGER_EMAILS = [
+  "operation@carres.com",
+  "jess@carres.com",
+] as const;
 export function isOpsManager(
   role: string | null | undefined,
   email: string | null | undefined,
