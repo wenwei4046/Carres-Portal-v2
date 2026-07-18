@@ -319,7 +319,6 @@ export default function PosConfigurePage({
   customerPhone,
   onApplyVoucherCode,
   editLine,
-  initialSkuId,
   onAdd,
   onClose,
 }: {
@@ -355,9 +354,6 @@ export default function PosConfigurePage({
    *  then REPLACES the line in the cart instead of appending. A PWP / free
    *  claim on the old line is NOT restored — the cart re-offers it. */
   editLine?: DraftLine;
-  /** SKU-search entry (Maintain → New Order): preselect this size at mount so
-   *  a search hit lands configured to its variant. Read once; editLine wins. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -424,7 +420,7 @@ export default function PosConfigurePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [skuId, setSkuId] = useState<string>(edit?.skuId ?? initialSkuId ?? "");
+  const [skuId, setSkuId] = useState<string>(edit?.skuId ?? "");
   // Mattress gap is THREE-state (Loo 2026-07-11): Confirm later (KIV, the
   // default — the customer hasn't decided yet; rides attrs.gap = "KIV" so the
   // PO/PDF show the pending choice) · None ("" — explicitly no gap) · a value.

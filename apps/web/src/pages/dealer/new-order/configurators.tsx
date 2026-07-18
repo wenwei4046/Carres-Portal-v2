@@ -81,21 +81,18 @@ export function MattressConfigurator({
   model,
   skus,
   specialAddons,
-  initialSkuId,
   onAdd,
   variantLabel = "Size",
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry (Maintain → New Order): preselect this variant. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
   /** Field caption for the variant axis — "Size" for a mattress; an accessory
    *  reuses this generic pick-variant + qty configurator as "Option". */
   variantLabel?: string;
 }) {
-  const [skuId, setSkuId] = useState<string>(initialSkuId ?? "");
+  const [skuId, setSkuId] = useState<string>("");
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons);
@@ -152,14 +149,11 @@ export function BedframeConfigurator({
   model,
   skus,
   specialAddons,
-  initialSkuId,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry (Maintain → New Order): preselect this size. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
 }) {
   // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color). The
@@ -169,7 +163,7 @@ export function BedframeConfigurator({
   // models — a stale color/gap id matches nothing in the new model's options,
   // the dropdown silently renders blank, and the line is added with attrs that
   // don't reflect a real selection.
-  const [skuId, setSkuId] = useState<string>(initialSkuId ?? "");
+  const [skuId, setSkuId] = useState<string>("");
   const [color, setColor] = useState<string>(model.colors?.[0] ?? "");
   const [gap, setGap] = useState<string>(model.gaps?.[0] ?? "");
   const [qty, setQty] = useState(1);
@@ -262,7 +256,6 @@ export function SofaConfigurator({
   fabricTierConfig,
   modelFabricTierOverrides,
   specialAddons,
-  initialSkuId,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -273,9 +266,6 @@ export function SofaConfigurator({
   /** Per-model tier overrides array (from catalog bundle). May be absent; looked up by model.id. */
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry (Maintain → New Order): preselect this variant; the
-   *  initial mode follows its variantKind (part → custom) when allowed. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
 }) {
   // Mode = 'preset' (pick a complete sub-model) or 'custom' (pick a part).
@@ -293,20 +283,8 @@ export function SofaConfigurator({
       : model.sofaMode === "custom"
         ? ["custom"]
         : ["preset"];
-  // SKU-search preselect: land in the mode the initial sku belongs to (when
-  // that mode is allowed), otherwise fall back to the default first mode.
-  const initialSku = initialSkuId ? skus.find((s) => s.id === initialSkuId) : undefined;
-  const initialMode: "preset" | "custom" | null = initialSku
-    ? initialSku.variantKind === "part"
-      ? "custom"
-      : "preset"
-    : null;
-  const [mode, setMode] = useState<"preset" | "custom">(
-    initialMode && allowed.includes(initialMode) ? initialMode : allowed[0] ?? "preset",
-  );
-  const [skuId, setSkuId] = useState<string>(
-    initialMode && allowed.includes(initialMode) ? initialSku?.id ?? "" : "",
-  );
+  const [mode, setMode] = useState<"preset" | "custom">(allowed[0] ?? "preset");
+  const [skuId, setSkuId] = useState<string>("");
   const [fabricId, setFabricId] = useState<string>(fabrics[0]?.id ?? "");
   const [qty, setQty] = useState(1);
 
@@ -478,7 +456,6 @@ export function ConfiguratorForModel({
   modelSofaCompartments,
   sofaCombos,
   specialAddons,
-  initialSkuId,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -497,20 +474,10 @@ export function ConfiguratorForModel({
   /** Special add-ons (0181) — the full catalog set; each configurator filters to
    *  the codes this model offers (allowed_options.specials). */
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry (Maintain → New Order): preselect this variant. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
 }) {
   if (model.category === "mattress") {
-    return (
-      <MattressConfigurator
-        model={model}
-        skus={skus}
-        specialAddons={specialAddons}
-        initialSkuId={initialSkuId}
-        onAdd={onAdd}
-      />
-    );
+    return <MattressConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
   }
   if (model.category === "accessory") {
     // Accessories are POS cards too (2990s parity) — the generic pick-variant
@@ -520,22 +487,13 @@ export function ConfiguratorForModel({
         model={model}
         skus={skus}
         specialAddons={specialAddons}
-        initialSkuId={initialSkuId}
         onAdd={onAdd}
         variantLabel="Option"
       />
     );
   }
   if (model.category === "bedframe") {
-    return (
-      <BedframeConfigurator
-        model={model}
-        skus={skus}
-        specialAddons={specialAddons}
-        initialSkuId={initialSkuId}
-        onAdd={onAdd}
-      />
-    );
+    return <BedframeConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
   }
   if (model.category === "sofa") {
     return (
@@ -549,7 +507,6 @@ export function ConfiguratorForModel({
         modelSofaCompartments={modelSofaCompartments}
         sofaCombos={sofaCombos}
         specialAddons={specialAddons}
-        initialSkuId={initialSkuId}
         onAdd={onAdd}
       />
     );
@@ -577,7 +534,6 @@ function SofaConfiguratorOrBuilder({
   modelSofaCompartments,
   sofaCombos,
   specialAddons,
-  initialSkuId,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -589,9 +545,6 @@ function SofaConfiguratorOrBuilder({
   modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
   sofaCombos?: SofaComboDto[] | null;
   specialAddons?: SpecialAddonDto[] | null;
-  /** SKU-search entry — only the dropdown configurator uses it; the visual
-   *  builder path (offered compartments) ignores a variant preselect. */
-  initialSkuId?: string;
   onAdd: (line: DraftLine) => void;
 }) {
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -618,7 +571,6 @@ function SofaConfiguratorOrBuilder({
         fabricTierConfig={fabricTierConfig}
         modelFabricTierOverrides={modelFabricTierOverrides}
         specialAddons={specialAddons}
-        initialSkuId={initialSkuId}
         onAdd={onAdd}
       />
     );

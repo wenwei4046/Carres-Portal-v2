@@ -3,9 +3,10 @@
  * 2990s Backend "New Sales Order" shape — NOT the POS wizard).
  *
  * What matters here:
- *  1. Line rows are pick-or-type comboboxes: a configurable catalog pick opens
- *     the product's OWN configure surface (specs follow the product) and fills
- *     the row; free text stays a custom "OTHERS" line; prices stay editable.
+ *  1. Line rows are pick-or-type comboboxes: picking an item fills the row
+ *     DIRECTLY — it NEVER jumps into the product-option page (Loo
+ *     2026-07-18). Specs stay optional via the row's ✎; free text stays a
+ *     custom "OTHERS" line; prices stay editable.
  *  2. Nothing gates: dealer + customer name + ≥1 keyed line is ALL the form
  *     requires — dates optional (past OK, empty = TBD), payment optional.
  *  3. Submit maps the whole form onto RawCreateOrderInput (attrs, structured
@@ -160,7 +161,7 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(screen.getByTestId("raw-submit")).toBeTruthy();
   });
 
-  it("row combobox: a configurable catalog pick opens the configure page preselected, Add fills the row", () => {
+  it("row combobox: picking an item fills the row DIRECTLY — never jumps into the product-option page", () => {
     wrap();
     fireEvent.focus(firstSkuInput());
     fireEvent.change(firstSkuInput(), { target: { value: "cloud" } });
@@ -168,23 +169,35 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(screen.getByTestId("raw-pick-CLOUD-KING").textContent).toContain("POS off");
 
     fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
-    // The POS full-page configurator opens ALREADY configured to Queen.
-    expect(screen.getByTestId("pos-configure-page")).toBeTruthy();
-    expect(screen.getByTestId("cfg-live-total").textContent).toContain("2,890");
-
-    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    // NO configurator opened — the row is filled in place at catalog price.
     expect(screen.queryByTestId("pos-configure-page")).toBeNull();
-    // The ROW got filled (not appended) — sku input now holds the pick.
     expect((firstSkuInput() as HTMLInputElement).value).toBe("CLOUD-QUEEN");
     expect(screen.getByText("Carres Cloud · Queen")).toBeTruthy();
+    expect(screen.getAllByText("RM 2,890.00").length).toBeGreaterThan(0);
   });
 
-  it("prices stay editable after configuration (raw override)", () => {
+  it("specs stay OPTIONAL: the row's ✎ opens the product configurator prefilled and writes back", () => {
     wrap();
     fireEvent.focus(firstSkuInput());
     fireEvent.change(firstSkuInput(), { target: { value: "queen" } });
     fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
+
+    // ✎ is there (bed/mattress line) but nothing opened on its own.
+    expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    fireEvent.click(screen.getAllByLabelText("Edit specs")[0]!);
+    // The configurator opens PREFILLED from the row (Queen · RM 2,890).
+    expect(screen.getByTestId("pos-configure-page")).toBeTruthy();
+    expect(screen.getByTestId("cfg-live-total").textContent).toContain("2,890");
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
+    expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    expect((firstSkuInput() as HTMLInputElement).value).toBe("CLOUD-QUEEN");
+  });
+
+  it("prices stay editable after a pick (raw override)", () => {
+    wrap();
+    fireEvent.focus(firstSkuInput());
+    fireEvent.change(firstSkuInput(), { target: { value: "queen" } });
+    fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
 
     fireEvent.change(screen.getAllByLabelText("Unit price (RM)")[0]!, {
       target: { value: "1000" },
@@ -244,11 +257,10 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     fireEvent.change(screen.getByTestId("raw-customer-name"), {
       target: { value: "Raw Customer" },
     });
-    // Configure a catalog line (attrs flow through the row).
+    // Pick a catalog line — fills in place, no configurator.
     fireEvent.focus(firstSkuInput());
     fireEvent.change(firstSkuInput(), { target: { value: "queen" } });
     fireEvent.mouseDown(screen.getByTestId("raw-pick-CLOUD-QUEEN"));
-    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     // Row remark → attrs.remark.
     fireEvent.change(screen.getAllByLabelText("Line remarks")[0]!, {
       target: { value: "backfill from AutoCount" },
