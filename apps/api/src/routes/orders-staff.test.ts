@@ -63,8 +63,9 @@ function buildStorage() {
   };
 }
 
-/** Records .eq()/.or() then resolves rows at .order() — GET list. */
-function mockList(rows: unknown[]) {
+/** Records .eq()/.or() then resolves rows at .order() — GET list. `selfLink`
+ *  answers the salespersons-by-user_id probe (0232 salesperson-ROLE fallback). */
+function mockList(rows: unknown[], selfLink: unknown | null = null) {
   const eqs: Array<[string, unknown]> = [];
   const ors: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,6 +78,7 @@ function mockList(rows: unknown[]) {
       ors.push(expr);
       return chain;
     },
+    maybeSingle: async () => ({ data: selfLink, error: null }),
     order: async () => ({ data: rows, error: null }),
   };
   return Object.assign(
@@ -346,6 +348,36 @@ describe("GET /api/orders — staff scoping", () => {
     expect(sb._ors.length).toBe(0);
   });
 
+  // 0232 T4 fix — a salesperson-ROLE login is a person-level credential: the
+  // server derives the scope from salespersons.user_id, no PIN token needed.
+  it("salesperson ROLE (no token, linked) → scoped server-side by user_id", async () => {
+    const sb = mockList([], { id: SP1, outlet_id: OUTLET_1, staff_role: "salesperson" });
+    vi.mocked(userClient).mockReturnValue(sb);
+    vi.mocked(adminClient).mockReturnValue(mockAdminActivated(true));
+    const jwt = await makeJwt("salesperson", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._eqs).toContainEqual(["user_id", "11111111-1111-1111-1111-000000000999"]);
+    expect(sb._eqs).toContainEqual(["salesperson_id", SP1]);
+  });
+
+  it("salesperson ROLE unlinked → dormant passthrough, NEVER locked out (even activated)", async () => {
+    const sb = mockList([], null);
+    vi.mocked(userClient).mockReturnValue(sb);
+    vi.mocked(adminClient).mockReturnValue(mockAdminActivated(true));
+    const jwt = await makeJwt("salesperson", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._eqs).not.toContainEqual(["salesperson_id", SP1]);
+    expect(sb._ors.length).toBe(0);
+  });
+
   it("wrong-dealer token is treated as absent → 403 on an activated store", async () => {
     vi.mocked(userClient).mockReturnValue(mockList([]));
     vi.mocked(adminClient).mockReturnValue(mockAdminActivated(true));
@@ -534,6 +566,20 @@ describe("POST /api/orders — staff scoping", () => {
     const token = await staffToken("principal", null, SP1);
     const res = await postOrder(jwt, token, createBody());
     expect(res.status).toBe(403);
+  });
+
+  it("salesperson ROLE (no token, linked) → salesperson_id overwritten server-side", async () => {
+    const m = mockCreate({
+      salespersonRow: { id: SP1, dealer_id: DEALER_A, outlet_id: OUTLET_1, staff_role: "salesperson", active: true },
+    });
+    vi.mocked(userClient).mockReturnValue(m);
+    vi.mocked(adminClient).mockReturnValue(mockAdminActivated(true));
+    const jwt = await makeJwt("salesperson", DEALER_A);
+    const res = await postOrder(jwt, null, createBody({ salespersonId: SP_OTHER }));
+    expect(res.status).toBe(201);
+    const created = m._rpcCalls.find((r: { name: string }) => r.name === "create_order");
+    expect(created?.args.payload?.salesperson_id).toBe(SP1);
+    expect(created?.args.payload?.outlet_id).toBe(OUTLET_1);
   });
 
   it("internal role (operation on-behalf) is EXEMPT — no staff narrowing", async () => {

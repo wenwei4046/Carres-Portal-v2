@@ -144,6 +144,22 @@ async function resolveStaffScope(c: Context<AppEnv>): Promise<StaffScope> {
   if (!STAFF_SCOPED_ROLES.has(auth.role)) return { kind: "exempt" };
   const staff = await getStaffContext(c);
   if (staff) return { kind: "scoped", tier: staff.tier, sid: staff.sid, oid: staff.oid };
+  // A salesperson-ROLE login is already a person-level credential (their own
+  // email+password), so no PIN token is demanded: derive the scope server-side
+  // from the salespersons.user_id link. Unlinked → dormant (pre-0232
+  // behaviour), never a lockout.
+  if (auth.role === "salesperson") {
+    const { data } = await userClient(c.env, auth.jwt)
+      .from("salespersons")
+      .select("id, outlet_id, staff_role")
+      .eq("user_id", auth.id)
+      .maybeSingle();
+    if (data) {
+      const sp = data as { id: string; outlet_id: string | null; staff_role: StaffTierDto };
+      return { kind: "scoped", tier: sp.staff_role, sid: sp.id, oid: sp.outlet_id };
+    }
+    return { kind: "dormant" };
+  }
   // No valid token — the store's activation state decides refuse-vs-passthrough.
   if (auth.dealerId && (await isStoreActivated(c.env, auth.dealerId))) {
     return { kind: "required" };

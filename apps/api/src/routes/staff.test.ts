@@ -354,6 +354,54 @@ describe("POST /api/staff/reauth", () => {
     fetchSpy.mockRestore();
   });
 
+  it("returns the FULL owner-mode session shape (tier from role, staff null)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ access_token: "x" }), { status: 200 }));
+    vi.mocked(userClient).mockReturnValue(mockUser({ byUserId: null }));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/staff/reauth", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "correct-horse" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { tier: string; staff: unknown; outletId: unknown };
+    expect(body.tier).toBe("principal");
+    expect(body.staff).toBeNull();
+    expect(body.outletId).toBeNull();
+    fetchSpy.mockRestore();
+  });
+
+  // T4 review fix — the prod showroom login carries a legacy salesperson-tier
+  // user_id link; owner-mode must NOT be downgraded (or outlet-bound) by it.
+  it("legacy salesperson-tier user_id link does NOT downgrade showroom owner-mode", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ access_token: "x" }), { status: 200 }));
+    vi.mocked(userClient).mockReturnValue(
+      mockUser({ byUserId: spRow({ staff_role: "salesperson", user_id: SELF_USER, outlet_id: OUTLET_1 }) }),
+    );
+    const jwt = await makeJwt("showroom", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/staff/reauth", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "correct-horse" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { tier: string; staff: unknown; outletId: unknown };
+    expect(body.tier).toBe("manager");
+    expect(body.staff).toBeNull();
+    expect(body.outletId).toBeNull();
+    fetchSpy.mockRestore();
+  });
+
   it("bad password → 401", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")

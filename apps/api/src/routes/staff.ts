@@ -270,24 +270,21 @@ staffRouter.post("/reauth", async (c) => {
     return c.json({ error: "bad_password" }, 401);
   }
 
-  // Prefer a linked staff row's identity (sid/outlet/tier) when one exists;
-  // otherwise mint a bare owner-mode token (sid null) the wizard runs on.
-  const sb = userClient(c.env, auth.jwt);
-  const { data: linked } = await sb
-    .from("salespersons")
-    .select("*")
-    .eq("user_id", auth.id)
-    .maybeSingle();
+  // Owner-mode = the PASSWORD-proven store authority. Deliberately NOT bound
+  // to any legacy salespersons.user_id link — a linked row must never
+  // downgrade (or outlet-bind) the store credential (the prod showroom login
+  // carries exactly such a salesperson-tier link). sid stays null; the wizard
+  // / Settings decide which staff identity to create or claim.
   const ownerTier: StaffTierDto = auth.role === "showroom" ? "manager" : "principal";
-  const sp = linked as DB.SalespersonRow | null;
-
   const token = await mintStaffToken(c.env, {
-    sid: sp?.id ?? null,
+    sid: null,
     did: auth.dealerId,
-    oid: sp?.outlet_id ?? null,
-    tier: sp?.staff_role ?? ownerTier,
+    oid: null,
+    tier: ownerTier,
   });
-  return c.json({ token });
+  return c.json(
+    staffSessionResponseSchema.parse({ token, staff: null, tier: ownerTier, outletId: null }),
+  );
 });
 
 // ---------------------------------------------------------------------------
