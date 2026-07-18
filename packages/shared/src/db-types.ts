@@ -104,6 +104,10 @@ export interface OutletRow {
   created_at: string;
 }
 
+// 0232 — POS staff tier. Distinct from the app_role JWT `Role`: staff tiers
+// live under ONE store login and are proven per-session by a 6-digit PIN.
+export type StaffTier = "principal" | "manager" | "salesperson";
+
 export interface SalespersonRow {
   id: string;
   dealer_id: string;
@@ -112,6 +116,10 @@ export interface SalespersonRow {
   phone: string | null;
   user_id: string | null;
   created_at: string;
+  // 0232 staff PIN login
+  staff_role: StaffTier;
+  color: string | null;
+  active: boolean;
 }
 
 export interface ProductModelRow {

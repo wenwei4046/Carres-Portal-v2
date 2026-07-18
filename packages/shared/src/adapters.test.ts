@@ -10,6 +10,7 @@ import {
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
+  salespersonFromRow,
   pwpCodeFromRow,
   pwpDiscoverFromRow,
   pwpRuleFromRow,
@@ -29,6 +30,7 @@ import type {
   PwpCodeRow,
   PwpDiscoverRow,
   PwpRuleRow,
+  SalespersonRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
   SpecialDeliveryFeeRuleRow,
@@ -1114,5 +1116,38 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
     expect(out).not.toHaveProperty("triggerItemCode");
     expect(out).not.toHaveProperty("redeemedItemSku");
     expect(out).not.toHaveProperty("customerId");
+  });
+});
+
+describe("salespersonFromRow (0232 staff PIN login)", () => {
+  const row: SalespersonRow = {
+    id: "22222222-2222-4222-8222-222222222222",
+    dealer_id: DEALER_ID,
+    outlet_id: null,
+    name: "Aina",
+    phone: "0123456789",
+    user_id: null,
+    created_at: "2026-07-18T00:00:00Z",
+    staff_role: "manager",
+    color: "ocean",
+    active: true,
+  };
+
+  it("maps the 0232 tier/color/active columns", () => {
+    const d = salespersonFromRow(row);
+    expect(d.staffRole).toBe("manager");
+    expect(d.color).toBe("ocean");
+    expect(d.active).toBe(true);
+  });
+
+  it("tolerates pre-0232 rows (mocks) missing the new columns", () => {
+    const legacy = { ...row } as unknown as SalespersonRow;
+    delete (legacy as Partial<SalespersonRow>).staff_role;
+    delete (legacy as Partial<SalespersonRow>).color;
+    delete (legacy as Partial<SalespersonRow>).active;
+    const d = salespersonFromRow(legacy);
+    expect(d.staffRole).toBe("salesperson");
+    expect(d.color).toBeNull();
+    expect(d.active).toBe(true);
   });
 });

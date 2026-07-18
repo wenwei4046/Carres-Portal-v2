@@ -1043,3 +1043,7 @@ export {
   type StripeSessionStatus,
   type StripeCheckoutSessionInfo,
 } from "./schemas/stripe-checkout";
+
+// Staff PIN login (0232) — tiers, PIN, staff session token, palette.
+// See docs/superpowers/plans/2026-07-18-staff-pin-login-plan.md.
+export * from "./schemas/staff";

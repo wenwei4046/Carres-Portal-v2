@@ -35,6 +35,10 @@ export const salespersonFromRow = (r: DB.SalespersonRow): D.Salesperson => ({
   name: r.name,
   phone: r.phone,
   userId: r.user_id,
+  // 0232 — tolerate pre-migration rows/mocks; zod re-defaults downstream too
+  staffRole: r.staff_role ?? "salesperson",
+  color: r.color ?? null,
+  active: r.active ?? true,
 });
 
 export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({

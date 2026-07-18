@@ -54,6 +54,10 @@ export interface Salesperson {
   name: string;
   phone: string | null;
   userId: string | null;
+  // 0232 staff PIN login
+  staffRole: "principal" | "manager" | "salesperson";
+  color: string | null;
+  active: boolean;
 }
 
 export interface ProductModel {
