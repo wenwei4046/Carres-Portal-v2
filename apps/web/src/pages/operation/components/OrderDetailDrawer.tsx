@@ -5089,25 +5089,36 @@ function StorageCard({
         <span className="inline-flex items-center gap-1.5 flex-wrap">
           {exempt ? (
             <span className={soft}>exempted</span>
-          ) : effectiveStart ? (
-            <>
-              <span className={chip}>{fmtDate(effectiveStart)}</span>
-              {form.storageFrom && <span className={soft}>manual</span>}
-              <span className="pill pill-confirmed">counting</span>
-            </>
-          ) : autoAnchor ? (
-            <span className={chip}>{fmtDate(autoAnchor)}</span>
           ) : (
-            <span className={soft}>—</span>
+            <>
+              {/* ONE date control (Jess: why two calendars?) — shows the
+                  auto anchor; editing it IS the manual override. */}
+              <input
+                type="date"
+                value={draft.storage_from || effectiveStart || autoAnchor || ""}
+                onChange={(e) => set("storage_from", e.target.value)}
+                aria-label="Storage start (edit = manual override)"
+                className={chip}
+              />
+              {form.storageFrom && (
+                <>
+                  <span className={soft}>manual</span>
+                  <button
+                    type="button"
+                    onClick={() => set("storage_from", "")}
+                    title="Back to auto"
+                    aria-label="Reset storage start to auto"
+                    className="text-base-400 hover:text-base-700"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              )}
+              {effectiveStart && !exempt && (
+                <span className="pill pill-confirmed">counting</span>
+              )}
+            </>
           )}
-          <input
-            type="date"
-            value={draft.storage_from}
-            onChange={(e) => set("storage_from", e.target.value)}
-            aria-label="Manual storage start (overrides auto)"
-            title="Manual start — overrides the auto anchor"
-            className={chip}
-          />
         </span>
       </Row>
 
