@@ -1798,11 +1798,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               {poolStaff.map((s) => (
                 <StaffChip
                   key={s.user_id}
-                  label={staffLabel(s)}
                   count={staffEntries.counts.get(s.user_id) ?? 0}
                   active={staffFilter === s.user_id}
                   avatar={{ text: staffInitials(s), ...avatarColor(s.user_id) }}
-                  title={s.email}
+                  title={`${staffLabel(s)} · ${s.email}`}
                   onClick={() =>
                     setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
                   }
@@ -2559,7 +2558,9 @@ function StaffChip({
   avatar,
   title,
 }: {
-  label: string;
+  /** Omitted on member chips (Jess: the avatar IS the identity — "SH no
+   *  need to show shasha"); the full name lives in the tooltip. */
+  label?: string;
   count: number;
   active: boolean;
   onClick: () => void;
