@@ -443,6 +443,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     staffName: "",
     staffRole: "principal" as StaffTierDto,
     staffPin: "",
+    staffPinConfirm: "",
     // 2026-05-22 (Loo) — region dropped from the form (structured address
     // below carries state/city; region was a free-text duplicate). The DB
     // column stays — existing dealers retain their value; new creations get
@@ -531,9 +532,10 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       if (draft.contactName.trim().length < 2) e.contactName = "Required";
       if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
       // 2026-07-18 (Loo) — first staff + PIN are part of store creation; the
-      // PIN format is hard-gated to exactly 6 digits.
+      // PIN format is hard-gated to exactly 6 digits and must be typed TWICE.
       if (!draft.staffName.trim()) e.staffName = "Required";
       if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
+      else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
     }
     if (draft.tempPassword.length < 8) e.tempPassword = "Min 8 chars";
     setErrors(e);
@@ -789,17 +791,33 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   </select>
                 </Field>
               </div>
-              <Field
-                label="PIN code"
-                hint="Exactly 6 digits · unlocks the POS staff screen after the store login"
-                error={errors.staffPin}
-              >
-                <Input
-                  value={draft.staffPin}
-                  onChange={(v) => set("staffPin", v.replace(/[^0-9]/g, "").slice(0, 6))}
-                  placeholder="e.g. 224466"
-                />
-              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="PIN code"
+                  hint="Exactly 6 digits · unlocks the POS staff screen"
+                  error={errors.staffPin}
+                >
+                  <Input
+                    value={draft.staffPin}
+                    onChange={(v) => set("staffPin", v.replace(/[^0-9]/g, "").slice(0, 6))}
+                    placeholder="e.g. 224466"
+                  />
+                </Field>
+                <Field
+                  label="Confirm PIN"
+                  hint="Type it again · must match"
+                  error={errors.staffPinConfirm}
+                >
+                  <Input
+                    value={draft.staffPinConfirm}
+                    onChange={(v) => set("staffPinConfirm", v.replace(/[^0-9]/g, "").slice(0, 6))}
+                    placeholder="e.g. 224466"
+                  />
+                </Field>
+              </div>
+              {draft.staffPinConfirm.length === 6 && draft.staffPin !== draft.staffPinConfirm && (
+                <div className="text-[11px] text-destructive -mt-1.5">PINs don't match.</div>
+              )}
             </div>
           )}
 
