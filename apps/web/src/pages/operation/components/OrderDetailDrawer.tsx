@@ -3120,15 +3120,24 @@ function DrawerBody({
               />
             }
             summary={
-              /* Round 1A chip: "overdue" (danger text) · "booked <date>" (green)
-                 · "not booked" (grey). */
+              /* 1A (2026-07-18, Jess) — the chip reads what's REALLY known, in
+                 truth order: Delivered ✓ › on hold › overdue › booked › not
+                 booked › no carrier. "booked" = logistic_eta (the partner's
+                 committed date, 1/162 filled); assigned-but-unbooked is the
+                 93% normal state and must NOT read as failure. A delivered
+                 order never alarms (pre-golive guardrail #2). */
               (() => {
-                const eta = form.control?.logistic_eta ?? null;
-                if (eta)
+                if (deliveredDone)
+                  return <MiniBadge tone="ready">Delivered ✓</MiniBadge>;
+                if (balanceGate === "hold" || storageGate === "hold")
                   return (
-                    <MiniBadge tone="kv">
-                      booked {fmtDate(eta).split(", ")[0]}
-                    </MiniBadge>
+                    <span
+                      title="Delivery on hold — collect the balance / storage fee before dispatch"
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
+                    >
+                      <AlertCircle size={14} strokeWidth={2.5} />
+                      on hold
+                    </span>
                   );
                 if (daysToDelivery !== null && daysToDelivery < 0)
                   return (
@@ -3136,7 +3145,16 @@ function DrawerBody({
                       overdue
                     </span>
                   );
-                return <MiniBadge tone="muted">not booked</MiniBadge>;
+                const eta = form.control?.logistic_eta ?? null;
+                if (eta)
+                  return (
+                    <MiniBadge tone="ready">
+                      booked {fmtDate(eta).split(", ")[0]}
+                    </MiniBadge>
+                  );
+                if (order.ops_assigned_logistic)
+                  return <MiniBadge tone="waiting">not booked</MiniBadge>;
+                return <MiniBadge tone="muted">no carrier</MiniBadge>;
               })()
             }
           >
@@ -3161,7 +3179,8 @@ function DrawerBody({
               {/* Chase window (§7.6 — renamed from "Call customer by"): a MANUAL
                   reminder to chase the PARTNER N days before the deadline. It
                   feeds the list's next-action engine, it does NOT auto-message. */}
-              {contactByLabel && (
+              {/* D2 — a delivered order has nobody left to chase. */}
+              {!deliveredDone && contactByLabel && (
                 <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
                   <span className="flex items-center gap-1 text-[12px] font-medium text-info min-w-0">
                     <Phone size={14} strokeWidth={2.25} className="shrink-0" />
