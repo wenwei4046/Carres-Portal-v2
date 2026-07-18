@@ -442,14 +442,26 @@ export function RoutingFields({
 /** Logistic ETA (the carrier's committed delivery date) → the Delivery section's
  *  RIGHT column. Distinct from Deadline (the customer's requested date); this is
  *  what the logistic partner updates. */
-export function LogisticEtaField({ form }: { form: OrderControlForm }) {
+export function LogisticEtaField({
+  form,
+  onCommit,
+}: {
+  form: OrderControlForm;
+  /** 2A instant-save (Jess 2026-07-18): fire a sparse save as soon as a full
+   *  date is picked / cleared — the Delivery tab has no draft Save anymore. */
+  onCommit?: (value: string) => void;
+}) {
   return (
     <FieldRow label="Logistic ETA">
       <input
         id="fld-logistic-eta"
         type="date"
         value={form.draft.logistic_eta}
-        onChange={(e) => form.set("logistic_eta", e.target.value)}
+        onChange={(e) => {
+          const v = e.target.value;
+          form.set("logistic_eta", v);
+          if (onCommit && (v === "" || ISO_DATE.test(v))) onCommit(v);
+        }}
         className={`${CELL} min-w-[150px]`}
       />
     </FieldRow>
@@ -1613,6 +1625,7 @@ export function RemarkControlField({
   field,
   label,
   placeholder,
+  onCommit,
 }: {
   form: OrderControlForm;
   field:
@@ -1622,6 +1635,9 @@ export function RemarkControlField({
     | "warehouse_remark";
   label: string;
   placeholder?: string;
+  /** 2A instant-save: called with the final value when the textarea blurs
+   *  (only if it actually changed) — the caller fires the sparse save. */
+  onCommit?: (value: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const val = form.draft[field];
@@ -1635,7 +1651,11 @@ export function RemarkControlField({
           autoFocus
           value={val}
           onChange={(e) => form.set(field, e.target.value)}
-          onBlur={() => setEditing(false)}
+          onBlur={() => {
+            setEditing(false);
+            const saved = form.control?.[field] ?? "";
+            if (onCommit && val !== saved) onCommit(val);
+          }}
           placeholder={placeholder}
           className={CELL + " resize-y block py-1"}
         />

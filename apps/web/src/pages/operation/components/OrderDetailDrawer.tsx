@@ -112,7 +112,6 @@ import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
-  DeliveryTimeSlotField,
   LogisticEtaField,
   StorageControlFields,
   RemarkControlField,
@@ -1430,9 +1429,11 @@ function DrawerBody({
   const formalPartnerName =
     (partnersData?.partners ?? []).find((p) => p.id === order.delivery_partner_id)
       ?.name ?? null;
-  // One sparse-save mutation for the customer-confirmed toggle (0220). Plain
-  // field, NO alert-engine wiring — the list stays unaffected.
+  // One sparse-save mutation for every instant-saved Delivery field (2A) +
+  // the customer-confirmed toggle (0220). NO alert-engine wiring — the list
+  // stays unaffected.
   const quickSave = useSaveOrderControl(order.id, {
+    onSuccess: () => toast.success("Saved"),
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
   const customerConfirmed = form.control?.customer_confirmed ?? false;
@@ -3173,8 +3174,12 @@ function DrawerBody({
                   form={form}
                   hideRegion
                 />
-                <LogisticEtaField form={form} />
-                <DeliveryTimeSlotField form={form} />
+                {/* 2A (Jess): Delivery fields save the moment they change —
+                    like a spreadsheet cell; no hidden Save bar dependency. */}
+                <LogisticEtaField
+                  form={form}
+                  onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
+                />
               </FieldGrid>
               {/* Chase window (§7.6 — renamed from "Call customer by"): a MANUAL
                   reminder to chase the PARTNER N days before the deadline. It
@@ -3194,6 +3199,18 @@ function DrawerBody({
                       max={60}
                       value={form.draft.contact_by_days}
                       onChange={(e) => form.set("contact_by_days", e.target.value)}
+                      onBlur={(e) => {
+                        // 2A instant-save — commit on leave, only if changed.
+                        const v = e.target.value.trim();
+                        const saved =
+                          form.control?.contact_by_days != null
+                            ? String(form.control.contact_by_days)
+                            : "";
+                        if (v !== saved)
+                          quickSave.mutate({
+                            contact_by_days: v ? Number(v) : null,
+                          });
+                      }}
                       placeholder="3"
                       aria-label="Chase window — days before the deadline to chase the partner"
                       title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
@@ -3227,6 +3244,9 @@ function DrawerBody({
                     field="customer_request"
                     label="Customer request"
                     placeholder="e.g. postponed to end of May"
+                    onCommit={(v) =>
+                      quickSave.mutate({ customer_request: v.trim() || null })
+                    }
                   />
                 </FieldGrid>
               </div>
