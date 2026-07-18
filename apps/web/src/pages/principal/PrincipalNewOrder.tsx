@@ -34,6 +34,7 @@ import PosConfigurePage from "../dealer/pos/PosConfigurePage";
 import SofaConfigurePage from "../dealer/pos/SofaConfigurePage";
 import { buildCatalogIndex } from "../dealer/pos/catalog-index";
 import { lineEditTarget } from "../dealer/pos/cart";
+import RawLineOptions from "./RawLineOptions";
 
 /**
  * MAINTAIN → New Order — the RAW Sales Order creator, remade 2026-07-18 as a
@@ -776,12 +777,15 @@ export default function PrincipalNewOrder() {
             const attrs = (l.attrs ?? {}) as Record<string, unknown>;
             const remark = typeof attrs.remark === "string" ? attrs.remark : "";
             const editable = catalog ? lineEditTarget(l, catalog) !== null : false;
+            const rowSku = skuByCode.get(l.sku);
+            const rowModel = rowSku ? modelById.get(rowSku.modelId) : undefined;
             return (
               <div
                 key={l.localId}
                 data-testid={`raw-line-${l.localId}`}
-                className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start border border-base-200 rounded-md p-2 bg-white"
+                className="border border-base-200 rounded-md p-2 bg-white"
               >
+              <div className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start">
                 <span className="t-tiny text-base-400 pt-2.5 text-center">{i + 1}</span>
                 <div className="min-w-0">
                   <RowSkuPicker
@@ -879,6 +883,26 @@ export default function PrincipalNewOrder() {
                     <Trash2 size={14} strokeWidth={1.75} />
                   </button>
                 </span>
+              </div>
+              {/* Inline variants — options come OUT under the row when the
+                  picked product has any (2990s SOFA VARIANTS parity). */}
+              {rowSku && rowModel && catalog && (
+                <RawLineOptions
+                  line={l}
+                  model={rowModel}
+                  sku={rowSku}
+                  catalog={catalog}
+                  onPatch={(patch) => {
+                    // A panel change re-derives the suggested price — drop any
+                    // in-progress manual price string so the row shows it.
+                    setPriceDrafts((p) => {
+                      const { [l.localId]: _drop, ...rest } = p;
+                      return rest;
+                    });
+                    patchLine(l.localId, patch);
+                  }}
+                />
+              )}
               </div>
             );
           })}
