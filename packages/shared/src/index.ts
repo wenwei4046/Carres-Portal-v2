@@ -649,6 +649,7 @@ export {
   updateOpsPoDutyInput,
   pickNextDutyHolder,
   canRaisePo,
+  isPoDutyEditor,
   type OpsPoDuty,
   type OpsPoDutyResponse,
   type UpdateOpsPoDutyInput,

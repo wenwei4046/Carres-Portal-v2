@@ -25,8 +25,9 @@ type Panel = "calendar" | "team" | "tasks" | "activity";
 // Team REPLACED Notes (Jess 2026-07-19): Keep notes shipped 6/12 and held
 // exactly ONE note ever — dead slot, repurposed as the DUTY & ROLES board.
 const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
-  { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
+  // Team FIRST (Jess 2026-07-19: "team put at first, after only calendar").
   { key: "team", label: "Team", icon: Users, active: "bg-success-soft text-success" },
+  { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
   { key: "tasks", label: "Follow-ups", icon: Flag, active: "bg-warning-soft text-warning" },
   // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
   // page into the rail, after the flag). Shows only when an order is open.

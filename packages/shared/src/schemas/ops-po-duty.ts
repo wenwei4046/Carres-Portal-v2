@@ -162,6 +162,18 @@ export function pickNextDutyHolder(
   return ranked[0] ?? null;
 }
 
+/** Who may EDIT the duty roster (Jess 2026-07-19: "can edit roster only
+ *  me") — STRICTER than isOpsManager: the shared operation@ account is a
+ *  manager for daily surfaces, but whoever holds its password must NOT be
+ *  able to rewrite the rotation. Jess's own login + principal only. */
+export function isPoDutyEditor(
+  role: string | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  if (role === "principal") return true;
+  return (email ?? "").toLowerCase() === "jess@carres.com";
+}
+
 /** May this user press Raise PO / create POs right now?
  *  Managers always; the month's holder; and EVERYONE while the duty layer is
  *  dormant (no holder) — a missing feature must never block real work. */

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
-  isOpsManager,
+  isPoDutyEditor,
   monthKeyMYT,
   pickNextDutyHolder,
   updateOpsPoDutyInput,
@@ -141,9 +141,11 @@ poDutyRouter.get("/", async (c) => {
 poDutyRouter.put("/", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
-  if (!isOpsManager(auth.role, auth.email)) {
+  // STRICTER than isOpsManager (Jess 2026-07-19: roster edits are HERS) —
+  // the shared operation@ login must not rewrite the rotation.
+  if (!isPoDutyEditor(auth.role, auth.email)) {
     throw new HTTPException(403, {
-      message: "Only management can change the PO duty holder",
+      message: "Only Jess (or principal) can change the PO duty roster",
     });
   }
 

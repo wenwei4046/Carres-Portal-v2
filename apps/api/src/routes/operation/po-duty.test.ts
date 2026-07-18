@@ -237,6 +237,12 @@ describe("PUT /api/operation/po-duty", () => {
     expect(res.status).toBe(403);
   });
 
+  it("403 even for the shared operation@ manager — roster edits are Jess-only", async () => {
+    const jwt = await makeJwt("operation", "operation@carres.com");
+    const res = await req("/api/operation/po-duty", "PUT", jwt, { userId: HOLDER });
+    expect(res.status).toBe(403);
+  });
+
   it("422 on invalid body for a manager", async () => {
     const jwt = await makeJwt("operation", "jess@carres.com");
     const res = await req("/api/operation/po-duty", "PUT", jwt, { userId: "nope" });

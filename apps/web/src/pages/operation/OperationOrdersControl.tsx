@@ -1766,26 +1766,35 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const nextPoIso = nextPoDayMYT();
   const nextPoLabel = `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`;
   // Queue-row owner adornments (B+C): goods queues carry the duty holder's
-  // avatar, PIC queues a grey tag — who does what, visible in the rail itself.
-  const dutyQueueChip = poDutyHolderShown ? (
-    <span
-      className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
-      style={{
-        background: avatarColor(poDutyHolderShown.userId).bg,
-        color: avatarColor(poDutyHolderShown.userId).fg,
-      }}
-      title={`${personLabel(poDutyHolderShown.name, poDutyHolderShown.email)}'s queue — PO duty this month`}
-    >
-      {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
-    </span>
-  ) : undefined;
-  const picQueueChip = (
+  // avatar, PIC queues a grey tag. Every QUEUES/TEAM row gets the SAME
+  // fixed-width leading slot — mixed chip widths broke label alignment
+  // (Jess 2026-07-19 "PIC & SH & LC should align"); chip-less rows carry an
+  // empty slot so all labels start on one line.
+  const chipSlot = (content?: ReactNode) => (
+    <span className="w-8 shrink-0 flex justify-center">{content}</span>
+  );
+  const emptyQueueChip = chipSlot();
+  const dutyQueueChip = chipSlot(
+    poDutyHolderShown ? (
+      <span
+        className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+        style={{
+          background: avatarColor(poDutyHolderShown.userId).bg,
+          color: avatarColor(poDutyHolderShown.userId).fg,
+        }}
+        title={`${personLabel(poDutyHolderShown.name, poDutyHolderShown.email)}'s queue — PO duty this month`}
+      >
+        {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
+      </span>
+    ) : undefined,
+  );
+  const picQueueChip = chipSlot(
     <span
       className="shrink-0 text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
       title="Each PIC chases their own orders"
     >
       PIC
-    </span>
+    </span>,
   );
   const poDutyTitleChips = poDutyHolderShown ? (
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
@@ -2087,6 +2096,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
                     tone="danger"
                     active={dueFilter === "Overdue"}
+                    chip={emptyQueueChip}
                     title="Past the delivery date and not delivered yet — who to chase = the row's NEXT verb"
                     onClick={() => setDueFilter((r) => (r === "Overdue" ? null : "Overdue"))}
                   />
@@ -2132,6 +2142,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     label="Follow-up"
                     count={flaggedCount}
                     active={flaggedOnly}
+                    chip={emptyQueueChip}
                     title="Orders with an open follow-up note for the next operator"
                     onClick={() => setFlaggedOnly((v) => !v)}
                   />
@@ -2141,6 +2152,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     label="For Jess"
                     count={escalateCount}
                     active={escalateOnly}
+                    chip={emptyQueueChip}
                     title="Escalated to Jess — orders needing the boss's action"
                     onClick={() => setEscalateOnly((v) => !v)}
                   />
@@ -2186,7 +2198,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         label={isDuty ? `${presence} · PO duty` : presence}
                         count={staffEntries.counts.get(s.user_id) ?? 0}
                         active={staffFilter === s.user_id}
-                        chip={
+                        chip={chipSlot(
                           <span
                             className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
                             style={{
@@ -2195,8 +2207,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                             }}
                           >
                             {staffInitials(s)}
-                          </span>
-                        }
+                          </span>,
+                        )}
                         title={
                           isDuty
                             ? `${baseTitle} — controls POs this month (PO duty)`
@@ -2216,13 +2228,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       <KanbanRow
                         key={s.user_id}
                         label={
+                          /* "· pending" (Jess 2026-07-19: the long "joins on
+                             first login" truncated the name) — the suffix
+                             disappears the moment she first logs in (auto-
+                             enroll flips her to a normal pooled row). */
                           isDuty
-                            ? `${staffLabel(s)} · joins on first login · PO duty`
-                            : `${staffLabel(s)} · joins on first login`
+                            ? `${staffLabel(s)} · pending · PO duty`
+                            : `${staffLabel(s)} · pending`
                         }
                         count={0}
                         active={staffFilter === s.user_id}
-                        chip={
+                        chip={chipSlot(
                           <span
                             className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0 opacity-60"
                             style={{
@@ -2231,8 +2247,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                             }}
                           >
                             {staffInitials(s)}
-                          </span>
-                        }
+                          </span>,
+                        )}
                         title={`${s.email} — account ready; her first login auto-joins the pool and deals her a share (no admin step)`}
                         onClick={() =>
                           setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
@@ -2246,6 +2262,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     label="No PIC"
                     count={staffEntries.none}
                     active={staffFilter === NO_STAFF}
+                    chip={emptyQueueChip}
                     title="Orders nobody is watching yet"
                     onClick={() =>
                       setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))

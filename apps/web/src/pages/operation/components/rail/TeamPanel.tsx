@@ -9,6 +9,7 @@ import {
 import {
   monthKeyMYT,
   nextPoDayMYT,
+  isPoDutyEditor,
   isOpsManager,
   isOpsGenericAccount,
 } from "@carres/shared";
@@ -98,13 +99,14 @@ export default function TeamPanel() {
   const currentMonth = dutyQ.data?.month ?? monthKeyMYT();
   const nextUp = (dutyQ.data?.roster ?? []).filter((r) => r.month > currentMonth);
 
-  // Manager-only inline roster edit (Jess option A): hover ✎ on the hero /
-  // click a NEXT UP entry → the name becomes a candidate select; staff never
-  // see the affordance (the API 403s them anyway — two layers, one rule).
+  // Roster edit = JESS-ONLY (+principal) — STRICTER than isOpsManager: the
+  // shared operation@ login must never rewrite the rotation (Jess 2026-07-19
+  // "can edit roster only me"). Hover ✎ on the hero / click a NEXT UP entry
+  // → candidate select; everyone else never sees it, the API 403s anyway.
   const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
-  const isManager = isOpsManager(authRole, authEmail);
-  const staffQ = useOperationStaff({ enabled: isManager });
+  const isEditor = isPoDutyEditor(authRole, authEmail);
+  const staffQ = useOperationStaff({ enabled: isEditor });
   const candidates = useMemo(
     () =>
       (staffQ.data?.staff ?? []).filter(
@@ -185,7 +187,7 @@ export default function TeamPanel() {
               </span>
             </span>
           )}
-          {isManager && editingMonth !== currentMonth && (
+          {isEditor && editingMonth !== currentMonth && (
             <button
               type="button"
               onClick={() => setEditingMonth(currentMonth)}
@@ -270,7 +272,7 @@ export default function TeamPanel() {
               return (
                 <span key={r.month} className="inline-flex items-center gap-1.5">
                   {i > 0 && <span className="text-base-300">·</span>}
-                  {isManager ? (
+                  {isEditor ? (
                     <button
                       type="button"
                       onClick={() => setEditingMonth(r.month)}
