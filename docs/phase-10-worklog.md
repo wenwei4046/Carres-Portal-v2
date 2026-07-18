@@ -329,7 +329,7 @@ Loo: a salesperson (or HQ) must be able to ADD a product to an existing order af
 - **Deploy** — 0231/0232/0233 on prod (0233 shares its number with `0233_staff_pin_login`, cosmetic — tracker keys on timestamp). FINAL that day: api Worker `5dc3406a` · web `index-BwAFO91J.js`.
 - **CF** — `add-lines-pwp-one-promo-policy` (MEDIUM) · `add-lines-delivery-rederive` (MEDIUM) · `change-request-midproduction-approve` (MEDIUM) · `add-lines-rpc-30-line-cap` (LOW) · `change-request-survives-unproceed` (LOW). See §17.5.
 
-## 2026-07-18 · POS/ERP domain split — pos.carresofficial.com / erp.carresofficial.com (PR #195)
+## 2026-07-18 · POS/ERP domain split — pos.carresofficial.com / erp.carresofficial.com (PR #196)
 
 Loo: isolate the retail POS onto `pos.carresofficial.com` (users: dealer + showroom + BD) and keep the original portal as `erp.carresofficial.com` — same shape as 2990s (`apps/pos` + `apps/backend` sharing one API). Carres mirrors it at the DOMAIN level: **one build artifact, two Pages projects, two custom domains** (code stays one tree — a physical folder split stays available later, invisible to users).
 
