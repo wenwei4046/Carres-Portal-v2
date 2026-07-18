@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Copy,
   MessageCircle,
   Plus,
@@ -716,18 +715,7 @@ function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
 
-/** A2 track stages (MASTER SPEC §7, 2026-07-18) — each KPI track is a
- *  full-width progress LINE of numbered nodes with the stage word under
- *  each node. done = grey (Jess's stepper reference: grey when finished). */
-type StageState = "done" | "current" | "pending";
-type TrackStage = {
-  word: string;
-  state: StageState;
-  /** Time-based lateness (ETA / deadline passed) — the CURRENT node shows a
-   *  red CLOCK instead of its number (§7: Booked 逾期未约 = 红 clock). */
-  clock?: boolean;
-};
-/** Track tone — colours the CURRENT node + its stage word. */
+/** Track tone — drives the tab-rail alert dots. */
 type KpiTone = "success" | "warning" | "danger" | "neutral";
 
 /** Dial states (MASTER SPEC §8) — NO blue: Unpaid/No-stock = gray · Deposit/
@@ -792,140 +780,48 @@ function PieDial({
   );
 }
 
-/** The CURRENT node's fill per track tone (A2) — "状态色圈带编号". A healthy
- *  current stage reads green, a warning amber, a blocker red; neutral (e.g.
- *  no total set yet) stays a quiet bold ring. */
-const CURRENT_NODE_CLS: Record<KpiTone, string> = {
-  success: "bg-success text-white",
-  warning: "bg-warning text-white",
-  danger: "bg-danger text-white",
-  neutral: "bg-white border-[1.5px] border-base-400 text-base-600",
-};
-
-/** One A2 node — 24px numbered circle: done = GREY filled ✓ · current =
- *  tone-colour circle with the number (red CLOCK when time-overdue) ·
- *  pending = grey empty ring with the number. */
-function StageNode({ n, stage, tone }: { n: number; stage: TrackStage; tone: KpiTone }) {
-  if (stage.state === "done")
-    return (
-      <span className="w-6 h-6 rounded-full grid place-items-center bg-base-400 text-white shrink-0">
-        <Check size={14} strokeWidth={2.5} aria-label={`${stage.word} — done`} />
-      </span>
-    );
-  if (stage.state === "current")
-    return (
-      <span
-        className={`w-6 h-6 rounded-full grid place-items-center shrink-0 text-[12px] font-bold ${
-          stage.clock ? "bg-danger text-white" : CURRENT_NODE_CLS[tone]
-        }`}
-      >
-        {stage.clock ? (
-          <Clock size={14} strokeWidth={2.5} aria-label={`${stage.word} — overdue`} />
-        ) : (
-          n
-        )}
-      </span>
-    );
-  return (
-    <span
-      className="w-6 h-6 rounded-full grid place-items-center bg-white border-[1.5px] border-base-300 text-base-400 shrink-0 text-[12px] font-semibold"
-      aria-label={`${stage.word} — pending`}
-    >
-      {n}
-    </span>
-  );
-}
-
-/** ProgressTrack (A2, MASTER SPEC §7 — replaces PartyCard): ONE full-width
- *  progress line per KPI track — neutral icon + label · numbered node line
- *  with the stage word under each node · right = 18px headline value (dial
- *  beside it, §8) + a SHORT summary. Chasing moved to the left-rail Chase
- *  Now panel; clicking the track opens its tab. */
-function ProgressTrack({
+/** StatusChip (rev14, Jess's option B — replaces the A2 ProgressTrack rows):
+ *  the three KPI tracks compressed into ONE ~48px strip of clickable chips —
+ *  neutral icon + §8 dial + 18px headline value + short summary, Shopify-
+ *  style operator chips. Stage detail lives inside each tab; the chip's job
+ *  is the NUMBER and the JUMP. */
+function StatusChip({
   label,
   icon: Icon,
-  stages,
-  tone,
   value,
   summary,
   onOpen,
 }: {
   label: string;
   icon: LucideIcon;
-  stages: TrackStage[];
-  tone: KpiTone;
   /** 18px headline (the §8 dial rides inside, beside the value). */
   value: ReactNode;
-  /** One line under the headline — Balance "+ storage" · Stock category
-   *  badges · Delivery partner + booked state. */
+  /** Inline tail — Balance "+ storage" · Stock category badges · Delivery
+   *  partner + booked state. */
   summary?: ReactNode;
   onOpen: () => void;
 }) {
   return (
-    <div
-      className="kpi-box cursor-pointer transition-colors hover:border-base-300 !flex-row flex-wrap items-center gap-x-4 gap-y-1 min-w-0"
+    <button
+      type="button"
       onClick={onOpen}
-      role="button"
+      title={`Open ${label}`}
+      aria-label={label}
+      className="bg-white border border-base-200 rounded-[12px] px-3 min-h-11 py-1.5 flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-left cursor-pointer transition-colors hover:border-base-300"
     >
-      <span className="flex items-center gap-2 w-[120px] shrink-0">
-        <span className="size-[30px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
-          <Icon size={16} strokeWidth={2} aria-hidden="true" />
+      <Icon
+        size={16}
+        strokeWidth={2}
+        className="text-base-500 shrink-0"
+        aria-hidden="true"
+      />
+      <span className="text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
+      {summary && (
+        <span className="min-w-0 flex flex-wrap items-center gap-1 text-[12px] text-base-500">
+          {summary}
         </span>
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
-          {label}
-        </span>
-      </span>
-      {/* COMPACT stepper (international pattern — Stripe/DHL-style): the
-          node cluster hugs together on FIXED short connectors instead of
-          stretching to fill the row, so the right value column always keeps
-          its own clean space (no overlap at narrow widths). A connector
-          reads "filled" (dark) once the node BEFORE it is done; mt aligns
-          the 2px line with the 24px node's centre. */}
-      <div className="shrink-0 flex items-start">
-        {stages.map((s, i) => (
-          <Fragment key={s.word}>
-            {i > 0 && (
-              <span
-                className={`w-5 h-0.5 rounded-full mt-[11px] shrink-0 ${
-                  stages[i - 1].state === "done" ? "bg-base-400" : "bg-base-200"
-                }`}
-                aria-hidden="true"
-              />
-            )}
-            <span className="flex flex-col items-center gap-1 shrink-0 px-1.5">
-              <StageNode n={i + 1} stage={s} tone={tone} />
-              <span
-                className={`text-[12px] whitespace-nowrap ${
-                  s.state === "current"
-                    ? s.clock || tone === "danger"
-                      ? "text-danger font-semibold"
-                      : tone === "warning"
-                        ? "text-warning font-semibold"
-                        : "text-base-900 font-semibold"
-                    : s.state === "done"
-                      ? "text-base-500"
-                      : "text-base-400"
-                }`}
-              >
-                {s.word}
-              </span>
-            </span>
-          </Fragment>
-        ))}
-      </div>
-      {/* ml-auto right-aligns the value on WHATEVER line it lands: one line
-          when the card is wide (office 1920), naturally wrapping to its own
-          right-aligned second line when narrow — the three tracks' values
-          always read as ONE right column (B, Jess 2026-07-18). */}
-      <span className="ml-auto shrink-0 text-right min-w-0 max-w-[300px]">
-        <span className="block text-[18px] font-bold t-num whitespace-nowrap">{value}</span>
-        {summary && (
-          <span className="mt-0.5 flex flex-wrap items-center justify-end gap-1 text-[12px] text-base-500">
-            {summary}
-          </span>
-        )}
-      </span>
-    </div>
+      )}
+    </button>
   );
 }
 
@@ -1817,17 +1713,6 @@ function DrawerBody({
             ? "warning"
             : "success";
 
-  // ═══ A2 stage arrays (MASTER SPEC §7/§8) — stage words per §8, sequential:
-  // the CURRENT node is the first not-done stage; clock = time-overdue. ═══
-  const confirmedDone = customerConfirmed || deliveredDone;
-  const balanceStages: TrackStage[] = [
-    { word: "Placed", state: "done" },
-    { word: "Confirmed", state: confirmedDone ? "done" : "current" },
-    {
-      word: "Paid",
-      state: paidDone ? "done" : confirmedDone ? "current" : "pending",
-    },
-  ];
   // Chase groups merged ACROSS categories by PO (a PO spanning two categories
   // is one counterparty) — un-ready categories only.
   const chaseByPo = new Map<string, ChaseGroup>();
@@ -1845,61 +1730,6 @@ function DrawerBody({
     }
   }
   const chaseGroups = [...chaseByPo.values()];
-  const stockAllReady = goodsN > 0 && readyN === goodsN;
-  // "PO raised" = every un-reserved line is covered by a PO; "ETA set" =
-  // every open PO carries an ETA (vacuously true for in-stock goods that
-  // just await reserving — the current stage then reads "Goods ready").
-  const poRaisedDone = stockAllReady || (goodsN > 0 && nopoN === 0);
-  const etaSetDone =
-    stockAllReady || (poRaisedDone && chaseGroups.every((g) => g.eta));
-  const stockStages: TrackStage[] =
-    deliveredDone
-      ? /* Delivered = closed — the goods went out; nothing left to shout
-           (pre-golive guardrail #2: no red on delivered orders). */
-        [
-          { word: "PO raised", state: "done" },
-          { word: "ETA set", state: "done" },
-          { word: "Goods ready", state: "done" },
-        ]
-      : goodsN === 0
-      ? [
-          { word: "PO raised", state: "pending" },
-          { word: "ETA set", state: "pending" },
-          { word: "Goods ready", state: "pending" },
-        ]
-      : [
-          { word: "PO raised", state: poRaisedDone ? "done" : "current" },
-          {
-            word: "ETA set",
-            state: etaSetDone ? "done" : poRaisedDone ? "current" : "pending",
-          },
-          {
-            word: "Goods ready",
-            state: stockAllReady ? "done" : etaSetDone ? "current" : "pending",
-            clock: stockDelayed,
-          },
-        ];
-  const deliveryStages: TrackStage[] = [
-    {
-      word: "Assigned",
-      state: assignedLogisticName || deliveredDone ? "done" : "current",
-    },
-    {
-      word: "Booked",
-      state:
-        bookedEta || deliveredDone
-          ? "done"
-          : assignedLogisticName
-            ? "current"
-            : "pending",
-      clock: overDeadline,
-    },
-    {
-      word: "Delivered",
-      state: deliveredDone ? "done" : bookedEta ? "current" : "pending",
-      clock: overDeadline,
-    },
-  ];
 
   // ═══ Track summaries (§7) — one short line under each headline. ═══
   // Balance: the storage fee joins the readout while it accrues.
@@ -2327,19 +2157,17 @@ function DrawerBody({
           </button>
         </nav>
         </div>
-        {/* RIGHT — A2 progress tracks pinned + the tab content below. */}
+        {/* RIGHT — the status strip pinned + the tab content below. */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-        {/* ═══ A2 PROGRESS TRACKS (MASTER SPEC §7, 2026-07-18) — the three
-            KPI boxes became three FULL-WIDTH progress lines: numbered nodes
-            + stage words + right headline (dial beside the value, §8) + a
-            short summary. All chasing lives in the left-rail Chase Now
-            panel; clicking a track opens its tab. */}
-        <div className="shrink-0 flex flex-col gap-2.5">
-          <ProgressTrack
+        {/* ═══ STATUS STRIP (rev14, Jess's option B — supersedes the A2
+            progress-track rows, which ate ~240px narrating what the tabs +
+            Chase Now already say): ONE ~48px row of three clickable chips —
+            money · stock · deadline, dial beside value (§8), chip click =
+            its tab. Stage detail lives inside each tab. */}
+        <div className="shrink-0 flex flex-wrap gap-2.5">
+          <StatusChip
             label="Balance"
             icon={Wallet}
-            stages={balanceStages}
-            tone={moneyTone}
             value={
               /* §8 — the payment dial sits BESIDE the headline value. */
               <span className="inline-flex items-center gap-1.5">
@@ -2358,11 +2186,9 @@ function DrawerBody({
             summary={balanceSummary}
             onOpen={() => setTab("balance")}
           />
-          <ProgressTrack
+          <StatusChip
             label="Stock"
             icon={Package}
-            stages={stockStages}
-            tone={stockTone}
             value={
               /* §8 — the stock dial sits BESIDE the headline value. A
                  delivered order reads green "Delivered" (guardrail #2). */
@@ -2400,11 +2226,9 @@ function DrawerBody({
             summary={stockSummary}
             onOpen={() => setTab("items")}
           />
-          <ProgressTrack
+          <StatusChip
             label="Delivery"
             icon={Truck}
-            stages={deliveryStages}
-            tone={logisticTone}
             value={
               /* The RED colour IS the overdue signal (no " · over" suffix). */
               <span
