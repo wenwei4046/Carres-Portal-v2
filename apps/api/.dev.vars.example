@@ -8,3 +8,6 @@ SUPABASE_ANON_KEY=your-anon-key
 # Hono-only — never exposed to the browser bundle.
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_JWT_SECRET=your-jwt-secret
+
+# 0232 staff PIN login — HS256 secret for the short-lived staff session token.
+STAFF_SESSION_SECRET=any-long-random-string
