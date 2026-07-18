@@ -17,6 +17,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse, Order } from "@carres/shared";
+import { RAW_DRAFT_STORAGE_KEY, emptyDraft } from "../dealer/new-order/draft";
 import PrincipalNewOrder from "./PrincipalNewOrder";
 
 const DEALER_ID = "00000000-0000-0000-0000-0000000000d1";
@@ -377,6 +378,53 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(input.paid).toBe(2000);
     expect(input.paymentMethod).toBe("credit");
     expect(input.entryData).toEqual({ payment: { bank: "Maybank" } });
+  });
+
+  it("billing address keys in with the SAME MY cascade as delivery and composes at submit", async () => {
+    // Prefill a draft with structured billing parts (billingSame OFF) so the
+    // submit mapping is exercised without walking the real postcode data.
+    const d = emptyDraft();
+    sessionStorage.setItem(
+      RAW_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        ...d,
+        actingDealerId: DEALER_ID,
+        actingDealerName: "Dealer One",
+        customer: {
+          ...d.customer,
+          name: "Raw Customer",
+          billingSame: false,
+          billingLine1: "88 Jalan B",
+          billingState: "Penang",
+          billingCity: "George Town",
+          billingPostcode: "10000",
+        },
+        lines: [
+          { localId: "l1", sku: "CUSTOM LINE", qty: 1, attrs: null, unitPrice: 100, label: "" },
+        ],
+      }),
+    );
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-6",
+      so: 1306,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
+    wrap();
+
+    // The billing block renders the SAME cascading picker (not one textarea):
+    // a second State/City/Postcode set appears when billingSame is off.
+    expect(screen.getByTestId("raw-billing-fields")).toBeTruthy();
+    expect(screen.getAllByText("State *").length).toBe(2);
+    expect(screen.getAllByText("Postcode *").length).toBe(2);
+
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    await screen.findByText("Order SO-1306 created");
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.customer.billingSame).toBe(false);
+    expect(input.customer.billing).toContain("88 Jalan B");
+    expect(input.customer.billing).toContain("Penang");
+    expect(input.customer.billing).toContain("10000");
   });
 
   it("Pay online (Stripe) is offered: creates the order UNPAID and opens the QR / link modal", async () => {

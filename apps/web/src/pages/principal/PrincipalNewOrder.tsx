@@ -255,6 +255,16 @@ export default function PrincipalNewOrder() {
         city: c.addressCity,
         postcode: c.addressPostcode,
       });
+      // Billing keys in structured (same MY cascade as delivery) but persists
+      // as the single composed string — `customer_billing` stays text. Legacy
+      // free-text `billing` (old drafts) is the fallback.
+      const composedBilling = composeAddress({
+        line1: c.billingLine1,
+        line2: c.billingLine2,
+        state: c.billingState,
+        city: c.billingCity,
+        postcode: c.billingPostcode,
+      });
       const fields = Object.fromEntries(
         Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
       );
@@ -278,7 +288,7 @@ export default function PrincipalNewOrder() {
           addressState: c.addressUnknown ? null : c.addressState || null,
           addressCity: c.addressUnknown ? null : c.addressCity || null,
           addressPostcode: c.addressUnknown ? null : c.addressPostcode || null,
-          billing: c.billingSame ? null : c.billing.trim() || null,
+          billing: c.billingSame ? null : composedBilling || c.billing.trim() || null,
           billingSame: c.billingSame,
           emergency: composeEmergency(c) || null,
           email: c.email.trim() || null,
@@ -804,34 +814,37 @@ export default function PrincipalNewOrder() {
           <input
             type="checkbox"
             checked={c.billingSame}
-            onChange={(e) =>
-              setC({
-                billingSame: e.target.checked,
-                billing: e.target.checked
-                  ? composeAddress({
-                      line1: c.addressLine1,
-                      line2: c.addressLine2,
-                      state: c.addressState,
-                      city: c.addressCity,
-                      postcode: c.addressPostcode,
-                    })
-                  : c.billing,
-              })
-            }
+            onChange={(e) => setC({ billingSame: e.target.checked })}
             className="mt-0.5 w-4 h-4"
           />
           <span className="t-body">Billing address same as delivery</span>
         </label>
+        {/* Billing keys in with the SAME MY cascade as delivery (Loo
+            2026-07-18) — a second MYAddressFields mapped onto the billing*
+            fields; composed into the single billing string at submit. */}
         {!c.billingSame && (
-          <div className="mt-3">
-            <Field label="Billing address">
-              <textarea
-                rows={2}
-                value={c.billing}
-                onChange={(e) => setC({ billing: e.target.value })}
-                className={INPUT_CLASS}
-              />
-            </Field>
+          <div className="mt-3" data-testid="raw-billing-fields">
+            <p className="t-tiny uppercase tracking-wide text-base-500 mb-2">Billing address</p>
+            <MYAddressFields
+              data={{
+                addressLine1: c.billingLine1,
+                addressLine2: c.billingLine2,
+                addressState: c.billingState,
+                addressCity: c.billingCity,
+                addressPostcode: c.billingPostcode,
+              }}
+              onChange={(patch) =>
+                setC({
+                  ...(patch.addressLine1 !== undefined ? { billingLine1: patch.addressLine1 } : {}),
+                  ...(patch.addressLine2 !== undefined ? { billingLine2: patch.addressLine2 } : {}),
+                  ...(patch.addressState !== undefined ? { billingState: patch.addressState } : {}),
+                  ...(patch.addressCity !== undefined ? { billingCity: patch.addressCity } : {}),
+                  ...(patch.addressPostcode !== undefined
+                    ? { billingPostcode: patch.addressPostcode }
+                    : {}),
+                })
+              }
+            />
           </div>
         )}
       </Section>
