@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import {
   assignPickupPartnerInput,
   cancelPoInput,
@@ -8,8 +8,10 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   receivePoWithDoInput,
+  isOpsManager,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
+import { resolveCurrentPoDuty } from "./po-duty";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { PoTemplateData } from "../../lib/pdf/types";
 import { requireOperation } from "../../lib/auth-guards";
@@ -42,6 +44,36 @@ import type { AppEnv } from "../../types";
  * lib/route-helpers + RPC wraps).
  */
 const operationPosRouter = new Hono<AppEnv>();
+
+/** PO duty gate (0236, Jess 2026-07-18): while a duty holder exists for the
+ *  current MYT month, only that holder + management may CREATE POs (web hides
+ *  the button; this is the API layer of the same rule — two layers, one
+ *  rule). Dormant DB / empty pool → no gate (a missing feature must never
+ *  block procurement). Read-only PO routes are untouched. */
+async function poDutyGate(c: Context<AppEnv>): Promise<Response | null> {
+  const auth = c.var.auth;
+  if (isOpsManager(auth.role, auth.email)) return null;
+  const sb = userClient(c.env, auth.jwt);
+  const duty = await resolveCurrentPoDuty(sb);
+  if (!duty || duty.user_id === auth.id) return null;
+  const holder = await sb
+    .from("app_users")
+    .select("name, email")
+    .eq("id", duty.user_id)
+    .maybeSingle();
+  const label =
+    (holder.data?.name as string | null) ??
+    (holder.data?.email as string | null) ??
+    "the duty holder";
+  return c.json(
+    {
+      error: "forbidden",
+      code: "po_duty",
+      message: `PO duty: this month is ${label}'s — only the duty holder and management can raise POs.`,
+    },
+    403,
+  );
+}
 
 // ----- GET / list -----
 operationPosRouter.get("/", requireOperation, async (c) => {
@@ -684,6 +716,8 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // camelCase (parity with every other route), and the snake_case translation
 // happens once at the DB edge.
 operationPosRouter.post("/", requireOperation, async (c) => {
+  const gated = await poDutyGate(c);
+  if (gated) return gated;
   const parsed = await parseJsonBody(c, createPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -748,6 +782,8 @@ operationPosRouter.post("/", requireOperation, async (c) => {
 //   • 42501                                → 403
 //   • Other PG errors                      → mapPgError fallback
 operationPosRouter.post("/batch", requireOperation, async (c) => {
+  const gated = await poDutyGate(c);
+  if (gated) return gated;
   const parsed = await parseJsonBody(c, createPosBatchInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

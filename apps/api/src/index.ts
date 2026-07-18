@@ -30,6 +30,7 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import opsStaffRouter from "./routes/operation/staff";
+import poDutyRouter from "./routes/operation/po-duty";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -82,6 +83,7 @@ import activityRouter from "./routes/operation/activity";
 import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
+import { runPoDutyCron } from "./cron/po-duty";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -144,6 +146,8 @@ api.route("/operation/orders", bulkCompleteRouter);
 api.route("/operation/payments", operationPaymentsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
+// 0236 PO duty rotation — GET current holder / PUT manager override
+api.route("/operation/po-duty", poDutyRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
@@ -200,6 +204,11 @@ export default {
       (async () => {
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
+        // 0236 — Mon/Thu (MYT) PO-day reminder for the duty holder; no-ops on
+        // other days and on a pre-0236 DB.
+        await runPoDutyCron(env).catch((e) =>
+          console.error("po-duty cron failed:", (e as Error).message),
+        );
       })(),
     );
   },
