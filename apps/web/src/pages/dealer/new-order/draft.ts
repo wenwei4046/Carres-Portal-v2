@@ -127,6 +127,16 @@ export interface WizardDraft {
     addressUnknown: boolean;
     billing: string;
     billingSame: boolean;
+    /** Structured billing parts (Loo 2026-07-18 — the raw New Order keys the
+     *  billing address with the SAME MY cascade as delivery). Composed into
+     *  the single `billing` string at submit (`customer_billing` stays text);
+     *  the POS keeps its free-text billing box. Defaults "" — old drafts
+     *  restore cleanly via the emptyDraft spread in loadDraft. */
+    billingLine1: string;
+    billingLine2: string;
+    billingState: string;
+    billingCity: string;
+    billingPostcode: string;
     emergencyName: string;
     emergencyPhone: string;
     emergencyRelationship: string;
@@ -216,6 +226,11 @@ export function emptyDraft(): WizardDraft {
       addressUnknown: false,
       billing: "",
       billingSame: true,
+      billingLine1: "",
+      billingLine2: "",
+      billingState: "",
+      billingCity: "",
+      billingPostcode: "",
       emergencyName: "",
       emergencyPhone: "",
       emergencyRelationship: "",
