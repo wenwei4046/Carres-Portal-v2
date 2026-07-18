@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Bed,
   BedDouble,
+  Bell,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -110,13 +111,13 @@ import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
-  DeliveryTimeSlotField,
   LogisticEtaField,
   StorageCollectWaiver,
   StorageExtensionRow,
   RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
+  FieldRow,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
@@ -709,6 +710,133 @@ function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
 }
 
+/** One step of the Delivery tab timeline (rev24, Jess Option A — 合体: the
+ *  progress line IS the step header, fields live under their own step). Node
+ *  grammar = the SAME approved JourneyCard sample (done = ink-filled ✓ · the
+ *  ONE step needing work is the only coloured node: red = act now / amber =
+ *  waiting on someone · not-yet = pale ring · connector darkens over done
+ *  ground). One column, one vocabulary — nothing to cross-reference. */
+type DeliveryStepState = "done" | "act" | "wait" | "todo";
+function DeliveryStep({
+  n,
+  state,
+  title,
+  who,
+  right,
+  last = false,
+  children,
+}: {
+  n: number;
+  state: DeliveryStepState;
+  title: string;
+  who?: string;
+  /** header-right slot (chase buttons / open-Items link) */
+  right?: ReactNode;
+  last?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="relative flex items-start gap-2.5 pb-3 last:pb-0">
+      {!last && (
+        <span
+          aria-hidden="true"
+          className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
+            state === "done" ? "bg-base-800" : "bg-base-200"
+          }`}
+        />
+      )}
+      <span
+        className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
+          state === "done"
+            ? "bg-base-800 text-white"
+            : state === "act"
+              ? "bg-error-soft text-danger ring-2 ring-danger"
+              : state === "wait"
+                ? "bg-warning-soft text-warning"
+                : "bg-white border-2 border-base-300 text-base-400"
+        }`}
+      >
+        {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-h-6">
+          <span
+            className={`text-[13px] font-semibold ${
+              state === "todo" ? "text-base-400" : "text-base-900"
+            }`}
+          >
+            {title}
+          </span>
+          {who && (
+            <span className="text-[11px] text-base-400 truncate">· {who}</span>
+          )}
+          {right && (
+            <span className="ml-auto flex items-center gap-1.5 shrink-0">
+              {right}
+            </span>
+          )}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** rev23 (Jess) — the Customer-request NOTES are an auto-dated LOG, not one
+ *  overwrite box: "18 Jul · wants 15 July" stacks on "12 Jul · prefers
+ *  Saturday — told NETS". Everything still lives in the ONE customer_request
+ *  text column (newline per entry, newest first) — zero migration, the list
+ *  tooltip + Master export keep reading it; casual date-chatter lands HERE so
+ *  the one-time formal Postponed extension isn't burned on small talk. */
+function DeliveryNotesLog({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const entries = value
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const add = () => {
+    const text = draft.trim();
+    if (!text) return;
+    // Date law (Jess rev25): every shown date = "31 Jul 26".
+    const stamp = new Date().toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "2-digit",
+    });
+    onCommit([`${stamp} · ${text}`, ...entries].join("\n"));
+    setDraft("");
+  };
+  return (
+    <div className="min-w-0">
+      {entries.map((e, i) => (
+        <div
+          key={i}
+          className="text-[12px] text-base-700 py-1 border-b border-base-100/70 last:border-b-0"
+        >
+          {e}
+        </div>
+      ))}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") add();
+        }}
+        onBlur={add}
+        placeholder="+ add note — date stamps itself"
+        aria-label="Add a customer note (auto-dated)"
+        className="mt-1 w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] outline-none hover:border-base-400 focus:border-primary placeholder:text-base-300"
+      />
+    </div>
+  );
+}
+
 /** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
 type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
@@ -1014,6 +1142,12 @@ function DrawerBody({
   // default (the Logistic dropdown is the default route); it expands behind
   // "+ Add stop" and stays open once the order actually has legs.
   const [showRouteBlock, setShowRouteBlock] = useState(false);
+  // rev23 — "Postponed? →" reveals the one-time formal extension recorder
+  // (0196); casual date chatter goes to the NOTES log instead.
+  const [postponeOpen, setPostponeOpen] = useState(false);
+  // rev25 — the auto-reminder −Nd tuner hides behind a click (0/162 ever
+  // changed it; the 0197 cron fires the task by itself).
+  const [editingChaseDays, setEditingChaseDays] = useState(false);
   // Lifted so the Customer panel's ⋮ "Edit details" can trigger the card's own
   // safe-edit mode (every panel gets a ⋮ — Jess 2026-07-11).
   // Customer identity lives in the header strip now (Jess 2026-07-15): the
@@ -1207,13 +1341,14 @@ function DrawerBody({
   const contactByDays = form.draft.contact_by_days.trim()
     ? Number(form.draft.contact_by_days)
     : form.control?.contact_by_days ?? 3;
+  // Date law (Jess rev25): shown dates are "31 Jul 26" — no weekday tail.
   const contactByLabel =
     !order.delivery_date_tbd && order.delivery_date
       ? fmtDate(
           new Date(new Date(order.delivery_date).getTime() - contactByDays * 86_400_000)
             .toISOString()
             .slice(0, 10),
-        )
+        ).split(", ")[0]
       : null;
   // Collect-before-delivery reminder dates (Jess): ideal collect ≥7 days before the
   // logistic ETA (delivery date); last-call at ETA−1 (after which delivery holds).
@@ -1427,12 +1562,13 @@ function DrawerBody({
   const formalPartnerName =
     (partnersData?.partners ?? []).find((p) => p.id === order.delivery_partner_id)
       ?.name ?? null;
-  // One sparse-save mutation for the customer-confirmed toggle (0220). Plain
-  // field, NO alert-engine wiring — the list stays unaffected.
+  // One sparse-save mutation for every instant-saved Delivery field (2A) +
+  // the customer-confirmed toggle (0220). NO alert-engine wiring — the list
+  // stays unaffected.
   const quickSave = useSaveOrderControl(order.id, {
+    onSuccess: () => toast.success("Saved"),
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
-  const customerConfirmed = form.control?.customer_confirmed ?? false;
   // Chase-event stamp (0221, deploy-gated) — SILENT on error so a not-yet-
   // deployed API never blocks the chase itself (the copy already happened).
   const chaseStamp = useSaveOrderControl(order.id);
@@ -1538,6 +1674,12 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // S4 (2026-07-18) — ‹prev/next› keeps the drawer mounted, so `tab` carries
+  // across orders; if the new order doesn't offer the current tab (Storage
+  // hides without MS/BF/SOF goods), fall back to Items instead of a blank pane.
+  useEffect(() => {
+    if (tab === "storage" && !(hasMsbf || hasSof)) setTab("items");
+  }, [tab, hasMsbf, hasSof]);
   // Item-listing groups (Jess 2026-07-18): Ready collapsible; category groups
   // remember manual toggles (default: all-reserved groups start collapsed).
   const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
@@ -3091,10 +3233,18 @@ function DrawerBody({
                       const from =
                         form.control?.storage_from ?? form.draft.storage_from;
                       if (from && from.trim()) {
+                        // S2 — the meter stops at the window END (actual
+                        // delivery / collection, else the logistic ETA);
+                        // "today" only while still accruing.
+                        const end =
+                          form.draft.storage_to.trim() ||
+                          form.draft.logistic_eta.trim() ||
+                          new Date().toISOString().slice(0, 10);
                         const days = Math.max(
                           0,
                           Math.round(
-                            (Date.now() - new Date(`${from}T00:00:00`).getTime()) /
+                            (new Date(`${end}T00:00:00`).getTime() -
+                              new Date(`${from}T00:00:00`).getTime()) /
                               86_400_000,
                           ),
                         );
@@ -3194,107 +3344,331 @@ function DrawerBody({
                       toast.success("Address copied");
                     },
                   },
+                  // 3A (Jess 2026-07-18): multi-leg is a 0/179 rarity — it
+                  // lives behind the ⋮, not on the tab face. The block still
+                  // auto-shows whenever an order actually HAS legs.
+                  {
+                    label: "Multi-leg route…",
+                    icon: <Truck size={14} />,
+                    onClick: () => setShowRouteBlock(true),
+                  },
                 ]}
               />
             }
             summary={
-              /* Round 1A chip: "overdue" (danger text) · "booked <date>" (green)
-                 · "not booked" (grey). */
-              (() => {
-                const eta = form.control?.logistic_eta ?? null;
-                if (eta)
-                  return (
-                    <MiniBadge tone="kv">
-                      booked {fmtDate(eta).split(", ")[0]}
-                    </MiniBadge>
-                  );
-                if (daysToDelivery !== null && daysToDelivery < 0)
-                  return (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
-                      overdue
-                    </span>
-                  );
-                return <MiniBadge tone="muted">not booked</MiniBadge>;
-              })()
+              /* rev24 header (Jess): DEADLINE readout + the truth-ladder chip
+                 (Delivered ✓ › on hold › overdue Nd › booked › not booked ›
+                 no carrier). "booked" = logistic_eta; assigned-but-unbooked
+                 is the 93% normal state and must NOT read as failure. A
+                 delivered order never alarms (pre-golive guardrail #2). */
+              /* rev25 (Jess): badge FIRST, no "deadline" word, the date stays
+                 BLACK — red lives only inside the badge. */
+              <span className="flex items-center gap-2 min-w-0">
+                {(() => {
+                  if (deliveredDone)
+                    return <MiniBadge tone="ready">Delivered ✓</MiniBadge>;
+                  if (balanceGate === "hold" || storageGate === "hold")
+                    return (
+                      <span
+                        title="Delivery on hold — collect the balance / storage fee before dispatch"
+                        className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
+                      >
+                        <AlertCircle size={14} strokeWidth={2.5} />
+                        on hold
+                      </span>
+                    );
+                  if (daysToDelivery !== null && daysToDelivery < 0)
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
+                        overdue {-daysToDelivery}d
+                      </span>
+                    );
+                  const eta = form.control?.logistic_eta ?? null;
+                  if (eta)
+                    return (
+                      <MiniBadge tone="ready">
+                        booked {fmtDate(eta).split(", ")[0]}
+                      </MiniBadge>
+                    );
+                  if (order.ops_assigned_logistic)
+                    return <MiniBadge tone="waiting">not booked</MiniBadge>;
+                  return <MiniBadge tone="muted">no carrier</MiniBadge>;
+                })()}
+                {deadlineLabel !== "—" && (
+                  <span className="text-[13px] font-semibold tabular-nums text-base-900 whitespace-nowrap">
+                    {deadlineLabel}
+                  </span>
+                )}
+              </span>
             }
           >
-            <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
-              {/* Round 1A: ONE full-width column — label left / input right,
-                  nothing truncated (the old two-column split squeezed each input
-                  to ~140px). Field order: Logistic · Deadline · Logistic ETA ·
-                  Time slot · Call window · Customer request. */}
-              <FieldGrid>
-                <RoutingFields
-                  orderId={order.id}
-                  customerAddress={order.customer_address ?? null}
-                  deliveryDate={order.delivery_date}
-                  proceedDate={order.proceed_date ?? null}
-                  opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-                  form={form}
-                  hideRegion
-                />
-                <LogisticEtaField form={form} />
-                <DeliveryTimeSlotField form={form} />
-              </FieldGrid>
-              {/* Chase window (§7.6 — renamed from "Call customer by"): a MANUAL
-                  reminder to chase the PARTNER N days before the deadline. It
-                  feeds the list's next-action engine, it does NOT auto-message. */}
-              {contactByLabel && (
-                <div className="flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                  <span className="flex items-center gap-1 text-[12px] font-medium text-info min-w-0">
-                    <Phone size={14} strokeWidth={2.25} className="shrink-0" />
-                    <span className="truncate">Chase partner by {contactByLabel}</span>
-                  </span>
-                  <span className="flex items-center gap-0.5 text-[12px] text-info/70 whitespace-nowrap shrink-0">
-                    <span>−</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={60}
-                      value={form.draft.contact_by_days}
-                      onChange={(e) => form.set("contact_by_days", e.target.value)}
-                      placeholder="3"
-                      aria-label="Chase window — days before the deadline to chase the partner"
-                      title="Days before the deadline to chase the partner (manual reminder, no auto-message)"
-                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+            <div className="p-3 min-h-0 overflow-auto flex-1">
+              {/* rev24 (Jess Option A — 合体): ONE column, ONE vocabulary — the
+                  progress line IS the step header and each step's fields live
+                  under their own node. Node grammar = the approved JourneyCard
+                  sample (ink ✓ done · ONE coloured current node: red act /
+                  amber waiting · pale ring not-yet). Stock is a read-only step
+                  so the logistic sees goods readiness before calling. */}
+              {(() => {
+                const eta = form.control?.logistic_eta ?? null;
+                const late = daysToDelivery !== null && daysToDelivery < 0;
+                const hasStockStep = goodsN > 0;
+                // done-flags in step order; the FIRST not-done step is the one
+                // coloured node (red when the order is already late).
+                const doneFlags = [
+                  !!order.ops_assigned_logistic,
+                  ...(hasStockStep ? [readyN === goodsN] : []),
+                  !!eta,
+                  deliveredDone,
+                ];
+                const current = doneFlags.findIndex((d) => !d);
+                const stepState = (
+                  idx: number,
+                  tone: "act" | "wait",
+                ): DeliveryStepState =>
+                  doneFlags[idx]
+                    ? "done"
+                    : idx === current
+                      ? late
+                        ? "act"
+                        : tone
+                      : "todo";
+                const nCall = hasStockStep ? 3 : 2;
+                const nDeliv = hasStockStep ? 4 : 3;
+                return (
+                  <div className="max-w-[700px]">
+                    <DeliveryStep
+                      n={1}
+                      state={stepState(0, "act")}
+                      title="Assign logistic"
+                      who="you"
+                    >
+                  <FieldGrid>
+                    <RoutingFields
+                      orderId={order.id}
+                      customerAddress={order.customer_address ?? null}
+                      deliveryDate={order.delivery_date}
+                      proceedDate={order.proceed_date ?? null}
+                      opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                      form={form}
+                      hideRegion
+                      hideDeadline
                     />
-                    <span>d</span>
-                  </span>
-                </div>
-              )}
-              {/* Customer confirmed (0220) — a FIELD inside Delivery per UI-KIT
-                  §5.1 (moved out of the old header banner). Same quick sparse-
-                  save; the list stays unaffected. */}
-              <label className="flex items-center justify-between gap-2 rounded-md bg-base-50 px-2 py-1 cursor-pointer select-none">
-                <span className="text-[12px] text-base-500">
-                  Customer confirmed
-                </span>
-                <input
-                  type="checkbox"
-                  checked={customerConfirmed}
-                  disabled={quickSave.isPending}
-                  onChange={() =>
-                    quickSave.mutate({ customer_confirmed: !customerConfirmed })
-                  }
-                  className="cursor-pointer accent-primary"
-                />
-              </label>
-              <div className="border-t border-base-100 pt-2">
-                <FieldGrid>
-                  <RemarkControlField
-                    form={form}
-                    field="customer_request"
-                    label="Customer request"
-                    placeholder="e.g. postponed to end of May"
-                  />
-                </FieldGrid>
-              </div>
+                    {/* rev23 — the deadline is IMPORT-OWNED (AutoCount "New-
+                        Delivery Date"): read-only here. A customer delay is
+                        recorded via Postponed (the one-time 0196 extension —
+                        original date snapshotted for storage) — NOT by editing
+                        this date; casual "prefers Saturday" talk → NOTES. */}
+                    <FieldRow label="Customer deadline">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] text-base-300 whitespace-nowrap">
+                          auto · AutoCount
+                        </span>
+                        <span
+                          className={`text-[13px] font-semibold tabular-nums ${overDeadline && !deliveredDone ? "text-danger" : "text-base-900"}`}
+                        >
+                          {deadlineLabel}
+                        </span>
+                        {/* paint-once: with an extension recorded, the row
+                            right below already says "→ 31 Jul 26 …". */}
+                        {(form.control?.extension_count ?? 0) === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPostponeOpen((v) => !v)}
+                            title="Record the customer's ONE-TIME formal delivery extension (affects the storage free window; a 2nd needs a principal). Casual date talk goes in Notes."
+                            className="text-[12px] text-info hover:underline whitespace-nowrap"
+                          >
+                            Postponed?
+                          </button>
+                        )}
+                      </span>
+                    </FieldRow>
+                    {(postponeOpen ||
+                      (form.control?.extension_count ?? 0) > 0) && (
+                      <StorageExtensionRow
+                        orderId={order.id}
+                        control={form.control}
+                        hasMsbf={hasMsbf}
+                        hasSof={hasSof}
+                        meta={{
+                          orderCode: `SO-${order.so}`,
+                          customerName: order.customer_name ?? "",
+                          customerPhone: order.customer_phone ?? "",
+                        }}
+                      />
+                    )}
+                  </FieldGrid>
+                    </DeliveryStep>
+                    {/* Stock — READ-ONLY (guardrail: the work lives in Items);
+                        here so the logistic knows what to tell the customer.
+                        SAME stockCats the Items tab derives from. */}
+                    {hasStockStep && (
+                      <DeliveryStep
+                        n={2}
+                        state={stepState(1, "wait")}
+                        title={`Stock ready ${readyN}/${goodsN}`}
+                        who="read-only — work in Items"
+                        right={
+                          <button
+                            type="button"
+                            onClick={() => setTab("items")}
+                            className="text-[12px] text-info hover:underline whitespace-nowrap"
+                          >
+                            open Items ›
+                          </button>
+                        }
+                      >
+                        <div className="text-[12px] text-base-700 leading-relaxed py-0.5">
+                          {stockCats.map((c, i) => (
+                            <span key={c.cat}>
+                              {i > 0 && " · "}
+                              {c.label} {c.ready}/{c.total}
+                              {c.allReady ? (
+                                " ✓"
+                              ) : (
+                                <span className="text-warning"> — {c.status}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </DeliveryStep>
+                    )}
+                    <DeliveryStep
+                      n={nCall}
+                      state={stepState(hasStockStep ? 2 : 1, "wait")}
+                      title="Call customer"
+                      who="NETS — keyed by us for now"
+                      right={
+                        order.ops_assigned_logistic && !deliveredDone ? (
+                          <>
+                            <Btn
+                              variant="ghost"
+                              size="sm"
+                              icon={Bell}
+                              onClick={() => copyChase("logistic", "reminder")}
+                            >
+                              Remind
+                            </Btn>
+                            <Btn
+                              variant="box"
+                              size="sm"
+                              icon={MessageCircle}
+                              onClick={() => copyChase("logistic", "chase")}
+                            >
+                              Chase
+                            </Btn>
+                          </>
+                        ) : undefined
+                      }
+                    >
+                  {/* Money the caller must mention — SAME balanceDue the
+                      Balance tab shows; hidden when no total is set (never a
+                      wrong RM0 on the phone). Stock already told in step 2. */}
+                  {!deliveredDone && totalSet && balanceDue > 0 && (
+                    <div className="text-[12px] text-base-700 py-0.5">
+                      collect{" "}
+                      <span className="font-semibold text-danger">
+                        {RM(balanceDue)}
+                      </span>{" "}
+                      before delivery
+                    </div>
+                  )}
+                  <FieldGrid>
+                    {/* 2A: fields save the moment they change — spreadsheet cell.
+                        (Customer confirmed checkbox REMOVED rev25 — Jess: "we
+                        don't mark"; the 0220 column stays, no UI.) */}
+                    <LogisticEtaField
+                      form={form}
+                      onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
+                    />
+                  </FieldGrid>
+                  {/* Auto-reminder line (rev25) — the 0197 cron creates the
+                      chase task by ITSELF on deadline−N; nothing to press.
+                      N defaults to 3 (0/162 ever changed it) — click "−3d"
+                      to reveal the tuner, Items-ETA click-to-edit style. */}
+                  {!deliveredDone && contactByLabel && (
+                    <div className="flex items-center gap-1 py-0.5 text-[12px] text-base-400">
+                      <span className="truncate">
+                        if not booked, auto-reminder {contactByLabel}
+                      </span>
+                      {editingChaseDays ? (
+                        <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
+                          <span>−</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={60}
+                            autoFocus
+                            value={form.draft.contact_by_days}
+                            onChange={(e) =>
+                              form.set("contact_by_days", e.target.value)
+                            }
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              const saved =
+                                form.control?.contact_by_days != null
+                                  ? String(form.control.contact_by_days)
+                                  : "";
+                              if (v !== saved)
+                                quickSave.mutate({
+                                  contact_by_days: v ? Number(v) : null,
+                                });
+                              setEditingChaseDays(false);
+                            }}
+                            placeholder="3"
+                            aria-label="Days before the deadline for the automatic chase reminder"
+                            className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+                          />
+                          <span>d</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingChaseDays(true)}
+                          title="Automatic — a task is created by itself this many days before the deadline. Click to change."
+                          className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
+                        >
+                          · −{contactByDays}d auto
+                        </button>
+                      )}
+                    </div>
+                  )}
+                    </DeliveryStep>
+                    {/* Bare on purpose — "overdue Nd" lives ONCE, in the
+                        header (state paints once). */}
+                    <DeliveryStep
+                      n={nDeliv}
+                      state={stepState(hasStockStep ? 3 : 2, "wait")}
+                      title="Delivered"
+                      last
+                    />
+                    {/* NOTES — not a stage: the auto-dated customer log. */}
+                    <div className="border-t border-base-100 mt-2.5 pt-2">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-base-600">
+                          Notes
+                        </span>
+                        <span className="text-[11px] text-base-400">
+                          · auto-dated
+                        </span>
+                      </div>
+                      <DeliveryNotesLog
+                        value={form.draft.customer_request}
+                        onCommit={(next) => {
+                          form.set("customer_request", next);
+                          quickSave.mutate({ customer_request: next || null });
+                        }}
+                      />
+                    </div>
               {/* Carriers / route (§7.6) — HIDDEN by default: the Logistic
                   dropdown above IS the standard single-carrier route, so the
                   multi-leg bar only renders when the order actually has legs,
                   or after "+ Add stop" opens it. */}
-              {(order.delivery_stops?.length ?? 0) > 0 || showRouteBlock ? (
-                <div className="border-t border-base-100 pt-2">
+              {/* 3A — no permanent multi-leg furniture on the tab face: the
+                  block renders only when the order HAS legs, or after the ⋮
+                  "Multi-leg route…" opens it. */}
+              {((order.delivery_stops?.length ?? 0) > 0 || showRouteBlock) && (
+                <div className="border-t border-base-100 pt-2 mt-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] text-base-400">
                       Carriers / route
@@ -3313,19 +3687,10 @@ function DrawerBody({
                     }
                   />
                 </div>
-              ) : (
-                <div className="border-t border-base-100 pt-1.5">
-                  <Btn
-                    variant="ghost"
-                    size="sm"
-                    icon={Plus}
-                    onClick={() => setShowRouteBlock(true)}
-                    title="Multi-leg delivery (a second carrier / transit hop) — the Logistic above covers the standard single trip"
-                  >
-                    Add stop (multi-leg)
-                  </Btn>
-                </div>
               )}
+                  </div>
+                );
+              })()}
             </div>
           </Panel>
           </SectionCard>

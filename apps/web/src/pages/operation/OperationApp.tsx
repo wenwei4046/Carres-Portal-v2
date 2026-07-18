@@ -10,6 +10,7 @@ import {
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 import OperationDashboard from "./OperationDashboard";
 // Jess redesign step 2 (2026-06-08) — the Orders tab is now the unified control
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
@@ -71,6 +72,20 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp() {
   const location = useLocation();
   const navigate = useNavigate();
+  // Presence heartbeat (0235, Jess: opens portal = came to work = available
+  // for auto-assign; MC/no-show = never stamped = skipped). Stamps the
+  // caller's OWN app_users.last_seen_at on mount + every 15 min; fails soft
+  // on a Worker that predates the route.
+  useEffect(() => {
+    const beat = () => {
+      void apiFetch("/api/operation/staff/heartbeat", { method: "POST" }).catch(
+        () => {},
+      );
+    };
+    beat();
+    const t = setInterval(beat, 15 * 60_000);
+    return () => clearInterval(t);
+  }, []);
   // 0226 (Loo 2026-07-16) — Product & Maintenance (selling prices) is
   // principal-only; operation lands on the costing Operation Catalog instead,
   // even on a stale `?tab=catalog` deep link.

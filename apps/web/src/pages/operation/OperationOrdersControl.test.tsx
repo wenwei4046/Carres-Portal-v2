@@ -371,9 +371,10 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = 3 ; need = 5 → partial arrival now reads as the amber "Waiting"
-    // pill (the separate "Partial" state was dropped, Loo 2026-07-09).
-    expect(within(row).getByText("Waiting")).toBeInTheDocument();
+    // have = 3 ; need = 5 → partial arrival = waiting. C rebuild (§14): the
+    // word "Waiting" is gone — the cell shows the grey ETA sub-line ("ETA —"
+    // here, nothing imported) and the 货 dot carries the amber.
+    expect(within(row).getByText("ETA —")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="need_po"]')).toBeTruthy();
   });
 
@@ -414,7 +415,7 @@ describe("OperationOrdersControl · Stock column", () => {
     expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
   });
 
-  it("shows an amber Waiting dot for awaiting_operation_action (PO already open)", () => {
+  it("shows the waiting stock state for awaiting_operation_action (PO already open)", () => {
     oneRow({
       id: "aw",
       so: 2005,
@@ -423,8 +424,10 @@ describe("OperationOrdersControl · Stock column", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Waiting")).toBeInTheDocument();
+    // C rebuild (§14): no "Waiting" word — the grey ETA sub-line + the state
+    // attribute carry it (colour lives in the 货 dot).
     expect(row.querySelector('[data-stock-state="awaiting"]')).toBeTruthy();
+    expect(row.querySelector('[data-stock-eta]')).toBeTruthy();
   });
 
   it("falls back to — for an early native order while the stock snapshot is still loading", () => {
@@ -494,7 +497,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Deadline · Stock · Next", () => {
+  it("orders columns: select · Follow-up · Status dots · Order · Customer · Stock · Delivery · Deadline · Next (C rebuild §14)", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -503,32 +506,59 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (10 columns). The follow-up flag is the 2nd column (icon-only
-    // header). Ref is split into Order ID (SO) + Ref No; MS/BF/SOF dropped (the
-    // STOCK core ratio carries the core total). Logistic sits next to Region; the
-    // standalone Logistic-ETA column was removed (Jess spec 2026-07-11) and the
-    // "Next" single-action column closes the row.
+    // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
+    // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
+    // merge into Order, Customer absorbs Region (caption line), Logistic became
+    // Delivery (truth-ladder words) and the "Next" verb closes the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
       "", // follow-up flag — icon-only header
-      "Order ID",
-      "Ref No",
+      "Status",
+      "Order",
       "Customer",
-      "Region",
-      "Logistic",
-      "Deadline",
+      "Deadline", // right after Customer (Jess 2026-07-18)
       "Stock",
+      "Delivery",
+      "PIC", // staff owner — its own column (Jess 2026-07-18)
       "Next",
     ]);
-    // Order ID (SO) + Ref No are now separate columns; the phone tooltip stays on
-    // the Order ID cell.
+    // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
+    // stays on that cell; the row always renders its three status dots.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
     expect(within(row).getByText("TCF2024/06-461")).toBeInTheDocument();
-    const refCell = within(row).getByText("SO-3012").closest("td")!;
-    expect(refCell).toHaveAttribute("title", "012-3456789");
+    const orderCell = within(row).getByText("SO-3012").closest("td")!;
+    expect(orderCell).toHaveAttribute("title", "012-3456789");
+    expect(within(row).getByText("TCF2024/06-461").closest("td")).toBe(orderCell);
+    // Option C (round-3): quiet-when-good — the Status cell renders either a
+    // single green ✓ or only the amber/red line icons, never bare dots.
+    expect(within(row).getByTestId("row-dots").children.length).toBeGreaterThan(0);
+  });
+
+  it("a delivered order NEVER shows the red over pill (guardrail #2)", () => {
+    // Past deadline + delivered → muted date only; an open order with the same
+    // past deadline keeps its "over" pill.
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "done",
+          so: 7001,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivery_date: "2026-03-26",
+        }),
+        makeRow({ id: "live", so: 7002, delivery_date: "2026-03-26" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    const rows = screen.getAllByTestId("order-row");
+    const live = rows.find((r) => r.textContent?.includes("SO-7002"))!;
+    const done = rows.find((r) => r.textContent?.includes("SO-7001"))!;
+    expect(within(live).getByText("over")).toBeInTheDocument();
+    expect(within(done).queryByText("over")).not.toBeInTheDocument();
+    expect(within(done).getByText("Done")).toBeInTheDocument();
   });
 
   it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {
@@ -599,12 +629,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is now the 8th cell (index 7: select · flag · Order ID · Ref No ·
-    // Customer · Region · Logistic · Deadline) — the Logistic-ETA column was
-    // removed (Jess spec 2026-07-11). date + weekday.
+    // Deadline sits right after Customer (Jess 2026-07-18): index 5 —
+    // select · flag · Status dots · Order · Customer · Deadline.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[7].textContent).not.toBe("—");
-    expect(cells[7].textContent).toMatch(/\d/);
+    expect(cells[5].textContent).not.toBe("—");
+    expect(cells[5].textContent).toMatch(/\d/);
   });
 
   it("windows to the first 30 rows + shows the load-more sentinel (infinite scroll)", () => {
@@ -618,9 +647,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // the bottom sentinel scrolls into view (IntersectionObserver — not firable
     // in jsdom, so only the initial window is asserted here).
     expect(screen.getAllByTestId("order-row")).toHaveLength(30);
-    expect(screen.getByText("30 of 120")).toBeInTheDocument();
-    // The sentinel row advertises what's left to load.
-    expect(screen.getByText(/Loading more/)).toBeInTheDocument();
+    // The toolbar "N of M" counter is gone (Jess 2026-07-18 — it duplicated
+    // the footer count); the sentinel row advertises what's left to load.
+    expect(screen.getByText(/Loading more… \(30 of 120\)/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {

@@ -29,6 +29,7 @@ import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
+import opsStaffRouter from "./routes/operation/staff";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -141,6 +142,8 @@ api.route("/orders", stripeCheckoutRouter);
 api.route("/operation/orders", bulkCompleteRouter);
 // 0165 Payments panel (Master Sheet "Balance" tab) — GET list
 api.route("/operation/payments", operationPaymentsRouter);
+// 0232 staff assignment pool — GET / + PUT /:userId
+api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);

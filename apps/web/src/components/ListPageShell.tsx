@@ -26,7 +26,6 @@
  */
 import type { ReactNode } from "react";
 import { PanelLeft, X } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
 
 export interface ActiveChip {
   /** Chip label, e.g. "Region: KV". */
@@ -96,17 +95,25 @@ export default function ListPageShell({
       className={`h-full flex flex-col bg-background ${className}`}
       data-testid={testId}
     >
-      {/* Header — ONE full-width WHITE surface band (no cream showing above or
-          between): breadcrumb + title + freshness on the left, the page's
-          search/utility cluster on the right, all inside this one strip. */}
-      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2.5">
-        {(breadcrumb || meta) && (
-          <div className="flex items-center justify-between gap-3 text-[12px] text-base-400">
-            <div className="min-w-0 flex items-center gap-1.5">{breadcrumb}</div>
-            {meta && <div className="shrink-0 flex items-center gap-1">{meta}</div>}
+      {/* Header — TWO rows (Jess 2026-07-18 round-3): row 1 = breadcrumb with
+          the search/utility cluster on the SAME line (her round-2 ask); row 2 =
+          the page title + freshness stamp, KEPT (round-3: "i never ask you
+          removed my 2row header — Order + synced"). */}
+      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-1.5 text-[12px] text-base-400">
+            {breadcrumb}
           </div>
-        )}
-        <PageHeader title={title} actions={actions} noBorder />
+          {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
+        </div>
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <div className="min-w-0 truncate t-h2 text-base-900">{title}</div>
+          {meta && (
+            <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
+              {meta}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Body split — facet aside (left) + right column (control strip + table),

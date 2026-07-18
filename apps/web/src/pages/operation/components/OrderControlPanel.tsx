@@ -1,5 +1,13 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Plus, Trash2, ShieldCheck, Receipt } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
+  ShieldCheck,
+  Receipt,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -115,6 +123,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // focus — clean but structured.
 const CELL =
   "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
+/** CELL without the rubber-band w-full (rev25, Jess: fields are FIXED-width
+ *  boxes like the approved mock — a date box needs no kilometre). Pair with an
+ *  explicit width class at the call site. */
+export const CELL_FIT = CELL.replace("w-full ", "");
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -323,6 +335,7 @@ export function RoutingFields({
   opsAssignedLogistic,
   form,
   hideRegion = false,
+  hideDeadline = false,
 }: {
   orderId: string;
   customerAddress: string | null;
@@ -336,6 +349,11 @@ export function RoutingFields({
   /** Delivery card shows the region once in its header — hide the duplicate
    *  Region row here (Jess: no repeated region). */
   hideRegion?: boolean;
+  /** rev23 (Jess): the deadline is auto-filled by the AutoCount/Master import
+   *  and read-only in the Delivery tab — the caller renders its own read-only
+   *  row (with the Postponed affordance), so this component skips its editable
+   *  Deadline input. */
+  hideDeadline?: boolean;
 }) {
   const { data: partnersData } = useDeliveryPartners();
   const partners = useMemo(
@@ -379,7 +397,7 @@ export function RoutingFields({
             onChange={(e) =>
               setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
             }
-            className={`${CELL} flex-1 min-w-[150px] disabled:opacity-50`}
+            className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
             <option value="">— pick carrier —</option>
             {partners.map((p) => (
@@ -403,24 +421,26 @@ export function RoutingFields({
         </div>
       </FieldRow>
 
-      <FieldRow label="Deadline">
-        <input
-          type="date"
-          defaultValue={deliveryDate ?? ""}
-          disabled={setDate.isPending}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (ISO_DATE.test(v) && v !== deliveryDate) {
-              // Phase 11.1: set_order_date requires a proceed date <= the
-              // delivery date. Keep the existing proceed date when still valid;
-              // otherwise default it to the new delivery date.
-              const pd = proceedDate && proceedDate <= v ? proceedDate : v;
-              setDate.mutate({ date: v, proceedDate: pd });
-            }
-          }}
-          className={CELL}
-        />
-      </FieldRow>
+      {!hideDeadline && (
+        <FieldRow label="Deadline">
+          <input
+            type="date"
+            defaultValue={deliveryDate ?? ""}
+            disabled={setDate.isPending}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (ISO_DATE.test(v) && v !== deliveryDate) {
+                // Phase 11.1: set_order_date requires a proceed date <= the
+                // delivery date. Keep the existing proceed date when still valid;
+                // otherwise default it to the new delivery date.
+                const pd = proceedDate && proceedDate <= v ? proceedDate : v;
+                setDate.mutate({ date: v, proceedDate: pd });
+              }
+            }}
+            className={CELL}
+          />
+        </FieldRow>
+      )}
       {area === "Outstation" && (
         <FieldRow label="Call before PO">
           <select
@@ -442,15 +462,27 @@ export function RoutingFields({
 /** Logistic ETA (the carrier's committed delivery date) → the Delivery section's
  *  RIGHT column. Distinct from Deadline (the customer's requested date); this is
  *  what the logistic partner updates. */
-export function LogisticEtaField({ form }: { form: OrderControlForm }) {
+export function LogisticEtaField({
+  form,
+  onCommit,
+}: {
+  form: OrderControlForm;
+  /** 2A instant-save (Jess 2026-07-18): fire a sparse save as soon as a full
+   *  date is picked / cleared — the Delivery tab has no draft Save anymore. */
+  onCommit?: (value: string) => void;
+}) {
   return (
     <FieldRow label="Logistic ETA">
       <input
         id="fld-logistic-eta"
         type="date"
         value={form.draft.logistic_eta}
-        onChange={(e) => form.set("logistic_eta", e.target.value)}
-        className={`${CELL} min-w-[150px]`}
+        onChange={(e) => {
+          const v = e.target.value;
+          form.set("logistic_eta", v);
+          if (onCommit && (v === "" || ISO_DATE.test(v))) onCommit(v);
+        }}
+        className={`${CELL_FIT} w-[170px]`}
       />
     </FieldRow>
   );
@@ -911,6 +943,18 @@ export function StorageControlFields({
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
+  // S1 (Jess 2026-07-18, thin inputs): waiver + extension fold away by
+  // default — they auto-open only when one is already in play.
+  const hasWaiverOrExt =
+    (form.control?.storage_waiver_status ?? "none") !== "none" ||
+    form.control?.storage_collected_at != null ||
+    (form.control?.extension_count ?? 0) > 0;
+  const [moreOpen, setMoreOpen] = useState(hasWaiverOrExt);
+  // The control row loads async — pop the fold open once data shows a live
+  // waiver / extension (never auto-closes).
+  useEffect(() => {
+    if (hasWaiverOrExt) setMoreOpen(true);
+  }, [hasWaiverOrExt]);
   // End of the storage window: explicit storage_to (the actual delivery /
   // collection), else the logistic's committed ETA, else today (still
   // accruing). Auto-shown but editable — set it to freeze the fee.
@@ -1113,20 +1157,40 @@ export function StorageControlFields({
             </select>
           </FieldRow>
           {orderId && (
-            <StorageCollectWaiver
-              orderId={orderId}
-              control={form.control}
-              charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : effAutoTotal}
-            />
-          )}
-          {orderId && (
-            <StorageExtensionRow
-              orderId={orderId}
-              control={form.control}
-              hasMsbf={hasMsbf}
-              hasSof={hasSof}
-              meta={meta}
-            />
+            <>
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                className="flex items-center gap-1 text-[12px] text-base-500 hover:text-base-700 px-1 py-0.5"
+              >
+                {moreOpen ? (
+                  <ChevronDown size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={2} />
+                )}
+                Waiver &amp; extension
+              </button>
+              {moreOpen && (
+                <>
+                  <StorageCollectWaiver
+                    orderId={orderId}
+                    control={form.control}
+                    charge={
+                      draft.storage_fee_override.trim()
+                        ? Number(draft.storage_fee_override)
+                        : effAutoTotal
+                    }
+                  />
+                  <StorageExtensionRow
+                    orderId={orderId}
+                    control={form.control}
+                    hasMsbf={hasMsbf}
+                    hasSof={hasSof}
+                    meta={meta}
+                  />
+                </>
+              )}
+            </>
           )}
         </>
       )}
@@ -1609,6 +1673,7 @@ export function RemarkControlField({
   field,
   label,
   placeholder,
+  onCommit,
 }: {
   form: OrderControlForm;
   field:
@@ -1618,6 +1683,9 @@ export function RemarkControlField({
     | "warehouse_remark";
   label: string;
   placeholder?: string;
+  /** 2A instant-save: called with the final value when the textarea blurs
+   *  (only if it actually changed) — the caller fires the sparse save. */
+  onCommit?: (value: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const val = form.draft[field];
@@ -1631,7 +1699,11 @@ export function RemarkControlField({
           autoFocus
           value={val}
           onChange={(e) => form.set(field, e.target.value)}
-          onBlur={() => setEditing(false)}
+          onBlur={() => {
+            setEditing(false);
+            const saved = form.control?.[field] ?? "";
+            if (onCommit && val !== saved) onCommit(val);
+          }}
           placeholder={placeholder}
           className={CELL + " resize-y block py-1"}
         />

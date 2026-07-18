@@ -9,6 +9,8 @@ import {
   requestStorageWaiverInput,
   decideStorageWaiverInput,
   recordStorageExtensionInput,
+  distributeOrders,
+  seenTodayMYT,
 } from "./ops-order-control";
 
 /**
@@ -241,5 +243,65 @@ describe("recordStorageExtensionInput", () => {
   it("requires a note when the reason is Others", () => {
     expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others" }).success).toBe(false);
     expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others", note: "moving house" }).success).toBe(true);
+  });
+});
+
+describe("distributeOrders (0232 staff auto-assign)", () => {
+  it("hands each order to the least-loaded staff, bumping as it goes", () => {
+    const plan = distributeOrders(
+      ["o1", "o2", "o3", "o4"],
+      [
+        { userId: "a", openCount: 2 },
+        { userId: "b", openCount: 0 },
+      ],
+    );
+    // b (0) takes o1+o2 to reach 2, then they alternate a→b.
+    expect(plan).toEqual([
+      { orderId: "o1", userId: "b" },
+      { orderId: "o2", userId: "b" },
+      { orderId: "o3", userId: "a" },
+      { orderId: "o4", userId: "b" },
+    ]);
+  });
+
+  it("ties break on userId so concurrent sweeps converge", () => {
+    const plan = distributeOrders(
+      ["o1", "o2"],
+      [
+        { userId: "b", openCount: 1 },
+        { userId: "a", openCount: 1 },
+      ],
+    );
+    expect(plan[0]).toEqual({ orderId: "o1", userId: "a" });
+    expect(plan[1]).toEqual({ orderId: "o2", userId: "b" });
+  });
+
+  it("no staff or no orders → empty plan (sweep no-ops)", () => {
+    expect(distributeOrders(["o1"], [])).toEqual([]);
+    expect(distributeOrders([], [{ userId: "a", openCount: 0 }])).toEqual([]);
+  });
+
+  it("never mutates the caller's load array", () => {
+    const loads = [{ userId: "a", openCount: 0 }];
+    distributeOrders(["o1", "o2"], loads);
+    expect(loads[0]!.openCount).toBe(0);
+  });
+});
+
+describe("seenTodayMYT (0235 presence)", () => {
+  // 2026-07-18 10:00 MYT = 02:00 UTC.
+  const now = new Date("2026-07-18T02:00:00Z");
+  it("stamped earlier today (MYT) → true", () => {
+    // 00:30 MYT same day = 16:30 UTC the day before.
+    expect(seenTodayMYT("2026-07-17T16:30:00Z", now)).toBe(true);
+  });
+  it("stamped yesterday MYT → false (even if same UTC date)", () => {
+    // 23:00 MYT on 17 Jul = 15:00 UTC 17 Jul.
+    expect(seenTodayMYT("2026-07-17T15:00:00Z", now)).toBe(false);
+  });
+  it("never stamped / garbage → false", () => {
+    expect(seenTodayMYT(null, now)).toBe(false);
+    expect(seenTodayMYT(undefined, now)).toBe(false);
+    expect(seenTodayMYT("not-a-date", now)).toBe(false);
   });
 });

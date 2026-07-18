@@ -7,6 +7,10 @@ import {
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
+  useOperationStaff,
+  useUpdateStaffSetting,
+  useAssignOrderStaff,
+  assignOrderStaffRequest,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
@@ -29,7 +33,15 @@ import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
-import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
+import {
+  distributeOrders,
+  seenTodayMYT,
+  isOpsManager,
+  type OpsTask,
+  type OpsTasksListResponse,
+  type OpsStaffMember,
+} from "@carres/shared";
+import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
@@ -49,6 +61,9 @@ import {
   Lock,
   Printer,
   MoreVertical,
+  Users,
+  CircleDollarSign,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -404,21 +419,118 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-// Next-action pill colours — restored to Jess's original proposal
-// (carres_full_page_final_dateformat.html) so the five action tones read as
-// five DISTINCT colours, not one washed-out red. Each = soft fill + strong
-// ink + a matching border; carried inline so the shared global `.pill` stays put.
-/* v4 §6 hues (tone SEMANTICS unchanged): red/amber/green/grey from the kit;
- * borders dropped (v4 pills are borderless — border mirrors the fill). The
- * blue info tone is the same known legacy as `.pill-sent` (v4 blue =
- * selection) — realigned when the scheduled-tone question is settled. */
-const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
-  danger: { text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" }, // chase / overdue — red
-  warning: { text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" }, // waiting stock — amber
-  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#D3E4FB" }, // call / assign — blue (LEGACY)
-  success: { text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" }, // schedule delivery — green
-  neutral: { text: "#6B7280", bg: "#F3F4F6", border: "#F3F4F6" }, // done — grey
+/** NEXT is plain TEXT in the C rebuild (§14, 2026-07-18) — the pill chrome and
+ *  the legacy info-BLUE are gone (blue = selection only). Red text is reserved
+ *  for the two genuine dangers (past-deadline Chase logistic + Order PO);
+ *  green = Confirm; everything in progress is plain ink; Done is muted. */
+const NEXT_TEXT_COLOR: Record<NextTone, string> = {
+  danger: "#A32D2D",
+  warning: "#374151",
+  info: "#374151",
+  success: "#3B6D11",
+  neutral: "#A8A8A8",
 };
+
+// ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
+// One row = three dots in a FIXED order — Money · Stock · Delivery — sharing
+// the §8 dial hues. The dots are the row's ONLY colour channel; the fact cells
+// (n/m, ETA, partner, ladder word) stay ink/grey. Grey = not applicable.
+const DOT_HEX = {
+  green: "#639922",
+  amber: "#EF9F27",
+  red: "#E24B4A",
+  grey: "#D1D5DB",
+} as const;
+interface RowDot {
+  color: string;
+  title: string;
+}
+export function rowDotsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  se: StockEta,
+  logi: LogisticState,
+): [RowDot, RowDot, RowDot] {
+  const completed = controlTabOf(o) === "completed";
+  const ovl = ovlOf(o);
+  const bal = ovl?.balance == null ? null : Number(ovl.balance);
+  // 钱 — an owing balance stays RED even after delivery (§7: the owing customer
+  // is the one chase that survives Delivered).
+  const money: RowDot =
+    bal == null
+      ? { color: DOT_HEX.grey, title: "Money — no balance data" }
+      : bal > 0
+        ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(bal)} outstanding` }
+        : { color: DOT_HEX.green, title: "Money — settled" };
+  // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
+  let goods: RowDot;
+  if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
+  else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
+    goods = { color: DOT_HEX.green, title: "Stock — all in" };
+  else if (stock.state === "unknown")
+    goods = { color: DOT_HEX.red, title: "Stock — no PO raised yet" };
+  else if (se.state === "overdue" || se.state === "late")
+    goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
+  else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
+  // 送 — guardrail #2: a delivered order never alarms. Open: booked = green,
+  // not booked = amber NORMAL state (truth ladder §12), red only past deadline.
+  let delivery: RowDot;
+  if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
+  else if (logi.key === "scheduled")
+    delivery = { color: DOT_HEX.green, title: "Delivery — booked" };
+  else if (logi.key === "unassigned")
+    delivery = { color: DOT_HEX.grey, title: "Delivery — no carrier yet" };
+  else {
+    const dd = daysToDue(o);
+    delivery =
+      dd !== null && dd < 0
+        ? { color: DOT_HEX.red, title: "Delivery — past deadline, not booked" }
+        : { color: DOT_HEX.amber, title: "Delivery — not booked yet" };
+  }
+  return [money, goods, delivery];
+}
+function fmtRM(n: number): string {
+  return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
+}
+
+// ─── Staff ownership (migration 0232, Jess model B 2026-07-18) ───────────────
+// One soft owner per order (ops_order_control.assigned_staff). NEVER a
+// visibility wall: everyone sees every row; the owner is who's watching it.
+const NO_STAFF = "__none" as const;
+function ownerOf(o: operationOrderListRow): string | null {
+  return ovlOf(o)?.assigned_staff ?? null;
+}
+/** The calling-name as keyed in app_users.name ("Shasha" / "Khor Yee" /
+ *  "Li Ching") — the facet tab label. Falls back to the email local-part. */
+function staffLabel(m: OpsStaffMember): string {
+  const n = (m.name ?? "").trim();
+  return n || m.email.split("@")[0] || m.email;
+}
+/** Avatar code (Jess round-3, 2026-07-18): first letter of each WORD of the
+ *  name, MAX 2 letters — "Khor Yee"→KY · "Li Ching"→LC; a single-word name
+ *  takes its first two letters — "Shasha"→SH. */
+function staffInitials(m: OpsStaffMember): string {
+  const words = staffLabel(m).split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return (words[0] ?? m.email).slice(0, 2).toUpperCase();
+}
+
+/** Per-person identity colour for the PIC avatar — a fixed muted palette that
+ *  deliberately AVOIDS the status hues (green/amber/red), flame (action) and
+ *  selection blue, so identity never reads as state. Stable by user id. */
+const AVATAR_COLORS: { bg: string; fg: string }[] = [
+  { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
+  { bg: "#CCFBF1", fg: "#115E59" }, // teal
+  { bg: "#FCE7F3", fg: "#9D174D" }, // rose
+  { bg: "#EDE9FE", fg: "#5B21B6" }, // violet
+  { bg: "#CFFAFE", fg: "#155E75" }, // cyan
+  { bg: "#E7E5E4", fg: "#44403C" }, // stone
+];
+function avatarColor(userId: string): { bg: string; fg: string } {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h + userId.charCodeAt(i)) % 997;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
 
 function ovlOf(o: operationOrderListRow) {
   const raw = o.ops_order_control;
@@ -822,15 +934,22 @@ interface OrderColDef {
   label: string;
   w: number;
 }
+/** §14 six-col rebuild (Jess picked C, 2026-07-18): dots lead, SO+Ref and
+ *  Customer+Region merge into two-line cells, LOGISTIC→DELIVERY (truth-ladder
+ *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
+ *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "orderId", label: "Order ID", w: 7 },
-  { key: "ref", label: "Ref No", w: 8 },
-  { key: "customer", label: "Customer", w: 14 },
-  { key: "region", label: "Region", w: 8 },
-  { key: "logistic", label: "Logistic", w: 11 },
+  { key: "dots", label: "Status", w: 5 },
+  { key: "order", label: "Order", w: 11 },
+  { key: "customer", label: "Customer", w: 17 },
+  // Deadline right after Customer (Jess 2026-07-18).
   { key: "deadline", label: "Deadline", w: 13 },
-  { key: "stock", label: "Stock", w: 13 },
-  { key: "next", label: "Next", w: 20 },
+  { key: "stock", label: "Stock", w: 12 },
+  { key: "delivery", label: "Delivery", w: 12 },
+  // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
+  // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
+  { key: "pic", label: "PIC", w: 5 },
+  { key: "next", label: "Next", w: 13 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -958,6 +1077,26 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // `undefined` until loaded → the Stock cell falls back to stage-only state.
   const stockQ = useOperationStock();
   const qc = useQueryClient();
+
+  // Staff assignment pool (0232) — fails soft to an empty list on a Worker
+  // that predates the route, keeping the whole assignment layer inert.
+  // MANAGEMENT gate (Jess 2026-07-18): only operation@carres.com + principal
+  // may manually assign / manage the pool / run the sweep; staff read-only.
+  const authRole = useAuth((s) => s.role);
+  const authEmail = useAuth((s) => s.user?.email ?? null);
+  const isManager = isOpsManager(authRole, authEmail);
+  const staffQ = useOperationStaff();
+  const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
+  const staffById = useMemo(
+    () => new Map(staffList.map((s) => [s.user_id, s])),
+    [staffList],
+  );
+  const poolStaff = useMemo(() => staffList.filter((s) => s.pooled), [staffList]);
+  const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  const assignStaffMut = useAssignOrderStaff({
+    onSuccess: () => toast.success("Reassigned"),
+    onError: (e) => toast.error(`Reassign failed — ${e.message}`),
+  });
 
   // Bulk-action mutations: assign-logistic loops the Inbox ops-assign endpoint;
   // create-tasks loops the ops cockpit /ops/tasks. CSV export is client-side.
@@ -1134,6 +1273,99 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [tabFiltered],
   );
 
+  // STAFF facet counts — per pool member + "No PIC", over the current tab.
+  // A DELIVERED order without a PIC is closed work, not "nobody watching" —
+  // it never counts toward No PIC (guardrail #2 spirit).
+  const staffEntries = useMemo(() => {
+    const counts = new Map<string, number>();
+    let none = 0;
+    for (const o of tabFiltered) {
+      const owner = ownerOf(o);
+      if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      else if (controlTabOf(o) !== "completed") none += 1;
+    }
+    return { counts, none };
+  }, [tabFiltered]);
+
+  // AUTO-ASSIGN sweep (Jess 2026-07-18): every OPEN order without an owner is
+  // distributed to the least-loaded AVAILABLE pool member — runs once per page
+  // load, assign-at-entry only (existing owners are never silently moved; MC/
+  // resign moves go through the explicit Team-popover redistribute). No pool →
+  // no-op, so the layer is inert until Jess opts staff in.
+  const sweepDone = useRef(false);
+  useEffect(() => {
+    if (sweepDone.current) return;
+    // Management sessions only — staff can't write assignments (API 403s
+    // anyway); the presence-RPC upgrade may widen this later.
+    if (!isManager) return;
+    const all = data?.orders;
+    if (!all || !staffQ.data) return;
+    // Available = in the pool + not manually away + SEEN TODAY (0235: opened
+    // the portal = came to work; MC/no-show auto-skipped, zero clicks).
+    const avail = staffQ.data.staff.filter(
+      (s) => s.pooled && s.available && seenTodayMYT(s.last_seen_at),
+    );
+    if (avail.length === 0) return;
+    const open = all.filter((o) => controlTabOf(o) !== "completed");
+    const unassigned = open.filter((o) => !ownerOf(o));
+    sweepDone.current = true;
+    if (unassigned.length === 0) return;
+    const loads = avail.map((s) => ({
+      userId: s.user_id,
+      openCount: open.filter((o) => ownerOf(o) === s.user_id).length,
+    }));
+    const plan = distributeOrders(unassigned.map((o) => o.id), loads);
+    void (async () => {
+      let ok = 0;
+      for (let i = 0; i < plan.length; i += 8) {
+        const chunk = plan.slice(i, i + 8);
+        const results = await Promise.allSettled(
+          chunk.map((p) => assignOrderStaffRequest(p.orderId, p.userId)),
+        );
+        ok += results.filter((r) => r.status === "fulfilled").length;
+      }
+      if (ok > 0) {
+        toast.success(`Auto-assigned ${ok} order${ok === 1 ? "" : "s"}`);
+        void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      }
+    })();
+  }, [data, staffQ.data, qc, isManager]);
+
+  // Redistribute ONE member's open orders across the other available members
+  // (the resign / long-MC one-click; Team popover).
+  async function redistributeStaff(userId: string) {
+    const all = data?.orders ?? [];
+    const open = all.filter((o) => controlTabOf(o) !== "completed");
+    const mine = open.filter((o) => ownerOf(o) === userId);
+    const others = poolStaff.filter(
+      (s) =>
+        s.available && seenTodayMYT(s.last_seen_at) && s.user_id !== userId,
+    );
+    if (mine.length === 0 || others.length === 0) {
+      toast.error(
+        mine.length === 0
+          ? "No open orders to redistribute"
+          : "No other available staff to take them",
+      );
+      return;
+    }
+    const loads = others.map((s) => ({
+      userId: s.user_id,
+      openCount: open.filter((o) => ownerOf(o) === s.user_id).length,
+    }));
+    const plan = distributeOrders(mine.map((o) => o.id), loads);
+    let ok = 0;
+    for (let i = 0; i < plan.length; i += 8) {
+      const chunk = plan.slice(i, i + 8);
+      const results = await Promise.allSettled(
+        chunk.map((p) => assignOrderStaffRequest(p.orderId, p.userId)),
+      );
+      ok += results.filter((r) => r.status === "fulfilled").length;
+    }
+    toast.success(`Redistributed ${ok} order${ok === 1 ? "" : "s"}`);
+    void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+  }
+
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (flaggedOnly) r = r.filter(hasOpenTask);
@@ -1144,12 +1376,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
+    if (staffFilter)
+      r = r.filter((o) =>
+        staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
+      );
     if (categoryFilter.size > 0) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareBySlack);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1357,6 +1593,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     !!search ||
     !!stockFilter ||
     !!logisticFilter ||
+    !!staffFilter ||
     !!regionFilter ||
     !!dueFilter ||
     categoryFilter.size > 0 ||
@@ -1368,6 +1605,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     setSearch("");
     setStockFilter(null);
     setLogisticFilter(null);
+    setStaffFilter(null);
     setRegionFilter(null);
     setDueFilter(null);
     setCategoryFilter(new Set());
@@ -1389,6 +1627,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
     activeChips.push({
       label: regionFilter === OTHERS_LABEL ? "No region" : `Region: ${regionFilter}`,
       onClear: () => setRegionFilter(null),
+    });
+  if (staffFilter)
+    activeChips.push({
+      label:
+        staffFilter === NO_STAFF
+          ? "No PIC"
+          : `PIC: ${(() => {
+              const m = staffById.get(staffFilter);
+              return m ? staffLabel(m) : staffFilter;
+            })()}`,
+      onClear: () => setStaffFilter(null),
     });
   if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
   if (etaOnly) activeChips.push({ label: "No ETA", onClear: () => setEtaOnly(false) });
@@ -1467,18 +1716,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           />
         }
         toolbarRight={
-          /* ONE-row toolbar, right cluster in this exact order:
-             N of M · + Master · + AutoCount · ⋮ (the overflow sits at the far
-             corner; its menu = Show columns, with room for Density/Export). */
+          /* ONE-row toolbar, right cluster: + Master · + AutoCount · ⋮. The
+             "N of M" counter is GONE (Jess 2026-07-18: it floated in the air
+             and duplicated the footer count + the Loading-more sentinel). */
           <>
-            {total > 0 && (
-              <span
-                className="text-[12px] text-base-500 tabular-nums"
-                title="Rows loaded / total in this tab"
-              >
-                {Math.min(shown.length, total)} of {total}
-              </span>
-            )}
             <button
               type="button"
               onClick={() => setEtaImportOpen(true)}
@@ -1689,6 +1930,65 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </KanbanGroup>
 
+              {/* STAFF — 每人一个 tab (Jess 2026-07-18): pool members + Unassigned.
+                  ⚙ Team manages membership / MC availability / redistribute.
+                  Hidden entirely while the staff route is absent (old Worker). */}
+              {staffList.length > 0 && (
+                <KanbanGroup
+                  title="STAFF"
+                  testid="filter-staff"
+                  total={tabFiltered.length}
+                  collapsed={collapsedGroups.has("STAFF")}
+                  onToggle={() => toggleGroup("STAFF")}
+                  headerRight={
+                    /* Pool management = management only (Jess 2026-07-18). */
+                    isManager ? (
+                      <TeamPopover
+                        staff={staffList}
+                        openCounts={staffEntries.counts}
+                        onRedistribute={(id) => void redistributeStaff(id)}
+                      />
+                    ) : undefined
+                  }
+                >
+                  {poolStaff.map((s) => (
+                    <KanbanRow
+                      key={s.user_id}
+                      label={
+                        !s.available
+                          ? `${staffLabel(s)} · away`
+                          : !seenTodayMYT(s.last_seen_at)
+                            ? `${staffLabel(s)} · not in`
+                            : staffLabel(s)
+                      }
+                      count={staffEntries.counts.get(s.user_id) ?? 0}
+                      active={staffFilter === s.user_id}
+                      title={
+                        !s.available
+                          ? `${s.email} — marked away (MC/leave); new orders skip them`
+                          : !seenTodayMYT(s.last_seen_at)
+                            ? `${s.email} — hasn't opened the portal today; new orders skip them until they do`
+                            : s.email
+                      }
+                      onClick={() =>
+                        setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
+                      }
+                    />
+                  ))}
+                  {/* "No PIC", NOT "Unassigned" — that word already means
+                      no-logistic in CHASE NOW (Jess 2026-07-18, word law). */}
+                  <KanbanRow
+                    label="No PIC"
+                    count={staffEntries.none}
+                    active={staffFilter === NO_STAFF}
+                    title="Orders nobody is watching yet"
+                    onClick={() =>
+                      setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
+                    }
+                  />
+                </KanbanGroup>
+              )}
+
               <KanbanGroup
                 title="STOCK"
                 total={stockEntries
@@ -1791,22 +2091,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
         className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          /* UI-KIT v4 §8b (LOCKED): rows are 44px FIXED — content adapts to
-             the row, never the reverse. whitespace-nowrap kills the silent
-             row-growers (text WRAPPING inside narrow fixed columns — "SO-1112"
-             at a 31px column folded to 2 lines and pushed rows to 48/57px);
-             stacked multi-DIV cells (ref ≤2 lines, logistic, deadline) still
-             stack, each line just ellipsises. Keep in sync with
-             design-standard.ts ROW.heightPx. */
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
+          /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
+             content adapts to the row, never the reverse. whitespace-nowrap
+             kills the silent row-growers (text WRAPPING inside narrow fixed
+             columns); the two-line cells (Order / Customer / Stock / Delivery)
+             stack at 15px line-height, each line just ellipsises. */
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
               horizontally scrolls on any screen; long content ellipsis-truncates.
-              Data columns take a small share (tight groups); Manage takes the
-              largest (its future multi-line message). Order: ☐ · ⚑ · Order ID ·
-              Ref No · Customer · Region · Logistic · ETA · Deadline · Stock ·
-              Manage. */}
+              Order (C rebuild §14): ☐ · ⚑ · Status dots · Order · Customer ·
+              Stock · Delivery · Deadline · Next. */}
           <colgroup>
             <col style={{ width: "3%" }} />
             <col style={{ width: "3%" }} />
@@ -1825,7 +2121,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 indeterminate dash on a partial tick. */}
             <tr
               className="border-b"
-              style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
+              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild). */
+              style={{ backgroundColor: "#F9FAFB", borderBottomColor: "#E5E7EB" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -1842,13 +2139,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <th className="px-1 py-1.5 text-center" title="Follow-up">
                 <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
               </th>
-              {showCol("orderId") && <Th>Order ID</Th>}
-              {showCol("ref") && <Th>Ref No</Th>}
+              {showCol("dots") && (
+                <Th>
+                  <span title="Money · Stock · Delivery — green OK · amber in progress · red needs action">
+                    Status
+                  </span>
+                </Th>
+              )}
+              {showCol("order") && <Th>Order</Th>}
               {showCol("customer") && <Th>Customer</Th>}
-              {showCol("region") && <Th>Region</Th>}
-              {showCol("logistic") && <Th>Logistic</Th>}
               {showCol("deadline") && <Th>Deadline</Th>}
               {showCol("stock") && <Th>Stock</Th>}
+              {showCol("delivery") && <Th>Delivery</Th>}
+              {showCol("pic") && (
+                <Th>
+                  <span title="Person in charge — who's watching this order">PIC</span>
+                </Th>
+              )}
               {showCol("next") && <Th>Next</Th>}
             </tr>
           </thead>
@@ -1875,6 +2182,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onOpen={() => setOpenOrderId(o.id)}
                 onFlag={openFollowUp}
                 showCol={showCol}
+                staffById={staffById}
+                poolStaff={poolStaff}
+                onAssignStaff={(orderId, staff) =>
+                  assignStaffMut.mutate({ orderId, staff })
+                }
+                canAssign={isManager}
                 hasPendingChange={pendingCROrders.has(o.id)}
               />
             ))}
@@ -2157,6 +2470,145 @@ function KanbanGroup({
   );
 }
 
+/** Team popover (0232) — the ⚙ on the STAFF band. Lists every ACTIVE operation
+ *  account: [Add] opts one into the auto-assign pool; pool members get an
+ *  "away" toggle (MC/leave — new orders skip them) + [Remove] + a one-click
+ *  [Shift N] that redistributes their open orders to the other available
+ *  members. Everything here is pool mechanics — visibility never changes. */
+function TeamPopover({
+  staff,
+  openCounts,
+  onRedistribute,
+}: {
+  staff: OpsStaffMember[];
+  openCounts: Map<string, number>;
+  onRedistribute: (userId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // FIXED positioning: the facet column is an overflow-auto scroller, so an
+  // absolutely-positioned panel gets clipped at its edge — anchor to the
+  // viewport off the button rect instead.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const mut = useUpdateStaffSetting({
+    onError: (e) => toast.error(`Team update failed — ${e.message}`),
+  });
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label="Manage team"
+        title="Manage team — who receives auto-assigned orders"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setPos({
+            top: r.bottom + 4,
+            left: Math.max(8, Math.min(r.left, window.innerWidth - 296)),
+          });
+          setOpen((v) => !v);
+        }}
+        className="p-0.5 rounded text-base-500 hover:text-base-800 hover:bg-base-100"
+      >
+        <Users size={14} strokeWidth={2} />
+      </button>
+      {open && pos && (
+        <div
+          className="fixed z-40 w-72 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">
+            Auto-assign pool
+          </div>
+          {staff.map((s) => (
+            <div
+              key={s.user_id}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-base-50"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-base-900 truncate">
+                  {staffLabel(s)}
+                  {s.pooled && !s.available && (
+                    <span className="text-[11px] text-base-500"> · away</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-base-500 truncate">
+                  {s.email}
+                  {s.pooled &&
+                    (seenTodayMYT(s.last_seen_at) ? " · in today" : " · not in yet")}
+                </div>
+              </div>
+              {!s.pooled ? (
+                <button
+                  type="button"
+                  className="btn-secondary text-[11px] py-0.5 px-2"
+                  disabled={mut.isPending}
+                  onClick={() => mut.mutate({ userId: s.user_id, pooled: true })}
+                >
+                  Add
+                </button>
+              ) : (
+                <>
+                  <label
+                    className="flex items-center gap-1 text-[11px] text-base-600 cursor-pointer"
+                    title="Away (MC / leave) — new orders skip them; existing orders stay until shifted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!s.available}
+                      disabled={mut.isPending}
+                      onChange={() =>
+                        mut.mutate({
+                          userId: s.user_id,
+                          pooled: true,
+                          available: !s.available ? true : false,
+                        })
+                      }
+                    />
+                    away
+                  </label>
+                  {(openCounts.get(s.user_id) ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      className="btn-ghost text-[11px] py-0.5 px-1.5"
+                      title="Shift all their open orders to the other available staff"
+                      onClick={() => onRedistribute(s.user_id)}
+                    >
+                      Shift {openCounts.get(s.user_id)}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-ghost text-[11px] py-0.5 px-1.5 text-base-500"
+                    disabled={mut.isPending}
+                    title="Remove from the pool (their assigned orders keep the name until shifted)"
+                    onClick={() => mut.mutate({ userId: s.user_id, pooled: false })}
+                  >
+                    ✕
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+          <div className="t-micro text-base-400 px-3 pt-1.5 pb-1">
+            New orders auto-assign to the least-loaded member. Everyone still
+            sees every order.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Status pipeline TABS (P2 H) — Gmail Primary/Social-style horizontal tabs at
  *  the top of the LIST. Keeps `data-testid="filter-status"` + button names
  *  (label + count) so the status-filter tests resolve. Active = ink label +
@@ -2181,7 +2633,15 @@ function StatusTabs({
     completed: CheckCircle2,
   };
   return (
-    <div data-testid="filter-status" className="flex items-center gap-1 flex-wrap">
+    /* ONE line always (Jess 2026-07-18: Delivered wrapped to a 2nd row on
+       MacBook) — no wrap; tab icons only show on wide desktops so the six
+       tabs + the import cluster fit ~1000px content width (§0 rule 11). */
+    <div
+      data-testid="filter-status"
+      /* overflow-x scroll = the below-MacBook fallback: tabs stay reachable
+         on a squeezed window instead of clipping Delivered off the row. */
+      className="flex items-center gap-0.5 flex-nowrap min-w-0 overflow-x-auto no-scrollbar"
+    >
       {tabs.map((t) => {
         const on = active === t.key;
         const Icon = TAB_ICON[t.key];
@@ -2191,13 +2651,18 @@ function StatusTabs({
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className={`inline-flex items-center gap-1.5 px-3 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] ${
+            className={`inline-flex items-center gap-1.5 px-2 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] whitespace-nowrap ${
               on
                 ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
                 : "border-transparent text-base-500 font-medium hover:text-base-800"
             }`}
           >
-            <Icon size={16} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+            <Icon
+              size={16}
+              strokeWidth={2}
+              className="shrink-0 hidden min-[1600px]:inline"
+              aria-hidden="true"
+            />
             {t.label}
             <span
               className={`tabular-nums text-[11px] px-1.5 rounded-full ${
@@ -2214,6 +2679,165 @@ function StatusTabs({
 }
 
 
+/** Row status icons — OPTION C (Jess 2026-07-18 round-3): all quiet → one
+ *  green ✓; otherwise only the amber/red lines appear, each as the icon the
+ *  team already knows: RM$ = money · box = stock · truck = delivery
+ *  (logistic). Grey (no data) stays silent. Tooltips carry the detail. */
+const LINE_ICONS: [LucideIcon, LucideIcon, LucideIcon] = [
+  CircleDollarSign,
+  Package,
+  Truck,
+];
+function RowStatusIcons({ dots }: { dots: [RowDot, RowDot, RowDot] }) {
+  const alerts = dots
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.color === DOT_HEX.amber || d.color === DOT_HEX.red);
+  return (
+    <div className="flex items-center gap-1.5" data-testid="row-dots">
+      {alerts.length === 0 ? (
+        <span title={`All good — ${dots.map((d) => d.title).join(" · ")}`}>
+          <CheckCircle2
+            size={14}
+            strokeWidth={2}
+            style={{ color: DOT_HEX.green }}
+            aria-label="All good"
+          />
+        </span>
+      ) : (
+        alerts.map(({ d, i }) => {
+          const Icon = LINE_ICONS[i]!;
+          return (
+            <span key={i} title={d.title}>
+              <Icon size={14} strokeWidth={2} style={{ color: d.color }} />
+            </span>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/** Owner chip (0232) — 20px initials avatar on every row; hollow when
+ *  unassigned. Click = reassign popover (management only). Identity colour,
+ *  never status colour. */
+function OwnerChip({
+  o,
+  staffById,
+  poolStaff,
+  onAssignStaff,
+  canEdit,
+}: {
+  o: operationOrderListRow;
+  staffById: Map<string, OpsStaffMember>;
+  poolStaff: OpsStaffMember[];
+  onAssignStaff: (orderId: string, staff: string | null) => void;
+  /** Management only (Jess 2026-07-18) — staff see the avatar read-only. */
+  canEdit: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  // FIXED positioning — the table lives in an overflow-auto scroller, so an
+  // absolute menu would clip at the container edge (esp. bottom rows).
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const owner = ownerOf(o);
+  const member = owner ? staffById.get(owner) : undefined;
+  // No pool at all (feature dormant) → render nothing.
+  if (poolStaff.length === 0 && !member) return null;
+  const av = member ? avatarColor(member.user_id) : null;
+  // Staff = read-only avatar (identity + tooltip, no menu).
+  if (!canEdit) {
+    return member ? (
+      <span
+        className="shrink-0 w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none"
+        style={{ background: av!.bg, color: av!.fg }}
+        title={`PIC: ${member.name ?? member.email}`}
+        aria-label={`Assigned to ${staffLabel(member)}`}
+      >
+        {staffInitials(member)}
+      </span>
+    ) : (
+      <span
+        className="shrink-0 w-[20px] h-[20px] rounded-full border border-dashed border-base-300 flex items-center justify-center text-[11px] text-base-300 leading-none"
+        title="No PIC yet"
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <div className="shrink-0" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign PIC"}
+        title={
+          member
+            ? `PIC: ${member.name ?? member.email} — click to reassign`
+            : "No PIC — click to assign"
+        }
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setPos({
+            top: Math.min(r.bottom + 4, window.innerHeight - 240),
+            left: Math.max(8, Math.min(r.left, window.innerWidth - 184)),
+          });
+          setOpen((v) => !v);
+        }}
+        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
+          member
+            ? "hover:ring-2 hover:ring-base-300"
+            : "border border-dashed border-base-300 text-base-300 hover:border-base-500 hover:text-base-500"
+        }`}
+        style={member ? { background: av!.bg, color: av!.fg } : undefined}
+      >
+        {member ? staffInitials(member) : "+"}
+      </button>
+      {open && pos && (
+        <div
+          className="fixed z-40 w-44 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {poolStaff.map((s) => (
+            <button
+              key={s.user_id}
+              type="button"
+              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-base-50 ${
+                s.user_id === owner ? "font-semibold text-base-900" : "text-base-700"
+              }`}
+              onClick={() => {
+                setOpen(false);
+                if (s.user_id !== owner) onAssignStaff(o.id, s.user_id);
+              }}
+            >
+              {staffLabel(s)}
+              {!s.available && <span className="t4-caption"> · away</span>}
+            </button>
+          ))}
+          {owner && (
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-[13px] text-base-500 hover:bg-base-50 border-t border-base-100"
+              onClick={() => {
+                setOpen(false);
+                onAssignStaff(o.id, null);
+              }}
+            >
+              Clear PIC
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderRow({
   o,
   partnerName,
@@ -2224,6 +2848,10 @@ function OrderRow({
   onOpen,
   onFlag,
   showCol,
+  staffById,
+  poolStaff,
+  onAssignStaff,
+  canAssign,
   hasPendingChange,
 }: {
   o: operationOrderListRow;
@@ -2238,6 +2866,12 @@ function OrderRow({
   onFlag: (o: operationOrderListRow) => void;
   /** Column visibility predicate (Columns show/hide) — gates the 8 data cells. */
   showCol: (key: string) => boolean;
+  /** Staff pool (0232) — owner-chip lookup + the reassign popover options. */
+  staffById: Map<string, OpsStaffMember>;
+  poolStaff: OpsStaffMember[];
+  onAssignStaff: (orderId: string, staff: string | null) => void;
+  /** Management-only manual assignment (Jess 2026-07-18). */
+  canAssign: boolean;
   /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
   hasPendingChange?: boolean;
 }) {
@@ -2251,6 +2885,8 @@ function OrderRow({
   const sofaQty = catQty(lines, "sofa");
 
   const logi = logisticStateOf(o, partnerName);
+  const dots = rowDotsOf(o, stock, se, logi);
+  const completed = controlTabOf(o) === "completed";
 
   return (
     <tr
@@ -2273,133 +2909,95 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
-          here; paired tight with the Ref No column to its right. */}
-      {showCol("orderId") && (
-      <td className="pl-1 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
-        <span
-          className="font-mono tabular-nums"
-          style={{ fontSize: "13px", fontWeight: 500, color: "#1A1A1A" }}
-        >
-          SO-{o.so}
-        </span>
-        {/* 0234 — a dealer product change awaits approval (open the order →
-            the approval card sits at the top of the drawer). */}
-        {hasPendingChange && (
-          <span
-            className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-warning-soft text-base-800 border border-warning"
-            title="Product change awaiting approval — open the order to decide"
-            data-testid="oc-change-badge"
-          >
-            Change
-          </span>
-        )}
+      {/* Status (Jess picked OPTION C, 2026-07-18 round-3): quiet when good —
+          all lines green/grey → ONE green ✓; only the amber/red lines show
+          their recognisable icon (RM$ money · box stock · truck delivery),
+          coloured by state. Replaces the anonymous 三点 (new staff couldn't
+          read them). */}
+      {showCol("dots") && (
+      <td className="pl-2 pr-1">
+        <RowStatusIcons dots={dots} />
       </td>
       )}
-      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. v4 §8b:
-          the row is 44px FIXED, so at most 2 refs show (2×16px lines fit);
-          the rest fold to "+N" ON the second line — content adapts to the
-          row, never the other way. Full list stays in the title tooltip. */}
-      {showCol("ref") && (
-      <td className="px-1 py-1.5">
-        {ref.length === 0 ? (
-          <span className="text-base-300">—</span>
-        ) : (
-          /* Closed set: REF = row EMPHASIS (13/600 ink); "+N" = caption. */
-          <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            <div className="truncate tabular-nums t4-row-strong">{ref[0]}</div>
-            {ref.length === 2 ? (
-              <div className="truncate tabular-nums t4-row-strong">{ref[1]}</div>
-            ) : ref.length > 2 ? (
-              <div className="t4-caption">+{ref.length - 1} more</div>
-            ) : null}
+      {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
+          caption line ("+N" folds extras; full list in the tooltip). Phone
+          tooltip kept on the cell. */}
+      {showCol("order") && (
+      <td className="pl-1 pr-1" title={o.customer_phone ?? undefined}>
+        <div style={{ lineHeight: "15px" }}>
+          <div
+            className="font-mono tabular-nums truncate"
+            style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A" }}
+          >
+            SO-{o.so}
+            {/* 0234 (merged from main) — a dealer product change awaits
+                approval; open the order → the approval card tops the drawer. */}
+            {hasPendingChange && (
+              <span
+                className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-warning-soft text-base-800 border border-warning"
+                title="Product change awaiting approval — open the order to decide"
+                data-testid="oc-change-badge"
+              >
+                Change
+              </span>
+            )}
           </div>
-        )}
+          {ref.length > 0 && (
+            <div
+              className="font-mono tabular-nums truncate t4-caption"
+              title={ref.join("\n")}
+            >
+              {ref[0]}
+              {ref.length > 1 ? ` +${ref.length - 1}` : ""}
+            </div>
+          )}
+        </div>
       </td>
       )}
-      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
+      {/* Customer — name (emphasis) + region on the caption line; the
+          outstation warning survives in the tooltip. */}
       {showCol("customer") && (
-      <td className="pl-1 pr-2 py-2">
-        {o.customer_name ? (
-          /* Closed set: the NAME is row EMPHASIS (the sample's bold company). */
-          <span
-            className={`${cjkClassName(o.customer_name)} t4-row-strong block truncate`}
-            title={o.customer_name}
-          >
-            {o.customer_name}
-          </span>
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </td>
-      )}
-      {/* Region — its own group; gap before it separates it from the identity trio. */}
-      {showCol("region") && (
-      <td className="pl-4 pr-2 py-2">
-        {loc.label ? (
-          /* Closed set: region = row content, ink (the outstation gold tint
-             was decoration — the tooltip + MiniBadge carry that signal). */
-          <span
-            className="t4-row block truncate"
+      <td className="pl-1 pr-2">
+        <div style={{ lineHeight: "15px" }}>
+          {o.customer_name ? (
+            <div
+              className={`${cjkClassName(o.customer_name)} t4-row-strong truncate`}
+              title={o.customer_name}
+            >
+              {o.customer_name}
+            </div>
+          ) : (
+            <div className="text-base-300">—</div>
+          )}
+          <div
+            className="t4-caption truncate"
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
                 : loc.label ?? undefined
             }
           >
-            {loc.label}
-          </span>
-        ) : (
-          <span className="text-base-400">—</span>
-        )}
+            {loc.label ?? "—"}
+          </div>
+        </div>
       </td>
       )}
-      {/* Logistic — partner tag + delivery-date state machine (伙伴 + 送货日):
-          — unassigned · no date yet (grey) · call now (red, ≤3d window) ·
-          Deliver <date> (green, booked) · Delivered ✓. Never "by". */}
-      {showCol("logistic") && (
-      <td className="pl-4 pr-1 py-2 whitespace-nowrap leading-[1.25]">
-        {logi.key === "unassigned" ? (
-          <span className="t4-caption text-[13px]">— unassigned</span>
-        ) : (
-          <>
-            {/* Closed set: partner name = row content (ink); the sub-line is a
-                STATUS signal so it keeps colour — v4 hues only. */}
-            <span className="t4-row block truncate">{logi.partner}</span>
-            <div style={{ marginTop: 1 }}>
-              {logi.key === "delivered" ? (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
-                  Delivered ✓
-                </span>
-              ) : logi.key === "scheduled" && logi.date ? (
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: "12px", fontWeight: 600, color: "#3B6D11" }}
-                >
-                  Deliver {fmtDate(logi.date).split(", ")[0]}
-                </span>
-              ) : logi.key === "call_now" ? (
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#A32D2D" }}>
-                  call now
-                </span>
-              ) : (
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#A8A8A8" }}>
-                  no date yet
-                </span>
-              )}
-            </div>
-          </>
-        )}
-      </td>
-      )}
-      {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
-          (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
+      {/* Deadline — date + days-left heat pill, OPEN orders only. A delivered
+          order NEVER alarms (guardrail #2): muted date, no pill. */}
       {showCol("deadline") && (
       <td
-        className="pl-1 pr-2 py-2 leading-[1.2] whitespace-nowrap"
+        className="pl-1 pr-2 leading-[1.2]"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
-        {o.delivery_date_tbd ? (
+        {completed ? (
+          o.delivery_date ? (
+            <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
+              {fmtDate(o.delivery_date).split(", ")[0]}
+            </span>
+          ) : (
+            <span className="text-base-300">—</span>
+          )
+        ) : o.delivery_date_tbd ? (
           <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
@@ -2452,30 +3050,69 @@ function OrderRow({
         )}
       </td>
       )}
-      {/* Stock — its own group; gap before it separates it from the logistic trio. */}
+      {/* Stock — facts only (n/m ratio + sub word / supplier ETA); the 货 dot
+          carries the colour. */}
       {showCol("stock") && (
-      <td className="pl-4 pr-2 py-2 whitespace-nowrap">
+      <td className="pl-1 pr-2">
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
       </td>
       )}
-      {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
-          actions (open / flag / assign) that appear on row hover (P2 F). */}
+      {/* Delivery — partner + §12 truth-ladder word. "call now" is DEAD (§14:
+          the red time-window alarm painted every row); call_now/no_date both
+          render "not booked" — the NORMAL state, worded grey because the 送
+          dot carries the colour. */}
+      {showCol("delivery") && (
+      <td className="pl-1 pr-2">
+        {logi.key === "unassigned" ? (
+          <span className="t4-caption text-[13px]">— unassigned</span>
+        ) : (
+          <div style={{ lineHeight: "15px" }}>
+            <div className="t4-row-strong truncate">{logi.partner}</div>
+            {logi.key === "delivered" ? (
+              <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
+                Delivered ✓
+              </div>
+            ) : logi.key === "scheduled" && logi.date ? (
+              <div
+                className="tabular-nums"
+                style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
+              >
+                booked {fmtDate(logi.date).split(", ")[0]}
+              </div>
+            ) : (
+              <div className="t4-caption">not booked</div>
+            )}
+          </div>
+        )}
+      </td>
+      )}
+      {/* PIC — the staff owner, own column (Jess 2026-07-18): initials chip,
+          click = reassign. Word law: PIC (the team's Issue-Tracker word). */}
+      {showCol("pic") && (
+      <td className="pl-1 pr-1">
+        <OwnerChip
+          o={o}
+          staffById={staffById}
+          poolStaff={poolStaff}
+          onAssignStaff={onAssignStaff}
+          canEdit={canAssign}
+        />
+      </td>
+      )}
+      {/* Next action — one plain-text verb (§14: NEXT 文字, pill chrome gone)
+          + Gmail-style hover actions (open / flag / assign) on row hover. */}
       {showCol("next") && (
-      <td className="pl-2 pr-2 py-2 whitespace-nowrap relative">
+      <td className="pl-2 pr-2 relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
-          const st = NEXT_TONE_STYLE[na.tone];
           return (
             <span
-              className="inline-flex items-center gap-1 rounded-full align-middle max-w-full group-hover:opacity-0 transition-opacity"
+              className="inline-flex items-center gap-1 align-middle max-w-full group-hover:opacity-0 transition-opacity"
               style={{
-                fontSize: "11px",
+                fontSize: "12px",
                 fontWeight: 600,
                 letterSpacing: "0.01em",
-                padding: "2px 9px",
-                color: st.text,
-                background: st.bg,
-                border: `1px solid ${st.border}`,
+                color: NEXT_TEXT_COLOR[na.tone],
               }}
               data-next-action={na.label}
             >
@@ -2570,24 +3207,12 @@ function ActionCell({
   );
 }
 
-// STOCK cell = a 3-state pill (Partial merged into Waiting) + a CORE-only
-// received/total ratio (Loo 2026-07-09). Colours reuse Jess's proposal legend
-// (Ready green / Waiting amber / No PO red).
-const STOCK_PILL: Record<
-  "ready" | "waiting" | "no_po",
-  { label: string; text: string; bg: string; border: string }
-> = {
-  ready: { label: "Ready", text: "#3B6D11", bg: "#EAF3DE", border: "#EAF3DE" },
-  waiting: { label: "Waiting", text: "#854F0B", bg: "#FAEEDA", border: "#FAEEDA" },
-  no_po: { label: "No PO", text: "#A32D2D", bg: "#FCEBEB", border: "#FCEBEB" },
-};
-
-/** Stock cell — a status pill (Ready / Waiting / No PO, Partial folded into
- *  Waiting) + a CORE-only arrival ratio `received/total`. Denominator = the
- *  order's Mattress+Bedframe+Sofa unit total (accessories don't gate delivery,
- *  so they're excluded). Numerator: Ready = all core, No PO = 0; Waiting shows
- *  "–" because the list payload carries no per-line GRN-received qty (esp.
- *  AutoCount orders). `data-stock-state` kept verbatim for the tests. */
+/** Stock cell (C rebuild §14) — FACTS only, two lines: the CORE arrival ratio
+ *  `n/m` (emphasis) + a grey sub-line (Ready / No PO / supplier ETA). The 货
+ *  dot owns the colour — this cell stays ink/grey (the old Ready/Waiting/No-PO
+ *  pill + the red/amber ETA line are gone). Denominator = Mattress+Bedframe+
+ *  Sofa unit total (accessories don't gate delivery). `data-stock-state` /
+ *  `data-stock-eta` kept verbatim for the tests. */
 function StockDot({
   info,
   coreTotal,
@@ -2623,60 +3248,39 @@ function StockDot({
         break;
     }
   }
-  const S = STOCK_PILL[key];
   const num = key === "ready" ? String(coreTotal) : "0";
 
-  // Supplier ETA line (stock_eta version) — shown only while waiting; coloured
-  // vs the customer deadline: OVERDUE red · LATE orange · on-track grey · no-ETA
-  // faint. Ready shows nothing (no ETA noise once the goods are in).
-  const eta = (() => {
-    if (key === "ready" || se.state === "ready" || se.state === "none") return null;
-    // Colour carries the state (red=overdue · orange=late · grey=on-track), like
-    // the DEADLINE pill — no text suffix, so the line stays short + never clips.
-    if (se.state === "no_eta")
-      return { text: "ETA —", color: "#A8A8A8", tip: "Waiting on stock — no supplier ETA entered yet" };
-    if (!se.etaIso) return null;
+  // Sub-line: Ready / No PO / supplier ETA while waiting. GREY — the tip keeps
+  // the detail (overdue/late), the 货 dot keeps the colour.
+  const sub = (() => {
+    if (key === "ready") return { text: "Ready", tip: title };
+    if (key === "no_po") return { text: "No PO", tip: title };
+    if (se.state === "no_eta" || !se.etaIso)
+      return { text: "ETA —", tip: "Waiting on stock — no supplier ETA entered yet" };
     const d = fmtDate(se.etaIso).split(", ")[0];
-    // v4 hues: red overdue · amber late; on-track is CONTENT (a date) → ink.
     if (se.state === "overdue")
-      return { text: `ETA ${d}`, color: "#A32D2D", tip: "OVERDUE — supplier ETA has passed and the goods still aren't in" };
+      return { text: `ETA ${d}`, tip: "Supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
-      return { text: `ETA ${d}`, color: "#854F0B", tip: "LATE — supplier ETA is later than the deadline − 3 days" };
-    return { text: `ETA ${d}`, color: "#1A1A1A", tip: "Supplier arrival ETA — on track" };
+      return { text: `ETA ${d}`, tip: "Supplier ETA is later than the deadline − 3 days" };
+    return { text: `ETA ${d}`, tip: "Supplier arrival ETA — on track" };
   })();
 
   return (
-    <div className="leading-[1.3]">
-      <span
-        className="inline-flex items-center rounded-full whitespace-nowrap"
-        style={{
-          fontSize: "11px",
-          fontWeight: 600,
-          padding: "1px 9px",
-          color: S.text,
-          background: S.bg,
-          border: `1px solid ${S.border}`,
-        }}
-        title={title}
-        data-stock-state={info.state}
-      >
-        <span>{S.label}</span>
-        {coreTotal > 0 && (
-          <span className="tabular-nums" style={{ marginLeft: 6, fontWeight: 700 }}>
-            {num}/{coreTotal}
-          </span>
-        )}
-      </span>
-      {eta && (
-        <div
-          className="tabular-nums"
-          style={{ fontSize: "10.5px", fontWeight: 600, color: eta.color, marginTop: 1 }}
-          title={eta.tip}
-          data-stock-eta={se.state}
-        >
-          {eta.text}
+    <div style={{ lineHeight: "15px" }} title={title} data-stock-state={info.state}>
+      {coreTotal > 0 ? (
+        <div className="tabular-nums t4-row-strong truncate">
+          {num}/{coreTotal}
         </div>
+      ) : (
+        <div className="text-base-300">—</div>
       )}
+      <div
+        className="tabular-nums t4-caption truncate"
+        title={sub.tip}
+        data-stock-eta={se.state}
+      >
+        {sub.text}
+      </div>
     </div>
   );
 }
@@ -2692,7 +3296,8 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#4A4335", fontSize: "11px", letterSpacing: "0.04em" }}
+      /* v4 header: DARK 12/600 cool ink (warm #4A4335 retired). */
+      style={{ color: "#374151", fontSize: "12px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>

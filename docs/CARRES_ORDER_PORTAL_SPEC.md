@@ -87,12 +87,24 @@ Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reser
 Generate invoice=左表+右实时预览+输出 PDF/Email/WhatsApp(点了才出)。收据 v-next 加 OCR 自动填。
 数据:Total=货款+storage;Collected=付款和;Outstanding=Total−Collected;dial Unpaid/Deposit/Overdue/Paid。
 
-## 11. Storage(费率 LOCKED)
+## 11. Storage(费率 LOCKED;tab 定稿 rev21 2026-07-18)
 费必须有 START+END,只算 START→END。START=deadline 之后下一个同星期几(周一1/1→START周一8/1);END=实际送出/收货。
 费率:Mattress+Bedframe RM150/月;Sofa 免14天后 RM200。(RM5/day、RM14.30/day 作废。)
 From–End 同一行;费用 roll 进 Balance 当一条 charge line。
+**Tab 定稿(rev21)**:规则说明文字 = ⓘ rates tooltip,不摆卡(零解释文字法);chip "held Nd" 算到 END 停表(storage_to→logistic_eta→today),不永远数到今天;waiver+extension 收进 "› Waiver & extension" 折叠(有在用时自动展开);输入主面 = Storage?·From–End·Charge·Paid? 四件。切单时 tab 不存在(无 MS/BF/SOF)→ 自动落回 Items,不留白纸。
 
-## 12. Delivery/物流(LOCKED — 调货引擎另开专门 chat)
+## 12. Delivery/物流(LOCKED — 调货引擎另开专门 chat;tab 定稿 rev21 2026-07-18)
+**Delivery tab chip 真相阶梯(1A,Jess)**:Delivered ✓绿 › on hold红(balance/storage hold 第一次上 Delivery 面)› overdue红(过 deadline 未送)› booked <date>绿(logistic_eta)› not booked琥珀(有 carrier 没约,93% 常态,不准报忧)› no carrier灰。已送达永不告警(guardrail #2:chip+chase 行都闭嘴)。
+**保存模型(2A)**:Delivery tab 全字段改了就存(sparse save + Saved toast),像 Excel cell;顶部 Save bar 与本 tab 无关。Time slot 字段撤下(0/162 死田,数据模型保留)。
+**步骤布局(⭐ rev24 定稿,Jess Option A 合体 — rev23 的双栏 rail+band 作废:两套词逼人连线,乱)**:
+- **一栏一套词:进度线就是步骤头,格子长在自己那步下面**(max-w 700)。节点语法 = journey card 同款(Jess 拍板样本):**done=墨色✓·当前唯一有色节点〔红=马上做/琥珀=等别人;单已 overdue 时当前节点转红〕·未到=浅圈·走过的连接线变墨色**。
+- 步骤:`✓ 1 Assign logistic · you`(Logistic+Apply 建议;**Customer deadline 只读** "auto · AutoCount"——import 的 New-Delivery-Date 所有权归 import;**Postponed?** = 一次性 0196 extension〔快照原日期、动 storage、第二次要 principal〕,已延显示 "→ 新日期 (postponed)")→ `2 Stock ready n/m · read-only — work in Items`(标题带 n/m;正文一行各类目 n/m+status,与 Items 同一 stockCats;"open Items ›" 跳 Items;guardrail:Delivery 永不加 stock 动作)→ `3 Call customer · NETS — keyed by us for now`(步骤头右挂 **Remind(ghost+bell)/ Chase(box+message-circle)** → copyChase logistic + last_chased_at 章;正文:collect RM 提示〔与 Balance 同一 balanceDue,无 total 不显钱〕· Logistic ETA〔NETS 回报,今代填〕· Customer confirmed 手动勾 · "if not booked, chase by 日期 · −Nd" 输入)→ `4 Delivered`(光秃——overdue 只住 header)。
+- **Header(rev25)= 阶梯 chip 在前(overdue 带天数 "overdue 9d")+ deadline 日期在后、永远墨色**(红只住 badge 里;不写 "deadline" 字)。状态全 portal 只画一次(有 extension 时 inline "(postponed)" 不画——下面 extension 行已讲)。
+- **rev25 五律**:①字段 = 固定宽小盒(CELL_FIT:select 240px·date 170px),禁橡皮筋摊宽;②Customer confirmed 勾 UI 撤下(Jess:我们不标记;0220 列保留);③日期法:所有显示日期 = **"31 Jul 26"**(notes 戳带年份、去星期尾巴);④催人闹钟一句话 "if not booked, auto-reminder 9 Jul 26 · −3d auto"(0197 cron 自动生成 task,不用按;−Nd 点了才展开改,0/162 改过);⑤延期链:Postponed? 只在未用时显示。
+- **NOTES(非阶段,线下方自己一节)**:自动盖日期流水,append 进原 customer_request 列(一行一条最新在上,零 migration,list tooltip/导出照读);客人随口改期进这里,别烧 Postponed。
+- 与左栏 journey card(WHERE THIS ORDER IS,整单 4 步)是两个 zoom:journey=整单钱货送,本 tab 时间线=送货内部;同一节点语法。
+**工具教训(rev22)**:根 tsconfig 是 references-only,`npx tsc --noEmit` 在 apps/web 是橡皮图章——真闸门 = `tsc -p tsconfig.app.json`(或 `tsc -b`);rev22 起体检用真闸门。
+**Multi-leg(3A)**:入口收进 ⋮ "Multi-leg route…";有 delivery_stops 时区块自动显示;DeliveryChain 组件重刷等调货引擎 chat。
 Sites:Carres 仓(Aman Perdana Klang,default 收货)·NETS(仓+物流,~97%,来 Klang 收再送)·AL(Sungai Buloh)·HOUZS(Balakong)·NF(Nice Future 床垫供应商)。
 地区:Klang Valley 首选 NETS 备 HOUZS/AL;外坡/东海岸 首选 AL 备 HOUZS。
 AL 不来 Klang:货在 Klang→Carres 直送 AL 一趟(不经 HOUZS);货在 HOUZS→AL 去 HOUZS 收;货在供应商→供应商直送 AL(最省)。避免让 AL 的货进 Klang。
@@ -110,6 +122,9 @@ Partner 面:supplier PO 打头、logistic REF 打头,永不出现 SO。多单 bu
 
 ## 14. List 页(drawer 收完才做)
 顶部不加 KPI box(facet Summary 已是聚合 KPI)。每行=三线点(钱·货·送 绿/琥珀/红)+Next 文字。红只 danger,杀满屏 call now。facet 每数字可点=filter(At-risk=deadline≤3天或已过且某线未完;On-time)。选中=chip 可叠可清。Bulk bar:Chase 中性 inline;Assign logistic instant;Raise PO review(路线甲 consolidated→Klang池→reserve)。
+**C rebuild 定稿(2026-07-18,Jess 挑 C,commit `04903cb`)**:六列 = Status 三线点(钱货送 8px 点,行内唯一颜色通道;灰=不适用)· Order(SO 粗 + Ref caption "+N")· Customer(名 + region caption,截断根治)· Stock(n/m 粗 + 灰副行 Ready/No PO/ETA d;10.5px→11 已清)· Delivery(partner + truth-ladder 词:Delivered ✓绿 / booked <date>绿 / not booked 灰字=常态 / — unassigned;**"call now" 死词下架**)· Deadline(热度 pill 只 open 单;**delivered 行灰日期无 pill = guardrail #2,含 regression test**)· Next(纯文字 12/600:红只 过期 Chase logistic + Order PO;Confirm 绿;Done 灰;info 蓝 pill 死)。行高 44→**40**;表头带冷灰 #F9FAFB + th 12/600 #374151(暖棕退役)。钱点 = ops_order_control.balance(>0 红即使 delivered;null 灰)。排序 slack 不变(货线红点=排序解释)。旧列 keys(orderId/ref/region/logistic)退役,旧 hidden-cols pref 无害 no-op。
+**Staff auto-assign(2026-07-18 Jess 拍板 B,推翻 05-14 "不做分工"——换血后新人需要明确责任)**:每单一个 owner;新单自动派给最闲在职 operation 账号(只在进单时分,**绝不半路自动换人**);人人看全表(不加 RLS 隔离);任何人可一键改派;辞职=停用账号时一键平分/指定其手上 open 单;可选 "Rebalance now"(预览后执行)。统计中性 + 新人 ramp 标记(不比烂)。**BUILT(2026-07-18,commit `a0428a8`;migration 0232 已 apply prod——注意 wenwei 同日用掉 0230/0231,号要先查 prod)**:`ops_order_control.assigned_staff/by/at`(server 盖 by/at)+ `ops_staff_settings`(**opt-in pool**:有 row 才收自动派单——挡住 logistics@ 这类通用账号;`available=false` = away/MC,新单跳过;RLS 抄 ops_tasks operation+principal ALL)。API `GET/PUT /api/operation/staff`;shared `distributeOrders`(least-loaded,tie 按 userId 决定性)。Web:STAFF facet(pool 成员每人一行 tab + Unassigned,可点=chip)+ band 上 ⚙ Team popover(Add 入池 / away 勾 / **Shift N** 一键把某人 open 单摊给其他可用成员 / ✕ 出池)+ 每行 18px owner 初写字母 chip(点=改派 popover)+ **进单自动 sweep**(load 时把无主 open 单派给最闲可用成员;绝不动已有 owner)。**fails soft**:Worker 没有 staff route → 整层隐身(preview 已验)。**⚠️ 生效需 Worker deploy(deploy-gated §16);deploy 后 Jess 在 ⚙ 里把 Shasha/Ching/Chow Add 进 pool 才开闸。**Housekeeping:samantha@ 停用、Ching(7/19)+ Chow(8/1)账号要建(Principal → Accounts);**Jess 开自己的 jess@carres.com**(已预列管理层名单——共用 operation@ 让 audit 认不出人)。
+**Round-3 定稿(2026-07-18,commits `9cf8e61`+`54ce1c7`;migration 0235 已 apply prod——wenwei 同日又用掉 0233/0234,号永远先查 prod)**:① Status 列 = **Option C**:全好→一个绿勾 ✓;有事才现该线图标(**RM$ 钱 · 箱子 货 · 卡车 送**,14px 状态色;匿名三点作废;delivered 全绿勾)。② **PIC 头像**:name 填称呼(可两个字,不 key 全名),字母 = **每个字取首字母、上限 2**(Shasha→SH · Khor Yee→KY · Li Ching→LC);每人固定专属色(调色板避开状态/action/selection 色);facet label 显完整称呼。③ **管理层专属**:`isOpsManager`(principal + operation@ + jess@)才能手动派/改/Shift/管 pool + 跑 sweep,web 藏 + API 403 双层;员工只读。④ **Presence(0235)**:OperationApp 开页 + 每 15min 心跳 `touch_last_seen`(DEFINER,self-only,anon revoked);available = pool + 非 away + **今天上过线(MYT)**——MC/没来 = 没心跳 = 自动跳过,零点击;facet 标 "· not in"/"· away"。⑤ Header 两行还原(round-3 纠错:面包屑+search/铃/help/⚙ 一行,Orders+Synced 一行——**删 title 行没被授权过,教训**)。⑥ No PIC 只数 open 单(delivered=结案不算没人看)。词汇:**No PIC / Clear PIC**(Unassigned 专属 logistic)。
 
 ## 15. 防跳(机器强制)
 scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18} fail;RULE D text∉{11,12,13}+18 fail;RULE F 行高∉{36,40,52} fail;RULE E inline #F7F4EE fail(.kpi-box token 允许);RULE A raw hex ratchet;RULE G 手搓 section chrome fail。决策靠本文件+repo prototype 镜像,不靠聊天 quote。
@@ -118,5 +133,5 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
 ## Build order
-1. 详情页(feat/orders-drawer):布局✓·Items §9·KPI §7(Stock1.8+dial)·Balance §10·Delivery/Storage/Loan 待定稿。
+1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·Loan 剩样式还债已清(功能照旧)。
 2. 1B:⋮真动作·wa.me直发+存号·OCR收据·last_chased_at。 3. List §14。 4. Bulk bar。 5. AL 调货引擎(专门 chat)。
