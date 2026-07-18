@@ -8,6 +8,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
+  ArrowRight,
   Bed,
   BedDouble,
   Bell,
@@ -4970,6 +4971,11 @@ function StorageCard({
     : 0;
   const freeBase = supplierLate && latestGoodsEta ? latestGoodsEta : deadline;
   const [editingFee, setEditingFee] = useState(false);
+  // ONE value language (Jess): every fact sits in a chip or a pill — no
+  // bare prose, no glyph arrows, no how-to sentences.
+  const chip =
+    "inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-200 rounded-[6px] px-1.5 py-0.5 bg-white";
+  const soft = "pill bg-base-100 text-base-500";
 
   type StState = "done" | "act" | "wait" | "todo";
   const Node = ({ n, state }: { n: number; state: StState }) => (
@@ -5031,23 +5037,18 @@ function StorageCard({
         title="Promised delivery"
       >
         {deadline ? (
-          <>
-            <span className="font-mono font-semibold text-base-800">
-              {fmtDate(deadline)}
-            </span>
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span className={chip}>{fmtDate(deadline)}</span>
             {delivered ? (
-              " · delivered"
+              <span className="pill pill-confirmed">delivered</span>
             ) : deadlinePassed ? (
-              <span className="font-semibold text-danger">
-                {" "}
-                · passed {overdueDays}d
-              </span>
+              <span className="pill pill-overdue">passed {overdueDays}d</span>
             ) : (
-              ` · in ${-dayDiff(todayIso, deadline) * -1}d`
+              <span className={soft}>in {dayDiff(todayIso, deadline)}d</span>
             )}
-          </>
+          </span>
         ) : (
-          "no date yet (TBD)"
+          <span className={soft}>TBD</span>
         )}
       </Row>
 
@@ -5064,18 +5065,18 @@ function StorageCard({
         title="Free week"
       >
         {freeBase && autoAnchor ? (
-          <>
-            <span className="font-mono">{fmtDate(freeBase)}</span> →{" "}
-            <span className="font-mono">{fmtDate(autoAnchor)}</span>
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span className={chip}>{fmtDate(freeBase)}</span>
+            <ArrowRight size={14} className="text-base-400 shrink-0" aria-hidden="true" />
+            <span className={chip}>{fmtDate(autoAnchor)}</span>
             {supplierLate && latestGoodsEta && (
-              <span className="font-medium text-warning">
-                {" "}
-                · restarted — supplier late (ETA {fmtDate(latestGoodsEta)})
+              <span className="pill pill-warning">
+                supplier late · ETA {fmtDate(latestGoodsEta)}
               </span>
             )}
-          </>
+          </span>
         ) : (
-          "—"
+          <span className={soft}>—</span>
         )}
       </Row>
 
@@ -5085,26 +5086,23 @@ function StorageCard({
         state={exempt ? "todo" : counting ? "done" : "todo"}
         title="Counts from"
       >
-        <span className="inline-flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 flex-wrap">
           {exempt ? (
-            "exempted"
+            <span className={soft}>exempted</span>
           ) : effectiveStart ? (
             <>
-              <span className="font-mono font-semibold text-base-800">
-                {fmtDate(effectiveStart)}
-              </span>
-              {form.storageFrom ? " · manual" : " · auto"}
+              <span className={chip}>{fmtDate(effectiveStart)}</span>
+              <span className={soft}>{form.storageFrom ? "manual" : "auto"}</span>
+              <span className="pill pill-confirmed">counting</span>
             </>
           ) : autoAnchor ? (
             <>
-              will start{" "}
-              <span className="font-mono font-semibold text-base-800">
-                {fmtDate(autoAnchor)}
-              </span>{" "}
-              if undelivered
+              <span className={chip}>{fmtDate(autoAnchor)}</span>
+              <span className={soft}>auto</span>
+              <span className={soft}>not started</span>
             </>
           ) : (
-            "—"
+            <span className={soft}>—</span>
           )}
           <input
             type="date"
@@ -5112,7 +5110,7 @@ function StorageCard({
             onChange={(e) => set("storage_from", e.target.value)}
             aria-label="Manual storage start (overrides auto)"
             title="Manual start — overrides the auto anchor"
-            className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
+            className={chip}
           />
         </span>
       </Row>
@@ -5133,15 +5131,13 @@ function StorageCard({
       >
         {collectedAt ? (
           <span className="pill pill-confirmed">
-            ✓ collected · {fmtDate(String(collectedAt).slice(0, 10))}
+            collected · {fmtDate(String(collectedAt).slice(0, 10))}
           </span>
         ) : waived ? (
-          <span className="pill bg-base-100 text-base-500">waived</span>
+          <span className={soft}>waived</span>
         ) : exempt ? (
           <span className="inline-flex items-center gap-2">
-            <span className="pill bg-base-100 text-base-500">
-              No storage · exempted
-            </span>
+            <span className={soft}>No storage</span>
             <button
               type="button"
               onClick={() => set("storage_fee_override", "")}
@@ -5151,22 +5147,32 @@ function StorageCard({
             </button>
           </span>
         ) : counting ? (
-          <span className="inline-flex items-center gap-2 flex-wrap">
-            <span>
-              day {soFar}
-              {hasMsbf &&
-                ` · MS/BF ${impMsbf != null ? impMsbf.toLocaleString() : `${auto.msbfMonths} mth × 150`}`}
-              {hasSof &&
-                ` · Sofa ${impSof != null ? impSof.toLocaleString() : auto.sofCharged ? "flat 200" : "free"}`}
-            </span>
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span className={soft}>day {soFar}</span>
+            {hasMsbf && (
+              <span className={chip}>
+                MS/BF{" "}
+                {impMsbf != null
+                  ? impMsbf.toLocaleString()
+                  : `${auto.msbfMonths} mth × 150`}
+              </span>
+            )}
+            {hasSof && (
+              <span className={chip}>
+                Sofa{" "}
+                {impSof != null
+                  ? impSof.toLocaleString()
+                  : auto.sofCharged
+                    ? "flat 200"
+                    : "free"}
+              </span>
+            )}
             <span
               className={`font-mono font-bold text-[13px] ${effTotal > 0 ? "text-danger" : "text-base-800"}`}
             >
               {RM(effTotal)}
             </span>
-            {effTotal > 0 && (
-              <span className="font-semibold text-danger">unpaid</span>
-            )}
+            {effTotal > 0 && <span className="pill pill-overdue">unpaid</span>}
             {editingFee || overrideSet ? (
               <input
                 type="number"
@@ -5177,7 +5183,7 @@ function StorageCard({
                 onBlur={() => setEditingFee(false)}
                 placeholder={`auto ${auto.total}`}
                 aria-label="Override storage fee"
-                className="w-20 text-right font-mono text-[12px] px-1.5 py-0.5 border border-base-200 rounded bg-white"
+                className={`${chip} w-20 text-right`}
               />
             ) : (
               <button
@@ -5199,26 +5205,28 @@ function StorageCard({
             </button>
           </span>
         ) : (
-          "—"
+          <span className={soft}>RM 0</span>
         )}
       </Row>
 
       {/* ⑤ when it stops */}
       <Row n={5} state={delivered ? "done" : "todo"} title="Ends" last>
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 flex-wrap">
           {delivered ? (
-            <>delivered · {fmtDate(endEff)}</>
+            <span className="pill pill-confirmed">
+              delivered · {fmtDate(endEff)}
+            </span>
           ) : (
             <>
-              on delivery / collection
               <input
                 type="date"
                 value={draft.storage_to}
                 onChange={(e) => set("storage_to", e.target.value)}
                 aria-label="Storage end (blank = follows delivery)"
                 title="Blank = follows delivery"
-                className="border border-base-200 rounded px-1 py-0.5 text-[12px] font-mono text-base-800 bg-white"
+                className={chip}
               />
+              {!endSet && <span className={soft}>follows delivery</span>}
             </>
           )}
         </span>
