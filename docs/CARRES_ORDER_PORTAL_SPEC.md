@@ -99,7 +99,8 @@ From–End 同一行;费用 roll 进 Balance 当一条 charge line。
 **步骤布局(⭐ rev24 定稿,Jess Option A 合体 — rev23 的双栏 rail+band 作废:两套词逼人连线,乱)**:
 - **一栏一套词:进度线就是步骤头,格子长在自己那步下面**(max-w 700)。节点语法 = journey card 同款(Jess 拍板样本):**done=墨色✓·当前唯一有色节点〔红=马上做/琥珀=等别人;单已 overdue 时当前节点转红〕·未到=浅圈·走过的连接线变墨色**。
 - 步骤:`✓ 1 Assign logistic · you`(Logistic+Apply 建议;**Customer deadline 只读** "auto · AutoCount"——import 的 New-Delivery-Date 所有权归 import;**Postponed?** = 一次性 0196 extension〔快照原日期、动 storage、第二次要 principal〕,已延显示 "→ 新日期 (postponed)")→ `2 Stock ready n/m · read-only — work in Items`(标题带 n/m;正文一行各类目 n/m+status,与 Items 同一 stockCats;"open Items ›" 跳 Items;guardrail:Delivery 永不加 stock 动作)→ `3 Call customer · NETS — keyed by us for now`(步骤头右挂 **Remind(ghost+bell)/ Chase(box+message-circle)** → copyChase logistic + last_chased_at 章;正文:collect RM 提示〔与 Balance 同一 balanceDue,无 total 不显钱〕· Logistic ETA〔NETS 回报,今代填〕· Customer confirmed 手动勾 · "if not booked, chase by 日期 · −Nd" 输入)→ `4 Delivered`(光秃——overdue 只住 header)。
-- **Header = `deadline 9 Jul 26`(过期红)+ 阶梯 chip(overdue 带天数 "overdue 9d")**。状态全 portal 只画一次。
+- **Header(rev25)= 阶梯 chip 在前(overdue 带天数 "overdue 9d")+ deadline 日期在后、永远墨色**(红只住 badge 里;不写 "deadline" 字)。状态全 portal 只画一次(有 extension 时 inline "(postponed)" 不画——下面 extension 行已讲)。
+- **rev25 五律**:①字段 = 固定宽小盒(CELL_FIT:select 240px·date 170px),禁橡皮筋摊宽;②Customer confirmed 勾 UI 撤下(Jess:我们不标记;0220 列保留);③日期法:所有显示日期 = **"31 Jul 26"**(notes 戳带年份、去星期尾巴);④催人闹钟一句话 "if not booked, auto-reminder 9 Jul 26 · −3d auto"(0197 cron 自动生成 task,不用按;−Nd 点了才展开改,0/162 改过);⑤延期链:Postponed? 只在未用时显示。
 - **NOTES(非阶段,线下方自己一节)**:自动盖日期流水,append 进原 customer_request 列(一行一条最新在上,零 migration,list tooltip/导出照读);客人随口改期进这里,别烧 Postponed。
 - 与左栏 journey card(WHERE THIS ORDER IS,整单 4 步)是两个 zoom:journey=整单钱货送,本 tab 时间线=送货内部;同一节点语法。
 **工具教训(rev22)**:根 tsconfig 是 references-only,`npx tsc --noEmit` 在 apps/web 是橡皮图章——真闸门 = `tsc -p tsconfig.app.json`(或 `tsc -b`);rev22 起体检用真闸门。
