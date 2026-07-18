@@ -151,6 +151,8 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 
 **值日透明化 layout v2 定稿(2026-07-19,Jess:B+C 合体 + 全队可见 + design-first;migration 0236 已 APPLY prod,seeds Jul Shasha/Aug LC/Sep KY;commit `4da2ea6`,deploy-gated)**:①**标题行公告位**(Jess 提议——Orders·Synced 右侧死空间,省一整行):平日灰 chip「[SH] PO duty · next Mon 20 Jul 26」全队常驻;逢 Mon/Thu 或有急单同位置长出行动 chip(琥珀 PO day / 红 urgent)+ Raise PO(按钮只值日者+管理层);独立 banner 行删除,行4 回归纯 PIC chips。②**右 rail Team 板**:Notes 位(6/12 建,总共 1 条笔记=死功能,Jess 拍板替换;KeepPanel 文件保留)换 👥 Team——DUTY & ROLES 板:轮值行(now 绿签)+ 脚注「PO day = Mon & Thu · next <date>」+ **WHO CHASES WHAT 白纸黑字**(duty holder=Order PO·Chase supplier=供应商唯一窗口;every PIC=Chase logistic·Owing)。值日范围答案:duty = 整条货线,不只 PO 文书。③**QUEUES 行尾负责人**:货两行挂值日者头像、送钱两行灰 PIC 签(KanbanRow +chip)。④GET po-duty 回 roster;头像逻辑 `lib/staff-avatar.ts`(色板进 design-standard.ts,RULE A);ListPageShell +titleRight(additive)。全链 live-verified(wrangler dev + prod DB:真 Shasha chip · 38 urgent 红 · 真 roster)。**流程重申(Jess 本轮立规):design 先行,回 letter 才写 code。**
 
+**Chase logistic SOP 定案(2026-07-19,Jess)**:各 PIC 追自己的单 = 正式做法,**不依赖 NETS portal**(portal 可能延期/NETS 可能不用——来了算 bonus)。NETS 群纪律:一条信息 = 一张单、**REF 开头**(§13 模板本来就 REF 打头)、谁发谁跟进、**没有 REF 的问话不准发**;NETS 逐条回。公平性 = 单已按人头摊平,各追各名下。此条进周三 brief 一页纸。
+
 ## 16. DEPLOY-GATED(除非我说永不 deploy)
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
