@@ -264,14 +264,22 @@ export function MiniStopsBar({
 export function StopsEditor({
   stops,
   onChange,
+  onDone,
 }: {
   stops: string[];
   onChange: (stops: string[]) => void;
+  /** Renders a ✓ Done chip that closes the editor (rev18b — Jess: "once I
+   *  choose the route, how does it hide?"). */
+  onDone?: () => void;
 }) {
   const halt = (e: { stopPropagation: () => void }) => e.stopPropagation();
   const shown = stops.length > 0 ? stops : ["Carres Klang"];
   const update = (i: number, v: string) =>
     onChange(shown.map((s, j) => (j === i ? v : s)));
+  // "+" appends a place DIFFERENT from the last stop — appending the same
+  // default place made an instant meaningless "Klang → Klang" route.
+  const nextPlace =
+    LEG_PLACES.find((p) => p !== shown[shown.length - 1]) ?? "Carres Klang";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {shown.map((s, i) => (
@@ -319,13 +327,26 @@ export function StopsEditor({
         type="button"
         onClick={(e) => {
           halt(e);
-          onChange([...shown, "Carres Klang"]);
+          onChange([...shown, nextPlace]);
         }}
         title="Add a transfer stop"
         className="size-6 rounded-full border border-base-200 bg-white grid place-items-center text-base-500 hover:text-primary hover:border-base-300 shrink-0"
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
+      {onDone && (
+        <button
+          type="button"
+          onClick={(e) => {
+            halt(e);
+            onDone();
+          }}
+          title="Done — close the route editor (the route is kept)"
+          className="inline-flex items-center gap-1 text-[12px] font-semibold text-base-600 hover:text-base-900 bg-white border border-base-200 rounded-full px-2.5 py-0.5 shrink-0 ml-1"
+        >
+          ✓ Done
+        </button>
+      )}
     </div>
   );
 }

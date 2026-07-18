@@ -2266,10 +2266,16 @@ function DrawerBody({
                           <tr
                             onClick={() => setPickerSku(l.sku)}
                             className={`cursor-pointer h-[52px] transition-opacity ${
-                              l.sku === activeLineSku
+                              /* rev18b (Jess: "i still see blue?") — the blue
+                                 SELECTION wash shows ONLY while the warehouse
+                                 picker is actually open (activeLineSku
+                                 defaults to the first line, so gating on
+                                 pickerOpen stops a permanent mystery-blue
+                                 first row). */
+                              pickerOpen && l.sku === activeLineSku
                                 ? "bg-[#e6f1fb]"
                                 : `hover:bg-base-50 ${
-                                    activeLineSku ? "opacity-60 hover:opacity-100" : ""
+                                    pickerOpen ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
                           >
@@ -2520,6 +2526,7 @@ function DrawerBody({
                                   onChange={(s) =>
                                     form.setLineLocation(l.sku, s)
                                   }
+                                  onDone={() => setRouteOpenSku(null)}
                                 />
                               </td>
                             </tr>
