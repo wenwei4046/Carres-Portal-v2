@@ -122,6 +122,22 @@ function catalog(): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    // 0219 Order Entry config — the Payment section renders the SAME methods
+    // + follow-ups the POS gets (here: Credit/Debit with a Bank follow-up).
+    orderEntryConfig: {
+      paymentMethods: [
+        {
+          key: "credit",
+          label: "Credit / Debit",
+          sublabel: "Full payment",
+          active: true,
+          approvalCodeRequired: true,
+          followUps: [
+            { key: "bank", label: "Bank", required: true, options: ["Maybank", "CIMB Bank"] },
+          ],
+        },
+      ],
+    },
     // Maintenance pools + master fabrics — the inline row-variants sources.
     optionPools: [
       { id: "p1", pool: "sofa_size", value: '24"', active: true, sortOrder: 1 },
@@ -232,30 +248,49 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect((firstSkuInput() as HTMLInputElement).value).toBe("CLOUD-QUEEN");
   });
 
-  it("a sofa pick brings its VARIANTS out under the row — seat height / fabric / leg height reprice inline", () => {
+  it("a sofa pick brings its VARIANTS out under the row — specs only, NO money shown or written", async () => {
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-3",
+      so: 1303,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
     wrap();
     fireEvent.focus(firstSkuInput());
     fireEvent.change(firstSkuInput(), { target: { value: "5539" } });
     fireEvent.mouseDown(screen.getByTestId("raw-pick-5539-L(RHF)"));
     // No page jump — the options came OUT under the row instead.
     expect(screen.queryByTestId("pos-configure-page")).toBeNull();
-    const seat = screen.getByLabelText("Seat height");
-    const fabric = screen.getByLabelText("Fabric");
-    const leg = screen.getByLabelText("Leg height");
-    expect(seat).toBeTruthy();
-    expect(fabric).toBeTruthy();
-    expect(leg).toBeTruthy();
+    const seat = screen.getByLabelText("Seat height") as HTMLSelectElement;
+    const fabric = screen.getByLabelText("Fabric") as HTMLSelectElement;
+    const leg = screen.getByLabelText("Leg height") as HTMLSelectElement;
 
-    // Leg 6" carries a +RM30 pool surcharge → suggested price re-derives.
+    // The dropdowns carry NO price hints (Loo: 不应该出现那个价钱).
+    expect(seat.textContent).not.toMatch(/RM/);
+    expect(fabric.textContent).not.toMatch(/RM/);
+    expect(leg.textContent).not.toMatch(/RM/);
+
+    // Selections record specs but NEVER touch the operator's price.
     fireEvent.change(leg, { target: { value: '6"' } });
-    expect(screen.getAllByText("RM 2,030.00").length).toBeGreaterThan(0);
-    // Seat height 26" reads the sku's per-size price (2100) + leg 30.
     fireEvent.change(seat, { target: { value: '26"' } });
-    expect(screen.getAllByText("RM 2,130.00").length).toBeGreaterThan(0);
-    // Modular-ticked master fabric is offered; PRICE_1 adds nothing.
     fireEvent.change(fabric, { target: { value: "cf:CG-001" } });
-    expect((fabric as HTMLSelectElement).value).toBe("cf:CG-001");
-    expect(screen.getAllByText("RM 2,130.00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("RM 2,000.00").length).toBeGreaterThan(0);
+
+    // Submit: attrs carry the SPEC choices only — no surcharge / total money.
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    await screen.findByText("Order SO-1303 created");
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.lines[0].unitPrice).toBe(2000);
+    expect(input.lines[0].attrs).toEqual({
+      seat_height: '26"',
+      fabric_code: "CG-001",
+      fabric_name: "CG-001 Pearl",
+      options: [{ kind: "sofa_leg_height", value: '6"' }],
+    });
   });
 
   it("prices stay editable after a pick (raw override)", () => {
@@ -305,6 +340,35 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(input.lines).toEqual([
       { sku: "CUSTOM DELIVERY SURCHARGE", qty: 1, unitPrice: 150.5, attrs: null },
     ]);
+  });
+
+  it("payment follows the Order Entry config: follow-ups render here and ride entry_data.payment", async () => {
+    mockRawCreate.mockResolvedValue({
+      id: "o-raw-4",
+      so: 1304,
+      customer: { name: "Raw Customer" },
+      lines: [{ id: "ol1" }],
+    } as unknown as Order);
+    wrap();
+    fireEvent.change(screen.getByTestId("raw-dealer"), { target: { value: DEALER_ID } });
+    fireEvent.change(screen.getByTestId("raw-customer-name"), {
+      target: { value: "Raw Customer" },
+    });
+    fireEvent.change(firstSkuInput(), { target: { value: "CUSTOM LINE" } });
+
+    // Pick the configured method → its Bank follow-up appears (POS parity).
+    fireEvent.change(screen.getByTestId("raw-payment-method"), { target: { value: "credit" } });
+    fireEvent.change(screen.getByTestId("raw-pay-followup-bank"), {
+      target: { value: "Maybank" },
+    });
+    fireEvent.change(screen.getByTestId("raw-paid"), { target: { value: "2000" } });
+
+    fireEvent.click(screen.getByTestId("raw-submit"));
+    await screen.findByText("Order SO-1304 created");
+    const input = mockRawCreate.mock.calls[0][0];
+    expect(input.paid).toBe(2000);
+    expect(input.paymentMethod).toBe("credit");
+    expect(input.entryData).toEqual({ payment: { bank: "Maybank" } });
   });
 
   it("nothing gates beyond dealer + name + one line: dates/payment empty submit as TBD/nulls; remarks + attrs ride", async () => {

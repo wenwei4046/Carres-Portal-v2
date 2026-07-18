@@ -36,8 +36,6 @@ import {
   Undo2,
   Upload,
   User,
-  Wallet,
-  Warehouse,
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -1971,12 +1969,14 @@ function DrawerBody({
               lastChasedAt={form.control?.last_chased_at ?? null}
             />
           )}
-          {/* "Where this order is" — deposit → goods → balance → deliver,
-              real numbers on every step (sample grammar: ✓ filled · ONE
-              coloured node · pale not-yet). */}
-          {!railCollapsed && (
+          {/* THE SPINE — nav + progress + status in one (Jess 2026-07-18):
+              deposit → goods → balance → storage (when storing categories
+              exist) → deliver. Collapsed rail shows nodes only. */}
+          {(
             <JourneyCard
               onGo={setTab}
+              activeTab={tab}
+              collapsed={railCollapsed}
               steps={[
                 {
                   title: "Collect deposit",
@@ -2015,6 +2015,26 @@ function DrawerBody({
                       ? `still owes ${RM(balanceDue)} · before delivery`
                       : "all paid",
                 },
+                ...(hasMsbf || hasSof
+                  ? [
+                      {
+                        title: "Storage",
+                        tab: "storage" as DrawerTab,
+                        state: storageOwing
+                          ? storageGate === "hold"
+                            ? ("act" as const)
+                            : ("wait" as const)
+                          : storageIncurred && storageCleared
+                            ? ("done" as const)
+                            : ("todo" as const),
+                        sub: storageOwing
+                          ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
+                          : storageIncurred && storageCleared
+                            ? "collected"
+                            : "not counting",
+                      },
+                    ]
+                  : []),
                 {
                   title: "Deliver",
                   tab: "delivery",
@@ -2038,83 +2058,9 @@ function DrawerBody({
         >
           {(
             [
-              /* Tab-status law (Jess 2026-07-18, international pattern): the
-                 icon stays GREY always — colour arrives as an 8px corner
-                 badge on the icon (red = act now · amber = waiting) plus the
-                 right-side value/word in the same tone. Never tint the icon
-                 itself. Delivered = closed: no badges (guardrail #2). */
-              {
-                key: "items",
-                label: "Items",
-                icon: Package,
-                tone: deliveredDone
-                  ? undefined
-                  : stockTone === "danger"
-                    ? ("danger" as const)
-                    : readyN < goodsN
-                      ? ("warning" as const)
-                      : undefined,
-                v: goodsN > 0 ? `${readyN}/${goodsN}` : undefined,
-                w: deliveredDone
-                  ? "delivered"
-                  : readyN < goodsN
-                    ? `waiting ${goodsN - readyN}`
-                    : "all ready",
-              },
-              {
-                key: "delivery",
-                label: "Delivery",
-                icon: Truck,
-                tone:
-                  !deliveredDone && logisticTone === "danger"
-                    ? ("danger" as const)
-                    : undefined,
-                v: deliveredDone
-                  ? "Done"
-                  : logisticTone === "danger"
-                    ? "not booked"
-                    : undefined,
-                w: deliveredDone
-                  ? undefined
-                  : (assignedLogisticName ?? "no partner"),
-              },
-              {
-                key: "balance",
-                label: "Balance",
-                icon: Wallet,
-                tone:
-                  totalSet && balanceDue > 0 ? ("danger" as const) : undefined,
-                v: totalSet
-                  ? balanceDue > 0
-                    ? RM(balanceDue)
-                    : "Paid"
-                  : undefined,
-                w: totalSet
-                  ? balanceDue > 0
-                    ? "collect before delivery"
-                    : undefined
-                  : "nothing owing",
-              },
-              ...(hasMsbf || hasSof
-                ? [
-                    {
-                      key: "storage" as DrawerTab,
-                      label: "Storage",
-                      icon: Warehouse,
-                      tone: storageOwing
-                        ? storageGate === "hold"
-                          ? ("danger" as const)
-                          : ("warning" as const)
-                        : undefined,
-                      v: storageOwing
-                        ? storageFee > 0
-                          ? RM(storageFee)
-                          : "fee due"
-                        : undefined,
-                      w: storageOwing ? undefined : "not counting",
-                    },
-                  ]
-                : []),
+              /* Items / Delivery / Balance / Storage moved ONTO the spine —
+                 the nav keeps only the non-flow utilities (Jess: demoted,
+                 never hidden). */
               {
                 key: "loan",
                 label: "Loan",
@@ -4417,38 +4363,59 @@ async function viewSlip(p: OrderPaymentRow) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
-/** "Where this order is" — the journey card (Jess 2026-07-18, from her
- *  approved timeline sample): 4 FIXED steps in doing order — deposit →
- *  goods → balance → deliver. Sample grammar: done = ink-filled ✓ · the
- *  step needing work = the ONLY coloured node (red = act now, amber =
- *  waiting) · not-yet = pale ring; the connector darkens over completed
- *  ground. Every step carries its real number; clicking jumps to the tab. */
+/** "Where this order is" — the SPINE (Jess 2026-07-18): ONE vertical
+ *  progress line that is ALSO the section nav. Steps in doing order with
+ *  real numbers; clicking a step opens its tab (blue wash = the tab you're
+ *  on). Node grammar per Jess's approved sample: ink-filled ✓ done (the
+ *  connector darkens behind it) · red ring = act now · amber = waiting ·
+ *  pale ring = not yet. The line is a READING order, not a gate — every
+ *  node shows its own live state. The step WORDS are the locked
+ *  vocabulary; numbers may shift when the Storage step is absent.
+ *  Collapsed rail → nodes only. */
 type JourneyState = "done" | "act" | "wait" | "todo";
 function JourneyCard({
   steps,
+  activeTab,
+  collapsed,
   onGo,
 }: {
   steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
+  activeTab: DrawerTab;
+  collapsed: boolean;
   onGo: (t: DrawerTab) => void;
 }) {
   return (
-    <div className="bg-white border border-base-200 rounded-xl p-3 shrink-0">
-      <div className="t4-label mb-2">Where this order is</div>
+    <div
+      className={`bg-white border border-base-200 rounded-xl shrink-0 ${
+        collapsed ? "p-1.5" : "p-3"
+      }`}
+    >
+      {!collapsed && <div className="t4-label mb-2 px-1">Where this order is</div>}
       {steps.map((st, i) => {
         const last = i === steps.length - 1;
         const groundDone = steps.slice(0, i + 1).every((x) => x.state === "done");
+        const active = st.tab === activeTab;
         return (
           <button
             key={st.title}
             type="button"
             onClick={() => onGo(st.tab)}
-            title={`Open ${st.tab}`}
-            className="relative w-full flex items-start gap-2.5 text-left group pb-3 last:pb-0"
+            aria-selected={active}
+            title={`${st.title} — ${st.sub}`}
+            className={`relative w-full flex items-start text-left group rounded-lg ${
+              collapsed
+                ? "justify-center px-0 py-1.5"
+                : "gap-2.5 px-1.5 py-1.5"
+            } ${active ? "bg-info-soft" : "hover:bg-base-50"} ${
+              last ? "" : "pb-3"
+            }`}
           >
             {!last && (
               <span
                 aria-hidden="true"
-                className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
+                className={`absolute ${
+                  collapsed ? "left-1/2 -translate-x-1/2" : "left-[17px]"
+                } top-8 bottom-0 w-0.5 ${
                   groundDone ? "bg-base-800" : "bg-base-200"
                 }`}
               />
@@ -4466,20 +4433,28 @@ function JourneyCard({
             >
               {st.state === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}
             </span>
-            <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-base-900 group-hover:underline">
-                {st.title}
+            {!collapsed && (
+              <span className="min-w-0">
+                <span
+                  className={`block text-[13px] font-semibold group-hover:underline ${
+                    active ? "text-info" : "text-base-900"
+                  }`}
+                >
+                  {st.title}
+                </span>
+                <span
+                  className={`block text-[12px] ${
+                    st.state === "act"
+                      ? "font-semibold text-danger"
+                      : st.state === "wait"
+                        ? "font-medium text-warning"
+                        : "text-base-500"
+                  }`}
+                >
+                  {st.sub}
+                </span>
               </span>
-              <span
-                className={`block text-[12px] ${
-                  st.state === "act"
-                    ? "font-semibold text-danger"
-                    : "text-base-500"
-                }`}
-              >
-                {st.sub}
-              </span>
-            </span>
+            )}
           </button>
         );
       })}

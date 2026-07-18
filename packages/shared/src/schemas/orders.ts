@@ -444,12 +444,14 @@ export const topUpOrderInputSchema = z.object({
 });
 export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
 
-/** 0231 — Add-product P1 (design 2026-07-18): append products to a PLACE-lane
- *  order. NO client price — the route prices from the FRESH catalog (server
- *  authority, Loo default #2) and re-runs the special-addon + option-pick
- *  trust gates. `attrs` carries the configurator selections (size / fabric /
- *  specials / options with their client preview totals). Sofa BUILDS and
- *  promo/free markers are rejected by the route until P2. */
+/** 0231/0232 — Add-product P1+P2 (design 2026-07-18): append products to a
+ *  PLACE-lane order. Server price authority (Loo default #2): the route
+ *  prices flat lines from the FRESH catalog + re-runs the special-addon /
+ *  option-pick trust gates; a sofa BUILD line (attrs.sofa_build, P2) is
+ *  re-run through `computeSofaPrice` + exploded server-side. `attrs` carries
+ *  the configurator selections. Free markers are always rejected; a
+ *  voucher-CODED pwp claim (attrs.pwp.code) is rejected (code-less stateless
+ *  claims only — vouchers ride the wizard / a new order). */
 export const addOrderLinesInputSchema = z.object({
   lines: z
     .array(
@@ -457,6 +459,11 @@ export const addOrderLinesInputSchema = z.object({
         sku: z.string().trim().min(1),
         qty: z.number().int().min(1).max(99),
         attrs: z.record(z.unknown()).nullable().optional(),
+        /** P2 — the client PREVIEW total for a sofa BUILD line only: the sofa
+         *  recompute's ±0.5% drift gate compares it against the fresh server
+         *  figure (create-route contract). IGNORED on every non-build line —
+         *  flat lines stay fully server-priced. */
+        unitPrice: z.number().nonnegative().optional(),
       }),
     )
     .min(1)
