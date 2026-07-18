@@ -1,8 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Trash2 } from "lucide-react";
-import type { Order } from "@carres/shared";
+import { ArrowRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import type {
+  Order,
+  ProductModelDto,
+  ProductSkuDto,
+  RawCreateOrderInput,
+} from "@carres/shared";
 import { rm } from "@/lib/format-currency";
+import { composeAddress } from "@/data/malaysia-postcodes";
+import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   useCatalog,
   useOutlets,
@@ -10,78 +17,146 @@ import {
   useRawCreateOrder,
   useSalespersons,
 } from "@/lib/queries";
+import {
+  RAW_DRAFT_STORAGE_KEY,
+  clearDraft,
+  composeEmergency,
+  emptyDraft,
+  loadDraft,
+  saveDraft,
+  type DraftLine,
+  type WizardDraft,
+} from "../dealer/new-order/draft";
+import { newLocalId } from "../dealer/new-order/configurators";
+import Step3SignaturePayment from "../dealer/new-order/Step3SignaturePayment";
+import CustomerStep from "../dealer/pos/CustomerStep";
+import OrderSummaryRail from "../dealer/pos/OrderSummaryRail";
+import PosConfigurePage from "../dealer/pos/PosConfigurePage";
+import SofaConfigurePage from "../dealer/pos/SofaConfigurePage";
+import ConfigureDrawer from "../dealer/pos/ConfigureDrawer";
+import { buildCatalogIndex } from "../dealer/pos/catalog-index";
+import { lineEditTarget } from "../dealer/pos/cart";
 
 /**
- * MAINTAIN → New Order — the RAW Sales Order creator (POS-parity with the
- * 2990s Backend "New Sales Order"). Internal (principal) tooling:
- *   - NO POS gates: no signature, no terms, no payment method, no emergency
- *     contact, no lead-time floor (empty date = TBD)
- *   - lines are free-form: pick from the FULL catalog (incl. deactivated /
- *     unpriced skus) at an editable price, or type a fully custom line —
- *     every sku / qty / price is persisted exactly as entered
- * The server (POST /api/orders/raw) still enforces: dealer required, ≥1 line,
- * and the standing sofa ↔ mattress/bed-frame composition rule.
+ * MAINTAIN → New Order — the RAW Sales Order creator, rebuilt 2026-07-18 (Loo)
+ * as a POS-STRUCTURE-PARITY flow. Same three steps as the POS Create Order —
+ *   01 ITEMS    → SKU-search-first product entry (the ONLY part that differs
+ *                 from the POS: type a SKU, the product's OWN configure page
+ *                 opens with the variant preselected, so the spec fields —
+ *                 fabric / divan / gap / leg height / specials — follow the
+ *                 product). Lines stay price-EDITABLE + custom lines allowed.
+ *   02 CUSTOMER → the POS CustomerStep VERBATIM (dealer pick, outlet /
+ *                 salesperson, name autocomplete, demographics, MY address,
+ *                 emergency, target date + add-ons) — with raw dates (no
+ *                 lead-time floor, past dates OK, empty = TBD).
+ *   03 CONFIRM  → the POS payment + signature layout, everything OPTIONAL
+ *                 ("fill it if you have it") — no Stripe, no delivery-engine
+ *                 inputs.
+ * Submits via POST /api/orders/raw (extended): specs (line attrs), add-ons and
+ * the full customer block persist; NO POS engine runs (PWP / free-gift /
+ * delivery stay off — that is the point of the raw door).
  */
 
-interface RawLine {
-  localId: string;
-  sku: string;
-  /** Display caption under the sku (model · variant) — catalog picks only. */
-  label: string;
-  qty: number;
-  /** Kept as the raw input string so partial edits ("2.", "") don't fight the
-   *  user; parsed at submit/total time. */
-  unitPrice: string;
+type Step = 1 | 2 | 3;
+
+/** Raw drafts start with NO payment method picked (POS defaults "online" —
+ *  here payment is optional, absence must be representable). */
+function rawEmptyDraft(): WizardDraft {
+  const d = emptyDraft();
+  return { ...d, payment: { ...d.payment, method: "" } };
 }
-
-let rawLineSeq = 0;
-const nextLocalId = () => `raw-line-${++rawLineSeq}`;
-
-const priceOf = (l: RawLine) => {
-  const n = Number.parseFloat(l.unitPrice);
-  return Number.isFinite(n) && n >= 0 ? n : NaN;
-};
 
 export default function PrincipalNewOrder() {
   const navigate = useNavigate();
   const dealersQ = usePrincipalDealers();
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
+  // Admin bundle — the FULL catalog (deactivated + unpriced + discontinued
+  // models included): raw entry must reach every sku the business ever sold.
   const catalogQ = useCatalog({ admin: true });
   const createRaw = useRawCreateOrder();
 
-  const [dealerId, setDealerId] = useState("");
-  const [outletId, setOutletId] = useState("");
-  const [salespersonId, setSalespersonId] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [paid, setPaid] = useState("0");
-  const [lines, setLines] = useState<RawLine[]>([]);
-  const [pickerQuery, setPickerQuery] = useState("");
+  const [step, setStep] = useState<Step>(1);
+  const [customerSubStep, setCustomerSubStep] = useState<0 | 3>(0);
+  const [draft, setDraft] = useState<WizardDraft>(
+    () => loadDraft(RAW_DRAFT_STORAGE_KEY) ?? rawEmptyDraft(),
+  );
   const [submitted, setSubmitted] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  /** Configure surface to open: a model + (optionally) the picked sku. */
+  const [configure, setConfigure] = useState<{ modelId: string; skuId: string | null } | null>(
+    null,
+  );
+  const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
+  /** In-progress unit-price edit strings keyed by localId, so partial input
+   *  ("2.") doesn't fight the numeric DraftLine value. */
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
 
-  const dealers = useMemo(
-    () => (dealersQ.data?.dealers ?? []).filter((d) => d.status === "active"),
+  // Auto-save the raw draft (own sessionStorage slot — never the POS cart's).
+  useEffect(() => {
+    if (submitted) return;
+    saveDraft(draft, RAW_DRAFT_STORAGE_KEY);
+  }, [draft, submitted]);
+
+  const catalog = catalogQ.data ?? null;
+  const index = useMemo(
+    () =>
+      catalog
+        ? buildCatalogIndex(catalog, catalog.fabricTierConfig, catalog.modelFabricTierOverrides)
+        : null,
+    [catalog],
+  );
+  const modelById = useMemo(
+    () => new Map((catalog?.models ?? []).map((m) => [m.id, m])),
+    [catalog],
+  );
+  const skuByCode = useMemo(
+    () => new Map((catalog?.skus ?? []).map((s) => [s.sku, s])),
+    [catalog],
+  );
+
+  // In-flow dealer pick (the POS CustomerStep dealer card — principal has no
+  // JWT dealer). Outlet + salesperson lists follow the picked dealer.
+  const pickableDealers = useMemo(
+    () =>
+      (dealersQ.data?.dealers ?? [])
+        .filter((d) => d.status === "active")
+        .map((d) => ({ id: d.id, name: d.name })),
     [dealersQ.data],
   );
+  const actingDealerId = draft.actingDealerId ?? null;
   const outlets = useMemo(
-    () => (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === dealerId),
-    [outletsQ.data, dealerId],
+    () =>
+      actingDealerId
+        ? (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === actingDealerId)
+        : [],
+    [outletsQ.data, actingDealerId],
   );
   const salespersons = useMemo(
-    () => (salespersonsQ.data?.salespersons ?? []).filter((s) => s.dealerId === dealerId),
-    [salespersonsQ.data, dealerId],
+    () =>
+      actingDealerId
+        ? (salespersonsQ.data?.salespersons ?? []).filter((s) => s.dealerId === actingDealerId)
+        : [],
+    [salespersonsQ.data, actingDealerId],
   );
 
-  // Catalog picker — search sku / model / variant across the FULL admin bundle.
+  function pickDealer(id: string, name: string) {
+    setDraft((d) => ({
+      ...d,
+      actingDealerId: id,
+      actingDealerName: name,
+      outletId: null,
+      salespersonId: null,
+    }));
+  }
+
+  // ── Items — SKU search over the FULL admin bundle ─────────────────────────
   const pickerResults = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
-    if (!q || !catalogQ.data) return [];
-    const modelById = new Map(catalogQ.data.models.map((m) => [m.id, m]));
-    return catalogQ.data.skus
+    if (!q || !catalog) return [];
+    return catalog.skus
       .filter((s) => {
         const model = modelById.get(s.modelId);
         return (
@@ -90,80 +165,173 @@ export default function PrincipalNewOrder() {
           (s.variant?.toLowerCase().includes(q) ?? false)
         );
       })
-      .slice(0, 8)
-      .map((s) => {
-        const model = modelById.get(s.modelId);
-        return {
-          sku: s.sku,
-          label: [model?.name, s.variant].filter(Boolean).join(" · "),
-          price: s.price ?? 0,
-        };
-      });
-  }, [pickerQuery, catalogQ.data]);
+      .slice(0, 10);
+  }, [pickerQuery, catalog, modelById]);
 
-  function addCatalogLine(pick: { sku: string; label: string; price: number }) {
-    setLines((ls) => [
-      ...ls,
-      {
-        localId: nextLocalId(),
-        sku: pick.sku,
-        label: pick.label,
-        qty: 1,
-        unitPrice: String(pick.price),
-      },
-    ]);
+  function addLine(line: DraftLine) {
+    setDraft((d) => ({ ...d, lines: [...d.lines, line] }));
+  }
+
+  function replaceEditedLine(line: DraftLine) {
+    setDraft((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.localId === line.localId ? line : l)),
+    }));
+  }
+
+  /** A search hit opens the SAME configure surface the POS card would — with
+   *  the variant preselected — so the spec fields follow the product. Models
+   *  without spec fields (service / orphan skus) add a plain editable row. */
+  function openForSku(sku: ProductSkuDto) {
     setPickerQuery("");
+    const model = modelById.get(sku.modelId);
+    if (!model || model.category === "service") {
+      addLine({
+        localId: newLocalId(),
+        sku: sku.sku,
+        qty: 1,
+        attrs: null,
+        unitPrice: sku.price ?? 0,
+        label: model ? `${model.name} · ${sku.variant}` : sku.variant,
+      });
+      return;
+    }
+    setConfigure({ modelId: model.id, skuId: sku.id });
   }
 
-  function addCustomLine() {
-    setLines((ls) => [
-      ...ls,
-      { localId: nextLocalId(), sku: "", label: "", qty: 1, unitPrice: "0" },
-    ]);
-  }
-
-  function patchLine(localId: string, patch: Partial<RawLine>) {
-    setLines((ls) => ls.map((l) => (l.localId === localId ? { ...l, ...patch } : l)));
+  function patchLine(localId: string, patch: Partial<DraftLine>) {
+    setDraft((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.localId === localId ? { ...l, ...patch } : l)),
+    }));
   }
 
   function removeLine(localId: string) {
-    setLines((ls) => ls.filter((l) => l.localId !== localId));
+    setDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.localId !== localId) }));
   }
 
-  const total = lines.reduce((s, l) => {
-    const p = priceOf(l);
-    return s + (Number.isNaN(p) ? 0 : p * l.qty);
-  }, 0);
-  const paidNum = Number.parseFloat(paid) || 0;
+  function addCustomLine() {
+    addLine({ localId: newLocalId(), sku: "", qty: 1, attrs: null, unitPrice: 0, label: "" });
+  }
 
   const linesValid =
-    lines.length > 0 && lines.every((l) => l.sku.trim().length > 0 && l.qty > 0 && !Number.isNaN(priceOf(l)));
-  const canSubmit =
-    !!dealerId && customerName.trim().length > 0 && linesValid && paidNum >= 0 && !createRaw.isPending;
+    draft.lines.length > 0 &&
+    draft.lines.every((l) => l.sku.trim().length > 0 && l.qty > 0 && l.unitPrice >= 0);
 
-  async function handleSubmit() {
-    if (!canSubmit) return;
+  const total =
+    draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0) +
+    draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+
+  const canCreate =
+    !!actingDealerId &&
+    draft.customer.name.trim().length >= 2 &&
+    linesValid &&
+    !createRaw.isPending &&
+    !uploading;
+
+  // ── Submit — the extended raw door ────────────────────────────────────────
+  async function handleCreate() {
+    if (!canCreate || !actingDealerId) return;
     setSubmitError(null);
     try {
-      const order = await createRaw.mutateAsync({
-        dealerId,
-        outletId: outletId || null,
-        salespersonId: salespersonId || null,
+      // Signature / slip are OPTIONAL here — upload only what was captured.
+      let signaturePath: string | null = null;
+      let paymentSlipPath: string | null = null;
+      if (draft.wizardSessionId && (draft.signature || draft.payment.slip)) {
+        setUploading(true);
+        if (draft.signature) {
+          signaturePath = await uploadDataUrl({
+            dealerId: actingDealerId,
+            wizardSessionId: draft.wizardSessionId,
+            filename: "signature.png",
+            dataUrl: draft.signature,
+          });
+        }
+        if (draft.payment.slip) {
+          paymentSlipPath = await uploadDataUrl({
+            dealerId: actingDealerId,
+            wizardSessionId: draft.wizardSessionId,
+            filename: `payment-slip.${extensionForMime(draft.payment.slip.mime)}`,
+            dataUrl: draft.payment.slip.dataUrl,
+          });
+        }
+        setUploading(false);
+      }
+
+      const composedAddress = composeAddress({
+        line1: draft.customer.addressLine1,
+        line2: draft.customer.addressLine2,
+        state: draft.customer.addressState,
+        city: draft.customer.addressCity,
+        postcode: draft.customer.addressPostcode,
+      });
+      const followUps = Object.fromEntries(
+        Object.entries(draft.payment.followUps ?? {}).filter(([, v]) => v.trim()),
+      );
+      const customFields = Object.fromEntries(
+        Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
+      );
+      const hasEntryData = Object.keys(followUps).length > 0 || Object.keys(customFields).length > 0;
+
+      const input: RawCreateOrderInput = {
+        dealerId: actingDealerId,
+        outletId: draft.outletId,
+        salespersonId: draft.salespersonId,
         customer: {
-          name: customerName.trim(),
-          phone: customerPhone.trim() || null,
-          address: customerAddress.trim() || null,
+          name: draft.customer.name.trim(),
+          phone: draft.customer.phone.trim() || null,
+          address: draft.customer.addressUnknown
+            ? null
+            : composedAddress || draft.customer.address.trim() || null,
+          addressUnknown: draft.customer.addressUnknown,
+          billing: draft.customer.billingSame ? null : draft.customer.billing.trim() || null,
+          billingSame: draft.customer.billingSame,
+          emergency: composeEmergency(draft.customer) || null,
+          email: draft.customer.email.trim() || null,
+          race: draft.customer.race || null,
+          gender: draft.customer.gender || null,
+          birthday: draft.customer.birthday || null,
         },
-        deliveryDate: deliveryDate || null,
-        lines: lines.map((l) => ({
+        deliveryDate: draft.delivery.dateTbd ? null : draft.delivery.date || null,
+        proceedDate: draft.delivery.dateTbd ? null : draft.delivery.proceedDate || null,
+        deliveryFloor: draft.delivery.floor,
+        deliveryHasLift: draft.delivery.hasLift,
+        deliveryStairItems: draft.delivery.stairItems,
+        lines: draft.lines.map((l) => ({
           sku: l.sku.trim(),
           qty: l.qty,
-          unitPrice: priceOf(l),
+          unitPrice: l.unitPrice,
+          attrs: l.attrs,
         })),
-        paid: paidNum,
-      });
+        addons: draft.addons.map((a) => ({
+          addonKey: a.key,
+          qty: a.qty,
+          unitPrice: a.unitPrice,
+          attrs: a.attrs ?? null,
+        })),
+        paid: draft.paid,
+        paymentMethod: draft.payment.method || null,
+        approvalCode: draft.payment.approvalCode.trim() || null,
+        installmentMonths:
+          draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
+        signaturePath,
+        paymentSlipPath,
+        termsAccepted: draft.termsAccepted,
+        ...(hasEntryData
+          ? {
+              entryData: {
+                ...(Object.keys(followUps).length > 0 ? { payment: followUps } : {}),
+                ...(Object.keys(customFields).length > 0 ? { fields: customFields } : {}),
+              },
+            }
+          : {}),
+      };
+
+      const order = await createRaw.mutateAsync(input);
+      clearDraft(RAW_DRAFT_STORAGE_KEY);
       setSubmitted(order);
     } catch (err) {
+      setUploading(false);
       setSubmitError(err instanceof Error ? err.message : "Order creation failed");
     }
   }
@@ -171,18 +339,13 @@ export default function PrincipalNewOrder() {
   function startAnother() {
     setSubmitted(null);
     setSubmitError(null);
-    setDealerId("");
-    setOutletId("");
-    setSalespersonId("");
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerAddress("");
-    setDeliveryDate("");
-    setPaid("0");
-    setLines([]);
+    setDraft(rawEmptyDraft());
     setPickerQuery("");
+    setPriceDrafts({});
+    setStep(1);
   }
 
+  // ── Submitted card ────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className="min-h-full grid place-items-center p-8">
@@ -206,281 +369,651 @@ export default function PrincipalNewOrder() {
     );
   }
 
+  // ── Configure overlay routing (same surfaces as the POS CatalogStep) ──────
+  const overlay = (() => {
+    if (!catalog || !index) return null;
+    const editSku = editingLine ? skuByCode.get(editingLine.sku) : null;
+    const editModel = editSku ? modelById.get(editSku.modelId) ?? null : null;
+    const activeModel: ProductModelDto | null = editingLine
+      ? editModel
+      : configure
+        ? modelById.get(configure.modelId) ?? null
+        : null;
+    if (!activeModel) return null;
+    const editing = editingLine ?? undefined;
+    const emitLine = editing ? replaceEditedLine : addLine;
+    const closeConfigure = () => {
+      setConfigure(null);
+      setEditingLine(null);
+    };
+    const offered = (catalog.modelSofaCompartments ?? []).filter(
+      (mc) => mc.modelId === activeModel.id,
+    );
+    const initialSkuId = editing ? undefined : configure?.skuId ?? undefined;
+    // NOTE: no `catalog`/PWP props on these mounts — the raw door runs no PWP
+    // engine, so the voucher rail stays hidden by construction.
+    if (activeModel.category === "mattress" || activeModel.category === "bedframe") {
+      return (
+        <PosConfigurePage
+          key={editing?.localId ?? activeModel.id}
+          model={activeModel}
+          meta={index.meta.get(activeModel.id)}
+          skus={index.skusByModel.get(activeModel.id) ?? []}
+          specialAddons={catalog.specialAddons}
+          optionPools={catalog.optionPools}
+          fabrics={catalog.fabrics}
+          fabricTierConfig={catalog.fabricTierConfig}
+          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+          editLine={editing}
+          initialSkuId={initialSkuId}
+          onAdd={emitLine}
+          onClose={closeConfigure}
+        />
+      );
+    }
+    if (
+      activeModel.category === "sofa" &&
+      (offered.length > 0 ||
+        Boolean(editing && lineEditTarget(editing, catalog) === "sofa_build"))
+    ) {
+      return (
+        <SofaConfigurePage
+          key={editing?.localId ?? activeModel.id}
+          model={activeModel}
+          meta={index.meta.get(activeModel.id)}
+          skus={index.skusByModel.get(activeModel.id) ?? []}
+          fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+          masterFabrics={catalog.fabrics}
+          optionPools={catalog.optionPools}
+          fabricTierConfig={catalog.fabricTierConfig}
+          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+          sofaCompartments={catalog.sofaCompartments ?? []}
+          modelCompartments={offered}
+          sofaCombos={catalog.sofaCombos ?? []}
+          editLine={editing}
+          onAdd={emitLine}
+          onClose={closeConfigure}
+        />
+      );
+    }
+    if (editing) return null;
+    return (
+      <ConfigureDrawer
+        model={activeModel}
+        meta={index.meta.get(activeModel.id)}
+        skus={index.skusByModel.get(activeModel.id) ?? []}
+        fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
+        fabricTierConfig={catalog.fabricTierConfig}
+        modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+        sofaCompartments={catalog.sofaCompartments}
+        modelSofaCompartments={catalog.modelSofaCompartments}
+        sofaCombos={catalog.sofaCombos}
+        specialAddons={catalog.specialAddons}
+        initialSkuId={initialSkuId}
+        onAdd={addLine}
+        onClose={closeConfigure}
+      />
+    );
+  })();
+
+  const STEPS: Array<{ n: Step; label: string }> = [
+    { n: 1, label: "Items" },
+    { n: 2, label: "Customer" },
+    { n: 3, label: "Confirm" },
+  ];
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
-      <header>
-        <p className="t-micro text-base-400">Maintain · New order</p>
-        <h1 className="t-h2 mt-1">New Sales Order</h1>
-        <p className="t-small text-base-500 mt-1">
-          Raw creation — no POS gates. Every line, price and date is saved exactly as you enter it.
-        </p>
+    <div
+      className="pos-proto flex flex-col"
+      style={{ height: "100vh", background: "var(--pos-bg)" }}
+    >
+      {/* Top bar — POS-parity step strip, portal-shell edition (no wordmark /
+          staff chip: the PortalSidebar is already beside this page). */}
+      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <span className="pos-topbar__crumb" style={{ borderLeft: "none", paddingLeft: 0, marginLeft: 0 }}>
+            Maintain · New Sales Order
+          </span>
+          <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>
+            Raw creation — no POS gates; saved exactly as entered
+          </span>
+        </div>
+        <div className="pos-topbar__center">
+          {STEPS.map((s, i) => {
+            const clickable = s.n < step;
+            return (
+              <button
+                key={s.n}
+                type="button"
+                onClick={() => clickable && setStep(s.n)}
+                disabled={!clickable && s.n !== step}
+                aria-current={step === s.n ? "step" : undefined}
+                data-testid={`raw-step-${s.n}`}
+                className={`pos-topbar__step ${step === s.n ? "is-active" : ""}`}
+                style={{ cursor: clickable ? "pointer" : "default" }}
+              >
+                <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="pos-topbar__right">
+          {draft.lines.length > 0 && (
+            <span className="pos-topbar__count" data-testid="raw-topbar-count">
+              {draft.lines.length} line{draft.lines.length === 1 ? "" : "s"} · {rm(total)}
+            </span>
+          )}
+        </div>
       </header>
 
-      {/* Sale info */}
-      <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
-        <h2 className="t-h4 mb-4">Sale info</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Dealer *</span>
-            <select
-              value={dealerId}
-              onChange={(e) => {
-                setDealerId(e.target.value);
-                setOutletId("");
-                setSalespersonId("");
-              }}
-              data-testid="raw-dealer"
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body"
-            >
-              <option value="">
-                {dealersQ.isLoading ? "Loading…" : "Select a dealer…"}
-              </option>
-              {dealers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Outlet</span>
-            <select
-              value={outletId}
-              onChange={(e) => setOutletId(e.target.value)}
-              disabled={!dealerId}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body disabled:opacity-50"
-            >
-              <option value="">— optional —</option>
-              {outlets.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Salesperson</span>
-            <select
-              value={salespersonId}
-              onChange={(e) => setSalespersonId(e.target.value)}
-              disabled={!dealerId}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body disabled:opacity-50"
-            >
-              <option value="">— optional —</option>
-              {salespersons.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
-      {/* Customer */}
-      <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
-        <h2 className="t-h4 mb-4">Customer</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Full name *</span>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              data-testid="raw-customer-name"
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body"
-            />
-          </label>
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Phone</span>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body"
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Delivery address</span>
-            <textarea
-              value={customerAddress}
-              onChange={(e) => setCustomerAddress(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body"
-            />
-          </label>
-        </div>
-      </section>
-
-      {/* Items */}
-      <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="t-h4">Items</h2>
-          <button type="button" onClick={addCustomLine} className="btn-ghost text-[12px]">
-            <Plus size={14} strokeWidth={1.75} className="inline -mt-0.5 mr-1" />
-            Custom line
-          </button>
-        </div>
-
-        {/* Catalog picker */}
-        <div className="relative mb-4">
-          <Search
-            size={15}
-            strokeWidth={1.75}
-            className="absolute left-3.5 top-[13px] text-base-400 pointer-events-none"
-          />
-          <input
-            type="search"
-            value={pickerQuery}
-            onChange={(e) => setPickerQuery(e.target.value)}
-            placeholder="Add from catalog — name, SKU, variant… (includes deactivated + unpriced)"
-            data-testid="raw-picker"
-            className="w-full pl-9 pr-4 py-2 rounded-full border border-base-200 bg-base-50 t-small outline-none
-                       focus:border-primary focus:ring-2 focus:ring-primary/15 focus:bg-white transition-all"
-          />
-          {pickerResults.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full bg-white border border-base-200 rounded-lg shadow-md overflow-hidden">
-              {pickerResults.map((r) => (
-                <li key={r.sku}>
-                  <button
-                    type="button"
-                    onClick={() => addCatalogLine(r)}
-                    data-testid={`raw-pick-${r.sku}`}
-                    className="w-full flex items-baseline justify-between gap-3 px-4 py-2 text-left hover:bg-base-50"
-                  >
-                    <span className="min-w-0">
-                      <span className="font-mono text-[12px]">{r.sku}</span>
-                      {r.label && <span className="t-tiny text-base-500 ml-2">{r.label}</span>}
+      {/* Body */}
+      <main className="flex-1 min-h-0 overflow-hidden">
+        {!catalog ? (
+          <div className="h-full grid place-items-center">
+            <p className="text-sm text-muted-foreground">
+              {catalogQ.error
+                ? `Couldn't load catalog: ${(catalogQ.error as Error).message}`
+                : "Loading catalog…"}
+            </p>
+          </div>
+        ) : step === 1 ? (
+          <div key={1} className="page-shell h-full overflow-hidden">
+            <div className="handover">
+              <div className="handover__left">
+                <div className="handover__title-row">
+                  <div>
+                    <span className="phase-banner">
+                      <span className="phase-banner__dot" />
+                      Step 1 of 3 · Items
                     </span>
-                    <span className="font-mono text-[12px] text-base-600 shrink-0">{rm(r.price)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {lines.length === 0 ? (
-          <p className="t-small text-base-400 text-center py-6">
-            No items yet — search the catalog above, or add a custom line.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <div className="hidden sm:grid grid-cols-[1fr_84px_130px_110px_36px] gap-2 px-1">
-              <span className="t-micro text-base-400">SKU / description</span>
-              <span className="t-micro text-base-400">Qty</span>
-              <span className="t-micro text-base-400">Unit price (RM)</span>
-              <span className="t-micro text-base-400 text-right">Line total</span>
-              <span />
-            </div>
-            {lines.map((l) => {
-              const p = priceOf(l);
-              return (
-                <div
-                  key={l.localId}
-                  className="grid sm:grid-cols-[1fr_84px_130px_110px_36px] grid-cols-2 gap-2 items-center"
-                >
-                  <div className="col-span-2 sm:col-span-1">
-                    <input
-                      type="text"
-                      value={l.sku}
-                      onChange={(e) => patchLine(l.localId, { sku: e.target.value })}
-                      placeholder="SKU or free-text description"
-                      className="w-full rounded-md border border-base-300 bg-white px-3 py-1.5 font-mono text-[12px]"
-                    />
-                    {l.label && <p className="t-tiny text-base-400 mt-0.5 px-1">{l.label}</p>}
+                    <h1 className="handover__title">Search SKU</h1>
                   </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={l.qty}
-                    onChange={(e) =>
-                      patchLine(l.localId, { qty: Math.max(1, Math.floor(Number(e.target.value) || 1)) })
-                    }
-                    className="rounded-md border border-base-300 bg-white px-3 py-1.5 t-body"
+                </div>
+                <p className="handover__sub">
+                  Type a SKU, model or variant — picking a product opens its configure page
+                  (specs follow the product). Prices stay editable; free-text custom lines
+                  allowed.
+                </p>
+
+                {/* SKU search */}
+                <div style={{ position: "relative", marginBottom: 22 }}>
+                  <Search
+                    size={15}
+                    strokeWidth={1.75}
+                    style={{
+                      position: "absolute",
+                      left: 14,
+                      top: 13,
+                      color: "var(--fg-muted)",
+                      pointerEvents: "none",
+                    }}
                   />
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={l.unitPrice}
-                    onChange={(e) => patchLine(l.localId, { unitPrice: e.target.value })}
-                    className="rounded-md border border-base-300 bg-white px-3 py-1.5 font-mono text-[13px]"
+                    type="search"
+                    value={pickerQuery}
+                    onChange={(e) => setPickerQuery(e.target.value)}
+                    placeholder="Search SKU / model / variant… (includes deactivated + unpriced)"
+                    data-testid="raw-picker"
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px 10px 38px",
+                      borderRadius: 999,
+                      border: "1.5px solid var(--line)",
+                      background: "var(--pos-panel)",
+                      fontSize: 13,
+                      outline: "none",
+                    }}
                   />
-                  <span className="font-mono text-[13px] text-right">
-                    {Number.isNaN(p) ? "—" : rm(p * l.qty)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeLine(l.localId)}
-                    aria-label="Remove line"
-                    className="grid place-items-center w-8 h-8 rounded-md text-base-400 hover:text-destructive hover:bg-destructive/5"
+                  {pickerResults.length > 0 && (
+                    <ul
+                      style={{
+                        position: "absolute",
+                        zIndex: 10,
+                        marginTop: 4,
+                        width: "100%",
+                        background: "var(--pos-panel)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                        boxShadow: "0 12px 32px rgba(34,31,32,0.12)",
+                        overflow: "hidden",
+                        listStyle: "none",
+                        padding: 0,
+                      }}
+                    >
+                      {pickerResults.map((s) => {
+                        const model = modelById.get(s.modelId);
+                        return (
+                          <li key={s.id}>
+                            <button
+                              type="button"
+                              onClick={() => openForSku(s)}
+                              data-testid={`raw-pick-${s.sku}`}
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "baseline",
+                                gap: 12,
+                                padding: "9px 14px",
+                                textAlign: "left",
+                                fontSize: 13,
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = "var(--pos-rail)")
+                              }
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+                            >
+                              <span
+                                style={{
+                                  fontFamily: "var(--font-mono)",
+                                  fontSize: 12,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {s.sku}
+                              </span>
+                              <span
+                                style={{
+                                  color: "var(--fg-muted)",
+                                  fontSize: 12,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  flex: 1,
+                                }}
+                              >
+                                {[model?.name, s.variant].filter(Boolean).join(" · ")}
+                              </span>
+                              {s.posActive === false && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase",
+                                    color: "var(--c-burnt)",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  POS off
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  fontFamily: "var(--font-mono)",
+                                  fontSize: 12,
+                                  color: "var(--fg-muted)",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {rm(s.price ?? 0)}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Items list — editable qty / price rows */}
+                {draft.lines.length === 0 ? (
+                  <p
+                    style={{
+                      textAlign: "center",
+                      fontSize: 13,
+                      color: "var(--fg-muted)",
+                      padding: "36px 0",
+                    }}
                   >
-                    <Trash2 size={15} strokeWidth={1.75} />
+                    No items yet — search the catalog above, or add a custom line.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {draft.lines.map((l) => {
+                      const isCatalogLine = skuByCode.has(l.sku);
+                      const editTarget = lineEditTarget(l, catalog);
+                      const priceStr = priceDrafts[l.localId] ?? String(l.unitPrice);
+                      return (
+                        <div
+                          key={l.localId}
+                          data-testid={`raw-line-${l.localId}`}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 74px 120px 96px auto",
+                            gap: 10,
+                            alignItems: "center",
+                            padding: "10px 14px",
+                            borderRadius: 12,
+                            border: "1px solid var(--line)",
+                            background: "var(--pos-panel)",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            {isCatalogLine ? (
+                              <>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {l.label || l.sku}
+                                </div>
+                                <div
+                                  style={{
+                                    fontFamily: "var(--font-mono)",
+                                    fontSize: 11,
+                                    color: "var(--fg-muted)",
+                                  }}
+                                >
+                                  {l.sku}
+                                </div>
+                              </>
+                            ) : (
+                              <input
+                                type="text"
+                                value={l.sku}
+                                onChange={(e) => patchLine(l.localId, { sku: e.target.value })}
+                                placeholder="SKU or free-text description"
+                                aria-label="Custom line description"
+                                style={{
+                                  width: "100%",
+                                  padding: "7px 10px",
+                                  borderRadius: 8,
+                                  border: "1.5px solid var(--line)",
+                                  fontFamily: "var(--font-mono)",
+                                  fontSize: 12,
+                                  background: "var(--pos-panel)",
+                                  outline: "none",
+                                }}
+                              />
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            min={1}
+                            value={l.qty}
+                            aria-label="Quantity"
+                            onChange={(e) =>
+                              patchLine(l.localId, {
+                                qty: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                              })
+                            }
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 8,
+                              border: "1.5px solid var(--line)",
+                              fontSize: 13,
+                              background: "var(--pos-panel)",
+                              outline: "none",
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={priceStr}
+                            aria-label="Unit price (RM)"
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setPriceDrafts((p) => ({ ...p, [l.localId]: v }));
+                              const n = Number.parseFloat(v);
+                              if (Number.isFinite(n) && n >= 0) {
+                                patchLine(l.localId, { unitPrice: n });
+                              }
+                            }}
+                            onBlur={() =>
+                              setPriceDrafts((p) => {
+                                const { [l.localId]: _drop, ...rest } = p;
+                                return rest;
+                              })
+                            }
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 8,
+                              border: "1.5px solid var(--line)",
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 13,
+                              background: "var(--pos-panel)",
+                              outline: "none",
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 13,
+                              textAlign: "right",
+                            }}
+                          >
+                            {rm(l.unitPrice * l.qty)}
+                          </span>
+                          <span style={{ display: "flex", gap: 4 }}>
+                            {editTarget && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingLine(l)}
+                                aria-label="Edit configuration"
+                                title="Re-open the configurator"
+                                data-testid={`raw-edit-${l.localId}`}
+                                style={{
+                                  width: 30,
+                                  height: 30,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  borderRadius: 8,
+                                  color: "var(--fg-muted)",
+                                }}
+                              >
+                                <Pencil size={14} strokeWidth={1.75} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeLine(l.localId)}
+                              aria-label="Remove line"
+                              style={{
+                                width: 30,
+                                height: 30,
+                                display: "grid",
+                                placeItems: "center",
+                                borderRadius: 8,
+                                color: "var(--fg-muted)",
+                              }}
+                            >
+                              <Trash2 size={14} strokeWidth={1.75} />
+                            </button>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 14 }}>
+                  <button type="button" className="btn btn--ghost" onClick={addCustomLine}>
+                    <Plus size={14} strokeWidth={1.75} />
+                    Custom line
                   </button>
                 </div>
-              );
-            })}
+
+                {/* Footer nav — mirror CustomerStep's ghost/primary bar */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    marginTop: 32,
+                    paddingTop: 20,
+                    borderTop: "1px solid var(--line)",
+                  }}
+                >
+                  <span style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--lg"
+                    disabled={!linesValid}
+                    onClick={() => {
+                      setCustomerSubStep(0);
+                      setStep(2);
+                    }}
+                    data-testid="raw-items-next"
+                  >
+                    Next · Customer info
+                    <ArrowRight size={14} strokeWidth={1.75} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: the SAME live summary rail the POS shows */}
+              <OrderSummaryRail draft={draft} catalog={catalog} />
+            </div>
+          </div>
+        ) : step === 2 ? (
+          <div key={2} className="page-shell h-full overflow-hidden">
+            {outletsQ.data && salespersonsQ.data ? (
+              <CustomerStep
+                draft={draft}
+                onChange={setDraft}
+                outlets={outlets}
+                salespersons={salespersons}
+                catalog={catalog}
+                minLeadDays={0}
+                rawDates
+                initialSubStep={customerSubStep}
+                onBackToCart={() => setStep(1)}
+                onProceed={() => setStep(3)}
+                dealerPick={{
+                  dealers: pickableDealers,
+                  loading: dealersQ.isLoading,
+                  value: draft.actingDealerId ?? null,
+                  onPick: pickDealer,
+                }}
+              />
+            ) : (
+              <div className="h-full grid place-items-center">
+                <p className="text-sm text-muted-foreground">
+                  {outletsQ.error || salespersonsQ.error
+                    ? `Couldn't load outlets/salespersons: ${
+                        (outletsQ.error ?? salespersonsQ.error)?.message
+                      }`
+                    : "Loading outlets + salespersons…"}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div key={3} className="page-shell h-full overflow-hidden">
+            <div className="handover">
+              <div className="handover__left">
+                <div className="handover__title-row">
+                  <div>
+                    <span className="phase-banner">
+                      <span className="phase-banner__dot" />
+                      Step 3 of 3 · Confirm
+                    </span>
+                    <h1 className="handover__title">Confirm &amp; payment</h1>
+                  </div>
+                </div>
+                <p className="handover__sub">
+                  Internal entry — payment, slip and signature are all optional. Record
+                  whatever you have; the order is saved exactly as entered.
+                </p>
+                <Step3SignaturePayment
+                  draft={draft}
+                  onChange={setDraft}
+                  catalog={catalog}
+                  rawMode
+                />
+              </div>
+              <OrderSummaryRail draft={draft} catalog={catalog} />
+            </div>
           </div>
         )}
-      </section>
+      </main>
 
-      {/* Delivery + payment */}
-      <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
-        <h2 className="t-h4 mb-4">Delivery & payment</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Delivery date</span>
-            <input
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body"
-            />
-            <span className="t-tiny text-base-400 mt-1 block">
-              Leave empty = date TBC. No lead-time floor on this path.
-            </span>
-          </label>
-          <label className="block">
-            <span className="t-tiny uppercase tracking-wide text-base-500">Paid (RM)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={paid}
-              onChange={(e) => setPaid(e.target.value)}
-              className="mt-1 w-full rounded-md border border-base-300 bg-white px-3 py-2 font-mono"
-            />
-          </label>
-        </div>
-      </section>
-
-      {/* Footer */}
-      {submitError && (
-        <p className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2">
-          {submitError}
-        </p>
-      )}
-      <div className="flex items-center justify-between pb-10">
-        <span className="t-body text-base-700">
-          Total <span className="font-mono font-semibold text-base-900">{rm(total)}</span>
-          {paidNum > 0 && (
-            <span className="t-small text-base-500 ml-3">
-              Paid {rm(paidNum)}
-              {total > 0 && ` · ${Math.round((paidNum / total) * 100)}%`}
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={!canSubmit}
-          data-testid="raw-submit"
-          className="btn-hero disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Footer — step 3 only (steps 1/2 own their Next buttons) */}
+      {step === 3 && (
+        <footer
+          className="shrink-0"
+          style={{
+            borderTop: "1px solid var(--line)",
+            background: "var(--pos-panel)",
+            padding: "12px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
         >
-          {createRaw.isPending ? "Creating…" : "Create order →"}
-        </button>
-      </div>
+          {submitError && (
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--c-burnt)",
+                background: "color-mix(in oklab, var(--c-orange) 8%, transparent)",
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+                padding: "6px 12px",
+              }}
+              data-testid="raw-submit-error"
+            >
+              {submitError}
+            </p>
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={uploading || createRaw.isPending}
+              onClick={() => {
+                setCustomerSubStep(3);
+                setStep(2);
+              }}
+            >
+              ← Back
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+                Total{" "}
+                <span
+                  style={{
+                    fontFamily: "var(--font-num)",
+                    fontWeight: 900,
+                    fontSize: 18,
+                    color: "var(--c-burnt)",
+                  }}
+                >
+                  {rm(total)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={!canCreate}
+                className="btn btn--primary btn--lg"
+                data-testid="raw-submit"
+              >
+                {uploading
+                  ? "Uploading…"
+                  : createRaw.isPending
+                    ? "Creating…"
+                    : "Create order →"}
+              </button>
+            </div>
+          </div>
+        </footer>
+      )}
+
+      {overlay}
     </div>
   );
 }

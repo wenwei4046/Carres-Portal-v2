@@ -64,6 +64,7 @@ export default function CustomerStep({
   onBackToCart,
   onProceed,
   initialSubStep = 0,
+  rawDates,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -77,6 +78,10 @@ export default function CustomerStep({
   /** Sub-step to open on (Loo 2026-07-12): Back from the CONFIRM step lands on
    *  Target date (3) — the previous screen — not the first Customer form. */
   initialSubStep?: 0 | 1 | 2 | 3;
+  /** Maintain → New Order (raw creation): SAME form, but the Target-date
+   *  sub-step loses the lead-time/past-date gates — any (or no) date advances.
+   *  POS callers omit it (byte-identical). */
+  rawDates?: boolean;
 }) {
   const c = draft.customer;
   const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(initialSubStep);
@@ -196,9 +201,10 @@ export default function CustomerStep({
     }
     // Target date: date rules + every picked disposal add-on must have a size
     // (the add-ons picker lives on this sub-step now — same gate the cart
-    // drawer applies via step2Valid).
+    // drawer applies via step2Valid). Raw entry skips the date rules — every
+    // date (or none) is accepted exactly as entered.
     return (
-      step3DateValid(draft, minLeadDays) &&
+      (rawDates || step3DateValid(draft, minLeadDays)) &&
       step2FirstDisposalIssue(draft) === null &&
       customsValid(targetTab)
     );
@@ -676,6 +682,7 @@ export default function CustomerStep({
                   onChange={onChange}
                   catalog={catalog}
                   minLeadDays={minLeadDays}
+                  rawDates={rawDates}
                 />
                 <div style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 24 }}>
                   <StairCarryFields draft={draft} onChange={onChange} cfg={catalog.floorConfig} />

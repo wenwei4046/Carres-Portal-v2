@@ -215,6 +215,142 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.delivery_date_tbd).toBe(false);
   });
 
+  it("minimal body still maps to the historical nulls (backward-compatible wire shape)", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), validBody);
+    expect(res.status).toBe(201);
+    const p = sb._rpcCalls[0].payload;
+    expect(p.customer_billing).toBeNull();
+    expect(p.customer_billing_same).toBe(true);
+    expect(p.customer_emergency).toBeNull();
+    expect(p.customer_email).toBeNull();
+    expect(p.proceed_date).toBeNull();
+    expect(p.delivery_floor).toBe(1);
+    expect(p.delivery_has_lift).toBe(false);
+    expect(p.installment_months).toBeNull();
+    expect(p.addons).toEqual([]);
+    // entry_data key must be ABSENT (jsonb 'null' would trip the RPC guard).
+    expect("entry_data" in p).toBe(false);
+  });
+
+  it("POS-parity extras pass through: customer block, delivery extras, payment, addons, entry_data", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), {
+      ...validBody,
+      customer: {
+        name: "Raw Customer",
+        phone: "0123456789",
+        address: "12 Jalan A, KL",
+        addressUnknown: false,
+        billing: "Suite 8, Menara B",
+        billingSame: false,
+        emergency: "Alice · 012-9988776 · Spouse",
+        email: "cust@example.com",
+        race: "Chinese",
+        gender: "Female",
+        birthday: "1990-04-01",
+      },
+      deliveryDate: "2026-08-01",
+      proceedDate: "2026-07-20",
+      deliveryFloor: 3,
+      deliveryHasLift: true,
+      deliveryStairItems: 2,
+      addons: [
+        { addonKey: "dispose-mattress", qty: 1, unitPrice: 50, attrs: { size: "Queen" } },
+      ],
+      paymentMethod: "installment",
+      approvalCode: "8821-INST",
+      installmentMonths: 12,
+      signaturePath: "orders-attachments/d1/w1/signature.png",
+      paymentSlipPath: "orders-attachments/d1/w1/payment-slip.jpg",
+      termsAccepted: true,
+      entryData: { payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } },
+    });
+    expect(res.status).toBe(201);
+    const p = sb._rpcCalls[0].payload;
+    expect(p.customer_address).toBe("12 Jalan A, KL");
+    expect(p.customer_billing).toBe("Suite 8, Menara B");
+    expect(p.customer_billing_same).toBe(false);
+    expect(p.customer_emergency).toBe("Alice · 012-9988776 · Spouse");
+    expect(p.customer_email).toBe("cust@example.com");
+    expect(p.customer_race).toBe("Chinese");
+    expect(p.customer_gender).toBe("Female");
+    expect(p.customer_birthday).toBe("1990-04-01");
+    expect(p.delivery_date).toBe("2026-08-01");
+    expect(p.proceed_date).toBe("2026-07-20");
+    expect(p.delivery_floor).toBe(3);
+    expect(p.delivery_has_lift).toBe(true);
+    expect(p.delivery_stair_items).toBe(2);
+    expect(p.payment_method).toBe("installment");
+    expect(p.approval_code).toBe("8821-INST");
+    expect(p.installment_months).toBe(12);
+    expect(p.signature_url).toBe("orders-attachments/d1/w1/signature.png");
+    expect(p.payment_slip_url).toBe("orders-attachments/d1/w1/payment-slip.jpg");
+    expect(p.terms_accepted).toBe(true);
+    expect(p.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } });
+    expect(p.addons).toEqual([
+      { addon_key: "dispose-mattress", qty: 1, unit_price: 50, attrs: { size: "Queen" } },
+    ]);
+  });
+
+  it("line spec attrs pass through but engine-marker keys (pwp/free_gift/free_item) are stripped", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), {
+      ...validBody,
+      lines: [
+        {
+          sku: "KAYU-QUEEN",
+          qty: 1,
+          unitPrice: 3200,
+          attrs: {
+            gap: "KIV",
+            options: [{ kind: "bedframe_leg_height", value: "15cm" }],
+            pwp: { ruleId: "r1", code: "X" },
+            free_gift: true,
+          },
+        },
+        // Attrs that are ONLY marker keys collapse to null.
+        { sku: "CLOUD-QUEEN", qty: 1, unitPrice: 2890, attrs: { free_item: true } },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const p = sb._rpcCalls[0].payload;
+    expect(p.lines).toEqual([
+      {
+        sku: "KAYU-QUEEN",
+        qty: 1,
+        attrs: { gap: "KIV", options: [{ kind: "bedframe_leg_height", value: "15cm" }] },
+        unit_price: 3200,
+      },
+      { sku: "CLOUD-QUEEN", qty: 1, attrs: null, unit_price: 2890 },
+    ]);
+  });
+
+  it("client delivery addons are dropped (server-exclusive keys) and proceed date needs a delivery date", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await post(await makeJwt("principal"), {
+      ...validBody,
+      proceedDate: "2026-07-20", // no deliveryDate → must not persist
+      paymentMethod: "cash",
+      installmentMonths: 6, // non-installment method → months must not persist
+      addons: [
+        { addonKey: "DELIVERY", qty: 1, unitPrice: 100 },
+        { addonKey: "dispose-bedframe", qty: 1, unitPrice: 80, attrs: { size: "King" } },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const p = sb._rpcCalls[0].payload;
+    expect(p.proceed_date).toBeNull();
+    expect(p.installment_months).toBeNull();
+    expect(p.addons).toEqual([
+      { addon_key: "dispose-bedframe", qty: 1, unit_price: 80, attrs: { size: "King" } },
+    ]);
+  });
+
   it("422 rule_violation when the RPC rejects a sofa + mattress/bed-frame mix", async () => {
     const sb = buildSb({
       rpcError: {

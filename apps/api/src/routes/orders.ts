@@ -857,17 +857,34 @@ ordersRouter.post("/", async (c) => {
 
 // ---------------------------------------------------------------------------
 // RAW create door — POST /api/orders/raw (POS-parity, MAINTAIN → New Order)
-// The 2990s-Backend-style creation path for INTERNAL roles: no signature, no
-// terms, no payment method, no emergency contact, NO lead-time floor, and NONE
-// of the POS recompute engines (sofa/PWP/free-gift/special/delivery) — the
-// operator's line skus + prices are persisted exactly as entered; that is the
-// point of this path. Lines are stamped attrs=null so no downstream engine
-// ever recognises them as marker lines. The create_order RPC still enforces:
-// dealer required, ≥1 line, the sofa ↔ mattress/bed-frame composition rule,
-// and the internal-role gate (SECURITY DEFINER re-check).
+// The 2990s-Backend-style creation path for INTERNAL roles: NO lead-time floor
+// and NONE of the POS recompute engines (sofa/PWP/free-gift/special/delivery)
+// — the operator's line skus + prices are persisted exactly as entered; that
+// is the point of this path. Since 2026-07-18 (Loo — New Order = POS-structure
+// parity) the door also ACCEPTS the full POS customer block, delivery extras,
+// addons, line spec attrs and the payment/signature fields — all OPTIONAL
+// ("fill it if you have it"), persisted verbatim, gating nothing. Line attrs
+// are sanitised (engine-marker keys stripped) so no order-path engine ever
+// recognises a raw line as a marker line, and client delivery addons are
+// dropped (those keys are server-exclusive on the POS door). The create_order
+// RPC still enforces: dealer required, ≥1 line, the sofa ↔ mattress/bed-frame
+// composition rule, and the internal-role gate (SECURITY DEFINER re-check).
 // ---------------------------------------------------------------------------
 
 const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
+
+/** Engine-marker attr keys the raw door must never persist — they would make
+ *  downstream order-path machinery (PWP cancel trigger / free-line displays)
+ *  treat a raw line as one of its own. Spec/display attrs pass through. */
+const RAW_STRIPPED_ATTR_KEYS = new Set(["pwp", "free_gift", "free_item"]);
+
+function sanitizeRawLineAttrs(
+  attrs: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!attrs) return null;
+  const entries = Object.entries(attrs).filter(([k]) => !RAW_STRIPPED_ATTR_KEYS.has(k));
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
 
 ordersRouter.post("/raw", async (c) => {
   const auth = c.var.auth;
@@ -889,43 +906,72 @@ ordersRouter.post("/raw", async (c) => {
   }
   const input = parsed.data;
 
+  // Client delivery addons are server-exclusive on the POS door — same rule
+  // here, even though the raw door never appends its own (no engine runs).
+  const RAW_DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+  const addons = input.addons.filter((a) => !RAW_DELIVERY_ADDON_KEYS.has(a.addonKey));
+
   // deposit_pct only feeds the RPC's order_history line — derive it so the
-  // timeline text matches what the operator saw.
-  const total = input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  // timeline text matches what the operator saw. Addons count toward the total
+  // (same base the POS submit uses).
+  const total =
+    input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0) +
+    addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const depositPct =
     total > 0 ? Math.min(100, Math.max(0, Math.round((input.paid / total) * 100))) : 0;
 
+  // POS-parity fields, raw semantics: everything optional; absent → the same
+  // nulls this door always sent, so a minimal body stays byte-identical.
+  const addressUnknown = input.customer.addressUnknown ?? !input.customer.address;
+  const billingSame = input.customer.billingSame ?? true;
   const payload: Record<string, unknown> = {
     dealer_id: input.dealerId,
     outlet_id: input.outletId ?? null,
     salesperson_id: input.salespersonId ?? null,
     customer_name: input.customer.name,
     customer_phone: input.customer.phone ?? null,
-    customer_address: input.customer.address ?? null,
-    customer_address_unknown: !input.customer.address,
-    customer_billing: null,
-    customer_billing_same: true,
-    customer_emergency: null,
+    customer_address: addressUnknown ? null : input.customer.address ?? null,
+    customer_address_unknown: addressUnknown,
+    customer_billing: billingSame ? null : input.customer.billing ?? null,
+    customer_billing_same: billingSame,
+    customer_emergency: input.customer.emergency || null,
+    customer_email: input.customer.email || null,
+    customer_race: input.customer.race || null,
+    customer_gender: input.customer.gender || null,
+    customer_birthday: input.customer.birthday || null,
     delivery_date: input.deliveryDate ?? null,
-    proceed_date: null,
+    // proceed date pairs with the delivery date (create_order's rule) — a
+    // date-less order stays fully TBD.
+    proceed_date: input.deliveryDate ? input.proceedDate ?? null : null,
     delivery_date_tbd: !input.deliveryDate,
-    delivery_floor: 1,
-    delivery_has_lift: false,
-    delivery_stair_items: null,
+    delivery_floor: input.deliveryFloor ?? 1,
+    delivery_has_lift: input.deliveryHasLift ?? false,
+    delivery_stair_items: input.deliveryStairItems ?? null,
     paid: input.paid,
-    signature_url: null,
-    payment_slip_url: null,
-    terms_accepted: false,
-    payment_method: null,
-    approval_code: null,
-    installment_months: null,
+    signature_url: input.signaturePath ?? null,
+    payment_slip_url: input.paymentSlipPath ?? null,
+    terms_accepted: input.termsAccepted ?? false,
+    payment_method: input.paymentMethod ?? null,
+    approval_code: input.approvalCode || null,
+    // Cross-field rule mirrored from create_order (22023 otherwise): months
+    // only ride an installment method.
+    installment_months:
+      input.paymentMethod === "installment" ? input.installmentMonths ?? null : null,
+    // 0219 extras — OMIT the key entirely when absent (jsonb 'null' is NOT SQL
+    // NULL; it would trip create_order's entry_data object guard).
+    ...(input.entryData != null ? { entry_data: input.entryData } : {}),
     lines: input.lines.map((l) => ({
       sku: l.sku,
       qty: l.qty,
-      attrs: null,
+      attrs: sanitizeRawLineAttrs(l.attrs),
       unit_price: l.unitPrice,
     })),
-    addons: [],
+    addons: addons.map((a) => ({
+      addon_key: a.addonKey,
+      qty: a.qty,
+      unit_price: a.unitPrice,
+      attrs: a.attrs ?? null,
+    })),
     deposit_pct: depositPct,
   };
 
