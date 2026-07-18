@@ -87,12 +87,16 @@ Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reser
 Generate invoice=左表+右实时预览+输出 PDF/Email/WhatsApp(点了才出)。收据 v-next 加 OCR 自动填。
 数据:Total=货款+storage;Collected=付款和;Outstanding=Total−Collected;dial Unpaid/Deposit/Overdue/Paid。
 
-## 11. Storage(费率 LOCKED)
+## 11. Storage(费率 LOCKED;tab 定稿 rev21 2026-07-18)
 费必须有 START+END,只算 START→END。START=deadline 之后下一个同星期几(周一1/1→START周一8/1);END=实际送出/收货。
 费率:Mattress+Bedframe RM150/月;Sofa 免14天后 RM200。(RM5/day、RM14.30/day 作废。)
 From–End 同一行;费用 roll 进 Balance 当一条 charge line。
+**Tab 定稿(rev21)**:规则说明文字 = ⓘ rates tooltip,不摆卡(零解释文字法);chip "held Nd" 算到 END 停表(storage_to→logistic_eta→today),不永远数到今天;waiver+extension 收进 "› Waiver & extension" 折叠(有在用时自动展开);输入主面 = Storage?·From–End·Charge·Paid? 四件。切单时 tab 不存在(无 MS/BF/SOF)→ 自动落回 Items,不留白纸。
 
-## 12. Delivery/物流(LOCKED — 调货引擎另开专门 chat)
+## 12. Delivery/物流(LOCKED — 调货引擎另开专门 chat;tab 定稿 rev21 2026-07-18)
+**Delivery tab chip 真相阶梯(1A,Jess)**:Delivered ✓绿 › on hold红(balance/storage hold 第一次上 Delivery 面)› overdue红(过 deadline 未送)› booked <date>绿(logistic_eta)› not booked琥珀(有 carrier 没约,93% 常态,不准报忧)› no carrier灰。已送达永不告警(guardrail #2:chip+chase 行都闭嘴)。
+**保存模型(2A)**:Delivery tab 全字段改了就存(sparse save + Saved toast),像 Excel cell;顶部 Save bar 与本 tab 无关。Time slot 字段撤下(0/162 死田,数据模型保留)。
+**Multi-leg(3A)**:入口收进 ⋮ "Multi-leg route…";有 delivery_stops 时区块自动显示;DeliveryChain 组件重刷等调货引擎 chat。
 Sites:Carres 仓(Aman Perdana Klang,default 收货)·NETS(仓+物流,~97%,来 Klang 收再送)·AL(Sungai Buloh)·HOUZS(Balakong)·NF(Nice Future 床垫供应商)。
 地区:Klang Valley 首选 NETS 备 HOUZS/AL;外坡/东海岸 首选 AL 备 HOUZS。
 AL 不来 Klang:货在 Klang→Carres 直送 AL 一趟(不经 HOUZS);货在 HOUZS→AL 去 HOUZS 收;货在供应商→供应商直送 AL(最省)。避免让 AL 的货进 Klang。
@@ -118,5 +122,5 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
 ## Build order
-1. 详情页(feat/orders-drawer):布局✓·Items §9·KPI §7(Stock1.8+dial)·Balance §10·Delivery/Storage/Loan 待定稿。
+1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·Loan 剩样式还债已清(功能照旧)。
 2. 1B:⋮真动作·wa.me直发+存号·OCR收据·last_chased_at。 3. List §14。 4. Bulk bar。 5. AL 调货引擎(专门 chat)。
