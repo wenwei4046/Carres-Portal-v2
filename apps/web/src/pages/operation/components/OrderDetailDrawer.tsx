@@ -107,11 +107,7 @@ import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import {
-  RouteJourneyBar,
-  StopsEditor,
-  stopsToDisplay,
-} from "./RouteJourneyBar";
+import { StopsEditor } from "./RouteJourneyBar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -1519,7 +1515,6 @@ function DrawerBody({
   const [tab, setTab] = useState<DrawerTab>("items");
   // Item-listing groups (Jess 2026-07-18): Ready collapsible; category groups
   // remember manual toggles (default: all-reserved groups start collapsed).
-  const [readyCollapsed, setReadyCollapsed] = useState(false);
   const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
   // Vertical tab rail (Jess 2026-07-17 rev 5) — collapsible to icon-only.
   const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
@@ -2103,16 +2098,19 @@ function DrawerBody({
               /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
                  needs stock", from the SAME shared lineReadiness the row pills
                  use — ready = reserved-to-this-SO only (strict). */
+              /* rev17 copy — never lead with a zero: all ready → "All
+                 ready ✓" · none ready → "N needs stock" · mixed → both. */
               goodsLines.length === 0 ? (
                 <MiniBadge tone="muted">no goods</MiniBadge>
+              ) : readyN === goodsLines.length ? (
+                <MiniBadge tone="ready">All ready ✓</MiniBadge>
+              ) : readyN === 0 ? (
+                <MiniBadge tone="waiting">
+                  {goodsLines.length} needs stock
+                </MiniBadge>
               ) : (
-                <MiniBadge
-                  tone={readyN === goodsLines.length ? "ready" : "waiting"}
-                >
-                  {readyN} ready
-                  {goodsLines.length - readyN > 0
-                    ? ` · ${goodsLines.length - readyN} needs stock`
-                    : ""}
+                <MiniBadge tone="waiting">
+                  {readyN} ready · {goodsLines.length - readyN} needs stock
                 </MiniBadge>
               )
             }
@@ -2209,7 +2207,6 @@ function DrawerBody({
                       const locValue = stops[0] ?? "";
                       const etaValue =
                         form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                      const hasSpecialRoute = stops.length > 1;
                       const routeOpen = routeOpenSku === l.sku;
                       // AUTO-derived status (§7.7 — the manual dropdown is gone;
                       // reserving stock is what flips a line green).
@@ -2464,14 +2461,21 @@ function DrawerBody({
                             </td>
                           </tr>
                           {!isService && routeOpen && (
+                            /* rev17 (Jess: option A) — the expander is ONE
+                               horizontal strip, wordless: Stock ETA · Received
+                               n/m [Book in] · route chips (place → place → +).
+                               The chips ARE the journey and the editor — the
+                               old explanation sentence, journey bar and
+                               vertical numbered list said the same route three
+                               ways and stacked 5 rows tall. */
                             <tr className="bg-base-50">
                               <td
                                 colSpan={6}
                                 className="border-b border-base-100 bg-base-50 px-3 py-2"
                               >
-                                <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
                                   {!isAcc && (
-                                    <div className="flex items-center gap-4 flex-wrap">
+                                    <>
                                       <label className="flex items-center gap-1.5 text-[12px] text-base-500">
                                         Stock ETA
                                         <input
@@ -2484,54 +2488,46 @@ function DrawerBody({
                                           className="border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[12px] focus:border-primary focus:outline-none"
                                         />
                                       </label>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setReceiveLine({
-                                            sku: l.sku,
-                                            qty: l.qty,
-                                            received: lineReceivedOf(l.sku),
-                                          });
-                                        }}
-                                        title="Book in received units (GRN)"
-                                        className={`inline-flex items-center gap-1 text-[12px] tabular-nums px-1.5 py-0.5 rounded ${
-                                          lineReceivedOf(l.sku) >= l.qty
-                                            ? /* v4 — complete count is CONTENT: dark, not green. */
-                                              "text-base-900 font-semibold"
-                                            : "text-base-700 hover:text-base-900 hover:bg-base-50"
-                                        }`}
-                                      >
-                                        Received {lineReceivedOf(l.sku)}/{l.qty}
+                                      {/* Received count = quiet FACT; Book in =
+                                          the ACTION beside it (split — the old
+                                          text+icon+text single button read as
+                                          one confusing word-lump). */}
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <span
+                                          className={`text-[12px] tabular-nums ${
+                                            lineReceivedOf(l.sku) >= l.qty
+                                              ? "text-base-900 font-semibold"
+                                              : "text-base-500"
+                                          }`}
+                                        >
+                                          Received {lineReceivedOf(l.sku)}/{l.qty}
+                                        </span>
                                         {lineReceivedOf(l.sku) < l.qty && (
-                                          <>
+                                          <Btn
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setReceiveLine({
+                                                sku: l.sku,
+                                                qty: l.qty,
+                                                received: lineReceivedOf(l.sku),
+                                              });
+                                            }}
+                                            title="Record units that arrived at the warehouse (GRN)"
+                                          >
                                             <PackagePlus size={14} strokeWidth={2} />
                                             Book in
-                                          </>
+                                          </Btn>
                                         )}
-                                      </button>
-                                    </div>
+                                      </span>
+                                    </>
                                   )}
-                                  <div>
-                                    <div className="text-[12px] font-semibold text-base-500 mb-1">
-                                      Route — stop 1 is where the item sits; add
-                                      a stop for a special transfer. Delivery to
-                                      the customer is set in the Delivery panel.
-                                    </div>
-                                    {hasSpecialRoute && (
-                                      <div className="max-w-[280px] mb-1">
-                                        <RouteJourneyBar
-                                          legs={stopsToDisplay(stops)}
-                                        />
-                                      </div>
-                                    )}
-                                    <StopsEditor
-                                      stops={savedLoc ?? (locValue ? [locValue] : [])}
-                                      onChange={(s) =>
-                                        form.setLineLocation(l.sku, s)
-                                      }
-                                    />
-                                  </div>
+                                  <StopsEditor
+                                    stops={savedLoc ?? (locValue ? [locValue] : [])}
+                                    onChange={(s) =>
+                                      form.setLineLocation(l.sku, s)
+                                    }
+                                  />
                                 </div>
                               </td>
                             </tr>
@@ -2582,37 +2578,13 @@ function DrawerBody({
                         </td>
                       </tr>
                     );
+                    // rev17 (Jess) — a SMALL order (≤5 lines) reads FLAT: no
+                    // "Needs action 1" band over a single row (the counters
+                    // said one thing three times); the row's own Status pill
+                    // IS the message, Chase-Now style. Groups are for BIG
+                    // orders only.
                     if (orderedLines.length <= 5) {
-                      const needs = orderedLines.filter(needsLine);
-                      const needSet = new Set(needs.map((l) => l.sku));
-                      const rest = orderedLines.filter((l) => !needSet.has(l.sku));
-                      if (needs.length === 0)
-                        return orderedLines.map(renderRow);
-                      return (
-                        <>
-                          {groupHeader(
-                            "needs",
-                            "Needs action",
-                            null,
-                            needs.length,
-                            needs.length,
-                            true,
-                            () => {},
-                          )}
-                          {needs.map(renderRow)}
-                          {rest.length > 0 &&
-                            groupHeader(
-                              "ready",
-                              "Ready",
-                              null,
-                              rest.length,
-                              0,
-                              !readyCollapsed,
-                              () => setReadyCollapsed((v) => !v),
-                            )}
-                          {!readyCollapsed && rest.map(renderRow)}
-                        </>
-                      );
+                      return orderedLines.map(renderRow);
                     }
                     const CATS: {
                       key: "mattress" | "bedframe" | "sofa" | "acc";

@@ -62,6 +62,7 @@ Dial 一律贴 KPI headline 值旁,不放在阶段行上。
 
 ## 9. Items ordered tab(⭐ 2026-07-18 rev16 — 回到 v3 六列瘦身,Jess 拍板 A)
 **六列 table-fixed(alert-first,MacBook 一屏看全,~840px):STATUS(pill 打头:Reserved绿/Need N琥珀/On PO灰/Delayed红,与dial同词)·STOCK ETA(晚于deadline/无ETA→红alert)·ITEM(chevron+thumb42+名粗,副行=size · SKU mono 小字——独立 SKU 列已并入)·QTY(纯数字)·PO(In stock/PO####)·ACTION(必做动作直显如 Reserve + Manage▾:Reserve/Loan/Change route…)。** LOCATION 独立列删除——位置住在 chevron 展开的 route 行里。面板保留 DELIVERY 式横带(标题+收合+readiness pill+⋮,rev15c);列头行白底无灰 base;表格无内部限高,整栏滚动。(8 列宽版〔+SKU/SOURCE/LOCATION 独立列〕是 2026-07-18 office 大屏版,MacBook 装不下,作废。)
+**展开行(rev17,Jess A)= 一条横向 strip,零解释文字**:`Stock ETA [date] · Received n/m [Book in] · route chips`。route chips **本身就是编辑器**(地点 icon+select 装在 pill 里,chip 间 → 箭头,多站才出 🗑,圆形 + 加站)——旧版的说明句+journey bar+竖排编号列表(同一条路线画三次、叠 5 层)作废。Received=灰事实,Book in=旁边独立按钮(GRN)。**小单(≤5 行)平铺无组头**(行的 Status pill 就是 message,Chase-Now 式);>5 行才按 category 分组。readiness pill 文案:全齐 "All ready ✓"·全无 "N needs stock"·混合 "x ready · y needs stock"(绝不以 0 开头)。
 Route 平时藏,chevron 展开一行:site→carrier→customer,单件特殊挂 special·direct 可编辑。
 件多→按 category 分组(组图标+计数+"N need stock",needs-action 行蓝底,全 reserved 组自动收起);件少≤5 扁平。
 Reserve 行内→warehouse picker 筛同 model+size→配好翻1/1+toast。Reserved 行 STATUS 绿,Action=—(绿勾不放 Action 列)。
