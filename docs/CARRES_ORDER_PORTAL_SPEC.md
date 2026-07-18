@@ -153,6 +153,8 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 
 **Chase logistic SOP 定案(2026-07-19,Jess)**:各 PIC 追自己的单 = 正式做法,**不依赖 NETS portal**(portal 可能延期/NETS 可能不用——来了算 bonus)。NETS 群纪律:一条信息 = 一张单、**REF 开头**(§13 模板本来就 REF 打头)、谁发谁跟进、**没有 REF 的问话不准发**;NETS 逐条回。公平性 = 单已按人头摊平,各追各名下。此条进周三 brief 一页纸。
 
+**Team 面板 B3-final + 行内改班表(2026-07-19,Jess 逐轮拍板)**:panel = ①hero「WHO · on PO duty · **until 31 Jul 26**」(PagerDuty 式——写到几时不写月份名;头像绿点=now;动词 chips Order PO·Chase supplier)②两周迷你日历(Mon/Thu 灰底、下一个 PO day 绿格 + "next: Mon 20 Jul 26")③**NEXT UP 一行**(小头像 + Aug — Li Ching · Sep — Khor Yee)④EVERY PIC 一行 chips。全 panel 零句子,解释住 tooltip。**改班表 = A 案行内 ✎**:管理层 hover hero 出铅笔 / 点 NEXT UP 条目 → 名字变 pool 候选下拉 → 选人即存(PUT po-duty,`assigned_by` 盖章)+ toast;员工看不到入口,API 403 双层。已 live 来回验证(Aug↔Shasha↔Li Ching)。数据卫生发现:共享 operation 账号的 app_users.email 还是旧名 logistics@carres.com(0121 rename 漏改)→ audit стamp 显示成 logistics@;已开 spawn-task 修。
+
 ## 16. DEPLOY-GATED(除非我说永不 deploy)
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
