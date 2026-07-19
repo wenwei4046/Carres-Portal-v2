@@ -1156,6 +1156,12 @@ describe("explodeSofaBuildToOrderLines", () => {
     expect(lines[0].attrs).toMatchObject({ x: null, y: null, rot: null });
   });
 
+  it("stamps the build's seat size (sofa_height) on EVERY line — the customer regroup re-prints it", () => {
+    const b = build({ cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(RHF)" }], height: "24" });
+    const lines = explodeSofaBuildToOrderLines(b, 1800, { priceLookup: price, codeToSku: sku });
+    for (const l of lines) expect(l.attrs.sofa_height).toBe("24");
+  });
+
   it("empty cells → empty output", () => {
     expect(
       explodeSofaBuildToOrderLines(build({ cells: [] }), 0, {

@@ -36,7 +36,7 @@ describe("groupSofaBuildLines", () => {
     expect(rows.map((r) => (r.kind === "line" ? r.line.id : ""))).toEqual(["a", "b"]);
   });
 
-  it("collapses lines sharing a sofa_build_key into one sofa row with summed total + summary", () => {
+  it("collapses lines sharing a sofa_build_key into one sofa row with summed total + spec", () => {
     const c1 = line({ sku: "OHANA-2A", unitPrice: 1000, attrs: { sofa_build_key: "bk", module_code: "2A" } });
     const c2 = line({ sku: "OHANA-1A", unitPrice: 600, attrs: { sofa_build_key: "bk", module_code: "1A" } });
     const rows = groupSofaBuildLines([c1, c2]);
@@ -48,7 +48,20 @@ describe("groupSofaBuildLines", () => {
     expect(g.lines).toHaveLength(2);
     expect(g.qty).toBe(1);
     expect(g.totalPrice).toBe(1600);
-    expect(g.summary).toBe("2A + 1A");
+    expect(g.spec).toBe("2A + 1A");
+  });
+
+  it("spec carries the full customer copy (height · fabric · leg) + the total is cent-rounded", () => {
+    const whole = { sofa_height: "24", fabric_name: "CG-011 Peach", leg_height: '4"' };
+    const rows = groupSofaBuildLines([
+      line({ sku: "5539-1B(LHF)", unitPrice: 996.66, attrs: { ...whole, sofa_build_key: "bk", module_code: "1B(LHF)" } }),
+      line({ sku: "5539-CNR", unitPrice: 996.66, attrs: { ...whole, sofa_build_key: "bk", module_code: "CNR" } }),
+      line({ sku: "5539-2A(RHF)", unitPrice: 996.68, attrs: { ...whole, sofa_build_key: "bk", module_code: "2A(RHF)" } }),
+    ]);
+    const g = rows[0];
+    if (g.kind !== "sofa_build") throw new Error("expected group");
+    expect(g.spec).toBe('1B(LHF) + CNR + 2A(RHF) · 24″ · CG-011 Peach · leg 4"');
+    expect(g.totalPrice).toBe(2990);
   });
 
   it("the group lands at its first line's position; standalone lines keep order", () => {
@@ -74,7 +87,7 @@ describe("groupSofaBuildLines", () => {
   it("falls back to the sku when module_code is absent", () => {
     const c1 = line({ sku: "OHANA-2A", attrs: { sofa_build_key: "bk" } });
     const rows = groupSofaBuildLines([c1]);
-    expect(rows[0].kind === "sofa_build" && rows[0].summary).toBe("OHANA-2A");
+    expect(rows[0].kind === "sofa_build" && rows[0].spec).toBe("OHANA-2A");
   });
 
   it("empty input → empty output", () => {

@@ -816,7 +816,10 @@ export interface ExplodeSofaToLinesOpts {
  * Explode a sofa build into per-compartment order lines (Phase 5). Delegates the
  * Σ-exact price split to `explodeSofaBuild` (residue-on-last), then joins each
  * cell to its real sku + stamps `order_lines.attrs`:
- *   `{ ...fabricAttrs, sofa_build_key, cell_index, x, y, rot }`
+ *   `{ ...fabricAttrs, sofa_build_key, cell_index, module_code, sofa_height, x, y, rot }`
+ * (`sofa_height` = the build's seat size, on EVERY line like the fabric — the
+ * customer-facing regroup re-prints "… · 24″ · …" after the explode dropped
+ * the `sofa_build` descriptor.)
  * Structural keys are spread LAST so a stray fabric key can never clobber them.
  * Fabric rides on every line; there are no build-level extras in v1
  * (reclinerExtra is a stub). Pure — no IO; the caller supplies both lookups.
@@ -841,6 +844,7 @@ export function explodeSofaBuildToOrderLines(
         sofa_build_key: line.buildKey,
         cell_index: line.cellIndex,
         module_code: line.moduleCode,
+        sofa_height: build.height,
         x: cell?.x ?? null,
         y: cell?.y ?? null,
         rot: cell?.rot ?? null,

@@ -234,6 +234,15 @@ function attrsDescription(attrs: Record<string, unknown> | null): string | null 
   return bits.length > 0 ? bits.join(" · ") : null;
 }
 
+/** Sofa-build group sub-line (Loo 2026-07-19) — the server regroups a built
+ *  sofa's exploded compartment lines into ONE model row whose `attrs.sofa_spec`
+ *  carries the cart-style copy ("1B(LHF) + CNR + 2A(RHF) · 24″ · CG-011 Peach ·
+ *  leg 4″"). Null for every other line. */
+function sofaSpecLine(attrs: Record<string, unknown> | null): string | null {
+  const spec = attrs?.["sofa_spec"];
+  return typeof spec === "string" && spec.length > 0 ? spec : null;
+}
+
 /** Flame PWP marker for a reward line carrying `attrs.pwp` (P8b/c/d server
  *  canonical marker `{ruleId, type, code?, …}`). Null when the line isn't a
  *  PWP/promo reward. */
@@ -426,6 +435,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         </View>
         {lines.map((line, idx) => {
             const isLast = idx === lines.length - 1 && addons.length === 0;
+            const sofaSub = sofaSpecLine(line.attrs);
             const variantSub = attrsDescription(line.attrs);
             const pwpSub = pwpMarkerLine(line.attrs);
             const freeSub = freeMarkerLine(line.attrs);
@@ -443,6 +453,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={[styles.td, styles.colSku]}>{line.sku}</Text>
                 <View style={[styles.descCell, styles.colDesc]}>
                   <Text style={styles.descMain}>{line.description}</Text>
+                  {sofaSub ? <Text style={styles.descSub}>{sofaSub}</Text> : null}
                   {variantSub ? <Text style={styles.descSub}>{variantSub}</Text> : null}
                   {pwpSub ? <Text style={styles.descSubAccent}>{pwpSub}</Text> : null}
                   {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}

@@ -156,6 +156,57 @@ describe("ThankYou receipt items", () => {
     expect(screen.getByText("FREE")).toBeInTheDocument();
   });
 
+  it("regroups exploded sofa-build lines into ONE model row with the spec copy (Loo 2026-07-19)", () => {
+    const BOOQIT = "55555555-5555-5555-5555-555555555555";
+    const cat = catalog();
+    cat.models.push({
+      id: BOOQIT,
+      category: "sofa",
+      modelKey: "5539",
+      name: "Booqit",
+      blurb: null,
+      colors: null,
+      gaps: null,
+      sofaMode: null,
+      photoUrl: "https://cdn.test/booqit.jpg",
+    } as (typeof cat.models)[number]);
+    for (const code of ["1B(LHF)", "CNR", "2A(RHF)"]) {
+      cat.skus.push({
+        id: `id-${code}`,
+        modelId: BOOQIT,
+        sku: `5539-${code}`,
+        variant: code,
+        variantKind: "size",
+        price: 0,
+        cost: null,
+        supplierId: null,
+        description: null,
+      } as (typeof cat.skus)[number]);
+    }
+    const whole = { sofa_height: "24", fabric_name: "CG-011 Peach", leg_height: '4"' };
+    const { container } = renderThankYou(
+      order({
+        lines: [
+          { id: "c1", orderId: "ord-1", sku: "5539-1B(LHF)", qty: 1, unitPrice: 996.66, attrs: { ...whole, sofa_build_key: "bk", module_code: "1B(LHF)" } },
+          { id: "c2", orderId: "ord-1", sku: "5539-CNR", qty: 1, unitPrice: 996.66, attrs: { ...whole, sofa_build_key: "bk", module_code: "CNR" } },
+          { id: "c3", orderId: "ord-1", sku: "5539-2A(RHF)", qty: 1, unitPrice: 996.68, attrs: { ...whole, sofa_build_key: "bk", module_code: "2A(RHF)" } },
+        ],
+      }),
+      cat,
+    );
+    // ONE item row named after the model, carrying the cart-style spec + build total…
+    const items = container.querySelectorAll(".summary__item");
+    expect(items).toHaveLength(1);
+    const item = items[0] as HTMLElement;
+    expect(item.textContent).toContain("Booqit");
+    expect(item.textContent).toContain('1B(LHF) + CNR + 2A(RHF) · 24″ · CG-011 Peach · leg 4" · qty 1');
+    expect(item.textContent).toContain("2,990");
+    // …and the per-compartment split stays off the customer receipt.
+    expect(screen.queryByText(/996\.6/)).not.toBeInTheDocument();
+    // The hero counts the sofa as ONE piece.
+    expect(screen.getByText(/Your 1 piece will arrive/)).toBeInTheDocument();
+  });
+
   it("shows the human add-on name off the catalog (raw key as fallback)", () => {
     renderThankYou(
       order({

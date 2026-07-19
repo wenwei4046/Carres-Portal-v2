@@ -700,7 +700,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                       </div>
                       <div className="os-item__body">
                         <div className="os-item__name">{model?.name ?? "Sofa"}</div>
-                        <div className="os-item__detail">{row.summary}</div>
+                        <div className="os-item__detail">{row.spec}</div>
                       </div>
                       <div className="os-item__qty">×{row.qty}</div>
                       <div className="os-item__price">
