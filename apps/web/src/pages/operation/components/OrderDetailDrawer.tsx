@@ -28,6 +28,7 @@ import {
   MoreVertical,
   Package,
   PackagePlus,
+  Wrench,
   Paperclip,
   Pencil,
   Phone,
@@ -711,8 +712,21 @@ function MiniBadge({
 
 /** 42px listing-thumb fallback — the line's CATEGORY icon (no product photos
  *  in the order payload yet; when photoUrl lands, render it here instead). */
-function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
-  const I = cat === "mattress" ? BedDouble : cat === "bedframe" ? Bed : cat === "sofa" ? Sofa : Package;
+function CatIcon({
+  cat,
+}: {
+  cat: "mattress" | "bedframe" | "sofa" | "acc" | "service";
+}) {
+  const I =
+    cat === "mattress"
+      ? BedDouble
+      : cat === "bedframe"
+        ? Bed
+        : cat === "sofa"
+          ? Sofa
+          : cat === "service"
+            ? Wrench
+            : Package;
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
 }
 
@@ -2002,7 +2016,7 @@ function DrawerBody({
     },
     {
       panel: "Items",
-      title: "Ready stock",
+      title: "Stock ready",
       tab: "items",
       state:
         deliveredDone || (goodsN > 0 && readyN >= goodsN)
@@ -2935,26 +2949,32 @@ function DrawerBody({
                         </td>
                       </tr>
                     );
-                    // rev17 (Jess) — a SMALL order (≤5 lines) reads FLAT: no
-                    // "Needs action 1" band over a single row (the counters
-                    // said one thing three times); the row's own Status pill
-                    // IS the message, Chase-Now style. Groups are for BIG
-                    // orders only.
-                    if (orderedLines.length <= 5) {
+                    // Items ALWAYS split by category (Jess 2026-07-19, supersedes
+                    // the rev17 "≤5 reads flat" call): every category present gets
+                    // its own header + rows — Mattress · Bedframe · Sofa ·
+                    // Accessory · Service. A single-line order stays flat.
+                    if (orderedLines.length <= 1) {
                       return orderedLines.map(renderRow);
                     }
+                    // Service lines fall to "acc" under lineCategory — split them
+                    // into their OWN group so Accessory ≠ Service.
+                    const groupCatOf = (
+                      sku: string,
+                    ): "mattress" | "bedframe" | "sofa" | "acc" | "service" =>
+                      lineKind(sku) === "service" ? "service" : lineCategory(sku);
                     const CATS: {
-                      key: "mattress" | "bedframe" | "sofa" | "acc";
+                      key: "mattress" | "bedframe" | "sofa" | "acc" | "service";
                       label: string;
                     }[] = [
                       { key: "mattress", label: "Mattress" },
                       { key: "bedframe", label: "Bedframe" },
                       { key: "sofa", label: "Sofa" },
                       { key: "acc", label: "Accessory" },
+                      { key: "service", label: "Service" },
                     ];
                     return CATS.map(({ key, label }) => {
                       const rows = orderedLines.filter(
-                        (l) => lineCategory(l.sku) === key,
+                        (l) => groupCatOf(l.sku) === key,
                       );
                       if (rows.length === 0) return null;
                       const needN = rows.filter(needsLine).length;
