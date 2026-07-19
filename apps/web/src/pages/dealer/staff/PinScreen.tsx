@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { StaffDto } from "@carres/shared";
+import CarresLockup from "@/components/CarresLockup";
 import { ApiError } from "@/lib/api";
 import { useVerifyPin } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
 import PinPad from "../pos/PinPad";
-import { staffColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
+import { staffGateColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
 
 /**
  * PinScreen (0233) — the tap-your-name + 6-digit PIN sign-in for an activated
@@ -71,8 +72,11 @@ export default function PinScreen({
   }
 
   return (
-    <div className="staff-gate" data-testid="staff-pin-screen">
+    <div className="pos-proto staff-gate" data-testid="staff-pin-screen">
       <div className="staff-gate__card">
+        <div className="staff-gate__lockup">
+          <CarresLockup size={24} />
+        </div>
         <div className="staff-gate__eyebrow">{outletLabel || "Sign in"}</div>
         <h2 className="staff-gate__title">Tap your name</h2>
         <p className="staff-gate__sub">
@@ -96,7 +100,7 @@ export default function PinScreen({
               >
                 <span
                   className="staff-tile__avatar"
-                  style={{ background: staffColorHex(s.color) }}
+                  style={{ background: staffGateColorHex(s.color) }}
                 >
                   {staffInitials(s.name)}
                 </span>
@@ -188,14 +192,14 @@ function StaffKeypad({
   }
 
   return (
-    <div className="staff-gate" data-testid="staff-pin-keypad">
+    <div className="pos-proto staff-gate" data-testid="staff-pin-keypad">
       <div className="staff-gate__card staff-gate__card--narrow">
         <button className="icon-btn pin-gate__close" onClick={onBack} aria-label="Back" data-testid="staff-pin-back">
           <X size={16} strokeWidth={1.75} />
         </button>
         <span
-          className="staff-tile__avatar"
-          style={{ background: staffColorHex(staff.color), width: 56, height: 56, margin: "0 auto 14px" }}
+          className="staff-tile__avatar staff-gate__bigav"
+          style={{ background: staffGateColorHex(staff.color) }}
         >
           {staffInitials(staff.name)}
         </span>
