@@ -473,15 +473,6 @@ function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (diff <= 7) return "Upcoming";
   return "Later";
 }
-/** DEADLINE facet display labels (Jess 2026-07-19): the DueBucket *value* stays
- *  the filter key; only the rail label is spelled out for clarity. */
-const DUE_LABEL: Record<DueBucket, string> = {
-  Overdue: "Overdue",
-  Urgent: "Due ≤1 day",
-  Attention: "Due 2-3 days",
-  Upcoming: "Due ≤1 week",
-  Later: "Later",
-};
 
 // (Follow-up + Escalate-to-Jess now live in ops_tasks, keyed per order — see
 //  openTaskOf / taskUrgency above + the tasksByOrder map in the component.)
@@ -2562,27 +2553,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 collapsed={collapsedGroups.has("FILTERS")}
                 onToggle={() => toggleGroup("FILTERS")}
               >
-                {/* DEADLINE — the urgency ladder as a proper filter (Jess
-                    2026-07-19). Surfaces the existing dueFilter; kept expanded
-                    (most-used). "Later" is omitted — the tail isn't a queue. */}
-                <KanbanGroup
-                  title="DEADLINE"
-                  testid="filter-deadline"
-                  collapsed={collapsedGroups.has("DEADLINE")}
-                  onToggle={() => toggleGroup("DEADLINE")}
-                >
-                  {dueEntries
-                    .filter((e) => e.bucket !== "Later" && e.count > 0)
-                    .map((e) => (
-                      <KanbanRow
-                        key={e.bucket}
-                        label={DUE_LABEL[e.bucket]}
-                        count={e.count}
-                        active={dueFilter === e.bucket}
-                        onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
-                      />
-                    ))}
-                </KanbanGroup>
+                {/* Generic DEADLINE section REMOVED (Jess 2026-07-19: "6 is
+                    of who?") — an unlabelled deadline read as ambiguous. Deadline
+                    urgency now lives ONLY under its owner: SUPPLIER (stock-arrival
+                    deadline) and LOGISTIC (customer delivery deadline). */}
                 <KanbanGroup
                   title="LOGISTIC"
                   testid="filter-logistic"
