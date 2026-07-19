@@ -206,7 +206,7 @@ export default function RaisePoReview({
                 ? `${plan.coveredUnits} unit${plan.coveredUnits === 1 ? "" : "s"} covered by stock`
                 : null,
               plan.alreadyOnPo > 0
-                ? `${plan.alreadyOnPo} line${plan.alreadyOnPo === 1 ? "" : "s"} already on a PO`
+                ? `${plan.alreadyOnPo} line${plan.alreadyOnPo === 1 ? "" : "s"} already have a PO — chase the supplier instead`
                 : null,
               plan.nonCore > 0
                 ? `${plan.nonCore} accessory/service line${plan.nonCore === 1 ? "" : "s"} skipped`
@@ -219,8 +219,9 @@ export default function RaisePoReview({
 
         {plan.cards.length === 0 && plan.unresolved.length === 0 && (
           <div className="px-5 py-8 text-[13px] text-base-500">
-            Nothing to order — every selected line is covered by stock or an
-            existing PO.
+            Nothing to order — every selected line is covered by stock or
+            already has a PO. To push the factory on stock that's already
+            ordered, use <span className="font-medium text-base-700">Chase supplier</span> instead.
           </div>
         )}
 

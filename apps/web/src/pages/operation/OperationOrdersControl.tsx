@@ -1846,11 +1846,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const poDutyTitleChips = poDutyHolderShown ? (
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
       <span
-        className="inline-flex items-center gap-1.5 rounded-full border border-base-200 bg-white px-2 py-0.5 text-[11px] text-base-500 whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-[11px] text-base-500 whitespace-nowrap"
         title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls Order PO + Chase supplier (the one voice to suppliers). Full roster: right rail → Team.`}
       >
         <span
-          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+          className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none shrink-0"
           style={{
             background: avatarColor(poDutyHolderShown.userId).bg,
             color: avatarColor(poDutyHolderShown.userId).fg,
@@ -1862,7 +1862,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </span>
       {poHot && (
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${
+          className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-[11px] font-semibold whitespace-nowrap ${
             urgentPoCount > 0 && !(poDayPreview || isPoDayMYT())
               ? "bg-destructive/10 text-destructive"
               : "bg-warning-soft text-warning"
@@ -1886,7 +1886,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
             )
           }
-          className="btn-secondary text-[11px] py-0.5 px-2 whitespace-nowrap"
+          className="btn-secondary text-[11px] h-[26px] py-0 px-2 whitespace-nowrap inline-flex items-center"
         >
           Raise PO
         </button>
