@@ -7,6 +7,7 @@ import { useStaffSession } from "@/lib/staff";
 import {
   AddStaffModal,
   allowedCreateTiers,
+  EditStaffModal,
   SetPinModal,
   StaffAvatar,
   TierBadge,
@@ -110,6 +111,7 @@ function StaffRow({
   callerTier: StaffTierDto;
 }) {
   const [showPin, setShowPin] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const patch = usePatchStaff();
 
   // A manager may only touch salespersons; a principal may touch anyone.
@@ -141,13 +143,22 @@ function StaffRow({
             <TierBadge tier={staff.staffRole} />
           </div>
           <div className="text-[12px] text-muted-foreground">
-            {outletName} · {staff.hasPin ? "PIN set" : "No PIN"}
+            {outletName}
+            {staff.email ? ` · ${staff.email}` : ""} · {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
         </div>
       </div>
       {canEdit && (
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowEdit(true)}
+            data-testid={`staff-edit-${staff.id}`}
+            className="text-[12px] font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1"
+          >
+            Edit
+          </button>
           <button
             type="button"
             onClick={() => setShowPin(true)}
@@ -168,6 +179,7 @@ function StaffRow({
         </div>
       )}
       {showPin && <SetPinModal staff={staff} onClose={() => setShowPin(false)} />}
+      {showEdit && <EditStaffModal staff={staff} onClose={() => setShowEdit(false)} />}
     </li>
   );
 }

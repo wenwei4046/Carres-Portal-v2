@@ -9,7 +9,7 @@ import {
   type StaffTierDto,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useCreateStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
+import { useCreateStaff, usePatchStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
 
 /**
  * Shared staff-admin UI (0233) — the tier labels, colour avatar, STAFF_COLORS
@@ -668,6 +668,153 @@ export function AddStaffModal({
       {create.isError && (
         <div className="text-[12px] text-destructive">
           {create.error?.message ?? "Could not add staff"}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+/**
+ * Edit an existing member's profile (Loo 2026-07-19) — name / email /
+ * birthday / gender / phone / avatar colour. PIN rotation stays on the row's
+ * Set/Reset PIN action; role and outlet moves stay out of scope (server keeps
+ * them principal-only). Same field requirements as Add so older rows get
+ * their missing profile data filled when first edited.
+ */
+export function EditStaffModal({
+  staff,
+  onClose,
+}: {
+  staff: StaffDto;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(staff.name);
+  const [email, setEmail] = useState(staff.email ?? "");
+  const [birthday, setBirthday] = useState(staff.birthday ?? "");
+  const [gender, setGender] = useState<StaffGenderDto | "">(staff.gender ?? "");
+  const [phone, setPhone] = useState(staff.phone ?? "");
+  const [color, setColor] = useState<StaffColorKey>(
+    (staff.color as StaffColorKey | null) ?? "flame",
+  );
+  const patch = usePatchStaff();
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const valid = name.trim().length >= 2 && emailOk && birthday.length > 0 && gender !== "";
+
+  function submit() {
+    // `valid` already requires a gender pick — TS narrows it to male|female here.
+    if (!valid || patch.isPending) return;
+    patch.mutate(
+      {
+        id: staff.id,
+        patch: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          birthday,
+          gender,
+          phone: phone.trim() ? phone.trim() : null,
+          color,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Updated ${name.trim()}`);
+          onClose();
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not update staff"),
+      },
+    );
+  }
+
+  return (
+    <ModalShell
+      title="Edit staff"
+      subtitle={`${staff.name} — update their profile. PIN changes use the Set/Reset PIN action instead.`}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={patch.isPending} className={btnGhost}>
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!valid || patch.isPending}
+            className={btnSolid}
+            data-testid="staff-edit-save"
+          >
+            {patch.isPending ? "Saving…" : "Save changes"}
+          </button>
+        </>
+      }
+    >
+      <label className="flex flex-col gap-1.5">
+        <Label>Full name</Label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          data-testid="staff-edit-name"
+          autoFocus
+          className={inputCls}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Email</Label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          data-testid="staff-edit-email"
+          className={inputCls}
+          placeholder="name@store.com"
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <Label>Birthday</Label>
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => setBirthday(e.target.value)}
+            data-testid="staff-edit-birthday"
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <Label>Gender</Label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as StaffGenderDto | "")}
+            data-testid="staff-edit-gender"
+            className={inputCls}
+          >
+            <option value="">— select —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Phone (optional)</Label>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          data-testid="staff-edit-phone"
+          className={inputCls}
+          placeholder="012-3456789"
+        />
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Avatar colour</Label>
+        <ColorDotPicker value={color} onChange={setColor} />
+      </div>
+
+      {patch.isError && (
+        <div className="text-[12px] text-destructive">
+          {patch.error?.message ?? "Could not update staff"}
         </div>
       )}
     </ModalShell>

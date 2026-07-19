@@ -17,10 +17,12 @@ const ROSTER: StaffDto[] = [
   staff({ id: "sp2", name: "SP In O2", outletId: "o2" }),
 ];
 
+const patchMutate = vi.fn();
+
 vi.mock("@/lib/queries", () => ({
   useOutlets: () => ({ data: { outlets: [{ id: "o1", dealerId: "d1", name: "O1", address: "1 Jln" }, { id: "o2", dealerId: "d1", name: "O2", address: "2 Jln" }] }, isPending: false, error: null }),
   useStaffList: () => ({ data: { staff: ROSTER, activated: true, selfStaffId: null, storeKind: "dealer" }, isPending: false, error: null }),
-  usePatchStaff: () => ({ mutate: vi.fn(), isPending: false }),
+  usePatchStaff: () => ({ mutate: patchMutate, isPending: false, isError: false, error: null }),
   useCreateOutlet: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useCreateStaff: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   useSetStaffPin: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
@@ -36,7 +38,10 @@ function asTier(tier: StaffTierDto, outletId: string | null) {
   useStaffSession.getState().setSession("t", { sid: "me", tier, name: "Me", color: "flame", outletId }, "d1");
 }
 
-beforeEach(() => useStaffSession.getState().reset());
+beforeEach(() => {
+  useStaffSession.getState().reset();
+  patchMutate.mockClear();
+});
 afterEach(cleanup);
 
 describe("StaffManagePage — in-POS staff management overlay", () => {
@@ -80,5 +85,33 @@ describe("StaffManagePage — in-POS staff management overlay", () => {
     render(<StaffManagePage onClose={() => {}} />);
     expect(screen.queryByTestId("staff-section")).toBeNull();
     expect(screen.queryByTestId("add-outlet")).toBeNull();
+  });
+
+  it("Edit opens a prefilled profile form and PATCHes the row", () => {
+    asTier("principal", null);
+    render(<StaffManagePage onClose={() => {}} />);
+    fireEvent.click(screen.getByTestId("staff-edit-sp1"));
+    // Name prefilled from the row.
+    expect((screen.getByTestId("staff-edit-name") as HTMLInputElement).value).toBe("SP In O1");
+    // Profile fields are required before save enables.
+    expect((screen.getByTestId("staff-edit-save") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("staff-edit-email"), { target: { value: "SP1@Store.com" } });
+    fireEvent.change(screen.getByTestId("staff-edit-birthday"), { target: { value: "1990-01-02" } });
+    fireEvent.change(screen.getByTestId("staff-edit-gender"), { target: { value: "female" } });
+    fireEvent.click(screen.getByTestId("staff-edit-save"));
+    expect(patchMutate).toHaveBeenCalledWith(
+      {
+        id: "sp1",
+        patch: {
+          name: "SP In O1",
+          email: "sp1@store.com",
+          birthday: "1990-01-02",
+          gender: "female",
+          phone: null,
+          color: "flame",
+        },
+      },
+      expect.anything(),
+    );
   });
 });

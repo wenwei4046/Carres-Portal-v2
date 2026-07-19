@@ -482,6 +482,7 @@ staffRouter.patch("/:id", async (c) => {
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.color !== undefined) update.color = patch.color;
   if (patch.active !== undefined) update.active = patch.active;
+  if (patch.phone !== undefined) update.phone = patch.phone;
   // 0241 profile fields — same edit scope as name/color.
   if (patch.email !== undefined) update.email = patch.email;
   if (patch.birthday !== undefined) update.birthday = patch.birthday;
