@@ -139,6 +139,7 @@ export const updateStaffInputSchema = z
     outletId: z.string().uuid().nullable().optional(),
     color: staffColorSchema.nullable().optional(),
     active: z.boolean().optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
     // 0241 profile fields.
     email: z.string().trim().toLowerCase().email("Enter a valid email").max(200).optional(),
     birthday: staffBirthdaySchema.optional(),
