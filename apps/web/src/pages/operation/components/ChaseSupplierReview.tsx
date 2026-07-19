@@ -22,13 +22,17 @@ import { buildChaseSupplierPlan, type ChaseOrder } from "./chase-supplier-plan";
 export default function ChaseSupplierReview({
   orders,
   onClose,
+  initialMode = "remind",
 }: {
   orders: ChaseOrder[];
   onClose: () => void;
+  /** Which tone the review opens on (Jess 2026-07-19): the SUPPLIER-section
+   *  "Remind" button opens on remind, "Chase" opens on chase. */
+  initialMode?: "remind" | "chase";
 }) {
   const suppliersQ = useOperationSuppliers();
   const catalogQ = useCatalog();
-  const [mode, setMode] = useState<"remind" | "chase">("remind");
+  const [mode, setMode] = useState<"remind" | "chase">(initialMode);
 
   const suppliers = useMemo(() => suppliersQ.data?.suppliers ?? [], [suppliersQ.data]);
   const supplierById = useMemo(() => new Map(suppliers.map((s) => [s.id, s])), [suppliers]);

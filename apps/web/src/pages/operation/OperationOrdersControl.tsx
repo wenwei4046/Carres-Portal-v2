@@ -327,6 +327,30 @@ function daysToDue(o: operationOrderListRow): number | null {
   return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
 
+/** Supplier stock lead (Jess 2026-07-19): the days the supplier needs to have
+ *  the goods in before the customer deadline — sofa 5d, mattress/bedframe 7d.
+ *  5 only when EVERY core line is a sofa; else 7 (also the unknown default). */
+function supplierLeadDays(o: operationOrderListRow): number {
+  const cores = (o.order_lines ?? [])
+    .map((l) => lineCategory(l.sku))
+    .filter((c) => c === "mattress" || c === "bedframe" || c === "sofa");
+  if (cores.length > 0 && cores.every((c) => c === "sofa")) return 5;
+  return 7;
+}
+
+/** The SUPPLIER's stock-arrival deadline bucket = customer deadline − lead. A
+ *  goods-in view (distinct from the customer DEADLINE ladder): overdue = the
+ *  supplier deadline has passed, due3d = within 3 days of it. null = no dated
+ *  deadline (TBD / undated). */
+function supplierDeadlineBucket(o: operationOrderListRow): "overdue" | "due3d" | null {
+  const d = daysToDue(o);
+  if (d === null) return null;
+  const left = d - supplierLeadDays(o);
+  if (left < 0) return "overdue";
+  if (left <= 3) return "due3d";
+  return null;
+}
+
 /** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
 function todayIso(): string {
   const t = new Date();
@@ -1077,6 +1101,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // SUPPLIER facet (Jess 2026-07-19): filter by the order's primary core-line
   // supplier (holds a supplierId; null = no filter).
   const [supplierFilter, setSupplierFilter] = useState<string | null>(null);
+  // SUPPLIER-deadline urgency (Jess 2026-07-19): multi-select the supplier's
+  // stock-arrival deadline buckets (overdue / due≤3d). Empty set = no filter.
+  const [supplierUrgency, setSupplierUrgency] = useState<Set<"overdue" | "due3d">>(new Set());
   // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
   // matches if it hits ANY selected category (OR). Empty set = no filter.
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
@@ -1202,6 +1229,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
   const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
+  // Which tone the Chase-supplier review opens on (Jess 2026-07-19): the
+  // SUPPLIER section's Remind opens remind, Chase opens chase.
+  const [chaseInitialMode, setChaseInitialMode] = useState<"remind" | "chase">("remind");
   // ?poday=1 — MANAGER-ONLY preview of the PO-day surfaces (Jess 2026-07-19:
   // "you can't let me wait the day to see"): forces the banner + duty badge
   // on ANY day, using the real holder when 0236 is live, else the first pool
@@ -1452,11 +1482,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
       .map(([carrier, count]) => ({ carrier, count }));
   }, [liveScope, partnerName, partnersQ.data]);
 
+  // SUPPLIER-deadline urgency counts (Jess 2026-07-19) — the supplier's stock
+  // arrival deadline (customer deadline − lead), over liveScope.
+  const supOverdue = useMemo(
+    () => liveScope.filter((o) => supplierDeadlineBucket(o) === "overdue").length,
+    [liveScope],
+  );
+  const supDue3d = useMemo(
+    () => liveScope.filter((o) => supplierDeadlineBucket(o) === "due3d").length,
+    [liveScope],
+  );
+
   // SUPPLIER facet counts — per primary core-line supplier, over liveScope.
   // Unresolved (no core line / no supplier) rows are skipped. Sorted by name.
+  // When an urgency is selected, only orders in that bucket count, so the
+  // supplier rows reflect the pill selection.
   const supplierEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of liveScope) {
+      if (supplierUrgency.size > 0) {
+        const b = supplierDeadlineBucket(o);
+        if (!b || !supplierUrgency.has(b)) continue;
+      }
       const sid = primarySupplierId(o, skuMeta, suppliers);
       if (!sid) continue;
       m.set(sid, (m.get(sid) ?? 0) + 1);
@@ -1464,7 +1511,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return [...m.entries()]
       .map(([id, count]) => ({ id, name: supplierNameById.get(id) ?? id, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [liveScope, skuMeta, suppliers, supplierNameById]);
+  }, [liveScope, skuMeta, suppliers, supplierNameById, supplierUrgency]);
 
   const categoryEntries = useMemo(
     () =>
@@ -1589,6 +1636,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       !!stockFilter ||
       !!logisticFilter ||
       !!supplierFilter ||
+      supplierUrgency.size > 0 ||
       !!staffFilter ||
       categoryFilter.size > 0;
     if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
@@ -1603,6 +1651,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
     if (supplierFilter)
       r = r.filter((o) => primarySupplierId(o, skuMeta, suppliers) === supplierFilter);
+    if (supplierUrgency.size > 0) {
+      const b = supplierUrgency;
+      r = r.filter((o) => {
+        const bucket = supplierDeadlineBucket(o);
+        return bucket !== null && b.has(bucket);
+      });
+    }
     if (staffFilter)
       r = r.filter((o) =>
         staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
@@ -1614,7 +1669,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
     return [...r].sort(compareBySlack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, supplierUrgency, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1626,7 +1681,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
     () => setRenderCount(ROWS_PER_BATCH),
-    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, supplierFilter, categoryFilter],
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, supplierFilter, supplierUrgency, categoryFilter],
   );
 
   const total = visible.length;
@@ -1901,6 +1956,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     activeChips.push({
       label: `Supplier: ${supplierNameById.get(supplierFilter) ?? supplierFilter}`,
       onClear: () => setSupplierFilter(null),
+    });
+  if (supplierUrgency.size > 0)
+    activeChips.push({
+      label: `Supplier due: ${[...supplierUrgency]
+        .map((b) => (b === "overdue" ? "overdue" : "due ≤3d"))
+        .join(" + ")}`,
+      onClear: () => setSupplierUrgency(new Set()),
     });
   if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
   if (supplierLateOnly)
@@ -2203,7 +2265,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   ? "Raise consolidated POs — one per supplier — for the selection"
                   : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
               }
-              onChaseSupplier={() => setChaseOrders(selectedOrders)}
+              onChaseSupplier={() => {
+                setChaseInitialMode("remind");
+                setChaseOrders(selectedOrders);
+              }}
               onFlag={bulkCreateTasks}
               onExport={exportSelectedCsv}
               onPrint={printSelected}
@@ -2502,24 +2567,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     ))}
                 </KanbanGroup>
                 <KanbanGroup
-                  title="STOCK"
-                  collapsed={collapsedGroups.has("STOCK")}
-                  onToggle={() => toggleGroup("STOCK")}
-                >
-                  {/* "No PO" lives in FIX DATA — not repeated here. */}
-                  {stockEntries
-                    .filter((e) => e.bucket !== "No PO" && e.count > 0)
-                    .map((e) => (
-                      <KanbanRow
-                        key={e.bucket}
-                        label={e.bucket}
-                        count={e.count}
-                        active={stockFilter === e.bucket}
-                        onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-                      />
-                    ))}
-                </KanbanGroup>
-                <KanbanGroup
                   title="LOGISTIC"
                   testid="filter-logistic"
                   collapsed={collapsedGroups.has("LOGISTIC")}
@@ -2544,6 +2591,45 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("SUPPLIER")}
                   onToggle={() => toggleGroup("SUPPLIER")}
                 >
+                  {/* SUPPLIER-deadline urgency (Jess 2026-07-19): the supplier's
+                      stock-arrival deadline = customer deadline − lead (sofa 5d ·
+                      else 7d). Multi-select pills — both can be on. */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1">
+                    <button
+                      type="button"
+                      aria-pressed={supplierUrgency.has("overdue")}
+                      onClick={() =>
+                        setSupplierUrgency((prev) => {
+                          const n = new Set(prev);
+                          if (n.has("overdue")) n.delete("overdue");
+                          else n.add("overdue");
+                          return n;
+                        })
+                      }
+                      className={`pill pill-overdue ${
+                        supplierUrgency.has("overdue") ? "font-bold ring-1 ring-current" : ""
+                      }`}
+                    >
+                      Overdue {supOverdue}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={supplierUrgency.has("due3d")}
+                      onClick={() =>
+                        setSupplierUrgency((prev) => {
+                          const n = new Set(prev);
+                          if (n.has("due3d")) n.delete("due3d");
+                          else n.add("due3d");
+                          return n;
+                        })
+                      }
+                      className={`pill pill-warning ${
+                        supplierUrgency.has("due3d") ? "font-bold ring-1 ring-current" : ""
+                      }`}
+                    >
+                      Due ≤3d {supDue3d}
+                    </button>
+                  </div>
                   {/* Every supplier with ≥1 order in scope (Jess 2026-07-19).
                       Empty until the catalog loads. */}
                   {supplierEntries.map((e) => (
@@ -2555,6 +2641,46 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       onClick={() => setSupplierFilter((r) => (r === e.id ? null : e.id))}
                     />
                   ))}
+                  {/* One-click chase over the current supplier scope (Jess
+                      2026-07-19): Remind the due-≤3d, Chase the overdue. */}
+                  {supOverdue + supDue3d > 0 && (
+                    <div className="flex items-center gap-2 px-2.5 py-1">
+                      <button
+                        type="button"
+                        className="btn-secondary text-[12px] py-1 px-2 text-warning"
+                        onClick={() => {
+                          setChaseInitialMode("remind");
+                          setChaseOrders(
+                            liveScope.filter(
+                              (o) =>
+                                supplierDeadlineBucket(o) === "due3d" &&
+                                (!supplierFilter ||
+                                  primarySupplierId(o, skuMeta, suppliers) === supplierFilter),
+                            ),
+                          );
+                        }}
+                      >
+                        Remind {supDue3d}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary text-[12px] py-1 px-2 text-danger"
+                        onClick={() => {
+                          setChaseInitialMode("chase");
+                          setChaseOrders(
+                            liveScope.filter(
+                              (o) =>
+                                supplierDeadlineBucket(o) === "overdue" &&
+                                (!supplierFilter ||
+                                  primarySupplierId(o, skuMeta, suppliers) === supplierFilter),
+                            ),
+                          );
+                        }}
+                      >
+                        Chase {supOverdue}
+                      </button>
+                    </div>
+                  )}
                 </KanbanGroup>
                 <KanbanGroup
                   title="REGION"
@@ -2778,6 +2904,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {chaseOrders && (
         <ChaseSupplierReview
           orders={chaseOrders.map(toChaseOrder)}
+          initialMode={chaseInitialMode}
           onClose={() => {
             setChaseOrders(null);
             clearSel();

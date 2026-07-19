@@ -524,7 +524,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Next",
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
-    // stays on that cell; the row always renders its three status dots.
+    // stays on that cell; the Status cell names the pipeline STAGE in words.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
@@ -532,9 +532,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const orderCell = within(row).getByText("SO-3012").closest("td")!;
     expect(orderCell).toHaveAttribute("title", "012-3456789");
     expect(within(row).getByText("TCF2024/06-461").closest("td")).toBe(orderCell);
-    // Option C (round-3): quiet-when-good — the Status cell renders either a
-    // single green ✓ or only the amber/red line icons, never bare dots.
-    expect(within(row).getByTestId("row-dots").children.length).toBeGreaterThan(0);
+    // Status (Jess 2026-07-19): the Status cell shows the STAGE word (same
+    // vocabulary as the tabs). A native placed order reads "Placed" as a pill.
+    const stagePill = within(row).getByText("Placed");
+    expect(stagePill).toBeInTheDocument();
+    expect(stagePill.className).toContain("pill");
   });
 
   it("a delivered order NEVER shows the red over pill (guardrail #2)", () => {

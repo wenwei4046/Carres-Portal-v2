@@ -1,30 +1,44 @@
 # Backlog — design decisions pending
 
-## NETS onboarding gap — must resolve before Jul 30
+## NETS onboarding gap — ✅ RESOLVED 2026-07-19 (works by design)
 
-**Found during the 2026-07-17 NETS RLS audit.** All partner-facing RLS policies
-(orders read, order_lines read, order_history read, POD bucket, and the new
-partner write restrictions from migrations 0227+) scope access via
-`orders.delivery_partner_id = app_partner_id()`. But **as of 2026-07-17, zero
-orders have `delivery_partner_id` set** — day-to-day logistics assignment is
-recorded in the free-text `ops_assigned_logistic` column (5 distinct values in
-use), which RLS knows nothing about.
+**Verdict (Jess, 2026-07-19): NOT a data bug. `delivery_partner_id` being all-NULL
+is CORRECT — no order has yet reached the confirmed/booked state.** Cancelled the
+proposed backfill. The gap was a mis-reading of the business flow, corrected below.
 
-Consequence if unresolved: NETS logs in on go-live and sees **no orders at
-all** — the security model is correct but the assignment data never reaches
-the column it keys on.
+**Business flow (confirmed):** Sales creates order in POS → Portal shows `place`
+(customer ordered, no ETA). Customer confirms to the salesperson → salesperson
+clicks Proceed → operation confirms the proceed request, which places the PO to
+the supplier **and books the logistic partner**. Only at that booking moment does
+`delivery_partner_id` get set. NETS must NOT see `place` orders (unconfirmed) or
+historical delivered imports — only orders it has actually been booked on.
 
-Options (decision needed, NO assignment logic changed yet):
-1. Make the Orders control "assign logistic" action also set
-   `orders.delivery_partner_id` (map the `ops_assigned_logistic` text values →
-   `delivery_partners` rows; NETS already exists as
-   `delivery_partners` "NETS").
-2. One-off backfill for NETS-assigned open orders + change the assignment UI
-   going forward.
-3. Re-key partner RLS on a join through `ops_assigned_logistic` (worst option:
-   free text, no FK, fragile).
+**Correction to the 2026-07-17 audit note:** `ops_assigned_logistic` is NOT
+free-text — it is a `uuid` column with an FK to `delivery_partners.id`
+(`orders_ops_assigned_logistic_fkey`), same as `delivery_partner_id`. It holds the
+Inbox-triage *tentative* pick at `place`; `delivery_partner_id` holds the *formal
+booking* at proceed. The two-column split is intentional, not an accident.
 
-Owner: Jess. Blocking: NETS partner-portal go-live (~Jul 30).
+**Data snapshot (2026-07-19, 184 orders):** `delivery_partner_id` 0 filled;
+`ops_assigned_logistic` 164 filled — NETS 161, AL 1, TEOW 1, TT 1; 0 unmappable,
+0 conflicts. Of NETS's 161: 125 `delivered` (historical), 36 `place` (unconfirmed).
+Both buckets correctly invisible to NETS today.
+
+**End-to-end verification (rolled-back txn, no data changed):** ran the real
+`operation_confirm_proceed_request_v3(order, NETS)` RPC on a test order as an
+operation user, then read the order back through RLS impersonating the NETS partner
+login (`role authenticated`, NETS JWT sub):
+- Before proceed (dpid NULL): NETS sees **0 rows** (RLS correctly hides it).
+- RPC sets `delivery_partner_id` = NETS ✅ and `request_for_delivery_at` ✅, advances
+  `confirmed` → `in_production`.
+- After proceed: NETS sees **1 row** via the RLS-gated read ✅.
+
+**Conclusion:** the write path and partner RLS both work correctly. Blocker closes
+as **"works by design, awaiting real proceed events."** Nothing to build. Once real
+orders are proceeded (booked) after go-live, they will surface in NETS's portal
+automatically. No backfill, no assignment-flow change.
+
+Owner: Jess. Status: closed — no action required for NETS go-live (~Jul 30).
 
 ## NETS RPC workstream — write path for ops_order_control fields
 
