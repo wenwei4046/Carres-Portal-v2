@@ -2215,6 +2215,19 @@ function DrawerBody({
                       },
                     ]
                   : []),
+                // Loaner — a conditional step BEFORE Deliver (Jess 2026-07-19):
+                // when a substitute is out, it lives IN the journey (swapped back
+                // at delivery), not demoted below. Only appears when active.
+                ...(liveLoanCount > 0
+                  ? [
+                      {
+                        title: "Loaner",
+                        tab: "loan" as DrawerTab,
+                        state: "wait" as const,
+                        sub: `${liveLoanCount} out · back at delivery`,
+                      },
+                    ]
+                  : []),
                 {
                   title: "Deliver",
                   tab: "delivery",
