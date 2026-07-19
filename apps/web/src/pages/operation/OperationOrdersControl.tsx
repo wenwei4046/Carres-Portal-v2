@@ -3989,7 +3989,7 @@ function OrderRow({
                 scheduled {fmtDate(logi.date)}
               </div>
             ) : (
-              <div className="t4-caption">Yet Scheduled</div>
+              <div className="t4-caption">Unscheduled</div>
             )}
           </div>
         )}
