@@ -7,7 +7,7 @@ import type { CostSource, OperationStage } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
 import type { DefaultFreeGift } from "./free-gift";
 import type { FreeItemCampaign } from "./free-item-campaign";
-import type { BundleComponent } from "./product-bundle";
+import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
 // Re-exported so UI code can write `import type { CostSource } from
@@ -453,7 +453,11 @@ export interface ProductBundle {
   id: string;
   name: string;
   price: number;
+  /** 0241 — 'fixed' (pinned components) | 'custom' (slots walked at the POS). */
+  kind: "fixed" | "custom";
   components: BundleComponent[];
+  /** 0241 — kind='custom' item slots; [] for kind='fixed'. */
+  slots: BundleSlot[];
   active: boolean;
   sortOrder: number;
 }

@@ -4,7 +4,7 @@
  * `domain.ts` for UI code.
  */
 import type { DefaultFreeGift } from "./free-gift";
-import type { BundleComponent } from "./product-bundle";
+import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
 export type Role =
@@ -505,7 +505,10 @@ export interface ProductBundleRow {
   id: string;
   name: string;
   price: number;
+  // 0241 — bundle kinds; pre-0241 rows read via the adapter defaults.
+  kind?: "fixed" | "custom";
   components: BundleComponent[];
+  slots?: BundleSlot[];
   active: boolean;
   sort_order: number;
   created_at: string;

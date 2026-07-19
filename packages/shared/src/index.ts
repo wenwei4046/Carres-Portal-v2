@@ -258,12 +258,15 @@ export {
   pwpRuleInput,
   type PwpRuleDto,
   type PwpRuleInput,
-  // 0239 — Product bundle (bundle pricing) schemas/inputs/Dtos.
+  // 0239 — Product bundle (bundle pricing) schemas/inputs/Dtos. 0241 adds
+  // kind + slots (customizable bundles).
   bundleComponentSchema,
+  bundleSlotSchema,
   productBundleSchema,
   productBundleInput,
   productBundlePatchInput,
   type BundleComponentDto,
+  type BundleSlotDto,
   type ProductBundleDto,
   type ProductBundleInput,
   type ProductBundlePatchInput,
@@ -866,7 +869,10 @@ export type { PwpRule } from "./domain";
 export {
   explodeBundle,
   parseBundleComponents,
+  parseBundleSlots,
   type BundleComponent,
+  type BundleSlot,
+  type BundleVariantPolicy,
   type ExplodedBundleLine,
   type ExplodeBundleResult,
 } from "./product-bundle";

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BadgePercent, Boxes, Gift, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -1616,7 +1616,17 @@ function BundleRow({
           {!bundle.active && <span className="pill pill-neutral">inactive</span>}
         </div>
         <div className="t-tiny text-base-400 truncate">
-          {summarizeBundleComponents(bundle.components, catalog)}
+          {bundle.kind === "custom"
+            ? bundle.slots
+                .map((s, i) => {
+                  const names = s.modelIds
+                    .map((id) => catalog.models.find((m) => m.id === id)?.name)
+                    .filter(Boolean)
+                    .join(" / ");
+                  return `${s.label ?? names ?? `Item ${i + 1}`}${s.variant === "any" ? " (pick)" : ""}`;
+                })
+                .join(" + ")
+            : summarizeBundleComponents(bundle.components, catalog)}
         </div>
       </div>
       <div className="text-right t-num text-[12px]">{rm(bundle.price)}</div>
@@ -1684,6 +1694,33 @@ function BundleForm({
   // 2990s parity with PWP: a NEW bundle defaults Active (goes live on save).
   const [active, setActive] = useState(bundle?.active ?? true);
   const [price, setPrice] = useState(bundle ? String(bundle.price) : "");
+  // 0241 — bundle kinds. 'fixed' = pinned items (the rows below); 'custom' =
+  // item SLOTS the customer walks through at the POS.
+  const [kind, setKind] = useState<"fixed" | "custom">(bundle?.kind ?? "fixed");
+  interface SlotDraft {
+    label: string;
+    qty: number;
+    modelIds: string[];
+    variant: "any" | "fixed";
+    sku: string;
+  }
+  const [slotRows, setSlotRows] = useState<SlotDraft[]>(() =>
+    bundle && bundle.slots.length > 0
+      ? bundle.slots.map((s) => ({
+          label: s.label ?? "",
+          qty: s.qty,
+          modelIds: s.modelIds,
+          variant: s.variant,
+          sku: s.sku ?? "",
+        }))
+      : [{ label: "", qty: 1, modelIds: [], variant: "any", sku: "" }],
+  );
+  // Modular sofas (offered compartments) price via the server sofa recompute —
+  // incompatible with a fixed bundle split, so they can't join a bundle.
+  const modularModelIds = useMemo(
+    () => new Set((catalog.modelSofaCompartments ?? []).map((mc) => mc.modelId)),
+    [catalog.modelSofaCompartments],
+  );
   const [rows, setRows] = useState<BundleDraftRow[]>(() => {
     if (bundle && bundle.components.length > 0) {
       return bundle.components.map((comp) => ({
@@ -1716,31 +1753,51 @@ function BundleForm({
   const priceNum = Math.round(Number(price) * 100) / 100;
   const priceValid = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
 
-  // A component whose SKU has since been retired / removed from the catalog
-  // would ride the form invisibly (both selects render blank) — surface it and
-  // block Save until it's replaced or removed.
-  const goneSkus = components
-    .map((comp) => comp.sku)
-    .filter((code) => {
-      const s = skuBySku.get(code);
-      return !s || Boolean(s.discontinuedAt);
-    });
+  // A pinned SKU that has since been retired / removed would ride the form
+  // invisibly (selects render blank) — surface it and block Save.
+  const goneSkus = (
+    kind === "fixed"
+      ? components.map((comp) => comp.sku)
+      : slotRows.filter((r) => r.variant === "fixed" && r.sku).map((r) => r.sku)
+  ).filter((code) => {
+    const s = skuBySku.get(code);
+    return !s || Boolean(s.discontinuedAt);
+  });
 
   // 0089 mutex: an order can't hold sofa AND mattress/bed frame, so a bundle
   // spanning both could never be added at the POS — block Save outright.
   const cats = new Set(
-    components
-      .map((comp) => modelById.get(skuBySku.get(comp.sku)?.modelId ?? "")?.category)
+    (kind === "fixed"
+      ? components.map((comp) => skuBySku.get(comp.sku)?.modelId ?? "")
+      : slotRows.flatMap((r) => r.modelIds)
+    )
+      .map((mid) => modelById.get(mid)?.category)
       .filter(Boolean),
   );
   const mutexConflict = cats.has("sofa") && (cats.has("mattress") || cats.has("bedframe"));
 
+  // 0241 — custom-kind slot cleaning + validity.
+  const cleanedSlots = slotRows
+    .filter((r) => r.modelIds.length > 0)
+    .map((r) => ({
+      ...(r.label.trim() ? { label: r.label.trim() } : {}),
+      qty: Math.max(1, Math.floor(r.qty || 1)),
+      modelIds: r.variant === "fixed" ? r.modelIds.slice(0, 1) : r.modelIds,
+      variant: r.variant,
+      ...(r.variant === "fixed" && r.sku ? { sku: r.sku } : {}),
+    }));
+  const slotsValid =
+    slotRows.length >= 1 &&
+    slotRows.every(
+      (r) => r.modelIds.length > 0 && (r.variant === "any" || (r.modelIds.length === 1 && r.sku)),
+    );
+
   const valid =
     name.trim().length >= 2 &&
     priceValid &&
-    components.length >= 2 &&
     !mutexConflict &&
-    goneSkus.length === 0;
+    goneSkus.length === 0 &&
+    (kind === "fixed" ? components.length >= 2 : slotsValid);
 
   // A component that isn't POS-sellable makes the bundle card unavailable at
   // the POS (the explode refuses to guess a price) — say so while authoring.
@@ -1749,14 +1806,19 @@ function BundleForm({
     .filter((s) => s && (s.posActive === false || s.discontinuedAt))
     .map((s) => s!.sku);
 
-  // Live split preview — the SAME pure explodeBundle the POS runs.
-  const preview = priceValid
-    ? explodeBundle(components, priceNum, (sku) => skuBySku.get(sku)?.price ?? null)
-    : null;
+  // Live split preview — the SAME pure explodeBundle the POS runs (fixed only;
+  // a custom bundle's split depends on the customer's picks).
+  const preview =
+    priceValid && kind === "fixed"
+      ? explodeBundle(components, priceNum, (sku) => skuBySku.get(sku)?.price ?? null)
+      : null;
 
   async function submit() {
     if (!valid) return;
-    const body = { name: name.trim(), price: priceNum, components, active };
+    const body =
+      kind === "fixed"
+        ? { name: name.trim(), price: priceNum, kind, components, active }
+        : { name: name.trim(), price: priceNum, kind, slots: cleanedSlots, active };
     try {
       if (bundle) {
         await update.mutateAsync({ id: bundle.id, patch: body });
@@ -1815,6 +1877,193 @@ function BundleForm({
         </label>
       </div>
 
+      {/* 0241 — bundle kind. Fixed = pinned items auto-add (spec popup when
+          needed); Customizable = the customer walks item slots at the POS. */}
+      <div className="flex gap-1.5" data-testid="bundle-kind">
+        {(
+          [
+            ["fixed", "Fixed set — items pinned"],
+            ["custom", "Customizable — customer picks"],
+          ] as const
+        ).map(([v, lbl]) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={kind === v}
+            onClick={() => setKind(v)}
+            className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+              kind === v
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-base-300 bg-white text-base-600 hover:border-base-500"
+            }`}
+            data-testid={`bundle-kind-${v}`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {kind === "custom" && (
+        <div className="flex flex-col gap-3" data-testid="bundle-slots-editor">
+          <span className="label block">
+            Item slots — the customer picks each one in order at the POS
+          </span>
+          {slotRows.map((r, i) => {
+            const pickable = catalog.models.filter(
+              (m) => !m.discontinuedAt && !modularModelIds.has(m.id),
+            );
+            const patchSlot = (patch: Partial<SlotDraft>) =>
+              setSlotRows((cur) => cur.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+            const fixedModel = r.variant === "fixed" ? modelById.get(r.modelIds[0] ?? "") : null;
+            return (
+              <div
+                key={i}
+                className="bg-white border border-base-200 rounded-[4px] p-3 flex flex-col gap-2"
+                data-testid={`bundle-slot-row-${i}`}
+              >
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="block flex-1 min-w-[160px]">
+                    <span className="label block mb-1">Item name (optional)</span>
+                    <input
+                      value={r.label}
+                      onChange={(e) => patchSlot({ label: e.target.value })}
+                      placeholder={`e.g. Pick your mattress`}
+                      className={`${INPUT_CLS} w-full`}
+                      data-testid={`bundle-slot-label-${i}`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label block mb-1">Qty</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={9}
+                      step={1}
+                      value={r.qty}
+                      onChange={(e) =>
+                        patchSlot({ qty: Math.max(1, Math.floor(Number(e.target.value) || 1)) })
+                      }
+                      className={`${INPUT_CLS} w-16`}
+                    />
+                  </label>
+                  <div className="flex gap-1.5 pb-0.5">
+                    {(
+                      [
+                        ["any", "Any variant"],
+                        ["fixed", "Fixed spec"],
+                      ] as const
+                    ).map(([v, lbl]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={r.variant === v}
+                        onClick={() =>
+                          patchSlot({
+                            variant: v,
+                            modelIds: v === "fixed" ? r.modelIds.slice(0, 1) : r.modelIds,
+                            sku: "",
+                          })
+                        }
+                        className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                          r.variant === v
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-base-300 bg-white text-base-600 hover:border-base-500"
+                        }`}
+                        data-testid={`bundle-slot-variant-${i}-${v}`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSlotRows((cur) => (cur.length <= 1 ? cur : cur.filter((_, j) => j !== i)))
+                    }
+                    disabled={slotRows.length <= 1}
+                    aria-label={`Remove slot ${i + 1}`}
+                    className="btn-ghost p-2 text-base-400 hover:text-destructive disabled:opacity-40"
+                  >
+                    <Trash2 size={15} strokeWidth={1.75} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {pickable.map((m) => {
+                    const on = r.modelIds.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          patchSlot({
+                            modelIds:
+                              r.variant === "fixed"
+                                ? on
+                                  ? []
+                                  : [m.id]
+                                : on
+                                  ? r.modelIds.filter((x) => x !== m.id)
+                                  : [...r.modelIds, m.id],
+                            sku: "",
+                          })
+                        }
+                        className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                          on
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-base-300 bg-white text-base-700 hover:border-base-500"
+                        }`}
+                        data-testid={`bundle-slot-model-${i}-${m.id}`}
+                      >
+                        {modelLabel(m)}
+                        <span className="text-base-400"> · {m.category}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {r.variant === "fixed" && fixedModel && (
+                  <label className="block max-w-[280px]">
+                    <span className="label block mb-1">Exact size / variant</span>
+                    <select
+                      value={r.sku}
+                      onChange={(e) => patchSlot({ sku: e.target.value })}
+                      className={`${INPUT_CLS} w-full`}
+                      data-testid={`bundle-slot-sku-${i}`}
+                    >
+                      <option value="">Pick…</option>
+                      {skusFor(fixedModel.id).map((s) => (
+                        <option key={s.sku} value={s.sku}>
+                          {(s.variant?.trim() || s.description || s.sku) + ` — ${rm(s.price)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() =>
+              setSlotRows((cur) => [
+                ...cur,
+                { label: "", qty: 1, modelIds: [], variant: "any", sku: "" },
+              ])
+            }
+            className="btn-ghost text-[12px] self-start"
+            data-testid="bundle-slot-add"
+          >
+            + Add another item slot
+          </button>
+          <p className="t-tiny text-base-400">
+            The customer picks one product per slot (Any variant = they choose the size too), then
+            its specs — the bundle price covers the set; spec surcharges add on top. Modular sofas
+            can&rsquo;t join a bundle.
+          </p>
+        </div>
+      )}
+
+      {kind === "fixed" && (
       <div className="flex flex-col gap-2">
         <span className="label block">Items in the bundle (at least 2)</span>
         {rows.map((row, i) => (
@@ -1894,6 +2143,7 @@ function BundleForm({
           + Add another item
         </button>
       </div>
+      )}
 
       {mutexConflict && (
         <p role="alert" className="t-tiny text-danger" data-testid="bundle-mutex-warning">
