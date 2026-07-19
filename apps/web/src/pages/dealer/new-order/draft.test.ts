@@ -36,6 +36,7 @@ function validDraft(): WizardDraft {
       addressCity: "Bangsar",
       addressPostcode: "59000",
       addressUnknown: false,
+      buildingType: "",
       billing: "",
       billingSame: true,
       billingLine1: "",
@@ -252,6 +253,26 @@ describe("step1Valid — Continue gate", () => {
     const d = validDraft();
     d.customer.billingSame = false;
     d.customer.billing = "";
+    expect(step1Valid(d)).toBe(false);
+  });
+
+  // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
+  // so the gate requires the full cascade field-for-field.
+  it("billing cascade gates like delivery when not billingSame", () => {
+    const d = validDraft();
+    d.customer.billingSame = false;
+    d.customer.billingLine1 = "88 Jalan Invoice";
+    d.customer.billingState = "Selangor";
+    d.customer.billingCity = "Petaling Jaya";
+    d.customer.billingPostcode = "46200";
+    expect(step1Valid(d)).toBe(true);
+    d.customer.billingPostcode = "";
+    expect(step1Valid(d)).toBe(false);
+    d.customer.billingPostcode = "46200";
+    d.customer.billingState = "";
+    expect(step1Valid(d)).toBe(false);
+    d.customer.billingState = "Selangor";
+    d.customer.billingLine1 = "88";
     expect(step1Valid(d)).toBe(false);
   });
 

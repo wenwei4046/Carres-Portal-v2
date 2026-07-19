@@ -21,8 +21,6 @@ interface Props {
   stripeCollectedAmount?: number;
   /** Reset the flow back to a fresh draft + the CATALOG step (no navigation). */
   onNewOrder: () => void;
-  /** Leave the POS — caller clears the draft and navigates to the orders list. */
-  onClose: () => void;
 }
 
 /** sku → { name, variant, photo } off the catalog bundle (same photo source
@@ -56,7 +54,6 @@ export default function ThankYou({
   stripeCollectAmount,
   stripeCollectedAmount,
   onNewOrder,
-  onClose,
 }: Props) {
   const role = useAuth((s) => s.role);
   const firstName = order.customer.name?.trim().split(/\s+/)[0] || "friend";
@@ -147,9 +144,6 @@ export default function ThankYou({
                 variant="secondary"
               />
             )}
-            <button type="button" className="btn btn--ghost btn--lg" onClick={onClose}>
-              View orders
-            </button>
           </div>
         </div>
       </div>

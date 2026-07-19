@@ -25,6 +25,8 @@ import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 /** MY-standard demographic option lists (0200 — feed Sales analysis). */
 const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
 const GENDER_OPTIONS = ["Female", "Male"] as const;
+/** Delivery-address building types (Loo 2026-07-19). */
+const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Other"] as const;
 
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -224,7 +226,14 @@ export default function CustomerStep({
           !!c.addressState &&
           !!c.addressCity &&
           !!c.addressPostcode);
-      const billingOk = c.billingSame || c.billing.trim().length >= 5;
+      // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as
+      // delivery, so its gate mirrors the delivery rules field-for-field.
+      const billingOk =
+        c.billingSame ||
+        (c.billingLine1.trim().length >= 5 &&
+          !!c.billingState &&
+          !!c.billingCity &&
+          !!c.billingPostcode);
       return addressOk && billingOk && customsValid(addrTab);
     }
     if (stepIdx === 2) {
@@ -572,6 +581,24 @@ export default function CustomerStep({
                       }}
                       onChange={(patch) => setC(patch)}
                     />
+                    {/* Building type (Loo 2026-07-19) — delivery-access info for
+                        operation; optional, rides entry_data.fields. */}
+                    <label className="block mt-3.5">
+                      <span className="label block mb-1.5">Building type</span>
+                      <select
+                        value={c.buildingType}
+                        onChange={(e) => setC({ buildingType: e.target.value })}
+                        data-testid="pos-building-type"
+                        className="w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary max-w-[260px]"
+                      >
+                        <option value="">— select —</option>
+                        {BUILDING_TYPES.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                 )}
 
@@ -582,20 +609,7 @@ export default function CustomerStep({
                   <input
                     type="checkbox"
                     checked={c.billingSame}
-                    onChange={(e) =>
-                      setC({
-                        billingSame: e.target.checked,
-                        billing: e.target.checked
-                          ? composeAddress({
-                              line1: c.addressLine1,
-                              line2: c.addressLine2,
-                              state: c.addressState,
-                              city: c.addressCity,
-                              postcode: c.addressPostcode,
-                            })
-                          : c.billing,
-                      })
-                    }
+                    onChange={(e) => setC({ billingSame: e.target.checked })}
                   />
                   <span className="addr-toggle__box">
                     {c.billingSame && <Check size={12} strokeWidth={3} />}
@@ -608,17 +622,50 @@ export default function CustomerStep({
                   </span>
                 </label>
 
+                {/* Billing keys in with the SAME MY cascade as delivery (Loo
+                    2026-07-19) — a second MYAddressFields onto the billing*
+                    fields; the composed string stays in `billing` in step so
+                    the CONFIRM recap + submit keep reading it. */}
                 {!c.billingSame && (
-                  <div className="form-grid" style={{ marginTop: 22 }}>
-                    <div className="field field--span">
-                      <span className="field__label">Billing address</span>
-                      <textarea
-                        rows={2}
-                        value={c.billing}
-                        placeholder="Unit, street, area"
-                        onChange={(e) => setC({ billing: e.target.value })}
-                      />
+                  <div style={{ marginTop: 22 }} data-testid="pos-billing-fields">
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        fontFamily: "var(--font-button)",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Billing address
                     </div>
+                    <MYAddressFields
+                      data={{
+                        addressLine1: c.billingLine1,
+                        addressLine2: c.billingLine2,
+                        addressState: c.billingState,
+                        addressCity: c.billingCity,
+                        addressPostcode: c.billingPostcode,
+                      }}
+                      onChange={(patch) => {
+                        const next = {
+                          billingLine1: patch.addressLine1 ?? c.billingLine1,
+                          billingLine2: patch.addressLine2 ?? c.billingLine2,
+                          billingState: patch.addressState ?? c.billingState,
+                          billingCity: patch.addressCity ?? c.billingCity,
+                          billingPostcode: patch.addressPostcode ?? c.billingPostcode,
+                        };
+                        setC({
+                          ...next,
+                          billing: composeAddress({
+                            line1: next.billingLine1,
+                            line2: next.billingLine2,
+                            state: next.billingState,
+                            city: next.billingCity,
+                            postcode: next.billingPostcode,
+                          }),
+                        });
+                      }}
+                    />
                   </div>
                 )}
                 {addrTab.custom.length > 0 && (

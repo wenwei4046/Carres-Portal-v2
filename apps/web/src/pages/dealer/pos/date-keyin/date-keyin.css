@@ -48,6 +48,13 @@
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(34, 31, 32, 0.14);
 }
+/* Flip variant — the birthday field sits at the bottom of the Customer form,
+   so a downward popover lands below the fold and forces a scroll (Loo
+   2026-07-19). The wheel opens upward instead; the calendar keeps default. */
+.dki-pop--up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
 .dki-pop__head {
   display: flex;
   align-items: center;
