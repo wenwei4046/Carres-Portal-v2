@@ -47,7 +47,7 @@ export default function SetupWizard({
   const [ownerOutletId, setOwnerOutletId] = useState<string | null>(null);
 
   return (
-    <div className="staff-gate" data-testid="staff-setup-wizard">
+    <div className="pos-proto staff-gate" data-testid="staff-setup-wizard">
       <div className="staff-gate__card">
         {step === 1 && (
           <ReauthStep
