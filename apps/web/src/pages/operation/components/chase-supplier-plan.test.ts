@@ -25,6 +25,23 @@ describe("buildChaseSupplierPlan", () => {
     expect(unresolved).toBe(0);
   });
 
+  it("carries the order's source_po into row.po (first non-null wins)", () => {
+    const orders: ChaseOrder[] = [
+      {
+        id: "o1",
+        so: 1001,
+        refNo: "TCF-1001",
+        deliveryDate: null,
+        lines: [
+          { sku: "BF01-K", qty: 1, sourcePo: null },
+          { sku: "BF01-K", qty: 1, sourcePo: "PO-77" },
+        ],
+      },
+    ];
+    const { cards } = buildChaseSupplierPlan(orders, skuMeta, suppliers);
+    expect(cards[0].rows[0].po).toBe("PO-77");
+  });
+
   it("different suppliers → 2 cards", () => {
     const orders: ChaseOrder[] = [
       { id: "o1", so: 1001, refNo: "CR-1001", deliveryDate: null, lines: [{ sku: "MS01-K", qty: 1 }] },

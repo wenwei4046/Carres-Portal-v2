@@ -41,4 +41,32 @@ describe("buildSupplierGroupMessage", () => {
     ]);
     expect(msg).toContain("—\t");
   });
+
+  it("includePo=false (default) shows ref only — no PO", () => {
+    const msg = buildSupplierGroupMessage("remind", "Nice Future", [
+      { ref: "CR-1001", po: "PO-99", items: [{ sku: "MS01", qty: 1 }] },
+    ]);
+    expect(msg).toContain("CR-1001");
+    expect(msg).not.toContain("PO");
+  });
+
+  it("includePo=true shows 'ref · PO no' (sofa/bedframe suppliers)", () => {
+    const msg = buildSupplierGroupMessage(
+      "remind",
+      "Ohana",
+      [{ ref: "TCF-1002", po: "PO-77", items: [{ sku: "SF02", qty: 1 }] }],
+      true,
+    );
+    expect(msg).toContain("TCF-1002 · PO PO-77");
+  });
+
+  it("includePo=true with a missing PO renders 'PO —'", () => {
+    const msg = buildSupplierGroupMessage(
+      "chase",
+      "Ohana",
+      [{ ref: "TCF-1003", po: null, items: [{ sku: "SF03", qty: 1 }] }],
+      true,
+    );
+    expect(msg).toContain("TCF-1003 · PO —");
+  });
 });

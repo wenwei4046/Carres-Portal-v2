@@ -201,15 +201,21 @@ export function buildSupplierChase(i: SupplierChaseInput): string {
 // order's ref + items — Remind (before deadline) or Chase (already late).
 export interface SupplierGroupRow {
   ref: string | null;
+  /** PO number — included in the line only when `includePo` (sofa/bedframe
+   *  suppliers key off the PO; mattress + logistic speak the ref only). */
+  po?: string | null;
   items: { sku: string; qty: number }[];
 }
 
 /** One consolidated supplier message covering all `rows` (one row per order).
- *  `remind` = gentle (before deadline); `chase` = firmer (already late). */
+ *  `remind` = gentle (before deadline); `chase` = firmer (already late).
+ *  `includePo` (Jess 2026-07-19): sofa/bedframe suppliers get "ref · PO";
+ *  mattress suppliers + logistic partners get the ref alone. */
 export function buildSupplierGroupMessage(
   mode: "remind" | "chase",
   supplierName: string,
   rows: SupplierGroupRow[],
+  includePo = false,
 ): string {
   const opener =
     mode === "chase"
@@ -219,7 +225,12 @@ export function buildSupplierGroupMessage(
     mode === "chase"
       ? `Please confirm a ready date today so we can plan delivery. Thank you!`
       : `Appreciate a ready date per order. Thank you!`;
-  const body = rows.map((r) => `${r.ref ?? "—"}\t${itemsBlock(r.items)}\n`).join("");
+  const body = rows
+    .map((r) => {
+      const label = includePo ? `${r.ref ?? "—"} · PO ${r.po ?? "—"}` : `${r.ref ?? "—"}`;
+      return `${label}\t${itemsBlock(r.items)}\n`;
+    })
+    .join("");
   return `${opener}\n\n${body}\n${closer}`;
 }
 

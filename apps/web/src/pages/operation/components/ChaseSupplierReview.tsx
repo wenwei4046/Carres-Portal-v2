@@ -138,13 +138,19 @@ export default function ChaseSupplierReview({
             if (!supplier) return null;
             const rows: SupplierGroupRow[] = card.rows.map((r) => ({
               ref: r.ref,
+              po: r.po,
               items: r.items,
             }));
             const units = card.rows.reduce(
               (t, r) => t + r.items.reduce((u, i) => u + i.qty, 0),
               0,
             );
-            const msg = buildSupplierGroupMessage(mode, supplier.name, rows);
+            // Mattress suppliers speak the CR/TCF ref only; sofa/bedframe
+            // suppliers key off the PO too (Jess 2026-07-19).
+            const includePo = !(supplier.cat_covered ?? []).some((c) =>
+              c.toLowerCase().includes("mattress"),
+            );
+            const msg = buildSupplierGroupMessage(mode, supplier.name, rows, includePo);
             const groupUrl = supplier.whatsapp_group_url;
             return (
               <div

@@ -314,6 +314,7 @@ function toChaseOrder(o: operationOrderListRow): ChaseOrder {
     lines: (o.order_lines ?? []).map((l) => ({
       sku: l.sku,
       qty: Number(l.qty || 0),
+      sourcePo: l.source_po ?? null,
     })),
   };
 }

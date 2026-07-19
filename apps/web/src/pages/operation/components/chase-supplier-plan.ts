@@ -21,12 +21,22 @@ export interface ChaseOrder {
   so: number | null;
   refNo: string | null;
   deliveryDate: string | null;
-  lines: { sku: string; qty: number }[];
+  lines: { sku: string; qty: number; sourcePo?: string | null }[];
+}
+
+export interface ChaseRow {
+  ref: string | null;
+  /** The PO number Carres issued for this order (order_lines.source_po) — shown
+   *  for sofa/bedframe suppliers who key off the PO; null / hidden for mattress
+   *  suppliers + logistic partners (they only speak the CR/TCF ref). */
+  po: string | null;
+  so: number | null;
+  items: { sku: string; qty: number }[];
 }
 
 export interface ChaseCard {
   supplierId: string;
-  rows: { ref: string | null; so: number | null; items: { sku: string; qty: number }[] }[];
+  rows: ChaseRow[];
   lineCount: number;
 }
 
@@ -39,10 +49,7 @@ export function buildChaseSupplierPlan(
 ): { cards: ChaseCard[]; unresolved: number } {
   let unresolved = 0;
   // supplierId → (orderId → row)
-  const bySupplier = new Map<
-    string,
-    Map<string, { ref: string | null; so: number | null; items: { sku: string; qty: number }[] }>
-  >();
+  const bySupplier = new Map<string, Map<string, ChaseRow>>();
 
   for (const o of orders) {
     for (const l of o.lines) {
@@ -66,12 +73,15 @@ export function buildChaseSupplierPlan(
         orderRows = new Map();
         bySupplier.set(supplierId, orderRows);
       }
+      const po = l.sourcePo?.trim() || null;
       const row = orderRows.get(o.id);
       if (row) {
         row.items.push({ sku: l.sku, qty });
+        if (!row.po && po) row.po = po; // first non-null PO on the order
       } else {
         orderRows.set(o.id, {
           ref: o.refNo,
+          po,
           so: o.so,
           items: [{ sku: l.sku, qty }],
         });
