@@ -239,6 +239,12 @@ principalAccountsRouter.post("/", async (c) => {
           name: st.name,
           staff_role: st.staffRole,
           active: true,
+          // 0241 profile parity with the POS Add-staff form.
+          email: st.email ?? null,
+          birthday: st.birthday ?? null,
+          gender: st.gender ?? null,
+          phone: st.phone ?? null,
+          color: st.color ?? null,
         })
         .select("id")
         .single();
