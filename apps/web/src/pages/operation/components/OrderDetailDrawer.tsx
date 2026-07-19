@@ -5001,10 +5001,11 @@ function JourneyCard({
               collapsed
                 ? "justify-center px-0 py-1.5"
                 : "gap-2.5 px-1.5 py-1.5"
-            } ${active ? "" : "hover:bg-base-50"} ${last ? "" : "pb-3"}`}
-            // Selected = the app's selection blue #C2E7FF (matches the Orders
-            // facet), not the too-faint bg-info-soft #DBEAFE that read as grey
-            // (Jess 2026-07-19). Text stays dark ink for contrast.
+            } ${active ? "" : "hover:bg-info-soft/50"} ${last ? "" : "pb-3"}`}
+            // Selection = the app's blue #C2E7FF (matches the Orders facet);
+            // HOVER is a faint blue tint, NEVER grey (Jess 2026-07-19: "when i
+            // point it's grey, same as the header grey"). No grey in this rail.
+            // Text stays dark ink for contrast.
             style={active ? { backgroundColor: "#C2E7FF" } : undefined}
           >
             {!last && (
