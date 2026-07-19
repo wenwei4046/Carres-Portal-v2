@@ -2837,7 +2837,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
                  h-10 = same 40px as the data rows (SIZING LAW §3) so the header
                  never reads thinner than the listing. */
-              style={{ backgroundColor: "#F3F4F6", borderBottomColor: "#E5E7EB" }}
+              style={{ backgroundColor: "#E5E7EB", borderBottomColor: "#D1D5DB" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -3368,6 +3368,10 @@ function KanbanGroup({
   // index.css, recorded in design-standard.ts COLOR.sectionBand.
   return (
     <div data-testid={testid} className="mb-1">
+      {/* strong = a step-darker band (base-200) so the Orders-list facet groups
+          actually separate on the white rail (Jess 2026-07-19: #F9FAFB→#F3F4F6
+          was still invisible). The shared order-drawer bands don't pass it, so
+          they're unaffected. */}
       <SectionBand
         title={title}
         danger={danger}
@@ -3375,6 +3379,7 @@ function KanbanGroup({
         onToggle={onToggle}
         total={total}
         right={headerRight}
+        strong
       />
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
