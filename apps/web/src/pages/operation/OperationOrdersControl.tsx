@@ -51,6 +51,8 @@ import {
 } from "@carres/shared";
 import RaisePoReview from "./components/RaisePoReview";
 import type { RaisePoOrder } from "./components/raise-po-plan";
+import ChaseSupplierReview from "./components/ChaseSupplierReview";
+import type { ChaseOrder } from "./components/chase-supplier-plan";
 import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
@@ -76,6 +78,7 @@ import {
   CircleDollarSign,
   Package,
   PackagePlus,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -296,6 +299,21 @@ function toRaisePoOrder(o: operationOrderListRow): RaisePoOrder {
       qty: Number(l.qty || 0),
       sourcePo: (l as { source_po?: string | null }).source_po ?? null,
       attrs: (l as { attrs?: Record<string, unknown> | null }).attrs ?? null,
+    })),
+  };
+}
+
+/** Row → the pure Chase-supplier plan input. Suppliers speak the ORIGINAL
+ *  CR/TCF ref (source_ref[0]), never the SO number. */
+function toChaseOrder(o: operationOrderListRow): ChaseOrder {
+  return {
+    id: o.id,
+    so: o.so ?? null,
+    refNo: (o.source_ref ?? []).filter(Boolean)[0] ?? null,
+    deliveryDate: o.delivery_date ?? null,
+    lines: (o.order_lines ?? []).map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty || 0),
     })),
   };
 }
@@ -1125,6 +1143,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
+  const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
   // ?poday=1 — MANAGER-ONLY preview of the PO-day surfaces (Jess 2026-07-19:
   // "you can't let me wait the day to see"): forces the banner + duty badge
   // on ANY day, using the real holder when 0236 is live, else the first pool
@@ -2077,6 +2096,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   ? "Raise consolidated POs — one per supplier — for the selection"
                   : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
               }
+              onChaseSupplier={() => setChaseOrders(selectedOrders)}
               onFlag={bulkCreateTasks}
               onExport={exportSelectedCsv}
               onPrint={printSelected}
@@ -2601,6 +2621,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
+      {/* Chase supplier — one WhatsApp message per supplier group over the
+          selection (Remind / Chase). Open to all operation (no PO-duty gate). */}
+      {chaseOrders && (
+        <ChaseSupplierReview
+          orders={chaseOrders.map(toChaseOrder)}
+          onClose={() => {
+            setChaseOrders(null);
+            clearSel();
+          }}
+        />
+      )}
+
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
 
@@ -2636,6 +2668,7 @@ function OrdersBulkBar({
   onRaisePo,
   canRaisePo,
   raisePoTitle,
+  onChaseSupplier,
   onFlag,
   onExport,
   onPrint,
@@ -2657,6 +2690,7 @@ function OrdersBulkBar({
   onRaisePo: () => void;
   canRaisePo: boolean;
   raisePoTitle: string;
+  onChaseSupplier: () => void;
   onFlag: () => void;
   onExport: () => void;
   onPrint: () => void;
@@ -2735,6 +2769,17 @@ function OrdersBulkBar({
         className={btn}
       >
         <PackagePlus size={14} /> Raise PO
+      </button>
+      {/* Chase supplier — one WhatsApp message per supplier group over the
+          selection (Remind / Chase). Open to all operation (no duty gate). */}
+      <button
+        type="button"
+        onClick={onChaseSupplier}
+        disabled={busy}
+        title="Nudge each supplier's WhatsApp group — one message covering the selection's orders"
+        className={btn}
+      >
+        <MessageCircle size={14} /> Chase supplier
       </button>
       {/* Flag for follow-up (creates a follow-up task per selected order). */}
       <button type="button" onClick={onFlag} disabled={busy} className={btn}>

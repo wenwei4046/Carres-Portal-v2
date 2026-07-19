@@ -195,6 +195,34 @@ export function buildSupplierChase(i: SupplierChaseInput): string {
   );
 }
 
+// ── SUPPLIER GROUP — ONE message per supplier, covering many orders ──────────
+// Suppliers speak the ORIGINAL CR/TCF ref (orders.source_ref[0]), never the SO.
+// One WhatsApp group per supplier gets a single message listing every selected
+// order's ref + items — Remind (before deadline) or Chase (already late).
+export interface SupplierGroupRow {
+  ref: string | null;
+  items: { sku: string; qty: number }[];
+}
+
+/** One consolidated supplier message covering all `rows` (one row per order).
+ *  `remind` = gentle (before deadline); `chase` = firmer (already late). */
+export function buildSupplierGroupMessage(
+  mode: "remind" | "chase",
+  supplierName: string,
+  rows: SupplierGroupRow[],
+): string {
+  const opener =
+    mode === "chase"
+      ? `Hi ${supplierName} 👋 following up — we still need the ready date for these, customers are waiting:`
+      : `Hi ${supplierName} 👋 checking on these open orders, please confirm the ready date for each:`;
+  const closer =
+    mode === "chase"
+      ? `Please confirm a ready date today so we can plan delivery. Thank you!`
+      : `Appreciate a ready date per order. Thank you!`;
+  const body = rows.map((r) => `${r.ref ?? "—"}\t${itemsBlock(r.items)}\n`).join("");
+  return `${opener}\n\n${body}\n${closer}`;
+}
+
 /** URL-encoded body, ready for `https://wa.me/<number>?text=` — real line
  *  breaks become %0A. */
 export function waEncode(text: string): string {

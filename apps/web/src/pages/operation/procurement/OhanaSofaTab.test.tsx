@@ -39,6 +39,7 @@ const SUPPLIER_OHANA = {
   cat_covered: ["sofa", "bedframe"],
   lead_time: "10–14 days",
   contact: "+60 3-2222 2222",
+  whatsapp_group_url: null,
 };
 
 const WAREHOUSE_KL = {

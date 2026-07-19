@@ -2291,6 +2291,7 @@ export interface SupplierRow {
   cat_covered: string[];
   lead_time: string | null;
   contact: string | null;
+  whatsapp_group_url: string | null;
 }
 export interface SuppliersListResponse {
   suppliers: SupplierRow[];
