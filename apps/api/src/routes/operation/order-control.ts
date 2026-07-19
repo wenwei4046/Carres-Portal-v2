@@ -717,7 +717,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, ops_stock_items(sku, condition), suppliers(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, ops_stock_items(sku, condition, po_no), suppliers(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
@@ -732,7 +732,11 @@ orderControlRouter.get("/:id/loans", async (c) => {
 /** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */
 function mapLoanRow(r: unknown): SofaLoanDto {
   const row = r as Record<string, unknown> & {
-    ops_stock_items?: { sku?: string | null; condition?: string | null } | null;
+    ops_stock_items?: {
+      sku?: string | null;
+      condition?: string | null;
+      po_no?: string | null;
+    } | null;
     suppliers?: { name?: string | null } | null;
   };
   return {
@@ -743,6 +747,7 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     item_id: (row.item_id as string | null) ?? null,
     item_sku: row.ops_stock_items?.sku ?? null,
     item_condition: row.ops_stock_items?.condition ?? null,
+    item_po: row.ops_stock_items?.po_no ?? null,
     supplier_id: (row.supplier_id as string | null) ?? null,
     supplier_name: row.suppliers?.name ?? null,
     borrowed_sku: (row.borrowed_sku as string | null) ?? null,
@@ -803,7 +808,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .update({ status: "reserved", reserved_ref: `LOAN SO-${order.so}`, updated_at: now })
     .eq("id", itemId)
     .eq("status", "free")
-    .select("id, sku, condition")
+    .select("id, sku, condition, po_no")
     .maybeSingle();
   if (claimErr) {
     const m = mapPgError(claimErr);
@@ -845,6 +850,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     item_id: loan.item_id as string,
     item_sku: (claimed.sku as string | null) ?? null,
     item_condition: (claimed.condition as string | null) ?? null,
+    item_po: (claimed.po_no as string | null) ?? null,
     supplier_id: null,
     supplier_name: null,
     borrowed_sku: null,

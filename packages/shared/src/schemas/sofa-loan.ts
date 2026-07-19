@@ -67,6 +67,9 @@ export const sofaLoanSchema = z.object({
   item_id: z.string().uuid().nullable(),
   item_sku: z.string().nullable(),
   item_condition: z.string().nullable(),
+  // the loaned own-stock unit's original PO (traceability on the loan card) —
+  // joined from ops_stock_items; null for supplier borrows (nothing purchased).
+  item_po: z.string().nullable().default(null),
   // supplier source — who we borrowed from + owe back, and the borrowed piece
   supplier_id: z.string().uuid().nullable().default(null),
   supplier_name: z.string().nullable().default(null),

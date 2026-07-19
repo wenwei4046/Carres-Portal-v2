@@ -1,5 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Check, Plus, Package, AlertTriangle, Link2 } from "lucide-react";
+import {
+  Check,
+  Plus,
+  Package,
+  AlertTriangle,
+  Link2,
+  BedDouble,
+  Bed,
+  Sofa,
+  type LucideIcon,
+} from "lucide-react";
 import Segmented from "@/components/Segmented";
 import Btn from "@/components/Btn";
 import { toast } from "sonner";
@@ -65,6 +75,18 @@ function condTone(c: string): string {
 
 const TAG =
   "inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold tracking-[0.02em]";
+
+/** Category → icon, SAME map as the Items-ordered panel (drawer §710): a
+ *  loaned mattress wears the mattress icon, bedframe the bed, sofa the sofa. */
+function catIcon(cat: string | null | undefined): LucideIcon {
+  return cat === "mattress"
+    ? BedDouble
+    : cat === "bedframe"
+      ? Bed
+      : cat === "sofa"
+        ? Sofa
+        : Package;
+}
 
 /** The supplier return-by deadline rides notes ("expected return YYYY-MM-DD")
  *  until it earns a real column (1B). Read it back so the obligation shows a
@@ -147,6 +169,10 @@ function LoanCard({
     : "Warehouse · Klang";
   const returnBy = parseReturnBy(loan.notes);
   const nDay = dayN(loan);
+  // category icon aligned with the Items-ordered panel
+  const Icon = catIcon(
+    loan.category ?? (loan.item_sku ? lineCategory(loan.item_sku) : "acc"),
+  );
 
   return (
     <div className="bg-white border border-base-200 rounded-[11px] shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
@@ -158,7 +184,7 @@ function LoanCard({
               closed ? "bg-success-soft text-success" : "bg-primary/10 text-primary"
             }`}
           >
-            <Package size={16} />
+            <Icon size={16} />
           </span>
           <div className="min-w-0">
             <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-400">
@@ -198,6 +224,11 @@ function LoanCard({
             </span>
           </Row>
         )}
+        {loan.item_po && (
+          <Row k="PO">
+            <span className="font-mono text-[11.5px] text-base-700">{loan.item_po}</span>
+          </Row>
+        )}
 
         {/* at customer */}
         {swapped ? (
@@ -222,7 +253,7 @@ function LoanCard({
                 disabled={busy}
                 className="btn-secondary text-[12px] py-0.5 px-2.5"
               >
-                Collect swap
+                Collected back
               </button>
             }
           >
@@ -240,7 +271,7 @@ function LoanCard({
           ) : (
             <Row
               k="Return by"
-              tone={returnBy && daysFromToday(returnBy) < 0 ? "late" : owed ? "act" : undefined}
+              tone={owed ? "act" : undefined}
               action={
                 owed ? (
                   <button
@@ -260,8 +291,8 @@ function LoanCard({
                   {(() => {
                     const d = daysFromToday(returnBy);
                     return d < 0 ? (
-                      <span className="text-danger font-semibold ml-1">
-                        · overdue {Math.abs(d)} {Math.abs(d) === 1 ? "day" : "days"}
+                      <span className="text-warning font-semibold ml-1">
+                        · {Math.abs(d)} {Math.abs(d) === 1 ? "day" : "days"} past
                       </span>
                     ) : (
                       <span className={`ml-1 font-semibold ${d <= 3 ? "text-warning" : "text-base-400 font-normal"}`}>
@@ -347,11 +378,12 @@ function WarehousePick({
   function UnitRow({ g }: { g: UnitGroup }) {
     const isSofa = g.cat === "sofa";
     const gated = isSofa && !enterOk.has(g.key);
+    const UIcon = catIcon(g.cat);
     return (
       <div className="bg-white border border-base-200 rounded-[10px] px-2.5 py-2 mb-2">
         <div className="flex items-center gap-2.5">
           <span className="h-8 w-8 shrink-0 rounded-[9px] grid place-items-center bg-base-100 text-base-500">
-            <Package size={16} />
+            <UIcon size={16} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[12.5px] font-semibold text-base-900 truncate" title={g.sku}>
