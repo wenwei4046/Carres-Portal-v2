@@ -1241,6 +1241,58 @@ export function normalizeRefs(ref: string): string[] {
   ).sort();
 }
 
+/**
+ * Split a (possibly combined) Ref into its lead-first, deduped token list.
+ * Shared internals for {@link importOrderKey} / {@link importSourceRef} — same
+ * tokeniser + separators as {@link normalizeRefs}, but the input ORDER is kept
+ * (no `.sort()`), so the lead token stays first.
+ */
+function refTokensLeadFirst(ref: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of ref
+    .split(/[/+,&]/)
+    .map((r) => r.trim().toUpperCase())
+    .filter((r) => r.length > 0)) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
+ * ORDER-IDENTITY key for a (possibly combined) AutoCount Ref — the LEAD token.
+ *
+ * Jess's Ref law (2026-07-19): one customer can hold several Refs; the prefix
+ * names the goods/PO, so the FIRST token names the order that row is about
+ * ("CR1127 + TCF0477" = the CR1127 order [MS+BF]; "TCF0477 + CR1127" = the
+ * TCF0477 order [sofa]). Trailing tokens are "delivered-with" cross-refs, not
+ * part of the identity. Two rows with different lead tokens are DIFFERENT
+ * orders even when they share the same token set — which the sorted-set
+ * {@link normalizeRefs} key wrongly merges.
+ *
+ * NOT yet wired into the import grouping: flipping the live key is a
+ * coordinated change across the import RPC's dedup (`source_ref` array-equality),
+ * the already-stored SORTED `source_ref[]` on the ~116 live orders (a re-key
+ * migration), and `master-append.ts`. See the 2026-07-19 spec / wenwei coord.
+ */
+export function importOrderKey(ref: string): string {
+  return refTokensLeadFirst(ref)[0] ?? "";
+}
+
+/**
+ * The `source_ref[]` to STORE for a combined Ref under the lead-key model:
+ * lead-first, deduped, and deliberately NOT sorted. Every token stays a
+ * searchable alias, but two different-lead orders get DISTINCT arrays, so the
+ * import RPC's order-sensitive `source_ref = v_src_ref` array-equality dedups
+ * genuine re-exports (same lead, same order) while keeping the two orders apart.
+ */
+export function importSourceRef(ref: string): string[] {
+  return refTokensLeadFirst(ref);
+}
+
 const CORE_ITEM_RE = /mattress|bed ?fram|sofa/i;
 function isCoreItem(itemGroup: string): boolean {
   return CORE_ITEM_RE.test(itemGroup);
