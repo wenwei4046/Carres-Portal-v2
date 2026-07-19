@@ -189,7 +189,13 @@ function controlTabOf(
   // booked. Needs the live free-stock map; without it we fall back to the old
   // stage mapping (used by the param-less `=== "completed"` callers).
   if (availableBySku) {
-    const stockReady = stockBucketOf(o, availableBySku) === "Ready";
+    // Stock is READY when EITHER the live free-stock check says so OR the Master
+    // import marked every line ready (line_stock_status='ready', via stockEtaOf).
+    // Without the Master signal, AutoCount SKUs never match the catalog → the
+    // live check is always "awaiting" → NOTHING ever reached Scheduled (Jess
+    // 2026-07-19: "why scheduled no showing?"). Same fix as nextActionOf #5.
+    const stockReady =
+      stockBucketOf(o, availableBySku) === "Ready" || stockEtaOf(o).state === "ready";
     const logisticBooked = !!logisticEtaOf(o);
     return stockReady && logisticBooked ? "scheduled" : "pending";
   }
@@ -3987,6 +3993,12 @@ function OrderRow({
       {showCol("next") && (
       <td className="pl-2 pr-2">
         {(() => {
+          // Delivered = closed → Manage is a NEXT-ACTION column, and a closed
+          // order has no action, so the cell is BLANK (Jess 2026-07-19: STATUS
+          // already says "Delivered"; a "Done" pill is redundant — and would be
+          // wrong if a 2nd delivery were still pending, which keeps the order
+          // in-pipeline, not Delivered).
+          if (completed) return null;
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
           // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
