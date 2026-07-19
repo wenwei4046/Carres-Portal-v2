@@ -46,6 +46,38 @@ principalDealersRouter.get("/", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+
+  // 2026-07-19 (Loo) — a showroom is Carres' OWN store, a dealer is an external
+  // reseller, and HQ lists them on two separate pages. `dealers_with_stats_list`
+  // predates the split and returns no `channel`, so pull it (plus the outlet
+  // roll-up the Dealers page shows) alongside rather than reshaping the RPC's
+  // RETURNS TABLE — both selects are RLS-scoped and tiny (one row per org).
+  //
+  // FAIL CLOSED on either read. If we swallowed the error the response would
+  // still be a 200 with every store silently reclassified as a plain dealer
+  // and 0 outlets — the Showrooms page would render "No showrooms" (Loo's own
+  // stores gone from the portal) and every dealer row would raise a false
+  // "no outlet" alarm. A visible error beats confidently wrong data.
+  const [chanRes, outletRes] = await Promise.all([
+    sb.from("dealers").select("id, channel"),
+    sb.from("outlets").select("dealer_id"),
+  ]);
+  const joinErr = chanRes.error ?? outletRes.error;
+  if (joinErr) {
+    const m = mapPgError(joinErr);
+    return c.json(m.body, m.status);
+  }
+  const chanRows = chanRes.data;
+  const outletRows = outletRes.data;
+  const channelById = new Map<string, string>(
+    (chanRows ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
+  );
+  const outletCountById = new Map<string, number>();
+  for (const o of outletRows ?? []) {
+    const k = o.dealer_id as string;
+    outletCountById.set(k, (outletCountById.get(k) ?? 0) + 1);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dealers = (data ?? []).map((d: any) => ({
     id: d.id,
@@ -60,6 +92,9 @@ principalDealersRouter.get("/", async (c) => {
     orderCount: Number(d.order_count ?? 0),
     gmv: Number(d.gmv ?? 0),
     outstanding: Number(d.outstanding ?? 0),
+    // Unknown id → 'dealer', matching the column's own DB default.
+    channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
+    outletCount: outletCountById.get(d.id) ?? 0,
   }));
   return c.json({ dealers });
 });
@@ -85,12 +120,19 @@ principalDealersRouter.get("/:id", async (c) => {
 
   // 1b. dealer_with_stats RPC returns only the legacy columns. Pull the four
   // newer fields (address, ssm_code, contact_name, contact_phone — migrations
-  // 0144/0145/0146) directly so the DealerDrawer editor can pre-fill them.
+  // 0144/0145/0146) directly so the DealerDrawer editor can pre-fill them,
+  // plus `channel` so the drawer knows whether it is showing an external
+  // dealer or one of Carres' own showrooms (which carry no SSM / PIC).
   const { data: extra } = await sb
     .from("dealers")
-    .select("address, ssm_code, contact_name, contact_phone")
+    .select("address, ssm_code, contact_name, contact_phone, channel")
     .eq("id", id)
     .maybeSingle();
+  // Always present, so the drawer's `channel` is never undefined; an absent
+  // row falls back to 'dealer' (the column's DB default = the safe branch,
+  // which just shows the full business-profile editor as before).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (dealer as any).channel = extra?.channel === "showroom" ? "showroom" : "dealer";
   if (extra) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dealer as any).address       = extra.address ?? null;

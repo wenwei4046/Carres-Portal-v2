@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
-import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
+import type {
+  CreateOrderInput,
+  Order,
+  PwpDiscoverDto,
+  PwpDiscoverResponse,
+  StoreChannel,
+} from "@carres/shared";
 import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -251,7 +257,7 @@ export default function DealerPos({
   // The in-flow dealer choices (ACTIVE dealers only — matches the live status
   // gate). Only fetched for an internal operator; dealers never hit this
   // route. BD reads its own /api/bd/dealers (the principal route is
-  // principal-gated); both responses carry id/name/status.
+  // principal-gated); both responses carry id/name/status/channel.
   const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer && !isBd });
   const bdDealersQ = useBdDealers({ enabled: internalPicksDealer && isBd });
   const pickableDealers = useMemo(() => {
@@ -260,8 +266,22 @@ export default function DealerPos({
       : (principalDealersQ.data?.dealers ?? []);
     return list
       .filter((d) => d.status === "active")
-      .map((d) => ({ id: d.id, name: d.name }));
+      .map((d) => ({ id: d.id, name: d.name, channel: d.channel }));
   }, [isBd, bdDealersQ.data, principalDealersQ.data]);
+
+  // Which kind of store is this order written under? Drives the
+  // Outlet-vs-Showroom wording (Loo 2026-07-19). An internal operator: the
+  // store they picked in-flow. A store-side login: their own JWT role (the
+  // pick list is empty for them), the same rule the staff API uses
+  // (`resolveStoreKind`, apps/api/src/routes/staff.ts), so the two can't drift.
+  //
+  // Caveat: `pickableDealers` is only fetched when the operator picks in-flow.
+  // If this component is ever mounted WITH the `actingDealerId` prop (no live
+  // caller does today — both mounts are bare), the lookup misses and the label
+  // falls back to "Outlet". Wording only; nothing on the order depends on it.
+  const storeChannel: StoreChannel =
+    pickableDealers.find((d) => d.id === effectiveActingId)?.channel ??
+    (role === "showroom" ? "showroom" : "dealer");
 
   // When an internal operator places on behalf of a picked dealer, constrain the
   // outlet + salesperson choices to THAT dealer (the lists are RLS-read-all for
@@ -1053,7 +1073,9 @@ export default function DealerPos({
                 draft={draft}
                 onChange={setDraft}
                 outlets={outlets}
+                outletsLoaded={outletsQ.isSuccess}
                 salespersons={salespersons}
+                storeChannel={storeChannel}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
                 initialSubStep={customerSubStep}

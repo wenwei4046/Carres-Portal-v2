@@ -52,35 +52,44 @@ function buildSb(opts: {
   rpcResults?: Record<string, RpcResult>;
   ordersRows?: unknown[];
   ordersError?: { code?: string; message?: string };
+  /** Error returned by the awaited select on this table (fail-closed tests). */
+  tableError?: Record<string, { code?: string; message?: string }>;
+  /** Per-table rows for the awaited selects. 2026-07-19: GET / now also pulls
+   *  `dealers(id, channel)` + `outlets(dealer_id)` alongside the stats RPC. */
+  tableRows?: Record<string, unknown[]>;
+  /** Row returned by the GET /:id `.maybeSingle()` dealers pull. */
+  dealerExtra?: Record<string, unknown> | null;
 }) {
   const rpcCalls: RpcCall[] = [];
   const chainCalls: ChainCall[] = [];
 
-  const chain: Record<string, unknown> = {};
-  chain.select = (...args: unknown[]) => {
-    chainCalls.push({ method: "select", args });
+  // One chain per `.from(table)` call — GET / fires two selects concurrently
+  // (dealers + outlets) via Promise.all, so a single shared chain object would
+  // hand both awaits the same table's rows.
+  function makeChain(table: string) {
+    const chain: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "order", "limit"]) {
+      chain[m] = (...args: unknown[]) => {
+        chainCalls.push({ method: m, args });
+        return chain;
+      };
+    }
+    chain.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) => {
+      const tErr = opts.tableError?.[table];
+      if (tErr) return resolve({ data: null, error: tErr });
+      return resolve({
+        data: opts.tableRows?.[table] ?? opts.ordersRows ?? [],
+        error: opts.ordersError ?? null,
+      });
+    };
+    // 2026-05-22 (Loo) — GET /:id does a second `.from("dealers").select(...)
+    // .eq("id", id).maybeSingle()` pull for address/ssm_code/contact_name/
+    // contact_phone (0144/0145/0146) + `channel` (2026-07-19). Defaults to null
+    // so the route's null-coalescing path runs; tests asserting only the legacy
+    // fields are unaffected.
+    chain.maybeSingle = async () => ({ data: opts.dealerExtra ?? null, error: null });
     return chain;
-  };
-  chain.eq = (...args: unknown[]) => {
-    chainCalls.push({ method: "eq", args });
-    return chain;
-  };
-  chain.order = (...args: unknown[]) => {
-    chainCalls.push({ method: "order", args });
-    return chain;
-  };
-  chain.limit = (...args: unknown[]) => {
-    chainCalls.push({ method: "limit", args });
-    return chain;
-  };
-  chain.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
-    resolve({ data: opts.ordersRows ?? [], error: opts.ordersError ?? null });
-  // 2026-05-22 (Loo) — GET /:id now does a second `.from("dealers").select(...)
-  // .eq("id", id).maybeSingle()` pull for address/ssm_code/contact_name/
-  // contact_phone (migrations 0144/0145/0146). The mock returns null so the
-  // route's null-coalescing path runs; tests asserting only the legacy fields
-  // are unaffected.
-  chain.maybeSingle = async () => ({ data: null, error: null });
+  }
 
   const sb = {
     rpc: async (name: string, args: unknown) => {
@@ -91,7 +100,7 @@ function buildSb(opts: {
     },
     from: (table: string) => {
       chainCalls.push({ method: "from", args: [table] });
-      return chain;
+      return makeChain(table);
     },
   };
   return { sb, rpcCalls, chainCalls };
@@ -189,6 +198,110 @@ describe("GET /api/principal/dealers", () => {
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]?.name).toBe("dealers_with_stats_list");
   });
+
+  // Loo 2026-07-19 — HQ lists our own showrooms and external dealers on two
+  // separate pages, so the roster has to say which is which. The stats RPC
+  // predates the split and returns no `channel`; the route merges it in.
+  it("200 — carries dealers.channel + an outlet roll-up per store", async () => {
+    const SHOWROOM_ID = "00000000-0000-0000-0000-000000000d02";
+    const { sb } = buildSb({
+      rpcResults: {
+        dealers_with_stats_list: {
+          data: [
+            { id: DEALER_ID, name: "BedHouse KL", status: "active" },
+            { id: SHOWROOM_ID, name: "Kelana Jaya", status: "pending" },
+          ],
+        },
+      },
+      tableRows: {
+        dealers: [
+          { id: DEALER_ID, channel: "dealer" },
+          { id: SHOWROOM_ID, channel: "showroom" },
+        ],
+        outlets: [
+          { dealer_id: DEALER_ID },
+          { dealer_id: DEALER_ID },
+          { dealer_id: SHOWROOM_ID },
+        ],
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/principal/dealers", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      dealers: Array<{ id: string; channel: string; outletCount: number }>;
+    };
+    const byId = Object.fromEntries(body.dealers.map((d) => [d.id, d]));
+    expect(byId[DEALER_ID]?.channel).toBe("dealer");
+    expect(byId[DEALER_ID]?.outletCount).toBe(2);
+    expect(byId[SHOWROOM_ID]?.channel).toBe("showroom");
+    expect(byId[SHOWROOM_ID]?.outletCount).toBe(1);
+  });
+
+  it("200 — a store missing from the channel pull falls back to 'dealer' + 0 outlets", async () => {
+    const { sb } = buildSb({
+      rpcResults: {
+        dealers_with_stats_list: {
+          data: [{ id: DEALER_ID, name: "BedHouse KL", status: "active" }],
+        },
+      },
+      tableRows: { dealers: [], outlets: [] },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/principal/dealers", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as {
+      dealers: Array<{ channel: string; outletCount: number }>;
+    };
+    // Matches the DB column's own default — never silently a showroom.
+    expect(body.dealers[0]?.channel).toBe("dealer");
+    expect(body.dealers[0]?.outletCount).toBe(0);
+  });
+
+  // Fail closed, both ways. Swallowing either error would return a 200 with
+  // every store reclassified as a plain dealer with 0 outlets — the Showrooms
+  // page would read "No showrooms" and every dealer row would raise a false
+  // "no outlet" alarm, with nothing anywhere saying the read failed.
+  for (const table of ["dealers", "outlets"] as const) {
+    it(`5xx (not a wrong-data 200) when the ${table} join fails`, async () => {
+      const { sb } = buildSb({
+        rpcResults: {
+          dealers_with_stats_list: {
+            data: [{ id: DEALER_ID, name: "Kelana Jaya", status: "active" }],
+          },
+        },
+        tableRows: { dealers: [{ id: DEALER_ID, channel: "showroom" }], outlets: [] },
+        tableError: { [table]: { code: "57014", message: "statement timeout" } },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+
+      const jwt = await makeJwt("principal");
+      const res = await app.fetch(
+        new Request("http://t/api/principal/dealers", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).not.toBe(200);
+      expect((await res.json()) as { dealers?: unknown }).not.toHaveProperty("dealers");
+    });
+  }
 
   it("403 for dealer role (no Supabase round-trip)", async () => {
     const rpc = vi.fn();

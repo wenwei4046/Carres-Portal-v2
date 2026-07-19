@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import type { OutletDto } from "@carres/shared";
+import { branchNoun, type OutletDto, type StoreChannel } from "@carres/shared";
 import CarresLockup from "@/components/CarresLockup";
 
 /**
@@ -10,19 +10,23 @@ import CarresLockup from "@/components/CarresLockup";
  */
 export default function OutletPicker({
   outlets,
+  storeChannel = "dealer",
   onPick,
 }: {
   outlets: OutletDto[];
+  /** Names the branch — a dealer's is an "outlet", ours is a "showroom". */
+  storeChannel?: StoreChannel;
   onPick: (outletId: string) => void;
 }) {
+  const branch = branchNoun(storeChannel).toLowerCase();
   return (
     <div className="pos-proto staff-gate" data-testid="staff-outlet-picker">
       <div className="staff-gate__card staff-gate__card--narrow">
         <div className="staff-gate__lockup">
           <CarresLockup size={24} />
         </div>
-        <div className="staff-gate__eyebrow">Which outlet</div>
-        <h2 className="staff-gate__title">Pick your outlet</h2>
+        <div className="staff-gate__eyebrow">Which {branch}</div>
+        <h2 className="staff-gate__title">Pick your {branch}</h2>
         <p className="staff-gate__sub">Choose where you're working today. You can switch later.</p>
         <div className="staff-outlets">
           {outlets.map((o) => (

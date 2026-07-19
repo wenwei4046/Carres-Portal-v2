@@ -93,6 +93,16 @@ export async function handleCreateAccount(
       .insert({
         name: body.companyName!,
         channel,
+        // 2026-07-19 (Loo) — born ACTIVE. `dealers.status` defaults to
+        // 'pending', which belongs to the OTHER door: `dealer_invite` (the
+        // Dealers page's "+ Invite dealer"), where a reseller applies and the
+        // principal approves. This door is HQ creating the store itself —
+        // login, password and first staff PIN and all — so there is nobody
+        // left to approve it. Left on 'pending' it was a dead end: no
+        // `approvals` row is written here, so the drawer's "review in
+        // Approvals tab" pointed at an empty tab, and the store never showed
+        // in the on-behalf order picker (which lists active stores only).
+        status: "active",
         region: body.region?.trim() || "—",
         // Legacy single-text `contact` column auto-built from the new
         // structured contact_name + contact_phone fields so existing reads

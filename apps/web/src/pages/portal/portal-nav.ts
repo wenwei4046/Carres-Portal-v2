@@ -19,6 +19,7 @@ import {
   BadgeCheck,
   LayoutGrid,
   Users,
+  Store,
   Network,
   ScrollText,
   Settings,
@@ -209,7 +210,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
       { key: "orders", label: "Orders", icon: ClipboardList, path: "/operation/orders" },
+      // Loo 2026-07-19 — two separate doors: "Dealers" = external resellers,
+      // "Showrooms" = the stores Carres owns. Same page, filtered by
+      // `dealers.channel`.
       { key: "dealers", label: "Dealers", icon: Users },
+      { key: "showrooms", label: "Showrooms", icon: Store },
       { key: "partners", label: "Partners", icon: Network },
       { key: "audit", label: "Audit log", icon: ScrollText },
       { key: "accounts", label: "Accounts", icon: Settings },

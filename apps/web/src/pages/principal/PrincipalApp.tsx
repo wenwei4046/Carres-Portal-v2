@@ -66,7 +66,10 @@ export default function PrincipalApp() {
             fields (moved out of the SO Maintenance modal 2026-07-12). */}
         {tab === "order-entry" && <OrderEntryPage />}
         {tab === "approvals" && <PrincipalApprovals />}
-        {tab === "dealers" && <PrincipalDealers />}
+        {/* Two doors onto the same store roster, split by `dealers.channel`
+            (Loo 2026-07-19): external resellers vs Carres' own showrooms. */}
+        {tab === "dealers" && <PrincipalDealers channel="dealer" />}
+        {tab === "showrooms" && <PrincipalDealers channel="showroom" />}
         {tab === "partners" && <PrincipalPartners />}
         {tab === "catalog" && <ProductMaintenancePage isPrincipal />}
         {tab === "accounts" && <PrincipalAccounts />}

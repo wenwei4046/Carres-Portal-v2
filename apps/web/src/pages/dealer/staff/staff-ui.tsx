@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   STAFF_COLORS,
+  branchNoun,
   minDeliveryDateISO,
   staffPinSchema,
   type StaffColorKey,
@@ -620,14 +621,16 @@ export function AddStaffModal({
 
       {!managerLocked && staffRole !== "principal" && outlets.length > 1 && (
         <label className="flex flex-col gap-1.5">
-          <Label>Outlet</Label>
+          {/* Loo 2026-07-19 — a dealer's branch is an "outlet", one of ours is
+              a "showroom". Same rule everywhere, one helper. */}
+          <Label>{branchNoun(storeKind)}</Label>
           <select
             value={outletId}
             onChange={(e) => setOutletId(e.target.value)}
             data-testid="staff-add-outlet"
             className={inputCls}
           >
-            <option value="">— all outlets —</option>
+            <option value="">— all {branchNoun(storeKind).toLowerCase()}s —</option>
             {outlets.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}

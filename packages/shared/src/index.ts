@@ -1147,3 +1147,7 @@ export * from "./schemas/staff";
 
 // Store-account self-service (0240) — dealer-principal password/email change.
 export * from "./schemas/account";
+
+// Dealer vs Showroom — the naming rule for our own stores vs external
+// resellers, and for their branches (showroom vs outlet).
+export * from "./store-kind";

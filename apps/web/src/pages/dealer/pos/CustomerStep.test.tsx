@@ -50,8 +50,8 @@ describe("CustomerStep — in-flow dealer pick (internal operator)", () => {
         minLeadDays={14}
         dealerPick={{
           dealers: [
-            { id: "d1", name: "Dealer One" },
-            { id: "d2", name: "Dealer Two" },
+            { id: "d1", name: "Dealer One", channel: "dealer" },
+            { id: "d2", name: "Dealer Two", channel: "dealer" },
           ],
           loading: false,
           value: null,
@@ -60,12 +60,101 @@ describe("CustomerStep — in-flow dealer pick (internal operator)", () => {
       />,
     );
 
-    // Form gated — only the dealer card + hint render.
+    // Form gated — only the store card + hint render.
     expect(screen.getByTestId("pos-dealer-pick")).toBeTruthy();
-    expect(screen.getByText(/Pick a dealer to continue/)).toBeTruthy();
+    expect(screen.getByText(/Pick a store to continue/)).toBeTruthy();
 
     fireEvent.change(screen.getByTestId("pos-dealer-pick"), { target: { value: "d2" } });
     expect(onPick).toHaveBeenCalledWith("d2", "Dealer Two");
+  });
+
+  // Loo 2026-07-19 — our own showrooms used to sit in the same flat list as
+  // external dealers, so there was no way to tell whose store you were
+  // selling under.
+  it("groups the store picker into 'Our showrooms' and 'Dealers'", () => {
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        dealerPick={{
+          dealers: [
+            { id: "d1", name: "Dealer One", channel: "dealer" },
+            { id: "s1", name: "Kelana Jaya", channel: "showroom" },
+          ],
+          loading: false,
+          value: null,
+          onPick: () => {},
+        }}
+      />,
+    );
+    const groups = Array.from(
+      screen.getByTestId("pos-dealer-pick").querySelectorAll("optgroup"),
+    ).map((g) => g.getAttribute("label"));
+    expect(groups).toEqual(["Our showrooms", "Dealers"]);
+  });
+
+  it("names the branch field Showroom for a showroom and Outlet for a dealer", () => {
+    const pick = (channel: "dealer" | "showroom") => ({
+      dealers: [{ id: "x", name: "Store", channel }],
+      loading: false,
+      value: "x",
+      onPick: () => {},
+    });
+    const draft = { ...emptyDraft(), actingDealerId: "x", actingDealerName: "Store" };
+
+    const { unmount } = wrap(
+      <CustomerStep
+        draft={draft}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        dealerPick={pick("showroom")}
+      />,
+    );
+    expect(screen.getByText("Showroom *")).toBeTruthy();
+    unmount();
+
+    wrap(
+      <CustomerStep
+        draft={draft}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        dealerPick={pick("dealer")}
+      />,
+    );
+    expect(screen.getByText("Outlet *")).toBeTruthy();
+  });
+
+  // The AutoCount Archive account has zero outlets — Loo picked it and the
+  // dropdown just sat empty with no explanation (2026-07-19).
+  it("explains an empty branch list instead of showing a blank dropdown", () => {
+    wrap(
+      <CustomerStep
+        draft={{ ...emptyDraft(), actingDealerId: "d1", actingDealerName: "Dealer One" }}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        dealerPick={{
+          dealers: [{ id: "d1", name: "Dealer One", channel: "dealer" }],
+          loading: false,
+          value: "d1",
+          onPick: () => {},
+        }}
+      />,
+    );
+    expect(screen.getByTestId("pos-outlet-empty").textContent).toContain("no outlet yet");
+    expect(screen.getByTestId("pos-outlet-select")).toHaveProperty("disabled", true);
   });
 
   it("renders the full form once a dealer is picked", () => {
@@ -78,14 +167,14 @@ describe("CustomerStep — in-flow dealer pick (internal operator)", () => {
         catalog={catalog()}
         minLeadDays={14}
         dealerPick={{
-          dealers: [{ id: "d1", name: "Dealer One" }],
+          dealers: [{ id: "d1", name: "Dealer One", channel: "dealer" }],
           loading: false,
           value: "d1",
           onPick: () => {},
         }}
       />,
     );
-    expect(screen.queryByText(/Pick a dealer to continue/)).toBeNull();
+    expect(screen.queryByText(/Pick a store to continue/)).toBeNull();
     // The Customer sub-step form is mounted — demographics fields prove the
     // gate opened.
     expect(screen.getByTestId("pos-customer-race")).toBeTruthy();

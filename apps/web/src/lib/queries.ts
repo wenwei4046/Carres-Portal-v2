@@ -166,6 +166,7 @@ import {
   type ModelFabricTierOverrideDto,
   type OrderEntryConfigDto,
   type SetOrderEntryConfigInput,
+  type StoreChannel,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -1864,6 +1865,11 @@ export interface PrincipalDealerRow {
   orderCount: number;
   gmv: number;
   outstanding: number;
+  /** 'showroom' = one of Carres' OWN stores; 'dealer' = an external reseller.
+   *  HQ lists the two on separate pages (Loo 2026-07-19). */
+  channel: StoreChannel;
+  /** How many outlets hang off this account (a dealer's branches). */
+  outletCount: number;
 }
 export interface PrincipalDealersListResponse {
   dealers: PrincipalDealerRow[];
@@ -1893,6 +1899,9 @@ export interface PrincipalDealerDetailDealer {
   ssm_code: string | null;
   contact_name: string | null;
   contact_phone: string | null;
+  /** Same second SELECT — tells the drawer whether this is one of Carres' own
+   *  showrooms (no SSM / PIC) or an external dealer. */
+  channel: StoreChannel;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -5143,6 +5152,9 @@ export interface BdDealerRow {
   orderCount: number;
   gmv: number;
   outstanding: number;
+  /** 'showroom' = one of Carres' own stores; 'dealer' = external reseller.
+   *  BD's on-behalf store picker groups by it (Loo 2026-07-19). */
+  channel: StoreChannel;
 }
 
 export function useBdDealers(

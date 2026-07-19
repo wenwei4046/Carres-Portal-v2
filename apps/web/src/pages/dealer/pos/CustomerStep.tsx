@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
+  branchNoun,
+  isShowroom,
   minDeliveryDateISO,
   resolveFormTab,
+  storeNoun,
   type CatalogResponse,
   type CustomField,
   type OrderEntryTab,
   type OutletDto,
   type SalespersonDto,
+  type StoreChannel,
 } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -31,10 +35,14 @@ const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Oth
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
-/** In-flow dealer pick (internal operator placing on behalf of a dealer).
- *  Absent for dealer-side logins — their JWT dealer is the order's dealer. */
+/** In-flow store pick (internal operator placing on behalf of a store).
+ *  Absent for dealer-side logins — their JWT dealer is the order's dealer.
+ *
+ *  `channel` splits the list into Carres' own showrooms vs external dealers
+ *  (Loo 2026-07-19) — before the split they were one flat list and there was
+ *  no way to tell whose store you were selling under. */
 export interface DealerPick {
-  dealers: Array<{ id: string; name: string }>;
+  dealers: Array<{ id: string; name: string; channel: StoreChannel }>;
   loading: boolean;
   value: string | null;
   onPick: (id: string, name: string) => void;
@@ -60,7 +68,9 @@ export default function CustomerStep({
   draft,
   onChange,
   outlets,
+  outletsLoaded = true,
   salespersons,
+  storeChannel = "dealer",
   catalog,
   minLeadDays,
   dealerPick,
@@ -71,7 +81,13 @@ export default function CustomerStep({
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
   outlets: OutletDto[];
+  /** False while the outlets query is still in flight — an empty `outlets`
+   *  then means "unknown", not "this store has none". */
+  outletsLoaded?: boolean;
   salespersons: SalespersonDto[];
+  /** Kind of store this order belongs to — a dealer's branch is an "Outlet",
+   *  one of ours is a "Showroom" (Loo 2026-07-19). */
+  storeChannel?: StoreChannel;
   catalog: CatalogResponse;
   minLeadDays: number;
   dealerPick?: DealerPick;
@@ -194,6 +210,19 @@ export default function CustomerStep({
   const spOptions = staffSalesOptions ?? visibleSPs;
 
   const dealerPending = !!dealerPick && !dealerPick.value;
+
+  // Store pick, split into the two kinds so the dropdown can group them and
+  // the branch field can name itself (Loo 2026-07-19).
+  const pickedStore = dealerPick?.dealers.find((d) => d.id === dealerPick.value);
+  const pickShowrooms = (dealerPick?.dealers ?? []).filter((d) => isShowroom(d.channel));
+  const pickDealers = (dealerPick?.dealers ?? []).filter((d) => !isShowroom(d.channel));
+  // An internal operator's pick wins over the caller-supplied channel; a
+  // store-side login has no pick, so the prop (their own kind) decides.
+  const branchLabel = branchNoun(pickedStore?.channel ?? storeChannel);
+  // Only assert "no outlet" once the list has actually LOADED — `outlets` is
+  // [] while the query is in flight, and claiming a healthy store has no
+  // branch (plus greying out its picker) is worse than a blank dropdown.
+  const branchesEmpty = outletsLoaded && outlets.length === 0;
   // Same "today" source as the Step3Delivery pickers (shared helper — keeps
   // the birthday wheel's age/year cap on the same clock as the date floors).
   const todayIso = minDeliveryDateISO(0);
@@ -295,12 +324,14 @@ export default function CustomerStep({
           ))}
         </div>
 
-        {/* Dealer card — internal operator picks who this sale belongs to. */}
+        {/* Store card — internal operator picks who this sale belongs to.
+            Grouped so our OWN showrooms never read as somebody's dealership. */}
         {dealerPick && stepIdx === 0 && (
           <div className="fade-in" style={{ marginBottom: 22 }}>
             <div className="field">
               <span className="field__label">
-                Dealer <span style={{ color: "var(--c-orange)" }}>*</span>
+                {pickedStore ? storeNoun(pickedStore.channel) : "Dealer / Showroom"}{" "}
+                <span style={{ color: "var(--c-orange)" }}>*</span>
               </span>
               <select
                 value={dealerPick.value ?? ""}
@@ -313,20 +344,33 @@ export default function CustomerStep({
               >
                 <option value="">
                   {dealerPick.loading
-                    ? "Loading dealers…"
+                    ? "Loading stores…"
                     : dealerPick.dealers.length === 0
-                      ? "No active dealers"
-                      : "Select a dealer…"}
+                      ? "No active stores"
+                      : "Select a store…"}
                 </option>
-                {dealerPick.dealers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
+                {pickShowrooms.length > 0 && (
+                  <optgroup label="Our showrooms">
+                    {pickShowrooms.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {pickDealers.length > 0 && (
+                  <optgroup label="Dealers">
+                    {pickDealers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <span className="field__hint">
-                The order, outlet and salesperson are recorded under this dealer; the activity log
-                keeps your name as who placed it.
+                The order, {branchNoun(pickedStore?.channel).toLowerCase()} and salesperson are
+                recorded under this store; the activity log keeps your name as who placed it.
               </span>
             </div>
           </div>
@@ -334,7 +378,7 @@ export default function CustomerStep({
 
         {dealerPending ? (
           <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            Pick a dealer to continue — the outlet and salesperson lists follow the dealer.
+            Pick a store to continue — the lists below follow it.
           </p>
         ) : (
           <>
@@ -343,20 +387,37 @@ export default function CustomerStep({
               <div className="fade-in">
                 <div className="form-grid">
                   <div className="field">
-                    <span className="field__label">Outlet *</span>
+                    <span className="field__label">{branchLabel} *</span>
                     <select
                       value={draft.outletId ?? ""}
                       onChange={(e) => setOutlet(e.target.value)}
-                      disabled={outletLockedByStaff}
+                      disabled={outletLockedByStaff || branchesEmpty}
                       data-testid="pos-outlet-select"
                     >
-                      <option value="">— pick outlet —</option>
+                      <option value="">
+                        {branchesEmpty
+                          ? `— no ${branchLabel.toLowerCase()} yet —`
+                          : `— pick ${branchLabel.toLowerCase()} —`}
+                      </option>
                       {outlets.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name}
                         </option>
                       ))}
                     </select>
+                    {/* A store with no branch row can't take an order at all —
+                        say so instead of leaving an empty dropdown (Loo hit
+                        this on the AutoCount Archive account, 2026-07-19).
+                        The door differs by who is looking: an internal
+                        operator opens one in Admin → Accounts, a store owner
+                        in their own POS Staff overlay. */}
+                    {branchesEmpty && !outletLockedByStaff && (
+                      <span className="field__hint" data-testid="pos-outlet-empty">
+                        This store has no {branchLabel.toLowerCase()} yet — add one under{" "}
+                        {dealerPick ? "Admin → Accounts" : "Staff → Outlets"} before placing an
+                        order for it.
+                      </span>
+                    )}
                   </div>
                   <div className="field">
                     <span className="field__label">Salesperson *</span>
@@ -370,7 +431,7 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {spOptions.length === 0
-                          ? "— none in this outlet —"
+                          ? `— none in this ${branchLabel.toLowerCase()} —`
                           : "— pick salesperson —"}
                       </option>
                       {spOptions.map((sp) => (
