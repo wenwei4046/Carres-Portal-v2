@@ -135,6 +135,17 @@ staffRouter.get("/", async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
   const rows = (data ?? []) as DB.SalespersonRow[];
 
+  // Sequence = hierarchy (Loo 2026-07-19): highest level first — Dealer
+  // Principal → Manager → Salesperson — then A-Z within a tier. One sort here
+  // orders EVERY consumer (Staff & PINs list, PIN sign-in tiles, HQ Staff
+  // drawer, setup wizard).
+  const TIER_RANK: Record<string, number> = { principal: 0, manager: 1, salesperson: 2 };
+  rows.sort(
+    (a, b) =>
+      (TIER_RANK[a.staff_role] ?? 9) - (TIER_RANK[b.staff_role] ?? 9) ||
+      a.name.localeCompare(b.name),
+  );
+
   // hasPin: a single service_role IN-probe on the deny-all ledger (booleans
   // only — the hash never leaves Postgres). Empty roster → skip the probe.
   const withPin = new Set<string>();
