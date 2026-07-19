@@ -119,6 +119,11 @@ describe("customerPatchFromHit", () => {
       addressPostcode: "46200",
       billingSame: true,
       billing: "",
+      billingLine1: "",
+      billingLine2: "",
+      billingState: "",
+      billingCity: "",
+      billingPostcode: "",
       emergencyName: "Mei Tan",
       emergencyPhone: "012-9988776",
       emergencyRelationship: "Spouse",
@@ -162,5 +167,24 @@ describe("customerPatchFromHit", () => {
     );
     expect(patch.billingSame).toBe(false);
     expect(patch.billing).toBe("88 Jalan Invoice, KL");
+    // Unparseable → line1-only fallback, same behaviour as delivery.
+    expect(patch.billingLine1).toBe("88 Jalan Invoice, KL");
+    expect(patch.billingState).toBe("");
+    expect(patch.billingCity).toBe("");
+    expect(patch.billingPostcode).toBe("");
+  });
+
+  it("parses a composed billing back into the billing cascade (2026-07-19)", () => {
+    const patch = customerPatchFromHit(
+      hit({
+        billingSame: false,
+        billing: "88 Jalan Invoice, Petaling Jaya 46200, Selangor",
+      }),
+    );
+    expect(patch.billingLine1).toBe("88 Jalan Invoice");
+    expect(patch.billingLine2).toBe("");
+    expect(patch.billingState).toBe("Selangor");
+    expect(patch.billingCity).toBe("Petaling Jaya");
+    expect(patch.billingPostcode).toBe("46200");
   });
 });

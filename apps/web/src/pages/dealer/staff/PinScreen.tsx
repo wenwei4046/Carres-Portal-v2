@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import type { StaffDto } from "@carres/shared";
+import { branchNoun, type StaffDto, type StoreChannel } from "@carres/shared";
+import CarresLockup from "@/components/CarresLockup";
 import { ApiError } from "@/lib/api";
 import { useVerifyPin } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
 import PinPad from "../pos/PinPad";
-import { staffColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
+import { staffGateColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
 
 /**
  * PinScreen (0233) — the tap-your-name + 6-digit PIN sign-in for an activated
@@ -23,12 +24,15 @@ export default function PinScreen({
   sessionOutletId,
   dealerId,
   outletLabel,
+  storeChannel = "dealer",
   onForgotPin,
 }: {
   staff: StaffDto[];
   sessionOutletId: string | null;
   dealerId: string | null;
   outletLabel?: string | null;
+  /** Names the branch in the empty-state copy — outlet vs showroom. */
+  storeChannel?: StoreChannel;
   onForgotPin: () => void;
 }) {
   const setSession = useStaffSession((s) => s.setSession);
@@ -71,8 +75,11 @@ export default function PinScreen({
   }
 
   return (
-    <div className="staff-gate" data-testid="staff-pin-screen">
+    <div className="pos-proto staff-gate" data-testid="staff-pin-screen">
       <div className="staff-gate__card">
+        <div className="staff-gate__lockup">
+          <CarresLockup size={24} />
+        </div>
         <div className="staff-gate__eyebrow">{outletLabel || "Sign in"}</div>
         <h2 className="staff-gate__title">Tap your name</h2>
         <p className="staff-gate__sub">
@@ -81,7 +88,9 @@ export default function PinScreen({
 
         {visible.length === 0 ? (
           <p className="staff-gate__notice">
-            No staff set up for this outlet yet. Ask the owner to add you in Settings.
+            No staff set up for this {branchNoun(storeChannel).toLowerCase()} yet. Ask the owner to
+            add you from the Staff button
+            in the POS top bar.
           </p>
         ) : (
           <div className="staff-tiles">
@@ -96,15 +105,15 @@ export default function PinScreen({
               >
                 <span
                   className="staff-tile__avatar"
-                  style={{ background: staffColorHex(s.color) }}
+                  style={{ background: staffGateColorHex(s.color) }}
                 >
                   {staffInitials(s.name)}
                 </span>
                 <span className="staff-tile__name">{s.name}</span>
                 <span className="staff-tile__tier">
-                  {TIER_LABEL[s.staffRole].zh} · {TIER_LABEL[s.staffRole].en}
+                  {TIER_LABEL[s.staffRole]}
                 </span>
-                {!s.hasPin && <span className="staff-tile__badge">未设 PIN</span>}
+                {!s.hasPin && <span className="staff-tile__badge">No PIN</span>}
               </button>
             ))}
           </div>
@@ -188,19 +197,19 @@ function StaffKeypad({
   }
 
   return (
-    <div className="staff-gate" data-testid="staff-pin-keypad">
+    <div className="pos-proto staff-gate" data-testid="staff-pin-keypad">
       <div className="staff-gate__card staff-gate__card--narrow">
         <button className="icon-btn pin-gate__close" onClick={onBack} aria-label="Back" data-testid="staff-pin-back">
           <X size={16} strokeWidth={1.75} />
         </button>
         <span
-          className="staff-tile__avatar"
-          style={{ background: staffColorHex(staff.color), width: 56, height: 56, margin: "0 auto 14px" }}
+          className="staff-tile__avatar staff-gate__bigav"
+          style={{ background: staffGateColorHex(staff.color) }}
         >
           {staffInitials(staff.name)}
         </span>
         <div className="staff-gate__eyebrow">
-          {TIER_LABEL[staff.staffRole].zh} · {TIER_LABEL[staff.staffRole].en}
+          {TIER_LABEL[staff.staffRole]}
         </div>
         <h2 className="staff-gate__title">{staff.name}</h2>
         <p className="staff-gate__sub">

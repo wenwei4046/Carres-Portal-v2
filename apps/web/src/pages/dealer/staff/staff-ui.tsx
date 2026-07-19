@@ -2,27 +2,32 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   STAFF_COLORS,
+  branchNoun,
+  minDeliveryDateISO,
   staffPinSchema,
   type StaffColorKey,
   type StaffDto,
+  type StaffGenderDto,
   type StaffTierDto,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useCreateStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
+import { useCreateStaff, usePatchStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
+import BirthdayWheelField from "../pos/date-keyin/BirthdayWheelField";
 
 /**
- * Shared staff-admin UI (0233) — the bilingual tier labels, colour avatar,
- * STAFF_COLORS dot picker, and the Set-PIN + Add-staff modals. Reused by the
+ * Shared staff-admin UI (0233) — the tier labels, colour avatar, STAFF_COLORS
+ * dot picker, and the Set-PIN + Add-staff modals. Reused by the
  * dealer/showroom Settings staff section AND the principal Accounts staff
  * drawer so both surfaces create/manage staff identically. UI-KIT v4 surfaces
  * (token classes only — colour hexes come from the shared STAFF_COLORS map, so
- * no raw-hex literal ever appears here).
+ * no raw-hex literal ever appears here). All copy is ENGLISH ONLY (Loo
+ * 2026-07-19 — no Chinese anywhere in portal UI).
  */
 
-export const TIER_LABEL: Record<StaffTierDto, { zh: string; en: string }> = {
-  principal: { zh: "店主", en: "Owner" },
-  manager: { zh: "经理", en: "Manager" },
-  salesperson: { zh: "销售", en: "Salesperson" },
+export const TIER_LABEL: Record<StaffTierDto, string> = {
+  principal: "Owner",
+  manager: "Manager",
+  salesperson: "Salesperson",
 };
 
 /**
@@ -30,18 +35,15 @@ export const TIER_LABEL: Record<StaffTierDto, { zh: string; en: string }> = {
  * dealer = Dealer Principal / Manager / Sales Person; showroom = Sales
  * Manager / Sales Executive (no principal — that's Carres itself).
  */
-export function tierLabel(
-  tier: StaffTierDto,
-  storeKind: "dealer" | "showroom",
-): { zh: string; en: string } {
+export function tierLabel(tier: StaffTierDto, storeKind: "dealer" | "showroom"): string {
   if (storeKind === "showroom") {
-    if (tier === "manager") return { zh: "销售经理", en: "Sales Manager" };
-    if (tier === "salesperson") return { zh: "销售专员", en: "Sales Executive" };
+    if (tier === "manager") return "Sales Manager";
+    if (tier === "salesperson") return "Sales Executive";
     return TIER_LABEL.principal; // unreachable — showrooms have no principal
   }
-  if (tier === "principal") return { zh: "店主", en: "Dealer Principal" };
-  if (tier === "manager") return { zh: "经理", en: "Manager" };
-  return { zh: "销售", en: "Sales Person" };
+  if (tier === "principal") return "Dealer Principal";
+  if (tier === "manager") return "Manager";
+  return "Sales Person";
 }
 
 /** Store owner sees the whole tier ladder; a showroom's ladder caps at manager
@@ -71,6 +73,13 @@ export function staffColorHex(color: string | null | undefined): string {
   return STAFF_COLORS.slate;
 }
 
+/** PIN-gate avatars only: an unchosen colour renders brand terracotta instead
+ *  of admin-neutral slate — the gate is a branded surface, grey reads broken
+ *  there (Loo 2026-07-19). Admin chips/lists keep the slate fallback above. */
+export function staffGateColorHex(color: string | null | undefined): string {
+  return color && color in STAFF_COLORS ? STAFF_COLORS[color as StaffColorKey] : "var(--c-burnt)";
+}
+
 export function StaffAvatar({
   color,
   name,
@@ -98,10 +107,9 @@ export function StaffAvatar({
 }
 
 export function TierBadge({ tier }: { tier: StaffTierDto }) {
-  const l = TIER_LABEL[tier];
   return (
     <span className="inline-block px-2 py-[2px] rounded bg-base-100 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-base-700">
-      {l.zh} · {l.en}
+      {TIER_LABEL[tier]}
     </span>
   );
 }
@@ -135,18 +143,21 @@ export function ColorDotPicker({
   );
 }
 
-function ModalShell({
+export function ModalShell({
   title,
   subtitle,
   children,
   onClose,
   footer,
+  wide,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   onClose: () => void;
   footer: React.ReactNode;
+  /** 560px shell for long forms (the BD create-dealer door). */
+  wide?: boolean;
 }) {
   return (
     <div
@@ -156,7 +167,7 @@ function ModalShell({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded w-full max-w-[440px] max-h-[92vh] overflow-auto"
+        className={`bg-white rounded w-full ${wide ? "max-w-[560px]" : "max-w-[440px]"} max-h-[92vh] overflow-auto`}
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <h2 className="font-display text-[20px] tracking-[-0.02em] font-semibold">{title}</h2>
@@ -184,13 +195,17 @@ const btnGhost =
 const btnSolid =
   "px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50";
 
-/** Set / reset a 6-digit PIN (entered twice). `dealerId` scopes the roster
- *  invalidation when a principal edits another store's staff. */
+/** Set / reset a 6-digit PIN (entered twice). An internal HQ caller
+ *  (principal / bd) editing ANOTHER store's staff passes `dealerId` — the
+ *  server resolves the target store from it (400 without). */
 export function SetPinModal({
   staff,
+  dealerId,
   onClose,
 }: {
   staff: Pick<StaffDto, "id" | "name">;
+  /** Set when HQ (principal / bd) targets another store's member. */
+  dealerId?: string;
   onClose: () => void;
 }) {
   const [pin, setPin] = useState("");
@@ -204,7 +219,7 @@ export function SetPinModal({
   function submit() {
     if (!valid) return;
     setStaffPin.mutate(
-      { id: staff.id, pin },
+      { id: staff.id, pin, dealerId },
       {
         onSuccess: () => toast.success(`PIN set for ${staff.name}`),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not set PIN"),
@@ -306,10 +321,10 @@ export function ChangeMyPinModal({
     if (e instanceof ApiError) {
       const body = e.body as { error?: string; remaining?: number } | null;
       if (body?.error === "bad_pin") {
-        return `旧 PIN 不对 · Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
+        return `Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
       }
       if (body?.error === "pin_locked") {
-        return "试太多次,已锁定 15 分钟 · Locked, try again later";
+        return "Too many attempts — locked for 15 minutes, try again later";
       }
       return e.message;
     }
@@ -327,7 +342,7 @@ export function ChangeMyPinModal({
             { id: sid, pin },
             {
               onSuccess: () => {
-                toast.success("PIN updated · 新 PIN 已生效");
+                toast.success("PIN updated");
                 onClose();
               },
               onError: (e) =>
@@ -365,7 +380,7 @@ export function ChangeMyPinModal({
       }
     >
       <label className="flex flex-col gap-1.5">
-        <Label>Current PIN · 旧 PIN</Label>
+        <Label>Current PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -378,7 +393,7 @@ export function ChangeMyPinModal({
         />
       </label>
       <label className="flex flex-col gap-1.5">
-        <Label>New PIN · 新 PIN</Label>
+        <Label>New PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -391,7 +406,7 @@ export function ChangeMyPinModal({
         />
       </label>
       <label className="flex flex-col gap-1.5">
-        <Label>Confirm new PIN · 再输一次</Label>
+        <Label>Confirm new PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -418,6 +433,17 @@ export function ChangeMyPinModal({
   );
 }
 
+const inputCls =
+  "w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+const pinCls =
+  "w-full px-3 py-2.5 border border-base-200 rounded text-[15px] tracking-[0.4em] font-mono bg-white outline-none focus:border-base-700";
+
+/**
+ * Create a staff member — ONE step (Loo 2026-07-19): profile (name / email /
+ * birthday / gender, all required) + role/outlet/colour + the 6-digit PIN set
+ * right here, so there's no separate Set-PIN follow-up. The row's Set/Reset
+ * PIN action remains for later rotations.
+ */
 export function AddStaffModal({
   callerTier,
   storeKind,
@@ -437,25 +463,46 @@ export function AddStaffModal({
 }) {
   const tiers = allowedCreateTiers(callerTier, storeKind);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [gender, setGender] = useState<StaffGenderDto | "">("");
   const [phone, setPhone] = useState("");
   const [staffRole, setStaffRole] = useState<StaffTierDto>(tiers[tiers.length - 1] ?? "salesperson");
   const [color, setColor] = useState<StaffColorKey>("flame");
+  const [pin, setPin] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
   const managerLocked = callerTier === "manager";
   const [outletId, setOutletId] = useState<string>(
     managerLocked ? (callerOutletId ?? "") : (outlets[0]?.id ?? ""),
   );
   const create = useCreateStaff();
 
-  const valid = name.trim().length >= 2 && tiers.includes(staffRole);
+  const digits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const pinOk = staffPinSchema.safeParse(pin).success;
+  const pinMatch = pin === pinConfirm;
+  const valid =
+    name.trim().length >= 2 &&
+    emailOk &&
+    birthday.length > 0 &&
+    gender !== "" &&
+    tiers.includes(staffRole) &&
+    pinOk &&
+    pinMatch;
 
   function submit() {
+    // `valid` already requires a gender pick — TS narrows it to male|female here.
     if (!valid) return;
     create.mutate(
       {
         name: name.trim(),
+        email: email.trim().toLowerCase(),
+        birthday,
+        gender,
         staffRole,
         phone: phone.trim() ? phone.trim() : undefined,
         color,
+        pin,
         // Salespersons bind to an outlet; a store owner (principal tier) sees all
         // outlets, so a blank pick is legitimately "all outlets" (null).
         outletId: managerLocked
@@ -469,7 +516,7 @@ export function AddStaffModal({
       },
       {
         onSuccess: () => {
-          toast.success(`Added ${name.trim()}`);
+          toast.success(`Added ${name.trim()} — they can sign in with their PIN now`);
           onClose();
         },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not add staff"),
@@ -480,7 +527,7 @@ export function AddStaffModal({
   return (
     <ModalShell
       title="Add staff"
-      subtitle="They'll appear on the PIN screen once you set their PIN."
+      subtitle="Their PIN is set right here — they'll appear on the sign-in screen immediately."
       onClose={onClose}
       footer={
         <>
@@ -500,10 +547,48 @@ export function AddStaffModal({
           onChange={(e) => setName(e.target.value)}
           data-testid="staff-add-name"
           autoFocus
-          className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className={inputCls}
           placeholder="e.g. Aisha Rahman"
         />
       </label>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Email</Label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          data-testid="staff-add-email"
+          className={inputCls}
+          placeholder="aisha@store.com"
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label>Birthday</Label>
+          {/* Same drum picker as the Sales Order customer birthday (Loo 2026-07-19). */}
+          <BirthdayWheelField
+            value={birthday}
+            todayIso={minDeliveryDateISO(0)}
+            onChange={setBirthday}
+            testId="staff-add-birthday"
+          />
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <Label>Gender</Label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as StaffGenderDto | "")}
+            data-testid="staff-add-gender"
+            className={inputCls}
+          >
+            <option value="">— select —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </div>
 
       <label className="flex flex-col gap-1.5">
         <Label>Phone (optional)</Label>
@@ -511,7 +596,7 @@ export function AddStaffModal({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           data-testid="staff-add-phone"
-          className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className={inputCls}
           placeholder="012-3456789"
         />
       </label>
@@ -523,30 +608,29 @@ export function AddStaffModal({
             value={staffRole}
             onChange={(e) => setStaffRole(e.target.value as StaffTierDto)}
             data-testid="staff-add-role"
-            className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className={inputCls}
           >
-            {tiers.map((t) => {
-              const l = tierLabel(t, storeKind);
-              return (
-                <option key={t} value={t}>
-                  {l.en} · {l.zh}
-                </option>
-              );
-            })}
+            {tiers.map((t) => (
+              <option key={t} value={t}>
+                {tierLabel(t, storeKind)}
+              </option>
+            ))}
           </select>
         </label>
       )}
 
       {!managerLocked && staffRole !== "principal" && outlets.length > 1 && (
         <label className="flex flex-col gap-1.5">
-          <Label>Outlet</Label>
+          {/* Loo 2026-07-19 — a dealer's branch is an "outlet", one of ours is
+              a "showroom". Same rule everywhere, one helper. */}
+          <Label>{branchNoun(storeKind)}</Label>
           <select
             value={outletId}
             onChange={(e) => setOutletId(e.target.value)}
             data-testid="staff-add-outlet"
-            className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className={inputCls}
           >
-            <option value="">— all outlets —</option>
+            <option value="">— all {branchNoun(storeKind).toLowerCase()}s —</option>
             {outlets.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
@@ -561,9 +645,192 @@ export function AddStaffModal({
         <ColorDotPicker value={color} onChange={setColor} />
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <Label>6-digit PIN</Label>
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(digits(e.target.value))}
+            data-testid="staff-add-pin"
+            className={pinCls}
+            placeholder="••••••"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <Label>Confirm PIN</Label>
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={pinConfirm}
+            onChange={(e) => setPinConfirm(digits(e.target.value))}
+            data-testid="staff-add-pin-confirm"
+            className={pinCls}
+            placeholder="••••••"
+          />
+        </label>
+      </div>
+      {pinConfirm.length === 6 && !pinMatch && (
+        <div className="text-[12px] text-destructive">PINs don&apos;t match.</div>
+      )}
+
       {create.isError && (
         <div className="text-[12px] text-destructive">
           {create.error?.message ?? "Could not add staff"}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+/**
+ * Edit an existing member's profile (Loo 2026-07-19) — name / email /
+ * birthday / gender / phone / avatar colour. PIN rotation stays on the row's
+ * Set/Reset PIN action; role and outlet moves stay out of scope (server keeps
+ * them principal-only). Same field requirements as Add so older rows get
+ * their missing profile data filled when first edited.
+ */
+export function EditStaffModal({
+  staff,
+  dealerId,
+  onClose,
+}: {
+  staff: StaffDto;
+  /** Set when HQ (principal / bd) edits another store's member. */
+  dealerId?: string;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(staff.name);
+  const [email, setEmail] = useState(staff.email ?? "");
+  const [birthday, setBirthday] = useState(staff.birthday ?? "");
+  const [gender, setGender] = useState<StaffGenderDto | "">(staff.gender ?? "");
+  const [phone, setPhone] = useState(staff.phone ?? "");
+  const [color, setColor] = useState<StaffColorKey>(
+    (staff.color as StaffColorKey | null) ?? "flame",
+  );
+  const patch = usePatchStaff();
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const valid = name.trim().length >= 2 && emailOk && birthday.length > 0 && gender !== "";
+
+  function submit() {
+    // `valid` already requires a gender pick — TS narrows it to male|female here.
+    if (!valid || patch.isPending) return;
+    patch.mutate(
+      {
+        id: staff.id,
+        dealerId,
+        patch: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          birthday,
+          gender,
+          phone: phone.trim() ? phone.trim() : null,
+          color,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Updated ${name.trim()}`);
+          onClose();
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not update staff"),
+      },
+    );
+  }
+
+  return (
+    <ModalShell
+      title="Edit staff"
+      subtitle={`${staff.name} — update their profile. PIN changes use the Set/Reset PIN action instead.`}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={patch.isPending} className={btnGhost}>
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!valid || patch.isPending}
+            className={btnSolid}
+            data-testid="staff-edit-save"
+          >
+            {patch.isPending ? "Saving…" : "Save changes"}
+          </button>
+        </>
+      }
+    >
+      <label className="flex flex-col gap-1.5">
+        <Label>Full name</Label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          data-testid="staff-edit-name"
+          autoFocus
+          className={inputCls}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Email</Label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          data-testid="staff-edit-email"
+          className={inputCls}
+          placeholder="name@store.com"
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label>Birthday</Label>
+          {/* Same drum picker as the Sales Order customer birthday (Loo 2026-07-19). */}
+          <BirthdayWheelField
+            value={birthday}
+            todayIso={minDeliveryDateISO(0)}
+            onChange={setBirthday}
+            testId="staff-edit-birthday"
+          />
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <Label>Gender</Label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as StaffGenderDto | "")}
+            data-testid="staff-edit-gender"
+            className={inputCls}
+          >
+            <option value="">— select —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Phone (optional)</Label>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          data-testid="staff-edit-phone"
+          className={inputCls}
+          placeholder="012-3456789"
+        />
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Avatar colour</Label>
+        <ColorDotPicker value={color} onChange={setColor} />
+      </div>
+
+      {patch.isError && (
+        <div className="text-[12px] text-destructive">
+          {patch.error?.message ?? "Could not update staff"}
         </div>
       )}
     </ModalShell>

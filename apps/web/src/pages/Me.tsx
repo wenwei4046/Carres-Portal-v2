@@ -5,7 +5,7 @@ import type { Role } from "@carres/shared/domain";
 import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
+import { changeOwnPassword } from "@/lib/password";
 
 function homeForRole(role: Role | null): string {
   switch (role) {
@@ -153,17 +153,10 @@ function ChangePasswordCard({ email }: { email: string }) {
 
     setBusy(true);
     try {
-      // Step 1: verify current by re-running signInWithPassword. Wrong → error.
-      const verify = await supabase.auth.signInWithPassword({ email, password: current });
-      if (verify.error) {
-        setError("Current password is incorrect");
-        setBusy(false);
-        return;
-      }
-      // Step 2: rotate password on the now-fresh session.
-      const upd = await supabase.auth.updateUser({ password: next });
-      if (upd.error) {
-        setError(upd.error.message);
+      // Shared 2-step rotation (verify current → updateUser) — lib/password.ts.
+      const result = await changeOwnPassword(email, current, next);
+      if (!result.ok) {
+        setError(result.error);
         setBusy(false);
         return;
       }

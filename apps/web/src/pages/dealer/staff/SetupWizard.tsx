@@ -47,7 +47,7 @@ export default function SetupWizard({
   const [ownerOutletId, setOwnerOutletId] = useState<string | null>(null);
 
   return (
-    <div className="staff-gate" data-testid="staff-setup-wizard">
+    <div className="pos-proto staff-gate" data-testid="staff-setup-wizard">
       <div className="staff-gate__card">
         {step === 1 && (
           <ReauthStep
@@ -201,7 +201,7 @@ function IdentityStep({
   return (
     <>
       <div className="staff-gate__eyebrow">First-time setup · 2 of 3</div>
-      <h2 className="staff-gate__title">You're the {TIER_LABEL[ownerTier].zh}</h2>
+      <h2 className="staff-gate__title">You're the {TIER_LABEL[ownerTier]}</h2>
       <p className="staff-gate__sub">
         This is your own sign-in tile. Pick a colour and a 6-digit PIN — you'll tap your name and
         enter this PIN to open the POS.
@@ -277,7 +277,8 @@ function ExistingStaffStep({
         <div className="staff-gate__eyebrow">First-time setup · 3 of 3</div>
         <h2 className="staff-gate__title">You're all set</h2>
         <p className="staff-gate__sub">
-          Add your salespeople anytime from Settings → Staff. For now, let's get selling.
+          Add your salespeople anytime from the Staff button in the POS top bar. For now,
+          let's get selling.
         </p>
         <button
           type="button"
@@ -297,8 +298,8 @@ function ExistingStaffStep({
       <div className="staff-gate__eyebrow">First-time setup · 3 of 3</div>
       <h2 className="staff-gate__title">Set your team's PINs</h2>
       <p className="staff-gate__sub">
-        Give each salesperson a PIN so they can sign in. You can also do this later in Settings —
-        skip if you're not ready.
+        Give each salesperson a PIN so they can sign in. You can also do this later from the
+        POS Staff button — skip if you're not ready.
       </p>
 
       <div className="staff-outlets">
@@ -346,7 +347,7 @@ function ExistingStaffRow({ staff }: { staff: StaffDto }) {
         <span style={{ flex: 1 }}>
           <span className="staff-outlet__name">{staff.name}</span>
           <span className="staff-outlet__addr">
-            {TIER_LABEL[staff.staffRole].zh} · {staff.hasPin ? "PIN set" : "no PIN"}
+            {TIER_LABEL[staff.staffRole]} · {staff.hasPin ? "PIN set" : "no PIN"}
           </span>
         </span>
         {saved ? (

@@ -155,7 +155,9 @@ export type SalesOrderTemplateData = {
    * Line items rendered in the body table. `description` includes the SKU's
    * model + variant; `attrs` summarises bedframe `{color, gap}` / sofa
    * `{fabric_name, fabric_surcharge}` / mattress `{preset}` so the customer
-   * sees what they actually bought.
+   * sees what they actually bought. A built sofa arrives REGROUPED (Loo
+   * 2026-07-19): one row per build (sku = model key, description = model
+   * name) whose `attrs.sofa_spec` carries the cart-style spec copy.
    */
   lines: Array<{
     sku: string;

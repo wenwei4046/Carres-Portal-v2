@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
-  createAccountInput,
   setAccountStatusInput,
   resetPasswordInput,
+  decideEmailChangeInputSchema,
+  emailChangeRequestFromRow,
+  EMAIL_CHANGE_REQUESTS_TABLE,
+  type EmailChangeRequestRow,
 } from "@carres/shared";
+import { handleCreateAccount } from "../../lib/create-account";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -103,294 +107,9 @@ principalAccountsRouter.get("/", async (c) => {
 });
 
 // ---------- POST / — create ----------
-principalAccountsRouter.post("/", async (c) => {
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    raw = {};
-  }
-  const parsed = createAccountInput.safeParse(raw);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
-  const body = parsed.data;
-  const sb = adminClient(c.env);
-  const principalEmail = c.var.auth.email;
-
-  // Email uniqueness check upfront (auth.admin.createUser surfaces a generic
-  // 422 if collision; this gives a cleaner contract for the FE).
-  const existing = await sb
-    .from("app_users")
-    .select("id")
-    .eq("email", body.email)
-    .maybeSingle();
-  if (existing.data) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "email_in_use",
-        message: "Email already in use",
-      },
-      422,
-    );
-  }
-
-  // Step 1 (if needed): create new org row for dealer/supplier/partner.
-  let dealerId: string | null = null;
-  let supplierId: string | null = null;
-  let partnerId: string | null = null;
-  let createdOrgTable: "dealers" | "suppliers" | "delivery_partners" | null = null;
-  let createdOrgId: string | null = null;
-
-  if (body.role === "dealer" || body.role === "showroom") {
-    // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under
-    // the hood, so the org-creation path is identical to plain dealer. The
-    // only difference is the `channel` column value, which drives the
-    // dealer-channel vs showroom-channel branching in downstream UI/PDF
-    // (e.g. Sales Order "Sold By" letterhead).
-    const channel = body.role === "showroom" ? "showroom" : "dealer";
-    const dpInsert = await sb
-      .from("dealers")
-      .insert({
-        name: body.companyName!,
-        channel,
-        region: body.region?.trim() || "—",
-        // Legacy single-text `contact` column auto-built from the new
-        // structured contact_name + contact_phone fields so existing reads
-        // (DealerRow tooltip, DealerDrawer header) keep working.
-        contact: `${body.contactName!} · ${body.contactPhone!}`,
-        address: body.address!,
-        ssm_code: body.ssmCode!,
-        contact_name: body.contactName!,
-        contact_phone: body.contactPhone!,
-      })
-      .select("id")
-      .single();
-    if (dpInsert.error || !dpInsert.data) {
-      return c.json(
-        {
-          error: "rpc_failed",
-          code: "dealers_insert_failed",
-          message: dpInsert.error?.message ?? "dealers insert failed",
-        },
-        500,
-      );
-    }
-    dealerId = dpInsert.data.id;
-    createdOrgTable = "dealers";
-    createdOrgId = dealerId;
-
-    // 2026-05-22 (Loo) — auto-create the default outlet so the dealer/
-    // showroom can start creating sales orders immediately. Without this
-    // the Step 1 picker stalls with "No outlets yet — add one in Settings".
-    // outletName defaults to companyName when blank (handles the common
-    // case "outlet = company"); explicit override supported via the form.
-    const outletInsert = await sb
-      .from("outlets")
-      .insert({
-        dealer_id: dealerId,
-        name: (body.outletName?.trim() || body.companyName)!,
-        address: body.address!,
-      })
-      .select("id")
-      .single();
-    if (outletInsert.error || !outletInsert.data) {
-      return c.json(
-        {
-          error: "rpc_failed",
-          code: "outlets_insert_failed",
-          message: outletInsert.error?.message ?? "default outlet insert failed",
-        },
-        500,
-      );
-    }
-    const defaultOutletId = outletInsert.data.id as string;
-
-    // 2026-07-18 (Loo) — the FIRST staff identity + PIN provisioned right at
-    // account creation, so the store is born ACTIVATED: its first login lands
-    // straight on the PIN screen (no setup wizard). A Dealer-Principal tier is
-    // store-wide (null outlet); manager/salesperson land in the default
-    // outlet. zod already caps showroom at manager.
-    if (body.initialStaff) {
-      const st = body.initialStaff;
-      const staffInsert = await sb
-        .from("salespersons")
-        .insert({
-          dealer_id: dealerId,
-          outlet_id: st.staffRole === "principal" ? null : defaultOutletId,
-          name: st.name,
-          staff_role: st.staffRole,
-          active: true,
-        })
-        .select("id")
-        .single();
-      if (staffInsert.error || !staffInsert.data) {
-        await sb.from("dealers").delete().eq("id", dealerId);
-        return c.json(
-          {
-            error: "rpc_failed",
-            code: "staff_insert_failed",
-            message: staffInsert.error?.message ?? "initial staff insert failed",
-          },
-          500,
-        );
-      }
-      const pinRes = await sb.rpc("staff_set_pin", {
-        p_salesperson_id: staffInsert.data.id,
-        p_pin: st.pin,
-      });
-      if (pinRes.error) {
-        await sb.from("dealers").delete().eq("id", dealerId);
-        return c.json(
-          {
-            error: "rpc_failed",
-            code: "staff_pin_failed",
-            message: pinRes.error.message,
-          },
-          500,
-        );
-      }
-    }
-  } else if (body.role === "supplier") {
-    const dpInsert = await sb
-      .from("suppliers")
-      .insert({
-        name: body.companyName!,
-        contact_email: body.email,
-      })
-      .select("id")
-      .single();
-    if (dpInsert.error || !dpInsert.data) {
-      return c.json(
-        {
-          error: "rpc_failed",
-          code: "suppliers_insert_failed",
-          message: dpInsert.error?.message ?? "suppliers insert failed",
-        },
-        500,
-      );
-    }
-    supplierId = dpInsert.data.id;
-    createdOrgTable = "suppliers";
-    createdOrgId = supplierId;
-  } else if (body.role === "partner") {
-    const dpInsert = await sb
-      .from("delivery_partners")
-      .insert({
-        name: body.companyName!,
-        contact: `${body.name} · ${body.email}`,
-      })
-      .select("id")
-      .single();
-    if (dpInsert.error || !dpInsert.data) {
-      return c.json(
-        {
-          error: "rpc_failed",
-          code: "delivery_partners_insert_failed",
-          message: dpInsert.error?.message ?? "delivery_partners insert failed",
-        },
-        500,
-      );
-    }
-    partnerId = dpInsert.data.id;
-    createdOrgTable = "delivery_partners";
-    createdOrgId = partnerId;
-  }
-
-  // Step 2: create auth.users via service_role admin API. The
-  // app_metadata.role is mirrored into the JWT by the custom_access_token_hook
-  // (migration 0004) at login — but we also write it here so the user can
-  // sign in immediately without waiting for the hook to fire on first
-  // session refresh.
-  const appMetadata: Record<string, string | null> = { role: body.role };
-  if (dealerId) appMetadata.dealer_id = dealerId;
-  if (supplierId) appMetadata.supplier_id = supplierId;
-  if (partnerId) appMetadata.partner_id = partnerId;
-
-  const userResult = await sb.auth.admin.createUser({
-    email: body.email,
-    password: body.tempPassword,
-    email_confirm: true,
-    app_metadata: appMetadata,
-  });
-
-  if (userResult.error || !userResult.data?.user) {
-    if (createdOrgTable && createdOrgId) {
-      await sb.from(createdOrgTable).delete().eq("id", createdOrgId);
-    }
-    return c.json(
-      {
-        error: "rpc_failed",
-        code: "auth_user_create_failed",
-        message: userResult.error?.message ?? "auth.admin.createUser failed",
-      },
-      500,
-    );
-  }
-  const authUserId = userResult.data.user.id;
-
-  // Step 3: insert app_users row.
-  const appUserInsert = await sb
-    .from("app_users")
-    .insert({
-      id: authUserId,
-      email: body.email,
-      name: body.name,
-      role: body.role,
-      title: body.title ?? null,
-      status: "active",
-      dealer_id: dealerId,
-      supplier_id: supplierId,
-      partner_id: partnerId,
-      created_by: c.var.auth.id,
-    });
-
-  if (appUserInsert.error) {
-    await sb.auth.admin.deleteUser(authUserId);
-    if (createdOrgTable && createdOrgId) {
-      await sb.from(createdOrgTable).delete().eq("id", createdOrgId);
-    }
-    return c.json(
-      {
-        error: "rpc_failed",
-        code: "app_users_insert_failed",
-        message: appUserInsert.error.message,
-      },
-      500,
-    );
-  }
-
-  // Audit — non-blocking. Action text mirrors proto wording.
-  const orgPart = body.companyName ? ` · ${body.companyName}` : "";
-  await sb.from("audit_log").insert({
-    role: "principal",
-    actor_text: principalEmail,
-    action: `Created ${body.role} account · ${body.name} (${body.email})${orgPart}`,
-    dealer_id: dealerId,
-    ref: authUserId,
-  });
-
-  return c.json(
-    {
-      id: authUserId,
-      email: body.email,
-      name: body.name,
-      role: body.role,
-      dealerId,
-      supplierId,
-      partnerId,
-    },
-    201,
-  );
-});
+// Body moved verbatim to lib/create-account.ts (2026-07-19) so the BD portal
+// can mount the SAME door restricted to role=dealer (/api/bd/accounts).
+principalAccountsRouter.post("/", (c) => handleCreateAccount(c, { actorRole: "principal" }));
 
 // ---------- POST /:id/status — disable / re-enable ----------
 principalAccountsRouter.post("/:id/status", async (c) => {
@@ -533,6 +252,145 @@ principalAccountsRouter.post("/:id/reset-password", async (c) => {
   });
 
   return c.json({ id, ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Store email-change requests (0240, Loo 2026-07-19) — a dealer principal
+// files a login-email change from the POS (/api/account/email-change); HQ
+// decides here. Approve swaps the REAL login email (auth.admin) + app_users;
+// reject parks a note the store sees. Same service_role + audit_log pattern
+// as reset-password above.
+// ---------------------------------------------------------------------------
+
+// ---------- GET /email-change-requests — the HQ queue ----------
+principalAccountsRouter.get("/email-change-requests", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .select("*, dealers(name)")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({
+    requests: ((data ?? []) as EmailChangeRequestRow[]).map(emailChangeRequestFromRow),
+  });
+});
+
+// ---------- POST /email-change-requests/:id/approve ----------
+principalAccountsRouter.post("/email-change-requests/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const sb = adminClient(c.env);
+  const principalEmail = c.var.auth.email;
+
+  const { data: row, error: findErr } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (findErr) throw new HTTPException(500, { message: findErr.message });
+  if (!row) {
+    return c.json({ error: "not_found", code: "not_found", message: "Request not found" }, 404);
+  }
+  const req = row as EmailChangeRequestRow;
+  if (req.status !== "pending") {
+    return c.json({ error: "not_pending", message: `Request is already ${req.status}` }, 409);
+  }
+
+  // Uniqueness re-check at decision time (excluding the target's own row so a
+  // partially-applied approve stays retryable).
+  const { data: taken, error: takenErr } = await sb
+    .from("app_users")
+    .select("id")
+    .eq("email", req.requested_email)
+    .neq("id", req.user_id)
+    .maybeSingle();
+  if (takenErr) throw new HTTPException(500, { message: takenErr.message });
+  if (taken) {
+    return c.json({ error: "email_in_use", message: "Email already in use — reject with a note instead" }, 422);
+  }
+
+  // The REAL swap: auth.users first (the login), then the app_users mirror.
+  // If the mirror write fails the request stays pending — re-approving is
+  // idempotent (same email onto the same auth user).
+  const upd = await sb.auth.admin.updateUserById(req.user_id, {
+    email: req.requested_email,
+    email_confirm: true,
+  });
+  if (upd.error) {
+    return c.json(
+      { error: "rpc_failed", code: "auth_email_update_failed", message: upd.error.message },
+      500,
+    );
+  }
+  const mirror = await sb
+    .from("app_users")
+    .update({ email: req.requested_email })
+    .eq("id", req.user_id);
+  if (mirror.error) throw new HTTPException(500, { message: mirror.error.message });
+
+  const { data: decided, error: decideErr } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .update({
+      status: "approved",
+      decided_by: c.var.auth.id,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (decideErr) throw new HTTPException(500, { message: decideErr.message });
+
+  await sb.from("audit_log").insert({
+    role: "principal",
+    actor_text: principalEmail,
+    action: `Approved store email change · ${req.current_email} → ${req.requested_email}`,
+    dealer_id: req.dealer_id,
+    ref: req.user_id,
+  });
+
+  return c.json(emailChangeRequestFromRow(decided as EmailChangeRequestRow));
+});
+
+// ---------- POST /email-change-requests/:id/reject ----------
+principalAccountsRouter.post("/email-change-requests/:id/reject", async (c) => {
+  const id = c.req.param("id");
+  const parsed = decideEmailChangeInputSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_body", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid body" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const principalEmail = c.var.auth.email;
+
+  const { data: decided, error } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .update({
+      status: "rejected",
+      decision_note: parsed.data.note?.length ? parsed.data.note : null,
+      decided_by: c.var.auth.id,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  if (!decided) {
+    return c.json({ error: "not_pending", message: "No pending request with that id" }, 404);
+  }
+  const req = decided as EmailChangeRequestRow;
+
+  await sb.from("audit_log").insert({
+    role: "principal",
+    actor_text: principalEmail,
+    action: `Rejected store email change · ${req.current_email} → ${req.requested_email}${parsed.data.note ? ` · ${parsed.data.note}` : ""}`,
+    dealer_id: req.dealer_id,
+    ref: req.user_id,
+  });
+
+  return c.json(emailChangeRequestFromRow(req));
 });
 
 export default principalAccountsRouter;

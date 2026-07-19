@@ -4,6 +4,7 @@ import type { CatalogResponse, Order } from "@carres/shared";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { useAuth } from "@/lib/auth";
 import { usePwpCodesByOrder } from "@/lib/queries";
+import { groupSofaBuildLines } from "@/lib/sofa-build-display";
 import StripeCollectModal from "../pos/StripeCollectModal";
 
 interface Props {
@@ -21,8 +22,6 @@ interface Props {
   stripeCollectedAmount?: number;
   /** Reset the flow back to a fresh draft + the CATALOG step (no navigation). */
   onNewOrder: () => void;
-  /** Leave the POS — caller clears the draft and navigates to the orders list. */
-  onClose: () => void;
 }
 
 /** sku → { name, variant, photo } off the catalog bundle (same photo source
@@ -56,7 +55,6 @@ export default function ThankYou({
   stripeCollectAmount,
   stripeCollectedAmount,
   onNewOrder,
-  onClose,
 }: Props) {
   const role = useAuth((s) => s.role);
   const firstName = order.customer.name?.trim().split(/\s+/)[0] || "friend";
@@ -74,7 +72,11 @@ export default function ThankYou({
     () => new Map((catalog?.addons ?? []).map((a) => [a.key, a.name])),
     [catalog],
   );
-  const itemCount = (order.lines ?? []).reduce((s, l) => s + l.qty, 0);
+  // A built sofa is persisted EXPLODED (one order_line per compartment,
+  // Phase 5) — that split is operation's view. The customer's receipt shows
+  // ONE model line with the sofa spec copy (Loo 2026-07-19), same as the cart.
+  const rows = useMemo(() => groupSofaBuildLines(order.lines ?? []), [order.lines]);
+  const itemCount = rows.reduce((s, r) => s + (r.kind === "line" ? r.line.qty : 1), 0);
   const itemsTotal = (order.lines ?? []).reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonsTotal = (order.addons ?? []).reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const total = itemsTotal + addonsTotal;
@@ -147,9 +149,6 @@ export default function ThankYou({
                 variant="secondary"
               />
             )}
-            <button type="button" className="btn btn--ghost btn--lg" onClick={onClose}>
-              View orders
-            </button>
           </div>
         </div>
       </div>
@@ -164,7 +163,35 @@ export default function ThankYou({
           <div className="summary__section">
             <div className="summary__section-label">Items</div>
             <div className="summary__items">
-              {(order.lines ?? []).map((l, i) => {
+              {rows.map((row, i) => {
+                if (row.kind === "sofa_build") {
+                  // ONE receipt row per built sofa: model name + the cart-style
+                  // spec ("1B(LHF) + CNR + 2A(RHF) · 24″ · …") + the build total.
+                  const info = infoBySku.get(row.lines[0]?.sku ?? "");
+                  return (
+                    <div key={row.buildKey} className="summary__item">
+                      <div
+                        className="summary__item-photo"
+                        style={
+                          info?.photo
+                            ? { backgroundImage: `url(${info.photo})`, backgroundColor: "white" }
+                            : undefined
+                        }
+                      />
+                      <div className="summary__item-main">
+                        <div className="summary__item-name">{info?.name ?? "Sofa"}</div>
+                        <div className="summary__item-meta">
+                          {[row.spec, `qty ${row.qty}`].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      <span className="summary__item-price">
+                        <sup>RM</sup>
+                        {row.totalPrice.toLocaleString("en-MY")}
+                      </span>
+                    </div>
+                  );
+                }
+                const l = row.line;
                 const info = infoBySku.get(l.sku);
                 const attrs = l.attrs as Record<string, unknown> | null;
                 const isFree = Boolean(attrs?.free_gift || attrs?.free_item);

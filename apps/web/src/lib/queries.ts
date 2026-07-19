@@ -76,6 +76,9 @@ import {
   // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0239 — Product bundles (bundle pricing, principal-only CRUD).
+  type ProductBundleDto,
+  type ProductBundleInput,
   // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
   type PwpReserveInput,
   type PwpCodesResponse,
@@ -131,6 +134,11 @@ import {
   type UpdateStaffInput,
   type SetStaffPinInput,
   type StaffDto,
+  // 0240 — store-account email-change requests (dealer principal → HQ approval).
+  type EmailChangeRequestDto,
+  type SubmitEmailChangeInput,
+  // 2026-07-19 — the BD dealer-account create door (principal-parity schema).
+  type CreateAccountInput,
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
@@ -159,6 +167,7 @@ import {
   type ModelFabricTierOverrideDto,
   type OrderEntryConfigDto,
   type SetOrderEntryConfigInput,
+  type StoreChannel,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -181,6 +190,8 @@ export const qk = {
    *  store via dealerId; own-store reads pass none. Kept off the `salespersons`
    *  prefix so staff mutations that flip hasPin invalidate distinctly. */
   staff:        (dealerId?: string) => ["staff", dealerId ?? null] as const,
+  /** 0240 — my store's latest email-change request (dealer principal). */
+  emailChange:  () => ["email-change", "mine"] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
    *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
    *  this so the rail re-reads the live RESERVED set after a trigger change. */
@@ -206,6 +217,8 @@ export const qk = {
     partners:  () => ["principal", "partners"] as const,
     /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
     accounts:  () => ["principal", "accounts"] as const,
+    /** 0240 — store email-change request queue (HQ approval). */
+    emailChanges: () => ["principal", "email-changes"] as const,
     /** Phase 10 — audit log (PrincipalAudit). */
     audit:     (filters?: Record<string, unknown>) =>
       ["principal", "audit", filters ?? {}] as const,
@@ -349,9 +362,11 @@ export const qk = {
     refunds:          (filters?: FinanceRefundsFilters) =>
       ["finance", "refunds", filters ?? {}] as const,
   },
-  // Phase 8 — BD namespace.
+  // BD namespace (2026-07-19 — the BD POS reads dealer stats + audit activity;
+  // the Phase-8 Inquiries key died with the ERP-style BD portal).
   bd: {
-    inquiries: () => ["bd", "inquiries"] as const,
+    dealers:  () => ["bd", "dealers"] as const,
+    activity: (limit?: number) => ["bd", "activity", limit ?? 12] as const,
   },
   // Phase 6 — Supplier namespace. Same nested-key strategy so mutations can
   // blast `["supplier"]` (e.g. ack/start-production ripples to PO list +
@@ -1435,8 +1450,8 @@ export function usePwpCodesByOrder(
 }
 
 /**
- * 2026-05-22 (Loo) — Dealer-side create outlet. Used in DealerSettings →
- * Outlets section to add a second / third physical location after the
+ * 2026-05-22 (Loo) — Dealer-side create outlet. Used in the POS Staff overlay's
+ * OutletsSection to add a second / third physical location after the
  * principal-seeded default outlet.
  */
 export function useCreateOutlet(
@@ -1613,14 +1628,21 @@ export function useCreateStaff(
   });
 }
 
-/** PATCH /api/staff/:id — edit name/color/outlet/tier/active (server tier-gates). */
+/** PATCH /api/staff/:id — edit name/color/outlet/tier/active (server tier-gates).
+ *  An internal HQ caller (principal / bd) editing ANOTHER store's member passes
+ *  `dealerId` — the server resolves the target store from the query param. */
 export function usePatchStaff(
-  opts?: Partial<UseMutationOptions<StaffDto, ApiError, { id: string; patch: UpdateStaffInput }>>,
+  opts?: Partial<
+    UseMutationOptions<StaffDto, ApiError, { id: string; patch: UpdateStaffInput; dealerId?: string }>
+  >,
 ) {
   const qc = useQueryClient();
-  return useMutation<StaffDto, ApiError, { id: string; patch: UpdateStaffInput }>({
-    mutationFn: ({ id, patch }) =>
-      apiFetch<StaffDto>(`/api/staff/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  return useMutation<StaffDto, ApiError, { id: string; patch: UpdateStaffInput; dealerId?: string }>({
+    mutationFn: ({ id, patch, dealerId }) =>
+      apiFetch<StaffDto>(`/api/staff/${id}${dealerId ? `?dealerId=${dealerId}` : ""}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["staff"] });
@@ -1630,20 +1652,124 @@ export function usePatchStaff(
   });
 }
 
-/** POST /api/staff/:id/pin — set/reset a member's 6-digit PIN (server scope-gates). */
+/** POST /api/staff/:id/pin — set/reset a member's 6-digit PIN (server scope-gates).
+ *  An internal HQ caller (principal / bd) targeting ANOTHER store's member
+ *  passes `dealerId` — without it the server's target-dealer resolve 400s. */
 export function useSetStaffPin(
-  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, { id: string } & SetStaffPinInput>>,
+  opts?: Partial<
+    UseMutationOptions<{ ok: true }, ApiError, { id: string; dealerId?: string } & SetStaffPinInput>
+  >,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ ok: true }, ApiError, { id: string } & SetStaffPinInput>({
-    mutationFn: ({ id, pin }) =>
-      apiFetch<{ ok: true }>(`/api/staff/${id}/pin`, {
+  return useMutation<{ ok: true }, ApiError, { id: string; dealerId?: string } & SetStaffPinInput>({
+    mutationFn: ({ id, pin, dealerId }) =>
+      apiFetch<{ ok: true }>(`/api/staff/${id}/pin${dealerId ? `?dealerId=${dealerId}` : ""}`, {
         method: "POST",
         body: JSON.stringify({ pin }),
       }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["staff"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0240 — store-account email-change (dealer principal submits; HQ decides).
+// Password change never touches these — it is client → Supabase Auth direct
+// (lib/password.ts).
+// ---------------------------------------------------------------------------
+
+/** GET /api/account/email-change — my store's LATEST request (any status). */
+export function useMyEmailChange(
+  opts?: Partial<UseQueryOptions<{ request: EmailChangeRequestDto | null }>>,
+) {
+  return useQuery({
+    queryKey: qk.emailChange(),
+    queryFn: () => apiFetch<{ request: EmailChangeRequestDto | null }>("/api/account/email-change"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** POST /api/account/email-change — submit for HQ approval (password re-proof).
+ *  ApiError bodies: bad_password 401 · email_in_use/same_email 422 ·
+ *  pending_exists 409. */
+export function useSubmitEmailChange(
+  opts?: Partial<UseMutationOptions<EmailChangeRequestDto, ApiError, SubmitEmailChangeInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<EmailChangeRequestDto, ApiError, SubmitEmailChangeInput>({
+    mutationFn: (input) =>
+      apiFetch<EmailChangeRequestDto>("/api/account/email-change", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.emailChange() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST /api/account/email-change/:id/cancel — withdraw my pending request. */
+export function useCancelEmailChange(
+  opts?: Partial<UseMutationOptions<EmailChangeRequestDto, ApiError, { id: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<EmailChangeRequestDto, ApiError, { id: string }>({
+    mutationFn: ({ id }) =>
+      apiFetch<EmailChangeRequestDto>(`/api/account/email-change/${id}/cancel`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.emailChange() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** GET /api/principal/accounts/email-change-requests — the HQ queue. */
+export function usePrincipalEmailChanges(
+  opts?: Partial<UseQueryOptions<{ requests: EmailChangeRequestDto[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.principal.emailChanges(),
+    queryFn: () =>
+      apiFetch<{ requests: EmailChangeRequestDto[] }>(
+        "/api/principal/accounts/email-change-requests",
+      ),
+    ...opts,
+  });
+}
+
+/** POST /api/principal/accounts/email-change-requests/:id/(approve|reject). */
+export function useDecideEmailChange(
+  opts?: Partial<
+    UseMutationOptions<
+      EmailChangeRequestDto,
+      ApiError,
+      { id: string; action: "approve" | "reject"; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    EmailChangeRequestDto,
+    ApiError,
+    { id: string; action: "approve" | "reject"; note?: string }
+  >({
+    mutationFn: ({ id, action, note }) =>
+      apiFetch<EmailChangeRequestDto>(
+        `/api/principal/accounts/email-change-requests/${id}/${action}`,
+        { method: "POST", body: JSON.stringify(note ? { note } : {}) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.emailChanges() });
+      // Approve changes the login email shown in the accounts table too.
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1740,6 +1866,11 @@ export interface PrincipalDealerRow {
   orderCount: number;
   gmv: number;
   outstanding: number;
+  /** 'showroom' = one of Carres' OWN stores; 'dealer' = an external reseller.
+   *  HQ lists the two on separate pages (Loo 2026-07-19). */
+  channel: StoreChannel;
+  /** How many outlets hang off this account (a dealer's branches). */
+  outletCount: number;
 }
 export interface PrincipalDealersListResponse {
   dealers: PrincipalDealerRow[];
@@ -1769,6 +1900,9 @@ export interface PrincipalDealerDetailDealer {
   ssm_code: string | null;
   contact_name: string | null;
   contact_phone: string | null;
+  /** Same second SELECT — tells the drawer whether this is one of Carres' own
+   *  showrooms (no SSM / PIC) or an external dealer. */
+  channel: StoreChannel;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -2484,6 +2618,10 @@ export interface operationOrderDetailOrder {
   customer_emergency?: string | null;
   customer_billing?: string | null;
   customer_billing_same?: boolean;
+  /** 2026-07-19 — POS entry extras bag; the drawer reads
+   *  `fields.building_type` (delivery-address building type). Optional so
+   *  older detail fixtures keep typechecking. */
+  entry_data?: Record<string, unknown> | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
@@ -5003,101 +5141,86 @@ export function useAttachPod(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 8 — BD namespace.
+// BD namespace (2026-07-19) — the BD POS: network dealer stats + audit-log
+// activity + the dealer-account create door. The Phase-8 Inquiries hooks died
+// with the ERP-style BD portal (API route kept — restore a panel if ever
+// needed).
 // ---------------------------------------------------------------------------
-export type InquiryKind = "new_dealer" | "expansion" | "product";
-export type InquiryStage = "new" | "contacted" | "qualified" | "converted" | "lost";
 
-export interface InquiryRow {
-  id:                string;
-  kind:              InquiryKind;
-  company:           string;
-  region:            string | null;
-  contact:           string | null;
-  stage:             InquiryStage;
-  owner_user_id:     string | null;
-  note:              string | null;
-  linked_dealer_id:  string | null;
-  created_at:        string;
-  updated_at:        string;
+/** Row shape of GET /api/bd/dealers (dealers_with_stats_list — all-time). */
+export interface BdDealerRow {
+  id: string;
+  name: string;
+  region: string | null;
+  contact: string | null;
+  status: string;
+  joinedDate: string | null;
+  orderCount: number;
+  gmv: number;
+  outstanding: number;
+  /** 'showroom' = one of Carres' own stores; 'dealer' = external reseller.
+   *  BD's on-behalf store picker groups by it (Loo 2026-07-19). */
+  channel: StoreChannel;
 }
 
-export interface InquiryCreateInput {
-  kind:    InquiryKind;
-  company: string;
-  region?: string | null;
-  contact?: string | null;
-  note?:   string | null;
-}
-
-export interface InquiryUpdateInput {
-  stage?:   InquiryStage;
-  contact?: string | null;
-  region?:  string | null;
-  note?:    string | null;
-}
-
-export function useBdInquiries(
-  opts?: Partial<UseQueryOptions<InquiryRow[], ApiError>>,
+export function useBdDealers(
+  opts?: Partial<UseQueryOptions<{ dealers: BdDealerRow[] }, ApiError>>,
 ) {
-  return useQuery<InquiryRow[], ApiError>({
-    queryKey: qk.bd.inquiries(),
-    queryFn: () => apiFetch<InquiryRow[]>("/api/bd/inquiries"),
+  return useQuery<{ dealers: BdDealerRow[] }, ApiError>({
+    queryKey: qk.bd.dealers(),
+    queryFn: () => apiFetch<{ dealers: BdDealerRow[] }>("/api/bd/dealers"),
     staleTime: 30_000,
     ...opts,
   });
 }
 
-export function useCreateInquiry(
-  opts?: Partial<UseMutationOptions<InquiryRow, ApiError, InquiryCreateInput>>,
+/** Row shape of GET /api/bd/dealers/activity (dealer-touching audit_log). */
+export interface BdActivityRow {
+  id: string;
+  role: string;
+  actor: string | null;
+  action: string;
+  dealerId: string | null;
+  dealerName: string | null;
+  occurredAt: string;
+}
+
+export function useBdActivity(
+  limit = 12,
+  opts?: Partial<UseQueryOptions<{ rows: BdActivityRow[] }, ApiError>>,
+) {
+  return useQuery<{ rows: BdActivityRow[] }, ApiError>({
+    queryKey: qk.bd.activity(limit),
+    queryFn: () => apiFetch<{ rows: BdActivityRow[] }>(`/api/bd/dealers/activity?limit=${limit}`),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** POST /api/bd/accounts — BD opens a DEALER account (principal-parity door,
+ *  role pinned to dealer server-side). */
+export interface BdCreateAccountResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  dealerId: string | null;
+}
+
+export function useBdCreateAccount(
+  opts?: Partial<UseMutationOptions<BdCreateAccountResponse, ApiError, CreateAccountInput>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<InquiryRow, ApiError, InquiryCreateInput>({
+  return useMutation<BdCreateAccountResponse, ApiError, CreateAccountInput>({
     mutationFn: (input) =>
-      apiFetch<InquiryRow>("/api/bd/inquiries", {
+      apiFetch<BdCreateAccountResponse>("/api/bd/accounts", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useUpdateInquiry(
-  opts?: Partial<UseMutationOptions<InquiryRow, ApiError, { id: string; patch: InquiryUpdateInput }>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<InquiryRow, ApiError, { id: string; patch: InquiryUpdateInput }>({
-    mutationFn: ({ id, patch }) =>
-      apiFetch<InquiryRow>(`/api/bd/inquiries/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useConvertInquiry(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, string>({
-    mutationFn: (id) =>
-      apiFetch(`/api/bd/inquiries/${id}/convert`, { method: "POST" }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
-      // Approval row was created — also blast principal namespace if it
-      // exists in the cache so the principal approvals view picks up the
-      // new pending row when next observed.
-      await qc.invalidateQueries({ queryKey: ["principal"] });
+      await qc.invalidateQueries({ queryKey: ["bd"] });
+      await qc.invalidateQueries({ queryKey: ["staff"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -6346,6 +6469,39 @@ export function useDeletePwpRule() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/pwp-rules/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0239 — Product bundles (bundle pricing). Principal-only CRUD from the
+// Promo/GWP tab; every mutation invalidates ["catalog"] so the tab list + the
+// POS bundle cards re-read. Mirrors the 0186 pwp-rule hooks.
+// ---------------------------------------------------------------------------
+
+export function useCreateBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProductBundleInput) =>
+      apiFetch<{ bundle: ProductBundleDto }>("/api/catalog/bundles", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<ProductBundleInput> }) =>
+      apiFetch<{ bundle: ProductBundleDto }>(`/api/catalog/bundles/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/bundles/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

@@ -4,6 +4,7 @@
  * `domain.ts` for UI code.
  */
 import type { DefaultFreeGift } from "./free-gift";
+import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
 export type Role =
@@ -120,6 +121,10 @@ export interface SalespersonRow {
   staff_role: StaffTier;
   color: string | null;
   active: boolean;
+  // 0241 staff profile (optional so pre-migration rows/mocks stay valid)
+  email?: string | null;
+  birthday?: string | null;
+  gender?: "male" | "female" | null;
 }
 
 export interface ProductModelRow {
@@ -488,6 +493,28 @@ export interface PwpRuleRow {
   // ── P8d (0188) cross-order carry-forward policy ──
   carry_forward: boolean;
   carry_forward_days: number | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `product_bundles` (migration 0239) — bundle pricing: a named set of catalog
+ * SKUs sold together at one bundle price. `components` is [{sku, qty}] jsonb;
+ * the adapter runs `parseBundleComponents` to drop malformed entries. `active`
+ * defaults false (dormant until the principal flips it on). Principal-owned;
+ * `created_at` / `updated_at` / `updated_by` mirror the catalog convention.
+ */
+export interface ProductBundleRow {
+  id: string;
+  name: string;
+  price: number;
+  // 0241 — bundle kinds; pre-0241 rows read via the adapter defaults.
+  kind?: "fixed" | "custom";
+  components: BundleComponent[];
+  slots?: BundleSlot[];
+  active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

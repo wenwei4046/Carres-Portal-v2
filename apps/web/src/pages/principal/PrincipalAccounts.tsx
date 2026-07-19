@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   usePrincipalAccounts,
   useCreateAccount,
   useCreateStaff,
   usePrincipalDealers,
+  usePrincipalEmailChanges,
+  useDecideEmailChange,
   useSetAccountStatus,
   useResetAccountPassword,
   useStaffList,
@@ -12,11 +15,16 @@ import {
   type AppRole,
 } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
-import type { CreatableAppRole, StaffTierDto } from "@carres/shared";
+// Aliased: this file already has a local `isShowroom` meaning "the ROLE being
+// created is showroom". The shared helper answers a different question — "is
+// THIS store row one of ours" — and reads `dealers.channel`.
+import { minDeliveryDateISO, isShowroom as isShowroomStore } from "@carres/shared";
+import type { CreatableAppRole, StaffColorKey, StaffGenderDto, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
-import { tierLabel } from "@/pages/dealer/staff/staff-ui";
+import { ColorDotPicker, tierLabel } from "@/pages/dealer/staff/staff-ui";
+import BirthdayWheelField from "@/pages/dealer/pos/date-keyin/BirthdayWheelField";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -72,7 +80,21 @@ export default function PrincipalAccounts() {
   const [roleFilter, setRoleFilter] = useState<"all" | AppRole>("all");
   const [statusFilter, setStatusFilter] =
     useState<"all" | "active" | "invited" | "disabled">("all");
-  const [showCreate, setShowCreate] = useState(false);
+  // `?new=showroom` — the Showrooms page's "+ New showroom" button lands here
+  // with the modal already open on the right role (Loo 2026-07-19), so opening
+  // one of our own stores is a single click from where you noticed it missing.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openOnShowroom = searchParams.get("new") === "showroom";
+  const [showCreate, setShowCreate] = useState(openOnShowroom);
+  /** Close the modal AND drop `?new=` so a later "+ New account" opens plain. */
+  function closeCreate() {
+    setShowCreate(false);
+    if (openOnShowroom) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -116,6 +138,9 @@ export default function PrincipalAccounts() {
           <span className="text-[14px]">+</span> New account
         </button>
       </div>
+
+      {/* 0240 — store email-change approvals (renders only when pending). */}
+      <EmailChangeRequestsPanel />
 
       {/* KPI tiles */}
       <div className="grid gap-3 mb-[18px]" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
@@ -198,13 +223,117 @@ export default function PrincipalAccounts() {
       </div>
 
       {showCreate && (
-        <CreateAccountModal onClose={() => setShowCreate(false)} />
+        <CreateAccountModal
+          initialRole={openOnShowroom ? "showroom" : "dealer"}
+          onClose={closeCreate}
+        />
       )}
     </div>
   );
 }
 
 // ----------------------------------------------------------------------------
+
+/**
+ * 0240 (Loo 2026-07-19) — store email-change approval queue. A dealer
+ * principal files the request from the POS; approving here performs the REAL
+ * login-email swap (service_role, /api/principal/accounts routes). Hidden
+ * entirely while nothing is pending.
+ */
+export function EmailChangeRequestsPanel() {
+  const { data } = usePrincipalEmailChanges();
+  const decide = useDecideEmailChange();
+  const pending = (data?.requests ?? []).filter((r) => r.status === "pending");
+  if (pending.length === 0) return null;
+
+  function approve(r: (typeof pending)[number]) {
+    if (
+      !confirm(
+        `Approve changing ${r.dealerName ?? "this store"}'s login email to ${r.requestedEmail}?\n` +
+          `(Currently ${r.currentEmail} — the store signs in with the new email once approved.)`,
+      )
+    ) {
+      return;
+    }
+    decide.mutate(
+      { id: r.id, action: "approve" },
+      {
+        onSuccess: () => toast.success(`Approved — ${r.requestedEmail} is now the login`),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not approve"),
+      },
+    );
+  }
+
+  function reject(r: (typeof pending)[number]) {
+    const note = prompt(
+      `Reject ${r.dealerName ?? "this store"}'s email change — note for the store (optional):`,
+    );
+    if (note === null) return; // cancelled the dialog
+    decide.mutate(
+      { id: r.id, action: "reject", note: note.trim() || undefined },
+      {
+        onSuccess: () => toast.success("Rejected — the store will see your note"),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not reject"),
+      },
+    );
+  }
+
+  return (
+    <section
+      className="rounded-md border border-warning/40 bg-warning-soft/40 p-5 mb-[22px]"
+      data-testid="email-change-panel"
+    >
+      <h2 className="text-xs uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
+        Store email change requests ({pending.length})
+      </h2>
+      <ul className="divide-y divide-border">
+        {pending.map((r) => (
+          <li
+            key={r.id}
+            className="py-2.5 flex items-center justify-between gap-3 flex-wrap"
+            data-testid={`email-change-row-${r.id}`}
+          >
+            <div className="min-w-0 text-sm">
+              <div className="font-medium">
+                {r.dealerName ?? "—"}
+                <span className="ml-2 text-[11px] text-muted-foreground font-normal">
+                  by {r.requestedByName ?? "Store owner"} ·{" "}
+                  {new Date(r.createdAt).toLocaleDateString("en-MY", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+              </div>
+              <div className="text-[12.5px] text-muted-foreground font-mono mt-0.5">
+                {r.currentEmail} → <span className="text-foreground">{r.requestedEmail}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => approve(r)}
+                disabled={decide.isPending}
+                data-testid={`email-change-approve-${r.id}`}
+                className="text-[12px] font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                onClick={() => reject(r)}
+                disabled={decide.isPending}
+                data-testid={`email-change-reject-${r.id}`}
+                className="text-[12px] font-semibold text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
@@ -359,15 +488,17 @@ function StatusPill({ status }: { status: AccountRow["status"] }) {
 }
 
 // ----------------------------------------------------------------------------
-// Reset-password modal — confirms before flipping a password since the new
-// value needs to be communicated to the user out-of-band.
+// Reset-password modal — the admin TYPES the new password (twice; Loo
+// 2026-07-19: no auto-generated value) and hands it to the user out-of-band.
 // ----------------------------------------------------------------------------
 
 function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () => void }) {
-  const [tempPassword, setTempPassword] = useState(generateTempPassword);
+  const [password, setPassword] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
   const reset = useResetAccountPassword(user.id, {
     onSuccess: () => onClose(),
   });
+  const valid = password.length >= 8 && password === confirmPw;
 
   return (
     <div
@@ -384,24 +515,22 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
           <h2 className="font-display text-[20px] mt-1 tracking-[-0.02em] font-semibold">
             Reset password
           </h2>
-          <div className="text-[12px] text-base-600 mt-1">
-            {user.name} ({user.email}). Give them the new password directly — we
-            don't email it.
+          {/* min-w-0 + break-words: long emails must wrap, never clip/overlap. */}
+          <div className="text-[12px] text-base-600 mt-1 min-w-0 break-words leading-relaxed">
+            {user.name} (<span className="break-all">{user.email}</span>) — type the new
+            password, then give it to them directly. We don&apos;t email it.
           </div>
         </div>
         <div className="p-6 flex flex-col gap-3">
-          <FieldLabel>New temporary password</FieldLabel>
-          <div className="flex items-center gap-2 px-3 py-2 bg-base-50 border border-base-200 rounded">
-            <code className="flex-1 font-mono text-[13px] text-base-900 tracking-[0.05em]">
-              {tempPassword}
-            </code>
-            <button
-              onClick={() => setTempPassword(generateTempPassword())}
-              className="text-[11px] font-semibold text-base-600 px-2 py-1 border border-base-200 rounded hover:bg-white cursor-pointer"
-            >
-              ↻ Regenerate
-            </button>
-          </div>
+          <Field label="New password" hint="Min 8 characters">
+            <Input type="password" value={password} onChange={setPassword} />
+          </Field>
+          <Field label="Confirm password" hint="Type it again · must match">
+            <Input type="password" value={confirmPw} onChange={setConfirmPw} />
+          </Field>
+          {confirmPw.length > 0 && password !== confirmPw && (
+            <div className="text-[12px] text-destructive">Passwords don&apos;t match.</div>
+          )}
           {reset.isError && (
             <div className="text-[12px] text-primary">
               {reset.error?.message ?? "Reset failed"}
@@ -417,8 +546,8 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
             Cancel
           </button>
           <button
-            onClick={() => reset.mutate({ tempPassword })}
-            disabled={reset.isPending}
+            onClick={() => reset.mutate({ tempPassword: password })}
+            disabled={!valid || reset.isPending}
             className="px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
           >
             {reset.isPending ? "Rotating…" : "Confirm reset"}
@@ -434,11 +563,17 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
 // org-creation block for dealer/supplier/partner.
 // ----------------------------------------------------------------------------
 
-function CreateAccountModal({ onClose }: { onClose: () => void }) {
+function CreateAccountModal({
+  initialRole = "dealer",
+  onClose,
+}: {
+  initialRole?: CreatableAppRole;
+  onClose: () => void;
+}) {
   const [draft, setDraft] = useState({
     name: "",
     email: "",
-    role: "dealer" as CreatableAppRole,
+    role: initialRole,
     title: "",
     companyName: "",
     // 2026-07-18 (Loo) — the store's FIRST staff identity + 6-digit PIN,
@@ -449,6 +584,13 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     staffRole: "principal" as StaffTierDto,
     staffPin: "",
     staffPinConfirm: "",
+    // 0241 (Loo 2026-07-19) — profile parity with the POS Add-staff form: the
+    // two staff-create doors collect the SAME data.
+    staffEmail: "",
+    staffBirthday: "",
+    staffGender: "" as StaffGenderDto | "",
+    staffPhone: "",
+    staffColor: "flame" as StaffColorKey,
     // 2026-05-22 (Loo) — region dropped from the form (structured address
     // below carries state/city; region was a free-text duplicate). The DB
     // column stays — existing dealers retain their value; new creations get
@@ -475,17 +617,25 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     // UI pre-fills with companyName so the "common case = outlet name same
     // as company" path takes zero clicks.
     outletName: "",
-    tempPassword: generateTempPassword(),
+    // 2026-07-19 (Loo) — the login password is typed MANUALLY (twice), not
+    // auto-generated: the admin decides it and hands it over directly.
+    tempPassword: "",
+    tempPasswordConfirm: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // 2026-05-22 (Loo) — showroom shares the dealer schema (channel='showroom'
-  // under the hood) so it carries the same SSM + contact + address + outlet
-  // requirements. The wider `needsOrg` covers all roles that need a company
-  // row at all (incl. supplier/partner); `dealerLike` is the stricter set
-  // that needs the full Malaysia-business profile.
+  // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under the
+  // hood. The wider `needsOrg` covers all roles that need a company row at
+  // all (incl. supplier/partner); `dealerLike` is the store set that needs an
+  // address + first-staff PIN. Since 2026-07-19 the full Malaysia-business
+  // profile (SSM + PIC contact) is DEALER-ONLY — see `isShowroom` below.
   const needsOrg = draft.role === "dealer" || draft.role === "showroom" || draft.role === "supplier" || draft.role === "partner";
   const dealerLike = draft.role === "dealer" || draft.role === "showroom";
+  // 2026-07-19 (Loo) — a showroom is Carres' OWN store: no company name, no
+  // SSM, no PIC contact, no personal full-name/job-title. The form collapses
+  // to Showroom name + login email + address + first staff PIN; the account's
+  // display name auto-derives from the showroom name.
+  const isShowroom = draft.role === "showroom";
   const create = useCreateAccount({
     onSuccess: () => onClose(),
   });
@@ -501,8 +651,8 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
   const existingStaffQ = useStaffList(existingDealerId || undefined, {
     enabled: existingMode && !!existingDealerId,
   });
-  // The picked store's kind comes from the server (the dealers list carries no
-  // channel); until it resolves, fall back to the clicked role tile.
+  // The picked store's kind comes from the server; until it resolves, fall
+  // back to the clicked role tile.
   const staffKind: "dealer" | "showroom" = existingMode
     ? (existingStaffQ.data?.storeKind ?? (draft.role === "showroom" ? "showroom" : "dealer"))
     : draft.role === "showroom"
@@ -556,12 +706,15 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     if (existingMode) {
       if (!existingDealerId) e.existingDealer = "Pick a store";
       if (!draft.staffName.trim()) e.staffName = "Required";
+      validateStaffProfile(e);
       if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
       else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
       setErrors(e);
       return Object.keys(e).length === 0;
     }
-    if (!draft.name.trim()) e.name = "Required";
+    // Showroom skips the personal full name — the account's display name
+    // derives from the showroom name at submit.
+    if (!isShowroom && !draft.name.trim()) e.name = "Required";
     if (!draft.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) e.email = "Invalid email";
     if (needsOrg && !draft.companyName.trim()) e.companyName = "Required";
@@ -574,18 +727,43 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       else if (!draft.addressState) e.addressState = "Required";
       else if (!draft.addressCity) e.addressCity = "Required";
       else if (!draft.addressPostcode) e.addressPostcode = "Required";
-      if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
-      if (draft.contactName.trim().length < 2) e.contactName = "Required";
-      if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+      // 2026-07-19 (Loo) — SSM + PIC contact are dealer-only: a showroom is
+      // Carres' own store, no external company registration or PIC needed.
+      if (draft.role === "dealer") {
+        if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
+        if (draft.contactName.trim().length < 2) e.contactName = "Required";
+        if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+      }
       // 2026-07-18 (Loo) — first staff + PIN are part of store creation; the
       // PIN format is hard-gated to exactly 6 digits and must be typed TWICE.
       if (!draft.staffName.trim()) e.staffName = "Required";
+      validateStaffProfile(e);
       if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
       else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
     }
     if (draft.tempPassword.length < 8) e.tempPassword = "Min 8 chars";
+    else if (draft.tempPasswordConfirm !== draft.tempPassword)
+      e.tempPasswordConfirm = "Passwords don't match";
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  // 0241 profile parity — same requirements as the POS Add-staff form.
+  function validateStaffProfile(e: Record<string, string>) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.staffEmail.trim())) e.staffEmail = "Valid email required";
+    if (!draft.staffBirthday) e.staffBirthday = "Required";
+    if (!draft.staffGender) e.staffGender = "Required";
+  }
+
+  /** The staff profile payload shared by both create doors. */
+  function staffProfilePayload() {
+    return {
+      email: draft.staffEmail.trim().toLowerCase(),
+      birthday: draft.staffBirthday,
+      gender: draft.staffGender === "" ? undefined : draft.staffGender,
+      phone: draft.staffPhone.trim() ? draft.staffPhone.trim() : undefined,
+      color: draft.staffColor,
+    };
   }
 
   function submit() {
@@ -597,6 +775,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           name: draft.staffName.trim(),
           staffRole: draft.staffRole,
           pin: draft.staffPin,
+          ...staffProfilePayload(),
         },
         {
           onSuccess: (s) => {
@@ -622,10 +801,12 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
         })
       : undefined;
     create.mutate({
-      name: draft.name.trim(),
+      // Showroom: the account's display name IS the showroom name (there's no
+      // separate person to name — it's Carres' own store login).
+      name: isShowroom ? draft.companyName.trim() : draft.name.trim(),
       email: draft.email.trim().toLowerCase(),
       role: draft.role,
-      title: draft.title.trim() || null,
+      title: isShowroom ? null : draft.title.trim() || null,
       companyName: needsOrg ? draft.companyName.trim() : undefined,
       // Region dropped from the form — API still accepts it (optional zod),
       // server-side defaults to "—" when absent (see accounts.ts dealer
@@ -637,12 +818,19 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           ? draft.outletName.trim()
           : undefined,
       address: composedAddress,
-      ssmCode: dealerLike ? draft.ssmCode.trim() : undefined,
-      contactName: dealerLike ? draft.contactName.trim() : undefined,
-      contactPhone: dealerLike ? draft.contactPhone.trim() : undefined,
+      // Dealer-only business profile — a showroom (Carres' own store) sends
+      // none of these; the server writes null.
+      ssmCode: draft.role === "dealer" ? draft.ssmCode.trim() : undefined,
+      contactName: draft.role === "dealer" ? draft.contactName.trim() : undefined,
+      contactPhone: draft.role === "dealer" ? draft.contactPhone.trim() : undefined,
       tempPassword: draft.tempPassword,
       initialStaff: dealerLike
-        ? { name: draft.staffName.trim(), staffRole: draft.staffRole, pin: draft.staffPin }
+        ? {
+            name: draft.staffName.trim(),
+            staffRole: draft.staffRole,
+            pin: draft.staffPin,
+            ...staffProfilePayload(),
+          }
         : undefined,
     });
   }
@@ -742,11 +930,28 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
                 >
                   <option value="">— pick a store —</option>
-                  {(dealersQ.data?.dealers ?? []).map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+                  {/* Grouped so our own showrooms never read as dealerships
+                      (Loo 2026-07-19). Partitioned with the shared helper, not
+                      `=== 'showroom'` per group, so an unexpected channel value
+                      lands under Dealers rather than vanishing. */}
+                  {[
+                    { label: "Our showrooms", mine: true },
+                    { label: "Dealers", mine: false },
+                  ].map(({ label, mine }) => {
+                    const rows = (dealersQ.data?.dealers ?? []).filter(
+                      (d) => isShowroomStore(d.channel) === mine,
+                    );
+                    if (rows.length === 0) return null;
+                    return (
+                      <optgroup key={label} label={label}>
+                        {rows.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </Field>
               {existingDealerId && existingStaffQ.data && (
@@ -758,7 +963,20 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {!existingMode && (
+          {/* 2026-07-19 (Loo) — showroom is Carres' own store: no personal
+              full name / job title. Only the login email remains. */}
+          {!existingMode && isShowroom && (
+            <Field label="Email address" hint="The store's login" error={errors.email}>
+              <Input
+                type="email"
+                value={draft.email}
+                onChange={(v) => set("email", v)}
+                placeholder="e.g. kl-showroom@carres.com"
+              />
+            </Field>
+          )}
+
+          {!existingMode && !isShowroom && (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Full name" error={errors.name}>
@@ -783,17 +1001,23 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           {needsOrg && !existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-                New{" "}
-                {draft.role === "dealer"
-                  ? "dealer"
-                  : draft.role === "showroom"
-                    ? "showroom"
-                    : draft.role === "supplier"
-                      ? "supplier"
-                      : "delivery partner"}{" "}
-                organisation
+                {/* 2026-07-19 (Loo) — a showroom is Carres' own store, not an
+                    external organisation: one name field, no SSM/PIC. */}
+                {draft.role === "showroom"
+                  ? "New showroom"
+                  : `New ${
+                      draft.role === "dealer"
+                        ? "dealer"
+                        : draft.role === "supplier"
+                          ? "supplier"
+                          : "delivery partner"
+                    } organisation`}
               </div>
-              <Field label="Company name" error={errors.companyName}>
+              <Field
+                label={isShowroom ? "Showroom name" : "Company name"}
+                hint={isShowroom ? "Carres' own store · also used as the outlet + account name" : undefined}
+                error={errors.companyName}
+              >
                 <Input
                   value={draft.companyName}
                   onChange={(v) => set("companyName", v)}
@@ -808,7 +1032,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   }
                 />
               </Field>
-              {dealerLike && (
+              {draft.role === "dealer" && (
                 <>
                   <Field label="Outlet name" hint="Default outlet · falls back to company name when blank">
                     <Input
@@ -840,6 +1064,10 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                       />
                     </Field>
                   </div>
+                </>
+              )}
+              {dealerLike && (
+                <>
                   <div>
                     <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
                       Business address
@@ -872,7 +1100,9 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                 </>
               )}
               <div className="text-[11px] text-base-500 leading-relaxed">
-                A new {draft.role} record will be created and this user will be the owner.
+                {isShowroom
+                  ? "Carres' own store — no company registration or contact person needed. The email above becomes its login."
+                  : `A new ${draft.role} record will be created and this user will be the owner.`}
               </div>
             </div>
           )}
@@ -905,17 +1135,60 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                     {(staffKind === "showroom"
                       ? (["manager", "salesperson"] as StaffTierDto[])
                       : (["principal", "manager", "salesperson"] as StaffTierDto[])
-                    ).map((t) => {
-                      const l = tierLabel(t, staffKind);
-                      return (
-                        <option key={t} value={t}>
-                          {l.en} · {l.zh}
-                        </option>
-                      );
-                    })}
+                    ).map((t) => (
+                      <option key={t} value={t}>
+                        {tierLabel(t, staffKind)}
+                      </option>
+                    ))}
                   </select>
                 </Field>
               </div>
+              {/* 0241 — profile parity with the POS Add-staff form. */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Email" error={errors.staffEmail}>
+                  <Input
+                    value={draft.staffEmail}
+                    onChange={(v) => set("staffEmail", v)}
+                    placeholder="aisha@store.com"
+                  />
+                </Field>
+                <Field label="Phone (optional)">
+                  <Input
+                    value={draft.staffPhone}
+                    onChange={(v) => set("staffPhone", v)}
+                    placeholder="012-3456789"
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Birthday" error={errors.staffBirthday}>
+                  {/* Same drum picker as the Sales Order customer birthday. */}
+                  <BirthdayWheelField
+                    value={draft.staffBirthday}
+                    todayIso={minDeliveryDateISO(0)}
+                    onChange={(iso) => set("staffBirthday", iso)}
+                    testId="acct-staff-birthday"
+                  />
+                </Field>
+                <Field label="Gender" error={errors.staffGender}>
+                  <select
+                    value={draft.staffGender}
+                    onChange={(e) => set("staffGender", e.target.value as StaffGenderDto | "")}
+                    data-testid="acct-staff-gender"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                  >
+                    <option value="">— select —</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Avatar colour">
+                <ColorDotPicker
+                  value={draft.staffColor}
+                  onChange={(c) => set("staffColor", c)}
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field
                   label="PIN code"
@@ -946,24 +1219,33 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {/* 2026-07-19 (Loo) — the login password is typed manually (twice),
+              never auto-generated. */}
           {!existingMode && (
-          <Field label="Temporary password" hint="Give this to the user directly. They can change it after first login.">
-            <div className="flex items-center gap-2 px-3 py-2 bg-base-50 border border-base-200 rounded">
-              <code className="flex-1 font-mono text-[13px] text-base-900 tracking-[0.05em]">
-                {draft.tempPassword}
-              </code>
-              <button
-                type="button"
-                onClick={() => set("tempPassword", generateTempPassword())}
-                className="text-[11px] font-semibold text-base-600 px-2 py-1 border border-base-200 rounded hover:bg-white cursor-pointer"
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Login password"
+                hint="Min 8 characters · give it to the user directly"
+                error={errors.tempPassword}
               >
-                ↻ Regenerate
-              </button>
+                <Input
+                  type="password"
+                  value={draft.tempPassword}
+                  onChange={(v) => set("tempPassword", v)}
+                />
+              </Field>
+              <Field
+                label="Confirm password"
+                hint="Type it again · must match"
+                error={errors.tempPasswordConfirm}
+              >
+                <Input
+                  type="password"
+                  value={draft.tempPasswordConfirm}
+                  onChange={(v) => set("tempPasswordConfirm", v)}
+                />
+              </Field>
             </div>
-            {errors.tempPassword && (
-              <div className="text-[11px] text-primary mt-1">{errors.tempPassword}</div>
-            )}
-          </Field>
           )}
 
           {!existingMode && create.isError && (
@@ -1033,9 +1315,3 @@ function Input({ value, onChange, type = "text", placeholder }: { value: string;
   );
 }
 
-function generateTempPassword() {
-  const adj = ["Brisk", "Calm", "Bold", "Clear", "Swift", "Bright", "Quiet", "Warm"];
-  const noun = ["Linen", "Coral", "Dawn", "Tide", "Stone", "Ember", "Cloud", "Pine"];
-  const num = Math.floor(Math.random() * 90) + 10;
-  return `${adj[Math.floor(Math.random() * adj.length)]}-${noun[Math.floor(Math.random() * noun.length)]}-${num}`;
-}

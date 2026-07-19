@@ -28,6 +28,9 @@ const mockDeleteCampaign = vi.fn();
 const mockCreatePwp = vi.fn().mockResolvedValue({ pwpRule: {} });
 const mockUpdatePwp = vi.fn().mockResolvedValue({ pwpRule: {} });
 const mockDeletePwp = vi.fn();
+const mockCreateBundle = vi.fn().mockResolvedValue({ bundle: {} });
+const mockUpdateBundle = vi.fn().mockResolvedValue({ bundle: {} });
+const mockDeleteBundle = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useUpsertModelFreeGifts: () => ({ mutate: vi.fn(), mutateAsync: mockUpsertGifts, isPending: false }),
@@ -38,6 +41,9 @@ vi.mock("@/lib/queries", () => ({
   useCreatePwpRule: () => ({ mutate: vi.fn(), mutateAsync: mockCreatePwp, isPending: false }),
   useUpdatePwpRule: () => ({ mutate: vi.fn(), mutateAsync: mockUpdatePwp, isPending: false }),
   useDeletePwpRule: () => ({ mutate: mockDeletePwp, isPending: false }),
+  useCreateBundle: () => ({ mutate: vi.fn(), mutateAsync: mockCreateBundle, isPending: false }),
+  useUpdateBundle: () => ({ mutate: vi.fn(), mutateAsync: mockUpdateBundle, isPending: false }),
+  useDeleteBundle: () => ({ mutate: mockDeleteBundle, isPending: false }),
 }));
 
 const MATTRESS_MODEL = "22222222-2222-2222-2222-222222222222";
@@ -347,6 +353,123 @@ describe("PromoTab — free item campaigns", () => {
     expect(confirmSpy).toHaveBeenCalled();
     expect(mockDeleteCampaign).toHaveBeenCalledWith("camp-1", expect.anything());
     confirmSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Product bundles (0239)
+// ---------------------------------------------------------------------------
+describe("PromoTab — product bundles", () => {
+  const BUNDLE = {
+    id: "bundle-1",
+    name: "King Bedroom Set",
+    price: 2000,
+    kind: "fixed" as const,
+    slots: [],
+    components: [
+      { sku: "MATT-A", qty: 1 },
+      { sku: "PILLOW", qty: 1 },
+    ],
+    active: true,
+    sortOrder: 0,
+  };
+
+  it("principal: '+ New Bundle' opens the modal; picking 2 items + price + Save calls useCreateBundle", async () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("bundle-add"));
+
+    fireEvent.change(screen.getByTestId("bundle-name"), { target: { value: "King Bedroom Set" } });
+    fireEvent.change(screen.getByTestId("bundle-price"), { target: { value: "2000" } });
+    // Row 0: Matt X — its single MATT-A sku auto-picks on model select.
+    fireEvent.change(screen.getByTestId("bundle-row-model-0"), { target: { value: MATTRESS_MODEL } });
+    // Row 1: Acc X — single PILLOW sku auto-picks.
+    fireEvent.change(screen.getByTestId("bundle-row-model-1"), { target: { value: ACCESSORY_MODEL } });
+
+    // Live split preview renders and totals the bundle price exactly:
+    // 1200/1300·2000 = 1846.15 + 100/1300·2000 = 153.85.
+    const preview = screen.getByTestId("bundle-split-preview");
+    expect(within(preview).getByText(/1,846\.15/)).toBeInTheDocument();
+    expect(within(preview).getByText(/153\.85/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("bundle-save"));
+    await waitFor(() => expect(mockCreateBundle).toHaveBeenCalledOnce());
+    expect(mockCreateBundle.mock.calls[0][0]).toEqual({
+      name: "King Bedroom Set",
+      price: 2000,
+      kind: "fixed",
+      components: [
+        { sku: "MATT-A", qty: 1 },
+        { sku: "PILLOW", qty: 1 },
+      ],
+      active: true,
+    });
+  });
+
+  it("Save stays disabled until 2 items are picked", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("bundle-add"));
+    fireEvent.change(screen.getByTestId("bundle-name"), { target: { value: "Half a bundle" } });
+    fireEvent.change(screen.getByTestId("bundle-price"), { target: { value: "500" } });
+    fireEvent.change(screen.getByTestId("bundle-row-model-0"), { target: { value: MATTRESS_MODEL } });
+    expect(screen.getByTestId("bundle-save")).toBeDisabled();
+  });
+
+  it("existing bundle renders (name + components + price); Edit → Save calls useUpdateBundle", async () => {
+    render(
+      wrap(<PromoTab catalog={makeCatalog({ bundles: [BUNDLE] })} isPrincipal={true} />),
+    );
+    const row = screen.getByTestId("bundle-row-bundle-1");
+    expect(within(row).getByText("King Bedroom Set")).toBeInTheDocument();
+    expect(within(row).getByText(/Matt X \(S\) \+ Acc X \(S\)/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("bundle-edit-bundle-1"));
+    fireEvent.change(screen.getByTestId("bundle-price"), { target: { value: "1800" } });
+    fireEvent.click(screen.getByTestId("bundle-save"));
+    await waitFor(() => expect(mockUpdateBundle).toHaveBeenCalledOnce());
+    const arg = mockUpdateBundle.mock.calls[0][0];
+    expect(arg.id).toBe("bundle-1");
+    expect(arg.patch.price).toBe(1800);
+    expect(arg.patch.components).toEqual(BUNDLE.components);
+  });
+
+  it("Delete confirms then calls useDeleteBundle", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      wrap(<PromoTab catalog={makeCatalog({ bundles: [BUNDLE] })} isPrincipal={true} />),
+    );
+    fireEvent.click(screen.getByTestId("bundle-delete-bundle-1"));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockDeleteBundle).toHaveBeenCalledWith("bundle-1", expect.anything());
+    confirmSpy.mockRestore();
+  });
+
+  it("non-principal: no '+ New Bundle', list read-only", () => {
+    render(
+      wrap(<PromoTab catalog={makeCatalog({ bundles: [BUNDLE] })} isPrincipal={false} />),
+    );
+    expect(screen.queryByTestId("bundle-add")).not.toBeInTheDocument();
+    expect(screen.getByTestId("bundle-row-bundle-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("bundle-edit-bundle-1")).not.toBeInTheDocument();
+  });
+
+  it("a sofa × mattress mix warns AND blocks Save (0089 mutex)", () => {
+    const SOFA_MODEL = "55555555-5555-5555-5555-555555555555";
+    const base = makeCatalog();
+    const cat = makeCatalog({
+      models: [
+        ...base.models,
+        { id: SOFA_MODEL, category: "sofa", modelKey: "sofa-x", name: "Sofa X", blurb: null, colors: null, gaps: null, sofaMode: "preset" },
+      ],
+      skus: [...base.skus, sku({ sku: "SOFA-3S", modelId: SOFA_MODEL, price: 2990 })],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("bundle-add"));
+    fireEvent.change(screen.getByTestId("bundle-name"), { target: { value: "Bad mix" } });
+    fireEvent.change(screen.getByTestId("bundle-price"), { target: { value: "4000" } });
+    fireEvent.change(screen.getByTestId("bundle-row-model-0"), { target: { value: MATTRESS_MODEL } });
+    fireEvent.change(screen.getByTestId("bundle-row-model-1"), { target: { value: SOFA_MODEL } });
+    expect(screen.getByTestId("bundle-mutex-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("bundle-save")).toBeDisabled();
   });
 });
 

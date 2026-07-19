@@ -18,14 +18,20 @@ export interface DealerListItem {
   orderCount: number;
   gmv: number;
   outstanding: number;
+  /** 'showroom' = one of Carres' own stores; 'dealer' = external reseller. */
+  channel: string;
+  /** Branches under this account. Shown on the Dealers page only — our own
+   *  showrooms ARE the branch, so the column would read "1" for every row. */
+  outletCount: number;
 }
 
 interface Props {
   d: DealerListItem;
+  showOutlets: boolean;
   onOpen: () => void;
 }
 
-export default function DealerRow({ d, onOpen }: Props) {
+export default function DealerRow({ d, showOutlets, onOpen }: Props) {
   const hasOutstanding = Number(d.outstanding) > 0;
   return (
     <tr
@@ -37,6 +43,18 @@ export default function DealerRow({ d, onOpen }: Props) {
         <div className="text-[11px] text-base-500 mt-0.5">{d.contact ?? "—"}</div>
       </td>
       <td className="px-4 py-3 text-base-700">{d.region}</td>
+      {showOutlets && (
+        <td
+          className={`px-4 py-3 text-right font-mono ${
+            d.outletCount === 0 ? "text-primary" : "text-base-700"
+          }`}
+          // 0 outlets is worth flagging: the store cannot take an order until
+          // one exists (the POS outlet picker would sit empty).
+          title={d.outletCount === 0 ? "No outlet yet — this dealer cannot take an order" : undefined}
+        >
+          {d.outletCount}
+        </td>
+      )}
       <td className="px-4 py-3 text-base-700">{d.joinedDate ?? "—"}</td>
       <td className="px-4 py-3 text-right font-mono">{d.orderCount}</td>
       <td className="px-4 py-3 text-right font-bold font-mono">

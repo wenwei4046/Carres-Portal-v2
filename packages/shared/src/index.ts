@@ -258,6 +258,18 @@ export {
   pwpRuleInput,
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0239 — Product bundle (bundle pricing) schemas/inputs/Dtos. 0241 adds
+  // kind + slots (customizable bundles).
+  bundleComponentSchema,
+  bundleSlotSchema,
+  productBundleSchema,
+  productBundleInput,
+  productBundlePatchInput,
+  type BundleComponentDto,
+  type BundleSlotDto,
+  type ProductBundleDto,
+  type ProductBundleInput,
+  type ProductBundlePatchInput,
   // 0187 — PWP voucher ledger (Phase 8c) schemas/inputs/Dtos.
   pwpCodeStatusSchema,
   pwpCodeSchema,
@@ -853,6 +865,24 @@ export {
 export { pwpRuleFromRow } from "./adapters";
 export type { PwpRule } from "./domain";
 
+// 0239 — bundle pricing: the PURE explode engine (`explodeBundle`, Σ-exact
+// split shared by the POS cart add + the ERP editor preview) + the components
+// parser. The row→domain adapter (`productBundleFromRow`) is surfaced
+// top-level too (mirrors pwpRuleFromRow); the zod schemas + Dto/input types
+// live in the schemas/catalog export block.
+export {
+  explodeBundle,
+  parseBundleComponents,
+  parseBundleSlots,
+  type BundleComponent,
+  type BundleSlot,
+  type BundleVariantPolicy,
+  type ExplodedBundleLine,
+  type ExplodeBundleResult,
+} from "./product-bundle";
+export { productBundleFromRow } from "./adapters";
+export type { ProductBundle } from "./domain";
+
 // 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART state
 // machine). The row→domain adapter (`pwpCodeFromRow`) + the camelCase domain
 // type are surfaced top-level here (mirrors pwpRuleFromRow / sofaComboFromRow);
@@ -1068,6 +1098,10 @@ export {
   type SofaAnalysis,
 } from "./sofa-geometry";
 
+// Customer-facing sofa spec copy from exploded lines (Loo 2026-07-19) — one
+// implementation for the POS receipt/detail regroup + the Sales Order PDF.
+export { sofaBuildSpec, type SofaSpecLine } from "./sofa-spec";
+
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";
 
@@ -1114,3 +1148,10 @@ export {
 // Staff PIN login (0233) — tiers, PIN, staff session token, palette.
 // See docs/superpowers/plans/2026-07-18-staff-pin-login-plan.md.
 export * from "./schemas/staff";
+
+// Store-account self-service (0240) — dealer-principal password/email change.
+export * from "./schemas/account";
+
+// Dealer vs Showroom — the naming rule for our own stores vs external
+// resellers, and for their branches (showroom vs outlet).
+export * from "./store-kind";

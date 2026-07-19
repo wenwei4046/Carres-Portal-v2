@@ -460,8 +460,8 @@ export default function OpsStockListView(props: Props) {
                 }
               >
                 <option value="">Select…</option>
-                <option value="urgent">急单 · Urgent sale</option>
-                <option value="exchange">换货 · Exchange</option>
+                <option value="urgent">Urgent sale</option>
+                <option value="exchange">Exchange</option>
               </select>
             </label>
             <button

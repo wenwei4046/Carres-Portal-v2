@@ -245,7 +245,7 @@ export default function BirthdayWheelField({ value, onChange, todayIso, testId }
       </button>
 
       {open && (
-        <div className="dki-pop" role="dialog" aria-label="Pick birthday">
+        <div className="dki-pop dki-pop--up" role="dialog" aria-label="Pick birthday">
           <div className="dki-pop__head">
             <span className="dki-pop__read">
               {pend.d} {MONTHS[pend.m]} {pend.y}

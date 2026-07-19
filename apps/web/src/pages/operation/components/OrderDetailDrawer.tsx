@@ -4059,6 +4059,8 @@ function CustomerIdentityCard({
     customer_phone: string | null;
     customer_address: string | null;
     source_ref?: string[] | null;
+    /** POS entry extras — `fields.building_type` shows under the address. */
+    entry_data?: Record<string, unknown> | null;
   };
   regionLabel: string | null;
   statusWord: string;
@@ -4083,6 +4085,14 @@ function CustomerIdentityCard({
     onError: (e) => setErr(e.message),
   });
   const wa = waLink(order.customer_phone);
+  // Building type (Loo 2026-07-19) — POS wizard extra riding entry_data;
+  // delivery-access info (landed vs condo etc.) for scheduling.
+  const buildingType = (() => {
+    const f = (order.entry_data as { fields?: Record<string, unknown> } | null | undefined)
+      ?.fields;
+    const v = f?.["building_type"];
+    return typeof v === "string" && v.trim() ? v : null;
+  })();
   const copy = (v: string, what: string) => {
     void navigator.clipboard.writeText(v);
     toast.success(`${what} copied`);
@@ -4227,6 +4237,14 @@ function CustomerIdentityCard({
                   {order.customer_address}
                 </button>
               )}
+              {showAddr && buildingType && (
+                <div
+                  className="text-[12px] text-base-500"
+                  data-testid="ops-building-type"
+                >
+                  Building type: {buildingType}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -4243,8 +4261,7 @@ function CustomerIdentityCard({
           {/* Data-honest (no customer master table exists — each order keeps
               its own copy): this edit changes THIS ORDER ONLY. */}
           <div className="text-[12px] text-base-500 leading-snug">
-            只改这张单的客户资料 (updates this order only — other orders keep
-            their own copy)
+            Updates this order only — other orders keep their own copy.
           </div>
           {err && <div className="text-[12px] text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">

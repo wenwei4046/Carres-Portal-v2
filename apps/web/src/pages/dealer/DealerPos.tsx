@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
-import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
+import type {
+  CreateOrderInput,
+  Order,
+  PwpDiscoverDto,
+  PwpDiscoverResponse,
+  StoreChannel,
+} from "@carres/shared";
 import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -10,8 +16,10 @@ import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import { useStaffSession } from "@/lib/staff";
+import StaffManagePage from "./staff/StaffManagePage";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
 import {
+  useBdDealers,
   useCancelOrder,
   useCatalog,
   useCreateOrder,
@@ -26,6 +34,8 @@ import {
   useReservePwpCode,
   useSalespersons,
 } from "@/lib/queries";
+import BdAccountsPage from "@/pages/bd/BdAccountsPage";
+import BdOrdersBoard from "@/pages/bd/BdOrdersBoard";
 import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
@@ -119,10 +129,13 @@ export default function DealerPos({
    *  themselves (the default, byte-identical to before). */
   actingDealerId?: string;
   actingDealerName?: string;
-  /** Where "Exit" / ThankYou-close goes. Default: navigate to /dealer/orders. */
+  /** Principal on-behalf only: where "Exit" goes. Dealer-side (undefined,
+   *  POS-only since 2026-07-19) the corner control signs the store OUT to the
+   *  email+password login (switching staff is the 换人 chip's job). */
   onExit?: () => void;
 } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   // Which CUSTOMER sub-step to open on: 0 (Customer form) when arriving from
   // the cart, 3 (Target date) when backing out of the CONFIRM step — Back
@@ -157,13 +170,23 @@ export default function DealerPos({
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
+  // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
+  // manage store staff) behind its own top-bar pill.
+  const [accountsOpen, setAccountsOpen] = useState(false);
 
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
+  // BD rides the SAME internal-operator POS as the principal on-behalf flow
+  // (in-flow dealer pick, body dealerId, staff-gate exempt); only its dealer
+  // list source + the two BD overlays differ.
+  const isBd = role === "bd";
   const userEmail = useAuth((s) => s.user?.email ?? "");
+  const signOut = useAuth((s) => s.signOut);
   // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
   // stores). When present the top-bar chip becomes a "换人 / switch" button.
   const staffMember = useStaffSession((s) => s.staff);
+  const clearStaffToken = useStaffSession((s) => s.clearToken);
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
 
@@ -204,6 +227,16 @@ export default function DealerPos({
     return () => window.removeEventListener("popstate", onPopState);
   }, [step, submitted]);
 
+  // Forgot-PIN owner-mode reauth (StaffGate) lands here with {openStaff: true}
+  // — open the Staff & PINs overlay directly (the back-office Settings page it
+  // used to open is gone), then clear the state so a refresh doesn't reopen it.
+  useEffect(() => {
+    if ((location.state as { openStaff?: boolean } | null)?.openStaff) {
+      setTeamOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate]);
+
   // POS-parity (2990s) — an INTERNAL operator (principal, no JWT dealer) who
   // wasn't handed an acting dealer by the caller picks the dealer IN-FLOW at
   // the CUSTOMER step; the pick lives on the draft so it survives refresh.
@@ -222,15 +255,33 @@ export default function DealerPos({
   const catalogQ = useCatalog();
 
   // The in-flow dealer choices (ACTIVE dealers only — matches the live status
-  // gate). Only fetched for an internal operator; dealers never hit this route.
-  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer });
-  const pickableDealers = useMemo(
-    () =>
-      (principalDealersQ.data?.dealers ?? [])
-        .filter((d) => d.status === "active")
-        .map((d) => ({ id: d.id, name: d.name })),
-    [principalDealersQ.data],
-  );
+  // gate). Only fetched for an internal operator; dealers never hit this
+  // route. BD reads its own /api/bd/dealers (the principal route is
+  // principal-gated); both responses carry id/name/status/channel.
+  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer && !isBd });
+  const bdDealersQ = useBdDealers({ enabled: internalPicksDealer && isBd });
+  const pickableDealers = useMemo(() => {
+    const list = isBd
+      ? (bdDealersQ.data?.dealers ?? [])
+      : (principalDealersQ.data?.dealers ?? []);
+    return list
+      .filter((d) => d.status === "active")
+      .map((d) => ({ id: d.id, name: d.name, channel: d.channel }));
+  }, [isBd, bdDealersQ.data, principalDealersQ.data]);
+
+  // Which kind of store is this order written under? Drives the
+  // Outlet-vs-Showroom wording (Loo 2026-07-19). An internal operator: the
+  // store they picked in-flow. A store-side login: their own JWT role (the
+  // pick list is empty for them), the same rule the staff API uses
+  // (`resolveStoreKind`, apps/api/src/routes/staff.ts), so the two can't drift.
+  //
+  // Caveat: `pickableDealers` is only fetched when the operator picks in-flow.
+  // If this component is ever mounted WITH the `actingDealerId` prop (no live
+  // caller does today — both mounts are bare), the lookup misses and the label
+  // falls back to "Outlet". Wording only; nothing on the order depends on it.
+  const storeChannel: StoreChannel =
+    pickableDealers.find((d) => d.id === effectiveActingId)?.channel ??
+    (role === "showroom" ? "showroom" : "dealer");
 
   // When an internal operator places on behalf of a picked dealer, constrain the
   // outlet + salesperson choices to THAT dealer (the lists are RLS-read-all for
@@ -485,6 +536,17 @@ export default function DealerPos({
         city: draft.customer.addressCity,
         postcode: draft.customer.addressPostcode,
       });
+      // Billing keys in structured (same MY cascade as delivery, Loo
+      // 2026-07-19) but persists as the single composed string —
+      // `customer_billing` stays text. Legacy free-text `billing` (old drafts
+      // / unparseable autofill) is the fallback.
+      const composedBilling = composeAddress({
+        line1: draft.customer.billingLine1,
+        line2: draft.customer.billingLine2,
+        state: draft.customer.billingState,
+        city: draft.customer.billingCity,
+        postcode: draft.customer.billingPostcode,
+      });
       const input: CreateOrderInput = {
         // Only an internal role (principal) sends a body dealerId; the API honors
         // it only when the JWT carries no dealer. A dealer omits it → JWT wins.
@@ -504,7 +566,9 @@ export default function DealerPos({
           addressState: draft.customer.addressUnknown ? null : draft.customer.addressState || null,
           addressCity: draft.customer.addressUnknown ? null : draft.customer.addressCity || null,
           addressPostcode: draft.customer.addressUnknown ? null : draft.customer.addressPostcode || null,
-          billing: draft.customer.billingSame ? null : draft.customer.billing,
+          billing: draft.customer.billingSame
+            ? null
+            : composedBilling || draft.customer.billing.trim() || null,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
           // 0200 — POS-parity demographics (POS-required via step1 gate;
@@ -577,6 +641,11 @@ export default function DealerPos({
           const fields = Object.fromEntries(
             Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
           );
+          // Building type (Loo 2026-07-19) — no orders column, so it rides the
+          // entry_data.fields bag next to the operator-configured answers.
+          if (draft.customer.buildingType.trim()) {
+            fields.building_type = draft.customer.buildingType.trim();
+          }
           const hasPayment = Object.keys(payment).length > 0;
           const hasFields = Object.keys(fields).length > 0;
           return hasPayment || hasFields
@@ -768,13 +837,28 @@ export default function DealerPos({
   }
 
   function handleExit() {
+    if (!onExit) {
+      // Dealer-side (Loo 2026-07-19): FULL sign-out to the email+password login
+      // — switching people is the 换人 chip's job. Confirm first: an accidental
+      // tap locks out staff who don't know the store password, and signOut's
+      // PII guardrail wipes the in-progress draft. The staff token is dropped
+      // too so the next store login starts at the PIN gate, not as the
+      // previous person.
+      const leave = window.confirm(
+        "Log out of the store account? You'll need the store email + password to sign back in; the cart draft is cleared.",
+      );
+      if (!leave) return;
+      clearStaffToken();
+      void signOut().then(() => navigate("/login", { replace: true }));
+      return;
+    }
     if (!submitted && draftHasContent(draft)) {
       const leave = window.confirm(
         "You have an unsaved order. Leave the POS? Your draft is saved and will be here when you return.",
       );
       if (!leave) return;
     }
-    (onExit ?? (() => navigate("/dealer/orders")))();
+    onExit();
   }
 
   const outletName = draft.outletId
@@ -859,6 +943,36 @@ export default function DealerPos({
             <ListOrdered size={13} strokeWidth={1.75} />
             <span>My orders</span>
           </button>
+          {/* BD (2026-07-19) — the Accounts overlay: open dealer accounts +
+              manage every store's staff. BD-only pill. */}
+          {isBd && (
+            <button
+              type="button"
+              onClick={() => setAccountsOpen(true)}
+              className="topbar-pill"
+              aria-label="Dealer accounts"
+              title="Dealer accounts"
+              data-testid="pos-topbar-accounts"
+            >
+              <Users size={13} strokeWidth={1.75} />
+              <span>Accounts</span>
+            </button>
+          )}
+          {/* Staff management (Loo 2026-07-19) — the store owner / manager adds
+              their team right from the POS; salesperson-tier sees no button. */}
+          {staffMember && staffMember.tier !== "salesperson" && (
+            <button
+              type="button"
+              onClick={() => setTeamOpen(true)}
+              className="topbar-pill"
+              aria-label="Manage staff"
+              title="Manage staff"
+              data-testid="pos-topbar-staff-manage"
+            >
+              <Users size={13} strokeWidth={1.75} />
+              <span>Staff</span>
+            </button>
+          )}
           {!submitted && itemCount > 0 && (
             <button
               type="button"
@@ -874,7 +988,7 @@ export default function DealerPos({
             </button>
           )}
           {staffMember ? (
-            <StaffSwitchChip variant="pos" />
+            <StaffSwitchChip />
           ) : (
             <Link
               to="/me"
@@ -893,12 +1007,15 @@ export default function DealerPos({
               </span>
             </Link>
           )}
+          {/* Principal on-behalf: exit back to the portal. Dealer-side: full
+              sign-out to the email+password login (Loo 2026-07-19 — 换人 chip
+              already covers going back to the PIN screen). */}
           <button
             type="button"
             onClick={handleExit}
             className="icon-btn"
-            aria-label="Exit POS"
-            title="Exit POS"
+            aria-label={onExit ? "Exit POS" : "Log out"}
+            title={onExit ? "Exit POS" : "Log out"}
             data-testid="pos-exit"
           >
             <LogOut size={18} strokeWidth={1.75} />
@@ -919,10 +1036,6 @@ export default function DealerPos({
               stripeCollectAmount={stripeCollectAmount}
               stripeCollectedAmount={stripeCollected}
               onNewOrder={startAnotherOrder}
-              onClose={() => {
-                clearDraft();
-                (onExit ?? (() => navigate("/dealer/orders")))();
-              }}
             />
           </div>
         ) : !catalogQ.data ? (
@@ -960,7 +1073,9 @@ export default function DealerPos({
                 draft={draft}
                 onChange={setDraft}
                 outlets={outlets}
+                outletsLoaded={outletsQ.isSuccess}
                 salespersons={salespersons}
+                storeChannel={storeChannel}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
                 initialSubStep={customerSubStep}
@@ -970,7 +1085,7 @@ export default function DealerPos({
                   internalPicksDealer
                     ? {
                         dealers: pickableDealers,
-                        loading: principalDealersQ.isLoading,
+                        loading: isBd ? bdDealersQ.isLoading : principalDealersQ.isLoading,
                         value: draft.actingDealerId ?? null,
                         onPick: pickDealer,
                       }
@@ -1026,9 +1141,18 @@ export default function DealerPos({
         />
       )}
 
-      {statusOpen && (
-        <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
-      )}
+      {statusOpen &&
+        (isBd ? (
+          /* BD — the network board: every dealer, By-dealer filter, audit
+             history. The store board stays byte-identical for everyone else. */
+          <BdOrdersBoard onClose={() => setStatusOpen(false)} />
+        ) : (
+          <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
+        ))}
+
+      {accountsOpen && isBd && <BdAccountsPage onClose={() => setAccountsOpen(false)} />}
+
+      {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
 
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·

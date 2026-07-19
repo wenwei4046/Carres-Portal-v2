@@ -29,6 +29,7 @@ import {
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
 import {
   useAddOrderLines,
@@ -211,6 +212,15 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const catalogQ = useCatalog();
   const order = orderQ.data;
   const catalog = catalogQ.data;
+  // 2026-07-19 (Loo, BD portal) — internal roles get the order's audit
+  // history inline (order_history already rides GET /api/orders/:id). Store
+  // logins keep the drawer exactly as before.
+  const viewerRole = useAuth((s) => s.role);
+  const internalViewer =
+    viewerRole === "principal" ||
+    viewerRole === "operation" ||
+    viewerRole === "finance" ||
+    viewerRole === "bd";
 
   // ── local edit state (2990s: seeded from the order, resync ONLY on id
   //    change — never on a background refetch of the same order) ────────────
@@ -458,6 +468,13 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   );
   const addressOk =
     structuredComplete || (!addressDirty && !!(order?.customer.address ?? "").trim());
+  /** Building type (Loo 2026-07-19) — wizard-keyed, rides entry_data.fields.
+   *  Read-only here: `set_order_address` doesn't carry entry_data. */
+  const buildingType = (() => {
+    const f = (order?.entryData as { fields?: Record<string, unknown> } | null)?.fields;
+    const v = f?.["building_type"];
+    return typeof v === "string" && v.trim() ? v : null;
+  })();
   const dateOk = !!edited?.deliveryDate;
   const proceedDateOk = !!edited?.proceedDate;
   const allOk = customerInfoOk && addressOk && dateOk && paidOk && proceedDateOk;
@@ -693,7 +710,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                       </div>
                       <div className="os-item__body">
                         <div className="os-item__name">{model?.name ?? "Sofa"}</div>
-                        <div className="os-item__detail">{row.summary}</div>
+                        <div className="os-item__detail">{row.spec}</div>
                       </div>
                       <div className="os-item__qty">×{row.qty}</div>
                       <div className="os-item__price">
@@ -966,6 +983,15 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 structured format.
               </p>
             )}
+            {buildingType && (
+              <p
+                className="t-tiny"
+                style={{ color: "var(--fg-muted)", marginTop: 8 }}
+                data-testid="pos-od-building-type"
+              >
+                Building type: {buildingType}
+              </p>
+            )}
             <div className="os-grid" style={{ marginTop: 12 }}>
               <label className="os-field">
                 <span>Delivery date</span>
@@ -1157,6 +1183,47 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               )}
             </div>
           </section>
+
+          {/* History — internal roles only (audit trail per SO). Newest first. */}
+          {internalViewer && (order.history ?? []).length > 0 && (
+            <section className="os-section" data-testid="pos-od-history">
+              <h4 className="os-section__title">
+                History <span>{(order.history ?? []).length} events</span>
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[...(order.history ?? [])]
+                  .sort((a, b) => (b.occurredAt ?? "").localeCompare(a.occurredAt ?? ""))
+                  .map((h) => (
+                    <div key={h.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: "var(--c-orange)",
+                          marginTop: 5,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, lineHeight: 1.45 }}>{h.text}</div>
+                        <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 1 }}>
+                          {new Date(h.occurredAt).toLocaleString("en-MY", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                          {h.byRole ? ` · ${h.byRole}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Footer */}

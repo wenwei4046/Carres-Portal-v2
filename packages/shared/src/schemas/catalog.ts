@@ -868,6 +868,94 @@ export const attrsPwpMarkerSchema = z
   .passthrough();
 export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;
 
+// ---------------------------------------------------------------------------
+// 0239 — Product bundles (bundle pricing). Principal-owned. A bundle = a named
+// set of catalog SKUs sold together at ONE bundle price; the POS explodes it
+// into component order_lines via the pure `explodeBundle` (split Σ-exact).
+// One schema, two consumers (§9.5): the API validates these and the Promo/GWP
+// tab editor reuses the exact same shapes. DORMANT until authored + active.
+// ---------------------------------------------------------------------------
+
+/** One bundle component (mirrors the shared `BundleComponent`). */
+export const bundleComponentSchema = z
+  .object({
+    sku: z.string().trim().min(1).max(60),
+    qty: z.number().int().positive().max(99),
+  })
+  .strict();
+export type BundleComponentDto = z.infer<typeof bundleComponentSchema>;
+
+/** One customizable-bundle slot (0241; mirrors the shared `BundleSlot`).
+ *  variant 'fixed' pins the exact `sku` (exactly ONE model); 'any' lets the
+ *  customer pick any live variant of the chosen model at the POS. */
+export const bundleSlotSchema = z
+  .object({
+    label: z.string().trim().min(1).max(60).optional(),
+    qty: z.number().int().positive().max(9),
+    modelIds: z.array(z.string().uuid()).min(1).max(10),
+    variant: z.enum(["any", "fixed"]),
+    sku: z.string().trim().min(1).max(60).optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.variant === "fixed" && !v.sku)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a fixed-variant slot needs its exact SKU" });
+    if (v.variant === "fixed" && v.modelIds.length !== 1)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a fixed-variant slot pins exactly one product" });
+  });
+export type BundleSlotDto = z.infer<typeof bundleSlotSchema>;
+
+/** A `product_bundles` row DTO (mirrors the shared `ProductBundle`). `kind` /
+ *  `slots` default for pre-0241 serialized payloads; the adapter always emits. */
+export const productBundleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  price: z.number(),
+  kind: z.enum(["fixed", "custom"]).default("fixed"),
+  components: z.array(bundleComponentSchema),
+  slots: z.array(bundleSlotSchema).default([]),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type ProductBundleDto = z.infer<typeof productBundleSchema>;
+
+/** Create a bundle. kind 'fixed' (default) needs ≥2 pinned components; kind
+ *  'custom' (0241) needs ≥1 slot. `active` defaults false server-side. The RM
+ *  1M price cap keeps a typo out of numeric(14,2) AND keeps the cents math
+ *  well inside float-safe integer range (mirrors the 0181 SPECIAL_MONEY bound). */
+const productBundleFields = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    price: z.number().nonnegative().lte(1_000_000),
+    kind: z.enum(["fixed", "custom"]).optional(),
+    components: z.array(bundleComponentSchema).max(20).optional(),
+    slots: z.array(bundleSlotSchema).max(10).optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export const productBundleInput = productBundleFields.superRefine((v, ctx) => {
+  const kind = v.kind ?? "fixed";
+  if (kind === "fixed" && (v.components?.length ?? 0) < 2)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["components"],
+      message: "a fixed bundle needs at least 2 items",
+    });
+  if (kind === "custom" && (v.slots?.length ?? 0) < 1)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["slots"],
+      message: "a customizable bundle needs at least 1 item slot",
+    });
+});
+export type ProductBundleInput = z.infer<typeof productBundleInput>;
+
+/** Patch a bundle — every field of create is optional (empty body → 422; the
+ *  per-kind minimums are create-time shape rules, not patch rules). */
+export const productBundlePatchInput = productBundleFields.partial().strict();
+export type ProductBundlePatchInput = z.infer<typeof productBundlePatchInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -898,6 +986,9 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0239 — Product bundles (additive, OPTIONAL). POS sees active only; admin
+  // sees all. Pre-0239 clients that don't read this key are wholly unaffected.
+  bundles: z.array(productBundleSchema).optional(),
   // 0219 — Order Entry config (payment methods + form fields; additive,
   // OPTIONAL). The POS renders payment methods + the Customer-step form from
   // it; empty/absent → code defaults (pre-0219 behavior + Cash).
@@ -944,6 +1035,10 @@ export const salespersonSchema = z.object({
   staffRole: z.enum(["principal", "manager", "salesperson"]).default("salesperson"),
   color: z.string().nullable().default(null),
   active: z.boolean().default(true),
+  // 0241 staff profile — defaulted for the same reason.
+  email: z.string().nullable().default(null),
+  birthday: z.string().nullable().default(null),
+  gender: z.enum(["male", "female"]).nullable().default(null),
 });
 export type SalespersonDto = z.infer<typeof salespersonSchema>;
 

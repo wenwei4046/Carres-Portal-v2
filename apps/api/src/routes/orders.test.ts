@@ -910,6 +910,54 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(body.lines[0].description).toBe("sofa:atrium:part:L-piece");
   });
 
+  // Loo 2026-07-19 — the customer's SO shows a built sofa as ONE model line;
+  // the per-compartment split (Phase-5 explode) is operation's view.
+  it("regroups exploded sofa-build lines into ONE model line (sku = model key, sofa_spec sub-line)", async () => {
+    const row = makeJoinedRow();
+    const whole = { sofa_height: "24", fabric_name: "CG-011 Peach", leg_height: '4"' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (row as any).order_lines = [
+      { sku: "5539-1B(LHF)", qty: 1, unit_price: "996.66", attrs: { ...whole, sofa_build_key: "bk-1", module_code: "1B(LHF)" } },
+      { sku: "5539-CNR", qty: 1, unit_price: "996.66", attrs: { ...whole, sofa_build_key: "bk-1", module_code: "CNR" } },
+      { sku: "5539-2A(RHF)", qty: 1, unit_price: "996.68", attrs: { ...whole, sofa_build_key: "bk-1", module_code: "2A(RHF)" } },
+      { sku: "MATT-A", qty: 2, unit_price: "100", attrs: null },
+    ];
+    const body = await fetchPayload(
+      buildSb({
+        one: row,
+        byTable: {
+          product_skus: [
+            {
+              sku: "5539-1B(LHF)",
+              variant: "1B(LHF)",
+              product_models: { name: "Booqit", model_key: "5539" },
+            },
+            {
+              sku: "MATT-A",
+              variant: "Queen",
+              product_models: { name: "Matt X", model_key: "matt-x" },
+            },
+          ],
+        },
+      }),
+    );
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines[0]).toMatchObject({
+      sku: "5539",
+      description: "Booqit",
+      qty: 1,
+      unit_price: 2990,
+      line_total: 2990,
+    });
+    expect(body.lines[0].attrs.sofa_spec).toBe(
+      '1B(LHF) + CNR + 2A(RHF) · 24″ · CG-011 Peach · leg 4"',
+    );
+    // The flat line passes through untouched…
+    expect(body.lines[1]).toMatchObject({ sku: "MATT-A", description: "Matt X (Queen)", qty: 2 });
+    // …and the Σ-exact split keeps the subtotal (2990 + 200 + addon 60).
+    expect(body.subtotal).toBe(3250);
+  });
+
   it("humanizes addon labels via addons.name and passes addon attrs through", async () => {
     const row = makeJoinedRow();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

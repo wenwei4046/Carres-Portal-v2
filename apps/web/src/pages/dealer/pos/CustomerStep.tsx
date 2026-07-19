@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
+  branchNoun,
+  isShowroom,
   minDeliveryDateISO,
   resolveFormTab,
+  storeNoun,
   type CatalogResponse,
   type CustomField,
   type OrderEntryTab,
   type OutletDto,
   type SalespersonDto,
+  type StoreChannel,
 } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -25,14 +29,20 @@ import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 /** MY-standard demographic option lists (0200 — feed Sales analysis). */
 const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
 const GENDER_OPTIONS = ["Female", "Male"] as const;
+/** Delivery-address building types (Loo 2026-07-19). */
+const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Other"] as const;
 
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
-/** In-flow dealer pick (internal operator placing on behalf of a dealer).
- *  Absent for dealer-side logins — their JWT dealer is the order's dealer. */
+/** In-flow store pick (internal operator placing on behalf of a store).
+ *  Absent for dealer-side logins — their JWT dealer is the order's dealer.
+ *
+ *  `channel` splits the list into Carres' own showrooms vs external dealers
+ *  (Loo 2026-07-19) — before the split they were one flat list and there was
+ *  no way to tell whose store you were selling under. */
 export interface DealerPick {
-  dealers: Array<{ id: string; name: string }>;
+  dealers: Array<{ id: string; name: string; channel: StoreChannel }>;
   loading: boolean;
   value: string | null;
   onPick: (id: string, name: string) => void;
@@ -58,7 +68,9 @@ export default function CustomerStep({
   draft,
   onChange,
   outlets,
+  outletsLoaded = true,
   salespersons,
+  storeChannel = "dealer",
   catalog,
   minLeadDays,
   dealerPick,
@@ -69,7 +81,13 @@ export default function CustomerStep({
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
   outlets: OutletDto[];
+  /** False while the outlets query is still in flight — an empty `outlets`
+   *  then means "unknown", not "this store has none". */
+  outletsLoaded?: boolean;
   salespersons: SalespersonDto[];
+  /** Kind of store this order belongs to — a dealer's branch is an "Outlet",
+   *  one of ours is a "Showroom" (Loo 2026-07-19). */
+  storeChannel?: StoreChannel;
   catalog: CatalogResponse;
   minLeadDays: number;
   dealerPick?: DealerPick;
@@ -192,6 +210,19 @@ export default function CustomerStep({
   const spOptions = staffSalesOptions ?? visibleSPs;
 
   const dealerPending = !!dealerPick && !dealerPick.value;
+
+  // Store pick, split into the two kinds so the dropdown can group them and
+  // the branch field can name itself (Loo 2026-07-19).
+  const pickedStore = dealerPick?.dealers.find((d) => d.id === dealerPick.value);
+  const pickShowrooms = (dealerPick?.dealers ?? []).filter((d) => isShowroom(d.channel));
+  const pickDealers = (dealerPick?.dealers ?? []).filter((d) => !isShowroom(d.channel));
+  // An internal operator's pick wins over the caller-supplied channel; a
+  // store-side login has no pick, so the prop (their own kind) decides.
+  const branchLabel = branchNoun(pickedStore?.channel ?? storeChannel);
+  // Only assert "no outlet" once the list has actually LOADED — `outlets` is
+  // [] while the query is in flight, and claiming a healthy store has no
+  // branch (plus greying out its picker) is worse than a blank dropdown.
+  const branchesEmpty = outletsLoaded && outlets.length === 0;
   // Same "today" source as the Step3Delivery pickers (shared helper — keeps
   // the birthday wheel's age/year cap on the same clock as the date floors).
   const todayIso = minDeliveryDateISO(0);
@@ -224,7 +255,14 @@ export default function CustomerStep({
           !!c.addressState &&
           !!c.addressCity &&
           !!c.addressPostcode);
-      const billingOk = c.billingSame || c.billing.trim().length >= 5;
+      // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as
+      // delivery, so its gate mirrors the delivery rules field-for-field.
+      const billingOk =
+        c.billingSame ||
+        (c.billingLine1.trim().length >= 5 &&
+          !!c.billingState &&
+          !!c.billingCity &&
+          !!c.billingPostcode);
       return addressOk && billingOk && customsValid(addrTab);
     }
     if (stepIdx === 2) {
@@ -286,12 +324,14 @@ export default function CustomerStep({
           ))}
         </div>
 
-        {/* Dealer card — internal operator picks who this sale belongs to. */}
+        {/* Store card — internal operator picks who this sale belongs to.
+            Grouped so our OWN showrooms never read as somebody's dealership. */}
         {dealerPick && stepIdx === 0 && (
           <div className="fade-in" style={{ marginBottom: 22 }}>
             <div className="field">
               <span className="field__label">
-                Dealer <span style={{ color: "var(--c-orange)" }}>*</span>
+                {pickedStore ? storeNoun(pickedStore.channel) : "Dealer / Showroom"}{" "}
+                <span style={{ color: "var(--c-orange)" }}>*</span>
               </span>
               <select
                 value={dealerPick.value ?? ""}
@@ -304,20 +344,33 @@ export default function CustomerStep({
               >
                 <option value="">
                   {dealerPick.loading
-                    ? "Loading dealers…"
+                    ? "Loading stores…"
                     : dealerPick.dealers.length === 0
-                      ? "No active dealers"
-                      : "Select a dealer…"}
+                      ? "No active stores"
+                      : "Select a store…"}
                 </option>
-                {dealerPick.dealers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
+                {pickShowrooms.length > 0 && (
+                  <optgroup label="Our showrooms">
+                    {pickShowrooms.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {pickDealers.length > 0 && (
+                  <optgroup label="Dealers">
+                    {pickDealers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <span className="field__hint">
-                The order, outlet and salesperson are recorded under this dealer; the activity log
-                keeps your name as who placed it.
+                The order, {branchNoun(pickedStore?.channel).toLowerCase()} and salesperson are
+                recorded under this store; the activity log keeps your name as who placed it.
               </span>
             </div>
           </div>
@@ -325,7 +378,7 @@ export default function CustomerStep({
 
         {dealerPending ? (
           <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            Pick a dealer to continue — the outlet and salesperson lists follow the dealer.
+            Pick a store to continue — the lists below follow it.
           </p>
         ) : (
           <>
@@ -334,20 +387,37 @@ export default function CustomerStep({
               <div className="fade-in">
                 <div className="form-grid">
                   <div className="field">
-                    <span className="field__label">Outlet *</span>
+                    <span className="field__label">{branchLabel} *</span>
                     <select
                       value={draft.outletId ?? ""}
                       onChange={(e) => setOutlet(e.target.value)}
-                      disabled={outletLockedByStaff}
+                      disabled={outletLockedByStaff || branchesEmpty}
                       data-testid="pos-outlet-select"
                     >
-                      <option value="">— pick outlet —</option>
+                      <option value="">
+                        {branchesEmpty
+                          ? `— no ${branchLabel.toLowerCase()} yet —`
+                          : `— pick ${branchLabel.toLowerCase()} —`}
+                      </option>
                       {outlets.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name}
                         </option>
                       ))}
                     </select>
+                    {/* A store with no branch row can't take an order at all —
+                        say so instead of leaving an empty dropdown (Loo hit
+                        this on the AutoCount Archive account, 2026-07-19).
+                        The door differs by who is looking: an internal
+                        operator opens one in Admin → Accounts, a store owner
+                        in their own POS Staff overlay. */}
+                    {branchesEmpty && !outletLockedByStaff && (
+                      <span className="field__hint" data-testid="pos-outlet-empty">
+                        This store has no {branchLabel.toLowerCase()} yet — add one under{" "}
+                        {dealerPick ? "Admin → Accounts" : "Staff → Outlets"} before placing an
+                        order for it.
+                      </span>
+                    )}
                   </div>
                   <div className="field">
                     <span className="field__label">Salesperson *</span>
@@ -361,7 +431,7 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {spOptions.length === 0
-                          ? "— none in this outlet —"
+                          ? `— none in this ${branchLabel.toLowerCase()} —`
                           : "— pick salesperson —"}
                       </option>
                       {spOptions.map((sp) => (
@@ -376,7 +446,7 @@ export default function CustomerStep({
                     <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
                       <input
                         value={c.name}
-                        placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
+                        placeholder="e.g. Tan Mei Ling, Ahmad bin Yusof"
                         autoComplete="off"
                         data-testid="pos-customer-name"
                         onChange={(e) => {
@@ -572,6 +642,24 @@ export default function CustomerStep({
                       }}
                       onChange={(patch) => setC(patch)}
                     />
+                    {/* Building type (Loo 2026-07-19) — delivery-access info for
+                        operation; optional, rides entry_data.fields. */}
+                    <label className="block mt-3.5">
+                      <span className="label block mb-1.5">Building type</span>
+                      <select
+                        value={c.buildingType}
+                        onChange={(e) => setC({ buildingType: e.target.value })}
+                        data-testid="pos-building-type"
+                        className="w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary max-w-[260px]"
+                      >
+                        <option value="">— select —</option>
+                        {BUILDING_TYPES.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                 )}
 
@@ -582,20 +670,7 @@ export default function CustomerStep({
                   <input
                     type="checkbox"
                     checked={c.billingSame}
-                    onChange={(e) =>
-                      setC({
-                        billingSame: e.target.checked,
-                        billing: e.target.checked
-                          ? composeAddress({
-                              line1: c.addressLine1,
-                              line2: c.addressLine2,
-                              state: c.addressState,
-                              city: c.addressCity,
-                              postcode: c.addressPostcode,
-                            })
-                          : c.billing,
-                      })
-                    }
+                    onChange={(e) => setC({ billingSame: e.target.checked })}
                   />
                   <span className="addr-toggle__box">
                     {c.billingSame && <Check size={12} strokeWidth={3} />}
@@ -608,17 +683,50 @@ export default function CustomerStep({
                   </span>
                 </label>
 
+                {/* Billing keys in with the SAME MY cascade as delivery (Loo
+                    2026-07-19) — a second MYAddressFields onto the billing*
+                    fields; the composed string stays in `billing` in step so
+                    the CONFIRM recap + submit keep reading it. */}
                 {!c.billingSame && (
-                  <div className="form-grid" style={{ marginTop: 22 }}>
-                    <div className="field field--span">
-                      <span className="field__label">Billing address</span>
-                      <textarea
-                        rows={2}
-                        value={c.billing}
-                        placeholder="Unit, street, area"
-                        onChange={(e) => setC({ billing: e.target.value })}
-                      />
+                  <div style={{ marginTop: 22 }} data-testid="pos-billing-fields">
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        fontFamily: "var(--font-button)",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Billing address
                     </div>
+                    <MYAddressFields
+                      data={{
+                        addressLine1: c.billingLine1,
+                        addressLine2: c.billingLine2,
+                        addressState: c.billingState,
+                        addressCity: c.billingCity,
+                        addressPostcode: c.billingPostcode,
+                      }}
+                      onChange={(patch) => {
+                        const next = {
+                          billingLine1: patch.addressLine1 ?? c.billingLine1,
+                          billingLine2: patch.addressLine2 ?? c.billingLine2,
+                          billingState: patch.addressState ?? c.billingState,
+                          billingCity: patch.addressCity ?? c.billingCity,
+                          billingPostcode: patch.addressPostcode ?? c.billingPostcode,
+                        };
+                        setC({
+                          ...next,
+                          billing: composeAddress({
+                            line1: next.billingLine1,
+                            line2: next.billingLine2,
+                            state: next.billingState,
+                            city: next.billingCity,
+                            postcode: next.billingPostcode,
+                          }),
+                        });
+                      }}
+                    />
                   </div>
                 )}
                 {addrTab.custom.length > 0 && (

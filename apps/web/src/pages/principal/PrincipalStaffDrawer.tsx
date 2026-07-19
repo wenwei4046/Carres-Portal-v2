@@ -76,7 +76,7 @@ export default function PrincipalStaffDrawer({
           {roster.length > 0 && (
             <ul className="divide-y divide-base-100">
               {roster.map((s) => (
-                <StaffRow key={s.id} staff={s} />
+                <StaffRow key={s.id} staff={s} dealerId={dealerId} />
               ))}
             </ul>
           )}
@@ -97,7 +97,9 @@ export default function PrincipalStaffDrawer({
   );
 }
 
-function StaffRow({ staff }: { staff: StaffDto }) {
+// `dealerId` rides to SetPinModal — without it the HQ caller's set-pin request
+// has no target store and the server 400s (latent until 2026-07-19).
+function StaffRow({ staff, dealerId }: { staff: StaffDto; dealerId: string }) {
   const [showPin, setShowPin] = useState(false);
   return (
     <li className="py-2.5 flex items-center justify-between gap-3" data-testid={`principal-staff-row-${staff.id}`}>
@@ -111,7 +113,7 @@ function StaffRow({ staff }: { staff: StaffDto }) {
             <TierBadge tier={staff.staffRole} />
           </div>
           <div className="text-[11px] text-base-500">
-            {staff.hasPin ? "PIN set" : "未设 PIN · no PIN"}
+            {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
         </div>
@@ -124,7 +126,7 @@ function StaffRow({ staff }: { staff: StaffDto }) {
       >
         {staff.hasPin ? "Reset PIN" : "Set PIN"}
       </button>
-      {showPin && <SetPinModal staff={staff} onClose={() => setShowPin(false)} />}
+      {showPin && <SetPinModal staff={staff} dealerId={dealerId} onClose={() => setShowPin(false)} />}
     </li>
   );
 }

@@ -29,8 +29,12 @@ import type { AppEnv } from "../types";
  * Two caller shapes:
  *   - dealer / showroom / salesperson (the store login) — dealer scope from the
  *     JWT; their TIER comes from the staff token they PIN'd in with.
- *   - internal principal (Carres HQ) — passes `?dealerId=` and acts as
- *     principal-tier for that store (the Principal Accounts "Staff" drawer).
+ *   - internal HQ (principal, or BD acting for a dealership — Loo 2026-07-19:
+ *     BD helps every dealer, principal-parity) — passes `?dealerId=` and acts
+ *     as principal-tier for that store (the Principal Accounts "Staff" drawer
+ *     + the BD POS Accounts overlay). HQ salespersons WRITES go through
+ *     adminClient: RLS `salespersons_dealer_write` covers principal but not
+ *     bd, and the route already hard-checks dealer ownership on every path.
  *
  * PIN hashes never leave Postgres: only the service_role DEFINER fns
  * `staff_verify_pin` / `staff_set_pin` (and an EXISTS probe on the deny-all
@@ -39,8 +43,10 @@ import type { AppEnv } from "../types";
  */
 const staffRouter = new Hono<AppEnv>();
 
-const STAFF_READ_ROLES = new Set<string>(["dealer", "showroom", "salesperson", "principal"]);
+const STAFF_READ_ROLES = new Set<string>(["dealer", "showroom", "salesperson", "principal", "bd"]);
 const DEALER_FAMILY_ROLES = new Set<string>(["dealer", "showroom", "salesperson"]);
+/** Internal HQ roles that manage a store's staff via `?dealerId=`. */
+const INTERNAL_HQ_ROLES = new Set<string>(["principal", "bd"]);
 
 // ---------------------------------------------------------------------------
 // Shared resolvers
@@ -49,61 +55,65 @@ const DEALER_FAMILY_ROLES = new Set<string>(["dealer", "showroom", "salesperson"
 /**
  * The store this request targets + whether the caller is HQ acting on its
  * behalf. Dealer-family callers are pinned to their JWT dealer; an internal
- * principal names the store via `?dealerId=`.
+ * HQ role (principal / bd) names the store via `?dealerId=`.
  */
-function resolveTargetDealer(c: Context<AppEnv>): { dealerId: string; internalPrincipal: boolean } {
+function resolveTargetDealer(c: Context<AppEnv>): { dealerId: string; internalHq: boolean } {
   const auth = c.var.auth;
   if (DEALER_FAMILY_ROLES.has(auth.role)) {
     if (!auth.dealerId) throw new HTTPException(422, { message: "Caller has no dealer_id in JWT" });
-    return { dealerId: auth.dealerId, internalPrincipal: false };
+    return { dealerId: auth.dealerId, internalHq: false };
   }
-  if (auth.role === "principal") {
+  if (INTERNAL_HQ_ROLES.has(auth.role)) {
     const q = new URL(c.req.url).searchParams.get("dealerId");
     if (!q || !z.string().uuid().safeParse(q).success) {
-      throw new HTTPException(400, { message: "principal must pass a valid ?dealerId=" });
+      throw new HTTPException(400, { message: "internal HQ must pass a valid ?dealerId=" });
     }
-    return { dealerId: q, internalPrincipal: true };
+    return { dealerId: q, internalHq: true };
   }
   throw new HTTPException(403, { message: "Not permitted to manage staff" });
 }
 
 type MutationCaller = {
   dealerId: string;
-  internalPrincipal: boolean;
+  internalHq: boolean;
   tier: StaffTierDto;
   oid: string | null;
   sid: string | null;
 };
 
 /**
- * Establish the caller's TIER for a management action. An internal principal is
- * principal-tier by role; a dealer-family caller derives tier from the staff
- * token they PIN'd (or reauth'd) in with — no token → 403 (they must identify
- * first). Salesperson-tier is caught per-route where its scope differs.
+ * Establish the caller's TIER for a management action. An internal HQ role
+ * (principal / bd) is principal-tier by role; a dealer-family caller derives
+ * tier from the staff token they PIN'd (or reauth'd) in with — no token → 403
+ * (they must identify first). Salesperson-tier is caught per-route where its
+ * scope differs.
  */
 async function resolveMutationCaller(c: Context<AppEnv>): Promise<MutationCaller> {
-  const { dealerId, internalPrincipal } = resolveTargetDealer(c);
-  if (internalPrincipal) {
-    return { dealerId, internalPrincipal, tier: "principal", oid: null, sid: null };
+  const { dealerId, internalHq } = resolveTargetDealer(c);
+  if (internalHq) {
+    return { dealerId, internalHq, tier: "principal", oid: null, sid: null };
   }
   const staff = await getStaffContext(c);
   if (!staff) {
     throw new HTTPException(403, { message: "Staff session required" });
   }
-  return { dealerId, internalPrincipal, tier: staff.tier, oid: staff.oid, sid: staff.sid };
+  return { dealerId, internalHq, tier: staff.tier, oid: staff.oid, sid: staff.sid };
 }
 
 /** 'showroom' when the store's login role is showroom (they cap at manager). */
 async function resolveStoreKind(
   c: Context<AppEnv>,
   dealerId: string,
-  internalPrincipal: boolean,
+  internalHq: boolean,
 ): Promise<"dealer" | "showroom"> {
-  if (!internalPrincipal) {
+  if (!internalHq) {
     return c.var.auth.role === "showroom" ? "showroom" : "dealer";
   }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data } = await sb
+  // adminClient: app_users SELECT is self-or-principal only, so a BD caller
+  // would silently read nothing and mislabel a showroom store as 'dealer'
+  // (defeating the manager cap). Single-column existence probe, HQ-gated above.
+  const admin = adminClient(c.env);
+  const { data } = await admin
     .from("app_users")
     .select("role")
     .eq("dealer_id", dealerId)
@@ -124,7 +134,7 @@ staffRouter.get("/", async (c) => {
   if (!STAFF_READ_ROLES.has(auth.role)) {
     throw new HTTPException(403, { message: "Not permitted to view staff" });
   }
-  const { dealerId, internalPrincipal } = resolveTargetDealer(c);
+  const { dealerId, internalHq } = resolveTargetDealer(c);
 
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
@@ -134,6 +144,17 @@ staffRouter.get("/", async (c) => {
     .order("name");
   if (error) throw new HTTPException(500, { message: error.message });
   const rows = (data ?? []) as DB.SalespersonRow[];
+
+  // Sequence = hierarchy (Loo 2026-07-19): highest level first — Dealer
+  // Principal → Manager → Salesperson — then A-Z within a tier. One sort here
+  // orders EVERY consumer (Staff & PINs list, PIN sign-in tiles, HQ Staff
+  // drawer, setup wizard).
+  const TIER_RANK: Record<string, number> = { principal: 0, manager: 1, salesperson: 2 };
+  rows.sort(
+    (a, b) =>
+      (TIER_RANK[a.staff_role] ?? 9) - (TIER_RANK[b.staff_role] ?? 9) ||
+      a.name.localeCompare(b.name),
+  );
 
   // hasPin: a single service_role IN-probe on the deny-all ledger (booleans
   // only — the hash never leaves Postgres). Empty roster → skip the probe.
@@ -152,7 +173,7 @@ staffRouter.get("/", async (c) => {
 
   const staff = rows.map((r) => toStaffDto(r, withPin.has(r.id)));
   const selfStaffId = rows.find((r) => r.user_id === auth.id)?.id ?? null;
-  const storeKind = await resolveStoreKind(c, dealerId, internalPrincipal);
+  const storeKind = await resolveStoreKind(c, dealerId, internalHq);
 
   return c.json(
     staffListResponseSchema.parse({
@@ -362,7 +383,7 @@ staffRouter.post("/", async (c) => {
   } else {
     // principal-tier — showrooms have no store-principal (Carres is theirs).
     if (input.staffRole === "principal") {
-      const storeKind = await resolveStoreKind(c, caller.dealerId, caller.internalPrincipal);
+      const storeKind = await resolveStoreKind(c, caller.dealerId, caller.internalHq);
       if (storeKind === "showroom") {
         throw new HTTPException(403, { message: "Showroom stores cannot have a store principal" });
       }
@@ -370,6 +391,9 @@ staffRouter.post("/", async (c) => {
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
+  // HQ writes bypass RLS (salespersons_dealer_write covers principal, not bd);
+  // the explicit dealer/outlet ownership checks above+below stay the gate.
+  const writeSb = caller.internalHq ? adminClient(c.env) : sb;
 
   // An outlet reference must belong to THIS store — the bare FK would accept
   // any dealer's outlet.
@@ -385,7 +409,7 @@ staffRouter.post("/", async (c) => {
     }
   }
 
-  const { data, error } = await sb
+  const { data, error } = await writeSb
     .from("salespersons")
     .insert({
       dealer_id: caller.dealerId,
@@ -395,6 +419,10 @@ staffRouter.post("/", async (c) => {
       staff_role: input.staffRole,
       color: input.color ?? null,
       active: true,
+      // 0241 profile fields.
+      email: input.email ?? null,
+      birthday: input.birthday ?? null,
+      gender: input.gender ?? null,
     })
     .select("*")
     .single();
@@ -461,6 +489,9 @@ staffRouter.patch("/:id", async (c) => {
     }
   }
 
+  // HQ writes bypass RLS — same rationale as POST / above.
+  const writeSb = caller.internalHq ? adminClient(c.env) : sb;
+
   // An outlet move must stay inside THIS store (same guard as create).
   if (caller.tier === "principal" && patch.outletId) {
     const { data: outletRow, error: outletErr } = await sb
@@ -478,12 +509,17 @@ staffRouter.patch("/:id", async (c) => {
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.color !== undefined) update.color = patch.color;
   if (patch.active !== undefined) update.active = patch.active;
+  if (patch.phone !== undefined) update.phone = patch.phone;
+  // 0241 profile fields — same edit scope as name/color.
+  if (patch.email !== undefined) update.email = patch.email;
+  if (patch.birthday !== undefined) update.birthday = patch.birthday;
+  if (patch.gender !== undefined) update.gender = patch.gender;
   if (caller.tier === "principal") {
     if (patch.staffRole !== undefined) update.staff_role = patch.staffRole;
     if (patch.outletId !== undefined) update.outlet_id = patch.outletId;
   }
 
-  const { data, error } = await sb
+  const { data, error } = await writeSb
     .from("salespersons")
     .update(update)
     .eq("id", id)

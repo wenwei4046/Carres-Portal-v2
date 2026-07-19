@@ -7,6 +7,7 @@ import type { CostSource, OperationStage } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
 import type { DefaultFreeGift } from "./free-gift";
 import type { FreeItemCampaign } from "./free-item-campaign";
+import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
 // Re-exported so UI code can write `import type { CostSource } from
@@ -58,6 +59,10 @@ export interface Salesperson {
   staffRole: "principal" | "manager" | "salesperson";
   color: string | null;
   active: boolean;
+  // 0241 staff profile
+  email: string | null;
+  birthday: string | null;
+  gender: "male" | "female" | null;
 }
 
 export interface ProductModel {
@@ -436,6 +441,29 @@ export interface PwpRule {
   // ── P8d (0188) cross-order carry-forward policy ──
   carryForward: boolean;
   carryForwardDays: number | null;
+}
+
+/**
+ * One `product_bundles` row (migration 0239) — bundle pricing: a named set of
+ * catalog SKUs sold together at ONE bundle price (e.g. Cloud King + Lumi King +
+ * Kayu King = RM 2,500). `productBundleFromRow` maps it; `components` is parsed
+ * (malformed entries dropped) via `parseBundleComponents`. The POS explodes a
+ * bundle into component order_lines via the pure `explodeBundle` (split
+ * proportional to catalog price × qty, Σ-exact); bundle identity rides in
+ * order_lines.attrs.bundle_* — create_order / order_lines are UNTOUCHED.
+ * DORMANT until a bundle is authored + flipped active.
+ */
+export interface ProductBundle {
+  id: string;
+  name: string;
+  price: number;
+  /** 0241 — 'fixed' (pinned components) | 'custom' (slots walked at the POS). */
+  kind: "fixed" | "custom";
+  components: BundleComponent[];
+  /** 0241 — kind='custom' item slots; [] for kind='fixed'. */
+  slots: BundleSlot[];
+  active: boolean;
+  sortOrder: number;
 }
 
 /**
