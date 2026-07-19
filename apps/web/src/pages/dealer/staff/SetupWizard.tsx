@@ -277,7 +277,8 @@ function ExistingStaffStep({
         <div className="staff-gate__eyebrow">First-time setup · 3 of 3</div>
         <h2 className="staff-gate__title">You're all set</h2>
         <p className="staff-gate__sub">
-          Add your salespeople anytime from Settings → Staff. For now, let's get selling.
+          Add your salespeople anytime from the Staff button in the POS top bar. For now,
+          let's get selling.
         </p>
         <button
           type="button"
@@ -297,8 +298,8 @@ function ExistingStaffStep({
       <div className="staff-gate__eyebrow">First-time setup · 3 of 3</div>
       <h2 className="staff-gate__title">Set your team's PINs</h2>
       <p className="staff-gate__sub">
-        Give each salesperson a PIN so they can sign in. You can also do this later in Settings —
-        skip if you're not ready.
+        Give each salesperson a PIN so they can sign in. You can also do this later from the
+        POS Staff button — skip if you're not ready.
       </p>
 
       <div className="staff-outlets">

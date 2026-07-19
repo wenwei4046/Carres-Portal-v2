@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bookmark, ListOrdered, Lock, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
@@ -120,10 +120,13 @@ export default function DealerPos({
    *  themselves (the default, byte-identical to before). */
   actingDealerId?: string;
   actingDealerName?: string;
-  /** Where "Exit" / ThankYou-close goes. Default: navigate to /dealer/orders. */
+  /** Principal on-behalf only: where "Exit" / ThankYou-close goes. Dealer-side
+   *  (undefined, POS-only since 2026-07-19) the corner control LOCKS the
+   *  register instead and ThankYou's "View orders" opens the in-POS board. */
   onExit?: () => void;
 } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   // Which CUSTOMER sub-step to open on: 0 (Customer form) when arriving from
   // the cart, 3 (Target date) when backing out of the CONFIRM step — Back
@@ -166,6 +169,7 @@ export default function DealerPos({
   // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
   // stores). When present the top-bar chip becomes a "换人 / switch" button.
   const staffMember = useStaffSession((s) => s.staff);
+  const clearStaffToken = useStaffSession((s) => s.clearToken);
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
 
@@ -205,6 +209,16 @@ export default function DealerPos({
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [step, submitted]);
+
+  // Forgot-PIN owner-mode reauth (StaffGate) lands here with {openStaff: true}
+  // — open the Staff & PINs overlay directly (the back-office Settings page it
+  // used to open is gone), then clear the state so a refresh doesn't reopen it.
+  useEffect(() => {
+    if ((location.state as { openStaff?: boolean } | null)?.openStaff) {
+      setTeamOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   // POS-parity (2990s) — an INTERNAL operator (principal, no JWT dealer) who
   // wasn't handed an acting dealer by the caller picks the dealer IN-FLOW at
@@ -770,13 +784,20 @@ export default function DealerPos({
   }
 
   function handleExit() {
+    if (!onExit) {
+      // Dealer-side (Loo 2026-07-19, POS-only): the back-office is gone, so the
+      // corner control LOCKS the register — StaffGate drops to the PIN screen.
+      // Non-destructive: the draft persists and restores on the next unlock.
+      clearStaffToken();
+      return;
+    }
     if (!submitted && draftHasContent(draft)) {
       const leave = window.confirm(
         "You have an unsaved order. Leave the POS? Your draft is saved and will be here when you return.",
       );
       if (!leave) return;
     }
-    (onExit ?? (() => navigate("/dealer/orders")))();
+    onExit();
   }
 
   const outletName = draft.outletId
@@ -891,7 +912,7 @@ export default function DealerPos({
             </button>
           )}
           {staffMember ? (
-            <StaffSwitchChip variant="pos" />
+            <StaffSwitchChip />
           ) : (
             <Link
               to="/me"
@@ -910,16 +931,26 @@ export default function DealerPos({
               </span>
             </Link>
           )}
-          <button
-            type="button"
-            onClick={handleExit}
-            className="icon-btn"
-            aria-label="Exit POS"
-            title="Exit POS"
-            data-testid="pos-exit"
-          >
-            <LogOut size={18} strokeWidth={1.75} />
-          </button>
+          {/* Principal on-behalf: exit back to the portal. Dealer-side: LOCK
+              the register (Loo 2026-07-19 — it used to jump to the deleted
+              back-office). Hidden when there's neither (unlinked salesperson —
+              nothing to lock; sign-out lives on the /me chip). */}
+          {(onExit || staffMember) && (
+            <button
+              type="button"
+              onClick={handleExit}
+              className="icon-btn"
+              aria-label={onExit ? "Exit POS" : "Lock POS"}
+              title={onExit ? "Exit POS" : "锁定 · Lock POS"}
+              data-testid="pos-exit"
+            >
+              {onExit ? (
+                <LogOut size={18} strokeWidth={1.75} />
+              ) : (
+                <Lock size={18} strokeWidth={1.75} />
+              )}
+            </button>
+          )}
         </div>
       </header>
 
@@ -938,7 +969,10 @@ export default function DealerPos({
               onNewOrder={startAnotherOrder}
               onClose={() => {
                 clearDraft();
-                (onExit ?? (() => navigate("/dealer/orders")))();
+                // POS-only (2026-07-19): "View orders" opens the in-POS board;
+                // the principal on-behalf keeps its portal exit.
+                if (onExit) onExit();
+                else setStatusOpen(true);
               }}
             />
           </div>

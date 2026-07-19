@@ -6,6 +6,7 @@ import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
 import { parseDefaultFreeGifts } from "./free-gift";
 import { parseFreeItemEligible } from "./free-item-campaign";
+import { parseBundleComponents } from "./product-bundle";
 import { parseRuleTargets } from "./rule-target";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
@@ -410,6 +411,21 @@ export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
   // P8d (0188) — carry-forward defaults: a pre-0188 row / mock reads true / null.
   carryForward: r.carry_forward ?? true,
   carryForwardDays: r.carry_forward_days ?? null,
+});
+
+/**
+ * Maps a `product_bundles` row to the camelCase domain shape (0239).
+ * `components` jsonb is cleaned via `parseBundleComponents` (drops malformed
+ * entries); `price` / `sort_order` are Postgres numeric/integer → `Number()`
+ * (PostgREST may serialize them as strings).
+ */
+export const productBundleFromRow = (r: DB.ProductBundleRow): D.ProductBundle => ({
+  id: r.id,
+  name: r.name,
+  price: Number(r.price),
+  components: parseBundleComponents(r.components),
+  active: r.active,
+  sortOrder: Number(r.sort_order),
 });
 
 /**
