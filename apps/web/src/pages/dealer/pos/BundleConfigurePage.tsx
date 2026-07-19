@@ -53,7 +53,12 @@ export default function BundleConfigurePage({
   const [picks, setPicks] = useState<(BundleSlotPick | null)[]>(() =>
     units.map(({ slot }) => {
       if (slotNeedsConfig(slot, catalog)) return null;
-      const sku = catalog.skus.find((s) => s.sku === slot.sku);
+      // A spec-less slot auto-resolves: fixed → its pinned sku; any-variant →
+      // the single live sku of its single model (an any slot has no slot.sku).
+      const sku =
+        slot.variant === "fixed"
+          ? catalog.skus.find((s) => s.sku === slot.sku)
+          : catalog.skus.find((s) => s.modelId === slot.modelIds[0] && !s.discontinuedAt);
       const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
       if (!sku || !model) return null;
       return {

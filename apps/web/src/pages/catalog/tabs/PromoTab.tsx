@@ -1804,12 +1804,29 @@ function BundleForm({
     goneSkus.length === 0 &&
     (kind === "fixed" ? components.length >= 2 : slotsValid);
 
-  // A component that isn't POS-sellable makes the bundle card unavailable at
-  // the POS (the explode refuses to guess a price) — say so while authoring.
-  const offPosSkus = components
-    .map((comp) => skuBySku.get(comp.sku))
+  // Anything that isn't POS-sellable makes the bundle card unavailable at the
+  // POS (the explode refuses to guess a price) — say so while authoring. For
+  // custom kinds: pinned slot skus + any picked product with ZERO sellable
+  // skus (the "New Year / Pasir Wool Rug" trap, Loo 2026-07-19).
+  const offPosSkus = (
+    kind === "fixed"
+      ? components.map((comp) => comp.sku)
+      : slotRows.filter((r) => r.variant === "fixed" && r.sku).map((r) => r.sku)
+  )
+    .map((code) => skuBySku.get(code))
     .filter((s) => s && (s.posActive === false || s.discontinuedAt))
     .map((s) => s!.sku);
+  const offPosModels =
+    kind === "custom"
+      ? [...new Set(slotRows.flatMap((r) => (r.variant === "any" ? r.modelIds : [])))]
+          .filter(
+            (mid) =>
+              !catalog.skus.some(
+                (s) => s.modelId === mid && !s.discontinuedAt && s.posActive !== false,
+              ),
+          )
+          .map((mid) => (modelById.get(mid) ? modelLabel(modelById.get(mid)!) : mid))
+      : [];
 
   // Live split preview — the SAME pure explodeBundle the POS runs (fixed only;
   // a custom bundle's split depends on the customer's picks). Only once EVERY
@@ -1930,16 +1947,6 @@ function BundleForm({
                 data-testid={`bundle-slot-row-${i}`}
               >
                 <div className="flex flex-wrap items-end gap-2">
-                  <label className="block flex-1 min-w-[160px]">
-                    <span className="label block mb-1">Item name (optional)</span>
-                    <input
-                      value={r.label}
-                      onChange={(e) => patchSlot({ label: e.target.value })}
-                      placeholder={`e.g. Pick your mattress`}
-                      className={`${INPUT_CLS} w-full`}
-                      data-testid={`bundle-slot-label-${i}`}
-                    />
-                  </label>
                   <label className="block">
                     <span className="label block mb-1">Qty</span>
                     <input
@@ -1954,6 +1961,9 @@ function BundleForm({
                       className={`${INPUT_CLS} w-16`}
                     />
                   </label>
+                  {/* Accessories / services carry no variant axis — the pills
+                      are meaningless noise there (Loo 2026-07-19). */}
+                  {r.cat !== "accessory" && r.cat !== "service" && (
                   <div className="flex gap-1.5 pb-0.5">
                     {(
                       [
@@ -1983,6 +1993,7 @@ function BundleForm({
                       </button>
                     ))}
                   </div>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
@@ -2003,7 +2014,15 @@ function BundleForm({
                     <span className="label block mb-1">Category</span>
                     <select
                       value={r.cat}
-                      onChange={(e) => patchSlot({ cat: e.target.value as ProductCategory })}
+                      onChange={(e) => {
+                        const cat = e.target.value as ProductCategory;
+                        // No variant axis on accessory/service → force "any".
+                        patchSlot(
+                          cat === "accessory" || cat === "service"
+                            ? { cat, variant: "any", sku: "" }
+                            : { cat },
+                        );
+                      }}
                       className={`${INPUT_CLS} w-36`}
                       data-testid={`bundle-slot-cat-${i}`}
                     >
@@ -2018,8 +2037,11 @@ function BundleForm({
                     <span className="label block mb-1">
                       {r.variant === "fixed" ? "Product" : "Add a product the customer may pick"}
                     </span>
+                    {/* Fixed spec = a CONTROLLED select showing the pick (the
+                        dropdown itself is the answer — no chip below; Loo
+                        2026-07-19). Any-variant keeps the add-flow + chips. */}
                     <select
-                      value=""
+                      value={r.variant === "fixed" ? r.modelIds[0] ?? "" : ""}
                       onChange={(e) => {
                         const id = e.target.value;
                         if (!id) return;
@@ -2040,7 +2062,11 @@ function BundleForm({
                         {r.variant === "fixed" ? "Pick the product…" : "Add a product…"}
                       </option>
                       {pickable
-                        .filter((m) => m.category === r.cat && !r.modelIds.includes(m.id))
+                        .filter(
+                          (m) =>
+                            m.category === r.cat &&
+                            (r.variant === "fixed" || !r.modelIds.includes(m.id)),
+                        )
                         .map((m) => (
                           <option key={m.id} value={m.id}>
                             {modelLabel(m)}
@@ -2049,7 +2075,7 @@ function BundleForm({
                     </select>
                   </label>
                 </div>
-                {r.modelIds.length > 0 && (
+                {r.variant === "any" && r.modelIds.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {r.modelIds.map((mid) => {
                       const m = modelById.get(mid);
@@ -2213,10 +2239,11 @@ function BundleForm({
           No longer in the catalog: {goneSkus.join(", ")} — replace or remove those rows to save.
         </p>
       )}
-      {offPosSkus.length > 0 && (
+      {(offPosSkus.length > 0 || offPosModels.length > 0) && (
         <p className="t-tiny text-warning" data-testid="bundle-offpos-warning">
-          Not sellable at the POS right now: {offPosSkus.join(", ")} — the bundle card will stay
-          unavailable until every item is on.
+          Not sellable at the POS right now: {[...offPosSkus, ...offPosModels].join(", ")} — the
+          bundle card will stay greyed out until every item has an ACTIVE SKU (switch it on in the
+          Modular tab).
         </p>
       )}
 
