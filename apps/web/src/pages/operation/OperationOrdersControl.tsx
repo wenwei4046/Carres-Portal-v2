@@ -12,6 +12,8 @@ import {
   useUpdateStaffSetting,
   useAssignOrderStaff,
   assignOrderStaffRequest,
+  useCatalog,
+  useOperationSuppliers,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
@@ -436,6 +438,15 @@ function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (diff <= 7) return "Upcoming";
   return "Later";
 }
+/** DEADLINE facet display labels (Jess 2026-07-19): the DueBucket *value* stays
+ *  the filter key; only the rail label is spelled out for clarity. */
+const DUE_LABEL: Record<DueBucket, string> = {
+  Overdue: "Overdue",
+  Urgent: "Due ≤1 day",
+  Attention: "Due 2-3 days",
+  Upcoming: "Due ≤1 week",
+  Later: "Later",
+};
 
 // (Follow-up + Escalate-to-Jess now live in ops_tasks, keyed per order — see
 //  openTaskOf / taskUrgency above + the tasksByOrder map in the component.)
@@ -741,6 +752,30 @@ const CATEGORY_OPTS: {
   { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
 ];
 
+/** Primary supplier of an order = the supplier of its FIRST core line
+ *  (Mattress/Bedframe/Sofa). Mirrors raise-po / chase-supplier resolution:
+ *  catalog `product_skus.supplier_id`, else the SOLE supplier covering that
+ *  category, else unresolved (null). Accessory/service lines never carry a
+ *  supplier here. PURE so the SUPPLIER facet count stays cheap. */
+function primarySupplierId(
+  o: operationOrderListRow,
+  skuMeta: Map<string, { supplierId: string | null; category: string | null }>,
+  suppliers: { id: string; cat_covered: string[] | null }[],
+): string | null {
+  for (const l of o.order_lines ?? []) {
+    const meta = skuMeta.get(l.sku);
+    const cat =
+      meta?.category && (CORE_ORDER as readonly string[]).includes(meta.category)
+        ? meta.category
+        : (lineCategory(l.sku) as string);
+    if (!(CORE_ORDER as readonly string[]).includes(cat)) continue;
+    const covering = suppliers.filter((s) => (s.cat_covered ?? []).includes(cat));
+    const supplierId = meta?.supplierId ?? (covering.length === 1 ? covering[0].id : null);
+    if (supplierId) return supplierId;
+  }
+  return null;
+}
+
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master
  *  Sheet's qty column: "8 X" = 2 Mattress + 2 Bedframe + 4 Pillow, Disposal
@@ -1042,6 +1077,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
   const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
+  // SUPPLIER facet (Jess 2026-07-19): filter by the order's primary core-line
+  // supplier (holds a supplierId; null = no filter).
+  const [supplierFilter, setSupplierFilter] = useState<string | null>(null);
   // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
   // matches if it hits ANY selected category (OR). Empty set = no filter.
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
@@ -1115,6 +1153,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
     search: search.trim() || undefined,
   });
   const partnersQ = useDeliveryPartners();
+  // Catalog + suppliers → the SUPPLIER facet. skuMeta mirrors ChaseSupplierReview:
+  // sku → { supplierId, category }. Empty (facet hidden) until the catalog loads.
+  const catalogQ = useCatalog();
+  const suppliersQ = useOperationSuppliers();
+  const suppliers = useMemo(() => suppliersQ.data?.suppliers ?? [], [suppliersQ.data]);
+  const supplierNameById = useMemo(
+    () => new Map(suppliers.map((s) => [s.id, s.name])),
+    [suppliers],
+  );
+  const skuMeta = useMemo(() => {
+    const modelCat = new Map(
+      (catalogQ.data?.models ?? []).map((m) => [m.id, m.category as string]),
+    );
+    const m = new Map<string, { supplierId: string | null; category: string | null }>();
+    for (const s of catalogQ.data?.skus ?? []) {
+      m.set(s.sku, {
+        supplierId: s.supplierId ?? null,
+        category: modelCat.get(s.modelId) ?? null,
+      });
+    }
+    return m;
+  }, [catalogQ.data]);
   // Live free-balance map (sku → available) from the Stock On-Hand source. Its
   // keys ARE the matchable catalog SKUs; AutoCount free-text SKUs are absent.
   // `undefined` until loaded → the Stock cell falls back to stage-only state.
@@ -1377,18 +1437,37 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const m = new Map<string, number>();
     for (const o of liveScope) {
       const key = logisticOf(o, partnerName) ?? NO_CARRIER;
+      if (key === NO_CARRIER) continue; // no-carrier = the Assign-logistic queue
       m.set(key, (m.get(key) ?? 0) + 1);
     }
-    // Unassigned FIRST (most urgent — no carrier yet), then the rest by count
-    // desc (Loo 2026-07-09). Display order only; the filter is unchanged.
+    // Every partner is a filter option even at 0 (Jess 2026-07-19) — union the
+    // full delivery-partners list in with a 0 default.
+    for (const p of partnersQ.data?.partners ?? [])
+      if (!m.has(p.name)) m.set(p.name, 0);
+    // Data-present carriers by count desc first (tiebreak alpha), then the
+    // remaining 0-count partners alphabetically.
     return [...m.entries()]
       .sort((a, b) => {
-        if (a[0] === NO_CARRIER) return -1;
-        if (b[0] === NO_CARRIER) return 1;
-        return b[1] - a[1];
+        if ((a[1] > 0) !== (b[1] > 0)) return b[1] - a[1]; // non-zero group first
+        if (a[1] !== b[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
       })
       .map(([carrier, count]) => ({ carrier, count }));
-  }, [liveScope, partnerName]);
+  }, [liveScope, partnerName, partnersQ.data]);
+
+  // SUPPLIER facet counts — per primary core-line supplier, over liveScope.
+  // Unresolved (no core line / no supplier) rows are skipped. Sorted by name.
+  const supplierEntries = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of liveScope) {
+      const sid = primarySupplierId(o, skuMeta, suppliers);
+      if (!sid) continue;
+      m.set(sid, (m.get(sid) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .map(([id, count]) => ({ id, name: supplierNameById.get(id) ?? id, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [liveScope, skuMeta, suppliers, supplierNameById]);
 
   const categoryEntries = useMemo(
     () =>
@@ -1421,6 +1500,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // moment THEY open the portal, no manager session required. (Manual assign
   // stays management-only; this is system behaviour.) Fails soft on an old
   // Worker (404 → nothing happens).
+  // Default a plain salesperson to their OWN orders on first load (Jess
+  // 2026-07-19): if the signed-in user is NOT a manager and matches a staff
+  // row by email, pre-select their PIC. Runs ONCE (ref-guarded) and never
+  // overrides a manual staffFilter change; managers land on Everyone.
+  const didDefaultStaff = useRef(false);
+  useEffect(() => {
+    if (didDefaultStaff.current) return;
+    if (isManager) return; // managers see the whole team
+    if (staffFilter !== null) return; // respect any manual pick
+    if (!authEmail || staffList.length === 0) return;
+    const mine = staffList.find(
+      (s) => s.email?.toLowerCase() === authEmail.toLowerCase(),
+    );
+    if (!mine) return; // no matching PIC row → leave on Everyone
+    didDefaultStaff.current = true;
+    setStaffFilter(mine.user_id);
+  }, [staffList, isManager, authEmail, staffFilter]);
+
   const sweepDone = useRef(false);
   useEffect(() => {
     if (sweepDone.current) return;
@@ -1494,6 +1591,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       !!regionFilter ||
       !!stockFilter ||
       !!logisticFilter ||
+      !!supplierFilter ||
       !!staffFilter ||
       categoryFilter.size > 0;
     if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
@@ -1506,6 +1604,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
+    if (supplierFilter)
+      r = r.filter((o) => primarySupplierId(o, skuMeta, suppliers) === supplierFilter);
     if (staffFilter)
       r = r.filter((o) =>
         staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
@@ -1517,7 +1617,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
     return [...r].sort(compareBySlack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1529,7 +1629,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
     () => setRenderCount(ROWS_PER_BATCH),
-    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, supplierFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -1799,6 +1899,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
               return m ? staffLabel(m) : staffFilter;
             })()}`,
       onClear: () => setStaffFilter(null),
+    });
+  if (supplierFilter)
+    activeChips.push({
+      label: `Supplier: ${supplierNameById.get(supplierFilter) ?? supplierFilter}`,
+      onClear: () => setSupplierFilter(null),
     });
   if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
   if (supplierLateOnly)
@@ -2374,6 +2479,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 collapsed={collapsedGroups.has("FILTERS")}
                 onToggle={() => toggleGroup("FILTERS")}
               >
+                {/* DEADLINE — the urgency ladder as a proper filter (Jess
+                    2026-07-19). Surfaces the existing dueFilter; kept expanded
+                    (most-used). "Later" is omitted — the tail isn't a queue. */}
+                <KanbanGroup
+                  title="DEADLINE"
+                  testid="filter-deadline"
+                  collapsed={collapsedGroups.has("DEADLINE")}
+                  onToggle={() => toggleGroup("DEADLINE")}
+                >
+                  {dueEntries
+                    .filter((e) => e.bucket !== "Later" && e.count > 0)
+                    .map((e) => (
+                      <KanbanRow
+                        key={e.bucket}
+                        label={DUE_LABEL[e.bucket]}
+                        count={e.count}
+                        active={dueFilter === e.bucket}
+                        onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
+                      />
+                    ))}
+                </KanbanGroup>
                 <KanbanGroup
                   title="STOCK"
                   collapsed={collapsedGroups.has("STOCK")}
@@ -2398,19 +2524,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("LOGISTIC")}
                   onToggle={() => toggleGroup("LOGISTIC")}
                 >
-                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab);
-                      here only real carriers. */}
-                  {logisticEntries
-                    .filter((e) => e.carrier !== NO_CARRIER && e.count > 0)
-                    .map((e) => (
-                      <KanbanRow
-                        key={e.carrier}
-                        label={e.carrier}
-                        count={e.count}
-                        active={logisticFilter === e.carrier}
-                        onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
-                      />
-                    ))}
+                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab); here
+                      EVERY partner is an option (0-count included, Jess
+                      2026-07-19) so the whole fleet is filterable. */}
+                  {logisticEntries.map((e) => (
+                    <KanbanRow
+                      key={e.carrier}
+                      label={e.carrier}
+                      count={e.count}
+                      active={logisticFilter === e.carrier}
+                      onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+                    />
+                  ))}
+                </KanbanGroup>
+                <KanbanGroup
+                  title="SUPPLIER"
+                  testid="filter-supplier"
+                  collapsed={collapsedGroups.has("SUPPLIER")}
+                  onToggle={() => toggleGroup("SUPPLIER")}
+                >
+                  {/* Every supplier with ≥1 order in scope (Jess 2026-07-19).
+                      Empty until the catalog loads. */}
+                  {supplierEntries.map((e) => (
+                    <KanbanRow
+                      key={e.id}
+                      label={e.name}
+                      count={e.count}
+                      active={supplierFilter === e.id}
+                      onClick={() => setSupplierFilter((r) => (r === e.id ? null : e.id))}
+                    />
+                  ))}
                 </KanbanGroup>
                 <KanbanGroup
                   title="REGION"
