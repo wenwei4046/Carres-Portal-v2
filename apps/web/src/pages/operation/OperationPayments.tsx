@@ -27,7 +27,9 @@ import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
 import { renderReceiptPdf } from "@/lib/pdf/render";
+import { useAuth } from "@/lib/auth";
 import { areaForAddress, detectState } from "@/lib/region";
+import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import {
   buildCustomerChase,
   buildCustomerReminder,
@@ -906,6 +908,7 @@ function OrderMoneyDetail({
 }) {
   const { data: ledgerData, isLoading } = useOrderPayments(r.id);
   const ledger: OrderPaymentRow[] = ledgerData?.payments ?? [];
+  const role = useAuth((s) => s.role);
 
   const record = useRecordPayment(r.id, {
     onSuccess: (res) => {
@@ -1030,6 +1033,18 @@ function OrderMoneyDetail({
         <div className="mt-2 text-[11px] text-base-400">
           A receipt number is minted automatically (R{r.so}-n) — print it from the history at right.
         </div>
+        {role && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500">Documents</span>
+            <DownloadInvoiceButton
+              orderId={r.id}
+              so={r.so}
+              role={role as "operation" | "principal"}
+              variant="secondary"
+              className="text-[11px] py-1 px-2.5"
+            />
+          </div>
+        )}
       </div>
 
       {/* Payment history */}
