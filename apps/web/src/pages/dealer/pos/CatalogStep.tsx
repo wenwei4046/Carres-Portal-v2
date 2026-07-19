@@ -18,6 +18,8 @@ import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, lineEditTarget, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import BundleCard from "./BundleCard";
+import BundleConfigurePage from "./BundleConfigurePage";
+import { assembleBundleLines, bundleNeedsConfig, type BundleSlotPick } from "./bundle-flow";
 import ProductCard from "./ProductCard";
 import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
@@ -139,25 +141,43 @@ export default function CatalogStep({
   const bundleInfo = useMemo(
     () =>
       bundles.map((b) => {
-        const missing = b.components.some((comp) => !skuPrice.has(comp.sku));
+        // 0241 — availability per kind: fixed needs every component priced;
+        // custom needs every slot to offer ≥1 live pick (fixed-variant slots
+        // need THEIR sku live).
+        const missing =
+          b.kind === "custom"
+            ? b.slots.some((slot) =>
+                slot.variant === "fixed"
+                  ? !slot.sku || !skuPrice.has(slot.sku)
+                  : !slot.modelIds.some((mid) =>
+                      catalog.skus.some((s) => s.modelId === mid && !s.discontinuedAt),
+                    ),
+              )
+            : b.components.some((comp) => !skuPrice.has(comp.sku));
         const cats = new Set(
-          b.components
-            .map((comp) => index.skuToCategory.get(comp.sku))
-            .filter((cat): cat is ProductCategory => Boolean(cat)),
+          b.kind === "custom"
+            ? b.slots
+                .flatMap((slot) => slot.modelIds)
+                .map((mid) => catalog.models.find((m) => m.id === mid)?.category)
+                .filter((cat): cat is ProductCategory => Boolean(cat))
+            : b.components
+                .map((comp) => index.skuToCategory.get(comp.sku))
+                .filter((cat): cat is ProductCategory => Boolean(cat)),
         );
-        const catalogTotal = missing
-          ? 0
-          : b.components.reduce((s, comp) => s + (skuPrice.get(comp.sku) ?? 0) * comp.qty, 0);
-        const blob = [
-          b.name,
-          ...b.components.map((comp) => comp.sku),
-        ]
+        const catalogTotal =
+          missing || b.kind === "custom"
+            ? 0
+            : b.components.reduce((s, comp) => s + (skuPrice.get(comp.sku) ?? 0) * comp.qty, 0);
+        const blob = [b.name, ...b.components.map((comp) => comp.sku)]
           .join(" ")
           .toLowerCase();
         return { bundle: b, missing, cats, catalogTotal, blob };
       }),
-    [bundles, skuPrice, index.skuToCategory],
+    [bundles, skuPrice, index.skuToCategory, catalog.skus, catalog.models],
   );
+
+  // 0241 — the bundle currently in the slot walker (null = none open).
+  const [configuringBundle, setConfiguringBundle] = useState<ProductBundleDto | null>(null);
 
   const railEntries: RailEntry[] = [
     { key: "all", label: "All open", count: index.productModels.length },
@@ -264,6 +284,29 @@ export default function CatalogStep({
       };
     });
     onChange({ ...draft, lines: [...draft.lines, ...newLines] });
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 220);
+  }
+
+  /** 0241 — a bundle card tap routes: anything with a choice or spec axes
+   *  opens the slot walker; a fully-pinned no-axes fixed bundle keeps the V1
+   *  direct add. */
+  function handleBundleTap(bundle: ProductBundleDto) {
+    if (bundleNeedsConfig(bundle, catalog)) setConfiguringBundle(bundle);
+    else addBundle(bundle);
+  }
+
+  /** 0241 — walker completion: split the bundle price across the PICKED skus
+   *  (Σ-exact) + each pick's own spec surcharge on top, then append the group. */
+  function completeBundle(bundle: ProductBundleDto, picks: BundleSlotPick[]) {
+    const assembled = assembleBundleLines(bundle, picks, newLocalId());
+    if (!assembled) {
+      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      return;
+    }
+    const newLines: DraftLine[] = assembled.map((l) => ({ ...l, localId: newLocalId() }));
+    onChange({ ...draft, lines: [...draft.lines, ...newLines] });
+    setConfiguringBundle(null);
     setPulse(true);
     window.setTimeout(() => setPulse(false), 220);
   }
@@ -425,7 +468,7 @@ export default function CatalogStep({
                     inCart={draft.lines.some(
                       (l) => (l.attrs as Record<string, unknown> | null)?.bundle_key === bundle.id,
                     )}
-                    onAdd={() => addBundle(bundle)}
+                    onAdd={() => handleBundleTap(bundle)}
                   />
                 );
               })}
@@ -564,6 +607,18 @@ export default function CatalogStep({
           />
         );
       })()}
+
+      {/* 0241 — the bundle slot walker (custom bundles + spec-carrying fixed
+          bundles route here; fully-pinned no-axes bundles direct-add). */}
+      {configuringBundle && (
+        <BundleConfigurePage
+          bundle={configuringBundle}
+          catalog={catalog}
+          index={index}
+          onComplete={(picks) => completeBundle(configuringBundle, picks)}
+          onClose={() => setConfiguringBundle(null)}
+        />
+      )}
 
       {/* The cart hides while a line-edit configurator is up (one Escape = one
           layer; no stacking fight) and pops back — updated — when it closes. */}

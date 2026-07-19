@@ -127,6 +127,8 @@ describe("CatalogStep — bundles", () => {
           id: "bundle-1",
           name: "Cloud Pair + Rug",
           price: 5000,
+          kind: "fixed" as const,
+          slots: [],
           components: [
             { sku: "CLOUD-QUEEN", qty: 1 },
             { sku: "CLOUD-KING", qty: 1 },
@@ -202,6 +204,30 @@ describe("CatalogStep — bundles", () => {
     expect(card).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(card);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("a fixed bundle whose component has spec axes opens the slot walker (0241), not a direct add", () => {
+    const cat = catalogWithBundle();
+    // Turn the rug into a BEDFRAME component — bed frames always ask for specs.
+    cat.models = cat.models.map((m) =>
+      m.id === "m-acc" ? { ...m, category: "bedframe" as const } : m,
+    );
+    const onChange = vi.fn();
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={onChange}
+        catalog={cat}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("pos-bundle-card-bundle-1"));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId("bundle-configure-page")).toBeTruthy();
+    // The two spec-less mattress slots auto-resolved; the bedframe slot asks.
+    expect(screen.getByTestId("bundle-walker-add")).toBeDisabled();
   });
 
   it("no bundles → no Bundles rail entry", () => {

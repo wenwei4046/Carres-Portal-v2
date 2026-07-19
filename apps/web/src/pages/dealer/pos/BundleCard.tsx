@@ -30,19 +30,38 @@ export default function BundleCard({
   onAdd: () => void;
 }) {
   const modelById = new Map(catalog.models.map((m) => [m.id, m]));
-  const summary = bundle.components
-    .map((comp) => {
-      const sku = catalog.skus.find((s) => s.sku === comp.sku);
-      const model = sku ? modelById.get(sku.modelId) : undefined;
-      const name = model?.name ?? comp.sku;
-      const variant = sku?.variant?.trim();
-      return `${comp.qty > 1 ? `${comp.qty}× ` : ""}${name}${variant ? ` (${variant})` : ""}`;
-    })
-    .join(" + ");
+  // 0241 — a custom bundle summarizes its SLOTS ("your pick" markers); a fixed
+  // bundle its pinned components.
+  const summary =
+    bundle.kind === "custom"
+      ? bundle.slots
+          .map((slot, i) => {
+            const names = slot.modelIds
+              .map((id) => modelById.get(id)?.name)
+              .filter(Boolean)
+              .join(" / ");
+            return `${slot.label ?? (names || `Item ${i + 1}`)}${slot.variant === "any" ? " (your pick)" : ""}`;
+          })
+          .join(" + ")
+      : bundle.components
+          .map((comp) => {
+            const sku = catalog.skus.find((s) => s.sku === comp.sku);
+            const model = sku ? modelById.get(sku.modelId) : undefined;
+            const name = model?.name ?? comp.sku;
+            const variant = sku?.variant?.trim();
+            return `${comp.qty > 1 ? `${comp.qty}× ` : ""}${name}${variant ? ` (${variant})` : ""}`;
+          })
+          .join(" + ");
+  const itemCount = bundle.kind === "custom" ? bundle.slots.length : bundle.components.length;
   const photo = (() => {
-    for (const comp of bundle.components) {
-      const sku = catalog.skus.find((s) => s.sku === comp.sku);
-      const url = sku ? modelById.get(sku.modelId)?.photoUrl : null;
+    const modelIds =
+      bundle.kind === "custom"
+        ? bundle.slots.flatMap((s) => s.modelIds)
+        : bundle.components.map(
+            (comp) => catalog.skus.find((s) => s.sku === comp.sku)?.modelId ?? "",
+          );
+    for (const mid of modelIds) {
+      const url = modelById.get(mid)?.photoUrl;
       if (url) return url;
     }
     return null;
@@ -72,7 +91,7 @@ export default function BundleCard({
       </div>
       <div className="prod-card__body">
         <div className="prod-card__series">
-          {bundle.components.length} items · one price
+          {itemCount} items · one price{bundle.kind === "custom" ? " · you choose" : ""}
         </div>
         <div className="prod-card__name">{bundle.name}</div>
         <div className="prod-card__detail">{summary}</div>

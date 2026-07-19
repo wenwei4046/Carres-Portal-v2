@@ -6,7 +6,7 @@ import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
 import { parseDefaultFreeGifts } from "./free-gift";
 import { parseFreeItemEligible } from "./free-item-campaign";
-import { parseBundleComponents } from "./product-bundle";
+import { parseBundleComponents, parseBundleSlots } from "./product-bundle";
 import { parseRuleTargets } from "./rule-target";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
@@ -423,7 +423,10 @@ export const productBundleFromRow = (r: DB.ProductBundleRow): D.ProductBundle =>
   id: r.id,
   name: r.name,
   price: Number(r.price),
+  // 0241 — pre-0241 rows / mocks read as the fixed kind with no slots.
+  kind: r.kind === "custom" ? "custom" : "fixed",
   components: parseBundleComponents(r.components),
+  slots: parseBundleSlots(r.slots),
   active: r.active,
   sortOrder: Number(r.sort_order),
 });

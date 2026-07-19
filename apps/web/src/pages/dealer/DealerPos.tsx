@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, Lock, LogOut, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
@@ -121,7 +121,8 @@ export default function DealerPos({
   actingDealerId?: string;
   actingDealerName?: string;
   /** Principal on-behalf only: where "Exit" goes. Dealer-side (undefined,
-   *  POS-only since 2026-07-19) the corner control LOCKS the register instead. */
+   *  POS-only since 2026-07-19) the corner control signs the store OUT to the
+   *  email+password login (switching staff is the 换人 chip's job). */
   onExit?: () => void;
 } = {}) {
   const navigate = useNavigate();
@@ -165,6 +166,7 @@ export default function DealerPos({
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
   const userEmail = useAuth((s) => s.user?.email ?? "");
+  const signOut = useAuth((s) => s.signOut);
   // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
   // stores). When present the top-bar chip becomes a "换人 / switch" button.
   const staffMember = useStaffSession((s) => s.staff);
@@ -802,10 +804,18 @@ export default function DealerPos({
 
   function handleExit() {
     if (!onExit) {
-      // Dealer-side (Loo 2026-07-19, POS-only): the back-office is gone, so the
-      // corner control LOCKS the register — StaffGate drops to the PIN screen.
-      // Non-destructive: the draft persists and restores on the next unlock.
+      // Dealer-side (Loo 2026-07-19): FULL sign-out to the email+password login
+      // — switching people is the 换人 chip's job. Confirm first: an accidental
+      // tap locks out staff who don't know the store password, and signOut's
+      // PII guardrail wipes the in-progress draft. The staff token is dropped
+      // too so the next store login starts at the PIN gate, not as the
+      // previous person.
+      const leave = window.confirm(
+        "Log out of the store account? You'll need the store email + password to sign back in; the cart draft is cleared.",
+      );
+      if (!leave) return;
       clearStaffToken();
+      void signOut().then(() => navigate("/login", { replace: true }));
       return;
     }
     if (!submitted && draftHasContent(draft)) {
@@ -948,26 +958,19 @@ export default function DealerPos({
               </span>
             </Link>
           )}
-          {/* Principal on-behalf: exit back to the portal. Dealer-side: LOCK
-              the register (Loo 2026-07-19 — it used to jump to the deleted
-              back-office). Hidden when there's neither (unlinked salesperson —
-              nothing to lock; sign-out lives on the /me chip). */}
-          {(onExit || staffMember) && (
-            <button
-              type="button"
-              onClick={handleExit}
-              className="icon-btn"
-              aria-label={onExit ? "Exit POS" : "Lock POS"}
-              title={onExit ? "Exit POS" : "锁定 · Lock POS"}
-              data-testid="pos-exit"
-            >
-              {onExit ? (
-                <LogOut size={18} strokeWidth={1.75} />
-              ) : (
-                <Lock size={18} strokeWidth={1.75} />
-              )}
-            </button>
-          )}
+          {/* Principal on-behalf: exit back to the portal. Dealer-side: full
+              sign-out to the email+password login (Loo 2026-07-19 — 换人 chip
+              already covers going back to the PIN screen). */}
+          <button
+            type="button"
+            onClick={handleExit}
+            className="icon-btn"
+            aria-label={onExit ? "Exit POS" : "Log out"}
+            title={onExit ? "Exit POS" : "Log out"}
+            data-testid="pos-exit"
+          >
+            <LogOut size={18} strokeWidth={1.75} />
+          </button>
         </div>
       </header>
 
