@@ -3130,6 +3130,10 @@ function DrawerBody({
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
               logisticEta={bookedEta}
               partners={partnersData?.partners ?? []}
+              orderCode={soRef}
+              orderRef={(order.source_ref ?? [])[0] ?? null}
+              customerName={order.customer_name ?? ""}
+              customerPhone={order.customer_phone ?? ""}
             />
           </Panel>
           </SectionCard>

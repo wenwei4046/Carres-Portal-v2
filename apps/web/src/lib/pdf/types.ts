@@ -56,6 +56,17 @@ export type ExtensionAgreementTemplateData = {
   policy_lines: readonly string[]; // the one-time storage policy per category
 };
 
+export type LoanNoteTemplateData = {
+  ln_no: string; // LN-DDMMYY-NNNN (docNumber scheme)
+  order_code: string; // SO-123
+  order_ref?: string | null; // the customer's CR/TCF ref (source_ref[0]), if any
+  issue_date: string; // loaned-out date (yyyy-mm-dd)
+  customer: { name: string; phone: string };
+  item: string; // the loaned piece
+  condition: string; // condition at hand-over
+  source: string; // "Borrowed · Laveo" / "Warehouse · Klang"
+};
+
 export type InvoiceTemplateData = {
   /** Document heading — defaults to "TAX INVOICE"; an imported order's
    *  statement renders as "PAYMENT REQUEST" (AutoCount holds the tax
