@@ -4,6 +4,7 @@
  * `domain.ts` for UI code.
  */
 import type { DefaultFreeGift } from "./free-gift";
+import type { BundleComponent } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
 export type Role =
@@ -488,6 +489,25 @@ export interface PwpRuleRow {
   // ── P8d (0188) cross-order carry-forward policy ──
   carry_forward: boolean;
   carry_forward_days: number | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `product_bundles` (migration 0239) — bundle pricing: a named set of catalog
+ * SKUs sold together at one bundle price. `components` is [{sku, qty}] jsonb;
+ * the adapter runs `parseBundleComponents` to drop malformed entries. `active`
+ * defaults false (dormant until the principal flips it on). Principal-owned;
+ * `created_at` / `updated_at` / `updated_by` mirror the catalog convention.
+ */
+export interface ProductBundleRow {
+  id: string;
+  name: string;
+  price: number;
+  components: BundleComponent[];
+  active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

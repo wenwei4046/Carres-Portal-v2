@@ -20,6 +20,10 @@ export function lineEditTarget(
   line: DraftLine,
   catalog: CatalogResponse,
 ): LineEditTarget | null {
+  // 0239 — a bundle component line is never re-configured individually: its
+  // unitPrice is a share of the bundle price, and a configurator re-emit would
+  // re-price it at catalog. Remove the bundle and re-add instead.
+  if (lineBundleGroup(line) !== null) return null;
   const sku = catalog.skus.find((s) => s.sku === line.sku);
   const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
   if (!model) return null;
@@ -27,6 +31,21 @@ export function lineEditTarget(
   if (attrs?.sofa_build) return model.category === "sofa" ? "sofa_build" : null;
   if (model.category === "mattress" || model.category === "bedframe") return "bed_mattress";
   return null;
+}
+
+/** 0239 — the per-add bundle group id a bundle component line carries
+ *  (`attrs.bundle_group`), or null for a normal line. Bundle lines are
+ *  removed / price-locked as a GROUP: a lone component kept at its split
+ *  share would silently under-price the item. */
+export function lineBundleGroup(line: DraftLine): string | null {
+  const g = (line.attrs as Record<string, unknown> | null)?.bundle_group;
+  return typeof g === "string" && g.length > 0 ? g : null;
+}
+
+/** 0239 — the bundle display name stamped on a component line, if any. */
+export function lineBundleLabel(line: DraftLine): string | null {
+  const l = (line.attrs as Record<string, unknown> | null)?.bundle_label;
+  return typeof l === "string" && l.length > 0 ? l : null;
 }
 
 /** Stable JSON key for a line's attrs (sorted keys) so two adds of the same

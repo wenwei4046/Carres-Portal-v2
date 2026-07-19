@@ -53,6 +53,9 @@ import {
   FREE_ITEM_CAMPAIGNS,
   pwpRuleInput,
   PWP_RULES,
+  productBundleInput,
+  productBundlePatchInput,
+  PRODUCT_BUNDLES,
   deriveSkuCode,
   canonicalSize,
   skuImportInput,
@@ -211,7 +214,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR, bundlesR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -270,6 +273,10 @@ catalogRouter.get("/", async (c) => {
     // maybeSingle + LENIENT parse below: a missing/garbage row degrades to the
     // code defaults (pre-0219 behavior + Cash) instead of breaking the bundle.
     sb.from("order_entry_config").select("*").eq("id", true).maybeSingle(),
+    // 0239 — product bundles. Fetched UNFILTERED (the Promo/GWP editor needs
+    // inactive rows too); the POS active-only filter is applied client-side
+    // below, mirroring the 0181 special-addons branch.
+    sb.from(PRODUCT_BUNDLES).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -288,6 +295,7 @@ catalogRouter.get("/", async (c) => {
   if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
   if (pwpRulesR.error) throw new HTTPException(500, { message: pwpRulesR.error.message });
   if (fabricMasterR.error) throw new HTTPException(500, { message: fabricMasterR.error.message });
+  if (bundlesR.error) throw new HTTPException(500, { message: bundlesR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -463,6 +471,15 @@ catalogRouter.get("/", async (c) => {
           : String(ra.created_at).localeCompare(String(rb.created_at));
       })
       .map((r) => Adapters.pwpRuleFromRow(r as DB.PwpRuleRow)),
+    // 0239 — product bundles (additive, OPTIONAL). POS sees active only; admin
+    // (the Promo/GWP editor) sees all — mirrors the special-addons branch.
+    // Sorted by (sort_order, name) in JS to stay mock-friendly.
+    bundles: (bundlesR.data ?? [])
+      .filter((row) => adminMode || (row as DB.ProductBundleRow).active === true)
+      .map((r) => Adapters.productBundleFromRow(r as DB.ProductBundleRow))
+      .sort((a, b) =>
+        a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.name.localeCompare(b.name),
+      ),
     // 0202 — global procurement fabric master (additive, OPTIONAL). Sorted in
     // JS by (sort_order, fabric_code) to mirror the plain `.select("*")` fetch
     // and stay mock-friendly, the way the 0182 option-pools branch sorts.
@@ -2758,6 +2775,98 @@ catalogRouter.delete("/pwp-rules/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(PWP_RULES).delete().eq("id", id);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0239 — PRODUCT BUNDLES (bundle pricing). A bundle = a named set of catalog
+// SKUs sold together at ONE bundle price; the POS explodes it into component
+// order_lines via the shared `explodeBundle` (Σ-exact split) — create_order /
+// order_lines are UNTOUCHED (bundle identity rides order_lines.attrs.bundle_*).
+// All writes are principal-owned ("Master Admin"): early friendly 403 here,
+// with RLS (product_bundles_write_principal) the real boundary — we forward the
+// USER JWT (userClient) so RLS runs; NEVER service_role. DORMANT until a bundle
+// is authored + flipped active. Mirrors the 0186 pwp-rules routes EXACTLY.
+// ---------------------------------------------------------------------------
+
+const BUNDLE_MSG = "Only the principal (Master Admin) can manage bundles";
+
+// POST /bundles — create a bundle (principal-only). ≥2 components; `active`
+// defaults false (dormant until the principal flips it on).
+catalogRouter.post("/bundles", async (c) => {
+  principalOnly(c, BUNDLE_MSG);
+  const parsed = await parseJsonBody(c, productBundleInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PRODUCT_BUNDLES)
+    .insert({
+      name: parsed.data.name,
+      price: parsed.data.price,
+      // `components` is BundleComponent[] jsonb.
+      components: parsed.data.components,
+      active: parsed.data.active ?? false,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "bundle insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { bundle: Adapters.productBundleFromRow(data as DB.ProductBundleRow) },
+    201,
+  );
+});
+
+// PATCH /bundles/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/bundles/:id", async (c) => {
+  principalOnly(c, BUNDLE_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, productBundlePatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.price !== undefined) patch.price = parsed.data.price;
+  if (parsed.data.components !== undefined) patch.components = parsed.data.components;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PRODUCT_BUNDLES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "bundle not found" },
+      404,
+    );
+  }
+  return c.json({ bundle: Adapters.productBundleFromRow(data as DB.ProductBundleRow) });
+});
+
+// DELETE /bundles/:id — HARD delete (principal-only). Nothing FKs to this
+// table, so deletion is safe; the soft-hide path is `active=false` via PATCH.
+catalogRouter.delete("/bundles/:id", async (c) => {
+  principalOnly(c, BUNDLE_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(PRODUCT_BUNDLES).delete().eq("id", id);
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   return c.json({ ok: true });
 });
