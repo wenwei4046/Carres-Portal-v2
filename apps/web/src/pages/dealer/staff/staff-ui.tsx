@@ -148,12 +148,15 @@ export function ModalShell({
   children,
   onClose,
   footer,
+  wide,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   onClose: () => void;
   footer: React.ReactNode;
+  /** 560px shell for long forms (the BD create-dealer door). */
+  wide?: boolean;
 }) {
   return (
     <div
@@ -163,7 +166,7 @@ export function ModalShell({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded w-full max-w-[440px] max-h-[92vh] overflow-auto"
+        className={`bg-white rounded w-full ${wide ? "max-w-[560px]" : "max-w-[440px]"} max-h-[92vh] overflow-auto`}
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <h2 className="font-display text-[20px] tracking-[-0.02em] font-semibold">{title}</h2>
@@ -191,13 +194,17 @@ const btnGhost =
 const btnSolid =
   "px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50";
 
-/** Set / reset a 6-digit PIN (entered twice). `dealerId` scopes the roster
- *  invalidation when a principal edits another store's staff. */
+/** Set / reset a 6-digit PIN (entered twice). An internal HQ caller
+ *  (principal / bd) editing ANOTHER store's staff passes `dealerId` — the
+ *  server resolves the target store from it (400 without). */
 export function SetPinModal({
   staff,
+  dealerId,
   onClose,
 }: {
   staff: Pick<StaffDto, "id" | "name">;
+  /** Set when HQ (principal / bd) targets another store's member. */
+  dealerId?: string;
   onClose: () => void;
 }) {
   const [pin, setPin] = useState("");
@@ -211,7 +218,7 @@ export function SetPinModal({
   function submit() {
     if (!valid) return;
     setStaffPin.mutate(
-      { id: staff.id, pin },
+      { id: staff.id, pin, dealerId },
       {
         onSuccess: () => toast.success(`PIN set for ${staff.name}`),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not set PIN"),
@@ -685,9 +692,12 @@ export function AddStaffModal({
  */
 export function EditStaffModal({
   staff,
+  dealerId,
   onClose,
 }: {
   staff: StaffDto;
+  /** Set when HQ (principal / bd) edits another store's member. */
+  dealerId?: string;
   onClose: () => void;
 }) {
   const [name, setName] = useState(staff.name);
@@ -709,6 +719,7 @@ export function EditStaffModal({
     patch.mutate(
       {
         id: staff.id,
+        dealerId,
         patch: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
