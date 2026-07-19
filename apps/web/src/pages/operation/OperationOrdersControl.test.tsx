@@ -758,13 +758,13 @@ describe("orders export", () => {
 
   it("bulk Export menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
     wrap(<OperationOrdersControl />);
-    // Export/print live behind the row checkboxes + the bulk-bar Export ▾ menu
-    // (tick one customer → Export → Print prints just that order).
+    // Export/print live behind the row checkboxes + the bulk-bar More ▾ menu
+    // (tick one customer → More → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menuitem", { name: /Export CSV/ })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
+      screen.getByRole("menuitem", { name: /Print \/ Save as PDF/ }),
     ).toBeInTheDocument();
   });
 
@@ -784,8 +784,8 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
@@ -807,8 +807,8 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Print \/ Save as PDF/ }));
 
     expect(open).toHaveBeenCalledTimes(1);
     expect(fakeWin.document.write).toHaveBeenCalledTimes(1);
@@ -816,6 +816,23 @@ describe("orders export", () => {
     expect(fakeWin.document.write.mock.calls[0][0]).toContain("SO-");
 
     open.mockRestore();
+  });
+
+  it("bulk Logistic ⋮ → Chase opens the partner chase review", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    // Option B: counterparty menus, not verb buttons — open Logistic ⋮ first.
+    fireEvent.click(screen.getByRole("button", { name: "Logistic" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    expect(screen.getByTestId("chase-partner-review")).toBeInTheDocument();
+  });
+
+  it("bulk Supplier ⋮ → Chase opens the supplier chase review", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
 });
 

@@ -249,6 +249,50 @@ export function buildSupplierGroupMessage(
   return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
 }
 
+// ── LOGISTIC GROUP — ONE message per partner, covering many deliveries ───────
+// Mirrors the supplier group message, but a delivery is DISTINCT per customer
+// (different address + date), so we DON'T aggregate by SKU across orders — each
+// order is its own block: REF · customer (region) · items · deadline. One
+// WhatsApp group per partner (NETS/AL/TEOW/TT) gets a single message listing
+// every selected order — Remind (before deadline) or Chase (already late).
+export interface PartnerGroupRow {
+  ref: string | null;
+  customer: string | null;
+  region: string | null;
+  /** Display deadline, e.g. "6 Jul 26" or "TBD". */
+  deadline: string;
+  overdue: boolean;
+  items: { sku: string; qty: number }[];
+}
+
+/** One consolidated partner message covering all `rows` (deliveries).
+ *  `remind` = gentle (before deadline); `chase` = firmer (deadline at risk /
+ *  passed). REF-led (partners speak the CR/TCF ref, never the SO); each block
+ *  carries the customer + region so the driver can plan the route. */
+export function buildPartnerGroupMessage(
+  mode: "remind" | "chase",
+  partnerName: string,
+  rows: PartnerGroupRow[],
+): string {
+  const opener =
+    mode === "chase"
+      ? `Hi ${partnerName} 👋 following up — these deliveries still need a booked slot with the customer:`
+      : `Hi ${partnerName} 👋 please confirm the delivery date + time slot for these:`;
+  const closer =
+    mode === "chase"
+      ? `Please book the slots with the customers today. Thank you!`
+      : `Appreciate a confirmed date + slot per delivery. Thank you!`;
+  const body = rows
+    .map((r) => {
+      const head = `_${r.ref ?? "—"}_ — ${r.customer ?? "—"}${r.region ? ` (${r.region})` : ""}`;
+      const items = itemsBlock(r.items);
+      const when = `by ${r.deadline}${r.overdue ? " — overdue" : ""}`;
+      return `${head}\n${items}\n${when}`;
+    })
+    .join("\n\n");
+  return `${opener}\n\n${body}\n\n${rows.length} deliver${rows.length === 1 ? "y" : "ies"}. ${closer}`;
+}
+
 /** URL-encoded body, ready for `https://wa.me/<number>?text=` — real line
  *  breaks become %0A. */
 export function waEncode(text: string): string {

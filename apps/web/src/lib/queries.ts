@@ -2276,6 +2276,10 @@ export interface DeliveryPartnerRow {
   name: string;
   contact: string | null;
   zones: string | null;
+  /** Partner's WhatsApp GROUP invite link (chat.whatsapp.com/…), for the bulk
+   *  bar's Logistic ⋮ → Chase/Remind. Seeded for NETS/AL/TEOW/TT; null = not set
+   *  (the review card shows "group not set", Copy still works). */
+  whatsapp_group_url?: string | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];

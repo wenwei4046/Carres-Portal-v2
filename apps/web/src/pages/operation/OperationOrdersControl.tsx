@@ -55,11 +55,13 @@ import RaisePoReview from "./components/RaisePoReview";
 import type { RaisePoOrder } from "./components/raise-po-plan";
 import ChaseSupplierReview from "./components/ChaseSupplierReview";
 import type { ChaseOrder } from "./components/chase-supplier-plan";
+import ChasePartnerReview, {
+  type PartnerChaseOrder,
+} from "./components/ChasePartnerReview";
 import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
-  ChevronDown,
   ChevronRight,
   ChevronsLeft,
   Clock,
@@ -75,6 +77,8 @@ import {
   Lock,
   Printer,
   MoreVertical,
+  MoreHorizontal,
+  Bell,
   Users,
   PackagePlus,
   MessageCircle,
@@ -328,6 +332,25 @@ function toChaseOrder(o: operationOrderListRow): ChaseOrder {
       sku: l.sku,
       qty: Number(l.qty || 0),
       sourcePo: l.source_po ?? null,
+    })),
+  };
+}
+
+/** Row → the partner (logistic) chase input. Partners speak the ORIGINAL
+ *  CR/TCF ref; the partner is the order-level LP (delivery_partner_id) or the
+ *  Inbox-triaged LP (ops_assigned_logistic). Region = the real delivery place. */
+function toPartnerChaseOrder(o: operationOrderListRow): PartnerChaseOrder {
+  return {
+    id: o.id,
+    partnerId: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
+    refNo: (o.source_ref ?? []).filter(Boolean)[0] ?? null,
+    customer: o.customer_name ?? null,
+    region: locationForAddress(o.customer_address).label,
+    deliveryDate: o.delivery_date ?? null,
+    deliveryTbd: !!o.delivery_date_tbd,
+    lines: (o.order_lines ?? []).map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty || 0),
     })),
   };
 }
@@ -1097,7 +1120,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [renderCount, setRenderCount] = useState(ROWS_PER_BATCH);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
+  const [bulkMenu, setBulkMenu] = useState<
+    null | "supplier" | "logistic" | "assign" | "more"
+  >(null);
   // Filter dimensions stacked on top of the status tabs.
   const [dueFilter, setDueFilter] = useState<DueBucket | null>(null);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
@@ -1234,6 +1259,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
   const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
+  // Logistic ⋮ → Remind/Chase over the selection (partner-grouped review).
+  const [chasePartnerOrders, setChasePartnerOrders] = useState<
+    operationOrderListRow[] | null
+  >(null);
   // Which tone the Chase-supplier review opens on (Jess 2026-07-19): the
   // SUPPLIER section's Remind opens remind, Chase opens chase.
   const [chaseInitialMode, setChaseInitialMode] = useState<"remind" | "chase">("remind");
@@ -2273,9 +2302,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   ? "Raise consolidated POs — one per supplier — for the selection"
                   : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
               }
-              onChaseSupplier={() => {
-                setChaseInitialMode("remind");
+              onChaseSupplier={(mode) => {
+                setChaseInitialMode(mode);
                 setChaseOrders(selectedOrders);
+              }}
+              onChasePartner={(mode) => {
+                setChaseInitialMode(mode);
+                setChasePartnerOrders(selectedOrders);
               }}
               onFlag={bulkCreateTasks}
               onExport={exportSelectedCsv}
@@ -2898,6 +2931,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
+      {/* Chase logistic — one WhatsApp message per delivery-partner group over
+          the selection (Remind / Chase). Open to all operation. */}
+      {chasePartnerOrders && (
+        <ChasePartnerReview
+          orders={chasePartnerOrders.map(toPartnerChaseOrder)}
+          partners={partnersQ.data?.partners ?? []}
+          initialMode={chaseInitialMode}
+          onClose={() => {
+            setChasePartnerOrders(null);
+            clearSel();
+          }}
+        />
+      )}
+
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
 
@@ -2919,6 +2966,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
  *  stays checked / indeterminate so you can untick in place like Gmail; when the
  *  loaded window is a subset of the tab it offers "Select all N in <tab>". Inline:
  *  Assign logistic · Flag · Export ▾ (CSV / Print / Mark delivered); ✕ clears. */
+/**
+ * Bulk bar — Option B (Jess 2026-07-19): grouped by COUNTERPARTY, not by verb.
+ * Three chips — [📦 Supplier ⋮] [🚚 Logistic ⋮] [More] — and the two
+ * counterparty menus each hold that party's actions incl. Remind / Chase. The
+ * gated Raise PO sits INSIDE the Supplier menu (locked for non-duty), so the bar
+ * never shows a dead primary button; the shape stays 3 chips regardless of
+ * permission or selection.
+ */
 function OrdersBulkBar({
   count,
   total,
@@ -2934,6 +2989,7 @@ function OrdersBulkBar({
   canRaisePo,
   raisePoTitle,
   onChaseSupplier,
+  onChasePartner,
   onFlag,
   onExport,
   onPrint,
@@ -2948,14 +3004,17 @@ function OrdersBulkBar({
   allChecked: boolean;
   someChecked: boolean;
   onSelectAllInTab: () => void;
-  menu: null | "menu" | "assign";
-  setMenu: (m: null | "menu" | "assign") => void;
+  menu: null | "supplier" | "logistic" | "assign" | "more";
+  setMenu: (m: null | "supplier" | "logistic" | "assign" | "more") => void;
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
   onRaisePo: () => void;
   canRaisePo: boolean;
   raisePoTitle: string;
-  onChaseSupplier: () => void;
+  /** Open the supplier chase-review on the given tone (Remind / Chase). */
+  onChaseSupplier: (mode: "remind" | "chase") => void;
+  /** Open the partner chase-review on the given tone (Remind / Chase). */
+  onChasePartner: (mode: "remind" | "chase") => void;
   onFlag: () => void;
   onExport: () => void;
   onPrint: () => void;
@@ -2964,8 +3023,12 @@ function OrdersBulkBar({
   onClear: () => void;
   busy: boolean;
 }) {
-  const btn =
-    "inline-flex items-center gap-1 text-[13px] px-2 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
+  const chip =
+    "inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
+  const toggle = (m: "supplier" | "logistic" | "assign" | "more") =>
+    setMenu(menu === m ? null : m);
+  const pop =
+    "absolute left-0 top-full mt-1 z-30 w-60 bg-white text-base-900 rounded-lg shadow-lg border border-base-200 p-1 max-h-80 overflow-auto";
   return (
     <div className="flex items-center gap-2 rounded-xl border border-signature-100 bg-signature-50 px-3 py-1.5 text-base-800">
       <input
@@ -2993,44 +3056,89 @@ function OrdersBulkBar({
         </button>
       )}
       <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
-      {/* Bulk actions follow the pipeline (Jess 2026-07-19): GOODS → DELIVERY →
-          UTILITY, separated, so the bar reads as the workflow, not a random row. */}
-      {/* — GOODS — */}
-      {/* Raise PO — consolidated per-supplier review (0236: duty holder +
-          management only; disabled title names whose month it is). */}
-      <button
-        type="button"
-        onClick={onRaisePo}
-        disabled={busy || !canRaisePo}
-        title={raisePoTitle}
-        className={btn}
-      >
-        <PackagePlus size={14} /> Raise PO
-      </button>
-      {/* Chase supplier — one WhatsApp message per supplier group over the
-          selection (Remind / Chase). Open to all operation (no duty gate). */}
-      <button
-        type="button"
-        onClick={onChaseSupplier}
-        disabled={busy}
-        title="Nudge each supplier's WhatsApp group — one message covering the selection's orders"
-        className={btn}
-      >
-        <MessageCircle size={14} /> Chase supplier
-      </button>
-      <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
-      {/* — DELIVERY — Assign logistic (inline dropdown of partners). */}
+
+      {/* — SUPPLIER ⋮ — the goods counterparty. Raise PO (gated) + Remind +
+          Chase all live here; one voice per supplier. */}
       <div className="relative">
         <button
           type="button"
-          onClick={() => setMenu(menu === "assign" ? null : "assign")}
+          onClick={() => toggle("supplier")}
           disabled={busy}
-          className={btn}
+          aria-haspopup="menu"
+          aria-expanded={menu === "supplier"}
+          className={chip}
         >
-          <Truck size={14} /> Assign logistic <ChevronDown size={12} />
+          <PackageOpen size={15} className="text-base-500" /> Supplier
+          <MoreVertical size={13} className="text-base-400 -mr-0.5" />
         </button>
+        {menu === "supplier" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem
+              icon={PackagePlus}
+              label="Raise PO"
+              onClick={onRaisePo}
+              disabled={!canRaisePo}
+              title={raisePoTitle}
+              right={canRaisePo ? undefined : <Lock size={11} className="text-base-400" />}
+            />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
+            <BulkMenuItem
+              icon={Bell}
+              label="Remind"
+              hint="before deadline"
+              onClick={() => onChaseSupplier("remind")}
+            />
+            <BulkMenuItem
+              icon={MessageCircle}
+              label="Chase"
+              hint="overdue"
+              tone="wa"
+              onClick={() => onChaseSupplier("chase")}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* — LOGISTIC ⋮ — the delivery counterparty. Assign (partner picker) +
+          Remind + Chase. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => toggle("logistic")}
+          disabled={busy}
+          aria-haspopup="menu"
+          aria-expanded={menu === "logistic"}
+          className={chip}
+        >
+          <Truck size={15} className="text-base-500" /> Logistic
+          <MoreVertical size={13} className="text-base-400 -mr-0.5" />
+        </button>
+        {menu === "logistic" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem
+              icon={Truck}
+              label="Assign to…"
+              onClick={() => setMenu("assign")}
+              right={<ChevronRight size={13} className="text-base-400" />}
+            />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
+            <BulkMenuItem
+              icon={Bell}
+              label="Remind"
+              hint="before收货日"
+              onClick={() => onChasePartner("remind")}
+            />
+            <BulkMenuItem
+              icon={MessageCircle}
+              label="Chase"
+              hint="overdue"
+              tone="wa"
+              onClick={() => onChasePartner("chase")}
+            />
+          </div>
+        )}
         {menu === "assign" && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+          <div className={pop} role="menu">
             <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
               Assign to…
             </div>
@@ -3042,7 +3150,7 @@ function OrdersBulkBar({
                 key={p.id}
                 type="button"
                 onClick={() => onAssign(p.id)}
-                className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
+                className="w-full text-left px-2 py-1.5 text-[12px] rounded hover:bg-base-100"
               >
                 {p.name}
               </button>
@@ -3050,25 +3158,25 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
-      <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
-      {/* — UTILITY — Flag for follow-up (a follow-up task per selected order). */}
-      <button type="button" onClick={onFlag} disabled={busy} className={btn}>
-        <Flag size={14} /> Flag
-      </button>
-      {/* Export ▾ — CSV / Print / Mark delivered. */}
+
+      {/* — More — utility (Flag · Export · Print · Mark delivered · No storage). */}
       <div className="relative">
         <button
           type="button"
-          onClick={() => setMenu(menu === "menu" ? null : "menu")}
+          onClick={() => toggle("more")}
           disabled={busy}
-          className={btn}
+          aria-haspopup="menu"
+          aria-expanded={menu === "more"}
+          className={chip}
         >
-          <Download size={14} /> Export <ChevronDown size={12} />
+          <MoreHorizontal size={15} className="text-base-500" /> More
         </button>
-        {menu === "menu" && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+        {menu === "more" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem icon={Flag} label="Flag for follow-up" onClick={onFlag} />
             <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
             <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
             <BulkMenuItem
               icon={CheckCircle2}
               label={busy ? "Working…" : "Mark delivered"}
@@ -3082,6 +3190,7 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
+
       <button
         type="button"
         onClick={onClear}
@@ -3098,19 +3207,41 @@ function OrdersBulkBar({
 function BulkMenuItem({
   icon: Icon,
   label,
+  hint,
   onClick,
+  disabled,
+  title,
+  right,
+  tone,
 }: {
   icon: LucideIcon;
   label: string;
+  /** Faint trailing context (e.g. "overdue"). */
+  hint?: string;
   onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+  /** Trailing node (lock, chevron). */
+  right?: ReactNode;
+  /** "wa" tints the leading icon WhatsApp-green (Chase); default = grey. */
+  tone?: "wa";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] hover:bg-base-100"
+      disabled={disabled}
+      title={title}
+      role="menuitem"
+      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] rounded hover:bg-base-100 disabled:opacity-45 disabled:hover:bg-transparent"
     >
-      <Icon size={14} className="text-base-500" /> {label}
+      <Icon
+        size={14}
+        className={tone === "wa" ? "text-[#25D366]" : "text-base-500"}
+      />
+      <span>{label}</span>
+      {hint && <span className="text-[11px] text-base-400">{hint}</span>}
+      {right && <span className="ml-auto flex items-center">{right}</span>}
     </button>
   );
 }
