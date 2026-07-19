@@ -215,6 +215,28 @@ describe("GET /api/staff", () => {
     expect(body.staff.find((s) => s.id === SP2)?.hasPin).toBe(false);
   });
 
+  it("roster is ordered by hierarchy: principal → manager → salesperson, A-Z within a tier", async () => {
+    // Deliberately shuffled input (alphabetical would put the manager first).
+    vi.mocked(userClient).mockReturnValue(
+      mockUser({
+        list: [
+          spRow({ id: "00000000-0000-0000-0000-00000000aa01", name: "Bella", staff_role: "salesperson" }),
+          spRow({ id: "00000000-0000-0000-0000-00000000aa02", name: "Alvin", staff_role: "manager" }),
+          spRow({ id: "00000000-0000-0000-0000-00000000aa03", name: "Aaron", staff_role: "salesperson" }),
+          spRow({ id: "00000000-0000-0000-0000-00000000aa04", name: "Zul", staff_role: "principal" }),
+        ],
+      }),
+    );
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ pinRows: [] }));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/staff", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    const body = (await res.json()) as { staff: Array<{ name: string }> };
+    expect(body.staff.map((s) => s.name)).toEqual(["Zul", "Alvin", "Aaron", "Bella"]);
+  });
+
   it("activated=false when no staff has a PIN", async () => {
     vi.mocked(userClient).mockReturnValue(mockUser({ list: [spRow()] }));
     vi.mocked(adminClient).mockReturnValue(mockAdmin({ pinRows: [] }));
