@@ -3987,6 +3987,12 @@ function OrderRow({
       {showCol("next") && (
       <td className="pl-2 pr-2">
         {(() => {
+          // Delivered = closed → Manage is a NEXT-ACTION column, and a closed
+          // order has no action, so the cell is BLANK (Jess 2026-07-19: STATUS
+          // already says "Delivered"; a "Done" pill is redundant — and would be
+          // wrong if a 2nd delivery were still pending, which keeps the order
+          // in-pipeline, not Delivered).
+          if (completed) return null;
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
           // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
