@@ -130,6 +130,9 @@ import {
   type UpdateStaffInput,
   type SetStaffPinInput,
   type StaffDto,
+  // 0239 — store-account email-change requests (dealer principal → HQ approval).
+  type EmailChangeRequestDto,
+  type SubmitEmailChangeInput,
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
@@ -180,6 +183,8 @@ export const qk = {
    *  store via dealerId; own-store reads pass none. Kept off the `salespersons`
    *  prefix so staff mutations that flip hasPin invalidate distinctly. */
   staff:        (dealerId?: string) => ["staff", dealerId ?? null] as const,
+  /** 0239 — my store's latest email-change request (dealer principal). */
+  emailChange:  () => ["email-change", "mine"] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
    *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
    *  this so the rail re-reads the live RESERVED set after a trigger change. */
@@ -205,6 +210,8 @@ export const qk = {
     partners:  () => ["principal", "partners"] as const,
     /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
     accounts:  () => ["principal", "accounts"] as const,
+    /** 0239 — store email-change request queue (HQ approval). */
+    emailChanges: () => ["principal", "email-changes"] as const,
     /** Phase 10 — audit log (PrincipalAudit). */
     audit:     (filters?: Record<string, unknown>) =>
       ["principal", "audit", filters ?? {}] as const,
@@ -1643,6 +1650,106 @@ export function useSetStaffPin(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["staff"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0239 — store-account email-change (dealer principal submits; HQ decides).
+// Password change never touches these — it is client → Supabase Auth direct
+// (lib/password.ts).
+// ---------------------------------------------------------------------------
+
+/** GET /api/account/email-change — my store's LATEST request (any status). */
+export function useMyEmailChange(
+  opts?: Partial<UseQueryOptions<{ request: EmailChangeRequestDto | null }>>,
+) {
+  return useQuery({
+    queryKey: qk.emailChange(),
+    queryFn: () => apiFetch<{ request: EmailChangeRequestDto | null }>("/api/account/email-change"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** POST /api/account/email-change — submit for HQ approval (password re-proof).
+ *  ApiError bodies: bad_password 401 · email_in_use/same_email 422 ·
+ *  pending_exists 409. */
+export function useSubmitEmailChange(
+  opts?: Partial<UseMutationOptions<EmailChangeRequestDto, ApiError, SubmitEmailChangeInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<EmailChangeRequestDto, ApiError, SubmitEmailChangeInput>({
+    mutationFn: (input) =>
+      apiFetch<EmailChangeRequestDto>("/api/account/email-change", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.emailChange() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST /api/account/email-change/:id/cancel — withdraw my pending request. */
+export function useCancelEmailChange(
+  opts?: Partial<UseMutationOptions<EmailChangeRequestDto, ApiError, { id: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<EmailChangeRequestDto, ApiError, { id: string }>({
+    mutationFn: ({ id }) =>
+      apiFetch<EmailChangeRequestDto>(`/api/account/email-change/${id}/cancel`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.emailChange() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** GET /api/principal/accounts/email-change-requests — the HQ queue. */
+export function usePrincipalEmailChanges(
+  opts?: Partial<UseQueryOptions<{ requests: EmailChangeRequestDto[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.principal.emailChanges(),
+    queryFn: () =>
+      apiFetch<{ requests: EmailChangeRequestDto[] }>(
+        "/api/principal/accounts/email-change-requests",
+      ),
+    ...opts,
+  });
+}
+
+/** POST /api/principal/accounts/email-change-requests/:id/(approve|reject). */
+export function useDecideEmailChange(
+  opts?: Partial<
+    UseMutationOptions<
+      EmailChangeRequestDto,
+      ApiError,
+      { id: string; action: "approve" | "reject"; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    EmailChangeRequestDto,
+    ApiError,
+    { id: string; action: "approve" | "reject"; note?: string }
+  >({
+    mutationFn: ({ id, action, note }) =>
+      apiFetch<EmailChangeRequestDto>(
+        `/api/principal/accounts/email-change-requests/${id}/${action}`,
+        { method: "POST", body: JSON.stringify(note ? { note } : {}) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.emailChanges() });
+      // Approve changes the login email shown in the accounts table too.
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

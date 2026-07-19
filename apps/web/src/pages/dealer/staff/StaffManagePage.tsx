@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { ArrowLeft } from "lucide-react";
 import StaffSection from "./StaffSection";
+import StoreAccountSection from "./StoreAccountSection";
 
 /**
  * In-POS staff management overlay (Loo 2026-07-19: the dealer principal had NO
@@ -47,6 +48,8 @@ export default function StaffManagePage({ onClose }: { onClose: () => void }) {
             their 6-digit PIN — they&apos;ll appear on the sign-in screen.
           </p>
           <StaffSection />
+          {/* Store credential (dealer principal only — renders null otherwise). */}
+          <StoreAccountSection />
         </div>
       </div>
     </div>,

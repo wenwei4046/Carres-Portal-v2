@@ -25,6 +25,10 @@ vi.mock("@/lib/queries", () => ({
   useCreateOutlet: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useCreateStaff: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   useSetStaffPin: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
+  // StoreAccountSection (0239) — inert here (no dealer-role auth in these tests).
+  useMyEmailChange: () => ({ data: { request: null }, isPending: false, error: null }),
+  useSubmitEmailChange: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelEmailChange: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import DealerSettings from "./DealerSettings";

@@ -7,6 +7,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { useCreateOutlet, useDealerSelf, useOutlets } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
 import StaffSection from "./staff/StaffSection";
+import StoreAccountSection from "./staff/StoreAccountSection";
 
 /**
  * Dealer/Showroom self-service Settings.
@@ -109,6 +110,9 @@ export default function DealerSettings() {
 
       {/* Staff — the shared section; renders null for a salesperson-tier session. */}
       <StaffSection />
+
+      {/* Store credential (password / email) — dealer principal only. */}
+      <StoreAccountSection />
 
       {showAddOutletModal && <AddOutletModal onClose={() => setShowAddOutletModal(false)} />}
     </div>
