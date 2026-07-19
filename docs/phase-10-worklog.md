@@ -366,3 +366,18 @@ Loo (from the POS as "tan qu qu · 店主"): no tab anywhere in the POS to add s
 - **Numbering:** remote tail re-checked before numbering (guardrail #8) → 0239; the parallel session's draft renumbered itself to 0240 at its apply time — collision resolved by the draft-first flow.
 - **Tests/verify:** shared 848 · api 1355/1358 · web 1319+/1335 (all fails = §17.7 baseline, zero new; 39 new bundle tests) · tsc both clean · design-standard lint + v4-guard clean · dist SERVICE_ROLE = 0.
 - **Deploy:** api Worker `88fa0ac1-8078-4ec8-a022-473732d31efc` · web `index-51dnmdW6.js` → carres-portal `0d48c842` + carres-pos `676edf32` (`--branch=main`), from main `fcfaea6` (strict superset of the same-day `82be9bc` deploy). Cache-busted canonicals verified; GET /api/catalog → 401. **Seeded: "King Bedroom Set" = MAT-001-K + LUMI-CLASSIC-K + BED-201-K @ RM2,500, ACTIVE** (id `7e6b3629`; one-time seed — future bundles via the UI).
+
+## 2026-07-19 · Dealer goes POS-only — back-office tabs deleted (PR #210, no migration)
+
+Loo (screenshots): pressing the corner "lockout" control in the dealer POS jumped to the back-office Orders tab (with a load error); the whole three-tab chrome (Orders / Products / Settings) is redundant — "完完全全会用我们一般正常的那种 POS system 里面操作所有的问题". Web-only; net **−1,171 lines**.
+
+- **Deleted:** `DealerChrome` + `DealerOrders` + `DealerOrderDetail` + `DealerProducts` + `DealerSettings` (+ its test). `DealerApp` routes collapse to the POS index + catch-all redirect (legacy `/dealer/*` bookmarks land on the POS).
+- **Corner control = LOCK** (dealer-side): clears the staff token → StaffGate PIN screen; the draft persists and restores on the next unlock; icon LogOut→Lock, title "锁定 · Lock POS". Principal on-behalf keeps its `onExit` LogOut exit + unsaved-draft confirm (unchanged). Hidden when there's neither (unlinked salesperson — sign-out stays on the /me chip).
+- **ThankYou "View orders"** → opens the in-POS OrderStatusPage board (principal on-behalf keeps `onExit`).
+- **Outlets management** — the ONE Settings feature the POS lacked — moved verbatim into the StaffManagePage overlay as `staff/OutletsSection.tsx` ("+ Add outlet", principal tier only, same gate + testids; closed-loop preserved). StaffManagePage = the store's ONE admin surface: staff+PINs · outlets · store credential.
+- **Forgot-PIN owner reauth** now lands on `/dealer` with a one-shot `{openStaff:true}` location-state flag that DealerPos consumes to auto-open Staff & PINs (used to `navigate("/dealer/settings")`).
+- **Orphan sweep:** StaffSwitchChip "kit" variant removed (prop gone, single POS look); PinScreen/SetupWizard/ForgotPin copy re-pointed from "Settings" to the POS Staff button; stale docstrings (StaffSection/StoreAccountSection/useCreateOutlet) updated.
+- **Known loss (flagged):** old Settings' read-only account card (name/region/status/deposit balance) has no replacement surface — display-only; add to the Staff overlay if Loo asks.
+- **Role impact:** dealer + showroom (shared DealerApp) become POS-only; principal on-behalf + internal roles untouched; no API/schema change.
+- **Tests/verify:** full web suite 1,316 passed / 16 failed (all §17.7 baseline, zero new); dealer scope re-run after merging bundle-pricing main: 507/507; tsc + design-standard lint + v4-guard clean; dist SERVICE_ROLE = 0. Ported the deleted DealerSettings.test tier-gating cases into StaffManagePage.test (outlets visibility per tier + manager PIN scope).
+- **Deploy:** web `index-BBnNMd71.js` → carres-portal `9aa28f4b` + carres-pos `8153d394` (`--branch=main`), from main `942e80da` (= PR #210 merge, includes PR #208 bundle pricing). Cache-busted verify: both pages.dev canonicals + `pos.carresofficial.com` all serve the new bundle. API not redeployed (web-only).
