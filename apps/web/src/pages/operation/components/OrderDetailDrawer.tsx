@@ -4037,6 +4037,7 @@ function CustomerIdentityCard({
     customer_name: string | null;
     customer_phone: string | null;
     customer_address: string | null;
+    source_ref?: string[] | null;
   };
   regionLabel: string | null;
   statusWord: string;
@@ -4101,6 +4102,19 @@ function CustomerIdentityCard({
             <span className="font-mono font-bold text-[12px] text-white bg-base-900 rounded-[5px] px-1.5 py-0.5 shrink-0">
               #{order.so}
             </span>
+            {/* Customer/supplier REF — the CR/TCF the suppliers recognise (Jess
+                2026-07-19). One order can carry several; show the first + "+N". */}
+            {(order.source_ref ?? []).length > 0 && (
+              <span
+                className="font-mono text-[12px] text-base-700 bg-base-100 border border-base-200 rounded-[5px] px-1.5 py-0.5 shrink-0"
+                title={(order.source_ref ?? []).join(" · ")}
+              >
+                {(order.source_ref ?? [])[0]}
+                {(order.source_ref ?? []).length > 1
+                  ? ` +${(order.source_ref ?? []).length - 1}`
+                  : ""}
+              </span>
+            )}
             {/* State PILL (rev 9 shell spec) + the region as quiet text. */}
             <span
               className={`pill text-[12px] shrink-0 ${
