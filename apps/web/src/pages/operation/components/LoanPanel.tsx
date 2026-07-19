@@ -169,6 +169,14 @@ function LoanCard({
     : "Warehouse · Klang";
   const returnBy = parseReturnBy(loan.notes);
   const nDay = dayN(loan);
+  // OUT leg (0242) — how the loaner reached the customer.
+  const sup = loan.supplier_name ?? "supplier";
+  const routeText =
+    loan.out_route === "supplier_warehouse_customer"
+      ? `${sup} → Klang → customer`
+      : loan.out_route === "supplier_customer"
+        ? `${sup} → customer`
+        : "Klang → customer";
   // category icon aligned with the Items-ordered panel
   const Icon = catIcon(
     loan.category ?? (loan.item_sku ? lineCategory(loan.item_sku) : "acc"),
@@ -214,6 +222,18 @@ function LoanCard({
         {isSupplier && loan.category && (
           <Row k="Category">
             <span className="capitalize">{loan.category}</span>
+          </Row>
+        )}
+        {isSupplier && (
+          <Row k="Route">
+            <span className="inline-flex items-center gap-1.5 flex-wrap">
+              <span>{routeText}</span>
+              {loan.out_partner_name && (
+                <span className={`${TAG} bg-base-100 text-base-500`}>
+                  {loan.out_partner_name}
+                </span>
+              )}
+            </span>
           </Row>
         )}
         {loan.do_number && (
@@ -497,6 +517,11 @@ export default function LoanPanel({
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState("");
   const [returnDate, setReturnDate] = useState("");
+  // OUT leg (0242) — a supplier borrow ships straight to the customer, or via
+  // our warehouse first.
+  const [outRoute, setOutRoute] = useState<
+    "supplier_customer" | "supplier_warehouse_customer"
+  >("supplier_customer");
 
   function resetLend() {
     setLending(false);
@@ -505,6 +530,7 @@ export default function LoanPanel({
     setLabel("");
     setCategory("");
     setReturnDate("");
+    setOutRoute("supplier_customer");
   }
 
   function submitBorrow() {
@@ -517,6 +543,7 @@ export default function LoanPanel({
         supplierId,
         borrowedLabel: label.trim(),
         category: category.trim() || undefined,
+        outRoute,
         // return-by rides notes until it earns a real column (1B).
         notes: returnDate ? `expected return ${returnDate}` : undefined,
       },
@@ -622,6 +649,23 @@ export default function LoanPanel({
                 <option value="bedframe">Bedframe</option>
                 <option value="sofa">Sofa</option>
               </select>
+              {/* OUT leg (0242) — how it reaches the customer */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11.5px] text-base-500 shrink-0">Send</span>
+                <Segmented
+                  ariaLabel="Loaner delivery route"
+                  options={[
+                    { value: "supplier_customer", label: "Direct to customer" },
+                    { value: "supplier_warehouse_customer", label: "Via warehouse" },
+                  ]}
+                  value={outRoute}
+                  onChange={(v) =>
+                    setOutRoute(
+                      v as "supplier_customer" | "supplier_warehouse_customer",
+                    )
+                  }
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-[11.5px] text-base-500 shrink-0">Return by</span>
                 <ReturnByChip value={returnDate} onChange={setReturnDate} />

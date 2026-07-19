@@ -717,7 +717,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, ops_stock_items(sku, condition, po_no), suppliers(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
@@ -738,6 +738,7 @@ function mapLoanRow(r: unknown): SofaLoanDto {
       po_no?: string | null;
     } | null;
     suppliers?: { name?: string | null } | null;
+    delivery_partners?: { name?: string | null } | null;
   };
   return {
     id: row.id as string,
@@ -759,6 +760,16 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     loaned_at: row.loaned_at as string,
     returned_at: (row.returned_at as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    out_route:
+      (row.out_route as SofaLoanDto["out_route"] | null) ?? "warehouse_customer",
+    out_partner_id: (row.out_partner_id as string | null) ?? null,
+    out_partner_name: row.delivery_partners?.name ?? null,
+    dispatched_at: (row.dispatched_at as string | null) ?? null,
+    arrived_warehouse_at: (row.arrived_warehouse_at as string | null) ?? null,
+    loan_note_no: (row.loan_note_no as string | null) ?? null,
+    loan_note_signed_at: (row.loan_note_signed_at as string | null) ?? null,
+    supplier_return_due: (row.supplier_return_due as string | null) ?? null,
+    supplier_return_ref: (row.supplier_return_ref as string | null) ?? null,
   };
 }
 
@@ -861,6 +872,15 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     loaned_at: loan.loaned_at as string,
     returned_at: (loan.returned_at as string | null) ?? null,
     notes: (loan.notes as string | null) ?? null,
+    out_route: "warehouse_customer",
+    out_partner_id: null,
+    out_partner_name: null,
+    dispatched_at: null,
+    arrived_warehouse_at: null,
+    loan_note_no: null,
+    loan_note_signed_at: null,
+    supplier_return_due: null,
+    supplier_return_ref: null,
   };
   return c.json({ loan: dto });
 });
@@ -891,8 +911,16 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       422,
     );
   }
-  const { supplierId, category, borrowedSku, borrowedLabel, doNumber, notes } =
-    parsed.data;
+  const {
+    supplierId,
+    category,
+    borrowedSku,
+    borrowedLabel,
+    doNumber,
+    notes,
+    outRoute,
+    outPartnerId,
+  } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
   const { data: loan, error: loanErr } = await sb
@@ -909,9 +937,13 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       status: "on_loan",
       loaned_by: auth.id,
       notes: notes ?? null,
+      // OUT leg (0242) — a supplier borrow defaults to shipping straight to the
+      // customer unless the operator routes it via the warehouse.
+      out_route: outRoute ?? "supplier_customer",
+      out_partner_id: outPartnerId ?? null,
     })
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, suppliers(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, suppliers(name), delivery_partners(name)",
     )
     .single();
   if (loanErr) {
