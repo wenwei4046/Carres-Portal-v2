@@ -9,17 +9,23 @@ import {
   MessageCircle,
   Phone,
   X,
+  Receipt,
 } from "lucide-react";
 import {
+  PAYMENT_KINDS,
+  PAYMENT_METHODS,
   PAYMENT_STATUSES,
   computeStorageFee,
   summarizePayments,
+  type OrderPaymentRow,
   type PaymentKind,
+  type RecordPaymentInput,
   type UpdateOpsOrderControlInput,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
+import { useOrderPayments, useRecordPayment } from "@/lib/queries";
 import { areaForAddress, detectState } from "@/lib/region";
 import {
   buildCustomerChase,
@@ -309,6 +315,7 @@ export default function OperationPayments() {
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [chaseFor, setChaseFor] = useState<Row | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const today = todayIso();
 
   const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery<{
@@ -689,7 +696,14 @@ export default function OperationPayments() {
                 </tr>
               )}
               {visible.map((r) => (
-                <PaymentRow key={r.id} r={r} onSave={save} onChase={() => setChaseFor(r)} />
+                <PaymentRow
+                  key={r.id}
+                  r={r}
+                  onSave={save}
+                  onChase={() => setChaseFor(r)}
+                  expanded={expanded.has(r.id)}
+                  onToggle={() => setExpanded((prev) => toggleInSet(prev, r.id))}
+                />
               ))}
             </tbody>
           </table>
@@ -706,13 +720,18 @@ function PaymentRow({
   r,
   onSave,
   onChase,
+  expanded,
+  onToggle,
 }: {
   r: Row;
   onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
   onChase: () => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <tr className="border-t border-base-100 hover:bg-base-50 align-top">
+    <>
+    <tr className={`border-t border-base-100 hover:bg-base-50 align-top ${expanded ? "bg-base-50" : ""}`}>
       {/* Order · Status */}
       <td className="px-5 py-3">
         <div className="flex items-baseline gap-2" title={r.ref.length > 0 ? r.ref.join(" + ") : undefined}>
@@ -796,29 +815,253 @@ function PaymentRow({
 
       {/* Manage */}
       <td className="px-5 py-3">
-        {r.owing > 0 ? (
-          <>
-            <button
-              type="button"
-              onClick={onChase}
-              className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
-              title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
-            >
-              {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
-              Collect $
-            </button>
-            <div
-              className="mt-1.5 text-[11px] text-base-400"
-              title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
-            >
-              {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
-            </div>
-          </>
-        ) : (
-          <span className="pill pill-neutral">Done</span>
-        )}
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            {r.owing > 0 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onChase}
+                  className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
+                  title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
+                >
+                  {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
+                  Collect $
+                </button>
+                <div
+                  className="mt-1.5 text-[11px] text-base-400"
+                  title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
+                >
+                  {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
+                  {r.dueDate && (
+                    <span className={r.overdue ? "text-danger font-semibold" : "text-base-500"}>
+                      {" · "}
+                      {r.overdue ? "overdue" : "promised"} {fmtDate(r.dueDate)}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <span className="pill pill-neutral">Done</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse" : "Record payment / history"}
+            title={expanded ? "Collapse" : "Record payment · history · promise-to-pay"}
+            className="shrink-0 p-1 rounded text-base-400 hover:text-base-900 hover:bg-base-100"
+          >
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
+        </div>
       </td>
     </tr>
+    {expanded && (
+      <tr className="bg-base-50/60">
+        <td colSpan={5} className="px-5 pb-4 pt-0 border-t border-base-100">
+          <OrderMoneyDetail r={r} onSave={onSave} />
+        </td>
+      </tr>
+    )}
+    </>
+  );
+}
+
+/** Row-expand detail: record a payment (closes the money loop → mints a receipt
+ *  no) · the payment history · promise-to-pay (reuses balance_due_date, no
+ *  migration). Mounted only when a row is expanded, so the hooks below run in a
+ *  stable order per orderId. */
+function OrderMoneyDetail({
+  r,
+  onSave,
+}: {
+  r: Row;
+  onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
+}) {
+  const { data: ledgerData, isLoading } = useOrderPayments(r.id);
+  const ledger: OrderPaymentRow[] = ledgerData?.payments ?? [];
+
+  const record = useRecordPayment(r.id, {
+    onSuccess: (res) => {
+      const no = res.payment.receipt_no;
+      toast.success(no ? `Payment recorded · receipt ${no}` : "Payment recorded");
+    },
+    onError: (e) => toast.error(`Record failed — ${(e as Error).message}`),
+  });
+
+  const [amount, setAmount] = useState(r.owing > 0 ? String(r.owing.toFixed(2)) : "");
+  const [paidOn, setPaidOn] = useState(todayIso());
+  const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>("cash");
+  const [kind, setKind] = useState<PaymentKind>("payment");
+  const [reference, setReference] = useState("");
+
+  const submit = () => {
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Enter an amount greater than 0");
+      return;
+    }
+    const input: RecordPaymentInput = {
+      amount: amt,
+      paidOn,
+      method,
+      kind,
+      reference: reference.trim() || null,
+      note: null,
+    };
+    record.mutate(input, {
+      onSuccess: () => {
+        setAmount("");
+        setReference("");
+      },
+    });
+  };
+
+  const inputCls =
+    "text-[12px] px-2 py-1.5 border border-base-200 rounded bg-white outline-none focus:border-base-700";
+
+  return (
+    <div className="grid grid-cols-[1.1fr_1fr_0.9fr] gap-6 pt-3">
+      {/* Record payment — closes the loop, mints a receipt no */}
+      <div>
+        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+          Record payment
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+            Amount
+            <input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="0.00"
+              className={`${inputCls} w-[110px] tabular-nums`}
+              aria-label="Payment amount"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+            Paid on
+            <input
+              type="date"
+              value={paidOn}
+              onChange={(e) => setPaidOn(e.target.value)}
+              className={`${inputCls} w-[140px]`}
+              aria-label="Paid on"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+            Method
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value as (typeof PAYMENT_METHODS)[number])}
+              className={`${inputCls} capitalize`}
+              aria-label="Payment method"
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+            For
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as PaymentKind)}
+              className={`${inputCls} capitalize`}
+              aria-label="Payment kind"
+            >
+              {PAYMENT_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+            Reference
+            <input
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="txn / slip no"
+              className={`${inputCls} w-[130px]`}
+              aria-label="Payment reference"
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={record.isPending}
+              className="pill pill-collected inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Receipt size={12} strokeWidth={2.5} aria-hidden="true" />
+              {record.isPending ? "Recording…" : "Record + receipt"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-2 text-[11px] text-base-400">
+          A receipt number is minted automatically (R{r.so}-n) — the invoice/receipt PDF is next.
+        </div>
+      </div>
+
+      {/* Payment history */}
+      <div>
+        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+          Payment history
+        </h4>
+        {isLoading ? (
+          <div className="text-[12px] text-base-400">Loading…</div>
+        ) : ledger.length === 0 ? (
+          <div className="text-[12px] text-base-400">No payments recorded yet.</div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {ledger.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between text-[12px] border-b border-base-100 pb-1"
+              >
+                <span className="text-base-600">
+                  <span className="capitalize font-medium text-base-800">{p.kind}</span> ·{" "}
+                  {fmtDate(p.paid_on)} · <span className="capitalize">{p.method}</span>
+                  {p.receipt_no && <span className="ml-1 text-base-400 font-mono">{p.receipt_no}</span>}
+                </span>
+                <span className="font-mono tabular-nums font-semibold text-success">
+                  + {rm(Number(p.amount) || 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Promise-to-pay (reuses balance_due_date) */}
+      <div>
+        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+          Promise to pay
+        </h4>
+        <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          Committed date
+          <input
+            type="date"
+            defaultValue={r.dueDate ?? ""}
+            onChange={(e) => onSave(r.id, { balance_due_date: e.target.value || null })}
+            className={`${inputCls} w-[150px]`}
+            aria-label="Promise-to-pay date"
+          />
+        </label>
+        <div className="mt-2 text-[11px] text-base-400 leading-snug">
+          {r.dueDate
+            ? r.overdue
+              ? `Overdue since ${fmtDate(r.dueDate)} — chase now.`
+              : `Snoozed until ${fmtDate(r.dueDate)}.`
+            : "Set the date the customer promised to pay — it sinks off the chase queue until then."}
+        </div>
+      </div>
+    </div>
   );
 }
 
