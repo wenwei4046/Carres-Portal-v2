@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { staffPinSchema, staffTierSchema } from "./staff";
+import {
+  staffBirthdaySchema,
+  staffColorSchema,
+  staffGenderSchema,
+  staffPinSchema,
+  staffTierSchema,
+} from "./staff";
 
 /**
  * Phase 10 — Principal Accounts admin schemas.
@@ -63,6 +69,14 @@ export const initialStaffInput = z.object({
   name: z.string().trim().min(1).max(120),
   staffRole: staffTierSchema,
   pin: staffPinSchema,
+  // 0241 profile parity with the POS Add-staff form (Loo 2026-07-19: the two
+  // create doors must collect the SAME data). Optional at the contract level;
+  // the CreateAccountModal requires email/birthday/gender in the form.
+  email: z.string().trim().toLowerCase().email().max(200).optional(),
+  birthday: staffBirthdaySchema.optional(),
+  gender: staffGenderSchema.optional(),
+  phone: z.string().trim().max(40).optional(),
+  color: staffColorSchema.optional(),
 });
 export type InitialStaffInput = z.infer<typeof initialStaffInput>;
 

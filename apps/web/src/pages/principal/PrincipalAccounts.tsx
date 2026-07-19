@@ -14,11 +14,11 @@ import {
   type AppRole,
 } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
-import type { CreatableAppRole, StaffTierDto } from "@carres/shared";
+import type { CreatableAppRole, StaffColorKey, StaffGenderDto, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
-import { tierLabel } from "@/pages/dealer/staff/staff-ui";
+import { ColorDotPicker, tierLabel } from "@/pages/dealer/staff/staff-ui";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -465,15 +465,17 @@ function StatusPill({ status }: { status: AccountRow["status"] }) {
 }
 
 // ----------------------------------------------------------------------------
-// Reset-password modal — confirms before flipping a password since the new
-// value needs to be communicated to the user out-of-band.
+// Reset-password modal — the admin TYPES the new password (twice; Loo
+// 2026-07-19: no auto-generated value) and hands it to the user out-of-band.
 // ----------------------------------------------------------------------------
 
 function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () => void }) {
-  const [tempPassword, setTempPassword] = useState(generateTempPassword);
+  const [password, setPassword] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
   const reset = useResetAccountPassword(user.id, {
     onSuccess: () => onClose(),
   });
+  const valid = password.length >= 8 && password === confirmPw;
 
   return (
     <div
@@ -490,24 +492,22 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
           <h2 className="font-display text-[20px] mt-1 tracking-[-0.02em] font-semibold">
             Reset password
           </h2>
-          <div className="text-[12px] text-base-600 mt-1">
-            {user.name} ({user.email}). Give them the new password directly — we
-            don't email it.
+          {/* min-w-0 + break-words: long emails must wrap, never clip/overlap. */}
+          <div className="text-[12px] text-base-600 mt-1 min-w-0 break-words leading-relaxed">
+            {user.name} (<span className="break-all">{user.email}</span>) — type the new
+            password, then give it to them directly. We don&apos;t email it.
           </div>
         </div>
         <div className="p-6 flex flex-col gap-3">
-          <FieldLabel>New temporary password</FieldLabel>
-          <div className="flex items-center gap-2 px-3 py-2 bg-base-50 border border-base-200 rounded">
-            <code className="flex-1 font-mono text-[13px] text-base-900 tracking-[0.05em]">
-              {tempPassword}
-            </code>
-            <button
-              onClick={() => setTempPassword(generateTempPassword())}
-              className="text-[11px] font-semibold text-base-600 px-2 py-1 border border-base-200 rounded hover:bg-white cursor-pointer"
-            >
-              ↻ Regenerate
-            </button>
-          </div>
+          <Field label="New password" hint="Min 8 characters">
+            <Input type="password" value={password} onChange={setPassword} />
+          </Field>
+          <Field label="Confirm password" hint="Type it again · must match">
+            <Input type="password" value={confirmPw} onChange={setConfirmPw} />
+          </Field>
+          {confirmPw.length > 0 && password !== confirmPw && (
+            <div className="text-[12px] text-destructive">Passwords don&apos;t match.</div>
+          )}
           {reset.isError && (
             <div className="text-[12px] text-primary">
               {reset.error?.message ?? "Reset failed"}
@@ -523,8 +523,8 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
             Cancel
           </button>
           <button
-            onClick={() => reset.mutate({ tempPassword })}
-            disabled={reset.isPending}
+            onClick={() => reset.mutate({ tempPassword: password })}
+            disabled={!valid || reset.isPending}
             className="px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
           >
             {reset.isPending ? "Rotating…" : "Confirm reset"}
@@ -555,6 +555,13 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     staffRole: "principal" as StaffTierDto,
     staffPin: "",
     staffPinConfirm: "",
+    // 0241 (Loo 2026-07-19) — profile parity with the POS Add-staff form: the
+    // two staff-create doors collect the SAME data.
+    staffEmail: "",
+    staffBirthday: "",
+    staffGender: "" as StaffGenderDto | "",
+    staffPhone: "",
+    staffColor: "flame" as StaffColorKey,
     // 2026-05-22 (Loo) — region dropped from the form (structured address
     // below carries state/city; region was a free-text duplicate). The DB
     // column stays — existing dealers retain their value; new creations get
@@ -581,7 +588,10 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     // UI pre-fills with companyName so the "common case = outlet name same
     // as company" path takes zero clicks.
     outletName: "",
-    tempPassword: generateTempPassword(),
+    // 2026-07-19 (Loo) — the login password is typed MANUALLY (twice), not
+    // auto-generated: the admin decides it and hands it over directly.
+    tempPassword: "",
+    tempPasswordConfirm: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -667,6 +677,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     if (existingMode) {
       if (!existingDealerId) e.existingDealer = "Pick a store";
       if (!draft.staffName.trim()) e.staffName = "Required";
+      validateStaffProfile(e);
       if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
       else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
       setErrors(e);
@@ -697,12 +708,33 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       // 2026-07-18 (Loo) — first staff + PIN are part of store creation; the
       // PIN format is hard-gated to exactly 6 digits and must be typed TWICE.
       if (!draft.staffName.trim()) e.staffName = "Required";
+      validateStaffProfile(e);
       if (!/^[0-9]{6}$/.test(draft.staffPin)) e.staffPin = "Must be exactly 6 digits";
       else if (draft.staffPinConfirm !== draft.staffPin) e.staffPinConfirm = "PINs don't match";
     }
     if (draft.tempPassword.length < 8) e.tempPassword = "Min 8 chars";
+    else if (draft.tempPasswordConfirm !== draft.tempPassword)
+      e.tempPasswordConfirm = "Passwords don't match";
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  // 0241 profile parity — same requirements as the POS Add-staff form.
+  function validateStaffProfile(e: Record<string, string>) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.staffEmail.trim())) e.staffEmail = "Valid email required";
+    if (!draft.staffBirthday) e.staffBirthday = "Required";
+    if (!draft.staffGender) e.staffGender = "Required";
+  }
+
+  /** The staff profile payload shared by both create doors. */
+  function staffProfilePayload() {
+    return {
+      email: draft.staffEmail.trim().toLowerCase(),
+      birthday: draft.staffBirthday,
+      gender: draft.staffGender === "" ? undefined : draft.staffGender,
+      phone: draft.staffPhone.trim() ? draft.staffPhone.trim() : undefined,
+      color: draft.staffColor,
+    };
   }
 
   function submit() {
@@ -714,6 +746,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           name: draft.staffName.trim(),
           staffRole: draft.staffRole,
           pin: draft.staffPin,
+          ...staffProfilePayload(),
         },
         {
           onSuccess: (s) => {
@@ -763,7 +796,12 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       contactPhone: draft.role === "dealer" ? draft.contactPhone.trim() : undefined,
       tempPassword: draft.tempPassword,
       initialStaff: dealerLike
-        ? { name: draft.staffName.trim(), staffRole: draft.staffRole, pin: draft.staffPin }
+        ? {
+            name: draft.staffName.trim(),
+            staffRole: draft.staffRole,
+            pin: draft.staffPin,
+            ...staffProfilePayload(),
+          }
         : undefined,
     });
   }
@@ -1059,6 +1097,52 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   </select>
                 </Field>
               </div>
+              {/* 0241 — profile parity with the POS Add-staff form. */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Email" error={errors.staffEmail}>
+                  <Input
+                    value={draft.staffEmail}
+                    onChange={(v) => set("staffEmail", v)}
+                    placeholder="aisha@store.com"
+                  />
+                </Field>
+                <Field label="Phone (optional)">
+                  <Input
+                    value={draft.staffPhone}
+                    onChange={(v) => set("staffPhone", v)}
+                    placeholder="012-3456789"
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Birthday" error={errors.staffBirthday}>
+                  <input
+                    type="date"
+                    value={draft.staffBirthday}
+                    onChange={(e) => set("staffBirthday", e.target.value)}
+                    data-testid="acct-staff-birthday"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+                  />
+                </Field>
+                <Field label="Gender" error={errors.staffGender}>
+                  <select
+                    value={draft.staffGender}
+                    onChange={(e) => set("staffGender", e.target.value as StaffGenderDto | "")}
+                    data-testid="acct-staff-gender"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                  >
+                    <option value="">— select —</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Avatar colour">
+                <ColorDotPicker
+                  value={draft.staffColor}
+                  onChange={(c) => set("staffColor", c)}
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field
                   label="PIN code"
@@ -1089,24 +1173,33 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {/* 2026-07-19 (Loo) — the login password is typed manually (twice),
+              never auto-generated. */}
           {!existingMode && (
-          <Field label="Temporary password" hint="Give this to the user directly. They can change it after first login.">
-            <div className="flex items-center gap-2 px-3 py-2 bg-base-50 border border-base-200 rounded">
-              <code className="flex-1 font-mono text-[13px] text-base-900 tracking-[0.05em]">
-                {draft.tempPassword}
-              </code>
-              <button
-                type="button"
-                onClick={() => set("tempPassword", generateTempPassword())}
-                className="text-[11px] font-semibold text-base-600 px-2 py-1 border border-base-200 rounded hover:bg-white cursor-pointer"
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Login password"
+                hint="Min 8 characters · give it to the user directly"
+                error={errors.tempPassword}
               >
-                ↻ Regenerate
-              </button>
+                <Input
+                  type="password"
+                  value={draft.tempPassword}
+                  onChange={(v) => set("tempPassword", v)}
+                />
+              </Field>
+              <Field
+                label="Confirm password"
+                hint="Type it again · must match"
+                error={errors.tempPasswordConfirm}
+              >
+                <Input
+                  type="password"
+                  value={draft.tempPasswordConfirm}
+                  onChange={(v) => set("tempPasswordConfirm", v)}
+                />
+              </Field>
             </div>
-            {errors.tempPassword && (
-              <div className="text-[11px] text-primary mt-1">{errors.tempPassword}</div>
-            )}
-          </Field>
           )}
 
           {!existingMode && create.isError && (
@@ -1176,9 +1269,3 @@ function Input({ value, onChange, type = "text", placeholder }: { value: string;
   );
 }
 
-function generateTempPassword() {
-  const adj = ["Brisk", "Calm", "Bold", "Clear", "Swift", "Bright", "Quiet", "Warm"];
-  const noun = ["Linen", "Coral", "Dawn", "Tide", "Stone", "Ember", "Cloud", "Pine"];
-  const num = Math.floor(Math.random() * 90) + 10;
-  return `${adj[Math.floor(Math.random() * adj.length)]}-${noun[Math.floor(Math.random() * noun.length)]}-${num}`;
-}
