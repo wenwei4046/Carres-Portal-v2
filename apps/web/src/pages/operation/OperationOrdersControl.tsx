@@ -3266,7 +3266,7 @@ function KanbanRow({
       title={title}
       aria-pressed={active}
       className={`w-full flex items-center gap-1.5 rounded-full text-left transition-colors ${
-        active ? "" : "hover:bg-[#E9ECEF]"
+        active ? "" : "hover:bg-[#EAF3FE]"
       }`}
       style={{ padding: "6px 10px", backgroundColor: active ? "#C2E7FF" : undefined }}
     >
