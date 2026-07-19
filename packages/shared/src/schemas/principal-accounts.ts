@@ -119,11 +119,11 @@ export const createAccountInput = z
         message: `companyName is required for role=${v.role}`,
       });
     }
-    // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under
-    // the hood, so it carries the same legal/contact/address requirements as
-    // a plain dealer. Same SSM, same PIC contact, same printable address on
-    // SO PDFs. Group the checks under one role-list so it stays trivial to
-    // extend (e.g. a 'showroom' sub-flag later).
+    // 2026-07-19 (Loo) — a showroom is Carres' OWN store, not an external
+    // company, so it carries NO SSM / PIC-contact requirements. Its
+    // `companyName` field transports the showroom name (e.g. "Carres KL
+    // Showroom") and the address stays required for BOTH store kinds — it
+    // prints on Sales Order PDFs and seeds the NOT NULL outlets.address.
     const orgLikeDealer = v.role === "dealer" || v.role === "showroom";
     if (orgLikeDealer && (!v.address || v.address.length < 5)) {
       ctx.addIssue({
@@ -132,21 +132,21 @@ export const createAccountInput = z
         message: `address is required for role=${v.role}`,
       });
     }
-    if (orgLikeDealer && (!v.ssmCode || v.ssmCode.length < 6)) {
+    if (v.role === "dealer" && (!v.ssmCode || v.ssmCode.length < 6)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["ssmCode"],
         message: `ssmCode is required for role=${v.role}`,
       });
     }
-    if (orgLikeDealer && (!v.contactName || v.contactName.length < 2)) {
+    if (v.role === "dealer" && (!v.contactName || v.contactName.length < 2)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["contactName"],
         message: `contactName is required for role=${v.role}`,
       });
     }
-    if (orgLikeDealer && (!v.contactPhone || v.contactPhone.length < 7)) {
+    if (v.role === "dealer" && (!v.contactPhone || v.contactPhone.length < 7)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["contactPhone"],

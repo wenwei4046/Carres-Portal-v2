@@ -479,13 +479,18 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // 2026-05-22 (Loo) — showroom shares the dealer schema (channel='showroom'
-  // under the hood) so it carries the same SSM + contact + address + outlet
-  // requirements. The wider `needsOrg` covers all roles that need a company
-  // row at all (incl. supplier/partner); `dealerLike` is the stricter set
-  // that needs the full Malaysia-business profile.
+  // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under the
+  // hood. The wider `needsOrg` covers all roles that need a company row at
+  // all (incl. supplier/partner); `dealerLike` is the store set that needs an
+  // address + first-staff PIN. Since 2026-07-19 the full Malaysia-business
+  // profile (SSM + PIC contact) is DEALER-ONLY — see `isShowroom` below.
   const needsOrg = draft.role === "dealer" || draft.role === "showroom" || draft.role === "supplier" || draft.role === "partner";
   const dealerLike = draft.role === "dealer" || draft.role === "showroom";
+  // 2026-07-19 (Loo) — a showroom is Carres' OWN store: no company name, no
+  // SSM, no PIC contact, no personal full-name/job-title. The form collapses
+  // to Showroom name + login email + address + first staff PIN; the account's
+  // display name auto-derives from the showroom name.
+  const isShowroom = draft.role === "showroom";
   const create = useCreateAccount({
     onSuccess: () => onClose(),
   });
@@ -561,7 +566,9 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       setErrors(e);
       return Object.keys(e).length === 0;
     }
-    if (!draft.name.trim()) e.name = "Required";
+    // Showroom skips the personal full name — the account's display name
+    // derives from the showroom name at submit.
+    if (!isShowroom && !draft.name.trim()) e.name = "Required";
     if (!draft.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) e.email = "Invalid email";
     if (needsOrg && !draft.companyName.trim()) e.companyName = "Required";
@@ -574,9 +581,13 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
       else if (!draft.addressState) e.addressState = "Required";
       else if (!draft.addressCity) e.addressCity = "Required";
       else if (!draft.addressPostcode) e.addressPostcode = "Required";
-      if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
-      if (draft.contactName.trim().length < 2) e.contactName = "Required";
-      if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+      // 2026-07-19 (Loo) — SSM + PIC contact are dealer-only: a showroom is
+      // Carres' own store, no external company registration or PIC needed.
+      if (draft.role === "dealer") {
+        if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
+        if (draft.contactName.trim().length < 2) e.contactName = "Required";
+        if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+      }
       // 2026-07-18 (Loo) — first staff + PIN are part of store creation; the
       // PIN format is hard-gated to exactly 6 digits and must be typed TWICE.
       if (!draft.staffName.trim()) e.staffName = "Required";
@@ -622,10 +633,12 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
         })
       : undefined;
     create.mutate({
-      name: draft.name.trim(),
+      // Showroom: the account's display name IS the showroom name (there's no
+      // separate person to name — it's Carres' own store login).
+      name: isShowroom ? draft.companyName.trim() : draft.name.trim(),
       email: draft.email.trim().toLowerCase(),
       role: draft.role,
-      title: draft.title.trim() || null,
+      title: isShowroom ? null : draft.title.trim() || null,
       companyName: needsOrg ? draft.companyName.trim() : undefined,
       // Region dropped from the form — API still accepts it (optional zod),
       // server-side defaults to "—" when absent (see accounts.ts dealer
@@ -637,9 +650,11 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           ? draft.outletName.trim()
           : undefined,
       address: composedAddress,
-      ssmCode: dealerLike ? draft.ssmCode.trim() : undefined,
-      contactName: dealerLike ? draft.contactName.trim() : undefined,
-      contactPhone: dealerLike ? draft.contactPhone.trim() : undefined,
+      // Dealer-only business profile — a showroom (Carres' own store) sends
+      // none of these; the server writes null.
+      ssmCode: draft.role === "dealer" ? draft.ssmCode.trim() : undefined,
+      contactName: draft.role === "dealer" ? draft.contactName.trim() : undefined,
+      contactPhone: draft.role === "dealer" ? draft.contactPhone.trim() : undefined,
       tempPassword: draft.tempPassword,
       initialStaff: dealerLike
         ? { name: draft.staffName.trim(), staffRole: draft.staffRole, pin: draft.staffPin }
@@ -758,7 +773,20 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {!existingMode && (
+          {/* 2026-07-19 (Loo) — showroom is Carres' own store: no personal
+              full name / job title. Only the login email remains. */}
+          {!existingMode && isShowroom && (
+            <Field label="Email address" hint="The store's login" error={errors.email}>
+              <Input
+                type="email"
+                value={draft.email}
+                onChange={(v) => set("email", v)}
+                placeholder="e.g. kl-showroom@carres.com"
+              />
+            </Field>
+          )}
+
+          {!existingMode && !isShowroom && (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Full name" error={errors.name}>
@@ -783,17 +811,23 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           {needsOrg && !existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-                New{" "}
-                {draft.role === "dealer"
-                  ? "dealer"
-                  : draft.role === "showroom"
-                    ? "showroom"
-                    : draft.role === "supplier"
-                      ? "supplier"
-                      : "delivery partner"}{" "}
-                organisation
+                {/* 2026-07-19 (Loo) — a showroom is Carres' own store, not an
+                    external organisation: one name field, no SSM/PIC. */}
+                {draft.role === "showroom"
+                  ? "New showroom"
+                  : `New ${
+                      draft.role === "dealer"
+                        ? "dealer"
+                        : draft.role === "supplier"
+                          ? "supplier"
+                          : "delivery partner"
+                    } organisation`}
               </div>
-              <Field label="Company name" error={errors.companyName}>
+              <Field
+                label={isShowroom ? "Showroom name" : "Company name"}
+                hint={isShowroom ? "Carres' own store · also used as the outlet + account name" : undefined}
+                error={errors.companyName}
+              >
                 <Input
                   value={draft.companyName}
                   onChange={(v) => set("companyName", v)}
@@ -808,7 +842,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   }
                 />
               </Field>
-              {dealerLike && (
+              {draft.role === "dealer" && (
                 <>
                   <Field label="Outlet name" hint="Default outlet · falls back to company name when blank">
                     <Input
@@ -840,6 +874,10 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                       />
                     </Field>
                   </div>
+                </>
+              )}
+              {dealerLike && (
+                <>
                   <div>
                     <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
                       Business address
@@ -872,7 +910,9 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                 </>
               )}
               <div className="text-[11px] text-base-500 leading-relaxed">
-                A new {draft.role} record will be created and this user will be the owner.
+                {isShowroom
+                  ? "Carres' own store — no company registration or contact person needed. The email above becomes its login."
+                  : `A new ${draft.role} record will be created and this user will be the owner.`}
               </div>
             </div>
           )}
