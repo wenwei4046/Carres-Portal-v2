@@ -8,12 +8,13 @@ import {
   BedDouble,
   Bed,
   Sofa,
+  Printer,
   type LucideIcon,
 } from "lucide-react";
 import Segmented from "@/components/Segmented";
 import Btn from "@/components/Btn";
 import { toast } from "sonner";
-import type { SofaLoanDto } from "@carres/shared";
+import { docNumber, type SofaLoanDto } from "@carres/shared";
 import {
   useBorrowLoan,
   useUpdateLoan,
@@ -161,6 +162,7 @@ function LoanCard({
   partners,
   onCollect,
   onReturnSupplier,
+  onPrintNote,
   onSetRoute,
   onSetPartner,
   onSetReturnDue,
@@ -171,6 +173,7 @@ function LoanCard({
   partners: { id: string; name: string }[];
   onCollect: () => void;
   onReturnSupplier: (returnRef?: string) => void;
+  onPrintNote: () => void;
   onSetRoute: (route: "supplier_customer" | "supplier_warehouse_customer") => void;
   onSetPartner: (partnerId: string | null) => void;
   onSetReturnDue: (date: string | null) => void;
@@ -235,11 +238,22 @@ function LoanCard({
             </div>
           </div>
         </div>
-        {loan.loaned_at && (
-          <span className="font-mono text-[11.5px] text-base-400 pt-0.5 shrink-0">
-            {fmtDateShort(loan.loaned_at)}
-          </span>
-        )}
+        <span className="flex flex-col items-end gap-0.5 shrink-0">
+          {loan.loaned_at && (
+            <span className="font-mono text-[11.5px] text-base-400">
+              {fmtDateShort(loan.loaned_at)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onPrintNote}
+            className="inline-flex items-center gap-1 text-[11px] text-primary"
+            title="Print the ON LOAN note the customer signs"
+          >
+            <Printer size={12} />
+            Loan note
+          </button>
+        </span>
       </div>
 
       {/* body — labeled rows */}
@@ -652,6 +666,10 @@ function WarehousePick({
 
 export default function LoanPanel({
   orderId,
+  orderCode = "",
+  orderRef = null,
+  customerName = "",
+  customerPhone = "",
   loans,
   suppliers,
   partners = [],
@@ -661,6 +679,12 @@ export default function LoanPanel({
   logisticEta = null,
 }: {
   orderId: string;
+  /** Order context for the printable ON LOAN note. */
+  orderCode?: string;
+  /** The customer's CR/TCF ref (source_ref[0]) — printed after the SO. */
+  orderRef?: string | null;
+  customerName?: string;
+  customerPhone?: string;
   loans: SofaLoanDto[];
   suppliers: SupplierRow[];
   /** Delivery partners — the OUT-leg logistic that carries the loaner. */
@@ -713,6 +737,38 @@ export default function LoanPanel({
     setReturnDate("");
     setOutRoute("supplier_customer");
     setPartnerId("");
+  }
+
+  // Print the ON LOAN note (0242) the customer signs on hand-over.
+  async function printNote(loan: SofaLoanDto) {
+    const isSup = loan.source === "supplier";
+    const issueDate = loan.loaned_at.slice(0, 10);
+    try {
+      const { renderLoanNotePdf } = await import("@/lib/pdf/render");
+      const blob = await renderLoanNotePdf({
+        // LN-DDMMYY-NNNN — tail derived from the ORDER id so every doc of this
+        // order shares it, never a counter (volume stays private), reprint-stable.
+        ln_no: docNumber({ prefix: "LN", date: issueDate, seed: orderId, digits: 4 }),
+        order_code: orderCode || "—",
+        order_ref: orderRef,
+        issue_date: issueDate,
+        customer: { name: customerName, phone: customerPhone },
+        item:
+          (isSup ? loan.borrowed_label ?? loan.borrowed_sku : loan.item_sku) ??
+          "—",
+        condition: isSup
+          ? "Borrowed piece"
+          : (CONDITION_LABEL[loan.item_condition ?? ""] ??
+            loan.item_condition ??
+            "—"),
+        source: isSup
+          ? `Borrowed · ${loan.supplier_name ?? "supplier"}`
+          : "Warehouse · Klang",
+      });
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      toast.error(`Couldn't open loan note — ${(e as Error).message}`);
+    }
   }
 
   function submitBorrow() {
@@ -797,6 +853,7 @@ export default function LoanPanel({
               },
             )
           }
+          onPrintNote={() => void printNote(loan)}
         />
       ))}
 

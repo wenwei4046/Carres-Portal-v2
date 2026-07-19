@@ -1689,14 +1689,25 @@ function DrawerBody({
               deadline: deadlineLabel,
               overdue: daysToDelivery !== null && daysToDelivery < 0,
             });
+    const toneWord =
+      tone === "chase" ? "Chase" : tone === "final" ? "Final reminder" : "Reminder";
+    // 1B — wa.me DIRECT send (Jess 2026-07-19). The CUSTOMER has a personal
+    // number → open their WhatsApp with the message pre-filled (one tap to send;
+    // we never auto-send). Supplier/logistic chase a GROUP (chat.whatsapp.com,
+    // no ?text= prefill) → copy the text as before. Clipboard is kept as the
+    // desktop fallback regardless.
     void navigator.clipboard.writeText(text);
-    toast.success(
-      `${
-        tone === "chase" ? "Chase" : tone === "final" ? "Final reminder" : "Reminder"
-      } copied — paste into WhatsApp`,
-    );
-    // The logged chase event — today a manual WhatsApp copy stamps it; the
-    // future portal auto-fire writes the SAME event.
+    const customerWa = aud === "customer" ? waLink(order.customer_phone) : null;
+    if (customerWa) {
+      window.open(`${customerWa}?text=${encodeURIComponent(text)}`, "_blank");
+      toast.success(`${toneWord} — opening WhatsApp to the customer, hit send`);
+    } else if (aud === "customer") {
+      toast.success(`${toneWord} copied — no customer number on file, paste into WhatsApp`);
+    } else {
+      toast.success(`${toneWord} copied — paste into the WhatsApp group`);
+    }
+    // The logged chase event — a manual send stamps it; the future portal
+    // auto-fire writes the SAME event.
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
 
@@ -3130,6 +3141,10 @@ function DrawerBody({
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
               logisticEta={bookedEta}
               partners={partnersData?.partners ?? []}
+              orderCode={soRef}
+              orderRef={(order.source_ref ?? [])[0] ?? null}
+              customerName={order.customer_name ?? ""}
+              customerPhone={order.customer_phone ?? ""}
             />
           </Panel>
           </SectionCard>
