@@ -664,7 +664,17 @@ export function nextActionOf(
   if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !logisticEtaOf(o))
     return { label: "Chase logistic", tone: "danger" };
 
-  const ready = stock.state === "ready" || stock.state === "in_stock";
+  // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
+  // Master import's per-line `line_stock_status='ready'` (stockEtaOf), but
+  // nextActionOf used to trust ONLY stockReadiness (order_lines vs live
+  // stock_balances) — which is always "awaiting" for AutoCount SKUs that don't
+  // match the catalog → the row stayed on "Chase supplier" even when the STOCK
+  // column showed "Ready". Honour BOTH signals so a Master-ready order flows to
+  // the logistic track (Assign / Chase logistic), matching what the row shows.
+  const ready =
+    stock.state === "ready" ||
+    stock.state === "in_stock" ||
+    stockEtaOf(o).state === "ready";
 
   // STOCK TRACK — leads until the goods are secured.
   if (!ready) {
@@ -4046,26 +4056,49 @@ function OrderRow({
         {(() => {
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
+          // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
+          // is the PRIMARY verb; an outstanding balance is an INDEPENDENT track,
+          // shown as a secondary "Collect $" pill (max two pills). Hidden once
+          // the order is closed. `Confirm 🔒` already means "money-held", so the
+          // pill isn't doubled up there.
+          const owing = !completed && Number(ovlOf(o)?.balance ?? 0) > 0;
+          const showMoney = owing && na.label !== "Confirm";
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onNextAction(na.label);
-              }}
-              className="inline-flex items-center gap-1 align-middle max-w-full hover:underline"
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.01em",
-                color: NEXT_TEXT_COLOR[na.tone],
-              }}
-              data-next-action={na.label}
-              title={`${na.label} — click to act`}
-            >
-              {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-              <span className="truncate min-w-0">{na.label}</span>
-            </button>
+            <div className="flex items-center gap-1.5 max-w-full">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNextAction(na.label);
+                }}
+                className="inline-flex items-center gap-1 align-middle min-w-0 hover:underline"
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  letterSpacing: "0.01em",
+                  color: NEXT_TEXT_COLOR[na.tone],
+                }}
+                data-next-action={na.label}
+                title={`${na.label} — click to act`}
+              >
+                {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
+                <span className="truncate min-w-0">{na.label}</span>
+              </button>
+              {showMoney && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNextAction("Collect $");
+                  }}
+                  className="pill pill-collected shrink-0 hover:brightness-95"
+                  data-next-action="Collect $"
+                  title="Outstanding balance — open the order to collect"
+                >
+                  Collect $
+                </button>
+              )}
+            </div>
           );
         })()}
       </td>

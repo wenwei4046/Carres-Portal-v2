@@ -924,6 +924,21 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
   });
 
+  it("Master says Ready (line_stock_status) → logistic track, NOT Chase supplier (#5 fix)", () => {
+    // The AutoCount SKU misses the catalog so stockReadiness = "awaiting", but
+    // the Master import marked every line ready → NEXT must follow the STOCK
+    // column and move to the logistic track (Assign logistic here), not stay on
+    // "Chase supplier" (Jess 2026-07-19 #5).
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, source_po: "PO/1" }],
+      ops_order_control: { line_stock_status: { "mattress:MAT-1": "ready" } },
+    });
+    // stock arg = the awaiting SKU-mismatch signal the row would pass.
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistic");
+  });
+
   // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──
   it("ready + carrier + ETA + paid → Confirm (green)", () => {
     const o = makeRow({
