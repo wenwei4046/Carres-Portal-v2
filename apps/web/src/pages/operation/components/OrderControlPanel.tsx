@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   ChevronDown,
   ChevronRight,
   Plus,
@@ -1208,17 +1209,28 @@ export function StorageExtensionRow({
   hasMsbf = false,
   hasSof = false,
   meta,
+  chrome = "fieldrow",
 }: {
   orderId: string;
   control: OpsOrderControl | null;
   hasMsbf?: boolean;
   hasSof?: boolean;
   meta?: { orderCode: string; customerName: string; customerPhone: string };
+  /** "fieldrow" = wrapped in the label|value FieldRow (Delivery tab, legacy
+   *  storage panel). "bare" = single-column body for the Storage sub-card
+   *  (the band header is supplied by the caller). */
+  chrome?: "fieldrow" | "bare";
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
   const count = control?.extension_count ?? 0;
   const extended = count >= 1;
+  // rev26 (Jess B): facts live in chips/pills, never bare prose. A mono chip for
+  // the code/date; the "shell" wraps the body per `chrome`.
+  const chipCls =
+    "inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-200 rounded-[6px] px-1.5 py-0.5 bg-white";
+  const shell = (inner: ReactNode) =>
+    chrome === "bare" ? inner : <FieldRow label="Extension">{inner}</FieldRow>;
 
   // Open the one-time extension agreement (the Google-Form replacement) as a PDF.
   // Policy lines follow the §7.5 rule: storage starts the same weekday the week
@@ -1283,64 +1295,63 @@ export function StorageExtensionRow({
 
   // Already extended → readout. A principal can still record a further one.
   if (extended && !open) {
-    return (
-      <FieldRow label="Extension">
-        <div className="px-2 py-1.5 text-[13px] w-full">
-          <div className="font-semibold text-base-900">
-            → {fmt(control?.extension_new_date)}
-            <span className="ml-1 text-[12px] font-normal text-base-500">
-              · {control?.extension_reason ?? "—"} · free from {fmt(control?.extension_original_date)}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void exportAgreement()}
-              className="text-[12px] text-primary hover:underline inline-flex items-center gap-1"
-            >
-              <Receipt size={14} strokeWidth={2} />
-              Export agreement (PDF)
-            </button>
-            {isPrincipal && (
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="text-[12px] text-primary hover:underline"
-              >
-                + Extend again
-              </button>
-            )}
-          </div>
+    return shell(
+      <div className="p-2.5 space-y-2 text-[12px]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="pill pill-warning">postponed</span>
+          <ArrowRight size={14} className="text-base-400 shrink-0" aria-hidden="true" />
+          <span className={chipCls}>{fmt(control?.extension_new_date)}</span>
+          <span className="pill bg-base-100 text-base-500">
+            {control?.extension_reason ?? "—"}
+          </span>
+          <span className="pill bg-base-100 text-base-500">
+            free from {fmt(control?.extension_original_date)}
+          </span>
           {!isPrincipal && (
-            <span className="mt-0.5 inline-block pill bg-base-100 text-base-500">
-              1/1 used
-            </span>
+            <span className="pill bg-base-100 text-base-500">1/1 used</span>
           )}
         </div>
-      </FieldRow>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void exportAgreement()}
+            className="text-[12px] text-primary hover:underline inline-flex items-center gap-1"
+          >
+            <Receipt size={14} strokeWidth={2} />
+            Export agreement (PDF)
+          </button>
+          {isPrincipal && (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="text-[12px] text-primary hover:underline"
+            >
+              + Extend again
+            </button>
+          )}
+        </div>
+      </div>,
     );
   }
 
   if (!open) {
-    return (
-      <FieldRow label="Extension">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="px-2 py-1.5 text-[13px] text-primary hover:underline inline-flex items-center gap-1"
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          Extend storage
-        </button>
-      </FieldRow>
+    return shell(
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="px-2.5 py-2 text-[13px] text-primary hover:underline inline-flex items-center gap-1"
+      >
+        <Plus size={14} strokeWidth={2.5} />
+        Extend storage
+      </button>,
     );
   }
 
   const canSubmit =
     !!newDate && ack && (reason !== "Others" || !!note.trim()) && !extend.isPending;
 
-  return (
-    <FieldRow label="Extension">
+  return shell(
+    <div className="p-2.5">
       <div className="px-1.5 py-1.5 w-full space-y-1.5 border border-base-200 rounded-[3px] bg-base-50">
         <div className="grid grid-cols-2 gap-1.5">
           <label className="text-[12px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
@@ -1413,7 +1424,7 @@ export function StorageExtensionRow({
           </button>
         </div>
       </div>
-    </FieldRow>
+    </div>,
   );
 }
 
@@ -1425,15 +1436,21 @@ export function StorageCollectWaiver({
   orderId,
   control,
   charge,
+  chrome = "fieldrow",
 }: {
   orderId: string;
   control: OpsOrderControl | null;
   charge: number;
+  /** "bare" = single-column body for the Storage sub-card (band header supplied
+   *  by the caller); "fieldrow" = legacy label|value row. */
+  chrome?: "fieldrow" | "bare";
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
   const collectedAt = control?.storage_collected_at ?? null;
   const waiverStatus = control?.storage_waiver_status ?? "none";
+  const shell = (label: string, inner: ReactNode) =>
+    chrome === "bare" ? inner : <FieldRow label={label}>{inner}</FieldRow>;
 
   const collect = useCollectStorage(orderId, {
     onSuccess: () => toast.success("Storage fee collected — receipt issued"),
@@ -1455,29 +1472,27 @@ export function StorageCollectWaiver({
 
   // Already cleared → just confirm the gate is open.
   if (collectedAt) {
-    return (
-      <FieldRow label="Collected">
-        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
-          <ShieldCheck size={14} strokeWidth={2.5} />
-          Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
-        </div>
-      </FieldRow>
+    return shell(
+      "Collected",
+      <div className="px-2.5 py-2 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+        <ShieldCheck size={14} strokeWidth={2.5} />
+        Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
+      </div>,
     );
   }
   if (waiverStatus === "approved") {
-    return (
-      <FieldRow label="Waiver">
-        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
-          <ShieldCheck size={14} strokeWidth={2.5} />
-          Waived by principal · delivery unlocked
-        </div>
-      </FieldRow>
+    return shell(
+      "Waiver",
+      <div className="px-2.5 py-2 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+        <ShieldCheck size={14} strokeWidth={2.5} />
+        Waived by principal · delivery unlocked
+      </div>,
     );
   }
 
-  return (
-    <FieldRow label="Collect">
-      <div className="px-1.5 py-1.5 w-full space-y-1.5">
+  return shell(
+    "Collect",
+    <div className="px-2.5 py-2 w-full space-y-1.5">
         {/* Collect */}
         {collecting ? (
           <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">
@@ -1627,8 +1642,7 @@ export function StorageCollectWaiver({
             Waiver rejected — collect the fee to dispatch.
           </div>
         )}
-      </div>
-    </FieldRow>
+      </div>,
   );
 }
 

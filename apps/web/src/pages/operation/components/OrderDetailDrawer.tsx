@@ -77,7 +77,7 @@ import {
   type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
 import {
@@ -3323,11 +3323,21 @@ function DrawerBody({
                 const extActive =
                   storageActive || (form.control?.extension_count ?? 0) > 0;
                 if (!storageActive && !extActive) return null;
+                /* rev26 (Jess B): each flow is a titled sub-card — a band
+                   header + single-column body, no FieldRow left|right scatter.
+                   Same grammar as the spine above. */
+                const SubHead = ({ children }: { children: ReactNode }) => (
+                  <div className="bg-base-50 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.03em] text-base-600 border-b border-base-200/70">
+                    {children}
+                  </div>
+                );
                 return (
                   <div className="px-3 pb-3 space-y-2">
                     {storageActive && (
-                      <div className="rounded-[10px] border border-base-200/70">
+                      <div className="rounded-[10px] border border-base-200/70 overflow-hidden">
+                        <SubHead>Collect</SubHead>
                         <StorageCollectWaiver
+                          chrome="bare"
                           orderId={order.id}
                           control={form.control}
                           charge={
@@ -3339,8 +3349,10 @@ function DrawerBody({
                       </div>
                     )}
                     {extActive && (
-                      <div className="rounded-[10px] border border-base-200/70">
+                      <div className="rounded-[10px] border border-base-200/70 overflow-hidden">
+                        <SubHead>Extension</SubHead>
                         <StorageExtensionRow
+                          chrome="bare"
                           orderId={order.id}
                           control={form.control}
                           hasMsbf={hasMsbf}
@@ -4909,6 +4921,64 @@ function JourneyCard({
   );
 }
 
+/** A date fact that READS as a formatted chip ("31 Jul 26") and only reveals a
+ *  native date input on click — so the card never shows a raw "16/07/2026" /
+ *  "dd/mm/yyyy" box floating (rev25 date law · Jess: no empty form fields on the
+ *  face). Editing the value IS the manual override. When empty + `placeholderPill`
+ *  the default reads as a soft pill (words belong in pills, not mono chips). */
+function EditableDateChip({
+  value,
+  onChange,
+  placeholder,
+  chipCls,
+  ariaLabel,
+  placeholderPill,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  chipCls: string;
+  ariaLabel: string;
+  placeholderPill?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        type="date"
+        value={value}
+        autoFocus
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setEditing(false)}
+        aria-label={ariaLabel}
+        className={chipCls}
+      />
+    );
+  }
+  if (!value && placeholderPill) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={ariaLabel}
+        className="pill bg-base-100 text-base-500 hover:brightness-95"
+      >
+        {placeholder}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      aria-label={ariaLabel}
+      className={`${chipCls} ${value ? "" : "text-base-400 font-normal"}`}
+    >
+      {value ? fmtDateShort(value) : placeholder}
+    </button>
+  );
+}
+
 /** StorageCard (Jess 2026-07-18, version B): FIVE steps, always the same
  *  order, the customer's PROMISED DATE first — everything grows from it.
  *  ① promised delivery ② free week ③ counts from ④ fee so far ⑤ ends.
@@ -5037,7 +5107,7 @@ function StorageCard({
       >
         {deadline ? (
           <span className="inline-flex items-center gap-1.5 flex-wrap">
-            <span className={chip}>{fmtDate(deadline)}</span>
+            <span className={chip}>{fmtDateShort(deadline)}</span>
             {delivered ? (
               <span className="pill pill-confirmed">delivered</span>
             ) : deadlinePassed ? (
@@ -5065,12 +5135,12 @@ function StorageCard({
       >
         {freeBase && autoAnchor ? (
           <span className="inline-flex items-center gap-1.5 flex-wrap">
-            <span className={chip}>{fmtDate(freeBase)}</span>
+            <span className={chip}>{fmtDateShort(freeBase)}</span>
             <ArrowRight size={14} className="text-base-400 shrink-0" aria-hidden="true" />
-            <span className={chip}>{fmtDate(autoAnchor)}</span>
+            <span className={chip}>{fmtDateShort(autoAnchor)}</span>
             {supplierLate && latestGoodsEta && (
               <span className="pill pill-warning">
-                supplier late · ETA {fmtDate(latestGoodsEta)}
+                supplier late · ETA {fmtDateShort(latestGoodsEta)}
               </span>
             )}
           </span>
@@ -5090,14 +5160,15 @@ function StorageCard({
             <span className={soft}>exempted</span>
           ) : (
             <>
-              {/* ONE date control (Jess: why two calendars?) — shows the
-                  auto anchor; editing it IS the manual override. */}
-              <input
-                type="date"
+              {/* ONE date control (Jess: why two calendars?) — reads as the
+                  formatted auto anchor; click to reveal the picker (editing it
+                  IS the manual override). */}
+              <EditableDateChip
                 value={draft.storage_from || effectiveStart || autoAnchor || ""}
-                onChange={(e) => set("storage_from", e.target.value)}
-                aria-label="Storage start (edit = manual override)"
-                className={chip}
+                onChange={(v) => set("storage_from", v)}
+                placeholder="—"
+                ariaLabel="Storage start (edit = manual override)"
+                chipCls={chip}
               />
               {form.storageFrom && (
                 <>
@@ -5137,7 +5208,7 @@ function StorageCard({
       >
         {collectedAt ? (
           <span className="pill pill-confirmed">
-            collected · {fmtDate(String(collectedAt).slice(0, 10))}
+            collected · {fmtDateShort(String(collectedAt).slice(0, 10))}
           </span>
         ) : waived ? (
           <span className={soft}>waived</span>
@@ -5153,29 +5224,34 @@ function StorageCard({
             </button>
           </span>
         ) : counting ? (
-          <span className="inline-flex items-center gap-1.5 flex-wrap">
-            <span className={soft}>day {soFar}</span>
-            {hasMsbf && (
-              <span className={chip}>
-                MS/BF{" "}
-                {impMsbf != null
-                  ? impMsbf.toLocaleString()
-                  : `${auto.msbfMonths} mth × 150`}
-              </span>
-            )}
-            {hasSof && (
-              <span className={chip}>
-                Sofa{" "}
-                {impSof != null
-                  ? impSof.toLocaleString()
-                  : auto.sofCharged
-                    ? "flat 200"
-                    : "free"}
-              </span>
-            )}
-            {/* ONE money control (same law as the step-3 date): the box
-                shows the auto/Master figure; editing IS the override. */}
-            <span className="inline-flex items-center gap-1">
+          /* rev26 (Jess B): two quiet lines, not one crowded row — line 1 the
+             elapsed + formula, line 2 the amount + status, then the exempt
+             escape on its own. */
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={soft}>day {soFar}</span>
+              {hasMsbf && (
+                <span className={chip}>
+                  MS/BF ·{" "}
+                  {impMsbf != null
+                    ? impMsbf.toLocaleString()
+                    : `${auto.msbfMonths} mth × 150`}
+                </span>
+              )}
+              {hasSof && (
+                <span className={chip}>
+                  Sofa ·{" "}
+                  {impSof != null
+                    ? impSof.toLocaleString()
+                    : auto.sofCharged
+                      ? "flat 200"
+                      : "free"}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* ONE money control (same law as the step-3 date): the box
+                  shows the auto/Master figure; editing IS the override. */}
               <span className="font-mono font-semibold text-[12px] text-base-500">
                 RM
               </span>
@@ -5195,30 +5271,30 @@ function StorageCard({
                 aria-label="Storage fee (edit = manual override)"
                 className={`${chip} w-24 text-right ${effTotal > 0 ? "text-danger" : ""}`}
               />
-            </span>
-            {overrideSet && (
-              <>
-                <span className={soft}>manual</span>
-                <button
-                  type="button"
-                  onClick={() => set("storage_fee_override", "")}
-                  title="Back to auto"
-                  aria-label="Reset the fee to auto"
-                  className="text-base-400 hover:text-base-700"
-                >
-                  <X size={14} />
-                </button>
-              </>
-            )}
-            {effTotal > 0 && <span className="pill pill-overdue">unpaid</span>}
+              {overrideSet && (
+                <>
+                  <span className={soft}>manual</span>
+                  <button
+                    type="button"
+                    onClick={() => set("storage_fee_override", "")}
+                    title="Back to auto"
+                    aria-label="Reset the fee to auto"
+                    className="text-base-400 hover:text-base-700"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              )}
+              {effTotal > 0 && <span className="pill pill-overdue">unpaid</span>}
+            </div>
             <button
               type="button"
               onClick={() => set("storage_fee_override", "0")}
-              className="text-[12px] text-base-500 hover:text-base-800 underline"
+              className="self-start text-[12px] text-base-500 hover:text-base-800 underline"
             >
               No storage
             </button>
-          </span>
+          </div>
         ) : (
           <span className={soft}>RM 0</span>
         )}
@@ -5229,20 +5305,17 @@ function StorageCard({
         <span className="inline-flex items-center gap-1.5 flex-wrap">
           {delivered ? (
             <span className="pill pill-confirmed">
-              delivered · {fmtDate(endEff)}
+              delivered · {fmtDateShort(endEff)}
             </span>
           ) : (
-            <>
-              <input
-                type="date"
-                value={draft.storage_to}
-                onChange={(e) => set("storage_to", e.target.value)}
-                aria-label="Storage end (blank = follows delivery)"
-                title="Blank = follows delivery"
-                className={chip}
-              />
-              {!endSet && <span className={soft}>follows delivery</span>}
-            </>
+            <EditableDateChip
+              value={draft.storage_to}
+              onChange={(v) => set("storage_to", v)}
+              placeholder="follows delivery"
+              placeholderPill
+              ariaLabel="Storage end (blank = follows delivery)"
+              chipCls={chip}
+            />
           )}
         </span>
       </Row>
