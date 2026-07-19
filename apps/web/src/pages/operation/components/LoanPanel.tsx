@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Check, Plus } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Check, Plus, Package, AlertTriangle, Link2 } from "lucide-react";
 import Segmented from "@/components/Segmented";
 import Btn from "@/components/Btn";
 import { toast } from "sonner";
@@ -11,23 +11,32 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { lineCategory } from "@/lib/line-category";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDateShort } from "@/lib/fmt-date";
 import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
 /**
- * LoanPanel (Jess 2026-07-19, option A): the loaner story in the SAME
- * vertical step grammar as the Storage card / left-rail spine — ONE
- * progress language across the whole order page. A loaner is a substitute
- * piece lent while the real one isn't ready: from the own WAREHOUSE (a
- * free unit, swapped back) or BORROWED from a SUPPLIER (an obligation —
- * owe them a piece back, its own step so it's never forgotten).
- * Chip/pill law: every fact in a chip or pill, no prose, no glyph arrows,
- * no how-to sentences. migration 0217.
+ * LoanPanel — "ON MISSION" card language (Jess 2026-07-19, approved from her
+ * travel-itinerary sample): a loaner is a substitute piece lent while the real
+ * one isn't ready. Each loaner = a GROUNDED white card (icon header · source ·
+ * product name · date top-right) with LABELED key-value rows inside; pills are
+ * retired — status reads from a green ✓ / an amber "due soon" row / a red
+ * "overdue" row. No floating chips, no how-to sentences.
+ *
+ * Lend from the own WAREHOUSE (a free unit — swapped back) or BORROW from a
+ * SUPPLIER (an obligation: owe a piece back, with a return-by deadline).
+ *
+ * Picking a warehouse unit (Jess's rulings 2026-07-19):
+ *  · we OFFER what we can lend — the customer does NOT pick, and we do NOT
+ *    match the ordered size ("got what we borrow what"). Show the full unit
+ *    info so staff can read it: product · condition · date-in · original PO.
+ *  · DISPLAY stock first, sellable NEW stock last + a soft guard (lending new
+ *    sellable inventory as a temp loaner risks it — protect the stock).
+ *  · a SOFA loaner must physically ENTER the customer's space → an explicit
+ *    "checked it can enter" confirm gates the lend.
+ * migration 0217 (no schema change here).
  */
 
-type StepState = "done" | "act" | "wait" | "todo";
-
-/** Same labels + pill tones as the rev20 stock picker — one vocabulary. */
+/** Same labels as the rev20 stock picker — one vocabulary across the drawer. */
 const CONDITION_LABEL: Record<string, string> = {
   new: "New",
   exhibition: "Display",
@@ -36,64 +45,86 @@ const CONDITION_LABEL: Record<string, string> = {
   damaged: "Damaged",
 };
 
-const CHIP =
-  "inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-200 rounded-[6px] px-1.5 py-0.5 bg-white";
-const SOFT = "pill bg-base-100 text-base-500";
+/** Lend order — display/used stock first, sellable NEW last (protect stock). */
+const COND_RANK: Record<string, number> = {
+  exhibition: 0,
+  refurbished: 1,
+  old: 2,
+  new: 3,
+  damaged: 4,
+};
+const condRank = (c: string) => COND_RANK[c] ?? 3;
 
-function Node({ n, state }: { n: number; state: StepState }) {
-  return (
-    <span
-      className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
-        state === "done"
-          ? "bg-base-800 text-white"
-          : state === "act"
-            ? "bg-error-soft text-danger ring-2 ring-danger"
-            : state === "wait"
-              ? "bg-warning-soft text-warning"
-              : "bg-white border-2 border-base-300 text-base-400"
-      }`}
-    >
-      {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
-    </span>
-  );
+/** Condition tag tone: used/display = safe (green), new = sellable (amber),
+ *  damaged = red. */
+function condTone(c: string): string {
+  if (c === "new") return "bg-warning-soft text-warning";
+  if (c === "damaged") return "bg-error-soft text-danger";
+  return "bg-success-soft text-success";
 }
 
-function StepRow({
-  n,
-  state,
-  title,
+const TAG =
+  "inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold tracking-[0.02em]";
+
+/** The supplier return-by deadline rides notes ("expected return YYYY-MM-DD")
+ *  until it earns a real column (1B). Read it back so the obligation shows a
+ *  date + can go overdue — never buried. */
+function parseReturnBy(notes: string | null): string | null {
+  const m = notes?.match(/expected return (\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+/** Whole-day diff from today (MYT-agnostic; date-only). */
+function daysFromToday(iso: string): number {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
+  const t = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  return Math.round((d - t) / 86_400_000);
+}
+
+/** "day N since lent" for the at-customer row. */
+function dayN(loan: SofaLoanDto): number | null {
+  if (!loan.loaned_at) return null;
+  const end = (loan.returned_at ?? new Date().toISOString()).slice(0, 10);
+  const a = new Date(`${end}T00:00:00`).getTime();
+  const b = new Date(`${loan.loaned_at.slice(0, 10)}T00:00:00`).getTime();
+  return Math.max(0, Math.round((a - b) / 86_400_000));
+}
+
+/* ── one grounded loan card ──────────────────────────────────────────────── */
+
+function Row({
+  k,
   children,
-  last,
+  action,
+  tone,
 }: {
-  n: number;
-  state: StepState;
-  title: string;
+  k: string;
   children: ReactNode;
-  last?: boolean;
+  action?: ReactNode;
+  tone?: "act" | "late";
 }) {
+  const bg = tone === "late" ? "bg-error-soft/40" : tone === "act" ? "bg-warning-soft/40" : "";
   return (
-    <div className={`relative flex items-start gap-2.5 ${last ? "" : "pb-3"}`}>
-      {!last && (
-        <span
-          aria-hidden="true"
-          className={`absolute left-[11px] top-7 bottom-0 w-0.5 ${
-            state === "done" ? "bg-base-800" : "bg-base-200"
-          }`}
-        />
-      )}
-      <Node n={n} state={state} />
-      <div className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold text-base-900">
-          {title}
-        </span>
-        <div className="text-[12px] text-base-500">{children}</div>
-      </div>
+    <div
+      className={`grid grid-cols-[80px_1fr_auto] items-center gap-2.5 px-3 py-1.5 border-t border-base-100 first:border-t-0 ${bg}`}
+    >
+      <span className="text-[11px] text-base-500">{k}</span>
+      <span className="text-[12.5px] text-base-900 font-medium min-w-0">{children}</span>
+      <span className="shrink-0">{action ?? null}</span>
     </div>
   );
 }
 
-/** One loan as vertical steps: lent out → at customer → (supplier) return. */
-function LoanSteps({
+function DoneTick({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-success font-semibold">
+      <Check size={13} strokeWidth={2.5} />
+      {children}
+    </span>
+  );
+}
+
+function LoanCard({
   loan,
   onCollect,
   onReturnSupplier,
@@ -108,98 +139,292 @@ function LoanSteps({
   const swapped = loan.status === "returned";
   const owed = isSupplier && swapped && !loan.returned_to_supplier_at;
   const closed = isSupplier ? !!loan.returned_to_supplier_at : swapped;
-  const piece = isSupplier
-    ? (loan.borrowed_label ?? loan.borrowed_sku ?? "piece")
-    : (loan.item_sku ?? "piece");
-  const origin = isSupplier ? (loan.supplier_name ?? "supplier") : "Klang";
-  const dayN = loan.loaned_at
-    ? Math.max(
-        0,
-        Math.round(
-          (new Date(
-            `${(loan.returned_at ?? new Date().toISOString()).slice(0, 10)}T00:00:00`,
-          ).getTime() -
-            new Date(`${loan.loaned_at.slice(0, 10)}T00:00:00`).getTime()) /
-            86_400_000,
-        ),
-      )
-    : null;
+  const name = isSupplier
+    ? (loan.borrowed_label ?? loan.borrowed_sku ?? "Borrowed piece")
+    : (loan.item_sku ?? "Warehouse unit");
+  const src = isSupplier
+    ? `Borrowed · ${loan.supplier_name ?? "supplier"}`
+    : "Warehouse · Klang";
+  const returnBy = parseReturnBy(loan.notes);
+  const nDay = dayN(loan);
 
   return (
-    <div className="rounded-[10px] border border-base-200/70 p-3">
-      <StepRow n={1} state="done" title="Lent out">
-        <span className="inline-flex items-center gap-1.5 flex-wrap">
-          <span className={CHIP}>{piece}</span>
-          <span className={isSupplier ? "pill pill-warning" : SOFT}>
-            {isSupplier ? `borrowed · ${origin}` : `warehouse · ${origin}`}
+    <div className="bg-white border border-base-200 rounded-[11px] shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
+      {/* header — icon · source/name · lent-out date */}
+      <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <span
+            className={`h-8 w-8 shrink-0 rounded-[9px] grid place-items-center ${
+              closed ? "bg-success-soft text-success" : "bg-primary/10 text-primary"
+            }`}
+          >
+            <Package size={16} />
           </span>
-          {loan.loaned_at && (
-            <span className={CHIP}>{fmtDate(loan.loaned_at.slice(0, 10))}</span>
-          )}
-        </span>
-      </StepRow>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-400">
+              {src}
+            </div>
+            <div className="text-[13.5px] font-semibold text-base-900 truncate" title={name}>
+              {name}
+            </div>
+          </div>
+        </div>
+        {loan.loaned_at && (
+          <span className="font-mono text-[11.5px] text-base-400 pt-0.5 shrink-0">
+            {fmtDateShort(loan.loaned_at)}
+          </span>
+        )}
+      </div>
 
-      <StepRow
-        n={2}
-        state={swapped ? "done" : "wait"}
-        title="At customer"
-        last={!isSupplier}
-      >
-        <span className="inline-flex items-center gap-1.5 flex-wrap">
-          {swapped ? (
-            <span className="pill pill-confirmed">
-              collected
-              {loan.returned_at
-                ? ` · ${fmtDate(loan.returned_at.slice(0, 10))}`
-                : ""}
+      {/* body — labeled rows */}
+      <div className="border-t border-base-100">
+        {!isSupplier && loan.item_condition && (
+          <Row k="Condition">
+            <span className={`${TAG} ${condTone(loan.item_condition)}`}>
+              {CONDITION_LABEL[loan.item_condition] ?? loan.item_condition}
             </span>
-          ) : (
-            <>
-              {dayN != null && <span className={SOFT}>day {dayN}</span>}
+          </Row>
+        )}
+        {isSupplier && loan.category && (
+          <Row k="Category">
+            <span className="capitalize">{loan.category}</span>
+          </Row>
+        )}
+        {loan.do_number && (
+          <Row k="Loan DO">
+            <span className="inline-flex items-center gap-1 font-mono text-[11.5px] text-primary">
+              <Link2 size={12} />
+              {loan.do_number}
+            </span>
+          </Row>
+        )}
+
+        {/* at customer */}
+        {swapped ? (
+          <Row k="At customer">
+            <DoneTick>
+              Collected
+              {loan.returned_at ? (
+                <span className="text-base-400 font-normal ml-1">
+                  · {fmtDateShort(loan.returned_at)}
+                </span>
+              ) : null}
+            </DoneTick>
+          </Row>
+        ) : (
+          <Row
+            k="At customer"
+            tone="act"
+            action={
               <button
                 type="button"
                 onClick={onCollect}
                 disabled={busy}
-                className="btn-secondary text-[12px] py-0.5 px-2"
+                className="btn-secondary text-[12px] py-0.5 px-2.5"
               >
                 Collect swap
               </button>
-            </>
-          )}
-        </span>
-      </StepRow>
+            }
+          >
+            Waiting swap back
+            {nDay != null && <span className="text-base-400 font-normal ml-1">· day {nDay}</span>}
+          </Row>
+        )}
 
-      {isSupplier && (
-        <StepRow
-          n={3}
-          state={closed ? "done" : owed ? "wait" : "todo"}
-          title="Return to supplier"
-          last
-        >
-          <span className="inline-flex items-center gap-1.5 flex-wrap">
-            {closed ? (
-              <span className="pill pill-confirmed">returned</span>
-            ) : owed ? (
-              <>
-                <span className="pill pill-warning">owe {origin} 1 pc</span>
-                <button
-                  type="button"
-                  onClick={onReturnSupplier}
-                  disabled={busy}
-                  className="btn-secondary text-[12px] py-0.5 px-2"
-                >
-                  Returned
-                </button>
-              </>
-            ) : (
-              <span className={SOFT}>—</span>
-            )}
+        {/* return to supplier — the obligation + its deadline */}
+        {isSupplier &&
+          (closed ? (
+            <Row k="Return">
+              <DoneTick>Returned to supplier</DoneTick>
+            </Row>
+          ) : (
+            <Row
+              k="Return by"
+              tone={returnBy && daysFromToday(returnBy) < 0 ? "late" : owed ? "act" : undefined}
+              action={
+                owed ? (
+                  <button
+                    type="button"
+                    onClick={onReturnSupplier}
+                    disabled={busy}
+                    className="btn-primary text-[12px] py-0.5 px-2.5"
+                  >
+                    Mark returned
+                  </button>
+                ) : undefined
+              }
+            >
+              {returnBy ? (
+                <>
+                  <span className="font-mono">{fmtDateShort(returnBy)}</span>
+                  {(() => {
+                    const d = daysFromToday(returnBy);
+                    return d < 0 ? (
+                      <span className="text-danger font-semibold ml-1">
+                        · overdue {Math.abs(d)} {Math.abs(d) === 1 ? "day" : "days"}
+                      </span>
+                    ) : (
+                      <span className={`ml-1 font-semibold ${d <= 3 ? "text-warning" : "text-base-400 font-normal"}`}>
+                        · in {d} {d === 1 ? "day" : "days"}
+                      </span>
+                    );
+                  })()}
+                </>
+              ) : (
+                <span className="text-base-400 font-normal">owe 1 piece · no date set</span>
+              )}
+            </Row>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── warehouse pick — "offer what we can lend" ───────────────────────────── */
+
+type UnitGroup = {
+  key: string;
+  sku: string;
+  condition: string;
+  cat: string;
+  count: number;
+  firstId: string;
+  poNo: string | null;
+  dateIn: string | null;
+  location?: string | null;
+};
+
+function WarehousePick({
+  lendable,
+  onLend,
+}: {
+  lendable: ReserveFreeUnit[];
+  onLend?: (itemId: string, sku: string) => void;
+}) {
+  // Group identical units (sku + condition) → one row + a free count.
+  const groups = useMemo<UnitGroup[]>(() => {
+    const m = new Map<string, UnitGroup>();
+    for (const u of lendable) {
+      const key = `${u.sku}__${u.condition}`;
+      let g = m.get(key);
+      if (!g) {
+        g = {
+          key,
+          sku: u.sku,
+          condition: u.condition,
+          cat: lineCategory(u.sku),
+          count: 0,
+          firstId: u.id,
+          poNo: u.poNo,
+          dateIn: u.dateIn,
+          location: u.location,
+        };
+        m.set(key, g);
+      }
+      g.count += 1;
+      if (u.dateIn && (!g.dateIn || u.dateIn < g.dateIn)) g.dateIn = u.dateIn;
+    }
+    return [...m.values()].sort(
+      (a, b) => condRank(a.condition) - condRank(b.condition) || (a.dateIn ?? "").localeCompare(b.dateIn ?? ""),
+    );
+  }, [lendable]);
+
+  const safe = groups.filter((g) => g.condition !== "new");
+  const sellable = groups.filter((g) => g.condition === "new");
+
+  // Sofa loaners must be confirmed to physically enter before lending.
+  const [enterOk, setEnterOk] = useState<Set<string>>(new Set());
+  const toggleEnter = (k: string) =>
+    setEnterOk((prev) => {
+      const n = new Set(prev);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
+
+  if (lendable.length === 0)
+    return <div className="text-[12px] text-base-500 px-1 py-1">No free unit to lend for this order.</div>;
+
+  function UnitRow({ g }: { g: UnitGroup }) {
+    const isSofa = g.cat === "sofa";
+    const gated = isSofa && !enterOk.has(g.key);
+    return (
+      <div className="bg-white border border-base-200 rounded-[10px] px-2.5 py-2 mb-2">
+        <div className="flex items-center gap-2.5">
+          <span className="h-8 w-8 shrink-0 rounded-[9px] grid place-items-center bg-base-100 text-base-500">
+            <Package size={16} />
           </span>
-        </StepRow>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12.5px] font-semibold text-base-900 truncate" title={g.sku}>
+              {g.sku}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className={`${TAG} ${condTone(g.condition)}`}>
+                {CONDITION_LABEL[g.condition] ?? g.condition}
+                {g.condition === "new" ? " · sellable" : ""}
+              </span>
+              <span className="text-[11px] text-base-500">{g.count} free</span>
+              {g.dateIn && (
+                <span className="font-mono text-[10.5px] text-base-500">in {fmtDateShort(g.dateIn)}</span>
+              )}
+              {g.poNo && (
+                <span className="font-mono text-[10.5px] text-base-500">PO {g.poNo}</span>
+              )}
+              {g.location && <span className="text-[11px] text-base-500">{g.location}</span>}
+            </div>
+          </div>
+          <Btn size="sm" onClick={() => onLend?.(g.firstId, g.sku)} disabled={!onLend || gated}>
+            Lend out
+          </Btn>
+        </div>
+        {isSofa && (
+          <label className="flex items-center gap-2 mt-2 pl-[42px] text-[11.5px] text-base-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enterOk.has(g.key)}
+              onChange={() => toggleEnter(g.key)}
+              className="accent-primary"
+            />
+            Checked it can enter the customer&apos;s space
+          </label>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {safe.length > 0 && (
+        <>
+          <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-500 mb-1.5 px-0.5">
+            Available to lend · display stock first
+          </div>
+          {safe.map((g) => (
+            <UnitRow key={g.key} g={g} />
+          ))}
+        </>
+      )}
+
+      {sellable.length > 0 && (
+        <>
+          <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-500 mt-2 mb-1.5 px-0.5">
+            New stock · lend only if no display
+          </div>
+          {safe.length > 0 && (
+            <div className="flex items-start gap-1.5 bg-warning-soft/60 border border-warning/30 rounded-[8px] px-2.5 py-1.5 mb-2 text-[11px] text-warning">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+              This is sellable new stock — lend a display unit above when you have one.
+            </div>
+          )}
+          {sellable.map((g) => (
+            <UnitRow key={g.key} g={g} />
+          ))}
+        </>
       )}
     </div>
   );
 }
+
+/* ── panel ───────────────────────────────────────────────────────────────── */
 
 export default function LoanPanel({
   orderId,
@@ -212,35 +437,43 @@ export default function LoanPanel({
   orderId: string;
   loans: SofaLoanDto[];
   suppliers: SupplierRow[];
-  /** ALL free warehouse units (the panel scopes them to the order's
-   *  categories) — the "my warehouse free stock" lend source (§7.9). */
+  /** ALL free warehouse units (scoped here to the order's categories) — the
+   *  "my warehouse free stock" lend source (§7.9). */
   freeUnits?: ReserveFreeUnit[];
-  /** The order's core categories (mattress/bedframe/sofa) — the same-category
-   *  filter for the warehouse lend list. */
+  /** The order's core categories (mattress/bedframe/sofa) — filters the
+   *  warehouse lend list to same-category units. */
   orderCategories?: string[];
   /** Lend a picked warehouse unit (opens the loan-DO prompt in the parent). */
   onLend?: (itemId: string, sku: string) => void;
 }) {
   const active = loans.filter((l) => l.status === "on_loan");
-  const owed = loans.filter(
-    (l) => l.source === "supplier" && !l.returned_to_supplier_at,
-  );
+  const owed = loans.filter((l) => l.source === "supplier" && !l.returned_to_supplier_at);
   const returnLoan = useReturnLoan(orderId);
   const returnSupplier = useReturnLoanSupplier(orderId);
   const borrow = useBorrowLoan(orderId);
 
-  // §7.9 lend flow — closed by default; "+ Lend" opens the two-source choice.
-  const [source, setSource] = useState<"" | "warehouse" | "supplier">("");
-  const [lending, setLending] = useState(false);
-  const [supplierId, setSupplierId] = useState("");
-  const [label, setLabel] = useState("");
-  const [category, setCategory] = useState("");
-  const [expectedReturn, setExpectedReturn] = useState("");
-
+  // in-flight loans only (active + still-owed-to-supplier)
   const visible = [...active, ...owed.filter((l) => l.status === "returned")];
 
   const catSet = new Set(orderCategories);
   const lendable = freeUnits.filter((u) => catSet.has(lineCategory(u.sku)));
+
+  // §7.9 lend flow — closed by default; "+ Lend" opens the two-source choice.
+  const [lending, setLending] = useState(false);
+  const [source, setSource] = useState<"warehouse" | "supplier">("warehouse");
+  const [supplierId, setSupplierId] = useState("");
+  const [label, setLabel] = useState("");
+  const [category, setCategory] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+
+  function resetLend() {
+    setLending(false);
+    setSource("warehouse");
+    setSupplierId("");
+    setLabel("");
+    setCategory("");
+    setReturnDate("");
+  }
 
   function submitBorrow() {
     if (!supplierId || !label.trim()) {
@@ -252,18 +485,13 @@ export default function LoanPanel({
         supplierId,
         borrowedLabel: label.trim(),
         category: category.trim() || undefined,
-        // Expected return rides notes until it gets a real column (deploy-gated).
-        notes: expectedReturn ? `expected return ${expectedReturn}` : undefined,
+        // return-by rides notes until it earns a real column (1B).
+        notes: returnDate ? `expected return ${returnDate}` : undefined,
       },
       {
         onSuccess: () => {
           toast.success("Borrowed — loaner out, owe the supplier a piece");
-          setLending(false);
-          setSource("");
-          setSupplierId("");
-          setLabel("");
-          setCategory("");
-          setExpectedReturn("");
+          resetLend();
         },
         onError: (e) => toast.error(e.message),
       },
@@ -271,12 +499,12 @@ export default function LoanPanel({
   }
 
   const field =
-    "border border-base-300 rounded-[6px] bg-white px-1.5 py-1 text-[12px] focus:border-primary focus:outline-none";
+    "border border-base-300 rounded-[6px] bg-white px-2 py-1.5 text-[12px] focus:border-primary focus:outline-none";
 
   return (
     <div className="p-3 space-y-2.5">
       {visible.map((loan) => (
-        <LoanSteps
+        <LoanCard
           key={loan.id}
           loan={loan}
           busy={returnLoan.isPending || returnSupplier.isPending}
@@ -293,8 +521,7 @@ export default function LoanPanel({
             returnSupplier.mutate(
               { loanId: loan.id },
               {
-                onSuccess: () =>
-                  toast.success("Returned to supplier — obligation closed"),
+                onSuccess: () => toast.success("Returned to supplier — obligation closed"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -303,94 +530,35 @@ export default function LoanPanel({
       ))}
 
       {!lending && (
-        <Btn
-          size="sm"
-          icon={Plus}
-          onClick={() => {
-            setLending(true);
-            setSource("warehouse");
-          }}
-        >
+        <Btn size="sm" icon={Plus} onClick={() => setLending(true)}>
           Lend a loaner
         </Btn>
       )}
 
-      {/* lend flow — KIT Segmented source toggle inside ONE framed box */}
       {lending && (
-        <div className="rounded-[10px] border border-base-200/70 p-2.5 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="bg-base-50 border border-base-200 rounded-[11px] p-2.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <Segmented
               ariaLabel="Loaner source"
               options={[
                 { value: "warehouse", label: `Warehouse · ${lendable.length}` },
                 { value: "supplier", label: "Borrow from supplier" },
               ]}
-              value={source === "" ? "warehouse" : source}
-              onChange={(v) => setSource(v)}
+              value={source}
+              onChange={(v) => setSource(v as "warehouse" | "supplier")}
             />
-            <Btn
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setLending(false);
-                setSource("");
-              }}
-            >
+            <Btn size="sm" variant="ghost" onClick={resetLend}>
               Cancel
             </Btn>
           </div>
 
-          {source === "warehouse" &&
-            (lendable.length === 0 ? (
-              <span className={SOFT}>no free unit</span>
-            ) : (
-              <div>
-                {/* §9 data-table law: formal columns get HEADERS; the item is
-                    a product NAME → Inter (mono = codes only, §11b). */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-1 pb-1 border-b border-base-100 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-500">
-                  <span>Item</span>
-                  <span>Condition</span>
-                  <span>Arrived</span>
-                  <span aria-hidden="true" />
-                </div>
-                {lendable.map((u) => (
-                  <div
-                    key={u.id}
-                    className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-1 py-1 border-b border-base-100 last:border-b-0 text-[12px]"
-                  >
-                    <span
-                      className="font-semibold text-base-900 truncate"
-                      title={u.sku}
-                    >
-                      {u.sku}
-                    </span>
-                    <span
-                      className={`pill ${
-                        u.condition === "exhibition"
-                          ? "pill-warning"
-                          : "pill-confirmed"
-                      }`}
-                    >
-                      {CONDITION_LABEL[u.condition] ?? u.condition}
-                    </span>
-                    <span className="font-mono tabular-nums text-base-800">
-                      {u.dateIn ? fmtDate(u.dateIn) : "—"}
-                    </span>
-                    <Btn
-                      size="sm"
-                      onClick={() => onLend?.(u.id, u.sku)}
-                      disabled={!onLend}
-                      title="Issue a loan DO + mark this unit on-loan to the order"
-                    >
-                      Lend out
-                    </Btn>
-                  </div>
-                ))}
-              </div>
-            ))}
+          {source === "warehouse" && <WarehousePick lendable={lendable} onLend={onLend} />}
 
           {source === "supplier" && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
+              <div className="text-[11px] text-base-500 px-0.5">
+                Borrow whatever the supplier currently has — describe the piece.
+              </div>
               <select
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
@@ -422,16 +590,10 @@ export default function LoanPanel({
                 <option value="bedframe">Bedframe</option>
                 <option value="sofa">Sofa</option>
               </select>
-              <label className="flex items-center gap-2 text-[12px] text-base-500">
-                <span className="shrink-0">Return by</span>
-                <input
-                  type="date"
-                  value={expectedReturn}
-                  onChange={(e) => setExpectedReturn(e.target.value)}
-                  aria-label="Expected return to supplier"
-                  className={`${field} flex-1`}
-                />
-              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-[11.5px] text-base-500 shrink-0">Return by</span>
+                <ReturnByChip value={returnDate} onChange={setReturnDate} />
+              </div>
               <div className="flex items-center justify-end pt-0.5">
                 <button
                   type="button"
@@ -447,5 +609,39 @@ export default function LoanPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/** Formatted date chip → reveals a native picker on click (the drawer's date
+ *  law: show "31 Jul 26", never a raw dd/mm/yyyy box). */
+function ReturnByChip({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (open || !value) {
+    return (
+      <input
+        type="date"
+        autoFocus={open}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setOpen(false)}
+        aria-label="Expected return to supplier"
+        className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-300 border-dashed rounded-[6px] px-2 py-1 bg-white"
+    >
+      {fmtDateShort(value)}
+    </button>
   );
 }
