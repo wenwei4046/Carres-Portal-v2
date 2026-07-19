@@ -2243,18 +2243,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   }
                 >
                   {poolStaff.map((s) => {
+                    // Presence dot on the avatar (Jess 2026-07-19): green = in
+                    // today, grey = not in yet — replaces the "· not in" text.
+                    // "away" (planned leave) keeps its word; the dot is grey.
+                    const inToday = s.available && seenTodayMYT(s.last_seen_at);
                     const presence = !s.available
                       ? `${staffLabel(s)} · away`
-                      : !seenTodayMYT(s.last_seen_at)
-                        ? `${staffLabel(s)} · not in`
-                        : staffLabel(s);
+                      : staffLabel(s);
                     // PO duty badge (0236) — the month's PO controller.
                     const isDuty = poDutyHolderShown?.userId === s.user_id;
                     const baseTitle = !s.available
                       ? `${s.email} — marked away (planned leave); their orders shift to the others`
                       : !seenTodayMYT(s.last_seen_at)
                         ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
-                        : s.email;
+                        : `${s.email} — in today`;
                     return (
                       <KanbanRow
                         key={s.user_id}
@@ -2262,14 +2264,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         count={staffEntries.counts.get(s.user_id) ?? 0}
                         active={staffFilter === s.user_id}
                         chip={chipSlot(
-                          <span
-                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
-                            style={{
-                              background: avatarColor(s.user_id).bg,
-                              color: avatarColor(s.user_id).fg,
-                            }}
-                          >
-                            {staffInitials(s)}
+                          <span className="relative w-[18px] h-[18px] shrink-0">
+                            <span
+                              className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none"
+                              style={{
+                                background: avatarColor(s.user_id).bg,
+                                color: avatarColor(s.user_id).fg,
+                              }}
+                            >
+                              {staffInitials(s)}
+                            </span>
+                            <span
+                              className={`absolute -right-0.5 -bottom-0.5 w-2 h-2 rounded-full border border-white ${inToday ? "bg-success" : "bg-base-300"}`}
+                              title={inToday ? "in today" : "not in yet"}
+                            />
                           </span>,
                         )}
                         title={
