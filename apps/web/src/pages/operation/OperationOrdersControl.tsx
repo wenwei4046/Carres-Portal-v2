@@ -2682,7 +2682,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   }}
                   onChange={toggleAllPaged}
                   aria-label="Select all on this page"
-                  className="cursor-pointer accent-base-700 align-middle"
+                  className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
                 />
               </th>
               <th className="px-1 py-1.5 text-center" title="Follow-up">

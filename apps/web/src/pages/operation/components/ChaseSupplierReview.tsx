@@ -181,11 +181,13 @@ export default function ChaseSupplierReview({
                       <button
                         type="button"
                         className="btn-primary text-[12px] py-1 px-3 inline-flex items-center gap-1"
-                        // GROUP invite links reject ?text= — open the group and
-                        // rely on Copy for the message body.
-                        onClick={() =>
-                          window.open(groupUrl, "_blank", "noopener,noreferrer")
-                        }
+                        // GROUP invite links can't carry a pre-typed message
+                        // (WhatsApp limit) — so one click COPIES the message,
+                        // then opens the group; the operator just pastes.
+                        onClick={async () => {
+                          await copyMsg(msg, supplier.name);
+                          window.open(groupUrl, "_blank", "noopener,noreferrer");
+                        }}
                       >
                         Open group <ExternalLink size={13} strokeWidth={2} />
                       </button>
