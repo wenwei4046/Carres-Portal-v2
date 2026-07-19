@@ -23,12 +23,18 @@ export default function ChaseSupplierReview({
   orders,
   onClose,
   initialMode = "remind",
+  supplierScope = null,
 }: {
   orders: ChaseOrder[];
   onClose: () => void;
   /** Which tone the review opens on (Jess 2026-07-19): the SUPPLIER-section
    *  "Remind" button opens on remind, "Chase" opens on chase. */
   initialMode?: "remind" | "chase";
+  /** When the SUPPLIER facet is filtered to one supplier (Jess 2026-07-19 bug:
+   *  "select Nice Future — why still show Ohana?"), scope the review to THAT
+   *  supplier — a multi-supplier order otherwise spawns a card per supplier line.
+   *  null = no filter (the bulk-bar Supplier ⋮ → chase every supplier). */
+  supplierScope?: string | null;
 }) {
   const suppliersQ = useOperationSuppliers();
   const catalogQ = useCatalog();
@@ -53,10 +59,13 @@ export default function ChaseSupplierReview({
     return m;
   }, [catalogQ.data]);
 
-  const plan = useMemo(
-    () => buildChaseSupplierPlan(orders, skuMeta, suppliers),
-    [orders, skuMeta, suppliers],
-  );
+  const plan = useMemo(() => {
+    const p = buildChaseSupplierPlan(orders, skuMeta, suppliers);
+    // Scope to the filtered supplier so a multi-supplier order doesn't leak a
+    // card for the OTHER supplier's lines (Jess 2026-07-19 bug fix).
+    if (!supplierScope) return p;
+    return { ...p, cards: p.cards.filter((c) => c.supplierId === supplierScope) };
+  }, [orders, skuMeta, suppliers, supplierScope]);
 
   async function copyMsg(msg: string, supplierName: string) {
     try {

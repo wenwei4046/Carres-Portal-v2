@@ -1063,17 +1063,20 @@ interface OrderColDef {
  *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "dots", label: "Status", w: 5 },
+  // Status now shows a STAGE word pill (Placed/Proceed/Pending/Scheduled),
+  // not the old anonymous dots — 9% so "Scheduled"/"Pending" never clip to
+  // "Pendir" (Jess 2026-07-19). Rebalanced out of customer/deadline/delivery/next.
+  { key: "dots", label: "Status", w: 9 },
   { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 17 },
+  { key: "customer", label: "Customer", w: 16 },
   // Deadline right after Customer (Jess 2026-07-18).
-  { key: "deadline", label: "Deadline", w: 13 },
+  { key: "deadline", label: "Deadline", w: 12 },
   { key: "stock", label: "Stock", w: 12 },
-  { key: "delivery", label: "Delivery", w: 12 },
+  { key: "delivery", label: "Delivery", w: 11 },
   // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
-  { key: "next", label: "Next", w: 13 },
+  { key: "next", label: "Next", w: 12 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1266,6 +1269,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Which tone the Chase-supplier review opens on (Jess 2026-07-19): the
   // SUPPLIER section's Remind opens remind, Chase opens chase.
   const [chaseInitialMode, setChaseInitialMode] = useState<"remind" | "chase">("remind");
+  // When the chase is opened from the SUPPLIER facet (a specific supplier picked),
+  // scope the review to THAT supplier so a multi-supplier order doesn't leak the
+  // other supplier's card (Jess 2026-07-19 bug). null = bulk Supplier ⋮ (all).
+  const [chaseSupplierScope, setChaseSupplierScope] = useState<string | null>(null);
   // ?poday=1 — MANAGER-ONLY preview of the PO-day surfaces (Jess 2026-07-19:
   // "you can't let me wait the day to see"): forces the banner + duty badge
   // on ANY day, using the real holder when 0236 is live, else the first pool
@@ -2304,6 +2311,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               }
               onChaseSupplier={(mode) => {
                 setChaseInitialMode(mode);
+                setChaseSupplierScope(null);
                 setChaseOrders(selectedOrders);
               }}
               onChasePartner={(mode) => {
@@ -2669,6 +2677,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         className="btn-secondary text-[12px] py-1 px-2 text-warning"
                         onClick={() => {
                           setChaseInitialMode("remind");
+                          setChaseSupplierScope(supplierFilter);
                           setChaseOrders(
                             liveScope.filter(
                               (o) =>
@@ -2686,6 +2695,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         className="btn-secondary text-[12px] py-1 px-2 text-danger"
                         onClick={() => {
                           setChaseInitialMode("chase");
+                          setChaseSupplierScope(supplierFilter);
                           setChaseOrders(
                             liveScope.filter(
                               (o) =>
@@ -2817,7 +2827,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
                  h-10 = same 40px as the data rows (SIZING LAW §3) so the header
                  never reads thinner than the listing. */
-              style={{ backgroundColor: "#F9FAFB", borderBottomColor: "#E5E7EB" }}
+              style={{ backgroundColor: "#F3F4F6", borderBottomColor: "#E5E7EB" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -2886,7 +2896,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 hasPendingChange={pendingCROrders.has(o.id)}
                 onNextAction={(verb) => {
                   if (verb === "Order PO") setRaisePoOrders([o]);
-                  else if (verb === "Chase supplier") setChaseOrders([o]);
+                  else if (verb === "Chase supplier") {
+                    setChaseSupplierScope(null);
+                    setChaseOrders([o]);
+                  }
                   else setOpenOrderId(o.id);
                 }}
               />
@@ -2924,6 +2937,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         <ChaseSupplierReview
           orders={chaseOrders.map(toChaseOrder)}
           initialMode={chaseInitialMode}
+          supplierScope={chaseSupplierScope}
           onClose={() => {
             setChaseOrders(null);
             clearSel();

@@ -424,7 +424,7 @@
      facet groups AND every order-drawer panel header.) */
   /* v4 §11c — headers are DARK (the reference tables' headers are dark);
      muted is for meta only. */
-  .section-band { background: #F9FAFB; }
+  .section-band { background: #F3F4F6; }
   .section-band-title { color: #374151; }
   .section-band-title-danger { color: #A32D2D; }
   .section-band-total { color: #6B7280; }
