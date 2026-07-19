@@ -1516,6 +1516,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [liveScope, availableBySku],
   );
 
+  // Unassigned queue (Jess 2026-07-19): open orders with NO delivery partner yet,
+  // regardless of stock — the "who still needs a carrier" work list. Filters via
+  // logisticFilter holding NO_CARRIER.
+  const unassignedCount = useMemo(
+    () => liveScope.filter((o) => !logisticOf(o, partnerName)).length,
+    [liveScope, partnerName],
+  );
   const logisticEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of liveScope) {
@@ -2425,6 +2432,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       onClick={() => setNextFilter((f) => (f === v ? null : v))}
                     />
                   ) : null,
+                )}
+                {/* Unassigned (Jess 2026-07-19): every open order with no
+                    delivery partner yet — the broader "needs a carrier" list
+                    (Assign logistic above only fires once stock is Ready).
+                    Filters via logisticFilter holding NO_CARRIER. */}
+                {unassignedCount > 0 && (
+                  <KanbanRow
+                    label="Unassigned"
+                    count={unassignedCount}
+                    active={logisticFilter.has(NO_CARRIER)}
+                    chip={picQueueChip}
+                    title="No delivery partner picked yet — assign a carrier"
+                    onClick={() => setLogisticFilter((p) => toggleInSet(p, NO_CARRIER))}
+                  />
                 )}
                 {/* Supplier-late (storage arc, merged from main): the goods ETA
                     misses the promise — the supplier is the problem. Kept as a
@@ -3965,10 +3986,10 @@ function OrderRow({
                 className="tabular-nums"
                 style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
               >
-                booked {fmtDate(logi.date)}
+                scheduled {fmtDate(logi.date)}
               </div>
             ) : (
-              <div className="t4-caption">not booked</div>
+              <div className="t4-caption">Unscheduled</div>
             )}
           </div>
         )}

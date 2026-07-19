@@ -5030,9 +5030,12 @@ function JourneyCard({
               collapsed
                 ? "justify-center px-0 py-1.5"
                 : "gap-2.5 px-1.5 py-1.5"
-            } ${active ? "bg-info-soft" : "hover:bg-base-50"} ${
-              last ? "" : "pb-3"
-            }`}
+            } ${active ? "" : "hover:bg-info-soft/50"} ${last ? "" : "pb-3"}`}
+            // Selection = the app's blue #C2E7FF (matches the Orders facet);
+            // HOVER is a faint blue tint, NEVER grey (Jess 2026-07-19: "when i
+            // point it's grey, same as the header grey"). No grey in this rail.
+            // Text stays dark ink for contrast.
+            style={active ? { backgroundColor: "#C2E7FF" } : undefined}
           >
             {!last && (
               <span
@@ -5063,12 +5066,12 @@ function JourneyCard({
                 <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-base-400">
                   {st.panel}
                 </span>
-                {/* line 2 — the step's action */}
-                <span
-                  className={`block text-[13px] font-semibold group-hover:underline ${
-                    active ? "text-info" : "text-base-900"
-                  }`}
-                >
+                {/* line 2 — the step's action. SELECTED = blue background
+                    (bg-info-soft) + DARK ink text, matching the Orders facet
+                    selection (blue chip + near-black text). The old blue-on-blue
+                    (text-info on bg-info-soft) was unreadable — Jess 2026-07-19
+                    "before select blue, now grey cant read". */}
+                <span className="block text-[13px] font-semibold group-hover:underline text-base-900">
                   {st.title}
                 </span>
                 <span
