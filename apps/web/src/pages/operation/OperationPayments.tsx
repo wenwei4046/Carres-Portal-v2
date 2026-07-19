@@ -26,6 +26,7 @@ import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
+import { renderReceiptPdf } from "@/lib/pdf/render";
 import { areaForAddress, detectState } from "@/lib/region";
 import {
   buildCustomerChase,
@@ -119,6 +120,29 @@ function catOf(sku: string): "msbf" | "sof" | "other" {
 
 function rm(n: number): string {
   return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Render + open a receipt PDF for one ledger entry (client-side, self-contained
+ *  — needs only the ledger row + customer/SO, no order-total derivation). Mirrors
+ *  OrderControlPanel.printReceipt. */
+async function printReceipt(row: OrderPaymentRow, orderCode: string, customerName: string) {
+  try {
+    const blob = await renderReceiptPdf({
+      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+      issue_date: row.paid_on,
+      order_code: orderCode,
+      customer: { name: customerName },
+      amount: Number(row.amount),
+      method: row.method,
+      kind: row.kind,
+      reference: row.reference,
+      note: row.note,
+      currency: "MYR",
+    });
+    window.open(URL.createObjectURL(blob), "_blank");
+  } catch (e) {
+    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+  }
 }
 
 /** "Chased today / 3d ago" — collections must show when a debtor was last
@@ -1004,7 +1028,7 @@ function OrderMoneyDetail({
           </div>
         </div>
         <div className="mt-2 text-[11px] text-base-400">
-          A receipt number is minted automatically (R{r.so}-n) — the invoice/receipt PDF is next.
+          A receipt number is minted automatically (R{r.so}-n) — print it from the history at right.
         </div>
       </div>
 
@@ -1022,15 +1046,26 @@ function OrderMoneyDetail({
             {ledger.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between text-[12px] border-b border-base-100 pb-1"
+                className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1"
               >
-                <span className="text-base-600">
+                <span className="text-base-600 min-w-0 truncate">
                   <span className="capitalize font-medium text-base-800">{p.kind}</span> ·{" "}
                   {fmtDate(p.paid_on)} · <span className="capitalize">{p.method}</span>
                   {p.receipt_no && <span className="ml-1 text-base-400 font-mono">{p.receipt_no}</span>}
                 </span>
-                <span className="font-mono tabular-nums font-semibold text-success">
-                  + {rm(Number(p.amount) || 0)}
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className="font-mono tabular-nums font-semibold text-success">
+                    + {rm(Number(p.amount) || 0)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void printReceipt(p, `SO-${r.so}`, r.customer)}
+                    title="Open receipt PDF"
+                    aria-label="Open receipt PDF"
+                    className="p-1 rounded text-base-400 hover:text-base-900 hover:bg-base-100"
+                  >
+                    <Receipt size={13} strokeWidth={2} aria-hidden="true" />
+                  </button>
                 </span>
               </div>
             ))}
