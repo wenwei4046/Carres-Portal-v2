@@ -481,7 +481,8 @@ export function AddStaffModal({
     pinMatch;
 
   function submit() {
-    if (!valid || gender === "") return;
+    // `valid` already requires a gender pick — TS narrows it to male|female here.
+    if (!valid) return;
     create.mutate(
       {
         name: name.trim(),
