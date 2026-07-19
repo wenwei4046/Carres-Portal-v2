@@ -164,9 +164,22 @@ export default function CatalogStep({
                 .map((comp) => index.skuToCategory.get(comp.sku))
                 .filter((cat): cat is ProductCategory => Boolean(cat)),
         );
-        const catalogTotal =
-          missing || b.kind === "custom"
-            ? 0
+        // The "worth" the card strikes through: fixed = Σ component catalog
+        // prices; custom = Σ each slot's CHEAPEST eligible pick (Loo
+        // 2026-07-19 — the honest minimum a customer could assemble).
+        const catalogTotal = missing
+          ? 0
+          : b.kind === "custom"
+            ? b.slots.reduce((s, slot) => {
+                if (slot.variant === "fixed")
+                  return s + (skuPrice.get(slot.sku ?? "") ?? 0) * slot.qty;
+                const prices = slot.modelIds.flatMap((mid) =>
+                  catalog.skus
+                    .filter((sk) => sk.modelId === mid && !sk.discontinuedAt)
+                    .map((sk) => sk.price),
+                );
+                return s + (prices.length ? Math.min(...prices) : 0) * slot.qty;
+              }, 0)
             : b.components.reduce((s, comp) => s + (skuPrice.get(comp.sku) ?? 0) * comp.qty, 0);
         const blob = [b.name, ...b.components.map((comp) => comp.sku)]
           .join(" ")

@@ -95,14 +95,32 @@ export default function BundleCard({
         </div>
         <div className="prod-card__name">{bundle.name}</div>
         <div className="prod-card__detail">{summary}</div>
-        <div className="prod-card__row">
+        {/* Price story at a glance (Loo 2026-07-19): original struck through,
+            the saving called out, the retail price the hero. Custom bundles
+            strike the Σ of each slot's cheapest pick. */}
+        <div className="prod-card__row" style={{ alignItems: "flex-end" }}>
           <span className="prod-card__price">
             <sup>RM</sup>
             {bundle.price.toLocaleString("en-MY")}
           </span>
           {catalogTotal > bundle.price && (
-            <span className="prod-card__sku" style={{ textDecoration: "line-through" }}>
-              RM{catalogTotal.toLocaleString("en-MY")}
+            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+              <s style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                RM {catalogTotal.toLocaleString("en-MY")}
+              </s>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--c-burnt)",
+                  background: "rgba(196,77,43,0.08)",
+                  borderRadius: 999,
+                  padding: "2px 8px",
+                }}
+                data-testid={`bundle-save-${bundle.id}`}
+              >
+                Save RM {(catalogTotal - bundle.price).toLocaleString("en-MY")}
+              </span>
             </span>
           )}
         </div>
