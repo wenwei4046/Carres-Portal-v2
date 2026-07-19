@@ -161,5 +161,5 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
 ## Build order
-1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·Loan 剩样式还债已清(功能照旧)。
+1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·**Loan 定稿✓(2026-07-19,`f24065b6`,未 deploy)**。Loan = "ON MISSION" grounded-card 语言(Jess 从她的行程 sample 拍板;白/飘/全 pill 方向作废):每张 loaner = grounded 白卡(icon header · `BORROWED · <供应商>`/`Warehouse · Klang` · 品名 · loaned 日期右上)+ labeled 行(Condition/Category · Loan DO 内嵌链接 · At customer 等待/✓Collected+Collect-swap · **Return by** 日期+tone);**pill 全退**,状态靠绿✓/琥珀行托底/红行托底。供应商 **return-by** 从 notes(`expected return YYYY-MM-DD`)读回、现形+催(`in Nd`琥珀 / `overdue Nd`红),真列=1B。**仓库挑货 = 有什么借什么(不配客户尺寸,"got what we borrow what")**,全信息(品名·状况·库龄·**原始 PO**·free 数,同款合并)·展示品优先·新货压后+sellable 软提醒;**sofa** 借出前勾"能进得去"。Portal 通用设计 DNA(此后新 UI 都照)= grounded 卡 + icon 分类通道 + labeled 行 + pills-retired。
 2. 1B:⋮真动作·wa.me直发+存号·OCR收据·last_chased_at。 3. List §14。 4. Bulk bar。 5. AL 调货引擎(专门 chat)。
