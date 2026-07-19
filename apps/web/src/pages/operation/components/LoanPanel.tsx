@@ -158,17 +158,21 @@ function DoneTick({ children }: { children: ReactNode }) {
 function LoanCard({
   loan,
   logisticEta,
+  partners,
   onCollect,
   onReturnSupplier,
   onSetRoute,
+  onSetPartner,
   onSetReturnDue,
   busy,
 }: {
   loan: SofaLoanDto;
   logisticEta?: string | null;
+  partners: { id: string; name: string }[];
   onCollect: () => void;
   onReturnSupplier: () => void;
   onSetRoute: (route: "supplier_customer" | "supplier_warehouse_customer") => void;
+  onSetPartner: (partnerId: string | null) => void;
   onSetReturnDue: (date: string | null) => void;
   busy: boolean;
 }) {
@@ -267,15 +271,29 @@ function LoanCard({
                     onSetRoute(
                       v as "supplier_customer" | "supplier_warehouse_customer",
                     );
-                    setRouteEditing(false);
                   }}
                 />
+                {partners.length > 0 && (
+                  <select
+                    value={loan.out_partner_id ?? ""}
+                    onChange={(e) => onSetPartner(e.target.value || null)}
+                    aria-label="Logistic partner"
+                    className="border border-base-300 rounded-[6px] bg-white px-1.5 py-1 text-[12px] focus:border-primary focus:outline-none"
+                  >
+                    <option value="">Logistic…</option>
+                    {partners.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   onClick={() => setRouteEditing(false)}
                   className="text-[11px] text-base-400"
                 >
-                  cancel
+                  done
                 </button>
               </span>
             ) : (
@@ -597,6 +615,7 @@ export default function LoanPanel({
   orderId,
   loans,
   suppliers,
+  partners = [],
   freeUnits = [],
   orderCategories = [],
   onLend,
@@ -605,6 +624,8 @@ export default function LoanPanel({
   orderId: string;
   loans: SofaLoanDto[];
   suppliers: SupplierRow[];
+  /** Delivery partners — the OUT-leg logistic that carries the loaner. */
+  partners?: { id: string; name: string }[];
   /** ALL free warehouse units (scoped here to the order's categories) — the
    *  "my warehouse free stock" lend source (§7.9). */
   freeUnits?: ReserveFreeUnit[];
@@ -642,6 +663,7 @@ export default function LoanPanel({
   const [outRoute, setOutRoute] = useState<
     "supplier_customer" | "supplier_warehouse_customer"
   >("supplier_customer");
+  const [partnerId, setPartnerId] = useState("");
 
   function resetLend() {
     setLending(false);
@@ -651,6 +673,7 @@ export default function LoanPanel({
     setCategory("");
     setReturnDate("");
     setOutRoute("supplier_customer");
+    setPartnerId("");
   }
 
   function submitBorrow() {
@@ -664,6 +687,7 @@ export default function LoanPanel({
         borrowedLabel: label.trim(),
         category: category.trim() || undefined,
         outRoute,
+        outPartnerId: partnerId || undefined,
         // return-by rides notes until it earns a real column (1B).
         notes: returnDate ? `expected return ${returnDate}` : undefined,
       },
@@ -687,12 +711,22 @@ export default function LoanPanel({
           key={loan.id}
           loan={loan}
           logisticEta={logisticEta}
+          partners={partners}
           busy={returnLoan.isPending || returnSupplier.isPending || update.isPending}
           onSetRoute={(outRoute) =>
             update.mutate(
               { loanId: loan.id, outRoute },
               {
                 onSuccess: () => toast.success("Route updated"),
+                onError: (e) => toast.error(e.message),
+              },
+            )
+          }
+          onSetPartner={(outPartnerId) =>
+            update.mutate(
+              { loanId: loan.id, outPartnerId },
+              {
+                onSuccess: () => toast.success("Logistic updated"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -805,6 +839,21 @@ export default function LoanPanel({
                   }
                 />
               </div>
+              {partners.length > 0 && (
+                <select
+                  value={partnerId}
+                  onChange={(e) => setPartnerId(e.target.value)}
+                  aria-label="Logistic partner"
+                  className={`${field} w-full`}
+                >
+                  <option value="">Logistic (optional)…</option>
+                  {partners.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[11.5px] text-base-500 shrink-0">Return by</span>
                 <ReturnByChip value={returnDate} onChange={setReturnDate} />
