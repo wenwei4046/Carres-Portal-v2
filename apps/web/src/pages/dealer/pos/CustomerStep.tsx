@@ -385,7 +385,7 @@ export default function CustomerStep({
                     <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
                       <input
                         value={c.name}
-                        placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
+                        placeholder="e.g. Tan Mei Ling, Ahmad bin Yusof"
                         autoComplete="off"
                         data-testid="pos-customer-name"
                         onChange={(e) => {

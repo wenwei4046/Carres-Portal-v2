@@ -106,12 +106,27 @@ export const staffReauthInputSchema = z.object({
 });
 export type StaffReauthInput = z.infer<typeof staffReauthInputSchema>;
 
+/** 0241 staff profile. */
+export const staffGenderSchema = z.enum(["male", "female"]);
+export type StaffGenderDto = z.infer<typeof staffGenderSchema>;
+
+/** Birthday travels as a plain calendar date (YYYY-MM-DD). */
+export const staffBirthdaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be YYYY-MM-DD");
+
 export const createStaffInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   staffRole: staffTierSchema,
   outletId: z.string().uuid().nullable().optional(),
   color: staffColorSchema.optional(),
   phone: z.string().trim().max(40).optional(),
+  // 0241 profile fields (Loo 2026-07-19). Optional at the CONTRACT level so
+  // older callers (setup wizard, account-creation initialStaff) keep working;
+  // the AddStaffModal requires them in the form.
+  email: z.string().trim().toLowerCase().email("Enter a valid email").max(200).optional(),
+  birthday: staffBirthdaySchema.optional(),
+  gender: staffGenderSchema.optional(),
   /** Optional initial PIN (set-later is allowed; PIN-less staff can't sign in). */
   pin: staffPinSchema.optional(),
 });
@@ -124,6 +139,10 @@ export const updateStaffInputSchema = z
     outletId: z.string().uuid().nullable().optional(),
     color: staffColorSchema.nullable().optional(),
     active: z.boolean().optional(),
+    // 0241 profile fields.
+    email: z.string().trim().toLowerCase().email("Enter a valid email").max(200).optional(),
+    birthday: staffBirthdaySchema.optional(),
+    gender: staffGenderSchema.optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: "empty patch",

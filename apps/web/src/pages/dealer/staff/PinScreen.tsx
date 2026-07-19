@@ -85,7 +85,8 @@ export default function PinScreen({
 
         {visible.length === 0 ? (
           <p className="staff-gate__notice">
-            No staff set up for this outlet yet. Ask the owner to add you in Settings.
+            No staff set up for this outlet yet. Ask the owner to add you from the Staff button
+            in the POS top bar.
           </p>
         ) : (
           <div className="staff-tiles">
@@ -106,9 +107,9 @@ export default function PinScreen({
                 </span>
                 <span className="staff-tile__name">{s.name}</span>
                 <span className="staff-tile__tier">
-                  {TIER_LABEL[s.staffRole].zh} · {TIER_LABEL[s.staffRole].en}
+                  {TIER_LABEL[s.staffRole]}
                 </span>
-                {!s.hasPin && <span className="staff-tile__badge">未设 PIN</span>}
+                {!s.hasPin && <span className="staff-tile__badge">No PIN</span>}
               </button>
             ))}
           </div>
@@ -204,7 +205,7 @@ function StaffKeypad({
           {staffInitials(staff.name)}
         </span>
         <div className="staff-gate__eyebrow">
-          {TIER_LABEL[staff.staffRole].zh} · {TIER_LABEL[staff.staffRole].en}
+          {TIER_LABEL[staff.staffRole]}
         </div>
         <h2 className="staff-gate__title">{staff.name}</h2>
         <p className="staff-gate__sub">

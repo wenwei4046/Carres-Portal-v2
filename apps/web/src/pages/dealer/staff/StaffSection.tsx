@@ -20,9 +20,9 @@ import {
  * salesperson-tier session; a manager sees only their own outlet's
  * salespersons + can add salespersons.
  *
- * Extracted from DealerSettings (2026-07-19, Loo: the POS had no way to add
- * staff) so the back-office Settings page and the in-POS StaffManagePage
- * overlay share ONE implementation.
+ * Extracted from the (since-deleted) back-office DealerSettings page
+ * (2026-07-19, Loo: the POS had no way to add staff); now mounted only in the
+ * in-POS StaffManagePage overlay.
  */
 export default function StaffSection() {
   const outletsQ = useOutlets();
@@ -141,7 +141,7 @@ function StaffRow({
             <TierBadge tier={staff.staffRole} />
           </div>
           <div className="text-[12px] text-muted-foreground">
-            {outletName} · {staff.hasPin ? "PIN set" : "未设 PIN · no PIN"}
+            {outletName} · {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
         </div>

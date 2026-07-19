@@ -53,7 +53,7 @@ describe("PinScreen", () => {
     // No-PIN tile is present but disabled + carries the badge.
     const noPin = screen.getByTestId("staff-tile-s3") as HTMLButtonElement;
     expect(noPin.disabled).toBe(true);
-    expect(screen.getByText("未设 PIN")).toBeTruthy();
+    expect(screen.getByText("No PIN")).toBeTruthy();
     // Other outlet + inactive are filtered out.
     expect(screen.queryByTestId("staff-tile-s4")).toBeNull();
     expect(screen.queryByTestId("staff-tile-s5")).toBeNull();

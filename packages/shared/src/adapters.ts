@@ -40,6 +40,10 @@ export const salespersonFromRow = (r: DB.SalespersonRow): D.Salesperson => ({
   staffRole: r.staff_role ?? "salesperson",
   color: r.color ?? null,
   active: r.active ?? true,
+  // 0241 staff profile
+  email: r.email ?? null,
+  birthday: r.birthday ?? null,
+  gender: r.gender ?? null,
 });
 
 export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({

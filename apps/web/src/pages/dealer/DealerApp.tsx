@@ -1,16 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import DealerPos from "./DealerPos";
-import DealerChrome from "./DealerChrome";
-import DealerOrders from "./DealerOrders";
-import DealerProducts from "./DealerProducts";
-import DealerSettings from "./DealerSettings";
 import StaffGate from "./staff/StaffGate";
 
 /**
- * Dealer router. The `/dealer` index is the full-screen POS order-entry flow
- * ("open door = sell"); Orders / Products / Settings render inside the sidebar
- * chrome via a layout route. The legacy `?new=1` modal wizard is gone — opening
- * the POS is just navigating to `/dealer`.
+ * Dealer router — POS-only (Loo 2026-07-19: the Orders / Products / Settings
+ * back-office tabs are deleted; everything a store does lives inside the
+ * full-screen POS — the My orders board, the Staff & PINs overlay with outlets
+ * + store credential, and the Quotes drawer). Any legacy back-office URL
+ * (e.g. a /dealer/orders bookmark) redirects to the POS.
  *
  * Everything is wrapped in <StaffGate> (0233): after the store login, a
  * dealer/showroom either runs the one-time setup wizard or taps a name + PIN
@@ -23,12 +20,6 @@ export default function DealerApp() {
     <StaffGate>
       <Routes>
         <Route index element={<DealerPos />} />
-        <Route element={<DealerChrome />}>
-          <Route path="orders" element={<DealerOrders />} />
-          <Route path="orders/:id" element={<Navigate to="/dealer/orders" replace />} />
-          <Route path="products" element={<DealerProducts />} />
-          <Route path="settings" element={<DealerSettings />} />
-        </Route>
         <Route path="*" element={<Navigate to="/dealer" replace />} />
       </Routes>
     </StaffGate>

@@ -4156,8 +4156,7 @@ function CustomerIdentityCard({
           {/* Data-honest (no customer master table exists — each order keeps
               its own copy): this edit changes THIS ORDER ONLY. */}
           <div className="text-[12px] text-base-500 leading-snug">
-            只改这张单的客户资料 (updates this order only — other orders keep
-            their own copy)
+            Updates this order only — other orders keep their own copy.
           </div>
           {err && <div className="text-[12px] text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">
