@@ -77,7 +77,7 @@ export default function OperationRightRail() {
             <button
               type="button"
               onClick={() => setActive(null)}
-              className="p-1 rounded text-base-500 hover:bg-base-100"
+              className="p-1 rounded text-base-500 hover:bg-hovertint"
               aria-label="Close panel"
             >
               <X size={16} />
@@ -110,7 +110,7 @@ export default function OperationRightRail() {
               title={t.label}
               aria-label={t.label}
               className={`relative w-9 h-9 rounded-full grid place-items-center transition-colors ${
-                isActive ? t.active : "text-base-500 hover:bg-base-100"
+                isActive ? t.active : "text-base-500 hover:bg-hovertint"
               }`}
             >
               <t.icon size={18} strokeWidth={2} />

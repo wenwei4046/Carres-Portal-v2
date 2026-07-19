@@ -1,5 +1,11 @@
 # CLAUDE.md — Carres Portal v2
 
+> **⭐⭐ FOR ANY OPERATION-PORTAL / OPS-PANEL WORK, READ [`docs/OPS-BUILD-BRIEF.md`](docs/OPS-BUILD-BRIEF.md) FIRST.**
+> It is the single un-skippable entry point: the 3-track business model (货→送→钱), the
+> state vocabulary (5 words — never leak DB stage words), the Manage/pill + date law, and
+> pointers to `docs/UI-KIT.md §A0` (the golden reference + new-panel checklist). The Orders
+> page is the finished reference; new panels (Payments) copy its shape — do not reinvent.
+>
 > **You are working on Carres Portal v2.** Read this file fully before any task.
 > Master plan lives in `CARRES_PORTAL_V2_PLAN.md` at repo root — read it for any planning, schema, or phase question.
 >

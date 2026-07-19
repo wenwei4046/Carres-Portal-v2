@@ -560,7 +560,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const done = rows.find((r) => r.textContent?.includes("SO-7001"))!;
     expect(within(live).getByText("over")).toBeInTheDocument();
     expect(within(done).queryByText("over")).not.toBeInTheDocument();
-    expect(within(done).getByText("Done")).toBeInTheDocument();
+    // Delivered = closed → the Manage cell is BLANK (no "Done" pill): the STATUS
+    // column already says Delivered (Jess 2026-07-19). The live order DOES carry
+    // a Manage action.
+    expect(within(done).queryByText("Done")).not.toBeInTheDocument();
+    expect(within(done).queryByRole("button", { name: /Chase|Order PO|Assign|Confirm|Collect/ })).not.toBeInTheDocument();
   });
 
   it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {

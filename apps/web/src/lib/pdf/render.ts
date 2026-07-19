@@ -20,11 +20,13 @@ import { PoTemplate } from "./po-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
+import { LoanNoteTemplate } from "./loan-note-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
   ExtensionAgreementTemplateData,
   InvoiceTemplateData,
+  LoanNoteTemplateData,
   PoTemplateData,
   ReceiptTemplateData,
   SalesOrderTemplateData,
@@ -61,6 +63,12 @@ export function renderExtensionAgreementPdf(
 
 export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
   return toBlob(DoTemplate(data));
+}
+
+/** Migration 0242 — ON LOAN delivery-note (the customer signs on hand-over of a
+ *  loaner). Rendered on-demand from the ops_sofa_loans row + order. */
+export function renderLoanNotePdf(data: LoanNoteTemplateData): Promise<Blob> {
+  return toBlob(LoanNoteTemplate(data));
 }
 
 export function renderPoPdf(data: PoTemplateData): Promise<Blob> {
