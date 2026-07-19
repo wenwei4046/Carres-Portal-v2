@@ -1441,8 +1441,8 @@ export function usePwpCodesByOrder(
 }
 
 /**
- * 2026-05-22 (Loo) — Dealer-side create outlet. Used in DealerSettings →
- * Outlets section to add a second / third physical location after the
+ * 2026-05-22 (Loo) — Dealer-side create outlet. Used in the POS Staff overlay's
+ * OutletsSection to add a second / third physical location after the
  * principal-seeded default outlet.
  */
 export function useCreateOutlet(

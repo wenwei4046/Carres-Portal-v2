@@ -22,7 +22,7 @@ afterEach(cleanup);
 
 describe("StaffSwitchChip", () => {
   it("renders nothing when there is no staff session", () => {
-    const { container } = render(<StaffSwitchChip variant="pos" />);
+    const { container } = render(<StaffSwitchChip />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -33,7 +33,7 @@ describe("StaffSwitchChip", () => {
       "d1",
     );
     useStaffSession.getState().setSessionOutlet("o1");
-    render(<StaffSwitchChip variant="pos" />);
+    render(<StaffSwitchChip />);
     expect(screen.getByText("Aisha Rahman")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("staff-switch-chip"));
@@ -52,7 +52,7 @@ describe("StaffSwitchChip", () => {
       "d1",
     );
     verifyMock.mockImplementation((_v, opts) => opts?.onSuccess?.({}));
-    render(<StaffSwitchChip variant="pos" />);
+    render(<StaffSwitchChip />);
 
     fireEvent.click(screen.getByTestId("staff-changepin-chip"));
     fireEvent.change(screen.getByTestId("changepin-current"), { target: { value: "222222" } });
@@ -73,7 +73,7 @@ describe("StaffSwitchChip", () => {
       { sid: "s1", tier: "salesperson", name: "Aisha", color: null, outletId: null },
       "d1",
     );
-    render(<StaffSwitchChip variant="kit" />);
+    render(<StaffSwitchChip />);
     fireEvent.click(screen.getByTestId("staff-changepin-chip"));
     // same-as-current new PIN → still disabled
     fireEvent.change(screen.getByTestId("changepin-current"), { target: { value: "222222" } });
@@ -89,7 +89,7 @@ describe("StaffSwitchChip", () => {
       { sid: null, tier: "principal", name: "Owner", color: null, outletId: null },
       "d1",
     );
-    render(<StaffSwitchChip variant="pos" />);
+    render(<StaffSwitchChip />);
     expect(screen.queryByTestId("staff-changepin-chip")).toBeNull();
   });
 });

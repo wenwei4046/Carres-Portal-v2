@@ -1,18 +1,19 @@
 import { createPortal } from "react-dom";
 import { ArrowLeft } from "lucide-react";
+import OutletsSection from "./OutletsSection";
 import StaffSection from "./StaffSection";
 import StoreAccountSection from "./StoreAccountSection";
 
 /**
  * In-POS staff management overlay (Loo 2026-07-19: the dealer principal had NO
- * tab anywhere in the POS to add their sales manager / sales executive — the
- * only staff surface lived behind the back-office Settings page, reached via
- * an Exit icon that reads as "sign out"). Full-screen POS shell, same pattern
- * as the "My orders" OrderStatusPage; the body is the shared <StaffSection>
- * (also mounted in DealerSettings) so both surfaces manage staff identically.
+ * tab anywhere in the POS to add their sales manager / sales executive).
+ * Full-screen POS shell, same pattern as the "My orders" OrderStatusPage.
+ * Since the back-office Orders / Products / Settings tabs were deleted
+ * (Loo 2026-07-19, POS-only), this overlay is the store's ONE admin surface:
+ * staff + PINs, outlets, and the store login credential.
  *
  * Opened from the top-bar "Staff" pill, which DealerPos shows only for a
- * principal / manager-tier staff session — StaffSection re-checks the tier and
+ * principal / manager-tier staff session — each section re-checks the tier and
  * renders null for anyone else.
  */
 export default function StaffManagePage({ onClose }: { onClose: () => void }) {
@@ -48,6 +49,8 @@ export default function StaffManagePage({ onClose }: { onClose: () => void }) {
             their 6-digit PIN — they&apos;ll appear on the sign-in screen.
           </p>
           <StaffSection />
+          {/* Outlets (principal only — moved from the deleted Settings page). */}
+          <OutletsSection />
           {/* Store credential (dealer principal only — renders null otherwise). */}
           <StoreAccountSection />
         </div>
