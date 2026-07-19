@@ -1,13 +1,8 @@
--- ============================================================================
--- DRAFT — NOT YET APPLIED, NOT YET IN supabase/migrations/
--- (PRE-GOLIVE guardrail #8: migration drafts live in docs/ until approved.)
+-- 0240 — account_email_change_requests (Loo 2026-07-19; approved "go" same day)
 --
--- Number 0239 claimed against the remote tracker tail 0238 (list_migrations,
--- 2026-07-19). RE-CHECK the tail immediately before applying — parallel
--- sessions share prod.
--- ============================================================================
---
--- 0239 — account_email_change_requests (Loo 2026-07-19)
+-- Drafted as 0239 in docs/drafts/ per PRE-GOLIVE guardrail #8; renumbered to
+-- 0240 at apply time because a parallel session took 0239 (0239_product_bundles,
+-- tracker 20260719060758) between the draft and the approval.
 --
 -- The dealer principal (店主) can change the STORE password directly (client →
 -- Supabase Auth, no schema needed) but a login EMAIL change must be approved

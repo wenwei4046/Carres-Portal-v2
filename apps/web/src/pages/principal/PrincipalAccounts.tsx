@@ -119,7 +119,7 @@ export default function PrincipalAccounts() {
         </button>
       </div>
 
-      {/* 0239 — store email-change approvals (renders only when pending). */}
+      {/* 0240 — store email-change approvals (renders only when pending). */}
       <EmailChangeRequestsPanel />
 
       {/* KPI tiles */}
@@ -212,7 +212,7 @@ export default function PrincipalAccounts() {
 // ----------------------------------------------------------------------------
 
 /**
- * 0239 (Loo 2026-07-19) — store email-change approval queue. A dealer
+ * 0240 (Loo 2026-07-19) — store email-change approval queue. A dealer
  * principal files the request from the POS; approving here performs the REAL
  * login-email swap (service_role, /api/principal/accounts routes). Hidden
  * entirely while nothing is pending.

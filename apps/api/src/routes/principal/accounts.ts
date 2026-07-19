@@ -540,7 +540,7 @@ principalAccountsRouter.post("/:id/reset-password", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Store email-change requests (0239, Loo 2026-07-19) — a dealer principal
+// Store email-change requests (0240, Loo 2026-07-19) — a dealer principal
 // files a login-email change from the POS (/api/account/email-change); HQ
 // decides here. Approve swaps the REAL login email (auth.admin) + app_users;
 // reject parks a note the store sees. Same service_role + audit_log pattern

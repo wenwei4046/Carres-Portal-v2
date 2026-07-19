@@ -14,7 +14,7 @@ import { userClient, adminClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
 const KID = "test-kid-account";
-const STAFF_SESSION_SECRET = "test-staff-secret-0239-abcdef";
+const STAFF_SESSION_SECRET = "test-staff-secret-0240-abcdef";
 
 const env = {
   SUPABASE_URL,

@@ -65,7 +65,7 @@ import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
 // 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
-// 0239 — store-account self-service (dealer-principal email-change requests).
+// 0240 — store-account self-service (dealer-principal email-change requests).
 import accountRouter from "./routes/account";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.

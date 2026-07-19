@@ -1111,5 +1111,5 @@ export {
 // See docs/superpowers/plans/2026-07-18-staff-pin-login-plan.md.
 export * from "./schemas/staff";
 
-// Store-account self-service (0239) — dealer-principal password/email change.
+// Store-account self-service (0240) — dealer-principal password/email change.
 export * from "./schemas/account";

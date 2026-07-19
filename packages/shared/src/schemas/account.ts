@@ -8,7 +8,7 @@ import { z } from "zod";
  *              signInWithPassword, then updateUser; no schema, no Hono hop).
  *   email    — REQUEST + APPROVAL: the owner submits a new login email; the
  *              request parks in `account_email_change_requests` (migration
- *              0239) until a Carres HQ principal approves (the API then swaps
+ *              0240) until a Carres HQ principal approves (the API then swaps
  *              auth.users email via service_role admin) or rejects with a note.
  *
  * Scope: DEALER stores only. A showroom's login belongs to Carres HQ itself,

@@ -15,7 +15,7 @@ import { ModalShell } from "./staff-ui";
  * re-verify).
  *
  *   Password — changed directly (lib/password.ts, client → Supabase Auth).
- *   Email    — submit-for-approval: the request parks in the 0239 ledger until
+ *   Email    — submit-for-approval: the request parks in the 0240 ledger until
  *              a Carres HQ principal approves (login email actually swaps) or
  *              rejects with a note shown here.
  *

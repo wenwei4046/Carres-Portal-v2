@@ -130,7 +130,7 @@ import {
   type UpdateStaffInput,
   type SetStaffPinInput,
   type StaffDto,
-  // 0239 — store-account email-change requests (dealer principal → HQ approval).
+  // 0240 — store-account email-change requests (dealer principal → HQ approval).
   type EmailChangeRequestDto,
   type SubmitEmailChangeInput,
   type SetOrderAddressInput,
@@ -183,7 +183,7 @@ export const qk = {
    *  store via dealerId; own-store reads pass none. Kept off the `salespersons`
    *  prefix so staff mutations that flip hasPin invalidate distinctly. */
   staff:        (dealerId?: string) => ["staff", dealerId ?? null] as const,
-  /** 0239 — my store's latest email-change request (dealer principal). */
+  /** 0240 — my store's latest email-change request (dealer principal). */
   emailChange:  () => ["email-change", "mine"] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
    *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
@@ -210,7 +210,7 @@ export const qk = {
     partners:  () => ["principal", "partners"] as const,
     /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
     accounts:  () => ["principal", "accounts"] as const,
-    /** 0239 — store email-change request queue (HQ approval). */
+    /** 0240 — store email-change request queue (HQ approval). */
     emailChanges: () => ["principal", "email-changes"] as const,
     /** Phase 10 — audit log (PrincipalAudit). */
     audit:     (filters?: Record<string, unknown>) =>
@@ -1656,7 +1656,7 @@ export function useSetStaffPin(
 }
 
 // ---------------------------------------------------------------------------
-// 0239 — store-account email-change (dealer principal submits; HQ decides).
+// 0240 — store-account email-change (dealer principal submits; HQ decides).
 // Password change never touches these — it is client → Supabase Auth direct
 // (lib/password.ts).
 // ---------------------------------------------------------------------------
