@@ -38,6 +38,7 @@ import {
   Sofa,
   Truck,
   Undo2,
+  Wallet,
   Warehouse,
   Upload,
   User,
@@ -5549,22 +5550,6 @@ function MoneyCard({
     return s === "K" ? "King" : s === "Q" ? "Queen" : s === "S" ? "Single" : null;
   };
 
-  // ONE plain hint line (the 1·2·3 strip moved to the left-rail journey
-  // card). Everyday words only — Jess 2026-07-18.
-  const stepHint = hasLineTotal
-    ? !totalSet
-      ? "The total comes from the priced items below."
-      : balanceDue > 0
-        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
-        : "All paid — you can print the receipt."
-    : !totalSet
-      ? collected > 0
-        ? `${RM(collected)} already recorded — key what the customer owed BEFORE those payments; the system minus them for you.`
-        : "Nothing owing on record. Key an amount below ONLY if this customer owes money."
-      : balanceDue > 0
-        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
-        : "All paid — you can print the receipt.";
-
   // The keyed-total entry — the goods amount on an AutoCount order.
   const keyedTotalNode =
     editingTotal || orderTotal <= 0 ? (
@@ -5602,9 +5587,55 @@ function MoneyCard({
 
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-x-5 gap-y-2.5 items-start">
-      {/* ONE plain sentence — the step strip lives in the left-rail
-          journey card now. */}
-      <div className="col-span-2 text-[12px] text-base-500">{stepHint}</div>
+      {/* Grounded-card header (Loan template; Jess 2026-07-20) — icon + status
+          caption + the outstanding headline, replacing the prose hint (no
+          how-to sentences). Icon never tints; paid / no-total = grey. */}
+      <div className="col-span-2 flex items-center justify-between gap-2 pb-2 border-b border-base-100">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className={`h-8 w-8 shrink-0 rounded-[9px] grid place-items-center ${
+              balanceDue > 0 ? "bg-primary/10 text-primary" : "bg-base-100 text-base-500"
+            }`}
+          >
+            <Wallet size={16} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold tracking-[0.05em] uppercase text-base-500">
+              {!totalSet ? "No total" : balanceDue > 0 ? "Owing" : "Paid"}
+            </div>
+            <div
+              className={`text-[13px] font-semibold truncate ${
+                balanceDue > 0 ? "text-base-900" : "text-base-500"
+              }`}
+            >
+              {!totalSet ? (
+                collected > 0 ? (
+                  <>
+                    Collected{" "}
+                    <span className="font-mono">{RM(collected)}</span> so far
+                  </>
+                ) : (
+                  "Nothing on record"
+                )
+              ) : balanceDue > 0 ? (
+                <>
+                  Still owes{" "}
+                  <span className="font-mono text-danger">{RM(balanceDue)}</span>
+                </>
+              ) : (
+                "All collected"
+              )}
+            </div>
+          </div>
+        </div>
+        {balanceDue > 0 && (
+          <span
+            className={`pill ${collectByPast ? "pill-overdue" : "pill-warning"} shrink-0`}
+          >
+            {collectByLabel ? `by ${collectByLabel}` : "before delivery"}
+          </span>
+        )}
+      </div>
       {/* Delivery-eve red flag (§3.2) — spans both columns. */}
       {deliveryEve && (
         <div
