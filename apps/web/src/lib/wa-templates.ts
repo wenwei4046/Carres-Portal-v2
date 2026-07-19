@@ -207,10 +207,12 @@ export interface SupplierGroupRow {
   items: { sku: string; qty: number }[];
 }
 
-/** One consolidated supplier message covering all `rows` (one row per order).
+/** One consolidated supplier message covering all `rows`.
  *  `remind` = gentle (before deadline); `chase` = firmer (already late).
- *  `includePo` (Jess 2026-07-19): sofa/bedframe suppliers get "ref · PO";
- *  mattress suppliers + logistic partners get the ref alone. */
+ *  Jess 2026-07-19: AGGREGATE by SKU (same SKU across orders sums to one line,
+ *  e.g. Haven ×2), *bold* SKU + qty and _italic_ the refs (WhatsApp markup) so
+ *  it copy-pastes clean; SKUs sorted. `includePo` (sofa/bedframe) tags each ref
+ *  with its PO; mattress suppliers + logistic speak the ref alone. */
 export function buildSupplierGroupMessage(
   mode: "remind" | "chase",
   supplierName: string,
@@ -220,18 +222,31 @@ export function buildSupplierGroupMessage(
   const opener =
     mode === "chase"
       ? `Hi ${supplierName} 👋 following up — we still need the ready date for these, customers are waiting:`
-      : `Hi ${supplierName} 👋 checking on these open orders, please confirm the ready date for each:`;
+      : `Hi ${supplierName} 👋 please confirm the ready date for these:`;
   const closer =
     mode === "chase"
       ? `Please confirm a ready date today so we can plan delivery. Thank you!`
-      : `Appreciate a ready date per order. Thank you!`;
-  const body = rows
-    .map((r) => {
-      const label = includePo ? `${r.ref ?? "—"} · PO ${r.po ?? "—"}` : `${r.ref ?? "—"}`;
-      return `${label}\t${itemsBlock(r.items)}\n`;
-    })
-    .join("");
-  return `${opener}\n\n${body}\n${closer}`;
+      : `Appreciate a ready date per SKU. Thank you!`;
+  // Aggregate every row's items by SKU → total qty + the refs carrying it.
+  const bySku = new Map<string, { qty: number; refs: string[] }>();
+  let totalUnits = 0;
+  for (const r of rows) {
+    const refTag = includePo
+      ? `${r.ref ?? "—"}${r.po ? ` (PO ${r.po})` : ""}`
+      : (r.ref ?? "—");
+    for (const it of r.items) {
+      const e = bySku.get(it.sku) ?? { qty: 0, refs: [] };
+      e.qty += it.qty;
+      if (!e.refs.includes(refTag)) e.refs.push(refTag);
+      bySku.set(it.sku, e);
+      totalUnits += it.qty;
+    }
+  }
+  const body = [...bySku.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([sku, e]) => `*${sku}* ×${e.qty}\n_${e.refs.join(", ")}_`)
+    .join("\n\n");
+  return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
 }
 
 /** URL-encoded body, ready for `https://wa.me/<number>?text=` — real line

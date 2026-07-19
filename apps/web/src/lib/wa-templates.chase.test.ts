@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSupplierGroupMessage,
-  itemsBlock,
   type SupplierGroupRow,
 } from "./wa-templates";
 
@@ -14,8 +13,8 @@ describe("buildSupplierGroupMessage", () => {
   it("remind mode: gentle opener + closer, supplier name present", () => {
     const msg = buildSupplierGroupMessage("remind", "Ohana", rows);
     expect(msg).toContain("Hi Ohana 👋");
-    expect(msg).toContain("checking on these open orders");
-    expect(msg).toContain("Appreciate a ready date per order. Thank you!");
+    expect(msg).toContain("please confirm the ready date for these");
+    expect(msg).toContain("Appreciate a ready date per SKU. Thank you!");
     expect(msg).not.toContain("customers are waiting");
   });
 
@@ -27,46 +26,48 @@ describe("buildSupplierGroupMessage", () => {
     expect(msg).toContain("Please confirm a ready date today so we can plan delivery.");
   });
 
-  it("lists every row's ref and uses itemsBlock for items", () => {
+  it("*bold* SKU + ×qty, _italic_ refs, and a units total", () => {
     const msg = buildSupplierGroupMessage("remind", "Ohana", rows);
-    expect(msg).toContain("CR-1001");
-    expect(msg).toContain("TCF-1002");
-    expect(msg).toContain(itemsBlock(rows[0].items));
-    expect(msg).toContain(itemsBlock(rows[1].items));
+    expect(msg).toContain("*MS01-K* ×2");
+    expect(msg).toContain("*BF03-Q* ×1");
+    expect(msg).toContain("_CR-1001_");
+    expect(msg).toContain("_TCF-1002_");
+    expect(msg).toContain("Total 3 units.");
+  });
+
+  it("AGGREGATES the same SKU across orders into one summed line", () => {
+    const msg = buildSupplierGroupMessage("remind", "Nice Future", [
+      { ref: "CR1195", items: [{ sku: "Haven-H1401F-K", qty: 1 }] },
+      { ref: "CR1177", items: [{ sku: "Haven-H1401F-K", qty: 1 }] },
+    ]);
+    expect(msg).toContain("*Haven-H1401F-K* ×2");
+    // both refs listed under the one SKU line
+    expect(msg).toContain("_CR1195, CR1177_");
+    expect(msg).toContain("Total 2 units.");
   });
 
   it("a null ref renders '—'", () => {
     const msg = buildSupplierGroupMessage("remind", "Ohana", [
       { ref: null, items: [{ sku: "SF02", qty: 1 }] },
     ]);
-    expect(msg).toContain("—\t");
+    expect(msg).toContain("_—_");
   });
 
   it("includePo=false (default) shows ref only — no PO", () => {
     const msg = buildSupplierGroupMessage("remind", "Nice Future", [
       { ref: "CR-1001", po: "PO-99", items: [{ sku: "MS01", qty: 1 }] },
     ]);
-    expect(msg).toContain("CR-1001");
-    expect(msg).not.toContain("PO");
+    expect(msg).toContain("_CR-1001_");
+    expect(msg).not.toContain("PO-99");
   });
 
-  it("includePo=true shows 'ref · PO no' (sofa/bedframe suppliers)", () => {
+  it("includePo=true tags each ref with its PO (sofa/bedframe suppliers)", () => {
     const msg = buildSupplierGroupMessage(
       "remind",
       "Ohana",
       [{ ref: "TCF-1002", po: "PO-77", items: [{ sku: "SF02", qty: 1 }] }],
       true,
     );
-    expect(msg).toContain("TCF-1002 · PO PO-77");
-  });
-
-  it("includePo=true with a missing PO renders 'PO —'", () => {
-    const msg = buildSupplierGroupMessage(
-      "chase",
-      "Ohana",
-      [{ ref: "TCF-1003", po: null, items: [{ sku: "SF03", qty: 1 }] }],
-      true,
-    );
-    expect(msg).toContain("TCF-1003 · PO —");
+    expect(msg).toContain("TCF-1002 (PO PO-77)");
   });
 });

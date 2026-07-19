@@ -2998,7 +2998,33 @@ function OrdersBulkBar({
         </button>
       )}
       <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
-      {/* Assign logistic — inline dropdown of partners. */}
+      {/* Bulk actions follow the pipeline (Jess 2026-07-19): GOODS → DELIVERY →
+          UTILITY, separated, so the bar reads as the workflow, not a random row. */}
+      {/* — GOODS — */}
+      {/* Raise PO — consolidated per-supplier review (0236: duty holder +
+          management only; disabled title names whose month it is). */}
+      <button
+        type="button"
+        onClick={onRaisePo}
+        disabled={busy || !canRaisePo}
+        title={raisePoTitle}
+        className={btn}
+      >
+        <PackagePlus size={14} /> Raise PO
+      </button>
+      {/* Chase supplier — one WhatsApp message per supplier group over the
+          selection (Remind / Chase). Open to all operation (no duty gate). */}
+      <button
+        type="button"
+        onClick={onChaseSupplier}
+        disabled={busy}
+        title="Nudge each supplier's WhatsApp group — one message covering the selection's orders"
+        className={btn}
+      >
+        <MessageCircle size={14} /> Chase supplier
+      </button>
+      <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
+      {/* — DELIVERY — Assign logistic (inline dropdown of partners). */}
       <div className="relative">
         <button
           type="button"
@@ -3029,29 +3055,8 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
-      {/* Raise PO — consolidated per-supplier review (0236: duty holder +
-          management only; disabled title names whose month it is). */}
-      <button
-        type="button"
-        onClick={onRaisePo}
-        disabled={busy || !canRaisePo}
-        title={raisePoTitle}
-        className={btn}
-      >
-        <PackagePlus size={14} /> Raise PO
-      </button>
-      {/* Chase supplier — one WhatsApp message per supplier group over the
-          selection (Remind / Chase). Open to all operation (no duty gate). */}
-      <button
-        type="button"
-        onClick={onChaseSupplier}
-        disabled={busy}
-        title="Nudge each supplier's WhatsApp group — one message covering the selection's orders"
-        className={btn}
-      >
-        <MessageCircle size={14} /> Chase supplier
-      </button>
-      {/* Flag for follow-up (creates a follow-up task per selected order). */}
+      <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
+      {/* — UTILITY — Flag for follow-up (a follow-up task per selected order). */}
       <button type="button" onClick={onFlag} disabled={busy} className={btn}>
         <Flag size={14} /> Flag
       </button>
