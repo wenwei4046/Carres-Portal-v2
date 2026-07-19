@@ -9,7 +9,14 @@ import {
   type DraftLine,
   type WizardDraft,
 } from "../new-order/draft";
-import { cartAddonSubtotal, cartItemCount, cartLineSubtotal, lineEditTarget } from "./cart";
+import {
+  cartAddonSubtotal,
+  cartItemCount,
+  cartLineSubtotal,
+  lineBundleGroup,
+  lineBundleLabel,
+  lineEditTarget,
+} from "./cart";
 import { saveQuote } from "./quotes";
 import { SpecialsSummary } from "../new-order/special-addons-picker";
 import {
@@ -110,6 +117,15 @@ export default function CartDrawer({
   }, [onClose]);
 
   function removeLine(localId: string) {
+    // 0239 — removing a bundle component removes the WHOLE bundle group: a
+    // lone component kept at its split share would silently under-price it.
+    const target = draft.lines.find((l) => l.localId === localId);
+    const group = target ? lineBundleGroup(target) : null;
+    if (group !== null) {
+      onChange({ ...draft, lines: draft.lines.filter((l) => lineBundleGroup(l) !== group) });
+      toast.info(`Bundle removed — "${lineBundleLabel(target!) ?? "bundle"}" items go together.`);
+      return;
+    }
     onChange({ ...draft, lines: draft.lines.filter((l) => l.localId !== localId) });
   }
   function bumpLineQty(localId: string, delta: number) {
@@ -279,6 +295,9 @@ export default function CartDrawer({
                 // CatalogStep routes with, so the two never drift.
                 const editable =
                   !!onEditLine && !!catalog && lineEditTarget(l, catalog) !== null;
+                // 0239 — bundle component lines are price-locked as a group:
+                // qty is fixed, no further discounts stack on the split price.
+                const inBundle = lineBundleGroup(l) !== null;
                 return (
                   <div key={l.localId} className="cart-item">
                     <div
@@ -294,13 +313,22 @@ export default function CartDrawer({
                       <div className="cart-item__name">{name}</div>
                       {detail && <div className="cart-item__detail">{detail}</div>}
                       <div className="cart-item__detail font-mono">{l.sku}</div>
+                      {inBundle && (
+                        <div
+                          className="t-tiny text-primary"
+                          data-testid={`cart-line-bundle-${l.localId}`}
+                        >
+                          Bundle · {lineBundleLabel(l) ?? "bundle price"}
+                        </div>
+                      )}
                       <SpecialsSummary attrs={l.attrs} />
 
                       <div className="cart-item__qty">
                         <button
                           type="button"
                           onClick={() => bumpLineQty(l.localId, -1)}
-                          disabled={l.qty <= 1}
+                          disabled={l.qty <= 1 || inBundle}
+                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
                           aria-label="Decrease quantity"
                           className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -310,14 +338,19 @@ export default function CartDrawer({
                         <button
                           type="button"
                           onClick={() => bumpLineQty(l.localId, 1)}
+                          disabled={inBundle}
+                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
                           aria-label="Increase quantity"
+                          className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <Plus />
                         </button>
                       </div>
 
-                      {/* 0185 — free-item "Make free" affordance (eligible lines). */}
-                      {catalog && (
+                      {/* 0185 — free-item "Make free" affordance (eligible lines).
+                          Hidden on bundle lines — the split price is already the
+                          discount; free/PWP claims must not stack on top. */}
+                      {catalog && !inBundle && (
                         <MakeFreeRow line={l} lines={draft.lines} catalog={catalog} onSet={replaceLine} />
                       )}
 
@@ -325,7 +358,7 @@ export default function CartDrawer({
                           Hidden once the line is claimed free (free-item wins — a
                           line can't be both free AND PWP-priced). 0187 binds a
                           RESERVED voucher code on claim (Auto-Fill). */}
-                      {catalog && !isLineFreeItem(l) && (
+                      {catalog && !inBundle && !isLineFreeItem(l) && (
                         <PwpRow
                           line={l}
                           lines={draft.lines}
