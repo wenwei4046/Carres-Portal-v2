@@ -547,6 +547,7 @@ interface DrawerBodyProps {
  */
 function Panel({
   title,
+  leading,
   summary,
   actions,
   collapsedAction,
@@ -556,6 +557,9 @@ function Panel({
   children,
 }: {
   title: string;
+  /** Optional step badge before the title — ties this tab header to its
+   *  journey-spine node (same number + colour). */
+  leading?: ReactNode;
   /** Pinned to the header's right edge — the at-a-glance status badge. */
   summary?: ReactNode;
   /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
@@ -606,6 +610,7 @@ function Panel({
     >
       <SectionBand
         title={title}
+        leading={leading}
         collapsed={!open}
         onToggle={toggle}
         right={
@@ -1707,6 +1712,10 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // Which spine step the operator clicked (Jess 甲 2026-07-19) — disambiguates
+  // the two Balance steps (deposit vs balance) so the tab header wears the
+  // clicked step's number + colour. null = opened via nav / not a step.
+  const [clickedStep, setClickedStep] = useState<number | null>(null);
   // S4 (2026-07-18) — ‹prev/next› keeps the drawer mounted, so `tab` carries
   // across orders; if the new order doesn't offer the current tab (Storage
   // hides without MS/BF/SOF goods), fall back to Items instead of a blank pane.
@@ -1967,6 +1976,110 @@ function DrawerBody({
     (a, b) => Number(b.urgency === "overdue") - Number(a.urgency === "overdue"),
   );
 
+  // THE journey spine — extracted so each tab header can wear the SAME step
+  // number + colour as its spine node (Jess 甲 2026-07-19): one numbered journey,
+  // whether you read the rail (overview) or the header (you-are-here).
+  const journeySteps: {
+    title: string;
+    sub: string;
+    state: JourneyState;
+    tab: DrawerTab;
+  }[] = [
+    {
+      title: "Collect deposit",
+      tab: "balance",
+      state: collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
+      sub:
+        collectedAll > 0
+          ? `${RM(collectedAll)} in`
+          : totalSet
+            ? "nothing received yet"
+            : "—",
+    },
+    {
+      title: "Goods ready",
+      tab: "items",
+      state:
+        deliveredDone || (goodsN > 0 && readyN >= goodsN)
+          ? "done"
+          : stockTone === "danger"
+            ? "act"
+            : "wait",
+      sub: deliveredDone
+        ? "all delivered"
+        : `${readyN}/${goodsN} ready${
+            goodsN - readyN > 0 ? ` · waiting ${goodsN - readyN}` : ""
+          }`,
+    },
+    {
+      title: "Collect balance",
+      tab: "balance",
+      state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
+      sub: !totalSet
+        ? "nothing owing on record"
+        : balanceDue > 0
+          ? `still owes ${RM(balanceDue)} · before delivery`
+          : "all paid",
+    },
+    ...(hasMsbf || hasSof
+      ? [
+          {
+            title: "Storage",
+            tab: "storage" as DrawerTab,
+            state: storageOwing
+              ? storageGate === "hold"
+                ? ("act" as const)
+                : ("wait" as const)
+              : storageIncurred && storageCleared
+                ? ("done" as const)
+                : ("todo" as const),
+            sub: storageOwing
+              ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
+              : storageIncurred && storageCleared
+                ? "collected"
+                : supplierLate
+                  ? "waiting supplier — not counting"
+                  : "not counting",
+          },
+        ]
+      : []),
+    // Loaner — a conditional step BEFORE Deliver (Jess 2026-07-19): when a
+    // substitute is out it lives IN the journey (swapped back at delivery).
+    ...(liveLoanCount > 0
+      ? [
+          {
+            title: "Loaner",
+            tab: "loan" as DrawerTab,
+            state: "wait" as const,
+            sub: `${liveLoanCount} out · back at delivery`,
+          },
+        ]
+      : []),
+    {
+      title: "Deliver",
+      tab: "delivery",
+      state: deliveredDone
+        ? "done"
+        : logisticTone === "danger"
+          ? "act"
+          : "wait",
+      sub: deliveredDone
+        ? "delivered"
+        : `${assignedLogisticName ?? "no partner yet"}${
+            logisticTone === "danger" ? " · not booked" : ""
+          }`,
+    },
+  ];
+  // The step badge a tab header wears: the clicked step when it matches this
+  // tab (Balance = 2 steps), else the tab's first step. Non-journey tabs → none.
+  const stepBadgeFor = (t: DrawerTab): ReactNode => {
+    const i =
+      clickedStep != null && journeySteps[clickedStep]?.tab === t
+        ? clickedStep
+        : journeySteps.findIndex((s) => s.tab === t);
+    return i < 0 ? null : <StepBadge n={i + 1} state={journeySteps[i].state} />;
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {receivePo && (
@@ -2152,97 +2265,13 @@ function DrawerBody({
               exist) → deliver. Collapsed rail shows nodes only. */}
           {(
             <JourneyCard
-              onGo={setTab}
+              onGo={(t, i) => {
+                setTab(t);
+                setClickedStep(i);
+              }}
               activeTab={tab}
               collapsed={railCollapsed}
-              steps={[
-                {
-                  title: "Collect deposit",
-                  tab: "balance",
-                  state:
-                    collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
-                  sub:
-                    collectedAll > 0
-                      ? `${RM(collectedAll)} in`
-                      : totalSet
-                        ? "nothing received yet"
-                        : "—",
-                },
-                {
-                  title: "Goods ready",
-                  tab: "items",
-                  state:
-                    deliveredDone || (goodsN > 0 && readyN >= goodsN)
-                      ? "done"
-                      : stockTone === "danger"
-                        ? "act"
-                        : "wait",
-                  sub: deliveredDone
-                    ? "all delivered"
-                    : `${readyN}/${goodsN} ready${
-                        goodsN - readyN > 0 ? ` · waiting ${goodsN - readyN}` : ""
-                      }`,
-                },
-                {
-                  title: "Collect balance",
-                  tab: "balance",
-                  state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
-                  sub: !totalSet
-                    ? "nothing owing on record"
-                    : balanceDue > 0
-                      ? `still owes ${RM(balanceDue)} · before delivery`
-                      : "all paid",
-                },
-                ...(hasMsbf || hasSof
-                  ? [
-                      {
-                        title: "Storage",
-                        tab: "storage" as DrawerTab,
-                        state: storageOwing
-                          ? storageGate === "hold"
-                            ? ("act" as const)
-                            : ("wait" as const)
-                          : storageIncurred && storageCleared
-                            ? ("done" as const)
-                            : ("todo" as const),
-                        sub: storageOwing
-                          ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
-                          : storageIncurred && storageCleared
-                            ? "collected"
-                            : supplierLate
-                              ? "waiting supplier — not counting"
-                              : "not counting",
-                      },
-                    ]
-                  : []),
-                // Loaner — a conditional step BEFORE Deliver (Jess 2026-07-19):
-                // when a substitute is out, it lives IN the journey (swapped back
-                // at delivery), not demoted below. Only appears when active.
-                ...(liveLoanCount > 0
-                  ? [
-                      {
-                        title: "Loaner",
-                        tab: "loan" as DrawerTab,
-                        state: "wait" as const,
-                        sub: `${liveLoanCount} out · back at delivery`,
-                      },
-                    ]
-                  : []),
-                {
-                  title: "Deliver",
-                  tab: "delivery",
-                  state: deliveredDone
-                    ? "done"
-                    : logisticTone === "danger"
-                      ? "act"
-                      : "wait",
-                  sub: deliveredDone
-                    ? "delivered"
-                    : `${assignedLogisticName ?? "no partner yet"}${
-                        logisticTone === "danger" ? " · not booked" : ""
-                      }`,
-                },
-              ]}
+              steps={journeySteps}
             />
           )}
           <nav
@@ -2372,6 +2401,7 @@ function DrawerBody({
               runs full length; the tab column scrolls). */}
           <Panel
             title="Items ordered"
+            leading={stepBadgeFor("items")}
             summary={
               /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
                  needs stock", from the SAME shared lineReadiness the row pills
@@ -3045,6 +3075,7 @@ function DrawerBody({
               obligation). The lend entry stays even at 0 loans. */}
           <Panel
             title="Loan"
+            leading={stepBadgeFor("loan")}
             summary={
               liveLoanCount > 0 ? (
                 <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
@@ -3100,6 +3131,7 @@ function DrawerBody({
           <SectionCard>
           <Panel
             title="Balance"
+            leading={stepBadgeFor("balance")}
             actions={
               /* §7.4 ⋮ — Generate invoice (server data → client PDF, same path
                  as DownloadInvoiceButton) + Print receipt (latest payment). */
@@ -3255,6 +3287,7 @@ function DrawerBody({
             <SectionCard className="shrink-0">
             <Panel
               title="Storage"
+              leading={stepBadgeFor("storage")}
               // Tab context — landing on the Storage TAB shows the card open.
               defaultOpen
               summary={
@@ -3382,6 +3415,7 @@ function DrawerBody({
           <SectionCard className="shrink-0">
           <Panel
             title="Delivery"
+            leading={stepBadgeFor("delivery")}
             actions={
               /* Round 1A ⋮ discipline: only WIRED actions — Print DO hidden
                  until 1B. */
@@ -4833,6 +4867,28 @@ async function viewSlip(p: OrderPaymentRow) {
  *  vocabulary; numbers may shift when the Storage step is absent.
  *  Collapsed rail → nodes only. */
 type JourneyState = "done" | "act" | "wait" | "todo";
+
+/** The step-number badge a tab header wears — SAME number + colour as its
+ *  journey-spine node, so the drawer reads as one numbered journey (Jess 甲). */
+function StepBadge({ n, state }: { n: number; state: JourneyState }) {
+  return (
+    <span
+      className={`shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ${
+        state === "done"
+          ? "bg-base-800 text-white"
+          : state === "act"
+            ? "bg-error-soft text-danger ring-1 ring-danger"
+            : state === "wait"
+              ? "bg-warning-soft text-warning"
+              : "bg-white border-2 border-base-300 text-base-400"
+      }`}
+      aria-hidden="true"
+    >
+      {n}
+    </span>
+  );
+}
+
 function JourneyCard({
   steps,
   activeTab,
@@ -4842,7 +4898,7 @@ function JourneyCard({
   steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
   activeTab: DrawerTab;
   collapsed: boolean;
-  onGo: (t: DrawerTab) => void;
+  onGo: (t: DrawerTab, stepIndex: number) => void;
 }) {
   return (
     <div
@@ -4859,7 +4915,7 @@ function JourneyCard({
           <button
             key={st.title}
             type="button"
-            onClick={() => onGo(st.tab)}
+            onClick={() => onGo(st.tab, i)}
             aria-selected={active}
             title={`${st.title} — ${st.sub}`}
             className={`relative w-full flex items-start text-left group rounded-lg ${

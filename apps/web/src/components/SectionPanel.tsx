@@ -50,6 +50,7 @@ export function SectionBand({
   onToggle,
   total,
   right,
+  leading,
   toggleTestId,
 }: {
   title: string;
@@ -61,6 +62,9 @@ export function SectionBand({
   total?: number;
   /** Status chip / ⋮ menu / extra control at the band's right edge. */
   right?: ReactNode;
+  /** Optional leading node before the title (e.g. the order-drawer step badge
+   *  that ties a tab header to its journey-spine node). Omit = unchanged. */
+  leading?: ReactNode;
   toggleTestId?: string;
 }) {
   return (
@@ -78,6 +82,7 @@ export function SectionBand({
         ) : (
           <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
+        {leading}
         <span
           /* v4 §11c — panel header is DARK 12/600 (muted headers were
              unreadable; muted is for meta only). */
