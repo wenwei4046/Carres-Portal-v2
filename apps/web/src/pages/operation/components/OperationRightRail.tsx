@@ -67,7 +67,11 @@ export default function OperationRightRail() {
       {active && (
         <div className="w-[320px] flex flex-col border-l border-base-200 bg-white">
           <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
-            <div className="t-h4 text-base-900">
+            <div className="t-h4 text-base-900 flex items-center gap-2">
+              {(() => {
+                const Icon = TABS.find((t) => t.key === active)?.icon;
+                return Icon ? <Icon size={18} className="text-base-500" /> : null;
+              })()}
               {TABS.find((t) => t.key === active)?.label}
             </div>
             <button

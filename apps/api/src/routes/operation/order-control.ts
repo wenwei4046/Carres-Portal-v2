@@ -11,6 +11,7 @@ import {
   receiveLineInput,
   loanSofaInput,
   borrowLoanInput,
+  updateLoanInput,
   returnLoanInput,
   returnToSupplierInput,
   appendMissingLinesInput,
@@ -717,7 +718,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, ops_stock_items(sku, condition), suppliers(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
@@ -732,8 +733,13 @@ orderControlRouter.get("/:id/loans", async (c) => {
 /** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */
 function mapLoanRow(r: unknown): SofaLoanDto {
   const row = r as Record<string, unknown> & {
-    ops_stock_items?: { sku?: string | null; condition?: string | null } | null;
+    ops_stock_items?: {
+      sku?: string | null;
+      condition?: string | null;
+      po_no?: string | null;
+    } | null;
     suppliers?: { name?: string | null } | null;
+    delivery_partners?: { name?: string | null } | null;
   };
   return {
     id: row.id as string,
@@ -743,6 +749,7 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     item_id: (row.item_id as string | null) ?? null,
     item_sku: row.ops_stock_items?.sku ?? null,
     item_condition: row.ops_stock_items?.condition ?? null,
+    item_po: row.ops_stock_items?.po_no ?? null,
     supplier_id: (row.supplier_id as string | null) ?? null,
     supplier_name: row.suppliers?.name ?? null,
     borrowed_sku: (row.borrowed_sku as string | null) ?? null,
@@ -754,6 +761,16 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     loaned_at: row.loaned_at as string,
     returned_at: (row.returned_at as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    out_route:
+      (row.out_route as SofaLoanDto["out_route"] | null) ?? "warehouse_customer",
+    out_partner_id: (row.out_partner_id as string | null) ?? null,
+    out_partner_name: row.delivery_partners?.name ?? null,
+    dispatched_at: (row.dispatched_at as string | null) ?? null,
+    arrived_warehouse_at: (row.arrived_warehouse_at as string | null) ?? null,
+    loan_note_no: (row.loan_note_no as string | null) ?? null,
+    loan_note_signed_at: (row.loan_note_signed_at as string | null) ?? null,
+    supplier_return_due: (row.supplier_return_due as string | null) ?? null,
+    supplier_return_ref: (row.supplier_return_ref as string | null) ?? null,
   };
 }
 
@@ -803,7 +820,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .update({ status: "reserved", reserved_ref: `LOAN SO-${order.so}`, updated_at: now })
     .eq("id", itemId)
     .eq("status", "free")
-    .select("id, sku, condition")
+    .select("id, sku, condition, po_no")
     .maybeSingle();
   if (claimErr) {
     const m = mapPgError(claimErr);
@@ -845,6 +862,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     item_id: loan.item_id as string,
     item_sku: (claimed.sku as string | null) ?? null,
     item_condition: (claimed.condition as string | null) ?? null,
+    item_po: (claimed.po_no as string | null) ?? null,
     supplier_id: null,
     supplier_name: null,
     borrowed_sku: null,
@@ -855,6 +873,15 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     loaned_at: loan.loaned_at as string,
     returned_at: (loan.returned_at as string | null) ?? null,
     notes: (loan.notes as string | null) ?? null,
+    out_route: "warehouse_customer",
+    out_partner_id: null,
+    out_partner_name: null,
+    dispatched_at: null,
+    arrived_warehouse_at: null,
+    loan_note_no: null,
+    loan_note_signed_at: null,
+    supplier_return_due: null,
+    supplier_return_ref: null,
   };
   return c.json({ loan: dto });
 });
@@ -885,8 +912,16 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       422,
     );
   }
-  const { supplierId, category, borrowedSku, borrowedLabel, doNumber, notes } =
-    parsed.data;
+  const {
+    supplierId,
+    category,
+    borrowedSku,
+    borrowedLabel,
+    doNumber,
+    notes,
+    outRoute,
+    outPartnerId,
+  } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
   const { data: loan, error: loanErr } = await sb
@@ -903,13 +938,70 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       status: "on_loan",
       loaned_by: auth.id,
       notes: notes ?? null,
+      // OUT leg (0242) — a supplier borrow defaults to shipping straight to the
+      // customer unless the operator routes it via the warehouse.
+      out_route: outRoute ?? "supplier_customer",
+      out_partner_id: outPartnerId ?? null,
     })
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, suppliers(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, suppliers(name), delivery_partners(name)",
     )
     .single();
   if (loanErr) {
     const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ loan: mapLoanRow(loan) });
+});
+
+// POST /:id/loan-update — edit an existing loan's logistics-leg fields (0242):
+// change the OUT route, (re)assign the OUT logistic, or set/clear the supplier
+// return-by override. Only the provided fields are touched (RLS bounds it to the
+// caller's order).
+orderControlRouter.post("/:id/loan-update", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = updateLoanInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "Invalid loan update" },
+      422,
+    );
+  }
+  const { loanId, outRoute, outPartnerId, supplierReturnDue } = parsed.data;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (outRoute !== undefined) patch.out_route = outRoute;
+  if (outPartnerId !== undefined) patch.out_partner_id = outPartnerId;
+  if (supplierReturnDue !== undefined) patch.supplier_return_due = supplierReturnDue;
+  if (Object.keys(patch).length === 1) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "No fields to update" },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: loan, error } = await sb
+    .from("ops_sofa_loans")
+    .update(patch)
+    .eq("id", loanId)
+    .eq("order_id", orderId)
+    .select(
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+    )
+    .single();
+  if (error) {
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   return c.json({ loan: mapLoanRow(loan) });
@@ -1006,7 +1098,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
       422,
     );
   }
-  const { loanId } = parsed.data;
+  const { loanId, returnRef } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
   const { data: loan, error: loanErr } = await sb
@@ -1036,7 +1128,11 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
   const now = new Date().toISOString();
   const { error: upErr } = await sb
     .from("ops_sofa_loans")
-    .update({ returned_to_supplier_at: now, updated_at: now })
+    .update({
+      returned_to_supplier_at: now,
+      updated_at: now,
+      ...(returnRef ? { supplier_return_ref: returnRef } : {}),
+    })
     .eq("id", loanId)
     .is("returned_to_supplier_at", null);
   if (upErr) {

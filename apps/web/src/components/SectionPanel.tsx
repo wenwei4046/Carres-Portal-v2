@@ -50,7 +50,9 @@ export function SectionBand({
   onToggle,
   total,
   right,
+  leading,
   toggleTestId,
+  strong,
 }: {
   title: string;
   /** Alarm section (list CHASE NOW) — title ink reads dark red. */
@@ -61,10 +63,21 @@ export function SectionBand({
   total?: number;
   /** Status chip / ⋮ menu / extra control at the band's right edge. */
   right?: ReactNode;
+  /** Optional leading node before the title (e.g. the order-drawer step badge
+   *  that ties a tab header to its journey-spine node). Omit = unchanged. */
+  leading?: ReactNode;
   toggleTestId?: string;
+  /** Step-darker band (the base-200 token) for surfaces that stack many groups
+   *  on white and need real separation — the Orders-list facet rail. Default
+   *  keeps the lighter shared band (order-drawer panels). */
+  strong?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-md pl-2 pr-1.5 py-1.5 shrink-0 section-band">
+    <div
+      className={`flex items-center gap-1 rounded-md pl-2 pr-1.5 py-1.5 shrink-0 section-band ${
+        strong ? "!bg-base-200" : ""
+      }`}
+    >
       <button
         type="button"
         onClick={onToggle}
@@ -78,6 +91,7 @@ export function SectionBand({
         ) : (
           <ChevronDown size={14} className="shrink-0 text-base-500" aria-hidden="true" />
         )}
+        {leading}
         <span
           /* v4 §11c — panel header is DARK 12/600 (muted headers were
              unreadable; muted is for meta only). */

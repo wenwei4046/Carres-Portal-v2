@@ -56,6 +56,7 @@ const SUPPLIER: SupplierRow = {
   cat_covered: ["sofa"],
   lead_time: "10–14 days",
   contact: "+60 3-2222 2222",
+  whatsapp_group_url: null,
 };
 
 function makePo(overrides: Partial<operationPoListRow> = {}): operationPoListRow {

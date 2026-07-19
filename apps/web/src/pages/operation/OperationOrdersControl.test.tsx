@@ -509,7 +509,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
     // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
     // merge into Order, Customer absorbs Region (caption line), Logistic became
-    // Delivery (truth-ladder words) and the "Next" verb closes the row.
+    // Delivery (truth-ladder words) and the "Manage" pills close the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -521,10 +521,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Stock",
       "Delivery",
       "PIC", // staff owner — its own column (Jess 2026-07-18)
-      "Next",
+      "Manage", // all NEXT actions as tone-coloured pills (Jess 2026-07-19)
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
-    // stays on that cell; the row always renders its three status dots.
+    // stays on that cell; the Status cell names the pipeline STAGE in words.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
@@ -532,9 +532,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const orderCell = within(row).getByText("SO-3012").closest("td")!;
     expect(orderCell).toHaveAttribute("title", "012-3456789");
     expect(within(row).getByText("TCF2024/06-461").closest("td")).toBe(orderCell);
-    // Option C (round-3): quiet-when-good — the Status cell renders either a
-    // single green ✓ or only the amber/red line icons, never bare dots.
-    expect(within(row).getByTestId("row-dots").children.length).toBeGreaterThan(0);
+    // Status (Jess 2026-07-19): the Status cell shows the STAGE word (same
+    // vocabulary as the tabs). A native placed order reads "Placed" as a pill.
+    const stagePill = within(row).getByText("Placed");
+    expect(stagePill).toBeInTheDocument();
+    expect(stagePill.className).toContain("pill");
   });
 
   it("a delivered order NEVER shows the red over pill (guardrail #2)", () => {
@@ -756,13 +758,13 @@ describe("orders export", () => {
 
   it("bulk Export menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
     wrap(<OperationOrdersControl />);
-    // Export/print live behind the row checkboxes + the bulk-bar Export ▾ menu
-    // (tick one customer → Export → Print prints just that order).
+    // Export/print live behind the row checkboxes + the bulk-bar More ▾ menu
+    // (tick one customer → More → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menuitem", { name: /Export CSV/ })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
+      screen.getByRole("menuitem", { name: /Print \/ Save as PDF/ }),
     ).toBeInTheDocument();
   });
 
@@ -782,8 +784,8 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
@@ -805,8 +807,8 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Print \/ Save as PDF/ }));
 
     expect(open).toHaveBeenCalledTimes(1);
     expect(fakeWin.document.write).toHaveBeenCalledTimes(1);
@@ -814,6 +816,38 @@ describe("orders export", () => {
     expect(fakeWin.document.write.mock.calls[0][0]).toContain("SO-");
 
     open.mockRestore();
+  });
+
+  it("bulk Logistic ⋮ → Chase opens the partner chase review", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    // Option B: counterparty menus, not verb buttons — open Logistic ⋮ first.
+    fireEvent.click(screen.getByRole("button", { name: "Logistic" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    expect(screen.getByTestId("chase-partner-review")).toBeInTheDocument();
+  });
+
+  it("bulk Supplier ⋮ → Chase opens the supplier chase review", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
+  });
+
+  it("DEADLINE band is multi-select — two buckets can be active at once (B redesign)", () => {
+    wrap(<OperationOrdersControl />);
+    const grp = within(screen.getByTestId("filter-deadline"));
+    const overdue = grp.getByRole("button", { name: /^Overdue/ });
+    const nextWeek = grp.getByRole("button", { name: /^Next week/ });
+    fireEvent.click(overdue);
+    fireEvent.click(nextWeek);
+    expect(overdue).toHaveAttribute("aria-pressed", "true");
+    expect(nextWeek).toHaveAttribute("aria-pressed", "true");
+    // A second click clears just that one (still multi, independent).
+    fireEvent.click(overdue);
+    expect(overdue).toHaveAttribute("aria-pressed", "false");
+    expect(nextWeek).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -903,6 +937,21 @@ describe("nextActionOf (C2)", () => {
   it("ready + carrier + no ETA → Chase logistic", () => {
     const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
     expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
+  });
+
+  it("Master says Ready (line_stock_status) → logistic track, NOT Chase supplier (#5 fix)", () => {
+    // The AutoCount SKU misses the catalog so stockReadiness = "awaiting", but
+    // the Master import marked every line ready → NEXT must follow the STOCK
+    // column and move to the logistic track (Assign logistic here), not stay on
+    // "Chase supplier" (Jess 2026-07-19 #5).
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, source_po: "PO/1" }],
+      ops_order_control: { line_stock_status: { "mattress:MAT-1": "ready" } },
+    });
+    // stock arg = the awaiting SKU-mismatch signal the row would pass.
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistic");
   });
 
   // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──

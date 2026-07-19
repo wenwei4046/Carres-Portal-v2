@@ -96,6 +96,7 @@ const SUPPLIER_A = {
   cat_covered: ["mattress", "bedframe"],
   lead_time: "5–7 days",
   contact: "+60 3-1111 1111",
+  whatsapp_group_url: null,
 };
 const SUPPLIER_B = {
   id: "11111111-1111-1111-1111-000000000002",
@@ -104,6 +105,7 @@ const SUPPLIER_B = {
   cat_covered: ["sofa"],
   lead_time: "10–14 days",
   contact: "+60 3-2222 2222",
+  whatsapp_group_url: null,
 };
 
 const WAREHOUSE_KL = {

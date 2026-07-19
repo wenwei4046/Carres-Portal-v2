@@ -7,6 +7,7 @@ import {
   buildLogisticChase,
   buildSupplierReminder,
   buildSupplierChase,
+  buildPartnerGroupMessage,
   itemsBlock,
   rmAmount,
   salutationOf,
@@ -162,5 +163,43 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
 
   it("waEncode is wa.me-ready — real line breaks become %0A", () => {
     expect(waEncode("a b\nc")).toBe("a%20b%0Ac");
+  });
+
+  it("partner GROUP message — one message covers many deliveries, REF-led", () => {
+    const rows = [
+      {
+        ref: "CR0902",
+        customer: "Lee Wei Yang",
+        region: "Puchong",
+        deadline: "6 Jul 26",
+        overdue: false,
+        items: [{ sku: "L1201F-K", qty: 1 }],
+      },
+      {
+        ref: "TCF0544",
+        customer: "Tan",
+        region: "Johor",
+        deadline: "2 Jul 26",
+        overdue: true,
+        items: [{ sku: "SOF-3RA", qty: 2 }],
+      },
+    ];
+    const r = buildPartnerGroupMessage("remind", "NETS", rows);
+    const c = buildPartnerGroupMessage("chase", "NETS", rows);
+    for (const t of [r, c]) {
+      expect(t).toContain("Hi NETS 👋");
+      // Each delivery is its own block — REF-led, never the SO.
+      expect(t).toContain("_CR0902_ — Lee Wei Yang (Puchong)");
+      expect(t).toContain("_TCF0544_ — Tan (Johor)");
+      expect(t).toContain("1× L1201F-K");
+      expect(t).toContain("2× SOF-3RA");
+      expect(t).toContain("2 deliveries.");
+      expect(t).not.toMatch(/SO-\d+/);
+    }
+    // The overdue delivery is tagged only on that block.
+    expect(r).toContain("by 6 Jul 26\n");
+    expect(c).toContain("by 2 Jul 26 — overdue");
+    expect(r).toContain("please confirm the delivery date");
+    expect(c).toContain("following up");
   });
 });

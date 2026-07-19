@@ -28,6 +28,7 @@ import {
   MoreVertical,
   Package,
   PackagePlus,
+  Wrench,
   Paperclip,
   Pencil,
   Phone,
@@ -547,6 +548,7 @@ interface DrawerBodyProps {
  */
 function Panel({
   title,
+  leading,
   summary,
   actions,
   collapsedAction,
@@ -556,6 +558,9 @@ function Panel({
   children,
 }: {
   title: string;
+  /** Optional step badge before the title — ties this tab header to its
+   *  journey-spine node (same number + colour). */
+  leading?: ReactNode;
   /** Pinned to the header's right edge — the at-a-glance status badge. */
   summary?: ReactNode;
   /** Header ⋮ menu — this panel's own actions (Jess 2026-07-11). */
@@ -606,6 +611,7 @@ function Panel({
     >
       <SectionBand
         title={title}
+        leading={leading}
         collapsed={!open}
         onToggle={toggle}
         right={
@@ -706,8 +712,21 @@ function MiniBadge({
 
 /** 42px listing-thumb fallback — the line's CATEGORY icon (no product photos
  *  in the order payload yet; when photoUrl lands, render it here instead). */
-function CatIcon({ cat }: { cat: "mattress" | "bedframe" | "sofa" | "acc" }) {
-  const I = cat === "mattress" ? BedDouble : cat === "bedframe" ? Bed : cat === "sofa" ? Sofa : Package;
+function CatIcon({
+  cat,
+}: {
+  cat: "mattress" | "bedframe" | "sofa" | "acc" | "service";
+}) {
+  const I =
+    cat === "mattress"
+      ? BedDouble
+      : cat === "bedframe"
+        ? Bed
+        : cat === "sofa"
+          ? Sofa
+          : cat === "service"
+            ? Wrench
+            : Package;
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
 }
 
@@ -1707,6 +1726,10 @@ function DrawerBody({
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
+  // Which spine step the operator clicked (Jess 甲 2026-07-19) — disambiguates
+  // the two Balance steps (deposit vs balance) so the tab header wears the
+  // clicked step's number + colour. null = opened via nav / not a step.
+  const [clickedStep, setClickedStep] = useState<number | null>(null);
   // S4 (2026-07-18) — ‹prev/next› keeps the drawer mounted, so `tab` carries
   // across orders; if the new order doesn't offer the current tab (Storage
   // hides without MS/BF/SOF goods), fall back to Items instead of a blank pane.
@@ -1967,6 +1990,119 @@ function DrawerBody({
     (a, b) => Number(b.urgency === "overdue") - Number(a.urgency === "overdue"),
   );
 
+  // THE journey spine — extracted so each tab header can wear the SAME step
+  // number + colour as its spine node (Jess 甲 2026-07-19): one numbered journey,
+  // whether you read the rail (overview) or the header (you-are-here).
+  // Each step reads as 3 lines (Jess 2026-07-19): panel (which tab it opens) ·
+  // action (what to do at this step) · sub (the live description).
+  const journeySteps: {
+    panel: string;
+    title: string;
+    sub: string;
+    state: JourneyState;
+    tab: DrawerTab;
+  }[] = [
+    {
+      panel: "Balance",
+      title: "Collect deposit",
+      tab: "balance",
+      state: collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
+      sub:
+        collectedAll > 0
+          ? `${RM(collectedAll)} in`
+          : totalSet
+            ? "nothing received yet"
+            : "—",
+    },
+    {
+      panel: "Items",
+      title: "Stock ready",
+      tab: "items",
+      state:
+        deliveredDone || (goodsN > 0 && readyN >= goodsN)
+          ? "done"
+          : stockTone === "danger"
+            ? "act"
+            : "wait",
+      sub: deliveredDone
+        ? "all delivered"
+        : `${readyN}/${goodsN} ready${
+            goodsN - readyN > 0 ? ` · waiting ${goodsN - readyN}` : ""
+          }`,
+    },
+    {
+      panel: "Balance",
+      title: "Collect balance",
+      tab: "balance",
+      state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
+      sub: !totalSet
+        ? "nothing owing on record"
+        : balanceDue > 0
+          ? `still owes ${RM(balanceDue)} · before delivery`
+          : "all paid",
+    },
+    ...(hasMsbf || hasSof
+      ? [
+          {
+            panel: "Storage",
+            title: "Hold & charge",
+            tab: "storage" as DrawerTab,
+            state: storageOwing
+              ? storageGate === "hold"
+                ? ("act" as const)
+                : ("wait" as const)
+              : storageIncurred && storageCleared
+                ? ("done" as const)
+                : ("todo" as const),
+            sub: storageOwing
+              ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
+              : storageIncurred && storageCleared
+                ? "collected"
+                : supplierLate
+                  ? "waiting supplier — not counting"
+                  : "not counting",
+          },
+        ]
+      : []),
+    // Loaner — a conditional step BEFORE Deliver (Jess 2026-07-19): when a
+    // substitute is out it lives IN the journey (swapped back at delivery).
+    ...(liveLoanCount > 0
+      ? [
+          {
+            panel: "Loan",
+            title: "Loaner out",
+            tab: "loan" as DrawerTab,
+            state: "wait" as const,
+            sub: `${liveLoanCount} out · back at delivery`,
+          },
+        ]
+      : []),
+    {
+      panel: "Delivery",
+      title: "Deliver",
+      tab: "delivery",
+      state: deliveredDone
+        ? "done"
+        : logisticTone === "danger"
+          ? "act"
+          : "wait",
+      sub: deliveredDone
+        ? "delivered"
+        : `${assignedLogisticName ?? "no partner yet"}${
+            logisticTone === "danger" ? " · not booked" : ""
+          }`,
+    },
+  ];
+  // The step badge a tab header wears: the clicked step when it matches this
+  // tab (Balance = 2 steps), else the tab's first step. Non-journey tabs → none.
+  const stepBadgeFor = (t: DrawerTab): ReactNode => {
+    const i =
+      clickedStep != null && journeySteps[clickedStep]?.tab === t
+        ? clickedStep
+        : journeySteps.findIndex((s) => s.tab === t);
+    return i < 0 ? null : <StepBadge n={i + 1} state={journeySteps[i].state} />;
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {receivePo && (
@@ -2123,7 +2259,7 @@ function DrawerBody({
         {/* LEFT — customer identity + the section rail. */}
         <div
           className={`shrink-0 flex flex-col gap-2.5 min-h-0 ${
-            railCollapsed ? "w-14" : "w-[260px]"
+            railCollapsed ? "w-14" : "w-[280px]"
           }`}
         >
           <CustomerIdentityCard
@@ -2152,84 +2288,13 @@ function DrawerBody({
               exist) → deliver. Collapsed rail shows nodes only. */}
           {(
             <JourneyCard
-              onGo={setTab}
+              onGo={(t, i) => {
+                setTab(t);
+                setClickedStep(i);
+              }}
               activeTab={tab}
               collapsed={railCollapsed}
-              steps={[
-                {
-                  title: "Collect deposit",
-                  tab: "balance",
-                  state:
-                    collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
-                  sub:
-                    collectedAll > 0
-                      ? `${RM(collectedAll)} in`
-                      : totalSet
-                        ? "nothing received yet"
-                        : "—",
-                },
-                {
-                  title: "Goods ready",
-                  tab: "items",
-                  state:
-                    deliveredDone || (goodsN > 0 && readyN >= goodsN)
-                      ? "done"
-                      : stockTone === "danger"
-                        ? "act"
-                        : "wait",
-                  sub: deliveredDone
-                    ? "all delivered"
-                    : `${readyN}/${goodsN} ready${
-                        goodsN - readyN > 0 ? ` · waiting ${goodsN - readyN}` : ""
-                      }`,
-                },
-                {
-                  title: "Collect balance",
-                  tab: "balance",
-                  state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
-                  sub: !totalSet
-                    ? "nothing owing on record"
-                    : balanceDue > 0
-                      ? `still owes ${RM(balanceDue)} · before delivery`
-                      : "all paid",
-                },
-                ...(hasMsbf || hasSof
-                  ? [
-                      {
-                        title: "Storage",
-                        tab: "storage" as DrawerTab,
-                        state: storageOwing
-                          ? storageGate === "hold"
-                            ? ("act" as const)
-                            : ("wait" as const)
-                          : storageIncurred && storageCleared
-                            ? ("done" as const)
-                            : ("todo" as const),
-                        sub: storageOwing
-                          ? `${storageCharge > 0 ? RM(storageCharge) : "fee"} unpaid`
-                          : storageIncurred && storageCleared
-                            ? "collected"
-                            : supplierLate
-                              ? "waiting supplier — not counting"
-                              : "not counting",
-                      },
-                    ]
-                  : []),
-                {
-                  title: "Deliver",
-                  tab: "delivery",
-                  state: deliveredDone
-                    ? "done"
-                    : logisticTone === "danger"
-                      ? "act"
-                      : "wait",
-                  sub: deliveredDone
-                    ? "delivered"
-                    : `${assignedLogisticName ?? "no partner yet"}${
-                        logisticTone === "danger" ? " · not booked" : ""
-                      }`,
-                },
-              ]}
+              steps={journeySteps}
             />
           )}
           <nav
@@ -2358,7 +2423,8 @@ function DrawerBody({
               column-header row and the 268px inner scroll cap (the table
               runs full length; the tab column scrolls). */}
           <Panel
-            title="Items ordered"
+            title="Items"
+            leading={stepBadgeFor("items")}
             summary={
               /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
                  needs stock", from the SAME shared lineReadiness the row pills
@@ -2883,26 +2949,32 @@ function DrawerBody({
                         </td>
                       </tr>
                     );
-                    // rev17 (Jess) — a SMALL order (≤5 lines) reads FLAT: no
-                    // "Needs action 1" band over a single row (the counters
-                    // said one thing three times); the row's own Status pill
-                    // IS the message, Chase-Now style. Groups are for BIG
-                    // orders only.
-                    if (orderedLines.length <= 5) {
+                    // Items ALWAYS split by category (Jess 2026-07-19, supersedes
+                    // the rev17 "≤5 reads flat" call): every category present gets
+                    // its own header + rows — Mattress · Bedframe · Sofa ·
+                    // Accessory · Service. A single-line order stays flat.
+                    if (orderedLines.length <= 1) {
                       return orderedLines.map(renderRow);
                     }
+                    // Service lines fall to "acc" under lineCategory — split them
+                    // into their OWN group so Accessory ≠ Service.
+                    const groupCatOf = (
+                      sku: string,
+                    ): "mattress" | "bedframe" | "sofa" | "acc" | "service" =>
+                      lineKind(sku) === "service" ? "service" : lineCategory(sku);
                     const CATS: {
-                      key: "mattress" | "bedframe" | "sofa" | "acc";
+                      key: "mattress" | "bedframe" | "sofa" | "acc" | "service";
                       label: string;
                     }[] = [
                       { key: "mattress", label: "Mattress" },
                       { key: "bedframe", label: "Bedframe" },
                       { key: "sofa", label: "Sofa" },
                       { key: "acc", label: "Accessory" },
+                      { key: "service", label: "Service" },
                     ];
                     return CATS.map(({ key, label }) => {
                       const rows = orderedLines.filter(
-                        (l) => lineCategory(l.sku) === key,
+                        (l) => groupCatOf(l.sku) === key,
                       );
                       if (rows.length === 0) return null;
                       const needN = rows.filter(needsLine).length;
@@ -3032,6 +3104,7 @@ function DrawerBody({
               obligation). The lend entry stays even at 0 loans. */}
           <Panel
             title="Loan"
+            leading={stepBadgeFor("loan")}
             summary={
               liveLoanCount > 0 ? (
                 <MiniBadge tone="waiting">{liveLoanCount} out</MiniBadge>
@@ -3055,6 +3128,8 @@ function DrawerBody({
                 ),
               ]}
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
+              logisticEta={bookedEta}
+              partners={partnersData?.partners ?? []}
             />
           </Panel>
           </SectionCard>
@@ -3087,6 +3162,7 @@ function DrawerBody({
           <SectionCard>
           <Panel
             title="Balance"
+            leading={stepBadgeFor("balance")}
             actions={
               /* §7.4 ⋮ — Generate invoice (server data → client PDF, same path
                  as DownloadInvoiceButton) + Print receipt (latest payment). */
@@ -3242,6 +3318,7 @@ function DrawerBody({
             <SectionCard className="shrink-0">
             <Panel
               title="Storage"
+              leading={stepBadgeFor("storage")}
               // Tab context — landing on the Storage TAB shows the card open.
               defaultOpen
               summary={
@@ -3369,6 +3446,7 @@ function DrawerBody({
           <SectionCard className="shrink-0">
           <Panel
             title="Delivery"
+            leading={stepBadgeFor("delivery")}
             actions={
               /* Round 1A ⋮ discipline: only WIRED actions — Print DO hidden
                  until 1B. */
@@ -3981,6 +4059,7 @@ function CustomerIdentityCard({
     customer_name: string | null;
     customer_phone: string | null;
     customer_address: string | null;
+    source_ref?: string[] | null;
     /** POS entry extras — `fields.building_type` shows under the address. */
     entry_data?: Record<string, unknown> | null;
   };
@@ -4055,14 +4134,23 @@ function CustomerIdentityCard({
             <span className="font-mono font-bold text-[12px] text-white bg-base-900 rounded-[5px] px-1.5 py-0.5 shrink-0">
               #{order.so}
             </span>
+            {/* Customer/supplier REF — the CR/TCF the suppliers recognise (Jess
+                2026-07-19). One order can carry several; show the first + "+N". */}
+            {(order.source_ref ?? []).length > 0 && (
+              <span
+                className="font-mono text-[12px] text-base-700 bg-base-100 border border-base-200 rounded-[5px] px-1.5 py-0.5 shrink-0"
+                title={(order.source_ref ?? []).join(" · ")}
+              >
+                {(order.source_ref ?? [])[0]}
+                {(order.source_ref ?? []).length > 1
+                  ? ` +${(order.source_ref ?? []).length - 1}`
+                  : ""}
+              </span>
+            )}
             {/* State PILL (rev 9 shell spec) + the region as quiet text. */}
             <span
               className={`pill text-[12px] shrink-0 ${
-                statusWord === "On hold"
-                  ? "pill-warning"
-                  : statusWord === "Delivered"
-                    ? "pill-confirmed"
-                    : "pill-neutral"
+                statusWord === "On hold" ? "pill-warning" : "pill-neutral"
               }`}
             >
               {statusWord}
@@ -4837,16 +4925,44 @@ async function viewSlip(p: OrderPaymentRow) {
  *  vocabulary; numbers may shift when the Storage step is absent.
  *  Collapsed rail → nodes only. */
 type JourneyState = "done" | "act" | "wait" | "todo";
+
+/** The step-number badge a tab header wears — SAME number + colour as its
+ *  journey-spine node, so the drawer reads as one numbered journey (Jess 甲). */
+function StepBadge({ n, state }: { n: number; state: JourneyState }) {
+  return (
+    <span
+      className={`shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ${
+        state === "done"
+          ? "bg-base-200 text-base-500"
+          : state === "act"
+            ? "bg-error-soft text-danger ring-1 ring-danger"
+            : state === "wait"
+              ? "bg-warning-soft text-warning"
+              : "bg-white border-2 border-base-300 text-base-400"
+      }`}
+      aria-hidden="true"
+    >
+      {n}
+    </span>
+  );
+}
+
 function JourneyCard({
   steps,
   activeTab,
   collapsed,
   onGo,
 }: {
-  steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
+  steps: {
+    panel: string;
+    title: string;
+    sub: string;
+    state: JourneyState;
+    tab: DrawerTab;
+  }[];
   activeTab: DrawerTab;
   collapsed: boolean;
-  onGo: (t: DrawerTab) => void;
+  onGo: (t: DrawerTab, stepIndex: number) => void;
 }) {
   return (
     <div
@@ -4863,7 +4979,7 @@ function JourneyCard({
           <button
             key={st.title}
             type="button"
-            onClick={() => onGo(st.tab)}
+            onClick={() => onGo(st.tab, i)}
             aria-selected={active}
             title={`${st.title} — ${st.sub}`}
             className={`relative w-full flex items-start text-left group rounded-lg ${
@@ -4880,14 +4996,14 @@ function JourneyCard({
                 className={`absolute ${
                   collapsed ? "left-1/2 -translate-x-1/2" : "left-[17px]"
                 } top-8 bottom-0 w-0.5 ${
-                  groundDone ? "bg-base-800" : "bg-base-200"
+                  groundDone ? "bg-base-300" : "bg-base-200"
                 }`}
               />
             )}
             <span
               className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
                 st.state === "done"
-                  ? "bg-base-800 text-white"
+                  ? "bg-base-200 text-base-500"
                   : st.state === "act"
                     ? "bg-error-soft text-danger ring-2 ring-danger"
                     : st.state === "wait"
@@ -4895,10 +5011,15 @@ function JourneyCard({
                       : "bg-white border-2 border-base-300 text-base-400"
               }`}
             >
-              {st.state === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}
+              {i + 1}
             </span>
             {!collapsed && (
               <span className="min-w-0">
+                {/* line 1 — which panel this step opens (Jess 2026-07-19) */}
+                <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-base-400">
+                  {st.panel}
+                </span>
+                {/* line 2 — the step's action */}
                 <span
                   className={`block text-[13px] font-semibold group-hover:underline ${
                     active ? "text-info" : "text-base-900"

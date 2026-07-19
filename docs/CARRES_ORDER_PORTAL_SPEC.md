@@ -161,5 +161,18 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
 ## Build order
-1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·Loan 剩样式还债已清(功能照旧)。
+1. 详情页(feat/orders-drawer):布局✓·Items §9✓·Balance §10✓·Delivery §12✓·Storage §11✓(rev21 2026-07-18)·**Loan 定稿✓(2026-07-19,`f24065b6`,未 deploy)**。Loan = "ON MISSION" grounded-card 语言(Jess 从她的行程 sample 拍板;白/飘/全 pill 方向作废):每张 loaner = grounded 白卡(icon header · `BORROWED · <供应商>`/`Warehouse · Klang` · 品名 · loaned 日期右上)+ labeled 行(Condition/Category · Loan DO 内嵌链接 · At customer 等待/✓Collected+Collect-swap · **Return by** 日期+tone);**pill 全退**,状态靠绿✓/琥珀行托底/红行托底。供应商 **return-by** 从 notes(`expected return YYYY-MM-DD`)读回、现形+催(`in Nd`琥珀 / `overdue Nd`红),真列=1B。**仓库挑货 = 有什么借什么(不配客户尺寸,"got what we borrow what")**,全信息(品名·状况·库龄·**原始 PO**·free 数,同款合并)·展示品优先·新货压后+sellable 软提醒;**sofa** 借出前勾"能进得去"。Portal 通用设计 DNA(此后新 UI 都照)= grounded 卡 + icon 分类通道 + labeled 行 + pills-retired。
+   **Loan 完整清单(2026-07-19,全部 push 到 `feat/orders-drawer`,⚠️ 未 deploy —— deploy 交一个人管、只 deploy 分支不 deploy main)：**
+   - `44a842c5` Loan 卡 = ON MISSION grounded 卡:category icon(复用 Items 面板 map)+ 原始 PO(API join `ops_stock_items.po_no`→`item_po`)+ 「Collected back」措辞。
+   - `cfa38192` **Loaner 进「WHERE THIS ORDER IS」spine**(条件步,`liveLoanCount>0` 才出现,排 Deliver 前,琥珀「N out · back at delivery」)。
+   - `e146a98f` **甲:每个 tab header 戴对应 spine 步的编号+同色**(`stepBadgeFor`+`StepBadge`;`journeySteps` 抽成 const;点的步存 `clickedStep` 区分 Balance 两步;`SectionBand`/`Panel` 加可选 `leading` slot,列表等其它一律不变)。
+   - `dc83c988` **spine 步 3 行**:面板小标(大写)/ 动作(粗)/ 描述;命名:Balance·Collect deposit / **Items·Stock ready** / Balance·Collect balance / Storage·Hold & charge / Loan·Loaner out / Delivery·Deliver(「Items ordered」→「Items」)。
+   - `64b60d59` **完成步 = 灰节点显数字**(不再黑底✓;connector 黑→灰;完成退到背景)。
+   - `cbdcf35d` **REF chip**:`order.source_ref[0]`(CR/TCF)灰 mono chip 接在黑 #SO 后(+"+N",hover 全部)。
+   - `449576bd` **Items 永远按类别分**(rev17「≤5 平铺」作废,只单行平铺)+ 新 **Service** 组(service 行原落 Accessory,现按 lineKind 拆出 + Wrench icon)。
+   - `bc146320` **Route 卡可编辑**(点 Route→Direct/Via warehouse inline,存 `POST /loan-update`)+ **Return-by 自动**(有 logistic ETA 跟 ETA,否则 `loaned_at+14d`,标「auto」;可键入覆盖写 `supplier_return_due` / clear 回 auto)+ **左栏 260→280px** + **Delivered pill 绿→灰**(对齐 journey「done=灰」)。
+   - `a0bf3b91` **OUT 腿选物流伙伴**(delivery_partners 传入 LoanPanel;borrow 表单 +「Logistic…」;卡 route-edit +伙伴下拉;存 `/loan-update` outPartnerId)。
+   - **migration `0242_loan_logistics_legs.sql`**(已上 prod,additive+dormant):`ops_sofa_loans` +`out_route`/`out_partner_id`/`dispatched_at`/`arrived_warehouse_at`/`loan_note_no`/`loan_note_signed_at`/`supplier_return_due`/`supplier_return_ref` + `ops_loan_note_seq`。
+   - **验证法**:web dev 连 prod API 看不到新 API 字段 → API 侧改动用**本地 API**(`preview_start name:"api"` :8888 + `web-local-api` :5197)对 prod 数据实测。
+   - **Loan 物流腿剩下的**:IN 腿(送货那天「Collected back」自动绑送货同趟)· 还供应商腿(软还款期✓,差「搭供应商送新货那趟」的 `supplier_return_ref`)· ON LOAN 送货单文件(LN-xxxx,`ops_loan_note_seq`;sequence 要给 authenticated 授权或用 DEFINER fn)。
 2. 1B:⋮真动作·wa.me直发+存号·OCR收据·last_chased_at。 3. List §14。 4. Bulk bar。 5. AL 调货引擎(专门 chat)。

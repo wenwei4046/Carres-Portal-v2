@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carres Ops Briefing — 22 Jul 26</title>
+<style>
+  :root{--ink:#111827;--sub:#6B7280;--line:#E5E7EB;--band:#F1EFE8;--red:#E24B4A;--amber:#B45309;--green:#3B6D11;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Inter,-apple-system,sans-serif;}
+  body{background:#F3F4F6;padding:30px;color:var(--ink);max-width:900px;margin:0 auto;}
+  h1{font-size:22px;font-weight:700;}
+  .date{font-size:13px;color:var(--sub);margin-bottom:20px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:14px;}
+  h2{font-size:14px;font-weight:700;margin-bottom:8px;letter-spacing:.02em;}
+  p,li{font-size:13.5px;line-height:1.65;}
+  ul{padding-left:18px;}
+  li{margin-bottom:4px;}
+  b.red{color:var(--red);} b.amber{color:var(--amber);} b.green{color:var(--green);}
+  .verb{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#F9FAFB;border:1px solid var(--line);border-radius:6px;padding:1px 7px;}
+  table{border-collapse:collapse;width:100%;margin-top:6px;}
+  th,td{font-size:13px;padding:6px 10px;border-top:1px solid #F3F4F6;text-align:left;}
+  th{background:#F9FAFB;font-size:11px;letter-spacing:.05em;color:#374151;}
+  .rule{color:var(--sub);font-size:12.5px;}
+</style>
+</head>
+<body>
+<h1>Carres Orders — the new way, in 5 minutes</h1>
+<div class="date">Team briefing · Wed 22 Jul 26 · 10:30 (Jess leads; we start using it after this)</div>
+
+<div class="card">
+  <h2>1 · Your day = the QUEUES on the left, four verbs</h2>
+  <p>Every order's <b>NEXT</b> column tells you the next step. The QUEUES on the left are just the totals of those steps — click one to get the list:</p>
+  <table>
+    <tr><th>Verb</th><th>What it means</th><th>Who does it</th></tr>
+    <tr><td><span class="verb">Order PO</span> <b class="red">red</b></td><td>Goods not yet ordered from the supplier</td><td><b>PO duty person</b></td></tr>
+    <tr><td><span class="verb">Chase supplier</span> <b class="amber">amber</b></td><td>PO placed, goods not in the warehouse yet → chase the factory</td><td><b>PO duty person</b></td></tr>
+    <tr><td><span class="verb">Assign logistic</span></td><td>No carrier picked yet</td><td>PIC (your own orders)</td></tr>
+    <tr><td><span class="verb">Chase logistic</span></td><td>Carrier picked, slot not fixed with the customer → chase the carrier</td><td>PIC (your own orders)</td></tr>
+  </table>
+  <p class="rule" style="margin-top:8px">Overdue = the delivery date we promised has passed and it's not delivered (a result). Who to chase is in that row's NEXT. Owing = the customer still owes money (PIC chases).</p>
+</div>
+
+<div class="card">
+  <h2>2 · PIC = your customers (orders are split per person)</h2>
+  <ul>
+    <li>Every order has one PIC (your avatar chip). Click your own avatar top-right = see only your orders.</li>
+    <li><b>You chase the money (Owing) and the delivery (logistic)</b>; if the customer calls, you answer.</li>
+    <li>Chase the customer / carrier with the system's <b>Chase</b> button → <b>one merged message</b> per counterparty per day. Don't fire off scattered messages.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>3 · PO duty (goods bought together) — Jul Shasha · Aug Li Ching · Sep Khor Yee</h2>
+  <ul>
+    <li>POs are <b>raised company-wide, together</b> — never split per person. <b>Only the duty person (+ management) can press Raise PO.</b></li>
+    <li>Every <b>Mon / Thu = PO day</b>: the system opens a task for the duty person + a banner on Orders → tick the orders → Raise PO → one card per supplier → Send each.</li>
+    <li><b class="red">Red urgent orders</b> (deadline inside the stock window: mattress/bedframe 7 days · sofa 5 days) must be raised <b>immediately, any day</b> — don't wait for PO day.</li>
+    <li><b>Only the duty person is the single voice to a supplier on WhatsApp.</b> Want to know when goods arrive → ask the duty person internally, don't poke the supplier yourself. Month-end handover = the open-PO list.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>4 · WhatsApp group rule — one message, one order</h2>
+  <ul>
+    <li><b>One message = one order</b>, <b class="red">start with the REF</b> (e.g. <span class="verb">CR1187 customer wants Saturday delivery</span>).</li>
+    <li><b class="red">No message without a REF</b> — questions, updates, anything: put the REF first, or the group can't trace it.</li>
+    <li>Whoever posts owns the thread to the end (<b>your thread, your follow-up</b>); nobody else picks it up.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>5 · Automatic rules (you don't manage these, but know them)</h2>
+  <ul>
+    <li>First login = auto-joins the pool, auto-gets orders. <b>Creating the account is the only manual step.</b></li>
+    <li><b>Before 10:00</b> not logged in — your share stays yours; <b>after 10:00</b> still not in = the system treats you as absent today, your orders flow to whoever is in; you log in and they flow back. No need to report MC to the system — it knows.</li>
+    <li>The <b>away</b> toggle is only for planned long leave; manual re-assign is Jess / management only.</li>
+    <li>Finished an order → press <b>Mark delivered</b> to clear it. Delivered orders never ring again.</li>
+  </ul>
+</div>
+</body>
+</html>

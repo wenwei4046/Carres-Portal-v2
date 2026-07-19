@@ -12,6 +12,8 @@ import {
   useUpdateStaffSetting,
   useAssignOrderStaff,
   assignOrderStaffRequest,
+  useCatalog,
+  useOperationSuppliers,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
@@ -51,15 +53,18 @@ import {
 } from "@carres/shared";
 import RaisePoReview from "./components/RaisePoReview";
 import type { RaisePoOrder } from "./components/raise-po-plan";
+import ChaseSupplierReview from "./components/ChaseSupplierReview";
+import type { ChaseOrder } from "./components/chase-supplier-plan";
+import ChasePartnerReview, {
+  type PartnerChaseOrder,
+} from "./components/ChasePartnerReview";
 import { useAuth } from "@/lib/auth";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
-  ChevronDown,
   ChevronRight,
   ChevronsLeft,
   Clock,
-  ExternalLink,
   Inbox,
   LayoutGrid,
   PackageOpen,
@@ -72,10 +77,11 @@ import {
   Lock,
   Printer,
   MoreVertical,
+  MoreHorizontal,
+  Bell,
   Users,
-  CircleDollarSign,
-  Package,
   PackagePlus,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -168,14 +174,28 @@ function stageOf(o: operationOrderListRow): OperationStage {
 }
 
 /** Which control tab an order belongs to. */
-function controlTabOf(o: operationOrderListRow): SettledTab {
+function controlTabOf(
+  o: operationOrderListRow,
+  availableBySku?: Map<string, number>,
+): SettledTab {
   const s = stageOf(o);
   if (s === "delivered") return "completed";
+  // Native POS order not yet proceeded stays "placed".
+  if (s === "placed" && o.source_system !== "autocount") return "placed";
+  // In-pipeline (proceeded / autocount / confirmed / in_production / dispatched).
+  // READINESS split (Jess 2026-07-19): the pipeline stage never advances in the
+  // portal (POs are raised outside), so tabs must read the REAL state — Pending
+  // = still waiting on stock OR a delivery slot; Scheduled = stock in AND a slot
+  // booked. Needs the live free-stock map; without it we fall back to the old
+  // stage mapping (used by the param-less `=== "completed"` callers).
+  if (availableBySku) {
+    const stockReady = stockBucketOf(o, availableBySku) === "Ready";
+    const logisticBooked = !!logisticEtaOf(o);
+    return stockReady && logisticBooked ? "scheduled" : "pending";
+  }
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
   if (s === "in_production") return "pending";
-  if (s === "confirmed") return "proceed";
-  // s === "placed": entry rule splits by source.
-  return o.source_system === "autocount" ? "proceed" : "placed";
+  return "proceed"; // confirmed OR autocount-placed
 }
 
 type StockState = "ready" | "in_stock" | "need_po" | "awaiting" | "unknown";
@@ -300,6 +320,41 @@ function toRaisePoOrder(o: operationOrderListRow): RaisePoOrder {
   };
 }
 
+/** Row → the pure Chase-supplier plan input. Suppliers speak the ORIGINAL
+ *  CR/TCF ref (source_ref[0]), never the SO number. */
+function toChaseOrder(o: operationOrderListRow): ChaseOrder {
+  return {
+    id: o.id,
+    so: o.so ?? null,
+    refNo: (o.source_ref ?? []).filter(Boolean)[0] ?? null,
+    deliveryDate: o.delivery_date ?? null,
+    lines: (o.order_lines ?? []).map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty || 0),
+      sourcePo: l.source_po ?? null,
+    })),
+  };
+}
+
+/** Row → the partner (logistic) chase input. Partners speak the ORIGINAL
+ *  CR/TCF ref; the partner is the order-level LP (delivery_partner_id) or the
+ *  Inbox-triaged LP (ops_assigned_logistic). Region = the real delivery place. */
+function toPartnerChaseOrder(o: operationOrderListRow): PartnerChaseOrder {
+  return {
+    id: o.id,
+    partnerId: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
+    refNo: (o.source_ref ?? []).filter(Boolean)[0] ?? null,
+    customer: o.customer_name ?? null,
+    region: locationForAddress(o.customer_address).label,
+    deliveryDate: o.delivery_date ?? null,
+    deliveryTbd: !!o.delivery_date_tbd,
+    lines: (o.order_lines ?? []).map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty || 0),
+    })),
+  };
+}
+
 function daysToDue(o: operationOrderListRow): number | null {
   if (o.delivery_date_tbd || !o.delivery_date) return null;
   const d = new Date(`${o.delivery_date}T00:00:00`);
@@ -308,6 +363,11 @@ function daysToDue(o: operationOrderListRow): number | null {
   today.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
+
+// (supplierDeadlineBucket + supplierLeadDays removed with the SUPPLIER-urgency
+//  rail pills — Jess 2026-07-19 B redesign: deadline is now the ONE shared
+//  customer-deadline DEADLINE band; the supplier stock-window nuance stays in
+//  the NEXT verb's red/amber tone, not a separate filter.)
 
 /** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
 function todayIso(): string {
@@ -403,19 +463,30 @@ export function slackDays(o: operationOrderListRow): number {
  *    Overdue (past) · Urgent (≤1d, today/tomorrow) · Attention (2–3d) ·
  *    Upcoming (4–7d) · Later (7+d).
  *  Completed / TBD / undated orders sit in NO bucket (only "All" shows them). */
-const DUE_BUCKETS = ["Overdue", "Urgent", "Attention", "Upcoming", "Later"] as const;
+// DEADLINE filter buckets (Jess 2026-07-19, B redesign) — the CUSTOMER deadline
+// (delivery_date) is the single shared spine; SUPPLIER + LOGISTIC both filter by
+// it. Multi-select. "Next week" caps at 14d; further-out orders are unbucketed
+// (the filter is opt-in). "Overdue" is ALSO the QUEUES Overdue row (same state).
+const DUE_BUCKETS = ["Overdue", "Due ≤3d", "This week", "Next week"] as const;
 type DueBucket = (typeof DUE_BUCKETS)[number];
-// (B rebuild 2026-07-18: the ladder's only rail surface is the Overdue queue —
-// the per-bucket DUE_DESC strings retired with the Urgent row.)
 function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (controlTabOf(o) === "completed") return null;
   const diff = daysToDue(o);
   if (diff === null) return null;
   if (diff < 0) return "Overdue";
-  if (diff <= 1) return "Urgent";
-  if (diff <= 3) return "Attention";
-  if (diff <= 7) return "Upcoming";
-  return "Later";
+  if (diff <= 3) return "Due ≤3d";
+  if (diff <= 7) return "This week";
+  if (diff <= 14) return "Next week";
+  return null;
+}
+
+/** Immutable toggle of one value in a Set — add if absent, remove if present.
+ *  Powers every multi-select facet (Jess 2026-07-19, B redesign). */
+function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
+  const n = new Set(prev);
+  if (n.has(v)) n.delete(v);
+  else n.add(v);
+  return n;
 }
 
 // (Follow-up + Escalate-to-Jess now live in ops_tasks, keyed per order — see
@@ -460,16 +531,20 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-/** NEXT is plain TEXT in the C rebuild (§14, 2026-07-18) — the pill chrome and
- *  the legacy info-BLUE are gone (blue = selection only). Red text is reserved
- *  for the two genuine dangers (past-deadline Chase logistic + Order PO);
- *  green = Confirm; everything in progress is plain ink; Done is muted. */
-const NEXT_TEXT_COLOR: Record<NextTone, string> = {
-  danger: "#A32D2D",
-  warning: "#374151",
-  info: "#374151",
-  success: "#3B6D11",
-  neutral: "#A8A8A8",
+/** MANAGE column (Jess 2026-07-19): every action is a tone-coloured .pill — one
+ *  consistent language (no more plain-text verb next to a Collect $ pill). Each
+ *  NextTone maps to its status pill: danger→red · warning→amber · info→blue ·
+ *  success→green · neutral→grey. (Money's "Collect $" keeps the distinct indigo
+ *  pill-collected so the independent money track reads apart from the goods/
+ *  delivery action.) */
+const NEXT_PILL_CLASS: Record<NextTone, string> = {
+  danger: "pill-overdue",
+  warning: "pill-warning",
+  // info actions (Assign logistic / Chase logistic-not-yet) are AMBER, not blue:
+  // blue is reserved for SELECTION only (§2 colour law, Jess 2026-07-19).
+  info: "pill-warning",
+  success: "pill-confirmed",
+  neutral: "pill-neutral",
 };
 
 // ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
@@ -585,7 +660,17 @@ export function nextActionOf(
   if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !logisticEtaOf(o))
     return { label: "Chase logistic", tone: "danger" };
 
-  const ready = stock.state === "ready" || stock.state === "in_stock";
+  // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
+  // Master import's per-line `line_stock_status='ready'` (stockEtaOf), but
+  // nextActionOf used to trust ONLY stockReadiness (order_lines vs live
+  // stock_balances) — which is always "awaiting" for AutoCount SKUs that don't
+  // match the catalog → the row stayed on "Chase supplier" even when the STOCK
+  // column showed "Ready". Honour BOTH signals so a Master-ready order flows to
+  // the logistic track (Assign / Chase logistic), matching what the row shows.
+  const ready =
+    stock.state === "ready" ||
+    stock.state === "in_stock" ||
+    stockEtaOf(o).state === "ready";
 
   // STOCK TRACK — leads until the goods are secured.
   if (!ready) {
@@ -721,6 +806,30 @@ const CATEGORY_OPTS: {
   { key: "pillow", label: "Pillow", match: (o) => orderHasAcc(o, "Pillow") },
   { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
 ];
+
+/** Primary supplier of an order = the supplier of its FIRST core line
+ *  (Mattress/Bedframe/Sofa). Mirrors raise-po / chase-supplier resolution:
+ *  catalog `product_skus.supplier_id`, else the SOLE supplier covering that
+ *  category, else unresolved (null). Accessory/service lines never carry a
+ *  supplier here. PURE so the SUPPLIER facet count stays cheap. */
+function primarySupplierId(
+  o: operationOrderListRow,
+  skuMeta: Map<string, { supplierId: string | null; category: string | null }>,
+  suppliers: { id: string; cat_covered: string[] | null }[],
+): string | null {
+  for (const l of o.order_lines ?? []) {
+    const meta = skuMeta.get(l.sku);
+    const cat =
+      meta?.category && (CORE_ORDER as readonly string[]).includes(meta.category)
+        ? meta.category
+        : (lineCategory(l.sku) as string);
+    if (!(CORE_ORDER as readonly string[]).includes(cat)) continue;
+    const covering = suppliers.filter((s) => (s.cat_covered ?? []).includes(cat));
+    const supplierId = meta?.supplierId ?? (covering.length === 1 ? covering[0].id : null);
+    if (supplierId) return supplierId;
+  }
+  return null;
+}
 
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master
@@ -960,17 +1069,21 @@ interface OrderColDef {
  *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  { key: "dots", label: "Status", w: 5 },
-  { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 17 },
-  // Deadline right after Customer (Jess 2026-07-18).
-  { key: "deadline", label: "Deadline", w: 13 },
+  // Status now shows a STAGE word pill (Placed/Proceed/Pending/Scheduled),
+  // not the old anonymous dots — 9% so "Scheduled"/"Pending" never clip to
+  // "Pendir" (Jess 2026-07-19). Rebalanced out of customer/deadline/delivery/next.
+  { key: "dots", label: "Status", w: 9 },
+  { key: "order", label: "Order", w: 10 },
+  { key: "customer", label: "Customer", w: 13 },
+  // Deadline right after Customer (Jess 2026-07-18). Wider (14) since every date
+  // now carries the weekday: "20 Jul 26, Sun" (Jess 2026-07-19 date law).
+  { key: "deadline", label: "Deadline", w: 14 },
   { key: "stock", label: "Stock", w: 12 },
   { key: "delivery", label: "Delivery", w: 12 },
   // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
-  { key: "next", label: "Next", w: 13 },
+  { key: "next", label: "Manage", w: 13 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1017,12 +1130,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [renderCount, setRenderCount] = useState(ROWS_PER_BATCH);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
-  // Filter dimensions stacked on top of the status tabs.
-  const [dueFilter, setDueFilter] = useState<DueBucket | null>(null);
-  const [regionFilter, setRegionFilter] = useState<string | null>(null);
+  const [bulkMenu, setBulkMenu] = useState<
+    null | "supplier" | "logistic" | "assign" | "more"
+  >(null);
+  // Filter dimensions (Jess 2026-07-19, B redesign) — ALL multi-select: pick
+  // several suppliers / partners / regions / deadline buckets at once (an order
+  // matches ANY selected value within a dimension = OR). Empty set = no filter.
+  // The left rail is now pure FILTER; the chase ACTIONS live in the bulk bar
+  // (Supplier ⋮ / Logistic ⋮).
+  const [dueFilter, setDueFilter] = useState<Set<DueBucket>>(new Set());
+  const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
-  const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
+  const [logisticFilter, setLogisticFilter] = useState<Set<string>>(new Set());
+  const [supplierFilter, setSupplierFilter] = useState<Set<string>>(new Set());
   // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
   // matches if it hits ANY selected category (OR). Empty set = no filter.
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
@@ -1096,6 +1216,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
     search: search.trim() || undefined,
   });
   const partnersQ = useDeliveryPartners();
+  // Catalog + suppliers → the SUPPLIER facet. skuMeta mirrors ChaseSupplierReview:
+  // sku → { supplierId, category }. Empty (facet hidden) until the catalog loads.
+  const catalogQ = useCatalog();
+  const suppliersQ = useOperationSuppliers();
+  const suppliers = useMemo(() => suppliersQ.data?.suppliers ?? [], [suppliersQ.data]);
+  const supplierNameById = useMemo(
+    () => new Map(suppliers.map((s) => [s.id, s.name])),
+    [suppliers],
+  );
+  const skuMeta = useMemo(() => {
+    const modelCat = new Map(
+      (catalogQ.data?.models ?? []).map((m) => [m.id, m.category as string]),
+    );
+    const m = new Map<string, { supplierId: string | null; category: string | null }>();
+    for (const s of catalogQ.data?.skus ?? []) {
+      m.set(s.sku, {
+        supplierId: s.supplierId ?? null,
+        category: modelCat.get(s.modelId) ?? null,
+      });
+    }
+    return m;
+  }, [catalogQ.data]);
   // Live free-balance map (sku → available) from the Stock On-Hand source. Its
   // keys ARE the matchable catalog SKUs; AutoCount free-text SKUs are absent.
   // `undefined` until loaded → the Stock cell falls back to stage-only state.
@@ -1125,6 +1267,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
+  const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
+  // Logistic ⋮ → Remind/Chase over the selection (partner-grouped review).
+  const [chasePartnerOrders, setChasePartnerOrders] = useState<
+    operationOrderListRow[] | null
+  >(null);
+  // Which tone the Chase-supplier review opens on (Jess 2026-07-19): the
+  // SUPPLIER section's Remind opens remind, Chase opens chase.
+  const [chaseInitialMode, setChaseInitialMode] = useState<"remind" | "chase">("remind");
+  // When the chase is opened from the SUPPLIER facet (a specific supplier picked),
+  // scope the review to THAT supplier so a multi-supplier order doesn't leak the
+  // other supplier's card (Jess 2026-07-19 bug). null = bulk Supplier ⋮ (all).
+  const [chaseSupplierScope, setChaseSupplierScope] = useState<string | null>(null);
   // ?poday=1 — MANAGER-ONLY preview of the PO-day surfaces (Jess 2026-07-19:
   // "you can't let me wait the day to see"): forces the banner + duty badge
   // on ANY day, using the real holder when 0236 is live, else the first pool
@@ -1252,15 +1406,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
       completed: 0,
       all: orders.length,
     };
-    for (const o of orders) c[controlTabOf(o)] += 1;
+    for (const o of orders) c[controlTabOf(o, availableBySku)] += 1;
     return c;
-  }, [orders]);
+  }, [orders, availableBySku]);
 
   // Status-tab filter first; the Urgent chip + region pills layer on top (all
   // stackable). The chip/region counts are computed over the tab-filtered set
   // so they reflect the current view.
   const tabFiltered = useMemo(
-    () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
+    () =>
+      tab === "all"
+        ? orders
+        : orders.filter((o) => controlTabOf(o, availableBySku) === tab),
     [orders, tab],
   );
   // LIVE scope (B rebuild, Jess 2026-07-18): every facet count runs over OPEN
@@ -1357,18 +1514,39 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const m = new Map<string, number>();
     for (const o of liveScope) {
       const key = logisticOf(o, partnerName) ?? NO_CARRIER;
+      if (key === NO_CARRIER) continue; // no-carrier = the Assign-logistic queue
       m.set(key, (m.get(key) ?? 0) + 1);
     }
-    // Unassigned FIRST (most urgent — no carrier yet), then the rest by count
-    // desc (Loo 2026-07-09). Display order only; the filter is unchanged.
+    // Every partner is a filter option even at 0 (Jess 2026-07-19) — union the
+    // full delivery-partners list in with a 0 default.
+    for (const p of partnersQ.data?.partners ?? [])
+      if (!m.has(p.name)) m.set(p.name, 0);
+    // Data-present carriers by count desc first (tiebreak alpha), then the
+    // remaining 0-count partners alphabetically.
     return [...m.entries()]
       .sort((a, b) => {
-        if (a[0] === NO_CARRIER) return -1;
-        if (b[0] === NO_CARRIER) return 1;
-        return b[1] - a[1];
+        if ((a[1] > 0) !== (b[1] > 0)) return b[1] - a[1]; // non-zero group first
+        if (a[1] !== b[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
       })
       .map(([carrier, count]) => ({ carrier, count }));
-  }, [liveScope, partnerName]);
+  }, [liveScope, partnerName, partnersQ.data]);
+
+  // SUPPLIER facet counts — per primary core-line supplier, over liveScope.
+  // Unresolved (no core line / no supplier) rows are skipped. Sorted by name.
+  // (B redesign: the supplier-deadline urgency pills + Remind/Chase left the
+  // rail — deadline is the shared DEADLINE band; chasing lives in the bulk bar.)
+  const supplierEntries = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of liveScope) {
+      const sid = primarySupplierId(o, skuMeta, suppliers);
+      if (!sid) continue;
+      m.set(sid, (m.get(sid) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .map(([id, count]) => ({ id, name: supplierNameById.get(id) ?? id, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [liveScope, skuMeta, suppliers, supplierNameById]);
 
   const categoryEntries = useMemo(
     () =>
@@ -1401,6 +1579,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // moment THEY open the portal, no manager session required. (Manual assign
   // stays management-only; this is system behaviour.) Fails soft on an old
   // Worker (404 → nothing happens).
+  // Default a plain salesperson to their OWN orders on first load (Jess
+  // 2026-07-19): if the signed-in user is NOT a manager and matches a staff
+  // row by email, pre-select their PIC. Runs ONCE (ref-guarded) and never
+  // overrides a manual staffFilter change; managers land on Everyone.
+  const didDefaultStaff = useRef(false);
+  useEffect(() => {
+    if (didDefaultStaff.current) return;
+    if (isManager) return; // managers see the whole team
+    if (staffFilter !== null) return; // respect any manual pick
+    if (!authEmail || staffList.length === 0) return;
+    const mine = staffList.find(
+      (s) => s.email?.toLowerCase() === authEmail.toLowerCase(),
+    );
+    if (!mine) return; // no matching PIC row → leave on Everyone
+    didDefaultStaff.current = true;
+    setStaffFilter(mine.user_id);
+  }, [staffList, isManager, authEmail, staffFilter]);
+
   const sweepDone = useRef(false);
   useEffect(() => {
     if (sweepDone.current) return;
@@ -1470,10 +1666,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
       escalateOnly ||
       !!nextFilter ||
       supplierLateOnly ||
-      !!dueFilter ||
-      !!regionFilter ||
+      dueFilter.size > 0 ||
+      regionFilter.size > 0 ||
       !!stockFilter ||
-      !!logisticFilter ||
+      logisticFilter.size > 0 ||
+      supplierFilter.size > 0 ||
       !!staffFilter ||
       categoryFilter.size > 0;
     if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
@@ -1481,11 +1678,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (escalateOnly) r = r.filter(hasEscalatedTask);
     if (nextFilter) r = r.filter((o) => nextVerbOf(o) === nextFilter);
     if (supplierLateOnly) r = r.filter(isSupplierLate);
-    if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
-    if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
+    // Multi-select: a row matches if its bucket/value is in the picked set (OR).
+    if (dueFilter.size > 0)
+      r = r.filter((o) => {
+        const b = dueBucketOf(o);
+        return b !== null && dueFilter.has(b);
+      });
+    if (regionFilter.size > 0)
+      r = r.filter((o) => regionFilter.has(regionBucket(o.customer_address ?? null)));
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
-    if (logisticFilter)
-      r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
+    if (logisticFilter.size > 0)
+      r = r.filter((o) => logisticFilter.has(logisticOf(o, partnerName) ?? NO_CARRIER));
+    if (supplierFilter.size > 0)
+      r = r.filter((o) => {
+        const sid = primarySupplierId(o, skuMeta, suppliers);
+        return sid !== null && supplierFilter.has(sid);
+      });
     if (staffFilter)
       r = r.filter((o) =>
         staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
@@ -1497,7 +1705,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
     return [...r].sort(compareBySlack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1509,7 +1717,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
     () => setRenderCount(ROWS_PER_BATCH),
-    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, regionFilter, stockFilter, logisticFilter, supplierFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -1730,11 +1938,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const anyFilter =
     !!search ||
     !!stockFilter ||
-    !!logisticFilter ||
+    logisticFilter.size > 0 ||
     !!staffFilter ||
     owingOnly ||
-    !!regionFilter ||
-    !!dueFilter ||
+    regionFilter.size > 0 ||
+    dueFilter.size > 0 ||
+    supplierFilter.size > 0 ||
     categoryFilter.size > 0 ||
     !!nextFilter ||
     supplierLateOnly ||
@@ -1744,11 +1953,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   function resetFilters() {
     setSearch("");
     setStockFilter(null);
-    setLogisticFilter(null);
+    setLogisticFilter(new Set());
     setStaffFilter(null);
     setOwingOnly(false);
-    setRegionFilter(null);
-    setDueFilter(null);
+    setRegionFilter(new Set());
+    setDueFilter(new Set());
+    setSupplierFilter(new Set());
     setCategoryFilter(new Set());
     setNextFilter(null);
     setFlaggedOnly(false);
@@ -1759,15 +1969,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
   if (search) activeChips.push({ label: `Search: ${search}`, onClear: () => setSearch("") });
   if (stockFilter)
     activeChips.push({ label: `Stock: ${stockFilter}`, onClear: () => setStockFilter(null) });
-  if (logisticFilter)
+  // Multi-select facets: one chip per picked value (✕ removes just that one).
+  for (const c of logisticFilter)
     activeChips.push({
-      label: logisticFilter === NO_CARRIER ? "Unassigned" : `Logistic: ${logisticFilter}`,
-      onClear: () => setLogisticFilter(null),
+      label: c === NO_CARRIER ? "Unassigned" : `Logistic: ${c}`,
+      onClear: () => setLogisticFilter((p) => toggleInSet(p, c)),
     });
-  if (regionFilter)
+  for (const rg of regionFilter)
     activeChips.push({
-      label: regionFilter === OTHERS_LABEL ? "No region" : `Region: ${regionFilter}`,
-      onClear: () => setRegionFilter(null),
+      label: rg === OTHERS_LABEL ? "No region" : `Region: ${rg}`,
+      onClear: () => setRegionFilter((p) => toggleInSet(p, rg)),
     });
   if (staffFilter)
     activeChips.push({
@@ -1780,10 +1991,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
             })()}`,
       onClear: () => setStaffFilter(null),
     });
+  for (const sid of supplierFilter)
+    activeChips.push({
+      label: `Supplier: ${supplierNameById.get(sid) ?? sid}`,
+      onClear: () => setSupplierFilter((p) => toggleInSet(p, sid)),
+    });
   if (owingOnly) activeChips.push({ label: "Owing", onClear: () => setOwingOnly(false) });
   if (supplierLateOnly)
     activeChips.push({ label: "Supplier late", onClear: () => setSupplierLateOnly(false) });
-  if (dueFilter) activeChips.push({ label: `Due: ${dueFilter}`, onClear: () => setDueFilter(null) });
+  for (const b of dueFilter)
+    activeChips.push({ label: `Deadline: ${b}`, onClear: () => setDueFilter((p) => toggleInSet(p, b)) });
   if (nextFilter)
     activeChips.push({ label: `Next: ${nextFilter}`, onClear: () => setNextFilter(null) });
   if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
@@ -1846,11 +2063,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const poDutyTitleChips = poDutyHolderShown ? (
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
       <span
-        className="inline-flex items-center gap-1.5 rounded-full border border-base-200 bg-white px-2 py-0.5 text-[11px] text-base-500 whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-[11px] text-base-500 whitespace-nowrap"
         title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls Order PO + Chase supplier (the one voice to suppliers). Full roster: right rail → Team.`}
       >
         <span
-          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+          className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none shrink-0"
           style={{
             background: avatarColor(poDutyHolderShown.userId).bg,
             color: avatarColor(poDutyHolderShown.userId).fg,
@@ -1862,7 +2079,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </span>
       {poHot && (
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${
+          className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-[11px] font-semibold whitespace-nowrap ${
             urgentPoCount > 0 && !(poDayPreview || isPoDayMYT())
               ? "bg-destructive/10 text-destructive"
               : "bg-warning-soft text-warning"
@@ -1886,13 +2103,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
               liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
             )
           }
-          className="btn-secondary text-[11px] py-0.5 px-2 whitespace-nowrap"
+          className="btn-secondary text-[11px] h-[26px] py-0 px-2 whitespace-nowrap inline-flex items-center"
         >
           Raise PO
         </button>
       )}
     </div>
   ) : undefined;
+  // Header PO-duty strip REMOVED (Jess 2026-07-19: "useless") — the duty holder
+  // lives in the right-rail Team board; Raise PO stays in the bulk bar. Built
+  // above but no longer mounted; `void` keeps the vars referenced (no churn).
+  void poDutyTitleChips;
 
   return (
     <>
@@ -1911,7 +2132,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {latestIn && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-base-400">
                 <span className="tabular-nums" title="Most recent order / import">
-                  Synced {fmtDateShort(latestIn)}
+                  Synced {fmtDate(latestIn)}
                 </span>
                 <button
                   type="button"
@@ -1926,7 +2147,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             )}
           </span>
         }
-        titleRight={poDutyTitleChips}
+        titleRight={undefined}
         actions={
           /* Header right cluster (ONE white header surface): search → Bell →
              HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
@@ -2077,6 +2298,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   ? "Raise consolidated POs — one per supplier — for the selection"
                   : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
               }
+              onChaseSupplier={(mode) => {
+                setChaseInitialMode(mode);
+                // If exactly one supplier is filtered, scope the review to it so a
+                // multi-supplier order doesn't leak the other supplier's card
+                // (Jess #1). Otherwise show every supplier in the selection.
+                setChaseSupplierScope(
+                  supplierFilter.size === 1 ? [...supplierFilter][0] : null,
+                );
+                setChaseOrders(selectedOrders);
+              }}
+              onChasePartner={(mode) => {
+                setChaseInitialMode(mode);
+                setChasePartnerOrders(selectedOrders);
+              }}
               onFlag={bulkCreateTasks}
               onExport={exportSelectedCsv}
               onPrint={printSelected}
@@ -2143,10 +2378,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     label="Overdue"
                     count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
                     tone="danger"
-                    active={dueFilter === "Overdue"}
+                    active={dueFilter.has("Overdue")}
                     chip={emptyQueueChip}
                     title="Past the delivery date and not delivered yet — who to chase = the row's NEXT verb"
-                    onClick={() => setDueFilter((r) => (r === "Overdue" ? null : "Overdue"))}
+                    onClick={() => setDueFilter((p) => toggleInSet(p, "Overdue"))}
                   />
                 )}
                 {owing.n > 0 && (
@@ -2243,18 +2478,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   }
                 >
                   {poolStaff.map((s) => {
+                    // Presence dot on the avatar (Jess 2026-07-19): green = in
+                    // today, grey = not in yet — replaces the "· not in" text.
+                    // "away" (planned leave) keeps its word; the dot is grey.
+                    const inToday = s.available && seenTodayMYT(s.last_seen_at);
                     const presence = !s.available
                       ? `${staffLabel(s)} · away`
-                      : !seenTodayMYT(s.last_seen_at)
-                        ? `${staffLabel(s)} · not in`
-                        : staffLabel(s);
+                      : staffLabel(s);
                     // PO duty badge (0236) — the month's PO controller.
                     const isDuty = poDutyHolderShown?.userId === s.user_id;
                     const baseTitle = !s.available
                       ? `${s.email} — marked away (planned leave); their orders shift to the others`
                       : !seenTodayMYT(s.last_seen_at)
                         ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
-                        : s.email;
+                        : `${s.email} — in today`;
                     return (
                       <KanbanRow
                         key={s.user_id}
@@ -2262,14 +2499,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         count={staffEntries.counts.get(s.user_id) ?? 0}
                         active={staffFilter === s.user_id}
                         chip={chipSlot(
-                          <span
-                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
-                            style={{
-                              background: avatarColor(s.user_id).bg,
-                              color: avatarColor(s.user_id).fg,
-                            }}
-                          >
-                            {staffInitials(s)}
+                          <span className="relative w-[18px] h-[18px] shrink-0">
+                            <span
+                              className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none"
+                              style={{
+                                background: avatarColor(s.user_id).bg,
+                                color: avatarColor(s.user_id).fg,
+                              }}
+                            >
+                              {staffInitials(s)}
+                            </span>
+                            <span
+                              className={`absolute -right-0.5 -bottom-0.5 w-2 h-2 rounded-full border border-white ${inToday ? "bg-success" : "bg-base-300"}`}
+                              title={inToday ? "in today" : "not in yet"}
+                            />
                           </span>,
                         )}
                         title={
@@ -2336,32 +2579,37 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </KanbanGroup>
               )}
 
-              {/* FILTERS — the dimension taxonomy DEMOTED (B rebuild): one
-                  collapsed fold holding Stock / Logistic / Region / Category.
-                  Group totals deleted (165/164/167 answered nothing); counts
-                  are open-only via liveScope; zero rows hidden. */}
-              <KanbanGroup
-                title="FILTERS"
-                collapsed={collapsedGroups.has("FILTERS")}
-                onToggle={() => toggleGroup("FILTERS")}
-              >
+              {/* FILTERS wrapper header REMOVED (Jess 2026-07-19) — the filter
+                  dimensions (Logistic / Supplier / Region / Category) render
+                  directly, no parent fold. */}
+              <>
+                {/* DEADLINE (Jess 2026-07-19, B redesign) — the shared customer
+                    delivery-date urgency band. Multi-select pills; SUPPLIER +
+                    LOGISTIC both read against it. "Overdue" mirrors the QUEUES
+                    Overdue row (same dueFilter state). */}
                 <KanbanGroup
-                  title="STOCK"
-                  collapsed={collapsedGroups.has("STOCK")}
-                  onToggle={() => toggleGroup("STOCK")}
+                  title="DEADLINE"
+                  testid="filter-deadline"
+                  collapsed={collapsedGroups.has("DEADLINE")}
+                  onToggle={() => toggleGroup("DEADLINE")}
                 >
-                  {/* "No PO" lives in FIX DATA — not repeated here. */}
-                  {stockEntries
-                    .filter((e) => e.bucket !== "No PO" && e.count > 0)
-                    .map((e) => (
-                      <KanbanRow
-                        key={e.bucket}
-                        label={e.bucket}
-                        count={e.count}
-                        active={stockFilter === e.bucket}
-                        onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-                      />
-                    ))}
+                  <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1">
+                    {DUE_BUCKETS.map((b) => {
+                      const count = dueEntries.find((e) => e.bucket === b)?.count ?? 0;
+                      const cls = b === "Overdue" ? "pill-overdue" : b === "Due ≤3d" ? "pill-warning" : "pill-neutral";
+                      return (
+                        <button
+                          key={b}
+                          type="button"
+                          aria-pressed={dueFilter.has(b)}
+                          onClick={() => setDueFilter((p) => toggleInSet(p, b))}
+                          className={`pill ${cls} ${dueFilter.has(b) ? "font-bold ring-1 ring-current" : ""}`}
+                        >
+                          {b} {count}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </KanbanGroup>
                 <KanbanGroup
                   title="LOGISTIC"
@@ -2369,19 +2617,37 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("LOGISTIC")}
                   onToggle={() => toggleGroup("LOGISTIC")}
                 >
-                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab);
-                      here only real carriers. */}
-                  {logisticEntries
-                    .filter((e) => e.carrier !== NO_CARRIER && e.count > 0)
-                    .map((e) => (
-                      <KanbanRow
-                        key={e.carrier}
-                        label={e.carrier}
-                        count={e.count}
-                        active={logisticFilter === e.carrier}
-                        onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
-                      />
-                    ))}
+                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab); here
+                      EVERY partner is an option (0-count included, Jess
+                      2026-07-19) so the whole fleet is filterable. */}
+                  {logisticEntries.map((e) => (
+                    <KanbanRow
+                      key={e.carrier}
+                      label={e.carrier}
+                      count={e.count}
+                      active={logisticFilter.has(e.carrier)}
+                      onClick={() => setLogisticFilter((p) => toggleInSet(p, e.carrier))}
+                    />
+                  ))}
+                </KanbanGroup>
+                <KanbanGroup
+                  title="SUPPLIER"
+                  testid="filter-supplier"
+                  collapsed={collapsedGroups.has("SUPPLIER")}
+                  onToggle={() => toggleGroup("SUPPLIER")}
+                >
+                  {/* Pure FILTER now (Jess 2026-07-19, B redesign): multi-select
+                      suppliers. The deadline filter is the shared DEADLINE band;
+                      Remind/Chase moved to the bulk bar's Supplier ⋮. */}
+                  {supplierEntries.map((e) => (
+                    <KanbanRow
+                      key={e.id}
+                      label={e.name}
+                      count={e.count}
+                      active={supplierFilter.has(e.id)}
+                      onClick={() => setSupplierFilter((p) => toggleInSet(p, e.id))}
+                    />
+                  ))}
                 </KanbanGroup>
                 <KanbanGroup
                   title="REGION"
@@ -2396,8 +2662,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         key={e.region}
                         label={e.region}
                         count={e.count}
-                        active={regionFilter === e.region}
-                        onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                        active={regionFilter.has(e.region)}
+                        onClick={() => setRegionFilter((p) => toggleInSet(p, e.region))}
                       />
                     ))}
                 </KanbanGroup>
@@ -2425,7 +2691,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       />
                     ))}
                 </KanbanGroup>
-              </KanbanGroup>
+              </>
 
               {/* FIX DATA — broken records to repair, NOT people to chase (B
                   rebuild): unreadable region + missing PO. Hidden when clean. */}
@@ -2440,9 +2706,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     <KanbanRow
                       label="No region"
                       count={regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0}
-                      active={regionFilter === OTHERS_LABEL}
+                      active={regionFilter.has(OTHERS_LABEL)}
                       title="Delivery region couldn't be read from the address — fix the address"
-                      onClick={() => setRegionFilter((r) => (r === OTHERS_LABEL ? null : OTHERS_LABEL))}
+                      onClick={() => setRegionFilter((p) => toggleInSet(p, OTHERS_LABEL))}
                     />
                   )}
                   {(stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) > 0 && (
@@ -2463,7 +2729,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto"
       >
         <table
           /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
@@ -2495,9 +2761,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 table never swaps its head). The select-all shows Gmail's
                 indeterminate dash on a partial tick. */}
             <tr
-              className="border-b"
-              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild). */
-              style={{ backgroundColor: "#F9FAFB", borderBottomColor: "#E5E7EB" }}
+              className="border-b h-10"
+              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
+                 h-10 = same 40px as the data rows (SIZING LAW §3) so the header
+                 never reads thinner than the listing. */
+              style={{ backgroundColor: "#E5E7EB", borderBottomColor: "#D1D5DB" }}
             >
               <th className="px-2 py-1.5">
                 <input
@@ -2508,7 +2776,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   }}
                   onChange={toggleAllPaged}
                   aria-label="Select all on this page"
-                  className="cursor-pointer accent-base-700 align-middle"
+                  className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
                 />
               </th>
               <th className="px-1 py-1.5 text-center" title="Follow-up">
@@ -2531,7 +2799,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   <span title="Person in charge — who's watching this order">PIC</span>
                 </Th>
               )}
-              {showCol("next") && <Th>Next</Th>}
+              {showCol("next") && <Th>Manage</Th>}
             </tr>
           </thead>
           <tbody>
@@ -2564,6 +2832,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }
                 canAssign={isManager}
                 hasPendingChange={pendingCROrders.has(o.id)}
+                onNextAction={(verb) => {
+                  if (verb === "Order PO") setRaisePoOrders([o]);
+                  else if (verb === "Chase supplier") {
+                    setChaseSupplierScope(null);
+                    setChaseOrders([o]);
+                  }
+                  else setOpenOrderId(o.id);
+                }}
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
@@ -2593,6 +2869,34 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
+      {/* Chase supplier — one WhatsApp message per supplier group over the
+          selection (Remind / Chase). Open to all operation (no PO-duty gate). */}
+      {chaseOrders && (
+        <ChaseSupplierReview
+          orders={chaseOrders.map(toChaseOrder)}
+          initialMode={chaseInitialMode}
+          supplierScope={chaseSupplierScope}
+          onClose={() => {
+            setChaseOrders(null);
+            clearSel();
+          }}
+        />
+      )}
+
+      {/* Chase logistic — one WhatsApp message per delivery-partner group over
+          the selection (Remind / Chase). Open to all operation. */}
+      {chasePartnerOrders && (
+        <ChasePartnerReview
+          orders={chasePartnerOrders.map(toPartnerChaseOrder)}
+          partners={partnersQ.data?.partners ?? []}
+          initialMode={chaseInitialMode}
+          onClose={() => {
+            setChasePartnerOrders(null);
+            clearSel();
+          }}
+        />
+      )}
+
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
 
@@ -2614,6 +2918,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
  *  stays checked / indeterminate so you can untick in place like Gmail; when the
  *  loaded window is a subset of the tab it offers "Select all N in <tab>". Inline:
  *  Assign logistic · Flag · Export ▾ (CSV / Print / Mark delivered); ✕ clears. */
+/**
+ * Bulk bar — Option B (Jess 2026-07-19): grouped by COUNTERPARTY, not by verb.
+ * Three chips — [📦 Supplier ⋮] [🚚 Logistic ⋮] [More] — and the two
+ * counterparty menus each hold that party's actions incl. Remind / Chase. The
+ * gated Raise PO sits INSIDE the Supplier menu (locked for non-duty), so the bar
+ * never shows a dead primary button; the shape stays 3 chips regardless of
+ * permission or selection.
+ */
 function OrdersBulkBar({
   count,
   total,
@@ -2628,6 +2940,8 @@ function OrdersBulkBar({
   onRaisePo,
   canRaisePo,
   raisePoTitle,
+  onChaseSupplier,
+  onChasePartner,
   onFlag,
   onExport,
   onPrint,
@@ -2642,13 +2956,17 @@ function OrdersBulkBar({
   allChecked: boolean;
   someChecked: boolean;
   onSelectAllInTab: () => void;
-  menu: null | "menu" | "assign";
-  setMenu: (m: null | "menu" | "assign") => void;
+  menu: null | "supplier" | "logistic" | "assign" | "more";
+  setMenu: (m: null | "supplier" | "logistic" | "assign" | "more") => void;
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
   onRaisePo: () => void;
   canRaisePo: boolean;
   raisePoTitle: string;
+  /** Open the supplier chase-review on the given tone (Remind / Chase). */
+  onChaseSupplier: (mode: "remind" | "chase") => void;
+  /** Open the partner chase-review on the given tone (Remind / Chase). */
+  onChasePartner: (mode: "remind" | "chase") => void;
   onFlag: () => void;
   onExport: () => void;
   onPrint: () => void;
@@ -2657,8 +2975,12 @@ function OrdersBulkBar({
   onClear: () => void;
   busy: boolean;
 }) {
-  const btn =
-    "inline-flex items-center gap-1 text-[13px] px-2 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
+  const chip =
+    "inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
+  const toggle = (m: "supplier" | "logistic" | "assign" | "more") =>
+    setMenu(menu === m ? null : m);
+  const pop =
+    "absolute left-0 top-full mt-1 z-30 w-60 bg-white text-base-900 rounded-lg shadow-lg border border-base-200 p-1 max-h-80 overflow-auto";
   return (
     <div className="flex items-center gap-2 rounded-xl border border-signature-100 bg-signature-50 px-3 py-1.5 text-base-800">
       <input
@@ -2686,18 +3008,89 @@ function OrdersBulkBar({
         </button>
       )}
       <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
-      {/* Assign logistic — inline dropdown of partners. */}
+
+      {/* — SUPPLIER ⋮ — the goods counterparty. Raise PO (gated) + Remind +
+          Chase all live here; one voice per supplier. */}
       <div className="relative">
         <button
           type="button"
-          onClick={() => setMenu(menu === "assign" ? null : "assign")}
+          onClick={() => toggle("supplier")}
           disabled={busy}
-          className={btn}
+          aria-haspopup="menu"
+          aria-expanded={menu === "supplier"}
+          className={chip}
         >
-          <Truck size={14} /> Assign logistic <ChevronDown size={12} />
+          <PackageOpen size={15} className="text-base-500" /> Supplier
+          <MoreVertical size={13} className="text-base-400 -mr-0.5" />
         </button>
+        {menu === "supplier" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem
+              icon={PackagePlus}
+              label="Raise PO"
+              onClick={onRaisePo}
+              disabled={!canRaisePo}
+              title={raisePoTitle}
+              right={canRaisePo ? undefined : <Lock size={11} className="text-base-400" />}
+            />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
+            <BulkMenuItem
+              icon={Bell}
+              label="Remind"
+              hint="before deadline"
+              onClick={() => onChaseSupplier("remind")}
+            />
+            <BulkMenuItem
+              icon={MessageCircle}
+              label="Chase"
+              hint="overdue"
+              tone="wa"
+              onClick={() => onChaseSupplier("chase")}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* — LOGISTIC ⋮ — the delivery counterparty. Assign (partner picker) +
+          Remind + Chase. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => toggle("logistic")}
+          disabled={busy}
+          aria-haspopup="menu"
+          aria-expanded={menu === "logistic"}
+          className={chip}
+        >
+          <Truck size={15} className="text-base-500" /> Logistic
+          <MoreVertical size={13} className="text-base-400 -mr-0.5" />
+        </button>
+        {menu === "logistic" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem
+              icon={Truck}
+              label="Assign to…"
+              onClick={() => setMenu("assign")}
+              right={<ChevronRight size={13} className="text-base-400" />}
+            />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
+            <BulkMenuItem
+              icon={Bell}
+              label="Remind"
+              hint="before收货日"
+              onClick={() => onChasePartner("remind")}
+            />
+            <BulkMenuItem
+              icon={MessageCircle}
+              label="Chase"
+              hint="overdue"
+              tone="wa"
+              onClick={() => onChasePartner("chase")}
+            />
+          </div>
+        )}
         {menu === "assign" && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+          <div className={pop} role="menu">
             <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
               Assign to…
             </div>
@@ -2709,7 +3102,7 @@ function OrdersBulkBar({
                 key={p.id}
                 type="button"
                 onClick={() => onAssign(p.id)}
-                className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
+                className="w-full text-left px-2 py-1.5 text-[12px] rounded hover:bg-base-100"
               >
                 {p.name}
               </button>
@@ -2717,35 +3110,25 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
-      {/* Raise PO — consolidated per-supplier review (0236: duty holder +
-          management only; disabled title names whose month it is). */}
-      <button
-        type="button"
-        onClick={onRaisePo}
-        disabled={busy || !canRaisePo}
-        title={raisePoTitle}
-        className={btn}
-      >
-        <PackagePlus size={14} /> Raise PO
-      </button>
-      {/* Flag for follow-up (creates a follow-up task per selected order). */}
-      <button type="button" onClick={onFlag} disabled={busy} className={btn}>
-        <Flag size={14} /> Flag
-      </button>
-      {/* Export ▾ — CSV / Print / Mark delivered. */}
+
+      {/* — More — utility (Flag · Export · Print · Mark delivered · No storage). */}
       <div className="relative">
         <button
           type="button"
-          onClick={() => setMenu(menu === "menu" ? null : "menu")}
+          onClick={() => toggle("more")}
           disabled={busy}
-          className={btn}
+          aria-haspopup="menu"
+          aria-expanded={menu === "more"}
+          className={chip}
         >
-          <Download size={14} /> Export <ChevronDown size={12} />
+          <MoreHorizontal size={15} className="text-base-500" /> More
         </button>
-        {menu === "menu" && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+        {menu === "more" && (
+          <div className={pop} role="menu">
+            <BulkMenuItem icon={Flag} label="Flag for follow-up" onClick={onFlag} />
             <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
             <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
+            <div className="h-px bg-base-200 my-1 mx-1.5" />
             <BulkMenuItem
               icon={CheckCircle2}
               label={busy ? "Working…" : "Mark delivered"}
@@ -2759,6 +3142,7 @@ function OrdersBulkBar({
           </div>
         )}
       </div>
+
       <button
         type="button"
         onClick={onClear}
@@ -2775,19 +3159,41 @@ function OrdersBulkBar({
 function BulkMenuItem({
   icon: Icon,
   label,
+  hint,
   onClick,
+  disabled,
+  title,
+  right,
+  tone,
 }: {
   icon: LucideIcon;
   label: string;
+  /** Faint trailing context (e.g. "overdue"). */
+  hint?: string;
   onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+  /** Trailing node (lock, chevron). */
+  right?: ReactNode;
+  /** "wa" tints the leading icon WhatsApp-green (Chase); default = grey. */
+  tone?: "wa";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] hover:bg-base-100"
+      disabled={disabled}
+      title={title}
+      role="menuitem"
+      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] rounded hover:bg-base-100 disabled:opacity-45 disabled:hover:bg-transparent"
     >
-      <Icon size={14} className="text-base-500" /> {label}
+      <Icon
+        size={14}
+        className={tone === "wa" ? "text-[#25D366]" : "text-base-500"}
+      />
+      <span>{label}</span>
+      {hint && <span className="text-[11px] text-base-400">{hint}</span>}
+      {right && <span className="ml-auto flex items-center">{right}</span>}
     </button>
   );
 }
@@ -2890,6 +3296,10 @@ function KanbanGroup({
   // index.css, recorded in design-standard.ts COLOR.sectionBand.
   return (
     <div data-testid={testid} className="mb-1">
+      {/* strong = a step-darker band (base-200) so the Orders-list facet groups
+          actually separate on the white rail (Jess 2026-07-19: #F9FAFB→#F3F4F6
+          was still invisible). The shared order-drawer bands don't pass it, so
+          they're unaffected. */}
       <SectionBand
         title={title}
         danger={danger}
@@ -2897,6 +3307,7 @@ function KanbanGroup({
         onToggle={onToggle}
         total={total}
         right={headerRight}
+        strong
       />
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
@@ -3172,44 +3583,6 @@ function StatusTabs({
 }
 
 
-/** Row status icons — OPTION C (Jess 2026-07-18 round-3): all quiet → one
- *  green ✓; otherwise only the amber/red lines appear, each as the icon the
- *  team already knows: RM$ = money · box = stock · truck = delivery
- *  (logistic). Grey (no data) stays silent. Tooltips carry the detail. */
-const LINE_ICONS: [LucideIcon, LucideIcon, LucideIcon] = [
-  CircleDollarSign,
-  Package,
-  Truck,
-];
-function RowStatusIcons({ dots }: { dots: [RowDot, RowDot, RowDot] }) {
-  const alerts = dots
-    .map((d, i) => ({ d, i }))
-    .filter(({ d }) => d.color === DOT_HEX.amber || d.color === DOT_HEX.red);
-  return (
-    <div className="flex items-center gap-1.5" data-testid="row-dots">
-      {alerts.length === 0 ? (
-        <span title={`All good — ${dots.map((d) => d.title).join(" · ")}`}>
-          <CheckCircle2
-            size={14}
-            strokeWidth={2}
-            style={{ color: DOT_HEX.green }}
-            aria-label="All good"
-          />
-        </span>
-      ) : (
-        alerts.map(({ d, i }) => {
-          const Icon = LINE_ICONS[i]!;
-          return (
-            <span key={i} title={d.title}>
-              <Icon size={14} strokeWidth={2} style={{ color: d.color }} />
-            </span>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
 /** Owner chip (0232) — 20px initials avatar on every row; hollow when
  *  unassigned. Click = reassign popover (management only). Identity colour,
  *  never status colour. */
@@ -3346,6 +3719,7 @@ function OrderRow({
   onAssignStaff,
   canAssign,
   hasPendingChange,
+  onNextAction,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -3367,6 +3741,8 @@ function OrderRow({
   canAssign: boolean;
   /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
   hasPendingChange?: boolean;
+  /** One-click NEXT (2026-07-19) — the row's NEXT verb, clicked = act on it. */
+  onNextAction: (verb: string) => void;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -3378,7 +3754,6 @@ function OrderRow({
   const sofaQty = catQty(lines, "sofa");
 
   const logi = logisticStateOf(o, partnerName);
-  const dots = rowDotsOf(o, stock, se, logi);
   const completed = controlTabOf(o) === "completed";
 
   return (
@@ -3402,14 +3777,28 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Status (Jess picked OPTION C, 2026-07-18 round-3): quiet when good —
-          all lines green/grey → ONE green ✓; only the amber/red lines show
-          their recognisable icon (RM$ money · box stock · truck delivery),
-          coloured by state. Replaces the anonymous 三点 (new staff couldn't
-          read them). */}
+      {/* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary
+          as the tabs (Placed → Proceed → Pending → Scheduled → Delivered). A
+          quiet .pill for the live stages; a muted "Delivered" (no pill) once
+          done. Replaces the anonymous status dots (new staff couldn't read). */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        <RowStatusIcons dots={dots} />
+        {completed ? (
+          <span className="text-[12px] text-base-400">Delivered</span>
+        ) : (
+          (() => {
+            const stage = controlTabOf(o, availableBySku);
+            const { label, cls } =
+              stage === "pending"
+                ? { label: "Pending", cls: "pill-warning" }
+                : stage === "scheduled"
+                  ? { label: "Scheduled", cls: "pill-confirmed" }
+                  : stage === "proceed"
+                    ? { label: "Proceed", cls: "pill-neutral" }
+                    : { label: "Placed", cls: "pill-neutral" };
+            return <span className={`pill ${cls}`}>{label}</span>;
+          })()
+        )}
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
@@ -3485,7 +3874,7 @@ function OrderRow({
         {completed ? (
           o.delivery_date ? (
             <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
-              {fmtDate(o.delivery_date).split(", ")[0]}
+              {fmtDate(o.delivery_date)}
             </span>
           ) : (
             <span className="text-base-300">—</span>
@@ -3494,7 +3883,7 @@ function OrderRow({
           <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const datePart = fmtDate(o.delivery_date).split(", ")[0];
+            const datePart = fmtDate(o.delivery_date);
             // Reuse the SAME DUE bucket as the top filter header so they can never
             // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
             const dd = daysToDue(o);
@@ -3557,7 +3946,7 @@ function OrderRow({
       {showCol("delivery") && (
       <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
-          <span className="t4-caption text-[13px]">— unassigned</span>
+          <span className="t4-caption">unassigned</span>
         ) : (
           <div style={{ lineHeight: "15px" }}>
             <div className="t4-row-strong truncate">{logi.partner}</div>
@@ -3570,7 +3959,7 @@ function OrderRow({
                 className="tabular-nums"
                 style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
               >
-                booked {fmtDate(logi.date).split(", ")[0]}
+                booked {fmtDate(logi.date)}
               </div>
             ) : (
               <div className="t4-caption">not booked</div>
@@ -3592,61 +3981,53 @@ function OrderRow({
         />
       </td>
       )}
-      {/* Next action — one plain-text verb (§14: NEXT 文字, pill chrome gone)
-          + Gmail-style hover actions (open / flag / assign) on row hover. */}
+      {/* Next action — one plain-text verb, now a one-click action (2026-07-19):
+          the whole row opens the drawer, so the NEXT verb itself is the button
+          that acts on the order (Order PO / Chase supplier / else open). */}
       {showCol("next") && (
-      <td className="pl-2 pr-2 relative">
+      <td className="pl-2 pr-2">
         {(() => {
           const na = nextActionOf(o, stock, lines);
+          if (!na.label) return null;
+          // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
+          // is the PRIMARY verb; an outstanding balance is an INDEPENDENT track,
+          // shown as a secondary "Collect $" pill (max two pills). Hidden once
+          // the order is closed. `Confirm 🔒` already means "money-held", so the
+          // pill isn't doubled up there.
+          const owing = !completed && Number(ovlOf(o)?.balance ?? 0) > 0;
+          const showMoney = owing && na.label !== "Confirm";
           return (
-            <span
-              className="inline-flex items-center gap-1 align-middle max-w-full group-hover:opacity-0 transition-opacity"
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.01em",
-                color: NEXT_TEXT_COLOR[na.tone],
-              }}
-              data-next-action={na.label}
-            >
-              {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-              <span className="truncate min-w-0">{na.label}</span>
-            </span>
+            <div className="flex items-center gap-1.5 max-w-full">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNextAction(na.label);
+                }}
+                className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
+                data-next-action={na.label}
+                title={`${na.label} — click to act`}
+              >
+                {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
+                <span className="truncate min-w-0">{na.label}</span>
+              </button>
+              {showMoney && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNextAction("Collect $");
+                  }}
+                  className="pill pill-collected shrink-0 hover:brightness-95"
+                  data-next-action="Collect $"
+                  title="Outstanding balance — open the order to collect"
+                >
+                  Collect $
+                </button>
+              )}
+            </div>
           );
         })()}
-        {/* Hover actions — hidden until the row is hovered (Gmail pattern). */}
-        <div
-          className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 rounded-md border border-base-200 bg-white shadow-sm px-0.5 py-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Open order"
-            aria-label="Open order"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <ExternalLink size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onFlag(o)}
-            title="Flag for follow-up"
-            aria-label="Flag for follow-up"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <Flag size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Assign logistic (opens the order)"
-            aria-label="Assign logistic"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <Truck size={13} />
-          </button>
-        </div>
       </td>
       )}
     </tr>
@@ -3750,7 +4131,7 @@ function StockDot({
     if (key === "no_po") return { text: "No PO", tip: title };
     if (se.state === "no_eta" || !se.etaIso)
       return { text: "ETA —", tip: "Waiting on stock — no supplier ETA entered yet" };
-    const d = fmtDate(se.etaIso).split(", ")[0];
+    const d = fmtDate(se.etaIso);
     if (se.state === "overdue")
       return { text: `ETA ${d}`, tip: "Supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")

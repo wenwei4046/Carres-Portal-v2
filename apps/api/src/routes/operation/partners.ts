@@ -31,7 +31,7 @@ operationPartnersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("delivery_partners")
-    .select("id, name, contact, zones")
+    .select("id, name, contact, zones, whatsapp_group_url")
     .order("name", { ascending: true });
   if (error) {
     const m = mapPgError(error);

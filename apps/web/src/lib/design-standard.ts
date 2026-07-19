@@ -162,11 +162,18 @@ export const SPACE = {
 // red), flame (action) and selection blue, so identity never reads as state.
 // Consumed via lib/staff-avatar.ts (initials + stable per-user hash).
 // ─────────────────────────────────────────────────────────────────────────────
+// 8 DISTINCT non-status hues (Jess 2026-07-19: "every staff own icon" — the old
+// 6-cool set landed Shasha + Yu Jun on near-identical purples). Deliberately
+// AVOIDS the status hues (green/amber/red), flame + selection-blue, so a person
+// never reads as a state. Ordered so the current 3 staff hash to well-separated
+// colours: Yu Jun→blue · Khor Yee→rose · Shasha→teal.
 export const AVATAR_COLORS: { bg: string; fg: string }[] = [
   { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
-  { bg: "#CCFBF1", fg: "#115E59" }, // teal
+  { bg: "#DBEAFE", fg: "#1E40AF" }, // blue
   { bg: "#FCE7F3", fg: "#9D174D" }, // rose
   { bg: "#EDE9FE", fg: "#5B21B6" }, // violet
   { bg: "#CFFAFE", fg: "#155E75" }, // cyan
-  { bg: "#E7E5E4", fg: "#44403C" }, // stone
+  { bg: "#FAE8FF", fg: "#86198F" }, // fuchsia
+  { bg: "#CCFBF1", fg: "#115E59" }, // teal
+  { bg: "#E2E8F0", fg: "#334155" }, // slate
 ];

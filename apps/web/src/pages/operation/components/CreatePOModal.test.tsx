@@ -119,6 +119,7 @@ const SUPPLIER_A = {
   cat_covered: ["mattress", "bedframe"],
   lead_time: "5–7 days",
   contact: "+60 3-1111 1111",
+  whatsapp_group_url: null,
 };
 // Added in T36 migration — the auto-split + 2-supplier batch tests need a 2nd
 // supplier whose `cat_covered` covers `sofa` so the modal routes a sofa SKU
@@ -130,6 +131,7 @@ const SUPPLIER_B = {
   cat_covered: ["sofa"],
   lead_time: "10–14 days",
   contact: "+60 3-2222 2222",
+  whatsapp_group_url: null,
 };
 
 const WAREHOUSE_KL = {

@@ -100,6 +100,7 @@ const SUPPLIER: SupplierRow = {
   cat_covered: ["mattress"],
   lead_time: "5–7 days",
   contact: "+60 3-1111 1111",
+  whatsapp_group_url: null,
 };
 
 const WAREHOUSE = {

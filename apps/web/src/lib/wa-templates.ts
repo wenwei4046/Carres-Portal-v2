@@ -195,6 +195,104 @@ export function buildSupplierChase(i: SupplierChaseInput): string {
   );
 }
 
+// ── SUPPLIER GROUP — ONE message per supplier, covering many orders ──────────
+// Suppliers speak the ORIGINAL CR/TCF ref (orders.source_ref[0]), never the SO.
+// One WhatsApp group per supplier gets a single message listing every selected
+// order's ref + items — Remind (before deadline) or Chase (already late).
+export interface SupplierGroupRow {
+  ref: string | null;
+  /** PO number — included in the line only when `includePo` (sofa/bedframe
+   *  suppliers key off the PO; mattress + logistic speak the ref only). */
+  po?: string | null;
+  items: { sku: string; qty: number }[];
+}
+
+/** One consolidated supplier message covering all `rows`.
+ *  `remind` = gentle (before deadline); `chase` = firmer (already late).
+ *  Jess 2026-07-19: AGGREGATE by SKU (same SKU across orders sums to one line,
+ *  e.g. Haven ×2), *bold* SKU + qty and _italic_ the refs (WhatsApp markup) so
+ *  it copy-pastes clean; SKUs sorted. `includePo` (sofa/bedframe) tags each ref
+ *  with its PO; mattress suppliers + logistic speak the ref alone. */
+export function buildSupplierGroupMessage(
+  mode: "remind" | "chase",
+  supplierName: string,
+  rows: SupplierGroupRow[],
+  includePo = false,
+): string {
+  const opener =
+    mode === "chase"
+      ? `Hi ${supplierName} 👋 following up — we still need the ready date for these, customers are waiting:`
+      : `Hi ${supplierName} 👋 please confirm the ready date for these:`;
+  const closer =
+    mode === "chase"
+      ? `Please confirm a ready date today so we can plan delivery. Thank you!`
+      : `Appreciate a ready date per SKU. Thank you!`;
+  // Aggregate every row's items by SKU → total qty + the refs carrying it.
+  const bySku = new Map<string, { qty: number; refs: string[] }>();
+  let totalUnits = 0;
+  for (const r of rows) {
+    const refTag = includePo
+      ? `${r.ref ?? "—"}${r.po ? ` (PO ${r.po})` : ""}`
+      : (r.ref ?? "—");
+    for (const it of r.items) {
+      const e = bySku.get(it.sku) ?? { qty: 0, refs: [] };
+      e.qty += it.qty;
+      if (!e.refs.includes(refTag)) e.refs.push(refTag);
+      bySku.set(it.sku, e);
+      totalUnits += it.qty;
+    }
+  }
+  const body = [...bySku.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([sku, e]) => `*${sku}* ×${e.qty}\n_${e.refs.join(", ")}_`)
+    .join("\n\n");
+  return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
+}
+
+// ── LOGISTIC GROUP — ONE message per partner, covering many deliveries ───────
+// Mirrors the supplier group message, but a delivery is DISTINCT per customer
+// (different address + date), so we DON'T aggregate by SKU across orders — each
+// order is its own block: REF · customer (region) · items · deadline. One
+// WhatsApp group per partner (NETS/AL/TEOW/TT) gets a single message listing
+// every selected order — Remind (before deadline) or Chase (already late).
+export interface PartnerGroupRow {
+  ref: string | null;
+  customer: string | null;
+  region: string | null;
+  /** Display deadline, e.g. "6 Jul 26" or "TBD". */
+  deadline: string;
+  overdue: boolean;
+  items: { sku: string; qty: number }[];
+}
+
+/** One consolidated partner message covering all `rows` (deliveries).
+ *  `remind` = gentle (before deadline); `chase` = firmer (deadline at risk /
+ *  passed). REF-led (partners speak the CR/TCF ref, never the SO); each block
+ *  carries the customer + region so the driver can plan the route. */
+export function buildPartnerGroupMessage(
+  mode: "remind" | "chase",
+  partnerName: string,
+  rows: PartnerGroupRow[],
+): string {
+  const opener =
+    mode === "chase"
+      ? `Hi ${partnerName} 👋 following up — these deliveries still need a booked slot with the customer:`
+      : `Hi ${partnerName} 👋 please confirm the delivery date + time slot for these:`;
+  const closer =
+    mode === "chase"
+      ? `Please book the slots with the customers today. Thank you!`
+      : `Appreciate a confirmed date + slot per delivery. Thank you!`;
+  const body = rows
+    .map((r) => {
+      const head = `_${r.ref ?? "—"}_ — ${r.customer ?? "—"}${r.region ? ` (${r.region})` : ""}`;
+      const items = itemsBlock(r.items);
+      const when = `by ${r.deadline}${r.overdue ? " — overdue" : ""}`;
+      return `${head}\n${items}\n${when}`;
+    })
+    .join("\n\n");
+  return `${opener}\n\n${body}\n\n${rows.length} deliver${rows.length === 1 ? "y" : "ies"}. ${closer}`;
+}
+
 /** URL-encoded body, ready for `https://wa.me/<number>?text=` — real line
  *  breaks become %0A. */
 export function waEncode(text: string): string {
