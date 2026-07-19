@@ -20,6 +20,7 @@ import {
   Copy,
   MessageCircle,
   Plus,
+  Printer,
   Download,
   ExternalLink,
   FileText,
@@ -47,6 +48,7 @@ import { toast } from "sonner";
 import {
   computeStorageFee,
   defaultStorageStart,
+  docNumber,
   normalizeSkuKey,
   STOCK_LOCATIONS,
   updateOrderInputSchema,
@@ -730,77 +732,9 @@ function CatIcon({
   return <I size={18} strokeWidth={2} aria-hidden="true" />;
 }
 
-/** One step of the Delivery tab timeline (rev24, Jess Option A — 合体: the
- *  progress line IS the step header, fields live under their own step). Node
- *  grammar = the SAME approved JourneyCard sample (done = ink-filled ✓ · the
- *  ONE step needing work is the only coloured node: red = act now / amber =
- *  waiting on someone · not-yet = pale ring · connector darkens over done
- *  ground). One column, one vocabulary — nothing to cross-reference. */
-type DeliveryStepState = "done" | "act" | "wait" | "todo";
-function DeliveryStep({
-  n,
-  state,
-  title,
-  who,
-  right,
-  last = false,
-  children,
-}: {
-  n: number;
-  state: DeliveryStepState;
-  title: string;
-  who?: string;
-  /** header-right slot (chase buttons / open-Items link) */
-  right?: ReactNode;
-  last?: boolean;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="relative flex items-start gap-2.5 pb-3 last:pb-0">
-      {!last && (
-        <span
-          aria-hidden="true"
-          className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
-            state === "done" ? "bg-base-800" : "bg-base-200"
-          }`}
-        />
-      )}
-      <span
-        className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
-          state === "done"
-            ? "bg-base-800 text-white"
-            : state === "act"
-              ? "bg-error-soft text-danger ring-2 ring-danger"
-              : state === "wait"
-                ? "bg-warning-soft text-warning"
-                : "bg-white border-2 border-base-300 text-base-400"
-        }`}
-      >
-        {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 min-h-6">
-          <span
-            className={`text-[13px] font-semibold ${
-              state === "todo" ? "text-base-400" : "text-base-900"
-            }`}
-          >
-            {title}
-          </span>
-          {who && (
-            <span className="text-[11px] text-base-400 truncate">· {who}</span>
-          )}
-          {right && (
-            <span className="ml-auto flex items-center gap-1.5 shrink-0">
-              {right}
-            </span>
-          )}
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
+// (DeliveryStep — the rev24 4-node in-tab spine — retired 2026-07-19 for the
+// grounded Delivery card, Loan-template language. The whole-order journey spine
+// stays in the left rail.)
 
 /** rev23 (Jess) — the Customer-request NOTES are an auto-dated LOG, not one
  *  overwrite box: "18 Jul · wants 15 July" stacks on "12 Jul · prefers
@@ -3521,12 +3455,12 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="ready">
-                        booked {fmtDate(eta).split(", ")[0]}
+                        Scheduled {fmtDate(eta).split(", ")[0]}
                       </MiniBadge>
                     );
                   if (order.ops_assigned_logistic)
-                    return <MiniBadge tone="waiting">not booked</MiniBadge>;
-                  return <MiniBadge tone="muted">no carrier</MiniBadge>;
+                    return <MiniBadge tone="waiting">Yet Scheduled</MiniBadge>;
+                  return <MiniBadge tone="muted">No carrier</MiniBadge>;
                 })()}
                 {deadlineLabel !== "—" && (
                   <span className="text-[13px] font-semibold tabular-nums text-base-900 whitespace-nowrap">
@@ -3547,36 +3481,82 @@ function DrawerBody({
                 const eta = form.control?.logistic_eta ?? null;
                 const late = daysToDelivery !== null && daysToDelivery < 0;
                 const hasStockStep = goodsN > 0;
-                // done-flags in step order; the FIRST not-done step is the one
-                // coloured node (red when the order is already late).
-                const doneFlags = [
-                  !!order.ops_assigned_logistic,
-                  ...(hasStockStep ? [readyN === goodsN] : []),
-                  !!eta,
-                  deliveredDone,
-                ];
-                const current = doneFlags.findIndex((d) => !d);
-                const stepState = (
-                  idx: number,
-                  tone: "act" | "wait",
-                ): DeliveryStepState =>
-                  doneFlags[idx]
-                    ? "done"
-                    : idx === current
-                      ? late
-                        ? "act"
-                        : tone
-                      : "todo";
-                const nCall = hasStockStep ? 3 : 2;
-                const nDeliv = hasStockStep ? 4 : 3;
+                const onHold = balanceGate === "hold" || storageGate === "hold";
+                // The delivery status word (Jess 2026-07-19): Scheduled = a
+                // logistic ETA is set · Yet Scheduled = carrier assigned, no ETA
+                // (the 89% normal state) · Delivered = done (grey, never alarms).
+                const statusWord = deliveredDone
+                  ? "Delivered"
+                  : onHold
+                    ? "On hold"
+                    : late
+                      ? `Overdue ${-(daysToDelivery ?? 0)}d`
+                      : eta
+                        ? "Scheduled"
+                        : order.ops_assigned_logistic
+                          ? "Yet Scheduled"
+                          : "No carrier";
                 return (
                   <div className="max-w-[700px]">
-                    <DeliveryStep
-                      n={1}
-                      state={stepState(0, "act")}
-                      title="Assign logistic"
-                      who="you"
-                    >
+                    {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
+                        ONE shipment = ONE card. The 4-node in-tab spine is
+                        retired; the whole-order journey spine stays in the left
+                        rail. Icon never tints (grey when done); status word in
+                        the caption; deadline anchor + DO print top-right. */}
+                    <div className="bg-white border border-base-200 rounded-[11px] shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
+                      {/* header — truck · status · carrier · deadline / DO */}
+                      <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <span
+                            className={`h-8 w-8 shrink-0 rounded-[9px] grid place-items-center ${
+                              deliveredDone
+                                ? "bg-base-100 text-base-500"
+                                : "bg-primary/10 text-primary"
+                            }`}
+                          >
+                            {deliveredDone ? <Check size={16} /> : <Truck size={16} />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold tracking-[0.05em] uppercase text-base-500">
+                              {statusWord}
+                            </div>
+                            <div
+                              className={`text-[13px] font-semibold truncate ${
+                                deliveredDone ? "text-base-500" : "text-base-900"
+                              }`}
+                              title={chasePartnerName ?? "No carrier yet"}
+                            >
+                              {chasePartnerName ?? "No carrier yet"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {deadlineLabel !== "—" && (
+                            <span
+                              className={`font-mono text-[12px] ${
+                                late && !deliveredDone ? "text-danger" : "text-base-500"
+                              }`}
+                            >
+                              {deadlineLabel}
+                            </span>
+                          )}
+                          {late && !deliveredDone && (
+                            <span className="text-[11px] font-bold rounded-[5px] px-1.5 py-0.5 bg-[#FCEBEB] text-[#A32D2D]">
+                              overdue {-(daysToDelivery ?? 0)}d
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void openDoPdf(order.id)}
+                            title="Print the Delivery Order (DO) — the driver's what-to-do sheet: items, address, RM to collect"
+                            className="inline-flex items-center gap-1 text-[11px] text-primary"
+                          >
+                            <Printer size={14} /> DO
+                          </button>
+                        </div>
+                      </div>
+                      {/* body */}
+                      <div className="border-t border-base-100 px-3 py-2">
                   <FieldGrid>
                     <RoutingFields
                       orderId={order.id}
@@ -3632,49 +3612,50 @@ function DrawerBody({
                       />
                     )}
                   </FieldGrid>
-                    </DeliveryStep>
-                    {/* Stock — READ-ONLY (guardrail: the work lives in Items);
-                        here so the logistic knows what to tell the customer.
-                        SAME stockCats the Items tab derives from. */}
-                    {hasStockStep && (
-                      <DeliveryStep
-                        n={2}
-                        state={stepState(1, "wait")}
-                        title={`Stock ready ${readyN}/${goodsN}`}
-                        who="read-only — work in Items"
-                        right={
+                      </div>
+                      {/* Goods ready — READ-ONLY (guardrail: the work lives in
+                          Items). SAME stockCats the Items tab derives from. */}
+                      {hasStockStep && (
+                        <DRow k="Goods ready">
+                          <span className="leading-relaxed">
+                            {stockCats.map((c, i) => (
+                              <span key={c.cat}>
+                                {i > 0 && " · "}
+                                {c.label} {c.ready}/{c.total}
+                                {c.allReady ? (
+                                  " ✓"
+                                ) : (
+                                  <span className="text-warning"> — {c.status}</span>
+                                )}
+                              </span>
+                            ))}
+                          </span>
                           <button
                             type="button"
                             onClick={() => setTab("items")}
-                            className="text-[12px] text-info hover:underline whitespace-nowrap"
+                            className="text-[11px] text-info whitespace-nowrap"
                           >
-                            open Items ›
+                            Items ›
                           </button>
-                        }
-                      >
-                        <div className="text-[12px] text-base-700 leading-relaxed py-0.5">
-                          {stockCats.map((c, i) => (
-                            <span key={c.cat}>
-                              {i > 0 && " · "}
-                              {c.label} {c.ready}/{c.total}
-                              {c.allReady ? (
-                                " ✓"
-                              ) : (
-                                <span className="text-warning"> — {c.status}</span>
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                      </DeliveryStep>
-                    )}
-                    <DeliveryStep
-                      n={nCall}
-                      state={stepState(hasStockStep ? 2 : 1, "wait")}
-                      title="Call customer"
-                      who="NETS — keyed by us for now"
-                      right={
-                        order.ops_assigned_logistic && !deliveredDone ? (
-                          <>
+                        </DRow>
+                      )}
+                      {/* Collect — SAME balanceDue the Balance tab shows; hidden
+                          when no total (never a wrong RM0 on the phone). The one
+                          line the person on the phone actually needs. */}
+                      {!deliveredDone && totalSet && balanceDue > 0 && (
+                        <DRow k="Collect">
+                          <span className="font-mono font-bold text-danger">
+                            {RM(balanceDue)}
+                          </span>
+                          <span className="text-[11px] text-base-400">
+                            before delivery
+                          </span>
+                        </DRow>
+                      )}
+                      {/* Chase logistic — Remind (gentle) / Chase (firm). */}
+                      {order.ops_assigned_logistic && !deliveredDone && (
+                        <DRow k="Chase logistic">
+                          <span className="flex items-center gap-1.5">
                             <Btn
                               variant="ghost"
                               size="sm"
@@ -3691,91 +3672,89 @@ function DrawerBody({
                             >
                               Chase
                             </Btn>
-                          </>
-                        ) : undefined
-                      }
-                    >
-                  {/* Money the caller must mention — SAME balanceDue the
-                      Balance tab shows; hidden when no total is set (never a
-                      wrong RM0 on the phone). Stock already told in step 2. */}
-                  {!deliveredDone && totalSet && balanceDue > 0 && (
-                    <div className="text-[12px] text-base-700 py-0.5">
-                      collect{" "}
-                      <span className="font-semibold text-danger">
-                        {RM(balanceDue)}
-                      </span>{" "}
-                      before delivery
-                    </div>
-                  )}
-                  <FieldGrid>
-                    {/* 2A: fields save the moment they change — spreadsheet cell.
-                        (Customer confirmed checkbox REMOVED rev25 — Jess: "we
-                        don't mark"; the 0220 column stays, no UI.) */}
-                    <LogisticEtaField
-                      form={form}
-                      onCommit={(v) => quickSave.mutate({ logistic_eta: v || null })}
-                    />
-                  </FieldGrid>
-                  {/* Auto-reminder line (rev25) — the 0197 cron creates the
-                      chase task by ITSELF on deadline−N; nothing to press.
-                      N defaults to 3 (0/162 ever changed it) — click "−3d"
-                      to reveal the tuner, Items-ETA click-to-edit style. */}
-                  {!deliveredDone && contactByLabel && (
-                    <div className="flex items-center gap-1 py-0.5 text-[12px] text-base-400">
-                      <span className="truncate">
-                        if not booked, auto-reminder {contactByLabel}
-                      </span>
-                      {editingChaseDays ? (
-                        <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
-                          <span>−</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={60}
-                            autoFocus
-                            value={form.draft.contact_by_days}
-                            onChange={(e) =>
-                              form.set("contact_by_days", e.target.value)
-                            }
-                            onBlur={(e) => {
-                              const v = e.target.value.trim();
-                              const saved =
-                                form.control?.contact_by_days != null
-                                  ? String(form.control.contact_by_days)
-                                  : "";
-                              if (v !== saved)
-                                quickSave.mutate({
-                                  contact_by_days: v ? Number(v) : null,
-                                });
-                              setEditingChaseDays(false);
-                            }}
-                            placeholder="3"
-                            aria-label="Days before the deadline for the automatic chase reminder"
-                            className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
-                          />
-                          <span>d</span>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingChaseDays(true)}
-                          title="Automatic — a task is created by itself this many days before the deadline. Click to change."
-                          className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
-                        >
-                          · −{contactByDays}d auto
-                        </button>
+                          </span>
+                        </DRow>
+                      )}
+                      {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
+                          tucked behind a fold, opened only when needed (Jess
+                          2026-07-19: design to the data). */}
+                      {!deliveredDone && (
+                        <details className="border-b border-base-100 last:border-b-0">
+                          <summary className="px-3 py-2 text-[11px] text-base-500 cursor-pointer select-none list-none flex items-center gap-1.5">
+                            <ChevronDown size={14} /> Booking ETA · auto-reminder
+                          </summary>
+                          <div className="px-3 pb-2">
+                            <FieldGrid>
+                              {/* fields save the moment they change (Customer-
+                                  confirmed checkbox REMOVED rev25 — "we don't
+                                  mark"; the 0220 column stays, no UI). */}
+                              <LogisticEtaField
+                                form={form}
+                                onCommit={(v) =>
+                                  quickSave.mutate({ logistic_eta: v || null })
+                                }
+                              />
+                            </FieldGrid>
+                            {/* Auto-reminder — the 0197 cron creates the chase
+                                task by ITSELF on deadline−N; nothing to press. */}
+                            {contactByLabel && (
+                              <div className="flex items-center gap-1 py-0.5 text-[12px] text-base-400">
+                                <span className="truncate">
+                                  if not booked, auto-reminder {contactByLabel}
+                                </span>
+                                {editingChaseDays ? (
+                                  <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
+                                    <span>−</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={60}
+                                      autoFocus
+                                      value={form.draft.contact_by_days}
+                                      onChange={(e) =>
+                                        form.set("contact_by_days", e.target.value)
+                                      }
+                                      onBlur={(e) => {
+                                        const v = e.target.value.trim();
+                                        const saved =
+                                          form.control?.contact_by_days != null
+                                            ? String(form.control.contact_by_days)
+                                            : "";
+                                        if (v !== saved)
+                                          quickSave.mutate({
+                                            contact_by_days: v ? Number(v) : null,
+                                          });
+                                        setEditingChaseDays(false);
+                                      }}
+                                      placeholder="3"
+                                      aria-label="Days before the deadline for the automatic chase reminder"
+                                      className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
+                                    />
+                                    <span>d</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingChaseDays(true)}
+                                    title="Automatic — a task is created by itself this many days before the deadline. Click to change."
+                                    className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
+                                  >
+                                    · −{contactByDays}d auto
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+                      {/* Delivered = grey note; a delivered order never alarms
+                          (pre-golive guardrail #2). */}
+                      {deliveredDone && (
+                        <div className="px-3 py-2.5 text-center text-[12px] font-semibold text-base-500">
+                          Delivered — nothing to do
+                        </div>
                       )}
                     </div>
-                  )}
-                    </DeliveryStep>
-                    {/* Bare on purpose — "overdue Nd" lives ONCE, in the
-                        header (state paints once). */}
-                    <DeliveryStep
-                      n={nDeliv}
-                      state={stepState(hasStockStep ? 3 : 2, "wait")}
-                      title="Delivered"
-                      last
-                    />
                     {/* NOTES — not a stage: the auto-dated customer log. */}
                     <div className="border-t border-base-100 mt-2.5 pt-2">
                       <div className="flex items-center gap-1.5 mb-1">
@@ -4496,6 +4475,47 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+/** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
+ *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
+ *  36px). Used by the Delivery card. */
+function DRow({
+  k,
+  children,
+  block = false,
+}: {
+  k: string;
+  children: ReactNode;
+  /** block = value drops below the label (for a field/form that needs width). */
+  block?: boolean;
+}) {
+  return (
+    <div
+      className={`px-3 py-1.5 border-b border-base-100 last:border-b-0 ${
+        block
+          ? ""
+          : "flex items-center justify-between gap-3 min-h-9"
+      }`}
+    >
+      <span
+        className={`text-[11px] font-semibold uppercase tracking-[0.03em] text-base-500 shrink-0 ${
+          block ? "block mb-1" : ""
+        }`}
+      >
+        {k}
+      </span>
+      <span
+        className={`min-w-0 text-[13px] font-medium text-base-900 ${
+          block
+            ? ""
+            : "text-right flex items-center gap-2 justify-end flex-wrap"
+        }`}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
 /** Storage-scope category (mirrors OperationPayments.catOf): MS/BF vs SOF. */
 /** Client-side CSV (opens in Excel) of the order — the ⋮ Download Excel item. */
 function downloadOrderCsv(
@@ -4575,14 +4595,24 @@ async function openInvoicePdf(orderId: string, so: number) {
   }
 }
 
-/** Fetch DO data + render the Delivery Order PDF — the Delivery ⋮ "Print DO".
- *  Mirrors PrintDoButton (same /print-do-data endpoint). */
+/** Fetch DO data + render the Delivery Order PDF — the Delivery card's "🖨 DO".
+ *  The driver's what-to-do sheet: items · customer · address · RM to collect.
+ *  Mirrors PrintDoButton (same /print-do-data endpoint). The DO number follows
+ *  the shared docNumber scheme (DO-DDMMYY-NNNN) so it shares this order's tail
+ *  with its loan note / receipt (per-order grouping) — overriding the server's
+ *  legacy random DO number. */
 async function openDoPdf(orderId: string) {
   try {
     const data = await apiFetch<DoTemplateData>(
       `/api/operation/orders/${orderId}/print-do-data`,
     );
-    const blob = await renderDoPdf(data);
+    const do_number = docNumber({
+      prefix: "DO",
+      date: data.issue_date,
+      seed: orderId,
+      digits: 4,
+    });
+    const blob = await renderDoPdf({ ...data, do_number });
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
@@ -4590,9 +4620,8 @@ async function openDoPdf(orderId: string) {
   }
 }
 
-// Not wired yet — reserved for the Drawer 1B ⋮ menu (invoice / DO print).
+// Invoice print stays reserved for the ⋮ menu; DO print is wired on the card.
 void openInvoicePdf;
-void openDoPdf;
 
 /** Malaysian receiving banks for the Bank-transfer dropdown (free set — the
  *  name rides `reference`, no schema change). */
