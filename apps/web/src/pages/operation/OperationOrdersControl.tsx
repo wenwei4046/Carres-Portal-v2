@@ -2015,6 +2015,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
       )}
     </div>
   ) : undefined;
+  // Header PO-duty strip REMOVED (Jess 2026-07-19: "useless") — the duty holder
+  // lives in the right-rail Team board; Raise PO stays in the bulk bar. Built
+  // above but no longer mounted; `void` keeps the vars referenced (no churn).
+  void poDutyTitleChips;
 
   return (
     <>
@@ -2048,7 +2052,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             )}
           </span>
         }
-        titleRight={poDutyTitleChips}
+        titleRight={undefined}
         actions={
           /* Header right cluster (ONE white header surface): search → Bell →
              HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
