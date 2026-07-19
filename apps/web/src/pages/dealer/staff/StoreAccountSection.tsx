@@ -41,11 +41,11 @@ export default function StoreAccountSection() {
 
   function cancelPending() {
     if (!pending) return;
-    if (!confirm(`撤回改邮箱申请（${pending.requestedEmail}）？· Withdraw this request?`)) return;
+    if (!confirm(`Withdraw the email change request (${pending.requestedEmail})?`)) return;
     cancel.mutate(
       { id: pending.id },
       {
-        onSuccess: () => toast.success("申请已撤回 · Request withdrawn"),
+        onSuccess: () => toast.success("Request withdrawn"),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not cancel"),
       },
     );
@@ -58,7 +58,7 @@ export default function StoreAccountSection() {
         data-testid="store-account-section"
       >
         <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-3">
-          Store login · 店铺登录账号
+          Store login
         </h2>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -72,7 +72,7 @@ export default function StoreAccountSection() {
             {pending && (
               <div className="mt-1.5 text-[12px]" data-testid="email-change-pending">
                 <span className="inline-block px-2 py-[2px] rounded bg-warning-soft text-warning font-semibold mr-2">
-                  等待 HQ 审批 · Pending approval
+                  Pending HQ approval
                 </span>
                 <span className="text-muted-foreground">→ {pending.requestedEmail}</span>
                 <button
@@ -82,15 +82,14 @@ export default function StoreAccountSection() {
                   data-testid="email-change-cancel"
                   className="ml-2 text-[12px] font-semibold text-destructive hover:bg-base-100 rounded px-1.5 py-0.5 disabled:opacity-50"
                 >
-                  撤回 · Withdraw
+                  Withdraw
                 </button>
               </div>
             )}
             {!pending && rejected && (
               <div className="mt-1.5 text-[12px] text-destructive" data-testid="email-change-rejected">
-                上次申请（{rejected.requestedEmail}）被 HQ 拒绝
-                {rejected.decisionNote ? `：${rejected.decisionNote}` : ""} · Last request was
-                rejected{rejected.decisionNote ? ` — ${rejected.decisionNote}` : ""}
+                Last request ({rejected.requestedEmail}) was rejected by Carres HQ
+                {rejected.decisionNote ? ` — ${rejected.decisionNote}` : ""}
               </div>
             )}
           </div>
@@ -103,26 +102,25 @@ export default function StoreAccountSection() {
               className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-base-700 border border-base-200 hover:bg-base-100 rounded px-3 py-1.5"
             >
               <KeyRound size={13} strokeWidth={1.75} />
-              改密码 · Change password
+              Change password
             </button>
             <button
               type="button"
               onClick={() => setEmailOpen(true)}
               disabled={!!pending}
-              title={pending ? "已有一个申请在等审批 · A request is already pending" : undefined}
+              title={pending ? "A request is already pending" : undefined}
               data-testid="store-account-changeemail"
               className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-base-700 border border-base-200 hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
             >
               <Mail size={13} strokeWidth={1.75} />
-              申请改邮箱 · Change email
+              Change email
             </button>
           </div>
         </div>
 
         <p className="text-[11.5px] text-muted-foreground mt-3">
-          密码改了马上生效；邮箱改动提交后要 Carres HQ 批准才生效（批准前继续用旧邮箱登录）。
-          Password changes apply immediately; an email change takes effect only after Carres HQ
-          approves it.
+          Password changes apply immediately. An email change takes effect only after Carres HQ
+          approves it — keep signing in with the old email until then.
         </p>
       </section>
 
@@ -160,14 +158,14 @@ function ChangeStorePasswordModal({ email, onClose }: { email: string; onClose: 
       setErr(result.error);
       return;
     }
-    toast.success("密码已更新 · Password updated");
+    toast.success("Password updated");
     onClose();
   }
 
   return (
     <ModalShell
       title="Change store password"
-      subtitle={`${email} — 先验证旧密码，马上生效。Verify the current password; applies immediately.`}
+      subtitle={`${email} — verify the current password first; the change applies immediately.`}
       onClose={onClose}
       footer={
         <>
@@ -187,7 +185,7 @@ function ChangeStorePasswordModal({ email, onClose }: { email: string; onClose: 
     >
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-          Current password · 旧密码
+          Current password
         </span>
         <input
           type="password"
@@ -200,7 +198,7 @@ function ChangeStorePasswordModal({ email, onClose }: { email: string; onClose: 
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-          New password · 新密码
+          New password
         </span>
         <input
           type="password"
@@ -211,12 +209,12 @@ function ChangeStorePasswordModal({ email, onClose }: { email: string; onClose: 
           className={inputCls}
         />
         <span className="text-[11px] text-muted-foreground">
-          至少 8 位，需与旧密码不同 · Min 8 characters, must differ from current.
+          Min 8 characters, must differ from the current password.
         </span>
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-          Confirm new password · 再输一次
+          Confirm new password
         </span>
         <input
           type="password"
@@ -255,11 +253,10 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
   function describeError(e: unknown): string {
     if (e instanceof ApiError) {
       const body = e.body as { error?: string } | null;
-      if (body?.error === "bad_password") return "店铺密码不对 · Wrong store password";
-      if (body?.error === "email_in_use") return "这个邮箱已被使用 · Email already in use";
-      if (body?.error === "pending_exists")
-        return "已有一个申请在等审批 · A request is already pending";
-      if (body?.error === "same_email") return "这已经是当前登录邮箱 · Already the current email";
+      if (body?.error === "bad_password") return "Wrong store password";
+      if (body?.error === "email_in_use") return "Email already in use";
+      if (body?.error === "pending_exists") return "A request is already pending";
+      if (body?.error === "same_email") return "That is already the current login email";
       return e.message;
     }
     return "Could not submit the request";
@@ -272,7 +269,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
       { newEmail: trimmed, password },
       {
         onSuccess: () => {
-          toast.success("已提交，等 HQ 审批 · Submitted for approval");
+          toast.success("Submitted for Carres HQ approval");
           onClose();
         },
         onError: (e) => setErr(describeError(e)),
@@ -283,7 +280,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
   return (
     <ModalShell
       title="Change login email"
-      subtitle={`当前 ${email} — 提交后需 Carres HQ 批准才生效。Submitted for Carres HQ approval; the login only changes once approved.`}
+      subtitle={`Currently ${email} — the request goes to Carres HQ; the login only changes once approved.`}
       onClose={onClose}
       footer={
         <>
@@ -303,7 +300,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
     >
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-          New email · 新邮箱
+          New email
         </span>
         <input
           type="email"
@@ -318,7 +315,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-          Store password · 店铺密码
+          Store password
         </span>
         <input
           type="password"
@@ -329,7 +326,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
           className={inputCls}
         />
         <span className="text-[11px] text-muted-foreground">
-          确认是店主本人操作 · Confirms it&apos;s really the store owner.
+          Confirms it&apos;s really the store owner.
         </span>
       </label>
       {err && (

@@ -395,6 +395,10 @@ staffRouter.post("/", async (c) => {
       staff_role: input.staffRole,
       color: input.color ?? null,
       active: true,
+      // 0241 profile fields.
+      email: input.email ?? null,
+      birthday: input.birthday ?? null,
+      gender: input.gender ?? null,
     })
     .select("*")
     .single();
@@ -478,6 +482,10 @@ staffRouter.patch("/:id", async (c) => {
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.color !== undefined) update.color = patch.color;
   if (patch.active !== undefined) update.active = patch.active;
+  // 0241 profile fields — same edit scope as name/color.
+  if (patch.email !== undefined) update.email = patch.email;
+  if (patch.birthday !== undefined) update.birthday = patch.birthday;
+  if (patch.gender !== undefined) update.gender = patch.gender;
   if (caller.tier === "principal") {
     if (patch.staffRole !== undefined) update.staff_role = patch.staffRole;
     if (patch.outletId !== undefined) update.outlet_id = patch.outletId;

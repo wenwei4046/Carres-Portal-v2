@@ -201,7 +201,7 @@ function IdentityStep({
   return (
     <>
       <div className="staff-gate__eyebrow">First-time setup · 2 of 3</div>
-      <h2 className="staff-gate__title">You're the {TIER_LABEL[ownerTier].zh}</h2>
+      <h2 className="staff-gate__title">You're the {TIER_LABEL[ownerTier]}</h2>
       <p className="staff-gate__sub">
         This is your own sign-in tile. Pick a colour and a 6-digit PIN — you'll tap your name and
         enter this PIN to open the POS.
@@ -347,7 +347,7 @@ function ExistingStaffRow({ staff }: { staff: StaffDto }) {
         <span style={{ flex: 1 }}>
           <span className="staff-outlet__name">{staff.name}</span>
           <span className="staff-outlet__addr">
-            {TIER_LABEL[staff.staffRole].zh} · {staff.hasPin ? "PIN set" : "no PIN"}
+            {TIER_LABEL[staff.staffRole]} · {staff.hasPin ? "PIN set" : "no PIN"}
           </span>
         </span>
         {saved ? (

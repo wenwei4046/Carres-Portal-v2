@@ -890,7 +890,7 @@ export default function DealerPos({
               onClick={() => setTeamOpen(true)}
               className="topbar-pill"
               aria-label="Manage staff"
-              title="员工管理 · Manage staff"
+              title="Manage staff"
               data-testid="pos-topbar-staff-manage"
             >
               <Users size={13} strokeWidth={1.75} />

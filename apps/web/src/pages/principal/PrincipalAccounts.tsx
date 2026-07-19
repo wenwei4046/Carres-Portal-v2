@@ -226,8 +226,8 @@ export function EmailChangeRequestsPanel() {
   function approve(r: (typeof pending)[number]) {
     if (
       !confirm(
-        `批准 ${r.dealerName ?? "this store"} 的登录邮箱改为 ${r.requestedEmail}？\n` +
-          `（原 ${r.currentEmail}；批准后店铺用新邮箱登录。）`,
+        `Approve changing ${r.dealerName ?? "this store"}'s login email to ${r.requestedEmail}?\n` +
+          `(Currently ${r.currentEmail} — the store signs in with the new email once approved.)`,
       )
     ) {
       return;
@@ -235,19 +235,21 @@ export function EmailChangeRequestsPanel() {
     decide.mutate(
       { id: r.id, action: "approve" },
       {
-        onSuccess: () => toast.success(`已批准 · ${r.requestedEmail} 生效`),
+        onSuccess: () => toast.success(`Approved — ${r.requestedEmail} is now the login`),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not approve"),
       },
     );
   }
 
   function reject(r: (typeof pending)[number]) {
-    const note = prompt(`拒绝 ${r.dealerName ?? "this store"} 的改邮箱申请 — 给店家的备注（可留空）：`);
+    const note = prompt(
+      `Reject ${r.dealerName ?? "this store"}'s email change — note for the store (optional):`,
+    );
     if (note === null) return; // cancelled the dialog
     decide.mutate(
       { id: r.id, action: "reject", note: note.trim() || undefined },
       {
-        onSuccess: () => toast.success("已拒绝，店家会看到备注"),
+        onSuccess: () => toast.success("Rejected — the store will see your note"),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not reject"),
       },
     );
@@ -259,7 +261,7 @@ export function EmailChangeRequestsPanel() {
       data-testid="email-change-panel"
     >
       <h2 className="text-xs uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
-        Email change requests · 店铺邮箱修改申请 ({pending.length})
+        Store email change requests ({pending.length})
       </h2>
       <ul className="divide-y divide-border">
         {pending.map((r) => (
@@ -1049,14 +1051,11 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                     {(staffKind === "showroom"
                       ? (["manager", "salesperson"] as StaffTierDto[])
                       : (["principal", "manager", "salesperson"] as StaffTierDto[])
-                    ).map((t) => {
-                      const l = tierLabel(t, staffKind);
-                      return (
-                        <option key={t} value={t}>
-                          {l.en} · {l.zh}
-                        </option>
-                      );
-                    })}
+                    ).map((t) => (
+                      <option key={t} value={t}>
+                        {tierLabel(t, staffKind)}
+                      </option>
+                    ))}
                   </select>
                 </Field>
               </div>

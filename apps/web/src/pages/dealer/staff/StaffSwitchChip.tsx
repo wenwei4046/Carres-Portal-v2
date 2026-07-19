@@ -5,11 +5,11 @@ import { ChangeMyPinModal, staffColorHex, staffInitials, TIER_LABEL } from "./st
 
 /**
  * Current-staff chip (0233) shown in the POS top bar. Renders the signed-in
- * staff member (colour avatar + name + tier) as a "换人 / switch" button:
- * clicking clears the staff token — keeping the working outlet — which drops
- * StaffGate back to the PIN screen. A sibling "改 PIN" button (Loo 2026-07-18)
- * lets EVERY tier rotate its own PIN (hidden in owner-mode, whose sid is null —
- * no personal PIN to rotate). Returns null when there's no staff session
+ * staff member (colour avatar + name + tier) as a Switch button: clicking
+ * clears the staff token — keeping the working outlet — which drops StaffGate
+ * back to the PIN screen. A sibling PIN button (Loo 2026-07-18) lets EVERY
+ * tier rotate its own PIN (hidden in owner-mode, whose sid is null — no
+ * personal PIN to rotate). Returns null when there's no staff session
  * (principal on-behalf / unlinked salesperson) so the host can fall back to
  * its default chip. (The back-office "kit" variant died with the back-office,
  * 2026-07-19.)
@@ -32,7 +32,7 @@ export default function StaffSwitchChip() {
         type="button"
         className="pos-staff-chip pos-staff-chip--btn"
         onClick={clearToken}
-        title="换人 · Switch staff"
+        title="Switch staff"
         data-testid="staff-switch-chip"
       >
         <span className="pos-staff-chip__avatar" style={{ background: staffColorHex(staff.color) }}>
@@ -41,12 +41,12 @@ export default function StaffSwitchChip() {
         <span style={{ textAlign: "left" }}>
           {staff.name}
           <span className="pos-staff-chip__role" style={{ display: "block" }}>
-            {tier.zh} · {tier.en}
+            {tier}
           </span>
         </span>
         <span className="pos-staff-chip__switch">
           <RefreshCw size={12} strokeWidth={2} />
-          换人
+          Switch
         </span>
       </button>
       {staff.sid && (
@@ -54,12 +54,12 @@ export default function StaffSwitchChip() {
           type="button"
           className="pos-staff-chip pos-staff-chip--btn"
           onClick={() => setPinOpen(true)}
-          title="改 PIN · Change my PIN"
+          title="Change my PIN"
           data-testid="staff-changepin-chip"
         >
           <span className="pos-staff-chip__switch">
             <KeyRound size={12} strokeWidth={2} />
-            改 PIN
+            PIN
           </span>
         </button>
       )}

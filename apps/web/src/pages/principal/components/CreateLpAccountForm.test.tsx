@@ -79,7 +79,7 @@ describe("CreateLpAccountForm", () => {
     vi.mocked(apiFetch).mockRejectedValue(new Error("Email already in use"));
     render(wrap(<CreateLpAccountForm onCreated={() => {}} />));
 
-    fireEvent.change(screen.getByLabelText(/公司名/i), {
+    fireEvent.change(screen.getByLabelText(/company name/i), {
       target: { value: "LP-Alpha" },
     });
     fireEvent.change(screen.getByLabelText(/contact/i), {
