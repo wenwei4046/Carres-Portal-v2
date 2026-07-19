@@ -2544,15 +2544,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </KanbanGroup>
               )}
 
-              {/* FILTERS — the dimension taxonomy DEMOTED (B rebuild): one
-                  collapsed fold holding Stock / Logistic / Region / Category.
-                  Group totals deleted (165/164/167 answered nothing); counts
-                  are open-only via liveScope; zero rows hidden. */}
-              <KanbanGroup
-                title="FILTERS"
-                collapsed={collapsedGroups.has("FILTERS")}
-                onToggle={() => toggleGroup("FILTERS")}
-              >
+              {/* FILTERS wrapper header REMOVED (Jess 2026-07-19) — the filter
+                  dimensions (Logistic / Supplier / Region / Category) render
+                  directly, no parent fold. */}
+              <>
                 {/* Generic DEADLINE section REMOVED (Jess 2026-07-19: "6 is
                     of who?") — an unlabelled deadline read as ambiguous. Deadline
                     urgency now lives ONLY under its owner: SUPPLIER (stock-arrival
@@ -2715,7 +2710,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       />
                     ))}
                 </KanbanGroup>
-              </KanbanGroup>
+              </>
 
               {/* FIX DATA — broken records to repair, NOT people to chase (B
                   rebuild): unreadable region + missing PO. Hidden when clean. */}
