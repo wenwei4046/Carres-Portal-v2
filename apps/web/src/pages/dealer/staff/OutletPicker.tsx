@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import type { OutletDto } from "@carres/shared";
+import CarresLockup from "@/components/CarresLockup";
 
 /**
  * OutletPicker (0233) — shown only when an activated store has MORE THAN ONE
@@ -15,8 +16,11 @@ export default function OutletPicker({
   onPick: (outletId: string) => void;
 }) {
   return (
-    <div className="staff-gate" data-testid="staff-outlet-picker">
+    <div className="pos-proto staff-gate" data-testid="staff-outlet-picker">
       <div className="staff-gate__card staff-gate__card--narrow">
+        <div className="staff-gate__lockup">
+          <CarresLockup size={24} />
+        </div>
         <div className="staff-gate__eyebrow">Which outlet</div>
         <h2 className="staff-gate__title">Pick your outlet</h2>
         <p className="staff-gate__sub">Choose where you're working today. You can switch later.</p>

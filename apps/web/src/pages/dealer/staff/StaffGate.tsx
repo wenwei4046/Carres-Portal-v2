@@ -220,7 +220,7 @@ function ForgotPinModal({
   }
 
   return (
-    <div className="pin-gate" data-testid="staff-forgot-modal">
+    <div className="pos-proto pin-gate" data-testid="staff-forgot-modal">
       <form className="pin-gate__card" onSubmit={submit} style={{ textAlign: "left" }}>
         <div className="staff-gate__eyebrow">Owner override</div>
         <h2 className="staff-gate__title">Reset a PIN</h2>
@@ -267,7 +267,7 @@ function ForgotPinModal({
 
 function GateSpinner({ label }: { label: string }) {
   return (
-    <div className="staff-gate" data-testid="staff-gate-spinner">
+    <div className="pos-proto staff-gate" data-testid="staff-gate-spinner">
       <div className="staff-gate__card staff-gate__card--narrow">
         <p className="staff-gate__sub" style={{ margin: 0 }}>
           {label}
