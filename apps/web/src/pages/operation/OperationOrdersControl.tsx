@@ -3787,7 +3787,7 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-base-50"
+        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-[#EAF3FE]"
       }`}
       data-testid="order-row"
     >
