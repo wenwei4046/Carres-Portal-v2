@@ -71,6 +71,13 @@ export function staffColorHex(color: string | null | undefined): string {
   return STAFF_COLORS.slate;
 }
 
+/** PIN-gate avatars only: an unchosen colour renders brand terracotta instead
+ *  of admin-neutral slate — the gate is a branded surface, grey reads broken
+ *  there (Loo 2026-07-19). Admin chips/lists keep the slate fallback above. */
+export function staffGateColorHex(color: string | null | undefined): string {
+  return color && color in STAFF_COLORS ? STAFF_COLORS[color as StaffColorKey] : "var(--c-burnt)";
+}
+
 export function StaffAvatar({
   color,
   name,

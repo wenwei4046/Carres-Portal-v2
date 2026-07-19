@@ -3470,11 +3470,12 @@
 }
 .pin-gate__dot {
   width: 14px; height: 14px; border-radius: 999px;
-  border: 1.5px solid var(--line-strong);
+  /* Solid track — the empty state must be visible too (was a 22% outline). */
+  background: var(--c-beige);
   transition: 120ms ease;
 }
-.pin-gate__dot.is-on { background: var(--c-orange); border-color: var(--c-orange); }
-.pin-gate__dot.is-err { background: #B8331F; border-color: #B8331F; }
+.pin-gate__dot.is-on { background: var(--c-orange); box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-orange) 18%, transparent); }
+.pin-gate__dot.is-err { background: #B8331F; box-shadow: none; }
 .pin-gate__dots.is-err { animation: shake 380ms ease; }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -3487,15 +3488,16 @@
 }
 .pin-gate__key {
   height: 52px; border-radius: 14px;
-  background: var(--pos-bg, #fff);
-  border: 1.5px solid var(--line);
+  /* Solid key faces — a touchscreen keypad has to look pressable at rest. */
+  background: #F3F0EB;
+  border: 1.5px solid rgba(34,31,32,0.13);
   font-family: var(--font-button); font-weight: 600; font-size: 20px;
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--fg);
   transition: 100ms ease;
 }
 .pin-gate__key:hover { border-color: var(--line-strong); }
-.pin-gate__key:active { transform: scale(0.96); box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); }
+.pin-gate__key:active { transform: scale(0.96); background: var(--c-beige); box-shadow: inset 0 1px 2px rgba(0,0,0,0.08); }
 .pin-gate__key--util { background: transparent; border-color: transparent; color: var(--fg-muted); font-size: 12px; letter-spacing: 0.06em; }
 .pin-gate__key svg { width: 18px; height: 18px; }
 .pin-gate__hint { font-size: 11px; color: var(--fg-muted); letter-spacing: 0.04em; }
@@ -3506,10 +3508,25 @@
    ============================================================ */
 .staff-gate {
   position: fixed; inset: 0; z-index: 60;
-  background: var(--pos-bg);
+  overflow: hidden;
+  /* Warm brand hero — same recipe as .confirm__hero (option A, Loo 2026-07-19):
+     cream base + terracotta glow + ghost Bodoni "C", so the white card reads
+     as a card instead of melting into a flat cream wash. */
+  background:
+    radial-gradient(72% 88% at 88% -12%, color-mix(in oklab, var(--c-orange) 17%, transparent) 0%, transparent 62%),
+    radial-gradient(58% 74% at -14% 112%, color-mix(in oklab, var(--c-beige) 80%, transparent) 0%, transparent 58%),
+    var(--c-cream);
   display: flex; align-items: center; justify-content: center;
   padding: 32px;
   animation: pageEnter 220ms cubic-bezier(0.22,1,0.36,1) both;
+}
+.staff-gate::before {
+  content: 'C';
+  position: absolute; right: -70px; top: 50%; transform: translateY(-53%);
+  font-family: var(--font-mark);
+  font-size: 640px; line-height: 1; font-weight: 500;
+  color: color-mix(in oklab, var(--c-orange) 8%, transparent);
+  pointer-events: none;
 }
 .staff-gate__card {
   position: relative;
@@ -3519,10 +3536,11 @@
   background: var(--pos-panel, #fff);
   border-radius: 24px;
   padding: 36px 40px 32px;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.16), 0 0 0 1px var(--line-strong);
+  box-shadow: 0 30px 70px rgba(34,31,32,0.18), 0 0 0 1px var(--line-strong);
   text-align: center;
 }
 .staff-gate__card--narrow { width: 460px; }
+.staff-gate__lockup { display: flex; justify-content: center; margin-bottom: 14px; }
 .staff-gate__eyebrow {
   font-family: var(--font-button); font-size: 10px; font-weight: 700;
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt);
@@ -3545,19 +3563,28 @@
 .staff-tile {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 20px 14px 16px;
-  background: var(--pos-bg, #fff);
-  border: 1.5px solid var(--line);
+  /* Solid fill + visible border — the tile must read as tappable at rest
+     (POS is a touchscreen: hover affordance alone is invisible there). */
+  background: #F3F0EB;
+  border: 1.5px solid rgba(34,31,32,0.15);
   border-radius: 18px;
   cursor: pointer; transition: 120ms ease;
   text-align: center;
 }
 .staff-tile:hover:not(:disabled) { border-color: var(--c-orange); transform: translateY(-2px); }
+.staff-tile:active:not(:disabled) { transform: scale(0.97); }
+.staff-tile:focus-visible { outline: 2px solid var(--c-orange); outline-offset: 2px; }
 .staff-tile:disabled { opacity: 0.55; cursor: not-allowed; }
 .staff-tile__avatar {
   width: 52px; height: 52px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff; font-family: var(--font-button); font-size: 18px; font-weight: 700;
   letter-spacing: 0.02em;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35);
+}
+.staff-gate__bigav {
+  width: 56px; height: 56px; margin: 0 auto 14px;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 6px 16px rgba(34,31,32,0.18);
 }
 .staff-tile__name { font-size: 14px; font-weight: 600; line-height: 1.2; }
 .staff-tile__tier { font-size: 11px; color: var(--fg-muted); font-weight: 500; }
@@ -3580,13 +3607,13 @@
 .staff-outlet {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 16px 18px;
-  background: var(--pos-bg, #fff);
-  border: 1.5px solid var(--line); border-radius: 14px;
+  background: #F3F0EB;
+  border: 1.5px solid rgba(34,31,32,0.15); border-radius: 14px;
   cursor: pointer; transition: 120ms ease; text-align: left;
 }
 .staff-outlet:hover { border-color: var(--c-orange); }
-.staff-outlet__name { font-size: 15px; font-weight: 600; }
-.staff-outlet__addr { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+.staff-outlet__name { display: block; font-size: 15px; font-weight: 600; }
+.staff-outlet__addr { display: block; font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 
 /* ----- Setup wizard bits ----- */
 .staff-wiz__field { text-align: left; margin-bottom: 18px; }
@@ -3596,8 +3623,8 @@
 }
 .staff-wiz__input {
   width: 100%; padding: 11px 14px;
-  background: var(--pos-bg, #fff);
-  border: 1.5px solid var(--line); border-radius: 12px;
+  background: #fff;
+  border: 1.5px solid rgba(34,31,32,0.20); border-radius: 12px;
   font-size: 15px; color: var(--fg); outline: none;
 }
 .staff-wiz__input:focus { border-color: var(--c-orange); }
