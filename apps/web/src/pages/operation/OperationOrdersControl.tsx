@@ -540,7 +540,9 @@ export interface NextAction {
 const NEXT_PILL_CLASS: Record<NextTone, string> = {
   danger: "pill-overdue",
   warning: "pill-warning",
-  info: "pill-sent",
+  // info actions (Assign logistic / Chase logistic-not-yet) are AMBER, not blue:
+  // blue is reserved for SELECTION only (§2 colour law, Jess 2026-07-19).
+  info: "pill-warning",
   success: "pill-confirmed",
   neutral: "pill-neutral",
 };
@@ -1071,16 +1073,17 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // not the old anonymous dots — 9% so "Scheduled"/"Pending" never clip to
   // "Pendir" (Jess 2026-07-19). Rebalanced out of customer/deadline/delivery/next.
   { key: "dots", label: "Status", w: 9 },
-  { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 15 },
-  // Deadline right after Customer (Jess 2026-07-18).
-  { key: "deadline", label: "Deadline", w: 12 },
-  { key: "stock", label: "Stock", w: 11 },
-  { key: "delivery", label: "Delivery", w: 11 },
+  { key: "order", label: "Order", w: 10 },
+  { key: "customer", label: "Customer", w: 13 },
+  // Deadline right after Customer (Jess 2026-07-18). Wider (14) since every date
+  // now carries the weekday: "20 Jul 26, Sun" (Jess 2026-07-19 date law).
+  { key: "deadline", label: "Deadline", w: 14 },
+  { key: "stock", label: "Stock", w: 12 },
+  { key: "delivery", label: "Delivery", w: 12 },
   // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
-  { key: "next", label: "Manage", w: 14 },
+  { key: "next", label: "Manage", w: 13 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -3871,7 +3874,7 @@ function OrderRow({
         {completed ? (
           o.delivery_date ? (
             <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
-              {fmtDate(o.delivery_date).split(", ")[0]}
+              {fmtDate(o.delivery_date)}
             </span>
           ) : (
             <span className="text-base-300">—</span>
@@ -3880,7 +3883,7 @@ function OrderRow({
           <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const datePart = fmtDate(o.delivery_date).split(", ")[0];
+            const datePart = fmtDate(o.delivery_date);
             // Reuse the SAME DUE bucket as the top filter header so they can never
             // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
             const dd = daysToDue(o);
@@ -3943,7 +3946,7 @@ function OrderRow({
       {showCol("delivery") && (
       <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
-          <span className="t4-caption text-[13px]">— unassigned</span>
+          <span className="t4-caption">unassigned</span>
         ) : (
           <div style={{ lineHeight: "15px" }}>
             <div className="t4-row-strong truncate">{logi.partner}</div>
@@ -3956,7 +3959,7 @@ function OrderRow({
                 className="tabular-nums"
                 style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
               >
-                booked {fmtDate(logi.date).split(", ")[0]}
+                booked {fmtDate(logi.date)}
               </div>
             ) : (
               <div className="t4-caption">not booked</div>
@@ -4128,7 +4131,7 @@ function StockDot({
     if (key === "no_po") return { text: "No PO", tip: title };
     if (se.state === "no_eta" || !se.etaIso)
       return { text: "ETA —", tip: "Waiting on stock — no supplier ETA entered yet" };
-    const d = fmtDate(se.etaIso).split(", ")[0];
+    const d = fmtDate(se.etaIso);
     if (se.state === "overdue")
       return { text: `ETA ${d}`, tip: "Supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
