@@ -150,7 +150,7 @@ export default function ListPageShell({
             <div className="shrink-0 mb-3">{bulkBar}</div>
           ) : (
             (toolbar || hasFacet || toolbarRight || toolbarSecondary) && (
-              <div className="shrink-0 mb-3 bg-white border border-base-200 rounded-lg shadow-sm px-3 py-2.5">
+              <div className="shrink-0 mb-3 bg-white border border-base-200 rounded-[12px] shadow-sm px-3 py-2.5">
                 {/* Row 1 — reopen toggle (only while collapsed; when open, the
                     facet's own control collapses it) + tabs · search + actions. */}
                 <div className="flex items-center justify-between gap-3">
@@ -204,7 +204,7 @@ export default function ListPageShell({
           {children}
           {footer && (
             <footer
-              className="shrink-0 flex items-center justify-between gap-3 px-3 h-9 rounded-b-lg border border-t-0 border-base-200 bg-white text-[12px] text-base-500"
+              className="shrink-0 flex items-center justify-between gap-3 px-3 h-9 rounded-b-[12px] border border-t-0 border-base-200 bg-white text-[12px] text-base-500"
               data-testid="listshell-footer"
             >
               {footer}

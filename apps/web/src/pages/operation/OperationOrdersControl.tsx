@@ -2635,7 +2635,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto"
       >
         <table
           /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
@@ -2667,8 +2667,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 table never swaps its head). The select-all shows Gmail's
                 indeterminate dash on a partial tick. */}
             <tr
-              className="border-b"
-              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild). */
+              className="border-b h-10"
+              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
+                 h-10 = same 40px as the data rows (SIZING LAW §3) so the header
+                 never reads thinner than the listing. */
               style={{ backgroundColor: "#F9FAFB", borderBottomColor: "#E5E7EB" }}
             >
               <th className="px-2 py-1.5">
