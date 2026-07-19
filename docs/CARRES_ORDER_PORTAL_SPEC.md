@@ -155,6 +155,8 @@ scripts/check-design-standard.mjs(已落地 2026-07-18):RULE C icon∉{14,16,18}
 
 **Team 面板 B3-final + 行内改班表(2026-07-19,Jess 逐轮拍板)**:panel = ①hero「WHO · on PO duty · **until 31 Jul 26**」(PagerDuty 式——写到几时不写月份名;头像绿点=now;动词 chips Order PO·Chase supplier)②两周迷你日历(Mon/Thu 灰底、下一个 PO day 绿格 + "next: Mon 20 Jul 26")③**NEXT UP 一行**(小头像 + Aug — Li Ching · Sep — Khor Yee)④EVERY PIC 一行 chips。全 panel 零句子,解释住 tooltip。**改班表 = A 案行内 ✎**:管理层 hover hero 出铅笔 / 点 NEXT UP 条目 → 名字变 pool 候选下拉 → 选人即存(PUT po-duty,`assigned_by` 盖章)+ toast;员工看不到入口,API 403 双层。已 live 来回验证(Aug↔Shasha↔Li Ching)。数据卫生发现:共享 operation 账号的 app_users.email 还是旧名 logistics@carres.com(0121 rename 漏改)→ audit стamp 显示成 logistics@;已开 spawn-task 修。
 
+**✅ DEPLOYED 2026-07-19(Jess 下令 deploy)**:PO-duty + 集合开 PO + C-vocab 队列 + Team 板 全上 prod。merge origin/main(1 冲突已解:留 C-vocab nextFilter + 嫁接 main 的 Supplier-late 队列,弃死词 To book/Waiting stock/No logistic)→ merge `e100304` → **PR #202**(直推 main 照旧被 classifier 挡)。API Worker `8e0eaaa8` · web bundle `index-CA3MZS5T.js` → carres-portal(`1cefdbc5`)+ carres-pos(`866c673e`)一份 dist 两个 Pages。SERVICE_ROLE 扫 dist=0;live 验:po-duty 401 · erp/pos 200。⚠️ 尽快 merge PR #202,否则从 main 部署会回滚(phase-11 教训)。**新 chat 续:presence 点 · Jess 旧单大扫除 · brief 加 REF 群规行 · 修 operation@ 旧 email · merge #202。**
+
 ## 16. DEPLOY-GATED(除非我说永不 deploy)
 customer_confirmed + migration 0220/0221 + API + 收据 bucket。
 
