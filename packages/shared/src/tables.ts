@@ -93,6 +93,12 @@ export const PWP_RULES = "pwp_rules" as const;
 // 0 codes minted → orders byte-identical).
 export const PWP_CODES = "pwp_codes" as const;
 
+// 0239 — bundle pricing: a named set of catalog SKUs sold together at one
+// bundle price. components jsonb = [{sku, qty}]. The POS explodes a bundle
+// into component order_lines (Σ-exact split via explodeBundle); identity rides
+// order_lines.attrs.bundle_*. Principal-only write; DORMANT until authored.
+export const PRODUCT_BUNDLES = "product_bundles" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

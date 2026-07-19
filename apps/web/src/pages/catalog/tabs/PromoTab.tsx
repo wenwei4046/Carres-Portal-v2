@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { BadgePercent, Gift, Tag, Trash2 } from "lucide-react";
+import { BadgePercent, Boxes, Gift, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type {
+  BundleComponent,
   CatalogResponse,
   DefaultFreeGift,
   FreeItemCampaignDto,
+  ProductBundleDto,
   ProductCategory,
   ProductModelDto,
   ProductSkuDto,
@@ -12,13 +14,18 @@ import type {
   RuleTarget,
   TargetRefinement,
 } from "@carres/shared";
+import { explodeBundle } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { rm } from "@/lib/format-currency";
 import {
+  useCreateBundle,
   useCreateFreeItemCampaign,
   useCreatePwpRule,
+  useDeleteBundle,
   useDeleteFreeItemCampaign,
   useDeleteModelFreeGifts,
   useDeletePwpRule,
+  useUpdateBundle,
   useUpdateFreeItemCampaign,
   useUpdatePwpRule,
   useUpsertModelFreeGifts,
@@ -67,6 +74,7 @@ export default function PromoTab({
   const [gwpOpen, setGwpOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [newRuleKind, setNewRuleKind] = useState<PwpRuleDto["type"] | null>(null);
+  const [bundleOpen, setBundleOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-8 max-w-[1120px]">
@@ -111,6 +119,14 @@ export default function PromoTab({
             >
               + New Free Item
             </button>
+            <button
+              type="button"
+              onClick={() => setBundleOpen(true)}
+              className="btn-ghost text-[12px]"
+              data-testid="bundle-add"
+            >
+              + New Bundle
+            </button>
           </div>
         )}
       </section>
@@ -134,6 +150,12 @@ export default function PromoTab({
           isPrincipal={isPrincipal}
           newRuleKind={newRuleKind}
           onCloseNewRule={() => setNewRuleKind(null)}
+        />
+        <BundlesSection
+          catalog={catalog}
+          isPrincipal={isPrincipal}
+          bundleOpen={bundleOpen}
+          onCloseBundle={() => setBundleOpen(false)}
         />
       </div>
     </div>
@@ -1469,6 +1491,477 @@ function PwpRuleForm({
           data-testid="pwp-save"
         >
           {busy ? "Saving…" : rule ? "Save" : "Create rule"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (d) Product bundles — bundle pricing (migration 0239)
+// ---------------------------------------------------------------------------
+
+/** Human summary of a bundle's components: "Cloud Series Mattress (King) + …". */
+function summarizeBundleComponents(
+  components: BundleComponent[],
+  catalog: CatalogResponse,
+): string {
+  if (components.length === 0) return "No items";
+  const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  return components
+    .map((comp) => {
+      const sku = catalog.skus.find((s) => s.sku === comp.sku);
+      const model = sku ? modelById.get(sku.modelId) : undefined;
+      const name = model ? modelLabel(model) : comp.sku;
+      const variant = sku?.variant?.trim();
+      const qty = comp.qty > 1 ? `${comp.qty}× ` : "";
+      return `${qty}${name}${variant ? ` (${variant})` : ""}`;
+    })
+    .join(" + ");
+}
+
+function BundlesSection({
+  catalog,
+  isPrincipal,
+  bundleOpen,
+  onCloseBundle,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+  bundleOpen: boolean;
+  onCloseBundle: () => void;
+}) {
+  const bundles = catalog.bundles ?? [];
+
+  return (
+    <section className="card p-5">
+      <div className="flex items-center justify-between mb-1">
+        <div className="t-h4 font-display flex items-center gap-2">
+          <Boxes size={16} strokeWidth={1.75} className="text-primary" />
+          Bundles
+        </div>
+      </div>
+      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+        Several products sold together at ONE bundle price (e.g. 2 mattresses + a bed frame, King
+        each, at RM 2,500). The POS shows a bundle card; adding it books every item at a
+        proportional share of the bundle price — the lines always total EXACTLY the bundle price.
+        A bundle is dormant until you flip it Active. Use &ldquo;+ New Bundle&rdquo; above to add
+        one.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+
+      {bundleOpen && isPrincipal && (
+        <Modal title="New Bundle" onClose={onCloseBundle} size="lg">
+          <BundleForm catalog={catalog} onDone={onCloseBundle} bare />
+        </Modal>
+      )}
+
+      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
+          style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+        >
+          <div className="label">Bundle</div>
+          <div className="label text-right">Price</div>
+          <div className="label text-right">Actions</div>
+        </div>
+        {bundles.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-4">No bundles.</div>
+        )}
+        {bundles.map((b) => (
+          <BundleRow key={b.id} bundle={b} catalog={catalog} isPrincipal={isPrincipal} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BundleRow({
+  bundle,
+  catalog,
+  isPrincipal,
+}: {
+  bundle: ProductBundleDto;
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const del = useDeleteBundle();
+
+  function remove() {
+    if (!confirm(`Delete the bundle "${bundle.name}"?`)) return;
+    del.mutate(bundle.id, {
+      onSuccess: () => toast.success("Bundle deleted"),
+      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Delete failed"),
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-white">
+        <BundleForm catalog={catalog} bundle={bundle} onDone={() => setEditing(false)} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${bundle.active ? "" : "opacity-60"}`}
+      style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+      data-testid={`bundle-row-${bundle.id}`}
+    >
+      <div className="min-w-0">
+        <div className="text-[13px] truncate flex items-center gap-2">
+          {bundle.name}
+          {!bundle.active && <span className="pill pill-neutral">inactive</span>}
+        </div>
+        <div className="t-tiny text-base-400 truncate">
+          {summarizeBundleComponents(bundle.components, catalog)}
+        </div>
+      </div>
+      <div className="text-right t-num text-[12px]">{rm(bundle.price)}</div>
+      <div className="text-right flex justify-end gap-1.5">
+        {isPrincipal && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="btn-ghost text-[11px]"
+              data-testid={`bundle-edit-${bundle.id}`}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={del.isPending}
+              className="btn-danger text-[11px]"
+              data-testid={`bundle-delete-${bundle.id}`}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** One in-form component row: model pick (grouped by category) → variant pick
+ *  (that model's SKUs) → qty. `modelId` is form-only scaffolding; only
+ *  `{sku, qty}` persists. */
+interface BundleDraftRow {
+  modelId: string;
+  sku: string;
+  qty: number;
+}
+
+/** Create / edit a bundle. `bundle` present = patch mode. `bare` = rendered
+ *  inside the "+ New Bundle" Modal (drop the inline card chrome). */
+function BundleForm({
+  catalog,
+  bundle,
+  onDone,
+  bare = false,
+}: {
+  catalog: CatalogResponse;
+  bundle?: ProductBundleDto;
+  onDone: () => void;
+  bare?: boolean;
+}) {
+  const create = useCreateBundle();
+  const update = useUpdateBundle();
+  const skuBySku = new Map(catalog.skus.map((s) => [s.sku, s]));
+  const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  const modelGroups = PRODUCT_CATEGORIES.map((cat) => ({
+    cat,
+    list: catalog.models
+      .filter((m) => m.category === cat && !m.discontinuedAt)
+      .sort((a, b) => modelLabel(a).localeCompare(modelLabel(b))),
+  })).filter((g) => g.list.length > 0);
+
+  const [name, setName] = useState(bundle?.name ?? "");
+  // 2990s parity with PWP: a NEW bundle defaults Active (goes live on save).
+  const [active, setActive] = useState(bundle?.active ?? true);
+  const [price, setPrice] = useState(bundle ? String(bundle.price) : "");
+  const [rows, setRows] = useState<BundleDraftRow[]>(() => {
+    if (bundle && bundle.components.length > 0) {
+      return bundle.components.map((comp) => ({
+        modelId: skuBySku.get(comp.sku)?.modelId ?? "",
+        sku: comp.sku,
+        qty: comp.qty,
+      }));
+    }
+    return [
+      { modelId: "", sku: "", qty: 1 },
+      { modelId: "", sku: "", qty: 1 },
+    ];
+  });
+  const busy = create.isPending || update.isPending;
+
+  function patchRow(i: number, patch: Partial<BundleDraftRow>) {
+    setRows((cur) => cur.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  }
+
+  const skusFor = (modelId: string): ProductSkuDto[] =>
+    catalog.skus
+      .filter((s) => s.modelId === modelId && !s.discontinuedAt)
+      .sort((a, b) => a.variant.localeCompare(b.variant));
+
+  const components: BundleComponent[] = rows
+    .filter((r) => r.sku.trim() !== "")
+    .map((r) => ({ sku: r.sku, qty: Math.max(1, Math.floor(r.qty || 1)) }));
+  // Round to the cent so the preview, the stored numeric(14,2) and the POS
+  // split all see the SAME figure (a "2500.005" input must not drift a cent).
+  const priceNum = Math.round(Number(price) * 100) / 100;
+  const priceValid = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
+
+  // A component whose SKU has since been retired / removed from the catalog
+  // would ride the form invisibly (both selects render blank) — surface it and
+  // block Save until it's replaced or removed.
+  const goneSkus = components
+    .map((comp) => comp.sku)
+    .filter((code) => {
+      const s = skuBySku.get(code);
+      return !s || Boolean(s.discontinuedAt);
+    });
+
+  // 0089 mutex: an order can't hold sofa AND mattress/bed frame, so a bundle
+  // spanning both could never be added at the POS — block Save outright.
+  const cats = new Set(
+    components
+      .map((comp) => modelById.get(skuBySku.get(comp.sku)?.modelId ?? "")?.category)
+      .filter(Boolean),
+  );
+  const mutexConflict = cats.has("sofa") && (cats.has("mattress") || cats.has("bedframe"));
+
+  const valid =
+    name.trim().length >= 2 &&
+    priceValid &&
+    components.length >= 2 &&
+    !mutexConflict &&
+    goneSkus.length === 0;
+
+  // A component that isn't POS-sellable makes the bundle card unavailable at
+  // the POS (the explode refuses to guess a price) — say so while authoring.
+  const offPosSkus = components
+    .map((comp) => skuBySku.get(comp.sku))
+    .filter((s) => s && (s.posActive === false || s.discontinuedAt))
+    .map((s) => s!.sku);
+
+  // Live split preview — the SAME pure explodeBundle the POS runs.
+  const preview = priceValid
+    ? explodeBundle(components, priceNum, (sku) => skuBySku.get(sku)?.price ?? null)
+    : null;
+
+  async function submit() {
+    if (!valid) return;
+    const body = { name: name.trim(), price: priceNum, components, active };
+    try {
+      if (bundle) {
+        await update.mutateAsync({ id: bundle.id, patch: body });
+        toast.success("Bundle updated");
+      } else {
+        await create.mutateAsync(body);
+        toast.success("Bundle created");
+      }
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Save failed");
+    }
+  }
+
+  return (
+    <div
+      className={
+        bare
+          ? "flex flex-col gap-3"
+          : "bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-3"
+      }
+    >
+      <div className="flex flex-wrap gap-4 items-end">
+        <label className="block flex-1 min-w-[200px]">
+          <span className="label block mb-1">Name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. King Bedroom Set"
+            className={`${INPUT_CLS} w-full`}
+            data-testid="bundle-name"
+          />
+        </label>
+        <label className="block">
+          <span className="label block mb-1">Bundle price (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="e.g. 2500"
+            className={`${INPUT_CLS} w-32`}
+            data-testid="bundle-price"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="w-4 h-4"
+            data-testid="bundle-active"
+          />
+          Active
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="label block">Items in the bundle (at least 2)</span>
+        {rows.map((row, i) => (
+          <div key={i} className="flex flex-wrap items-end gap-2">
+            <label className="block flex-1 min-w-[180px]">
+              <span className="label block mb-1">Product</span>
+              <select
+                value={row.modelId}
+                onChange={(e) => {
+                  const modelId = e.target.value;
+                  const skus = skusFor(modelId);
+                  // A single-SKU product (accessory/service) auto-picks its SKU.
+                  patchRow(i, { modelId, sku: skus.length === 1 ? skus[0]!.sku : "" });
+                }}
+                className={`${INPUT_CLS} w-full`}
+                data-testid={`bundle-row-model-${i}`}
+              >
+                <option value="">Pick a product…</option>
+                {modelGroups.map(({ cat, list }) => (
+                  <optgroup key={cat} label={cat}>
+                    {list.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {modelLabel(m)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="block min-w-[150px]">
+              <span className="label block mb-1">Size / variant</span>
+              <select
+                value={row.sku}
+                onChange={(e) => patchRow(i, { sku: e.target.value })}
+                disabled={!row.modelId}
+                className={`${INPUT_CLS} w-full disabled:opacity-40`}
+                data-testid={`bundle-row-sku-${i}`}
+              >
+                <option value="">Pick…</option>
+                {skusFor(row.modelId).map((s) => (
+                  <option key={s.sku} value={s.sku}>
+                    {(s.variant?.trim() || s.description || s.sku) + ` — ${rm(s.price)}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="label block mb-1">Qty</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={row.qty}
+                onChange={(e) => patchRow(i, { qty: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
+                className={`${INPUT_CLS} w-20`}
+                data-testid={`bundle-row-qty-${i}`}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setRows((cur) => (cur.length <= 2 ? cur : cur.filter((_, j) => j !== i)))}
+              disabled={rows.length <= 2}
+              aria-label={`Remove item ${i + 1}`}
+              className="btn-ghost p-2 text-base-400 hover:text-destructive disabled:opacity-40"
+              data-testid={`bundle-row-remove-${i}`}
+            >
+              <Trash2 size={15} strokeWidth={1.75} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setRows((cur) => [...cur, { modelId: "", sku: "", qty: 1 }])}
+          className="btn-ghost text-[12px] self-start"
+          data-testid="bundle-add-row"
+        >
+          + Add another item
+        </button>
+      </div>
+
+      {mutexConflict && (
+        <p role="alert" className="t-tiny text-danger" data-testid="bundle-mutex-warning">
+          A sofa can&rsquo;t share an order with a mattress / bed frame, so this mix could never be
+          added at the POS. Keep the bundle to one family to save.
+        </p>
+      )}
+      {goneSkus.length > 0 && (
+        <p role="alert" className="t-tiny text-danger" data-testid="bundle-gone-warning">
+          No longer in the catalog: {goneSkus.join(", ")} — replace or remove those rows to save.
+        </p>
+      )}
+      {offPosSkus.length > 0 && (
+        <p className="t-tiny text-warning" data-testid="bundle-offpos-warning">
+          Not sellable at the POS right now: {offPosSkus.join(", ")} — the bundle card will stay
+          unavailable until every item is on.
+        </p>
+      )}
+
+      {/* Live split preview — the same pure engine the POS explodes with. */}
+      {preview && preview.ok && (
+        <div
+          className="bg-white border border-base-200 rounded-[4px] px-3 py-2 flex flex-col gap-1"
+          data-testid="bundle-split-preview"
+        >
+          {preview.lines.map((l) => {
+            const sku = skuBySku.get(l.sku);
+            const model = sku ? modelById.get(sku.modelId) : undefined;
+            const label = model ? `${modelLabel(model)}${sku?.variant?.trim() ? ` · ${sku.variant}` : ""}` : l.sku;
+            return (
+              <div key={`${l.slot}`} className="flex items-center justify-between gap-3 t-tiny">
+                <span className="text-base-600 truncate">
+                  {l.qty > 1 ? `${l.qty}× ` : ""}
+                  {label}
+                </span>
+                <span className="t-num text-base-900 shrink-0">
+                  {rm(l.unitPrice * l.qty)}
+                  {sku && (
+                    <span className="text-base-400"> (was {rm(sku.price * l.qty)})</span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+          <div className="flex items-center justify-between gap-3 t-tiny border-t border-base-100 pt-1 mt-0.5">
+            <span className="text-base-600">
+              Bundle total
+              {preview.catalogTotal > priceNum && (
+                <span className="text-success"> · customer saves {rm(preview.catalogTotal - priceNum)}</span>
+              )}
+            </span>
+            <span className="t-num font-medium text-base-900">{rm(priceNum)}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-2">
+        <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!valid || busy}
+          className="btn-primary text-[12px] disabled:opacity-40"
+          data-testid="bundle-save"
+        >
+          {busy ? "Saving…" : bundle ? "Save" : "Create bundle"}
         </button>
       </div>
     </div>

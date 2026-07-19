@@ -21,6 +21,7 @@ vi.mock("@/lib/queries", () => ({
   useOutlets: () => ({ data: { outlets: [{ id: "o1", dealerId: "d1", name: "O1", address: "1 Jln" }, { id: "o2", dealerId: "d1", name: "O2", address: "2 Jln" }] }, isPending: false, error: null }),
   useStaffList: () => ({ data: { staff: ROSTER, activated: true, selfStaffId: null, storeKind: "dealer" }, isPending: false, error: null }),
   usePatchStaff: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateOutlet: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useCreateStaff: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   useSetStaffPin: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   // StoreAccountSection (0240) — inert here (no dealer-role auth in these tests).
@@ -39,7 +40,7 @@ beforeEach(() => useStaffSession.getState().reset());
 afterEach(cleanup);
 
 describe("StaffManagePage — in-POS staff management overlay", () => {
-  it("principal tier: full roster + Add staff, back fires onClose", () => {
+  it("principal tier: full roster + Add staff + outlets, back fires onClose", () => {
     asTier("principal", null);
     const onClose = vi.fn();
     render(<StaffManagePage onClose={onClose} />);
@@ -49,21 +50,35 @@ describe("StaffManagePage — in-POS staff management overlay", () => {
     expect(screen.getByTestId("staff-row-sp1")).toBeTruthy();
     expect(screen.getByTestId("staff-row-sp2")).toBeTruthy();
     expect(screen.getByTestId("staff-row-owner")).toBeTruthy();
+    // Outlets management (moved from the deleted Settings page) — principal only.
+    expect(screen.getByTestId("add-outlet")).toBeTruthy();
+    expect(screen.getByTestId("outlet-row-o1")).toBeTruthy();
     fireEvent.click(screen.getByTestId("staff-manage-back"));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("manager tier: own-outlet salespersons only, may still add", () => {
+  it("manager tier: own-outlet salespersons only, may still add; no outlets section", () => {
     asTier("manager", "o1");
     render(<StaffManagePage onClose={() => {}} />);
     expect(screen.getByTestId("staff-row-sp1")).toBeTruthy();
     expect(screen.queryByTestId("staff-row-sp2")).toBeNull();
     expect(screen.getByTestId("add-staff")).toBeTruthy();
+    expect(screen.queryByTestId("add-outlet")).toBeNull();
   });
 
-  it("salesperson tier: the section renders nothing (defence-in-depth — the POS pill is hidden too)", () => {
+  it("manager can edit a salesperson row but not the owner (principal) row", () => {
+    asTier("manager", "o1");
+    render(<StaffManagePage onClose={() => {}} />);
+    // salesperson row has the Set/Reset PIN affordance …
+    expect(screen.getByTestId("staff-setpin-sp1")).toBeTruthy();
+    // … the owner (principal) row does not (manager may only touch salespersons).
+    expect(screen.queryByTestId("staff-setpin-owner")).toBeNull();
+  });
+
+  it("salesperson tier: the sections render nothing (defence-in-depth — the POS pill is hidden too)", () => {
     asTier("salesperson", "o1");
     render(<StaffManagePage onClose={() => {}} />);
     expect(screen.queryByTestId("staff-section")).toBeNull();
+    expect(screen.queryByTestId("add-outlet")).toBeNull();
   });
 });

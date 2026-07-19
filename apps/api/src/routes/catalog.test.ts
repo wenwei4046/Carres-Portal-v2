@@ -4603,6 +4603,333 @@ describe("0186 — PWP & Promo rules (GET bundle + principal-gated CRUD)", () =>
 });
 
 // ---------------------------------------------------------------------------
+// 0239 — Product bundles (bundle pricing). GET bundle exposure (POS sees active
+// only; admin sees all) + principal-gated CRUD. Mirrors the 0186 pwp-rules
+// block: buildSb for the read bundle, buildWriteSb for the writes.
+// ---------------------------------------------------------------------------
+describe("0239 — product bundles (GET bundle + principal-gated CRUD)", () => {
+  const BUNDLE_A = "aa000000-0000-4000-8000-0000000000a1"; // active
+  const BUNDLE_B = "bb000000-0000-4000-8000-0000000000b2"; // inactive
+  const bundleRow = (over: Record<string, unknown> = {}) => ({
+    id: BUNDLE_A,
+    name: "King Bedroom Set",
+    price: 2500,
+    components: [
+      { sku: "MAT-001-K", qty: 1 },
+      { sku: "LUMI-CLASSIC-K", qty: 1 },
+      { sku: "BED-201-K", qty: 1 },
+    ],
+    active: true,
+    sort_order: 0,
+    created_at: "2026-07-19T00:00:00Z",
+    updated_at: "2026-07-19T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  const baseTables = () => ({
+    product_models: [],
+    product_skus: [],
+    sofa_fabrics: [],
+    addons: [],
+    floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+    fabric_tier_addon_config: [
+      { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+    ],
+    model_fabric_tier_overrides: [],
+  });
+
+  it("GET /api/catalog returns ACTIVE bundles only for a non-admin consumer (POS)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        ...baseTables(),
+        product_bundles: [
+          bundleRow({}),
+          bundleRow({ id: BUNDLE_B, name: "Retired Set", active: false }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.bundles).toHaveLength(1);
+    expect(body.bundles?.[0]).toMatchObject({
+      id: BUNDLE_A,
+      name: "King Bedroom Set",
+      price: 2500,
+      active: true,
+      sortOrder: 0,
+      components: [
+        { sku: "MAT-001-K", qty: 1 },
+        { sku: "LUMI-CLASSIC-K", qty: 1 },
+        { sku: "BED-201-K", qty: 1 },
+      ],
+    });
+  });
+
+  it("GET /api/catalog?admin=true returns inactive bundles too (editor)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        ...baseTables(),
+        product_bundles: [
+          bundleRow({}),
+          bundleRow({ id: BUNDLE_B, name: "Retired Set", active: false }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.bundles).toHaveLength(2);
+  });
+
+  it("GET /api/catalog drops malformed component entries (adapter parse)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        ...baseTables(),
+        product_bundles: [
+          bundleRow({
+            components: [
+              { sku: "MAT-001-K", qty: 1 },
+              { sku: "", qty: 1 },
+              { sku: "BED-201-K", qty: 0 },
+              "garbage",
+            ],
+          }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.bundles?.[0]?.components).toEqual([{ sku: "MAT-001-K", qty: 1 }]);
+  });
+
+  it("GET /api/catalog ships an empty bundles array when none are authored (dormant)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(baseTables()));
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.bundles).toEqual([]);
+  });
+
+  // ----- POST /bundles -----
+
+  it("POST /bundles — principal inserts → 201 (camel→snake; active defaults false)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: bundleRow({ active: false }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/bundles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "King Bedroom Set",
+          price: 2500,
+          components: [
+            { sku: "MAT-001-K", qty: 1 },
+            { sku: "LUMI-CLASSIC-K", qty: 1 },
+            { sku: "BED-201-K", qty: 1 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("product_bundles");
+    expect(ins?.payload).toMatchObject({
+      name: "King Bedroom Set",
+      price: 2500,
+      components: [
+        { sku: "MAT-001-K", qty: 1 },
+        { sku: "LUMI-CLASSIC-K", qty: 1 },
+        { sku: "BED-201-K", qty: 1 },
+      ],
+      active: false,
+      sort_order: 0,
+    });
+    const body = (await res.json()) as { bundle: { name: string; price: number; active: boolean } };
+    expect(body.bundle).toMatchObject({ name: "King Bedroom Set", price: 2500, active: false });
+  });
+
+  it("POST /bundles — a single-component bundle → 422 (≥2 components)", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/bundles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Just one",
+          price: 100,
+          components: [{ sku: "MAT-001-K", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /bundles — bad component qty (0) → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/bundles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Bad qty",
+          price: 100,
+          components: [
+            { sku: "MAT-001-K", qty: 0 },
+            { sku: "BED-201-K", qty: 1 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /bundles — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/bundles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "King Bedroom Set",
+          price: 2500,
+          components: [
+            { sku: "MAT-001-K", qty: 1 },
+            { sku: "BED-201-K", qty: 1 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(String(body.message ?? "")).toMatch(/Master Admin/i);
+  });
+
+  // ----- PATCH /bundles/:id -----
+
+  it("PATCH /bundles/:id — principal partial update → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: bundleRow({ price: 2400, active: true }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 2400, active: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.table).toBe("product_bundles");
+    expect(upd?.payload).toMatchObject({ price: 2400, active: true });
+    const body = (await res.json()) as { bundle: { price: number; active: boolean } };
+    expect(body.bundle).toMatchObject({ price: 2400, active: true });
+  });
+
+  it("PATCH /bundles/:id — empty body → 422", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /bundles/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 2400 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /bundles/:id — missing row → 404", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 2400 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // ----- DELETE /bundles/:id -----
+
+  it("DELETE /bundles/:id — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("product_bundles");
+  });
+
+  it("DELETE /bundles/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/bundles/${BUNDLE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 0186 — per-SKU pwp_price + per-sofa-combo pwp_prices_by_height write paths
 // (the EXISTING principal-gated sku / sofa-combo update routes). pwp_price joins
 // the 0175 price/cost principal lock; pwp_prices_by_height rides the already

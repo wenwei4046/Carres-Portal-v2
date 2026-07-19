@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
+  ProductBundleDto,
   ProductCategory,
   ProductModelDto,
   PwpCodeDto,
   PwpDiscoverDto,
 } from "@carres/shared";
+import { explodeBundle } from "@carres/shared";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
@@ -15,6 +17,7 @@ import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, lineEditTarget, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
+import BundleCard from "./BundleCard";
 import ProductCard from "./ProductCard";
 import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
@@ -93,7 +96,12 @@ export default function CatalogStep({
 
   // If the active category just got locked by the mutex, bounce to All.
   useEffect(() => {
-    if (activeRail !== "all" && activeRail !== "addons" && lockedCats.has(activeRail)) {
+    if (
+      activeRail !== "all" &&
+      activeRail !== "addons" &&
+      activeRail !== "bundles" &&
+      lockedCats.has(activeRail)
+    ) {
       setActiveRail("all");
     }
   }, [activeRail, lockedCats]);
@@ -118,6 +126,38 @@ export default function CatalogStep({
     }
     return s;
   }, [draft.lines, index.skusByModel]);
+
+  // 0239 — bundle pricing. The API already filters to ACTIVE bundles for the
+  // POS; a bundle is addable only when every component SKU is in the (live,
+  // pos_active) bundle so its catalog price is known — the explode never
+  // guesses a price for an off/retired component.
+  const bundles = useMemo(() => catalog.bundles ?? [], [catalog.bundles]);
+  const skuPrice = useMemo(
+    () => new Map(catalog.skus.map((s) => [s.sku, s.price])),
+    [catalog.skus],
+  );
+  const bundleInfo = useMemo(
+    () =>
+      bundles.map((b) => {
+        const missing = b.components.some((comp) => !skuPrice.has(comp.sku));
+        const cats = new Set(
+          b.components
+            .map((comp) => index.skuToCategory.get(comp.sku))
+            .filter((cat): cat is ProductCategory => Boolean(cat)),
+        );
+        const catalogTotal = missing
+          ? 0
+          : b.components.reduce((s, comp) => s + (skuPrice.get(comp.sku) ?? 0) * comp.qty, 0);
+        const blob = [
+          b.name,
+          ...b.components.map((comp) => comp.sku),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return { bundle: b, missing, cats, catalogTotal, blob };
+      }),
+    [bundles, skuPrice, index.skuToCategory],
+  );
 
   const railEntries: RailEntry[] = [
     { key: "all", label: "All open", count: index.productModels.length },
@@ -145,6 +185,10 @@ export default function CatalogStep({
       label: "Accessories",
       count: countByCat.get("accessory") ?? 0,
     },
+    // 0239 — bundles rail shows only when at least one active bundle exists.
+    ...(bundles.length > 0
+      ? [{ key: "bundles", label: "Bundles", count: bundles.length } as RailEntry]
+      : []),
     { key: "addons", label: "Add-ons", count: activeAddons.length },
   ];
 
@@ -163,6 +207,13 @@ export default function CatalogStep({
 
   const shownModelCount = shownModels.length;
 
+  // 0239 — bundle cards show first in "All open" and alone under the Bundles
+  // rail; the search box matches bundle name + component SKU codes.
+  const shownBundles =
+    activeRail === "all" || activeRail === "bundles"
+      ? bundleInfo.filter((info) => !search || info.blob.includes(search))
+      : [];
+
   // Sofa ↔ mattress/bedframe exclusivity, for the banner above the grid.
   // Sofa in cart locks the mattress+bedframe rails; either of those locks sofa.
   const cartHasSofa = lockedCats.has("mattress") || lockedCats.has("bedframe");
@@ -178,6 +229,41 @@ export default function CatalogStep({
     // The one-shot FAB pulse (class applied by FloatingCartButton when
     // pulse=true; cleared after 220ms) is the ONLY add feedback — no toast,
     // per Loo 2026-07-14: no notification pop-ups on cart mutations.
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 220);
+  }
+
+  /** 0239 — add a bundle: explode it into one line per component (Σ-exact
+   *  split via the shared engine) and append them as ONE group. Bundle lines
+   *  never merge with anything (the per-add `bundle_group` uuid keeps their
+   *  attrs unique) and the cart removes/locks them as a group — a lone
+   *  component at its split share would be silent under-pricing. */
+  function addBundle(bundle: ProductBundleDto) {
+    const r = explodeBundle(bundle.components, bundle.price, (sku) => skuPrice.get(sku) ?? null);
+    if (!r.ok) {
+      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      return;
+    }
+    const group = newLocalId();
+    const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+    const newLines: DraftLine[] = r.lines.map((l) => {
+      const sku = catalog.skus.find((s) => s.sku === l.sku);
+      const name = (sku && modelById.get(sku.modelId)?.name) || l.sku;
+      return {
+        localId: newLocalId(),
+        sku: l.sku,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        label: sku?.variant?.trim() ? `${name} · ${sku.variant}` : name,
+        attrs: {
+          bundle_key: bundle.id,
+          bundle_label: bundle.name,
+          bundle_group: group,
+          bundle_slot: l.slot,
+        },
+      };
+    });
+    onChange({ ...draft, lines: [...draft.lines, ...newLines] });
     setPulse(true);
     window.setTimeout(() => setPulse(false), 220);
   }
@@ -269,7 +355,9 @@ export default function CatalogStep({
           <span className="cat-toolbar__count">
             {activeRail === "addons"
               ? `${activeAddons.length} add-on${activeAddons.length === 1 ? "" : "s"}`
-              : `${shownModelCount} piece${shownModelCount === 1 ? "" : "s"}`}
+              : activeRail === "bundles"
+                ? `${shownBundles.length} bundle${shownBundles.length === 1 ? "" : "s"}`
+                : `${shownModelCount} piece${shownModelCount === 1 ? "" : "s"}`}
           </span>
         </div>
 
@@ -302,7 +390,7 @@ export default function CatalogStep({
 
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
-          ) : shownModels.length === 0 ? (
+          ) : shownModels.length === 0 && shownBundles.length === 0 ? (
             <div className="cat-empty">
               <h4>No pieces match.</h4>
               <p>Try clearing the search or pick a different category.</p>
@@ -319,6 +407,28 @@ export default function CatalogStep({
             </div>
           ) : (
             <div className="cat-grid">
+              {/* 0239 — bundle offers lead the grid. */}
+              {shownBundles.map(({ bundle, missing, cats, catalogTotal }) => {
+                const mutexLocked = [...cats].some((cat) => lockedCats.has(cat));
+                return (
+                  <BundleCard
+                    key={bundle.id}
+                    bundle={bundle}
+                    catalog={catalog}
+                    catalogTotal={catalogTotal}
+                    locked={missing || mutexLocked}
+                    lockedReason={
+                      missing
+                        ? "An item in this bundle is off sale right now"
+                        : "Locked — this order already has a conflicting product family"
+                    }
+                    inCart={draft.lines.some(
+                      (l) => (l.attrs as Record<string, unknown> | null)?.bundle_key === bundle.id,
+                    )}
+                    onAdd={() => addBundle(bundle)}
+                  />
+                );
+              })}
               {shownModels.map((model) => (
                 <ProductCard
                   key={model.id}

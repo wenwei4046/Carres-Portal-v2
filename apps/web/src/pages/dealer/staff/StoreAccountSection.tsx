@@ -19,8 +19,8 @@ import { ModalShell } from "./staff-ui";
  *              a Carres HQ principal approves (login email actually swaps) or
  *              rejects with a note shown here.
  *
- * Mounted in the POS StaffManagePage overlay AND DealerSettings (shared, like
- * StaffSection).
+ * Mounted in the POS StaffManagePage overlay (the store's one admin surface
+ * since the back-office was deleted, 2026-07-19).
  */
 export default function StoreAccountSection() {
   const role = useAuth((s) => s.role);

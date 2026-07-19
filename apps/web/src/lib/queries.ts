@@ -75,6 +75,9 @@ import {
   // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0239 — Product bundles (bundle pricing, principal-only CRUD).
+  type ProductBundleDto,
+  type ProductBundleInput,
   // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
   type PwpReserveInput,
   type PwpCodesResponse,
@@ -1441,8 +1444,8 @@ export function usePwpCodesByOrder(
 }
 
 /**
- * 2026-05-22 (Loo) — Dealer-side create outlet. Used in DealerSettings →
- * Outlets section to add a second / third physical location after the
+ * 2026-05-22 (Loo) — Dealer-side create outlet. Used in the POS Staff overlay's
+ * OutletsSection to add a second / third physical location after the
  * principal-seeded default outlet.
  */
 export function useCreateOutlet(
@@ -6430,6 +6433,39 @@ export function useDeletePwpRule() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/pwp-rules/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0239 — Product bundles (bundle pricing). Principal-only CRUD from the
+// Promo/GWP tab; every mutation invalidates ["catalog"] so the tab list + the
+// POS bundle cards re-read. Mirrors the 0186 pwp-rule hooks.
+// ---------------------------------------------------------------------------
+
+export function useCreateBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProductBundleInput) =>
+      apiFetch<{ bundle: ProductBundleDto }>("/api/catalog/bundles", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<ProductBundleInput> }) =>
+      apiFetch<{ bundle: ProductBundleDto }>(`/api/catalog/bundles/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/bundles/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

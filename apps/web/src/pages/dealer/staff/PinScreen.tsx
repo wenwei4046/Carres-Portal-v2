@@ -85,7 +85,8 @@ export default function PinScreen({
 
         {visible.length === 0 ? (
           <p className="staff-gate__notice">
-            No staff set up for this outlet yet. Ask the owner to add you in Settings.
+            No staff set up for this outlet yet. Ask the owner to add you from the Staff button
+            in the POS top bar.
           </p>
         ) : (
           <div className="staff-tiles">

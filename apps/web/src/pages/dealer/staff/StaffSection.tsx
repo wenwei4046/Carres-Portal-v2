@@ -20,9 +20,9 @@ import {
  * salesperson-tier session; a manager sees only their own outlet's
  * salespersons + can add salespersons.
  *
- * Extracted from DealerSettings (2026-07-19, Loo: the POS had no way to add
- * staff) so the back-office Settings page and the in-POS StaffManagePage
- * overlay share ONE implementation.
+ * Extracted from the (since-deleted) back-office DealerSettings page
+ * (2026-07-19, Loo: the POS had no way to add staff); now mounted only in the
+ * in-POS StaffManagePage overlay.
  */
 export default function StaffSection() {
   const outletsQ = useOutlets();
