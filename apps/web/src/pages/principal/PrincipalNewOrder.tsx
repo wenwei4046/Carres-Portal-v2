@@ -11,8 +11,11 @@ import {
   ORDER_ENTRY_TABS,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
+  branchNoun,
+  isShowroom,
   resolveFormTab,
   resolvePaymentMethods,
+  storeNoun,
 } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -155,6 +158,12 @@ export default function PrincipalNewOrder() {
     [dealersQ.data],
   );
   const dealerId = draft.actingDealerId ?? "";
+  // Loo 2026-07-19 — group the picker so Carres' own showrooms never read as
+  // somebody else's dealership, and name the branch field after the pick.
+  const pickedStore = dealers.find((d) => d.id === dealerId);
+  const showroomOptions = useMemo(() => dealers.filter((d) => isShowroom(d.channel)), [dealers]);
+  const dealerOptions = useMemo(() => dealers.filter((d) => !isShowroom(d.channel)), [dealers]);
+  const branchLabel = branchNoun(pickedStore?.channel);
   const outlets = useMemo(
     () => (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === dealerId),
     [outletsQ.data, dealerId],
@@ -481,7 +490,7 @@ export default function PrincipalNewOrder() {
       {/* ── Sale info ── */}
       <Section title="Sale info">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Dealer *">
+          <Field label={`${pickedStore ? storeNoun(pickedStore.channel) : "Dealer / Showroom"} *`}>
             <select
               value={dealerId}
               onChange={(e) =>
@@ -497,22 +506,39 @@ export default function PrincipalNewOrder() {
               data-testid="raw-dealer"
               className={INPUT_CLASS}
             >
-              <option value="">{dealersQ.isLoading ? "Loading…" : "Select a dealer…"}</option>
-              {dealers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
+              <option value="">{dealersQ.isLoading ? "Loading…" : "Select a store…"}</option>
+              {showroomOptions.length > 0 && (
+                <optgroup label="Our showrooms">
+                  {showroomOptions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {dealerOptions.length > 0 && (
+                <optgroup label="Dealers">
+                  {dealerOptions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </Field>
-          <Field label="Outlet">
+          <Field label={branchLabel}>
             <select
               value={draft.outletId ?? ""}
               onChange={(e) => setDraft((d) => ({ ...d, outletId: e.target.value || null }))}
               disabled={!dealerId}
               className={dealerId ? INPUT_CLASS : INPUT_DISABLED}
             >
-              <option value="">— optional —</option>
+              <option value="">
+                {dealerId && outlets.length === 0
+                  ? `— none under this store —`
+                  : "— optional —"}
+              </option>
               {outlets.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.name}

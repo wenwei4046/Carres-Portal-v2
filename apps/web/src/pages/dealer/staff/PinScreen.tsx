@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import type { StaffDto } from "@carres/shared";
+import { branchNoun, type StaffDto, type StoreChannel } from "@carres/shared";
 import CarresLockup from "@/components/CarresLockup";
 import { ApiError } from "@/lib/api";
 import { useVerifyPin } from "@/lib/queries";
@@ -24,12 +24,15 @@ export default function PinScreen({
   sessionOutletId,
   dealerId,
   outletLabel,
+  storeChannel = "dealer",
   onForgotPin,
 }: {
   staff: StaffDto[];
   sessionOutletId: string | null;
   dealerId: string | null;
   outletLabel?: string | null;
+  /** Names the branch in the empty-state copy — outlet vs showroom. */
+  storeChannel?: StoreChannel;
   onForgotPin: () => void;
 }) {
   const setSession = useStaffSession((s) => s.setSession);
@@ -85,7 +88,8 @@ export default function PinScreen({
 
         {visible.length === 0 ? (
           <p className="staff-gate__notice">
-            No staff set up for this outlet yet. Ask the owner to add you from the Staff button
+            No staff set up for this {branchNoun(storeChannel).toLowerCase()} yet. Ask the owner to
+            add you from the Staff button
             in the POS top bar.
           </p>
         ) : (

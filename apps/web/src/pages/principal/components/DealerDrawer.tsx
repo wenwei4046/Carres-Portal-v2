@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { isShowroom, storeNoun } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   usePrincipalDealer,
@@ -279,35 +280,42 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             them later. Save button disabled until something changes. */}
         <div className="mb-[18px] pt-[18px] border-t border-base-100">
           <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-2">
-            Dealer profile
+            {storeNoun(dealer.channel)} profile
           </div>
           <div className="grid gap-3">
-            <ProfileField label="SSM code">
-              <input
-                value={draft.ssmCode}
-                onChange={(e) => setField("ssmCode", e.target.value)}
-                placeholder="e.g. 201801234567"
-                className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
-              />
-            </ProfileField>
-            <div className="grid grid-cols-2 gap-3">
-              <ProfileField label="Contact person">
-                <input
-                  value={draft.contactName}
-                  onChange={(e) => setField("contactName", e.target.value)}
-                  placeholder="e.g. Aisha Rahman"
-                  className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
-                />
-              </ProfileField>
-              <ProfileField label="Contact phone">
-                <input
-                  value={draft.contactPhone}
-                  onChange={(e) => setField("contactPhone", e.target.value)}
-                  placeholder="e.g. 012-3344556"
-                  className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
-                />
-              </ProfileField>
-            </div>
+            {/* SSM + PIC are the external-reseller's company details. One of
+                Carres' own showrooms has neither (Loo 2026-07-19 — the create
+                form already drops them), so the drawer hides them too. */}
+            {!isShowroom(dealer.channel) && (
+              <>
+                <ProfileField label="SSM code">
+                  <input
+                    value={draft.ssmCode}
+                    onChange={(e) => setField("ssmCode", e.target.value)}
+                    placeholder="e.g. 201801234567"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                  />
+                </ProfileField>
+                <div className="grid grid-cols-2 gap-3">
+                  <ProfileField label="Contact person">
+                    <input
+                      value={draft.contactName}
+                      onChange={(e) => setField("contactName", e.target.value)}
+                      placeholder="e.g. Aisha Rahman"
+                      className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                    />
+                  </ProfileField>
+                  <ProfileField label="Contact phone">
+                    <input
+                      value={draft.contactPhone}
+                      onChange={(e) => setField("contactPhone", e.target.value)}
+                      placeholder="e.g. 012-3344556"
+                      className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                    />
+                  </ProfileField>
+                </div>
+              </>
+            )}
             <ProfileField label="Business address" hint="Single text field — full address line">
               <textarea
                 value={draft.address}

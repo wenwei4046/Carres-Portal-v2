@@ -162,8 +162,15 @@ function DealerShowroomGate() {
   }
 
   // Activated, multi-outlet, none chosen → pick the working outlet first.
+  // `storeKind` names it: a dealer picks an outlet, we pick a showroom.
   if (outlets.length > 1 && sessionOutletId === null) {
-    return <OutletPicker outlets={outlets} onPick={(id) => setSessionOutlet(id)} />;
+    return (
+      <OutletPicker
+        outlets={outlets}
+        storeChannel={data.storeKind}
+        onPick={(id) => setSessionOutlet(id)}
+      />
+    );
   }
 
   const outletLabel = outlets.find((o) => o.id === sessionOutletId)?.name ?? null;
@@ -175,6 +182,7 @@ function DealerShowroomGate() {
         sessionOutletId={sessionOutletId}
         dealerId={authDealerId}
         outletLabel={outletLabel}
+        storeChannel={data.storeKind}
         onForgotPin={() => setForgotOpen(true)}
       />
       {forgotOpen && (

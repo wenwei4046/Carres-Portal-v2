@@ -1,21 +1,28 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import type { StaffTierDto } from "@carres/shared";
+import { branchNoun, type StaffTierDto, type StoreChannel } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import { useCreateOutlet, useOutlets } from "@/lib/queries";
+import { useCreateOutlet, useOutlets, useStaffList } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
 
 /**
- * Outlets management — list + "Add outlet" (principal tier only; a manager is
- * bound to one outlet). Moved verbatim out of the deleted back-office
- * DealerSettings page (Loo 2026-07-19: the dealer runs everything inside the
- * POS) into the StaffManagePage overlay, which is now the only front-end door
- * for opening a new branch.
+ * Branch management — list + "Add" (principal tier only; a manager is bound to
+ * one branch). Moved verbatim out of the deleted back-office DealerSettings
+ * page (Loo 2026-07-19: the dealer runs everything inside the POS) into the
+ * StaffManagePage overlay, which is now the only front-end door for opening a
+ * new branch.
+ *
+ * The noun follows the store kind (Loo 2026-07-19): a dealer's branch is an
+ * "outlet", one of Carres' own is a "showroom". This section sits directly
+ * under the Add-staff form in the same overlay, so the two must agree.
  */
 export default function OutletsSection() {
   const outletsQ = useOutlets();
+  const staffQ = useStaffList();
+  const storeKind: StoreChannel = staffQ.data?.storeKind ?? "dealer";
+  const branch = branchNoun(storeKind);
   const callerTier: StaffTierDto = useStaffSession((s) => s.staff?.tier ?? "salesperson");
   const [showAddOutletModal, setShowAddOutletModal] = useState(false);
 
@@ -28,7 +35,7 @@ export default function OutletsSection() {
       <section className="rounded-md border border-border bg-card p-5 mt-6" data-testid="outlets-section">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-            Outlets
+            {branch}s
           </h2>
           <button
             type="button"
@@ -36,7 +43,7 @@ export default function OutletsSection() {
             data-testid="add-outlet"
             className="btn-primary text-[12px] py-1.5 px-3"
           >
-            + Add outlet
+            + Add {branch.toLowerCase()}
           </button>
         </div>
         {outletsQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -45,7 +52,7 @@ export default function OutletsSection() {
         )}
         {outletsQ.data && outlets.length === 0 && (
           <p className="text-sm text-muted-foreground italic">
-            No outlets yet. Add one to start creating orders.
+            No {branch.toLowerCase()}s yet. Add one to start creating orders.
           </p>
         )}
         {outlets.length > 0 && (
@@ -73,7 +80,9 @@ export default function OutletsSection() {
         )}
       </section>
 
-      {showAddOutletModal && <AddOutletModal onClose={() => setShowAddOutletModal(false)} />}
+      {showAddOutletModal && (
+        <AddOutletModal branch={branch} onClose={() => setShowAddOutletModal(false)} />
+      )}
     </>
   );
 }
@@ -82,7 +91,14 @@ export default function OutletsSection() {
  * 2026-05-22 (Loo) — dealer-side outlet create. Reuses MYAddressFields (the same
  * cascading picker used for SO customer address + Principal dealer-create).
  */
-function AddOutletModal({ onClose }: { onClose: () => void }) {
+function AddOutletModal({
+  branch,
+  onClose,
+}: {
+  /** "Outlet" for a dealer, "Showroom" for one of ours. */
+  branch: "Outlet" | "Showroom";
+  onClose: () => void;
+}) {
   const [name, setName] = useState("");
   const [addr, setAddr] = useState({
     addressLine1: "",
@@ -112,10 +128,12 @@ function AddOutletModal({ onClose }: { onClose: () => void }) {
     });
     try {
       await create.mutateAsync({ name: name.trim(), address });
-      toast.success(`Added outlet "${name.trim()}"`);
+      toast.success(`Added ${branch.toLowerCase()} "${name.trim()}"`);
       onClose();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not create outlet");
+      toast.error(
+        e instanceof ApiError ? e.message : `Could not create ${branch.toLowerCase()}`,
+      );
     }
   }
 
@@ -131,15 +149,17 @@ function AddOutletModal({ onClose }: { onClose: () => void }) {
         onSubmit={submit}
         className="relative bg-white rounded-md p-6 w-[520px] max-w-[92vw] max-h-[90vh] overflow-auto shadow-xl"
       >
-        <h3 className="font-display text-xl font-semibold mb-1">Add outlet</h3>
+        <h3 className="font-display text-xl font-semibold mb-1">
+          Add {branch.toLowerCase()}
+        </h3>
         <p className="text-[11.5px] text-muted-foreground mb-4">
-          A new physical location for this dealer. The first outlet is auto-created from your signup
+          A new physical location for this store. The first one is auto-created from your signup
           info; add more here when you open another branch.
         </p>
 
         <label className="block mb-4">
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-            Outlet name <span className="text-destructive">*</span>
+            {branch} name <span className="text-destructive">*</span>
           </span>
           <input
             type="text"
@@ -154,7 +174,7 @@ function AddOutletModal({ onClose }: { onClose: () => void }) {
 
         <div className="mb-4">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-            Outlet address
+            {branch} address
           </div>
           <MYAddressFields
             data={addr}
@@ -177,7 +197,7 @@ function AddOutletModal({ onClose }: { onClose: () => void }) {
             data-testid="outlet-submit"
             className="btn-primary disabled:opacity-50"
           >
-            {create.isPending ? "Adding…" : "Add outlet"}
+            {create.isPending ? "Adding…" : `Add ${branch.toLowerCase()}`}
           </button>
         </div>
       </form>

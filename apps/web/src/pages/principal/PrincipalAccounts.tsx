@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   usePrincipalAccounts,
@@ -14,7 +15,10 @@ import {
   type AppRole,
 } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
-import { minDeliveryDateISO } from "@carres/shared";
+// Aliased: this file already has a local `isShowroom` meaning "the ROLE being
+// created is showroom". The shared helper answers a different question — "is
+// THIS store row one of ours" — and reads `dealers.channel`.
+import { minDeliveryDateISO, isShowroom as isShowroomStore } from "@carres/shared";
 import type { CreatableAppRole, StaffColorKey, StaffGenderDto, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
@@ -76,7 +80,21 @@ export default function PrincipalAccounts() {
   const [roleFilter, setRoleFilter] = useState<"all" | AppRole>("all");
   const [statusFilter, setStatusFilter] =
     useState<"all" | "active" | "invited" | "disabled">("all");
-  const [showCreate, setShowCreate] = useState(false);
+  // `?new=showroom` — the Showrooms page's "+ New showroom" button lands here
+  // with the modal already open on the right role (Loo 2026-07-19), so opening
+  // one of our own stores is a single click from where you noticed it missing.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openOnShowroom = searchParams.get("new") === "showroom";
+  const [showCreate, setShowCreate] = useState(openOnShowroom);
+  /** Close the modal AND drop `?new=` so a later "+ New account" opens plain. */
+  function closeCreate() {
+    setShowCreate(false);
+    if (openOnShowroom) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -205,7 +223,10 @@ export default function PrincipalAccounts() {
       </div>
 
       {showCreate && (
-        <CreateAccountModal onClose={() => setShowCreate(false)} />
+        <CreateAccountModal
+          initialRole={openOnShowroom ? "showroom" : "dealer"}
+          onClose={closeCreate}
+        />
       )}
     </div>
   );
@@ -542,11 +563,17 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
 // org-creation block for dealer/supplier/partner.
 // ----------------------------------------------------------------------------
 
-function CreateAccountModal({ onClose }: { onClose: () => void }) {
+function CreateAccountModal({
+  initialRole = "dealer",
+  onClose,
+}: {
+  initialRole?: CreatableAppRole;
+  onClose: () => void;
+}) {
   const [draft, setDraft] = useState({
     name: "",
     email: "",
-    role: "dealer" as CreatableAppRole,
+    role: initialRole,
     title: "",
     companyName: "",
     // 2026-07-18 (Loo) — the store's FIRST staff identity + 6-digit PIN,
@@ -624,8 +651,8 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
   const existingStaffQ = useStaffList(existingDealerId || undefined, {
     enabled: existingMode && !!existingDealerId,
   });
-  // The picked store's kind comes from the server (the dealers list carries no
-  // channel); until it resolves, fall back to the clicked role tile.
+  // The picked store's kind comes from the server; until it resolves, fall
+  // back to the clicked role tile.
   const staffKind: "dealer" | "showroom" = existingMode
     ? (existingStaffQ.data?.storeKind ?? (draft.role === "showroom" ? "showroom" : "dealer"))
     : draft.role === "showroom"
@@ -903,11 +930,28 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                   className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
                 >
                   <option value="">— pick a store —</option>
-                  {(dealersQ.data?.dealers ?? []).map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+                  {/* Grouped so our own showrooms never read as dealerships
+                      (Loo 2026-07-19). Partitioned with the shared helper, not
+                      `=== 'showroom'` per group, so an unexpected channel value
+                      lands under Dealers rather than vanishing. */}
+                  {[
+                    { label: "Our showrooms", mine: true },
+                    { label: "Dealers", mine: false },
+                  ].map(({ label, mine }) => {
+                    const rows = (dealersQ.data?.dealers ?? []).filter(
+                      (d) => isShowroomStore(d.channel) === mine,
+                    );
+                    if (rows.length === 0) return null;
+                    return (
+                      <optgroup key={label} label={label}>
+                        {rows.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </Field>
               {existingDealerId && existingStaffQ.data && (

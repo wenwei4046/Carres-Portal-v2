@@ -34,6 +34,19 @@ bdDealersRouter.get("/", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+  // 2026-07-19 (Loo) — BD places orders on behalf of a store too, and its
+  // picker groups Carres' own showrooms apart from external dealers. The
+  // stats RPC carries no `channel`, so pull it alongside (same shape as
+  // principal/dealers). Fail closed: a broken read must not silently turn
+  // every showroom into a dealer.
+  const chan = await sb.from("dealers").select("id, channel");
+  if (chan.error) {
+    const m = mapPgError(chan.error);
+    return c.json(m.body, m.status);
+  }
+  const channelById = new Map<string, string>(
+    (chan.data ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dealers = (data ?? []).map((d: any) => ({
     id: d.id,
@@ -45,6 +58,8 @@ bdDealersRouter.get("/", async (c) => {
     orderCount: Number(d.order_count ?? 0),
     gmv: Number(d.gmv ?? 0),
     outstanding: Number(d.outstanding ?? 0),
+    // Unknown id → 'dealer', matching the column's own DB default.
+    channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
   }));
   return c.json({ dealers });
 });
