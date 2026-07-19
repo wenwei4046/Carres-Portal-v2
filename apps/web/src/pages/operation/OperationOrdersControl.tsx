@@ -63,7 +63,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   Clock,
-  ExternalLink,
   Inbox,
   LayoutGrid,
   PackageOpen,
@@ -77,8 +76,6 @@ import {
   Printer,
   MoreVertical,
   Users,
-  CircleDollarSign,
-  Package,
   PackagePlus,
   MessageCircle,
   type LucideIcon,
@@ -2738,6 +2735,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }
                 canAssign={isManager}
                 hasPendingChange={pendingCROrders.has(o.id)}
+                onNextAction={(verb) => {
+                  if (verb === "Order PO") setRaisePoOrders([o]);
+                  else if (verb === "Chase supplier") setChaseOrders([o]);
+                  else setOpenOrderId(o.id);
+                }}
               />
             ))}
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
@@ -3371,44 +3373,6 @@ function StatusTabs({
 }
 
 
-/** Row status icons — OPTION C (Jess 2026-07-18 round-3): all quiet → one
- *  green ✓; otherwise only the amber/red lines appear, each as the icon the
- *  team already knows: RM$ = money · box = stock · truck = delivery
- *  (logistic). Grey (no data) stays silent. Tooltips carry the detail. */
-const LINE_ICONS: [LucideIcon, LucideIcon, LucideIcon] = [
-  CircleDollarSign,
-  Package,
-  Truck,
-];
-function RowStatusIcons({ dots }: { dots: [RowDot, RowDot, RowDot] }) {
-  const alerts = dots
-    .map((d, i) => ({ d, i }))
-    .filter(({ d }) => d.color === DOT_HEX.amber || d.color === DOT_HEX.red);
-  return (
-    <div className="flex items-center gap-1.5" data-testid="row-dots">
-      {alerts.length === 0 ? (
-        <span title={`All good — ${dots.map((d) => d.title).join(" · ")}`}>
-          <CheckCircle2
-            size={14}
-            strokeWidth={2}
-            style={{ color: DOT_HEX.green }}
-            aria-label="All good"
-          />
-        </span>
-      ) : (
-        alerts.map(({ d, i }) => {
-          const Icon = LINE_ICONS[i]!;
-          return (
-            <span key={i} title={d.title}>
-              <Icon size={14} strokeWidth={2} style={{ color: d.color }} />
-            </span>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
 /** Owner chip (0232) — 20px initials avatar on every row; hollow when
  *  unassigned. Click = reassign popover (management only). Identity colour,
  *  never status colour. */
@@ -3545,6 +3509,7 @@ function OrderRow({
   onAssignStaff,
   canAssign,
   hasPendingChange,
+  onNextAction,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -3566,6 +3531,8 @@ function OrderRow({
   canAssign: boolean;
   /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
   hasPendingChange?: boolean;
+  /** One-click NEXT (2026-07-19) — the row's NEXT verb, clicked = act on it. */
+  onNextAction: (verb: string) => void;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -3577,7 +3544,6 @@ function OrderRow({
   const sofaQty = catQty(lines, "sofa");
 
   const logi = logisticStateOf(o, partnerName);
-  const dots = rowDotsOf(o, stock, se, logi);
   const completed = controlTabOf(o) === "completed";
 
   return (
@@ -3601,14 +3567,28 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Status (Jess picked OPTION C, 2026-07-18 round-3): quiet when good —
-          all lines green/grey → ONE green ✓; only the amber/red lines show
-          their recognisable icon (RM$ money · box stock · truck delivery),
-          coloured by state. Replaces the anonymous 三点 (new staff couldn't
-          read them). */}
+      {/* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary
+          as the tabs (Placed → Proceed → Pending → Scheduled → Delivered). A
+          quiet .pill for the live stages; a muted "Delivered" (no pill) once
+          done. Replaces the anonymous status dots (new staff couldn't read). */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        <RowStatusIcons dots={dots} />
+        {completed ? (
+          <span className="text-[12px] text-base-400">Delivered</span>
+        ) : (
+          (() => {
+            const stage = controlTabOf(o);
+            const { label, cls } =
+              stage === "pending"
+                ? { label: "Pending", cls: "pill-warning" }
+                : stage === "scheduled"
+                  ? { label: "Scheduled", cls: "pill-confirmed" }
+                  : stage === "proceed"
+                    ? { label: "Proceed", cls: "pill-neutral" }
+                    : { label: "Placed", cls: "pill-neutral" };
+            return <span className={`pill ${cls}`}>{label}</span>;
+          })()
+        )}
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
@@ -3791,15 +3771,22 @@ function OrderRow({
         />
       </td>
       )}
-      {/* Next action — one plain-text verb (§14: NEXT 文字, pill chrome gone)
-          + Gmail-style hover actions (open / flag / assign) on row hover. */}
+      {/* Next action — one plain-text verb, now a one-click action (2026-07-19):
+          the whole row opens the drawer, so the NEXT verb itself is the button
+          that acts on the order (Order PO / Chase supplier / else open). */}
       {showCol("next") && (
-      <td className="pl-2 pr-2 relative">
+      <td className="pl-2 pr-2">
         {(() => {
           const na = nextActionOf(o, stock, lines);
+          if (!na.label) return null;
           return (
-            <span
-              className="inline-flex items-center gap-1 align-middle max-w-full group-hover:opacity-0 transition-opacity"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNextAction(na.label);
+              }}
+              className="inline-flex items-center gap-1 align-middle max-w-full hover:underline"
               style={{
                 fontSize: "12px",
                 fontWeight: 600,
@@ -3807,45 +3794,13 @@ function OrderRow({
                 color: NEXT_TEXT_COLOR[na.tone],
               }}
               data-next-action={na.label}
+              title={`${na.label} — click to act`}
             >
               {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
               <span className="truncate min-w-0">{na.label}</span>
-            </span>
+            </button>
           );
         })()}
-        {/* Hover actions — hidden until the row is hovered (Gmail pattern). */}
-        <div
-          className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 rounded-md border border-base-200 bg-white shadow-sm px-0.5 py-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Open order"
-            aria-label="Open order"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <ExternalLink size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onFlag(o)}
-            title="Flag for follow-up"
-            aria-label="Flag for follow-up"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <Flag size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={onOpen}
-            title="Assign logistic (opens the order)"
-            aria-label="Assign logistic"
-            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
-          >
-            <Truck size={13} />
-          </button>
-        </div>
       </td>
       )}
     </tr>
