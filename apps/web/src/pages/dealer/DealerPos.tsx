@@ -794,8 +794,7 @@ export default function DealerPos({
       // too so the next store login starts at the PIN gate, not as the
       // previous person.
       const leave = window.confirm(
-        "登出店铺账号？需要 email + password 才能再登入，购物车草稿会被清除。\n" +
-          "Log out of the store account? You'll need the store email + password to sign back in; the cart draft is cleared.",
+        "Log out of the store account? You'll need the store email + password to sign back in; the cart draft is cleared.",
       );
       if (!leave) return;
       clearStaffToken();
@@ -950,7 +949,7 @@ export default function DealerPos({
             onClick={handleExit}
             className="icon-btn"
             aria-label={onExit ? "Exit POS" : "Log out"}
-            title={onExit ? "Exit POS" : "登出 · Log out"}
+            title={onExit ? "Exit POS" : "Log out"}
             data-testid="pos-exit"
           >
             <LogOut size={18} strokeWidth={1.75} />
