@@ -614,6 +614,8 @@ export {
   OPS_DAY_CUTOFF_HOUR_MYT,
   isOpsManager,
   OPS_MANAGER_EMAILS,
+  OPS_GENERIC_EMAILS,
+  isOpsGenericAccount,
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
@@ -634,6 +636,28 @@ export {
   type StorageExtensionReason,
   type RecordStorageExtensionInput,
 } from "./schemas/ops-order-control";
+
+export {
+  monthKeyMYT,
+  isPoDayMYT,
+  PO_DUTY_DAYS_MYT,
+  PO_STOCK_LEAD_DAYS,
+  PO_STOCK_LEAD_DEFAULT_DAYS,
+  poStockLeadDaysFor,
+  poUrgentBypass,
+  opsPoDutySchema,
+  opsPoDutyResponseSchema,
+  opsPoDutyRosterEntrySchema,
+  nextPoDayMYT,
+  type OpsPoDutyRosterEntry,
+  updateOpsPoDutyInput,
+  pickNextDutyHolder,
+  canRaisePo,
+  isPoDutyEditor,
+  type OpsPoDuty,
+  type OpsPoDutyResponse,
+  type UpdateOpsPoDutyInput,
+} from "./schemas/ops-po-duty";
 
 export {
   LOAN_SOURCES,
@@ -952,6 +976,22 @@ export {
   type StockEtaImportInput,
   type StockEtaImportResult,
 } from "./stock-eta-import";
+
+// Master append — "sheet has it, portal doesn't" reconcile (Option A,
+// 2026-07-18): pure missing-line detector + zod shared by the Master-import
+// result screen and POST /api/operation/orders/append-missing-lines.
+export {
+  normalizeRefTokens,
+  detectMissingLines,
+  masterAppendRowSchema,
+  appendMissingLinesInput,
+  type MasterAppendRow,
+  type MasterAppendRowParsed,
+  type AppendOrderRef,
+  type MissingLineCandidate,
+  type AppendMissingLinesInput,
+  type AppendMissingLinesResult,
+} from "./master-append";
 
 // On Hand C+ P3 — parse the "Klg Warehouse" ready-stock sheet into
 // ops_stock_items import rows (shared by the ImportStockDialog preview + the

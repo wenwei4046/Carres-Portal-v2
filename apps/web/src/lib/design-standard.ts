@@ -155,3 +155,18 @@ export const SPACE = {
   gap:      8,
   gapRow:   12,
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Staff identity palette (Jess round-3 2026-07-18) — the PIC avatar colours.
+// A fixed muted set that deliberately AVOIDS the status hues (green/amber/
+// red), flame (action) and selection blue, so identity never reads as state.
+// Consumed via lib/staff-avatar.ts (initials + stable per-user hash).
+// ─────────────────────────────────────────────────────────────────────────────
+export const AVATAR_COLORS: { bg: string; fg: string }[] = [
+  { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
+  { bg: "#CCFBF1", fg: "#115E59" }, // teal
+  { bg: "#FCE7F3", fg: "#9D174D" }, // rose
+  { bg: "#EDE9FE", fg: "#5B21B6" }, // violet
+  { bg: "#CFFAFE", fg: "#155E75" }, // cyan
+  { bg: "#E7E5E4", fg: "#44403C" }, // stone
+];

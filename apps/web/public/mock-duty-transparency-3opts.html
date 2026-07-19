@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>值日透明化 — 3 案</title>
+<style>
+  :root{--ink:#111827;--sub:#6B7280;--line:#E5E7EB;--band:#F1EFE8;--red:#E24B4A;--amber:#B45309;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Inter,-apple-system,"PingFang SC",sans-serif;}
+  body{background:#F3F4F6;padding:28px;color:var(--ink);}
+  h1{font-size:20px;font-weight:700;margin-bottom:4px;}
+  .sub{font-size:13px;color:var(--sub);margin-bottom:22px;max-width:880px;line-height:1.5;}
+  .cols{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+  .opt{width:310px;}
+  .opt h2{font-size:14px;font-weight:700;margin-bottom:2px;}
+  .opt .why{font-size:12px;color:var(--sub);line-height:1.55;margin-bottom:10px;min-height:88px;}
+  .rec{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#111827;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:1px;}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-bottom:8px;}
+  .band{background:var(--band);padding:7px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#374151;}
+  .row{display:flex;align-items:center;gap:7px;height:36px;padding:0 12px;font-size:13px;border-top:1px solid #F3F4F6;}
+  .row .n{margin-left:auto;font-variant-numeric:tabular-nums;font-size:12px;color:var(--sub);}
+  .row .n.red{color:var(--red);font-weight:700;}
+  .muted{color:#9CA3AF;}
+  .red{color:var(--red);} .amber{color:var(--amber);}
+  .av{width:18px;height:18px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex:none;}
+  .sh{background:#7C5CBF;} .lc{background:#2E7DA6;} .ky{background:#C06B2E;}
+  .pill{font-size:10px;font-weight:700;letter-spacing:.04em;border:1px solid var(--line);border-radius:999px;padding:1px 7px;color:#374151;background:#F9FAFB;}
+  .banner{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:12px;margin-bottom:8px;}
+  .banner .btn{margin-left:auto;border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600;background:#fff;}
+  .foot{padding:6px 12px;font-size:11px;color:#9CA3AF;border-top:1px solid #F3F4F6;}
+  .note{font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:2px;}
+</style>
+</head>
+<body>
+<h1>值日透明化 — 全队看得到,只有值日者按得动</h1>
+<p class="sub">共同底线(三案都有,已落):banner 全队可见、TEAM 徽章全队可见、别人按 Raise PO 显示 "Shasha's PO month"。差别在于:<b>非 PO day 的日子,团队去哪里看「谁值日、几时 PO day、下个月轮谁」</b>。</p>
+
+<div class="cols">
+
+  <!-- A -->
+  <div class="opt">
+    <h2>A · 事件式(最轻)</h2>
+    <div class="why">只在 PO day / 有急单时全队看到横幅;平日 rail 里只有值日者一个 "· PO duty" 后缀。最干净,但周二有人问「这个月谁管 PO?」——要等横幅出现或自己去翻。下月轮谁看不到。</div>
+    <div class="banner">📦 <b>PO day</b> — Order PO 4 · Chase supplier 51 <span class="muted">PO duty: Shasha</span><span class="btn">Raise PO</span></div>
+    <div class="panel">
+      <div class="band">TEAM</div>
+      <div class="row"><span class="av sh">SH</span>Shasha · PO duty<span class="n">80</span></div>
+      <div class="row"><span class="av lc">LC</span>Li Ching · not in<span class="n">0</span></div>
+      <div class="row"><span class="av ky">KY</span><span class="muted">Khor Yee · joins on first login</span><span class="n">0</span></div>
+    </div>
+    <div class="note">横幅只在 周一/四 或有红字急单时出现。</div>
+  </div>
+
+  <!-- B -->
+  <div class="opt">
+    <h2>B · TEAM 职责榜(常驻)<span class="rec">推荐</span></h2>
+    <div class="why">在大家天天看的 TEAM 里,把整条轮值链<b>常驻</b>写明:本月谁(徽章)、下月谁(next)、PO day 是哪两天 + 下一个是几号(TEAM 脚注)。再把 C 分工画进 QUEUES:货的两行挂值日者头像——「这两行是 Shasha 的活」一眼懂。零新增区块。</div>
+    <div class="banner">📦 <b>PO day</b> — Order PO 4 · Chase supplier 51 <span class="muted">PO duty: Shasha</span><span class="btn">Raise PO</span></div>
+    <div class="panel">
+      <div class="band">QUEUES</div>
+      <div class="row"><span class="red" style="font-weight:600">Overdue</span><span class="n red">29</span></div>
+      <div class="row">Owing<span class="n red">RM 52,137</span></div>
+      <div class="row"><span class="red" style="font-weight:600">Order PO</span><span class="av sh" title="Shasha 的活">SH</span><span class="n red">4</span></div>
+      <div class="row"><span class="amber">Chase supplier</span><span class="av sh">SH</span><span class="n">51</span></div>
+      <div class="row">Chase logistic<span class="pill">PIC</span><span class="n">25</span></div>
+    </div>
+    <div class="panel">
+      <div class="band">TEAM</div>
+      <div class="row"><span class="av sh">SH</span>Shasha <span class="pill">PO DUTY · JUL</span><span class="n">80</span></div>
+      <div class="row"><span class="av lc">LC</span>Li Ching · not in <span class="muted">· Aug next</span><span class="n">0</span></div>
+      <div class="row"><span class="av ky">KY</span><span class="muted">Khor Yee · joins on first login · Sep</span><span class="n">0</span></div>
+      <div class="foot">PO day = Mon &amp; Thu · next: Thu 23 Jul</div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="opt">
+    <h2>C · 独立 DUTY 公告板(最重)</h2>
+    <div class="why">rail 顶部加一块专门的 DUTY 板:整年轮值 + 下个 PO day,像办公室白板。信息最全,但跟 TEAM 重复(同样三个人出现两次),rail 变高,MacBook 一屏更挤(§0 规矩 11)。</div>
+    <div class="banner">📦 <b>PO day</b> — Order PO 4 · Chase supplier 51 <span class="muted">PO duty: Shasha</span><span class="btn">Raise PO</span></div>
+    <div class="panel">
+      <div class="band">PO DUTY</div>
+      <div class="row"><span class="av sh">SH</span>Jul — Shasha <span class="pill">NOW</span><span class="n"></span></div>
+      <div class="row"><span class="av lc">LC</span>Aug — Li Ching<span class="n"></span></div>
+      <div class="row"><span class="av ky">KY</span>Sep — Khor Yee<span class="n"></span></div>
+      <div class="foot">PO day = Mon &amp; Thu · next: Thu 23 Jul</div>
+    </div>
+    <div class="panel">
+      <div class="band">TEAM</div>
+      <div class="row"><span class="av sh">SH</span>Shasha · PO duty<span class="n">80</span></div>
+      <div class="row"><span class="av lc">LC</span>Li Ching · not in<span class="n">0</span></div>
+      <div class="row"><span class="av ky">KY</span><span class="muted">Khor Yee · joins on first login</span><span class="n">0</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

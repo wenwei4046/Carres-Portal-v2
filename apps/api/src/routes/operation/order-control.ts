@@ -13,6 +13,11 @@ import {
   borrowLoanInput,
   returnLoanInput,
   returnToSupplierInput,
+  appendMissingLinesInput,
+  detectMissingLines,
+  type AppendOrderRef,
+  type AppendMissingLinesResult,
+  type MissingLineCandidate,
   type OrderLineRef,
   type StockEtaImportResult,
   type ReceiveLineResult,
@@ -430,6 +435,115 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       return c.json(m.body, m.status);
     }
     result.balanceWritten = balanceByOrder.size;
+  }
+
+  return c.json({ result });
+});
+
+// POST /append-missing-lines — Master reconcile append (Jess Option A,
+// 2026-07-18; migration 0237). After a Master import, a sheet row whose PO
+// exists on NO line of its (existing, AutoCount) order is a line the portal is
+// missing — 0214 made re-import create-only, so nothing else can add it. dryRun
+// detects + returns the candidates (the import result screen renders them as a
+// tick-list; `clean` drives the default tick); the commit call receives ONLY
+// the ticked rows, RE-detects server-side (never trust the client's diff — a
+// line added between preview and commit must not duplicate), then appends via
+// the append_autocount_order_lines RPC (raw sku, unit_price 0, items_edited
+// flip + order_history/audit inside the RPC). Operation/principal only.
+orderControlRouter.post("/append-missing-lines", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = appendMissingLinesInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid append input at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+  const { rows, dryRun = false } = parsed.data;
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // The append universe: AutoCount orders + ALL their lines (PO-less lines
+  // included — they count as divergence in the clean check).
+  const { data: orderData, error: ordErr } = await sb
+    .from("orders")
+    .select("id, so, source_ref")
+    .eq("source_system", "autocount");
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  const orderIds = new Set((orderData ?? []).map((o) => o.id as string));
+  const { data: lineData, error: lineErr } = await sb
+    .from("order_lines")
+    .select("order_id, sku, source_po");
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  const linesByOrder = new Map<string, { sku: string; sourcePo: string | null }[]>();
+  for (const l of lineData ?? []) {
+    const oid = l.order_id as string;
+    if (!orderIds.has(oid)) continue;
+    const arr = linesByOrder.get(oid) ?? [];
+    arr.push({ sku: l.sku as string, sourcePo: (l.source_po as string | null) ?? null });
+    linesByOrder.set(oid, arr);
+  }
+  const orders: AppendOrderRef[] = (orderData ?? []).map((o) => ({
+    id: o.id as string,
+    so: o.so as number,
+    sourceRef: ((o.source_ref as string[] | null) ?? []).map((r) => String(r)),
+    lines: linesByOrder.get(o.id as string) ?? [],
+  }));
+
+  const candidates = detectMissingLines(rows, orders);
+
+  const result: AppendMissingLinesResult = {
+    candidates,
+    appended: 0,
+    orders: 0,
+    dryRun,
+  };
+  if (dryRun || candidates.length === 0) return c.json({ result });
+
+  // Group per order → one RPC call each (the RPC stamps history/audit once per
+  // order, matching how the operator thinks about the action).
+  const byOrder = new Map<string, MissingLineCandidate[]>();
+  for (const cand of candidates) {
+    (byOrder.get(cand.orderId) ?? byOrder.set(cand.orderId, []).get(cand.orderId)!).push(
+      cand,
+    );
+  }
+  for (const [orderId, cands] of byOrder) {
+    const { data, error } = await sb.rpc("append_autocount_order_lines", {
+      p_order_id: orderId,
+      p_lines: cands.map((cand) => ({
+        sku: cand.detail,
+        qty: cand.qty,
+        source_po: cand.po || null,
+        attrs: cand.itemGroup ? { item_group: cand.itemGroup } : {},
+      })),
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    result.appended += Number((data as { appended?: number } | null)?.appended ?? 0);
+    result.orders += 1;
   }
 
   return c.json({ result });

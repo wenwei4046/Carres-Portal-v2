@@ -25,3 +25,25 @@ Options (decision needed, NO assignment logic changed yet):
    free text, no FK, fragile).
 
 Owner: Jess. Blocking: NETS partner-portal go-live (~Jul 30).
+
+## NETS RPC workstream — write path for ops_order_control fields
+
+**Deliberately NOT covered by the 2026-07-17 RLS hardening (migrations
+0227–0229), which only removes over-broad access.** The spec's core NETS
+UPDATE fields — stock ETA (`stock_eta` / `line_etas`), GRN receive
+(`line_received` + `ops_stock_items`), customer confirmed date+time
+(`customer_confirmed`), and NETS's own logistic remark — all live in
+`ops_order_control`, which is internal-only (read AND write) for good reason:
+the same row carries storage fees / balance / waivers that NETS must never
+see.
+
+Planned shape: narrow per-action SECURITY DEFINER RPCs (mirroring the
+`partner_confirm_receive` family), each one:
+- gated on `app_role() = 'partner'` + the order's
+  `delivery_partner_id = app_partner_id()`,
+- writing ONLY its named field(s),
+- writing an activity-log entry (guardrail #4),
+- with explicit `REVOKE`/`GRANT` per the P8c EXECUTE-grant lesson.
+
+NO blanket partner policy on `ops_order_control`. Blocking: NETS self-service
+from ~Jul 30; until then Jess's team keys these fields in.

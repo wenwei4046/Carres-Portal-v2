@@ -269,8 +269,10 @@ row, table column-header all FIXED; only the facet body and table rows scroll.
    (SUMMARY → CHASE NOW (danger) → STOCK → LOGISTIC → REGION → CATEGORY);
    rows = Gmail-nav pills; « on SUMMARY collapses the whole panel.
 5. **Table** — 44px FIXED rows, sticky head, infinite scroll ×30, single-verb NEXT
-   column (`Order PO → Chase supplier → Book logistic → Chase logistic →
-   Confirm`, Confirm 🔒 on a money-hold), sort = slack ascending.
+   column (`Order PO → Chase supplier → Assign logistic → Chase logistic →
+   Confirm`, Confirm 🔒 on a money-hold; C-vocab 2026-07-19 — "assign" = we
+   pick the carrier, "booked" = the partner's slot STATE, "Book logistic"
+   dead), sort = slack ascending.
 6. **Footer** — `N orders · Reset filters`.
 
 List pages are **list-first**: no KPI cards above the table; summary lives in

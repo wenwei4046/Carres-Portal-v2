@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carres Ops 简报 — 22 Jul 26</title>
+<style>
+  :root{--ink:#111827;--sub:#6B7280;--line:#E5E7EB;--band:#F1EFE8;--red:#E24B4A;--amber:#B45309;--green:#3B6D11;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Inter,-apple-system,"PingFang SC",sans-serif;}
+  body{background:#F3F4F6;padding:30px;color:var(--ink);max-width:900px;margin:0 auto;}
+  h1{font-size:22px;font-weight:700;}
+  .date{font-size:13px;color:var(--sub);margin-bottom:20px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:14px;}
+  h2{font-size:14px;font-weight:700;margin-bottom:8px;letter-spacing:.02em;}
+  p,li{font-size:13.5px;line-height:1.65;}
+  ul{padding-left:18px;}
+  li{margin-bottom:4px;}
+  b.red{color:var(--red);} b.amber{color:var(--amber);} b.green{color:var(--green);}
+  .verb{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#F9FAFB;border:1px solid var(--line);border-radius:6px;padding:1px 7px;}
+  table{border-collapse:collapse;width:100%;margin-top:6px;}
+  th,td{font-size:13px;padding:6px 10px;border-top:1px solid #F3F4F6;text-align:left;}
+  th{background:#F9FAFB;font-size:11px;letter-spacing:.05em;color:#374151;}
+  .rule{color:var(--sub);font-size:12.5px;}
+</style>
+</head>
+<body>
+<h1>Carres Orders — 新做法 5 分钟</h1>
+<div class="date">Team briefing · Wed 22 Jul 26 · 10:30(Jess 主持;听完才开始用)</div>
+
+<div class="card">
+  <h2>1 · 你的一天 = 左边 QUEUES,四个动词</h2>
+  <p>每张单右边的 <b>NEXT</b> 列告诉你下一步做什么;左边 QUEUES 就是这些动词的合计,点进去就是清单:</p>
+  <table>
+    <tr><th>动词</th><th>意思</th><th>谁做</th></tr>
+    <tr><td><span class="verb">Order PO</span> <b class="red">红</b></td><td>货还没跟供应商下单</td><td><b>PO 值日者</b></td></tr>
+    <tr><td><span class="verb">Chase supplier</span> <b class="amber">琥珀</b></td><td>PO 下了,货还没进仓 → 催厂</td><td><b>PO 值日者</b></td></tr>
+    <tr><td><span class="verb">Assign logistic</span></td><td>还没派哪家车</td><td>PIC(自己的单)</td></tr>
+    <tr><td><span class="verb">Chase logistic</span></td><td>派了车、还没跟客人约好 slot → 催车</td><td>PIC(自己的单)</td></tr>
+  </table>
+  <p class="rule" style="margin-top:8px">Overdue = 过了答应客人的日子还没送到(结果);该追谁看那行 NEXT。Owing = 客人还欠钱(PIC 追)。</p>
+</div>
+
+<div class="card">
+  <h2>2 · PIC = 你的客人(人分单)</h2>
+  <ul>
+    <li>每张单一个 PIC(你的头像 chip)。点右上自己的头像 = 只看自己的单。</li>
+    <li><b>钱(Owing)和送(logistic)你追</b>;客人打来问什么,你负责答。</li>
+    <li>催客人/催车用系统的 <b>Chase</b> 按钮 → 一个对象一天<b>一条</b>合并消息,不要自己散弹发。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>3 · PO 值日(货合买)— 7月 Shasha · 8月 Li Ching · 9月 Khor Yee</h2>
+  <ul>
+    <li>PO <b>全公司合开</b>,永不按人拆。<b>只有值日者(+管理层)能按 Raise PO</b>。</li>
+    <li>每逢<b>周一 / 周四 = PO day</b>:系统自动给值日者开 task + Orders 页出横幅 → 勾单 → Raise PO → 一个供应商一张卡 → 逐卡 Send。</li>
+    <li><b class="red">红字急单</b>(deadline 掉进备货窗:床垫/床架 7 天 · 沙发 5 天)<b>任何一天</b>都要马上开,不等 PO day。</li>
+    <li><b>供应商 WhatsApp 只有值日者一个声音</b>。想知道货几时到 → 内部问值日者,不准自己去戳供应商。月底交接 = open PO 清单。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>4 · 全自动规则(你不用管,但要知道)</h2>
+  <ul>
+    <li>第一次登录 = 自动进 pool、自动分单。<b>开账号是唯一人工步骤。</b></li>
+    <li><b>10:00 前</b>没上线,你的份额还在;<b>10:00 后</b>还没上线 = 系统当你今天缺席,单自动流给在场同事;你一登录自动流回。MC 不用报备系统,它自己懂。</li>
+    <li>away 勾只用于<b>预先知道的长假</b>;手动改派只有 Jess/管理层能做。</li>
+    <li>做完的单按 <b>Mark delivered</b> 收掉——Delivered 的单永不再响。</li>
+  </ul>
+</div>
+</body>
+</html>

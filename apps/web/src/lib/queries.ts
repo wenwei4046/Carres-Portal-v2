@@ -25,6 +25,8 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type AppendMissingLinesInput,
+  type AppendMissingLinesResult,
   type StorageFeeImportRow,
   type BalanceImportRow,
   type StockEtaImportResult,
@@ -143,6 +145,7 @@ import {
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
   type OpsStaffListResponse,
+  type OpsPoDutyResponse,
   type UpdateOpsStaffSettingInput,
   type OrderPaymentRow,
   type RecordPaymentInput,
@@ -248,6 +251,8 @@ export const qk = {
     orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
     /** Staff assignment pool (migration 0232) — operation accounts + pool state. */
     staff: ["operation", "staff"] as const,
+    /** PO duty rotation (migration 0236) — this month's PO holder. */
+    poDuty: ["operation", "po-duty"] as const,
     /** Balance job (migration 0184) — the multi-entry payment ledger for an
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
@@ -3331,6 +3336,52 @@ export function useSaveOrderControl(
 /** Active operation accounts + their pool/availability state. Fails soft
  *  (retry off): on a Worker that predates the route the list page simply sees
  *  an empty pool and the whole assignment layer stays inert. */
+/** PO duty rotation (0236) — this month's PO holder. Fails soft (retry:false):
+ *  an old Worker (404) or a pre-0236 DB leaves data undefined → the whole
+ *  duty layer stays dormant (Raise PO behaves as before, no badge/banner). */
+export function useOperationPoDuty(
+  opts?: Partial<UseQueryOptions<OpsPoDutyResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.poDuty,
+    queryFn: () => apiFetch<OpsPoDutyResponse>(`/api/operation/po-duty`),
+    staleTime: 5 * 60_000,
+    retry: false,
+    ...opts,
+  });
+}
+
+/** Manager override of a month's PO-duty holder (0236, PUT — API 403s
+ *  non-management). Invalidates the duty query so every surface (title chip,
+ *  queue chips, Team board) flips together. */
+export function useUpdatePoDuty(
+  opts?: Partial<
+    UseMutationOptions<
+      { ok: boolean; month: string },
+      ApiError,
+      { userId: string; month?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; month: string },
+    ApiError,
+    { userId: string; month?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ ok: boolean; month: string }>(`/api/operation/po-duty`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.poDuty, exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export function useOperationStaff(
   opts?: Partial<UseQueryOptions<OpsStaffListResponse>>,
 ) {
@@ -5547,6 +5598,25 @@ export function useImportStockEta() {
     }) =>
       apiFetch<{ result: StockEtaImportResult }>(
         "/api/operation/orders/import-stock-eta",
+        catalogJson("POST", input),
+      ).then((r) => r.result),
+    onSuccess: (_res, vars) => {
+      if (!vars.dryRun) void qc.invalidateQueries({ queryKey: ["operation"] });
+    },
+  });
+}
+
+// Master reconcile append (Option A, 2026-07-18) — after a Master import, the
+// sheet can carry a line an EXISTING AutoCount order is missing (0214 re-import
+// is create-only). dryRun detects the candidates for the result-screen
+// tick-list; the commit call sends ONLY the ticked rows and appends via the
+// 0237 RPC (raw sku, unit_price 0, items_edited flips).
+export function useAppendMissingLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AppendMissingLinesInput) =>
+      apiFetch<{ result: AppendMissingLinesResult }>(
+        "/api/operation/orders/append-missing-lines",
         catalogJson("POST", input),
       ).then((r) => r.result),
     onSuccess: (_res, vars) => {
