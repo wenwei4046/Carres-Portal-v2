@@ -58,6 +58,37 @@ describe("createAccountInput (2026-07-18 staff-at-creation)", () => {
     expect(r.success).toBe(true);
   });
 
+  // 2026-07-19 (Loo) — a showroom is Carres' OWN store: SSM + PIC contact are
+  // dealer-only. A showroom needs only name/email/companyName/address.
+  it("showroom parses WITHOUT ssm/contact (Carres' own store)", () => {
+    const r = createAccountInput.safeParse({
+      name: "Carres KL Showroom",
+      email: "kl-showroom@carres.com",
+      role: "showroom",
+      companyName: "Carres KL Showroom",
+      address: "12 Jalan Contoh, 50000 KL",
+      tempPassword: "changeme123",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("showroom still requires an address (SO PDF + outlets.address)", () => {
+    const r = createAccountInput.safeParse({
+      name: "Carres KL Showroom",
+      email: "kl-showroom@carres.com",
+      role: "showroom",
+      companyName: "Carres KL Showroom",
+      tempPassword: "changeme123",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("dealer still requires ssm + PIC contact", () => {
+    expect(createAccountInput.safeParse(base({ ssmCode: undefined })).success).toBe(false);
+    expect(createAccountInput.safeParse(base({ contactName: undefined })).success).toBe(false);
+    expect(createAccountInput.safeParse(base({ contactPhone: undefined })).success).toBe(false);
+  });
+
   it("initialStaff on a non-store role is rejected", () => {
     const r = createAccountInput.safeParse({
       name: "Ops",

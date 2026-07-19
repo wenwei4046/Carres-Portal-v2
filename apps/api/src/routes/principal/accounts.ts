@@ -157,6 +157,9 @@ principalAccountsRouter.post("/", async (c) => {
     // dealer-channel vs showroom-channel branching in downstream UI/PDF
     // (e.g. Sales Order "Sold By" letterhead).
     const channel = body.role === "showroom" ? "showroom" : "dealer";
+    // 2026-07-19 (Loo) — showroom is Carres' own store: zod no longer
+    // requires SSM / PIC contact for it, so every business-profile column
+    // must tolerate absence (null, never the string "undefined").
     const dpInsert = await sb
       .from("dealers")
       .insert({
@@ -166,11 +169,14 @@ principalAccountsRouter.post("/", async (c) => {
         // Legacy single-text `contact` column auto-built from the new
         // structured contact_name + contact_phone fields so existing reads
         // (DealerRow tooltip, DealerDrawer header) keep working.
-        contact: `${body.contactName!} · ${body.contactPhone!}`,
+        contact:
+          body.contactName && body.contactPhone
+            ? `${body.contactName} · ${body.contactPhone}`
+            : null,
         address: body.address!,
-        ssm_code: body.ssmCode!,
-        contact_name: body.contactName!,
-        contact_phone: body.contactPhone!,
+        ssm_code: body.ssmCode ?? null,
+        contact_name: body.contactName ?? null,
+        contact_phone: body.contactPhone ?? null,
       })
       .select("id")
       .single();
