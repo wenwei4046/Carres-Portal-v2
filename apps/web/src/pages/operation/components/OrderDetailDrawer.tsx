@@ -1979,13 +1979,17 @@ function DrawerBody({
   // THE journey spine — extracted so each tab header can wear the SAME step
   // number + colour as its spine node (Jess 甲 2026-07-19): one numbered journey,
   // whether you read the rail (overview) or the header (you-are-here).
+  // Each step reads as 3 lines (Jess 2026-07-19): panel (which tab it opens) ·
+  // action (what to do at this step) · sub (the live description).
   const journeySteps: {
+    panel: string;
     title: string;
     sub: string;
     state: JourneyState;
     tab: DrawerTab;
   }[] = [
     {
+      panel: "Balance",
       title: "Collect deposit",
       tab: "balance",
       state: collectedAll > 0 ? "done" : totalSet ? "wait" : "todo",
@@ -1997,7 +2001,8 @@ function DrawerBody({
             : "—",
     },
     {
-      title: "Goods ready",
+      panel: "Items",
+      title: "Ready stock",
       tab: "items",
       state:
         deliveredDone || (goodsN > 0 && readyN >= goodsN)
@@ -2012,6 +2017,7 @@ function DrawerBody({
           }`,
     },
     {
+      panel: "Balance",
       title: "Collect balance",
       tab: "balance",
       state: !totalSet ? "todo" : balanceDue > 0 ? "act" : "done",
@@ -2024,7 +2030,8 @@ function DrawerBody({
     ...(hasMsbf || hasSof
       ? [
           {
-            title: "Storage",
+            panel: "Storage",
+            title: "Hold & charge",
             tab: "storage" as DrawerTab,
             state: storageOwing
               ? storageGate === "hold"
@@ -2048,7 +2055,8 @@ function DrawerBody({
     ...(liveLoanCount > 0
       ? [
           {
-            title: "Loaner",
+            panel: "Loan",
+            title: "Loaner out",
             tab: "loan" as DrawerTab,
             state: "wait" as const,
             sub: `${liveLoanCount} out · back at delivery`,
@@ -2056,6 +2064,7 @@ function DrawerBody({
         ]
       : []),
     {
+      panel: "Delivery",
       title: "Deliver",
       tab: "delivery",
       state: deliveredDone
@@ -2400,7 +2409,7 @@ function DrawerBody({
               column-header row and the 268px inner scroll cap (the table
               runs full length; the tab column scrolls). */}
           <Panel
-            title="Items ordered"
+            title="Items"
             leading={stepBadgeFor("items")}
             summary={
               /* ONE readiness chip, ONE vocabulary (§7.7): "<x> ready · <p>
@@ -4895,7 +4904,13 @@ function JourneyCard({
   collapsed,
   onGo,
 }: {
-  steps: { title: string; sub: string; state: JourneyState; tab: DrawerTab }[];
+  steps: {
+    panel: string;
+    title: string;
+    sub: string;
+    state: JourneyState;
+    tab: DrawerTab;
+  }[];
   activeTab: DrawerTab;
   collapsed: boolean;
   onGo: (t: DrawerTab, stepIndex: number) => void;
@@ -4951,6 +4966,11 @@ function JourneyCard({
             </span>
             {!collapsed && (
               <span className="min-w-0">
+                {/* line 1 — which panel this step opens (Jess 2026-07-19) */}
+                <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-base-400">
+                  {st.panel}
+                </span>
+                {/* line 2 — the step's action */}
                 <span
                   className={`block text-[13px] font-semibold group-hover:underline ${
                     active ? "text-info" : "text-base-900"
