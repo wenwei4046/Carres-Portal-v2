@@ -1807,9 +1807,12 @@ function BundleForm({
     .map((s) => s!.sku);
 
   // Live split preview — the SAME pure explodeBundle the POS runs (fixed only;
-  // a custom bundle's split depends on the customer's picks).
+  // a custom bundle's split depends on the customer's picks). Only once EVERY
+  // started row has its size picked: a partial cart would dump the whole
+  // bundle price onto the picked rows and read as nonsense (Loo 2026-07-19).
+  const pendingRows = rows.filter((r) => r.modelId && !r.sku);
   const preview =
-    priceValid && kind === "fixed"
+    priceValid && kind === "fixed" && pendingRows.length === 0 && components.length >= 2
       ? explodeBundle(components, priceNum, (sku) => skuBySku.get(sku)?.price ?? null)
       : null;
 
@@ -2160,6 +2163,12 @@ function BundleForm({
         <p className="t-tiny text-warning" data-testid="bundle-offpos-warning">
           Not sellable at the POS right now: {offPosSkus.join(", ")} — the bundle card will stay
           unavailable until every item is on.
+        </p>
+      )}
+
+      {kind === "fixed" && priceValid && !preview && (pendingRows.length > 0 || components.length < 2) && (
+        <p className="t-tiny text-base-400" data-testid="bundle-preview-pending">
+          Pick a size for every item — the live split shows once all items are complete.
         </p>
       )}
 
