@@ -81,6 +81,10 @@
     --info:           217 91% 60%;  /* #2563EB */
     --info-soft:      214 95% 93%;  /* #DBEAFE */
     --info-foreground: 0 0% 100%;
+    /* Hover tint — THE single faint-blue hover for every clickable row/nav/chip
+       (Jess 2026-07-19: hover is blue everywhere, distinct from the #C2E7FF
+       selection and from the grey section bands). Use hover:bg-hovertint. */
+    --hover-tint:     213 90% 96%;  /* #EAF3FE */
     /* --error shares the v17 red; *-soft kept for pill/callout fills. */
     --error-soft:      0 93% 94%;   /* #FEE2E2 */
   }
