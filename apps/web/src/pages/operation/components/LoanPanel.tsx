@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import type { SofaLoanDto } from "@carres/shared";
 import {
   useBorrowLoan,
+  useUpdateLoan,
   useReturnLoan,
   useReturnLoanSupplier,
   type SupplierRow,
@@ -96,6 +97,14 @@ function parseReturnBy(notes: string | null): string | null {
   return m ? m[1] : null;
 }
 
+/** iso date + n days → YYYY-MM-DD (the auto return-by = borrow + 14d fallback). */
+function addDays(iso: string | null, n: number): string | null {
+  if (!iso) return null;
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Whole-day diff from today (MYT-agnostic; date-only). */
 function daysFromToday(iso: string): number {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
@@ -148,13 +157,19 @@ function DoneTick({ children }: { children: ReactNode }) {
 
 function LoanCard({
   loan,
+  logisticEta,
   onCollect,
   onReturnSupplier,
+  onSetRoute,
+  onSetReturnDue,
   busy,
 }: {
   loan: SofaLoanDto;
+  logisticEta?: string | null;
   onCollect: () => void;
   onReturnSupplier: () => void;
+  onSetRoute: (route: "supplier_customer" | "supplier_warehouse_customer") => void;
+  onSetReturnDue: (date: string | null) => void;
   busy: boolean;
 }) {
   const isSupplier = loan.source === "supplier";
@@ -167,7 +182,16 @@ function LoanCard({
   const src = isSupplier
     ? `Borrowed · ${loan.supplier_name ?? "supplier"}`
     : "Warehouse · Klang";
-  const returnBy = parseReturnBy(loan.notes);
+  // Return-by (supplier leg): a manual override wins, else it AUTO-follows the
+  // delivery ETA (the loaner comes back at delivery), else borrow + 14 days.
+  const overrideReturnBy = loan.supplier_return_due ?? parseReturnBy(loan.notes);
+  const autoReturnBy = logisticEta
+    ? logisticEta.slice(0, 10)
+    : addDays(loan.loaned_at, 14);
+  const returnBy = overrideReturnBy ?? autoReturnBy;
+  const returnIsAuto = !overrideReturnBy;
+  const [routeEditing, setRouteEditing] = useState(false);
+  const [dueEditing, setDueEditing] = useState(false);
   const nDay = dayN(loan);
   // OUT leg (0242) — how the loaner reached the customer.
   const sup = loan.supplier_name ?? "supplier";
@@ -226,14 +250,52 @@ function LoanCard({
         )}
         {isSupplier && (
           <Row k="Route">
-            <span className="inline-flex items-center gap-1.5 flex-wrap">
-              <span>{routeText}</span>
-              {loan.out_partner_name && (
-                <span className={`${TAG} bg-base-100 text-base-500`}>
-                  {loan.out_partner_name}
+            {routeEditing ? (
+              <span className="inline-flex items-center gap-2 flex-wrap">
+                <Segmented
+                  ariaLabel="Delivery route"
+                  options={[
+                    { value: "supplier_customer", label: "Direct" },
+                    { value: "supplier_warehouse_customer", label: "Via warehouse" },
+                  ]}
+                  value={
+                    loan.out_route === "supplier_warehouse_customer"
+                      ? "supplier_warehouse_customer"
+                      : "supplier_customer"
+                  }
+                  onChange={(v) => {
+                    onSetRoute(
+                      v as "supplier_customer" | "supplier_warehouse_customer",
+                    );
+                    setRouteEditing(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setRouteEditing(false)}
+                  className="text-[11px] text-base-400"
+                >
+                  cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRouteEditing(true)}
+                disabled={busy}
+                title="Change the delivery route"
+                className="inline-flex items-center gap-1.5 flex-wrap text-left"
+              >
+                <span className="border-b border-dashed border-base-300">
+                  {routeText}
                 </span>
-              )}
-            </span>
+                {loan.out_partner_name && (
+                  <span className={`${TAG} bg-base-100 text-base-500`}>
+                    {loan.out_partner_name}
+                  </span>
+                )}
+              </button>
+            )}
           </Row>
         )}
         {loan.do_number && (
@@ -305,24 +367,77 @@ function LoanCard({
                 ) : undefined
               }
             >
-              {returnBy ? (
-                <>
-                  <span className="font-mono">{fmtDateShort(returnBy)}</span>
-                  {(() => {
-                    const d = daysFromToday(returnBy);
-                    return d < 0 ? (
-                      <span className="text-warning font-semibold ml-1">
-                        · {Math.abs(d)} {Math.abs(d) === 1 ? "day" : "days"} past
-                      </span>
-                    ) : (
-                      <span className={`ml-1 font-semibold ${d <= 3 ? "text-warning" : "text-base-400 font-normal"}`}>
-                        · in {d} {d === 1 ? "day" : "days"}
-                      </span>
-                    );
-                  })()}
-                </>
+              {dueEditing ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    autoFocus
+                    defaultValue={returnBy ?? ""}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        onSetReturnDue(e.target.value);
+                        setDueEditing(false);
+                      }
+                    }}
+                    onBlur={() => setDueEditing(false)}
+                    aria-label="Return-by date"
+                    className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDueEditing(false)}
+                    className="text-[11px] text-base-400"
+                  >
+                    cancel
+                  </button>
+                </span>
+              ) : returnBy ? (
+                <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setDueEditing(true)}
+                    disabled={busy}
+                    title="Set the return-by date"
+                    className="inline-flex items-center"
+                  >
+                    <span className="font-mono border-b border-dashed border-base-300">
+                      {fmtDateShort(returnBy)}
+                    </span>
+                    {(() => {
+                      const d = daysFromToday(returnBy);
+                      return d < 0 ? (
+                        <span className="text-warning font-semibold ml-1">
+                          · {Math.abs(d)} {Math.abs(d) === 1 ? "day" : "days"} past
+                        </span>
+                      ) : (
+                        <span className={`ml-1 font-semibold ${d <= 3 ? "text-warning" : "text-base-400 font-normal"}`}>
+                          · in {d} {d === 1 ? "day" : "days"}
+                        </span>
+                      );
+                    })()}
+                  </button>
+                  {returnIsAuto ? (
+                    <span className="text-[11px] text-base-400">auto</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onSetReturnDue(null)}
+                      disabled={busy}
+                      title="Clear the override — back to auto"
+                      className="text-[11px] text-base-400 border-b border-dashed border-base-300"
+                    >
+                      clear
+                    </button>
+                  )}
+                </span>
               ) : (
-                <span className="text-base-400 font-normal">owe 1 piece · no date set</span>
+                <button
+                  type="button"
+                  onClick={() => setDueEditing(true)}
+                  className="text-base-400 font-normal border-b border-dashed border-base-300"
+                >
+                  set a date
+                </button>
               )}
             </Row>
           ))}
@@ -485,6 +600,7 @@ export default function LoanPanel({
   freeUnits = [],
   orderCategories = [],
   onLend,
+  logisticEta = null,
 }: {
   orderId: string;
   loans: SofaLoanDto[];
@@ -497,12 +613,16 @@ export default function LoanPanel({
   orderCategories?: string[];
   /** Lend a picked warehouse unit (opens the loan-DO prompt in the parent). */
   onLend?: (itemId: string, sku: string) => void;
+  /** The order's delivery ETA (logistic booking) — the loaner comes back at
+   *  delivery, so the supplier return-by auto-follows this. */
+  logisticEta?: string | null;
 }) {
   const active = loans.filter((l) => l.status === "on_loan");
   const owed = loans.filter((l) => l.source === "supplier" && !l.returned_to_supplier_at);
   const returnLoan = useReturnLoan(orderId);
   const returnSupplier = useReturnLoanSupplier(orderId);
   const borrow = useBorrowLoan(orderId);
+  const update = useUpdateLoan(orderId);
 
   // in-flight loans only (active + still-owed-to-supplier)
   const visible = [...active, ...owed.filter((l) => l.status === "returned")];
@@ -566,7 +686,26 @@ export default function LoanPanel({
         <LoanCard
           key={loan.id}
           loan={loan}
-          busy={returnLoan.isPending || returnSupplier.isPending}
+          logisticEta={logisticEta}
+          busy={returnLoan.isPending || returnSupplier.isPending || update.isPending}
+          onSetRoute={(outRoute) =>
+            update.mutate(
+              { loanId: loan.id, outRoute },
+              {
+                onSuccess: () => toast.success("Route updated"),
+                onError: (e) => toast.error(e.message),
+              },
+            )
+          }
+          onSetReturnDue={(supplierReturnDue) =>
+            update.mutate(
+              { loanId: loan.id, supplierReturnDue },
+              {
+                onSuccess: () => toast.success("Return-by updated"),
+                onError: (e) => toast.error(e.message),
+              },
+            )
+          }
           onCollect={() =>
             returnLoan.mutate(
               { loanId: loan.id },

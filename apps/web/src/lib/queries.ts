@@ -35,6 +35,7 @@ import {
   type ReceiveLineResult,
   type LoanSofaInput,
   type BorrowLoanInput,
+  type UpdateLoanInput,
   type ReturnLoanInput,
   type ReturnToSupplierInput,
   type SofaLoanDto,
@@ -5724,6 +5725,23 @@ export function useBorrowLoan(orderId: string) {
     mutationFn: (input: BorrowLoanInput) =>
       apiFetch<{ loan: SofaLoanDto }>(
         `/api/operation/orders/${orderId}/loan-borrow`,
+        catalogJson("POST", input),
+      ).then((r) => r.loan),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+    },
+  });
+}
+
+/** Edit an existing loan's leg fields (0242) — change the OUT route or set/clear
+ *  the supplier return-by override. */
+export function useUpdateLoan(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateLoanInput) =>
+      apiFetch<{ loan: SofaLoanDto }>(
+        `/api/operation/orders/${orderId}/loan-update`,
         catalogJson("POST", input),
       ).then((r) => r.loan),
     onSuccess: () => {

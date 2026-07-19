@@ -11,6 +11,7 @@ import {
   receiveLineInput,
   loanSofaInput,
   borrowLoanInput,
+  updateLoanInput,
   returnLoanInput,
   returnToSupplierInput,
   appendMissingLinesInput,
@@ -948,6 +949,59 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
     .single();
   if (loanErr) {
     const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ loan: mapLoanRow(loan) });
+});
+
+// POST /:id/loan-update — edit an existing loan's logistics-leg fields (0242):
+// change the OUT route, (re)assign the OUT logistic, or set/clear the supplier
+// return-by override. Only the provided fields are touched (RLS bounds it to the
+// caller's order).
+orderControlRouter.post("/:id/loan-update", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = updateLoanInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "Invalid loan update" },
+      422,
+    );
+  }
+  const { loanId, outRoute, outPartnerId, supplierReturnDue } = parsed.data;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (outRoute !== undefined) patch.out_route = outRoute;
+  if (outPartnerId !== undefined) patch.out_partner_id = outPartnerId;
+  if (supplierReturnDue !== undefined) patch.supplier_return_due = supplierReturnDue;
+  if (Object.keys(patch).length === 1) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "No fields to update" },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: loan, error } = await sb
+    .from("ops_sofa_loans")
+    .update(patch)
+    .eq("id", loanId)
+    .eq("order_id", orderId)
+    .select(
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+    )
+    .single();
+  if (error) {
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   return c.json({ loan: mapLoanRow(loan) });

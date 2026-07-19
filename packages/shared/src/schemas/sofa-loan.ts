@@ -53,6 +53,27 @@ export const borrowLoanInput = z
   .strict();
 export type BorrowLoanInput = z.infer<typeof borrowLoanInput>;
 
+/** Edit an existing loan's logistics-leg fields (migration 0242) — the operator
+ *  can change the OUT route after the fact and set/clear the supplier return-by
+ *  (a manual override of the auto date). Only the provided fields are touched. */
+export const updateLoanInput = z
+  .object({
+    loanId: z.string().uuid(),
+    outRoute: z
+      .enum(["supplier_customer", "supplier_warehouse_customer"])
+      .optional(),
+    outPartnerId: z.string().uuid().nullable().optional(),
+    /** ISO date (YYYY-MM-DD) to override the auto return-by, or null to clear it
+     *  back to auto. */
+    supplierReturnDue: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+  })
+  .strict();
+export type UpdateLoanInput = z.infer<typeof updateLoanInput>;
+
 /** Return a loaned piece — the customer swap at final delivery (both sources). */
 export const returnLoanInput = z
   .object({

@@ -2259,7 +2259,7 @@ function DrawerBody({
         {/* LEFT — customer identity + the section rail. */}
         <div
           className={`shrink-0 flex flex-col gap-2.5 min-h-0 ${
-            railCollapsed ? "w-14" : "w-[260px]"
+            railCollapsed ? "w-14" : "w-[280px]"
           }`}
         >
           <CustomerIdentityCard
@@ -3128,6 +3128,7 @@ function DrawerBody({
                 ),
               ]}
               onLend={(itemId, sku) => setLoanTarget({ itemId, sku })}
+              logisticEta={bookedEta}
             />
           </Panel>
           </SectionCard>
@@ -4138,11 +4139,7 @@ function CustomerIdentityCard({
             {/* State PILL (rev 9 shell spec) + the region as quiet text. */}
             <span
               className={`pill text-[12px] shrink-0 ${
-                statusWord === "On hold"
-                  ? "pill-warning"
-                  : statusWord === "Delivered"
-                    ? "pill-confirmed"
-                    : "pill-neutral"
+                statusWord === "On hold" ? "pill-warning" : "pill-neutral"
               }`}
             >
               {statusWord}
