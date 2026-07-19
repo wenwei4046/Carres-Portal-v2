@@ -168,7 +168,7 @@ export default function PortalSidebar() {
             onClick={toggleCollapse}
             title="Show menu"
             aria-label="Show menu"
-            className="grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-base-100 hover:text-base-700"
+            className="grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-hovertint hover:text-base-700"
           >
             <PanelLeftOpen size={18} />
           </button>
@@ -182,7 +182,7 @@ export default function PortalSidebar() {
             onClick={toggleCollapse}
             title="Hide menu"
             aria-label="Hide menu"
-            className="shrink-0 grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-base-100 hover:text-base-700"
+            className="shrink-0 grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-hovertint hover:text-base-700"
           >
             <PanelLeftClose size={18} />
           </button>
@@ -309,7 +309,7 @@ export default function PortalSidebar() {
       <Link
         to="/me"
         title="Profile · Sign out"
-        className={`border-t border-base-100 flex items-center hover:bg-base-50 transition-colors ${
+        className={`border-t border-base-100 flex items-center hover:bg-hovertint transition-colors ${
           collapsed
             ? "px-2 py-4 justify-center"
             : "px-[22px] py-4 gap-2.5"

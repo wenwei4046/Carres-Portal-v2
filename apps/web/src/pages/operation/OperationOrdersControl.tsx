@@ -2152,7 +2152,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   onClick={() => void refetch()}
                   title="Refresh"
                   aria-label="Refresh orders"
-                  className="p-0.5 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
+                  className="p-0.5 rounded hover:text-base-900 hover:bg-hovertint transition-colors"
                 >
                   <RefreshCw size={13} strokeWidth={2} />
                 </button>
@@ -2229,7 +2229,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 title="Table options"
                 aria-haspopup="menu"
                 aria-expanded={columnsOpen}
-                className="p-1 rounded-md border border-base-200 text-base-500 hover:text-base-800 hover:bg-base-50 transition-colors"
+                className="p-1 rounded-md border border-base-200 text-base-500 hover:text-base-800 hover:bg-hovertint transition-colors"
               >
                 <MoreVertical size={15} />
               </button>
@@ -2240,7 +2240,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     {ORDER_COL_DEFS.map((d) => (
                       <label
                         key={d.key}
-                        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-base-50 cursor-pointer"
+                        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-hovertint cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -2375,7 +2375,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     onClick={() => setKanbanOpen(false)}
                     title="Collapse filters"
                     aria-label="Collapse filters"
-                    className="shrink-0 p-0.5 rounded text-base-400 hover:text-base-800 hover:bg-base-200/60 transition-colors"
+                    className="shrink-0 p-0.5 rounded text-base-400 hover:text-base-800 hover:bg-hovertint transition-colors"
                   >
                     <ChevronsLeft size={15} />
                   </button>
@@ -3129,7 +3129,7 @@ function OrdersBulkBar({
                 key={p.id}
                 type="button"
                 onClick={() => onAssign(p.id)}
-                className="w-full text-left px-2 py-1.5 text-[12px] rounded hover:bg-base-100"
+                className="w-full text-left px-2 py-1.5 text-[12px] rounded hover:bg-hovertint"
               >
                 {p.name}
               </button>
@@ -3212,7 +3212,7 @@ function BulkMenuItem({
       disabled={disabled}
       title={title}
       role="menuitem"
-      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] rounded hover:bg-base-100 disabled:opacity-45 disabled:hover:bg-transparent"
+      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] rounded hover:bg-hovertint disabled:opacity-45 disabled:hover:bg-transparent"
     >
       <Icon
         size={14}
@@ -3453,7 +3453,7 @@ function TeamPopover({
           });
           setOpen((v) => !v);
         }}
-        className="p-0.5 rounded text-base-500 hover:text-base-800 hover:bg-base-100"
+        className="p-0.5 rounded text-base-500 hover:text-base-800 hover:bg-hovertint"
       >
         <Users size={14} strokeWidth={2} />
       </button>
@@ -3468,7 +3468,7 @@ function TeamPopover({
           {staff.map((s) => (
             <div
               key={s.user_id}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-base-50"
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-hovertint"
             >
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] text-base-900 truncate">
@@ -3701,7 +3701,7 @@ function OwnerChip({
             <button
               key={s.user_id}
               type="button"
-              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-base-50 ${
+              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-hovertint ${
                 s.user_id === owner ? "font-semibold text-base-900" : "text-base-700"
               }`}
               onClick={() => {
@@ -3716,7 +3716,7 @@ function OwnerChip({
           {owner && (
             <button
               type="button"
-              className="w-full text-left px-3 py-1.5 text-[13px] text-base-500 hover:bg-base-50 border-t border-base-100"
+              className="w-full text-left px-3 py-1.5 text-[13px] text-base-500 hover:bg-hovertint border-t border-base-100"
               onClick={() => {
                 setOpen(false);
                 onAssignStaff(o.id, null);
