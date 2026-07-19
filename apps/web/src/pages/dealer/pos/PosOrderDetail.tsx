@@ -458,6 +458,13 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   );
   const addressOk =
     structuredComplete || (!addressDirty && !!(order?.customer.address ?? "").trim());
+  /** Building type (Loo 2026-07-19) — wizard-keyed, rides entry_data.fields.
+   *  Read-only here: `set_order_address` doesn't carry entry_data. */
+  const buildingType = (() => {
+    const f = (order?.entryData as { fields?: Record<string, unknown> } | null)?.fields;
+    const v = f?.["building_type"];
+    return typeof v === "string" && v.trim() ? v : null;
+  })();
   const dateOk = !!edited?.deliveryDate;
   const proceedDateOk = !!edited?.proceedDate;
   const allOk = customerInfoOk && addressOk && dateOk && paidOk && proceedDateOk;
@@ -964,6 +971,15 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               <p className="t-tiny" style={{ color: "var(--fg-muted)", marginTop: 8 }}>
                 Saved as free text — pick State / City / Postcode to upgrade it to the
                 structured format.
+              </p>
+            )}
+            {buildingType && (
+              <p
+                className="t-tiny"
+                style={{ color: "var(--fg-muted)", marginTop: 8 }}
+                data-testid="pos-od-building-type"
+              >
+                Building type: {buildingType}
               </p>
             )}
             <div className="os-grid" style={{ marginTop: 12 }}>

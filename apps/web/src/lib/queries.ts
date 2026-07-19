@@ -2588,6 +2588,10 @@ export interface operationOrderDetailOrder {
   customer_emergency?: string | null;
   customer_billing?: string | null;
   customer_billing_same?: boolean;
+  /** 2026-07-19 — POS entry extras bag; the drawer reads
+   *  `fields.building_type` (delivery-address building type). Optional so
+   *  older detail fixtures keep typechecking. */
+  entry_data?: Record<string, unknown> | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start

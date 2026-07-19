@@ -96,7 +96,7 @@ function order(over: Partial<Record<string, unknown>> = {}): Order {
 
 function renderThankYou(o: Order, cat: CatalogResponse | null) {
   return render(
-    <ThankYou order={o} catalog={cat} onNewOrder={() => {}} onClose={() => {}} />,
+    <ThankYou order={o} catalog={cat} onNewOrder={() => {}} />,
   );
 }
 

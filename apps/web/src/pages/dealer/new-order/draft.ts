@@ -125,13 +125,18 @@ export interface WizardDraft {
     addressCity: string;
     addressPostcode: string;
     addressUnknown: boolean;
+    /** Building type of the delivery address (Loo 2026-07-19 — landed / condo
+     *  / apartment / office / retail / other). Optional; rides to the server
+     *  in `entry_data.fields.building_type` (no orders column). */
+    buildingType: string;
     billing: string;
     billingSame: boolean;
     /** Structured billing parts (Loo 2026-07-18 — the raw New Order keys the
      *  billing address with the SAME MY cascade as delivery). Composed into
-     *  the single `billing` string at submit (`customer_billing` stays text);
-     *  the POS keeps its free-text billing box. Defaults "" — old drafts
-     *  restore cleanly via the emptyDraft spread in loadDraft. */
+     *  the single `billing` string at submit (`customer_billing` stays text).
+     *  Since 2026-07-19 the POS wizard keys billing with the same cascade too
+     *  (the free-text box is gone). Defaults "" — old drafts restore cleanly
+     *  via the emptyDraft spread in loadDraft. */
     billingLine1: string;
     billingLine2: string;
     billingState: string;
@@ -224,6 +229,7 @@ export function emptyDraft(): WizardDraft {
       addressCity: "",
       addressPostcode: "",
       addressUnknown: false,
+      buildingType: "",
       billing: "",
       billingSame: true,
       billingLine1: "",
@@ -357,7 +363,8 @@ export function clearDraft(storageKey: string = DRAFT_STORAGE_KEY): void {
  *   - Emergency name ≥ 2 chars + phone matches same
  *   - Emergency relationship picked AND ("Others" only valid with relOther ≥ 2)
  *   - Either addressUnknown OR address ≥ 5 chars
- *   - Either billingSame OR billing ≥ 5 chars
+ *   - Either billingSame OR the billing MY cascade complete (Line 1 ≥ 5 chars
+ *     + state + city + postcode — same rule as delivery)
  *   - Either delivery.dateTbd OR delivery.date is set
  *   - outletId + salespersonId both set
  */
@@ -417,7 +424,14 @@ export function step1FirstIssue(
     if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
     if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
   }
-  if (!c.billingSame && c.billing.trim().length < 5) return "Billing — fill billing address, or tick 'Same as delivery'";
+  // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
+  // so the gate mirrors the delivery rules field-for-field.
+  if (!c.billingSame) {
+    if (c.billingLine1.trim().length < 5) return "Billing — Line 1 (≥5 chars), or tick 'Same as delivery'";
+    if (!c.billingState)                  return "Billing — State, or tick 'Same as delivery'";
+    if (!c.billingCity)                   return "Billing — City, or tick 'Same as delivery'";
+    if (!c.billingPostcode)               return "Billing — Postcode, or tick 'Same as delivery'";
+  }
   // 0219 — operator-defined REQUIRED custom fields (all 4 tabs share the
   // d.customer.custom bag; target-tab customs gate here too so the shell's
   // customerReady covers everything before CONFIRM).

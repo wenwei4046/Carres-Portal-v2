@@ -282,6 +282,49 @@ describe("CustomerStep — Full-name autocomplete (existing customers)", () => {
     expect(screen.queryByTestId("pos-customer-suggest")).toBeNull();
   });
 
+  it("Address sub-step (2026-07-19): structured billing cascade + building type", () => {
+    const d = emptyDraft();
+    d.customer.billingSame = false;
+    const onChange = vi.fn();
+    wrap(
+      <CustomerStep
+        draft={d}
+        onChange={onChange}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        initialSubStep={1}
+      />,
+    );
+
+    // Billing renders the SAME MY cascade as delivery (state/city/postcode
+    // selects), not the old free-text textarea.
+    const billing = screen.getByTestId("pos-billing-fields");
+    expect(billing.querySelectorAll("select").length).toBe(3);
+    expect(billing.querySelector("textarea")).toBeNull();
+
+    // Typing billing Line 1 keeps the composed `billing` string in step.
+    const line1 = billing.querySelector("input")!;
+    fireEvent.change(line1, { target: { value: "88 Jalan Invoice" } });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: expect.objectContaining({
+          billingLine1: "88 Jalan Invoice",
+          billing: "88 Jalan Invoice",
+        }),
+      }),
+    );
+
+    // Building type select sits in the delivery-address block.
+    fireEvent.change(screen.getByTestId("pos-building-type"), { target: { value: "Condo" } });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: expect.objectContaining({ buildingType: "Condo" }),
+      }),
+    );
+  });
+
   it("blur closes the dropdown", () => {
     mockCustomerSearch.mockReturnValue({ data: { customers: [HIT] } });
     wrap(
