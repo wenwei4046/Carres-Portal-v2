@@ -5019,12 +5019,12 @@ function JourneyCard({
                 <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-base-400">
                   {st.panel}
                 </span>
-                {/* line 2 — the step's action */}
-                <span
-                  className={`block text-[13px] font-semibold group-hover:underline ${
-                    active ? "text-info" : "text-base-900"
-                  }`}
-                >
+                {/* line 2 — the step's action. SELECTED = blue background
+                    (bg-info-soft) + DARK ink text, matching the Orders facet
+                    selection (blue chip + near-black text). The old blue-on-blue
+                    (text-info on bg-info-soft) was unreadable — Jess 2026-07-19
+                    "before select blue, now grey cant read". */}
+                <span className="block text-[13px] font-semibold group-hover:underline text-base-900">
                   {st.title}
                 </span>
                 <span
