@@ -192,8 +192,10 @@ function DealerShowroomGate() {
               },
               authDealerId,
             );
-            // Owner-mode token active → land in Settings to reset PINs.
-            navigate("/dealer/settings");
+            // Owner-mode token active → straight into the POS Staff & PINs
+            // overlay to reset PINs (the back-office Settings page is gone,
+            // 2026-07-19 — DealerPos consumes the openStaff flag).
+            navigate("/dealer", { state: { openStaff: true } });
           }}
         />
       )}
@@ -202,7 +204,8 @@ function DealerShowroomGate() {
 }
 
 /** "Forgot PIN?" → prove the store password, mint an owner-mode token, and
- *  land in Settings → Staff (where PINs can be reset). Uses the POS look. */
+ *  land in the POS Staff & PINs overlay (where PINs can be reset). Uses the
+ *  POS look. */
 function ForgotPinModal({
   onClose,
   onReauthed,
@@ -225,8 +228,8 @@ function ForgotPinModal({
         <div className="staff-gate__eyebrow">Owner override</div>
         <h2 className="staff-gate__title">Reset a PIN</h2>
         <p className="staff-gate__sub" style={{ margin: "0 0 20px" }}>
-          Enter the store password to open Settings, where you can set a new PIN for any staff
-          member.
+          Enter the store password to open Staff &amp; PINs, where you can set a new PIN for any
+          staff member.
         </p>
         <div className="staff-wiz__field">
           <label className="staff-wiz__label">Store password</label>
