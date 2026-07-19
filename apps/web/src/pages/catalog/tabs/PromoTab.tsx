@@ -890,7 +890,7 @@ function FreeItemCampaignsSection({
       <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+          style={{ gridTemplateColumns: "minmax(140px,1.4fr) 90px 130px" }}
         >
           <div className="label">Campaign</div>
           <div className="label text-right">Max free</div>
@@ -938,7 +938,7 @@ function CampaignRow({
   return (
     <div
       className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${campaign.active ? "" : "opacity-60"}`}
-      style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+      style={{ gridTemplateColumns: "minmax(140px,1.4fr) 90px 130px" }}
       data-testid={`campaign-row-${campaign.id}`}
     >
       <div className="min-w-0">
@@ -1140,7 +1140,7 @@ function PwpRulesSection({
       <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(200px,1.8fr) 70px 90px" }}
+          style={{ gridTemplateColumns: "minmax(180px,1.6fr) 70px 130px" }}
         >
           <div className="label">Trigger → reward</div>
           <div className="label text-right">Per trigger</div>
@@ -1209,7 +1209,7 @@ function PwpRuleRow({
   return (
     <div
       className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${rule.active ? "" : "opacity-60"}`}
-      style={{ gridTemplateColumns: "minmax(200px,1.8fr) 70px 90px" }}
+      style={{ gridTemplateColumns: "minmax(180px,1.6fr) 70px 130px" }}
       data-testid={`pwp-row-${rule.id}`}
     >
       <div className="min-w-0">
@@ -1559,7 +1559,7 @@ function BundlesSection({
       <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+          style={{ gridTemplateColumns: "minmax(140px,1.4fr) 90px 130px" }}
         >
           <div className="label">Bundle</div>
           <div className="label text-right">Price</div>
@@ -1607,7 +1607,7 @@ function BundleRow({
   return (
     <div
       className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${bundle.active ? "" : "opacity-60"}`}
-      style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
+      style={{ gridTemplateColumns: "minmax(140px,1.4fr) 90px 130px" }}
       data-testid={`bundle-row-${bundle.id}`}
     >
       <div className="min-w-0">
@@ -1703,6 +1703,9 @@ function BundleForm({
     modelIds: string[];
     variant: "any" | "fixed";
     sku: string;
+    /** UI-only: the category filter driving the cascading product dropdown
+     *  (Loo 2026-07-19 — a chips wall doesn't scale past a few products). */
+    cat: ProductCategory;
   }
   const [slotRows, setSlotRows] = useState<SlotDraft[]>(() =>
     bundle && bundle.slots.length > 0
@@ -1712,8 +1715,10 @@ function BundleForm({
           modelIds: s.modelIds,
           variant: s.variant,
           sku: s.sku ?? "",
+          cat:
+            catalog.models.find((m) => m.id === s.modelIds[0])?.category ?? "mattress",
         }))
-      : [{ label: "", qty: 1, modelIds: [], variant: "any", sku: "" }],
+      : [{ label: "", qty: 1, modelIds: [], variant: "any", sku: "", cat: "mattress" }],
   );
   // Modular sofas (offered compartments) price via the server sofa recompute —
   // incompatible with a fixed bundle split, so they can't join a bundle.
@@ -1990,40 +1995,89 @@ function BundleForm({
                     <Trash2 size={15} strokeWidth={1.75} />
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {pickable.map((m) => {
-                    const on = r.modelIds.includes(m.id);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() =>
-                          patchSlot({
-                            modelIds:
-                              r.variant === "fixed"
-                                ? on
-                                  ? []
-                                  : [m.id]
-                                : on
-                                  ? r.modelIds.filter((x) => x !== m.id)
-                                  : [...r.modelIds, m.id],
-                            sku: "",
-                          })
-                        }
-                        className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                          on
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-base-300 bg-white text-base-700 hover:border-base-500"
-                        }`}
-                        data-testid={`bundle-slot-model-${i}-${m.id}`}
-                      >
-                        {modelLabel(m)}
-                        <span className="text-base-400"> · {m.category}</span>
-                      </button>
-                    );
-                  })}
+                {/* Cascading pick: category → product (scales past a chips
+                    wall, Loo 2026-07-19). Picked products list as removable
+                    chips below; fixed-spec keeps exactly one. */}
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="block">
+                    <span className="label block mb-1">Category</span>
+                    <select
+                      value={r.cat}
+                      onChange={(e) => patchSlot({ cat: e.target.value as ProductCategory })}
+                      className={`${INPUT_CLS} w-36`}
+                      data-testid={`bundle-slot-cat-${i}`}
+                    >
+                      {PRODUCT_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block flex-1 min-w-[200px]">
+                    <span className="label block mb-1">
+                      {r.variant === "fixed" ? "Product" : "Add a product the customer may pick"}
+                    </span>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) return;
+                        patchSlot({
+                          modelIds:
+                            r.variant === "fixed"
+                              ? [id]
+                              : r.modelIds.includes(id)
+                                ? r.modelIds
+                                : [...r.modelIds, id],
+                          sku: "",
+                        });
+                      }}
+                      className={`${INPUT_CLS} w-full`}
+                      data-testid={`bundle-slot-model-add-${i}`}
+                    >
+                      <option value="">
+                        {r.variant === "fixed" ? "Pick the product…" : "Add a product…"}
+                      </option>
+                      {pickable
+                        .filter((m) => m.category === r.cat && !r.modelIds.includes(m.id))
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {modelLabel(m)}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
                 </div>
+                {r.modelIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {r.modelIds.map((mid) => {
+                      const m = modelById.get(mid);
+                      return (
+                        <span
+                          key={mid}
+                          className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 text-primary px-2.5 py-1 text-[11px]"
+                          data-testid={`bundle-slot-picked-${i}-${mid}`}
+                        >
+                          {m ? modelLabel(m) : mid}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${m ? modelLabel(m) : "product"}`}
+                            onClick={() =>
+                              patchSlot({
+                                modelIds: r.modelIds.filter((x) => x !== mid),
+                                sku: "",
+                              })
+                            }
+                            className="hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
                 {r.variant === "fixed" && fixedModel && (
                   <label className="block max-w-[280px]">
                     <span className="label block mb-1">Exact size / variant</span>
@@ -2050,7 +2104,7 @@ function BundleForm({
             onClick={() =>
               setSlotRows((cur) => [
                 ...cur,
-                { label: "", qty: 1, modelIds: [], variant: "any", sku: "" },
+                { label: "", qty: 1, modelIds: [], variant: "any", sku: "", cat: "mattress" },
               ])
             }
             className="btn-ghost text-[12px] self-start"
