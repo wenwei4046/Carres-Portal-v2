@@ -509,7 +509,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
     // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
     // merge into Order, Customer absorbs Region (caption line), Logistic became
-    // Delivery (truth-ladder words) and the "Next" verb closes the row.
+    // Delivery (truth-ladder words) and the "Manage" pills close the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -521,7 +521,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Stock",
       "Delivery",
       "PIC", // staff owner — its own column (Jess 2026-07-18)
-      "Next",
+      "Manage", // all NEXT actions as tone-coloured pills (Jess 2026-07-19)
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
     // stays on that cell; the Status cell names the pipeline STAGE in words.

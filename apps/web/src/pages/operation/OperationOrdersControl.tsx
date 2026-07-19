@@ -531,16 +531,18 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-/** NEXT is plain TEXT in the C rebuild (§14, 2026-07-18) — the pill chrome and
- *  the legacy info-BLUE are gone (blue = selection only). Red text is reserved
- *  for the two genuine dangers (past-deadline Chase logistic + Order PO);
- *  green = Confirm; everything in progress is plain ink; Done is muted. */
-const NEXT_TEXT_COLOR: Record<NextTone, string> = {
-  danger: "#A32D2D",
-  warning: "#374151",
-  info: "#374151",
-  success: "#3B6D11",
-  neutral: "#A8A8A8",
+/** MANAGE column (Jess 2026-07-19): every action is a tone-coloured .pill — one
+ *  consistent language (no more plain-text verb next to a Collect $ pill). Each
+ *  NextTone maps to its status pill: danger→red · warning→amber · info→blue ·
+ *  success→green · neutral→grey. (Money's "Collect $" keeps the distinct indigo
+ *  pill-collected so the independent money track reads apart from the goods/
+ *  delivery action.) */
+const NEXT_PILL_CLASS: Record<NextTone, string> = {
+  danger: "pill-overdue",
+  warning: "pill-warning",
+  info: "pill-sent",
+  success: "pill-confirmed",
+  neutral: "pill-neutral",
 };
 
 // ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
@@ -1070,15 +1072,15 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // "Pendir" (Jess 2026-07-19). Rebalanced out of customer/deadline/delivery/next.
   { key: "dots", label: "Status", w: 9 },
   { key: "order", label: "Order", w: 11 },
-  { key: "customer", label: "Customer", w: 16 },
+  { key: "customer", label: "Customer", w: 15 },
   // Deadline right after Customer (Jess 2026-07-18).
   { key: "deadline", label: "Deadline", w: 12 },
-  { key: "stock", label: "Stock", w: 12 },
+  { key: "stock", label: "Stock", w: 11 },
   { key: "delivery", label: "Delivery", w: 11 },
   // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
-  { key: "next", label: "Next", w: 12 },
+  { key: "next", label: "Manage", w: 14 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -2127,7 +2129,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {latestIn && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-base-400">
                 <span className="tabular-nums" title="Most recent order / import">
-                  Synced {fmtDateShort(latestIn)}
+                  Synced {fmtDate(latestIn)}
                 </span>
                 <button
                   type="button"
@@ -2794,7 +2796,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   <span title="Person in charge — who's watching this order">PIC</span>
                 </Th>
               )}
-              {showCol("next") && <Th>Next</Th>}
+              {showCol("next") && <Th>Manage</Th>}
             </tr>
           </thead>
           <tbody>
@@ -3999,13 +4001,7 @@ function OrderRow({
                   e.stopPropagation();
                   onNextAction(na.label);
                 }}
-                className="inline-flex items-center gap-1 align-middle min-w-0 hover:underline"
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  letterSpacing: "0.01em",
-                  color: NEXT_TEXT_COLOR[na.tone],
-                }}
+                className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
                 data-next-action={na.label}
                 title={`${na.label} — click to act`}
               >

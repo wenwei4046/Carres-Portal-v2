@@ -25,6 +25,42 @@
 
 ---
 
+## A0. Golden reference + new-panel checklist (⭐ Jess 2026-07-19 — updated kit, overrides older shapes)
+
+> **The Operation Orders page (`apps/web/src/pages/operation/OperationOrdersControl.tsx`) is the GOLDEN reference.** Every new list/panel copies its header, its facet rail, its column + pill anatomy, and its date format. When a shape here disagrees with an older section below, **this section wins** (it is the newest ruling).
+
+**Date law (LOCKED 2026-07-19).** The canonical human date is **`19 Jul 26, Sun`** — abbreviated month + 2-digit year + weekday. It comes from **ONE** helper: `fmtDate()` in `@/lib/fmt-date`. Never hand-format a date, never call `toLocaleDateString`, never drop the weekday on a standalone date (the `Synced <date>` stamp, detail rows, timestamps). **Exception — dense table cell paired with a days-left/heat pill** (e.g. the Orders DEADLINE cell `[1d] 20 Jul 26`): the pill already carries the day-of-urgency, so the cell may use the compact `19 Jul 26` (no weekday) to protect the one-screen table rule (§A / §11). That is the ONLY place the weekday is dropped.
+
+**Action law — MANAGE column (LOCKED 2026-07-19).** A row's actions live in a column named **Manage** and are ALWAYS `.pill`s — never a plain-text verb sitting next to a pill. Each action's tone maps to its status pill (one language across QUEUES ↔ Manage ↔ the drawer's Chase Now):
+
+| tone | pill class | verbs |
+|---|---|---|
+| danger (red) | `pill-overdue` | Order PO · Chase supplier (in window) · Chase logistic (overdue) |
+| warning (amber) | `pill-warning` | Chase supplier (out of window) · Confirm 🔒 (money-held) |
+| info (blue) | `pill-sent` | Assign logistic · Chase logistic |
+| success (green) | `pill-confirmed` | Confirm |
+| neutral (grey) | `pill-neutral` | Done |
+| money (indigo) | `pill-collected` | **Collect $** — the independent money track, shown as a SECOND pill (max two pills/row) |
+
+**New-panel top-to-toe checklist** (every new list/panel must pass — mirror the Orders page):
+
+```
+□ ListPageShell — header TWO rows (breadcrumb + search/bell/help/⚙ · title + Synced <date>)
+□ Dates via fmtDate() → "19 Jul 26, Sun" (no toLocaleDateString / hand-format; weekday dropped ONLY in a pill-paired table cell)
+□ Colour only four jobs: blue = selection · flame = ONE hero/page · green·amber·red = status · else black/grey/white
+□ Actions = .pill, tone-mapped (table above); same-kind actions look identical — never text + pill mixed
+□ Section bands = <SectionBand strong> (base-200 #E5E7EB — visible on white)
+□ Icons 14/16/18 · text 11/12/13 · row height 36/40/52 (lint RULE C/D/F)
+□ Table: table-fixed + % col widths — one screen, no horizontal scroll (§A / §11)
+□ Status word ≠ action word; verbs from the C-vocab set (Order PO · Chase supplier · Assign logistic · Chase logistic · Confirm · Collect $)
+□ Money: 18 mono hero · 13 tabular row (only these two sizes)
+□ Facets multi-select (Set); each pick = one ✕-able chip on the toolbar
+□ Delivered = closed (no red alarm, no chase)
+□ Gate before commit: tsc -p tsconfig.app.json · check:v4 · lint · tests (16 pre-existing fails are the baseline)
+```
+
+---
+
 # PART A — PORTAL (v17)
 
 ## A1. Brand & colour (v17, locked 2026-06-09)
