@@ -2630,7 +2630,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                           type="button"
                           aria-pressed={dueFilter.has(b)}
                           onClick={() => setDueFilter((p) => toggleInSet(p, b))}
-                          className={`pill ${cls} ${dueFilter.has(b) ? "font-bold ring-1 ring-current" : ""}`}
+                          className={`pill ${cls} hover:brightness-95 ${dueFilter.has(b) ? "font-bold ring-1 ring-current" : ""}`}
                         >
                           {b} {count}
                         </button>
@@ -3266,7 +3266,7 @@ function KanbanRow({
       title={title}
       aria-pressed={active}
       className={`w-full flex items-center gap-1.5 rounded-full text-left transition-colors ${
-        active ? "" : "hover:bg-[#EAF3FE]"
+        active ? "" : "hover:bg-hovertint"
       }`}
       style={{ padding: "6px 10px", backgroundColor: active ? "#C2E7FF" : undefined }}
     >
@@ -3370,7 +3370,7 @@ function StaffChip({
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] whitespace-nowrap transition-colors ${
         active
           ? "border-transparent font-bold text-[#0B0B0B]"
-          : "border-base-200 bg-white text-base-700 hover:border-base-400"
+          : "border-base-200 bg-white text-base-700 hover:bg-hovertint hover:border-base-300"
       }`}
       style={active ? { backgroundColor: "#C2E7FF" } : undefined}
     >
@@ -3787,7 +3787,7 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-[#EAF3FE]"
+        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-hovertint"
       }`}
       data-testid="order-row"
     >

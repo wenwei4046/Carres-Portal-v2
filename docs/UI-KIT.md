@@ -31,6 +31,8 @@
 
 **Date law (LOCKED 2026-07-19).** The canonical human date is **`19 Jul 26, Sun`** — abbreviated month + 2-digit year + weekday — **EVERYWHERE, including inside list cells** (deadline, ETA, booked). It comes from **ONE** helper: `fmtDate()` in `@/lib/fmt-date`. Never hand-format a date, never call `toLocaleDateString`, never `.split(", ")[0]` off the weekday, never use `fmtDateShort`. A date column must be wide enough to hold the weekday (the Orders DEADLINE column is 14%); a secondary sub-caption date (ETA/booked) may `truncate` with a full-value tooltip on a narrow screen, but it still FORMATS with the weekday. (Jess 2026-07-19: rejected the earlier "drop the weekday in dense cells" exception — align everywhere.)
 
+**Hover law (LOCKED 2026-07-19).** Every clickable ROW / nav item / chip hovers to ONE faint-blue tint — `hover:bg-hovertint` (`#EAF3FE`, the `--hover-tint` token). NEVER a grey hover (it clashes with the section-band grey and reads as structure, not an affordance). Selection stays the stronger blue (`#C2E7FF` rows/chips, `#e6f1fb` table rows) so hover and selection are always distinguishable. Element-type nuance (international standard, don't force blue on these): **underline tabs** hover by darkening their text; **colour-filled pills** hover with `hover:brightness-95` (keep their own colour). Blue-bg hover is for neutral rows/nav/chips only.
+
 **Action law — MANAGE column (LOCKED 2026-07-19).** A row's actions live in a column named **Manage** and are ALWAYS `.pill`s — never a plain-text verb sitting next to a pill. Each action's tone maps to its status pill (one language across QUEUES ↔ Manage ↔ the drawer's Chase Now):
 
 | tone | pill class | verbs |

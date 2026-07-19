@@ -207,7 +207,7 @@ export default function PortalSidebar() {
                   onClick={() => fireMarkSeen(item.badge)}
                   title={item.label}
                   className={`relative w-full px-0 py-[9px] rounded flex items-center justify-center ${
-                    active ? "bg-base-100" : "hover:bg-base-50"
+                    active ? "bg-base-100" : "hover:bg-hovertint"
                   }`}
                 >
                   {active && (
@@ -260,7 +260,7 @@ export default function PortalSidebar() {
                           "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
                         const cls = active
                           ? `${baseCls} bg-base-100 text-base-900 font-semibold`
-                          : `${baseCls} text-base-600 font-medium hover:bg-base-50`;
+                          : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
                         return (
                           <Link
                             key={item.key}

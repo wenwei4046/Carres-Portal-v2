@@ -86,6 +86,8 @@ export default {
           soft: "hsl(var(--info-soft))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // THE hover tint — hover:bg-hovertint on every clickable row/nav/chip.
+        hovertint: "hsl(var(--hover-tint))",
         error: {
           // --error shares its hue/saturation with --destructive to keep
           // shadcn primitives (alerts, toasts) untouched. The *-soft variant
