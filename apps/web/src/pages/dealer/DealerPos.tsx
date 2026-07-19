@@ -120,7 +120,7 @@ export default function DealerPos({
    *  themselves (the default, byte-identical to before). */
   actingDealerId?: string;
   actingDealerName?: string;
-  /** Where "Exit" / ThankYou-close goes. Default: navigate to /dealer/orders. */
+  /** Where "Exit" goes. Default: navigate to /dealer/orders. */
   onExit?: () => void;
 } = {}) {
   const navigate = useNavigate();
@@ -487,6 +487,17 @@ export default function DealerPos({
         city: draft.customer.addressCity,
         postcode: draft.customer.addressPostcode,
       });
+      // Billing keys in structured (same MY cascade as delivery, Loo
+      // 2026-07-19) but persists as the single composed string —
+      // `customer_billing` stays text. Legacy free-text `billing` (old drafts
+      // / unparseable autofill) is the fallback.
+      const composedBilling = composeAddress({
+        line1: draft.customer.billingLine1,
+        line2: draft.customer.billingLine2,
+        state: draft.customer.billingState,
+        city: draft.customer.billingCity,
+        postcode: draft.customer.billingPostcode,
+      });
       const input: CreateOrderInput = {
         // Only an internal role (principal) sends a body dealerId; the API honors
         // it only when the JWT carries no dealer. A dealer omits it → JWT wins.
@@ -506,7 +517,9 @@ export default function DealerPos({
           addressState: draft.customer.addressUnknown ? null : draft.customer.addressState || null,
           addressCity: draft.customer.addressUnknown ? null : draft.customer.addressCity || null,
           addressPostcode: draft.customer.addressUnknown ? null : draft.customer.addressPostcode || null,
-          billing: draft.customer.billingSame ? null : draft.customer.billing,
+          billing: draft.customer.billingSame
+            ? null
+            : composedBilling || draft.customer.billing.trim() || null,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
           // 0200 — POS-parity demographics (POS-required via step1 gate;
@@ -579,6 +592,11 @@ export default function DealerPos({
           const fields = Object.fromEntries(
             Object.entries(draft.customer.custom ?? {}).filter(([, v]) => v.trim()),
           );
+          // Building type (Loo 2026-07-19) — no orders column, so it rides the
+          // entry_data.fields bag next to the operator-configured answers.
+          if (draft.customer.buildingType.trim()) {
+            fields.building_type = draft.customer.buildingType.trim();
+          }
           const hasPayment = Object.keys(payment).length > 0;
           const hasFields = Object.keys(fields).length > 0;
           return hasPayment || hasFields
@@ -936,10 +954,6 @@ export default function DealerPos({
               stripeCollectAmount={stripeCollectAmount}
               stripeCollectedAmount={stripeCollected}
               onNewOrder={startAnotherOrder}
-              onClose={() => {
-                clearDraft();
-                (onExit ?? (() => navigate("/dealer/orders")))();
-              }}
             />
           </div>
         ) : !catalogQ.data ? (

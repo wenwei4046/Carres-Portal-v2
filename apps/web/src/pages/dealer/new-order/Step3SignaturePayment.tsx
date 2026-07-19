@@ -206,6 +206,9 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 )
               }
             />
+            {draft.customer.buildingType && (
+              <KV label="Building type" value={draft.customer.buildingType} />
+            )}
             <KV label="Emergency contact" value={composeEmergency(draft.customer)} />
             <KV
               label="Delivery date"
