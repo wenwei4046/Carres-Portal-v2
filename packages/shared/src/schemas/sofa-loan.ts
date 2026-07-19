@@ -87,6 +87,10 @@ export type ReturnLoanInput = z.infer<typeof returnLoanInput>;
 export const returnToSupplierInput = z
   .object({
     loanId: z.string().uuid(),
+    /** Optional note (0242) — which supplier delivery / return-note the borrowed
+     *  piece rode back on (Jess: it usually piggybacks the supplier's next
+     *  new-stock delivery to the warehouse). */
+    returnRef: z.string().trim().max(120).optional(),
   })
   .strict();
 export type ReturnToSupplierInput = z.infer<typeof returnToSupplierInput>;

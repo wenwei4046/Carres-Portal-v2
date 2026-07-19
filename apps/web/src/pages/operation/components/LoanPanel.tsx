@@ -170,7 +170,7 @@ function LoanCard({
   logisticEta?: string | null;
   partners: { id: string; name: string }[];
   onCollect: () => void;
-  onReturnSupplier: () => void;
+  onReturnSupplier: (returnRef?: string) => void;
   onSetRoute: (route: "supplier_customer" | "supplier_warehouse_customer") => void;
   onSetPartner: (partnerId: string | null) => void;
   onSetReturnDue: (date: string | null) => void;
@@ -196,6 +196,10 @@ function LoanCard({
   const returnIsAuto = !overrideReturnBy;
   const [routeEditing, setRouteEditing] = useState(false);
   const [dueEditing, setDueEditing] = useState(false);
+  // return-to-supplier: click "Mark returned" → capture an optional ref (which
+  // supplier delivery it rode back on) → confirm.
+  const [returningSup, setReturningSup] = useState(false);
+  const [returnRef, setReturnRef] = useState("");
   const nDay = dayN(loan);
   // OUT leg (0242) — how the loaner reached the customer.
   const sup = loan.supplier_name ?? "supplier";
@@ -366,7 +370,42 @@ function LoanCard({
         {isSupplier &&
           (closed ? (
             <Row k="Return">
-              <DoneTick>Returned to supplier</DoneTick>
+              <span className="inline-flex items-center gap-1.5 flex-wrap">
+                <DoneTick>Returned to supplier</DoneTick>
+                {loan.supplier_return_ref && (
+                  <span className={`${TAG} bg-base-100 text-base-500`}>
+                    with {loan.supplier_return_ref}
+                  </span>
+                )}
+              </span>
+            </Row>
+          ) : owed && returningSup ? (
+            <Row
+              k="Return by"
+              tone="act"
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReturnSupplier(returnRef.trim() || undefined);
+                    setReturningSup(false);
+                    setReturnRef("");
+                  }}
+                  disabled={busy}
+                  className="btn-primary text-[12px] py-0.5 px-2.5"
+                >
+                  Confirm
+                </button>
+              }
+            >
+              <input
+                value={returnRef}
+                autoFocus
+                onChange={(e) => setReturnRef(e.target.value)}
+                placeholder="Returned with… (e.g. Laveo DO-2207) — optional"
+                aria-label="Returned with which supplier delivery"
+                className="w-full border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+              />
             </Row>
           ) : (
             <Row
@@ -376,7 +415,7 @@ function LoanCard({
                 owed ? (
                   <button
                     type="button"
-                    onClick={onReturnSupplier}
+                    onClick={() => setReturningSup(true)}
                     disabled={busy}
                     className="btn-primary text-[12px] py-0.5 px-2.5"
                   >
@@ -749,9 +788,9 @@ export default function LoanPanel({
               },
             )
           }
-          onReturnSupplier={() =>
+          onReturnSupplier={(returnRef) =>
             returnSupplier.mutate(
-              { loanId: loan.id },
+              { loanId: loan.id, returnRef },
               {
                 onSuccess: () => toast.success("Returned to supplier — obligation closed"),
                 onError: (e) => toast.error(e.message),

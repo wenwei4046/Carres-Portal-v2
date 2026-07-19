@@ -1098,7 +1098,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
       422,
     );
   }
-  const { loanId } = parsed.data;
+  const { loanId, returnRef } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
   const { data: loan, error: loanErr } = await sb
@@ -1128,7 +1128,11 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
   const now = new Date().toISOString();
   const { error: upErr } = await sb
     .from("ops_sofa_loans")
-    .update({ returned_to_supplier_at: now, updated_at: now })
+    .update({
+      returned_to_supplier_at: now,
+      updated_at: now,
+      ...(returnRef ? { supplier_return_ref: returnRef } : {}),
+    })
     .eq("id", loanId)
     .is("returned_to_supplier_at", null);
   if (upErr) {
