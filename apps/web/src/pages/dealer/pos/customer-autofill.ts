@@ -92,6 +92,12 @@ export function parseEmergency(emergency: string): {
  */
 export function customerPatchFromHit(hit: CustomerSearchHit): Partial<WizardDraft["customer"]> {
   const parsedAddress = hit.address ? parseComposedAddress(hit.address) : null;
+  // Billing mirrors delivery since the POS billing box became the same MY
+  // cascade (2026-07-19): parse the composed string back into the billing*
+  // fields, line1-only fallback when unparseable, everything reset when
+  // billing is same-as-delivery.
+  const parsedBilling =
+    !hit.billingSame && hit.billing ? parseComposedAddress(hit.billing) : null;
   return {
     name: hit.name,
     phone: hit.phone ?? "",
@@ -110,6 +116,13 @@ export function customerPatchFromHit(hit: CustomerSearchHit): Partial<WizardDraf
     }),
     billingSame: hit.billingSame,
     billing: hit.billingSame ? "" : (hit.billing ?? ""),
+    billingLine1: hit.billingSame
+      ? ""
+      : (parsedBilling?.addressLine1 ?? hit.billing ?? ""),
+    billingLine2: parsedBilling?.addressLine2 ?? "",
+    billingState: parsedBilling?.addressState ?? "",
+    billingCity: parsedBilling?.addressCity ?? "",
+    billingPostcode: parsedBilling?.addressPostcode ?? "",
     ...parseEmergency(hit.emergency ?? ""),
   };
 }

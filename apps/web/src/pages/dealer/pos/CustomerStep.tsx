@@ -224,7 +224,14 @@ export default function CustomerStep({
           !!c.addressState &&
           !!c.addressCity &&
           !!c.addressPostcode);
-      const billingOk = c.billingSame || c.billing.trim().length >= 5;
+      // Billing mirrors delivery's completeness gate now that it keys in via
+      // the same MY cascade (Loo 2026-07-19 — POS free-text billing retired).
+      const billingOk =
+        c.billingSame ||
+        (c.billingLine1.trim().length >= 5 &&
+          !!c.billingState &&
+          !!c.billingCity &&
+          !!c.billingPostcode);
       return addressOk && billingOk && customsValid(addrTab);
     }
     if (stepIdx === 2) {
@@ -581,10 +588,14 @@ export default function CustomerStep({
                 >
                   <input
                     type="checkbox"
+                    data-testid="pos-billing-same"
                     checked={c.billingSame}
                     onChange={(e) =>
                       setC({
                         billingSame: e.target.checked,
+                        // Keep the composed `billing` string honest either way:
+                        // same → a copy of delivery; different → whatever the
+                        // billing cascade currently holds.
                         billing: e.target.checked
                           ? composeAddress({
                               line1: c.addressLine1,
@@ -593,7 +604,13 @@ export default function CustomerStep({
                               city: c.addressCity,
                               postcode: c.addressPostcode,
                             })
-                          : c.billing,
+                          : composeAddress({
+                              line1: c.billingLine1,
+                              line2: c.billingLine2,
+                              state: c.billingState,
+                              city: c.billingCity,
+                              postcode: c.billingPostcode,
+                            }),
                       })
                     }
                   />
@@ -608,17 +625,51 @@ export default function CustomerStep({
                   </span>
                 </label>
 
+                {/* Billing keys in with the SAME MY cascade as delivery
+                    (Loo 2026-07-19 — parity with the raw New Order form, PR
+                    #187): a second MYAddressFields mapped onto the billing*
+                    fields; the composed `billing` string is kept in sync on
+                    every change so submit/validation readers stay untouched. */}
                 {!c.billingSame && (
-                  <div className="form-grid" style={{ marginTop: 22 }}>
-                    <div className="field field--span">
-                      <span className="field__label">Billing address</span>
-                      <textarea
-                        rows={2}
-                        value={c.billing}
-                        placeholder="Unit, street, area"
-                        onChange={(e) => setC({ billing: e.target.value })}
-                      />
+                  <div style={{ marginTop: 22 }} data-testid="pos-billing-fields">
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        fontFamily: "var(--font-button)",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Billing address
                     </div>
+                    <MYAddressFields
+                      data={{
+                        addressLine1: c.billingLine1,
+                        addressLine2: c.billingLine2,
+                        addressState: c.billingState,
+                        addressCity: c.billingCity,
+                        addressPostcode: c.billingPostcode,
+                      }}
+                      onChange={(patch) => {
+                        const next = {
+                          billingLine1: patch.addressLine1 ?? c.billingLine1,
+                          billingLine2: patch.addressLine2 ?? c.billingLine2,
+                          billingState: patch.addressState ?? c.billingState,
+                          billingCity: patch.addressCity ?? c.billingCity,
+                          billingPostcode: patch.addressPostcode ?? c.billingPostcode,
+                        };
+                        setC({
+                          ...next,
+                          billing: composeAddress({
+                            line1: next.billingLine1,
+                            line2: next.billingLine2,
+                            state: next.billingState,
+                            city: next.billingCity,
+                            postcode: next.billingPostcode,
+                          }),
+                        });
+                      }}
+                    />
                   </div>
                 )}
                 {addrTab.custom.length > 0 && (

@@ -128,10 +128,12 @@ export interface WizardDraft {
     billing: string;
     billingSame: boolean;
     /** Structured billing parts (Loo 2026-07-18 — the raw New Order keys the
-     *  billing address with the SAME MY cascade as delivery). Composed into
-     *  the single `billing` string at submit (`customer_billing` stays text);
-     *  the POS keeps its free-text billing box. Defaults "" — old drafts
-     *  restore cleanly via the emptyDraft spread in loadDraft. */
+     *  billing address with the SAME MY cascade as delivery; 2026-07-19 the
+     *  POS billing box joined it, retiring free text). Composed into the
+     *  single `billing` string (`customer_billing` stays text) — the raw form
+     *  composes at submit, the POS keeps it in sync on every change.
+     *  Defaults "" — old drafts restore cleanly via the emptyDraft spread in
+     *  loadDraft. */
     billingLine1: string;
     billingLine2: string;
     billingState: string;

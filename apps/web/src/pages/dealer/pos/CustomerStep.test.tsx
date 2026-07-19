@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse } from "@carres/shared";
 import { emptyDraft } from "../new-order/draft";
@@ -372,6 +373,60 @@ describe("CustomerStep — Target-date sub-step (Loo 2026-07-12)", () => {
       expect.objectContaining({
         addons: [expect.objectContaining({ key: "dispose-mattress", qty: 1, unitPrice: 80 })],
       }),
+    );
+  });
+});
+
+describe("CustomerStep — billing address cascade (2026-07-19)", () => {
+  /** The cascade needs applied state between interactions (state → city →
+   *  postcode), so drive CustomerStep through a stateful harness. */
+  function Stateful() {
+    const [draft, setDraft] = useState(emptyDraft());
+    return (
+      <>
+        <CustomerStep
+          draft={draft}
+          onChange={setDraft}
+          outlets={[]}
+          salespersons={[]}
+          catalog={catalog()}
+          minLeadDays={14}
+          initialSubStep={1}
+        />
+        <div data-testid="probe-billing">{draft.customer.billing}</div>
+      </>
+    );
+  }
+
+  it("unchecking 'same as delivery' opens the MY cascade (no free-text box) and composes draft.customer.billing", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <Stateful />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByTestId("pos-billing-fields")).toBeNull();
+    fireEvent.click(screen.getByTestId("pos-billing-same"));
+
+    const box = () => screen.getByTestId("pos-billing-fields");
+    // The old free-text billing textarea is retired.
+    expect(screen.queryByPlaceholderText("Unit, street, area")).toBeNull();
+
+    const [line1] = within(box()).getAllByRole("textbox");
+    fireEvent.change(line1, { target: { value: "88 Jalan Invoice" } });
+    fireEvent.change(within(box()).getAllByRole("combobox")[0], {
+      target: { value: "Selangor" },
+    });
+    fireEvent.change(within(box()).getAllByRole("combobox")[1], {
+      target: { value: "Petaling Jaya" },
+    });
+    fireEvent.change(within(box()).getAllByRole("combobox")[2], {
+      target: { value: "47301" },
+    });
+
+    expect(screen.getByTestId("probe-billing").textContent).toBe(
+      "88 Jalan Invoice, Petaling Jaya 47301, Selangor",
     );
   });
 });
