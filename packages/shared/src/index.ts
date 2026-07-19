@@ -1094,6 +1094,10 @@ export {
   type SofaAnalysis,
 } from "./sofa-geometry";
 
+// Customer-facing sofa spec copy from exploded lines (Loo 2026-07-19) — one
+// implementation for the POS receipt/detail regroup + the Sales Order PDF.
+export { sofaBuildSpec, type SofaSpecLine } from "./sofa-spec";
+
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";
 

@@ -23,6 +23,7 @@ import {
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
+  sofaBuildSpec,
   STAFF_SESSION_REQUIRED,
   topUpOrderInputSchema,
   updateOrderInputSchema,
@@ -3369,12 +3370,15 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // product_skus.description is a free-text REMARK ("waterproof protector"),
   // NOT the product name — the name lives on product_models.name + variant.
   const nameBySku = new Map<string, string>();
+  // Bare model identity per sku — the sofa-build regroup rows print the MODEL
+  // (name + model_key), not the compartment sku's composed description.
+  const modelBySku = new Map<string, { name: string; modelKey: string | null }>();
   try {
     const skuList = [...new Set(lines.map((l) => String(l.sku)))];
     if (skuList.length > 0) {
       const { data: skuRows } = await sb
         .from("product_skus")
-        .select("sku, variant, product_models(name)")
+        .select("sku, variant, product_models(name, model_key)")
         .in("sku", skuList);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of (skuRows ?? []) as any[]) {
@@ -3386,6 +3390,12 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         const variant =
           typeof r.variant === "string" && r.variant.trim().length > 0 ? r.variant.trim() : null;
         nameBySku.set(String(r.sku), variant ? `${modelName} (${variant})` : modelName);
+        const modelKey =
+          typeof r.product_models?.model_key === "string" &&
+          r.product_models.model_key.trim().length > 0
+            ? r.product_models.model_key.trim()
+            : null;
+        modelBySku.set(String(r.sku), { name: modelName, modelKey });
       }
     }
   } catch {
@@ -3409,16 +3419,69 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     /* fall back to addon keys */
   }
 
-  const lineRows = lines.map((l) => {
-    const qty = Number(l.qty);
-    const unitPrice = Number(l.unit_price);
+  // Sofa-build regroup (Loo 2026-07-19) — the customer's Sales Order shows a
+  // built sofa as ONE model line; the per-compartment split (Phase-5 explode,
+  // `attrs.sofa_build_key`) is operation's view, not the customer's. Group
+  // lines sharing a build key into one row: SKU column = the model key,
+  // description = the model name, price = the Σ-exact split total, and
+  // `attrs.sofa_spec` carries the cart-style copy ("1B(LHF) + CNR + 2A(RHF) ·
+  // 24″ · CG-011 Peach · leg 4″") the template prints as the sub-line. Keyless
+  // lines pass through untouched — flat orders render byte-identically.
+  type RawLine = (typeof lines)[number];
+  type DisplayUnit =
+    | { kind: "line"; line: RawLine }
+    | { kind: "build"; group: RawLine[] };
+  const units: DisplayUnit[] = [];
+  const buildByKey = new Map<string, Extract<DisplayUnit, { kind: "build" }>>();
+  for (const l of lines) {
+    const key = l.attrs?.["sofa_build_key"];
+    if (typeof key !== "string" || key.length === 0) {
+      units.push({ kind: "line", line: l });
+      continue;
+    }
+    const existing = buildByKey.get(key);
+    if (existing) {
+      existing.group.push(l);
+    } else {
+      const unit = { kind: "build" as const, group: [l] };
+      buildByKey.set(key, unit);
+      units.push(unit);
+    }
+  }
+  const lineRows = units.map((u) => {
+    if (u.kind === "line") {
+      const l = u.line;
+      const qty = Number(l.qty);
+      const unitPrice = Number(l.unit_price);
+      return {
+        sku: String(l.sku),
+        description: nameBySku.get(String(l.sku)) ?? String(l.sku),
+        qty,
+        unit_price: unitPrice,
+        line_total: qty * unitPrice,
+        attrs: l.attrs ?? null,
+      };
+    }
+    const first = u.group[0]!;
+    const total =
+      Math.round(u.group.reduce((s, g) => s + Number(g.qty) * Number(g.unit_price), 0) * 100) /
+      100;
+    const model = modelBySku.get(String(first.sku));
+    const pwp = first.attrs?.["pwp"];
     return {
-      sku: String(l.sku),
-      description: nameBySku.get(String(l.sku)) ?? String(l.sku),
-      qty,
-      unit_price: unitPrice,
-      line_total: qty * unitPrice,
-      attrs: l.attrs ?? null,
+      sku: model?.modelKey ?? String(first.sku),
+      description: model?.name ?? "Sofa",
+      qty: 1,
+      unit_price: total,
+      line_total: total,
+      attrs: {
+        sofa_spec: sofaBuildSpec(
+          u.group.map((g) => ({ sku: String(g.sku), attrs: g.attrs ?? null })),
+        ),
+        // The reward marker survives the regroup so the doc still prints
+        // "Promo · FREE" / "PWP price" on a sofa-as-reward build.
+        ...(pwp && typeof pwp === "object" ? { pwp } : {}),
+      },
     };
   });
   const addonRows = addons.map((a) => {

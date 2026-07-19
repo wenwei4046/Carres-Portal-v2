@@ -138,7 +138,10 @@ export type SalesOrderTemplateData = {
     sku: string;
     /** Human product name (`Model name (Variant)`), server-resolved from the
      *  sku since 2026-07-14 (2990s SO parity); older API builds echo the sku
-     *  code here — the template renders whatever arrives. */
+     *  code here — the template renders whatever arrives. A built sofa
+     *  arrives REGROUPED since 2026-07-19: one row per build (sku = model
+     *  key, description = model name) with the cart-style spec copy in
+     *  `attrs.sofa_spec`. */
     description: string;
     qty: number;
     unit_price: number;
