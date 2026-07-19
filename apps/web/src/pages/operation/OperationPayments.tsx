@@ -64,6 +64,7 @@ interface RawCtrl {
   extension_original_date: string | null;
   line_etas: Record<string, string> | null;
   line_stock_status: Record<string, string> | null;
+  last_chased_at: string | null;
 }
 interface RawLedgerEntry {
   amount: number | string;
@@ -112,6 +113,18 @@ function catOf(sku: string): "msbf" | "sof" | "other" {
 
 function rm(n: number): string {
   return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** "Chased today / 3d ago" — collections must show when a debtor was last
+ *  touched so it isn't over-chased or left to go cold. */
+function chasedAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "Chased today";
+  if (days === 1) return "Chased 1d ago";
+  return `Chased ${days}d ago`;
 }
 
 /** Phone → wa.me base link (MY-aware). Local copy of OrderDetailDrawer.waLink so
@@ -264,6 +277,7 @@ interface Row {
   owing: number;
   /** delivery held: goods in, not delivered, money owing → the 🔒 on Collect $. */
   held: boolean;
+  lastChasedAt: string | null;
 }
 
 /** The "owing / storage" view predicate — anything still to chase. */
@@ -378,6 +392,7 @@ export default function OperationPayments() {
         overdue,
         owing,
         held,
+        lastChasedAt: ctrl?.last_chased_at ?? null,
       };
     });
   }, [data, today]);
@@ -523,7 +538,7 @@ export default function OperationPayments() {
         toolbar={
           <StatusTabs
             tabs={[
-              { key: "owing", label: "Owing / storage", count: owingCount },
+              { key: "owing", label: "To collect", count: owingCount },
               { key: "all", label: "All orders", count: rows.length },
             ]}
             active={view}
@@ -782,15 +797,23 @@ function PaymentRow({
       {/* Manage */}
       <td className="px-5 py-3">
         {r.owing > 0 ? (
-          <button
-            type="button"
-            onClick={onChase}
-            className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
-            title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
-          >
-            {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
-            Collect $
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onChase}
+              className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
+              title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
+            >
+              {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
+              Collect $
+            </button>
+            <div
+              className="mt-1.5 text-[11px] text-base-400"
+              title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
+            >
+              {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
+            </div>
+          </>
         ) : (
           <span className="pill pill-neutral">Done</span>
         )}
@@ -815,13 +838,13 @@ function StockCell({ r }: { r: Row }) {
 
   const windowNote =
     s.state === "late"
-      ? "供应商迟 — 先催货,别催客户钱"
+      ? "Supplier late — chase the goods first, not the customer"
       : s.state === "waiting" || s.state === "no_eta"
-        ? "货未到 — 报窗口给客户,别承诺死日期"
+        ? "Goods not in — quote a window, don't promise a fixed date"
         : r.etaTbd
           ? "Delivery TBD"
           : r.eta
-            ? `Deliver ~ ${fmtDate(r.eta)} · 物流送货前 1-3 天联系`
+            ? `Deliver ~ ${fmtDate(r.eta)} · logistics calls 1–3 days before`
             : "No delivery date set";
 
   return (
@@ -897,13 +920,17 @@ function ChasePopover({
   // Pre-call brief (the operator's verbal script — NOT the WhatsApp text).
   const stockLine =
     r.stock.state === "ready"
-      ? "已到仓 ✓ 可安排送"
+      ? "In stock ✓ ready to deliver"
       : r.stock.state === "late"
-        ? `供应商迟(ETA ${fmtDate(r.stock.etaIso)} 已过)— 先催货`
+        ? `Supplier late (ETA ${fmtDate(r.stock.etaIso)} passed) — chase goods first`
         : r.stock.state === "waiting" || r.stock.state === "no_eta"
-          ? `未到 · ETA ${fmtDate(r.stock.etaIso)}`
-          : "未追踪";
-  const windowLine = r.etaTbd ? "待定" : r.eta ? `${fmtDate(r.eta)} 前后(报范围,别报死日期)` : "未定";
+          ? `Not in yet · ETA ${fmtDate(r.stock.etaIso)}`
+          : "Not tracked";
+  const windowLine = r.etaTbd
+    ? "TBD"
+    : r.eta
+      ? `around ${fmtDate(r.eta)} — give a window, not a fixed date`
+      : "Not set";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
@@ -914,7 +941,7 @@ function ChasePopover({
         <div className="flex items-center gap-2 px-4 py-3 border-b border-base-100">
           <MessageCircle size={16} className="text-success" strokeWidth={2.5} />
           <span className="text-[13px] font-bold text-base-900">
-            催收 · {r.customer} · {r.phone ?? "no phone"}
+            Chase · {r.customer} · {r.phone ?? "no phone"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex bg-base-100 rounded-full p-0.5">
@@ -940,17 +967,17 @@ function ChasePopover({
         {/* Pre-call brief */}
         <div className="mx-4 mt-3 rounded-xl border border-info/30 bg-info/5 px-3 py-2.5">
           <div className="text-[11px] font-bold uppercase tracking-[0.04em] text-info mb-1.5">
-            📞 打电话前看这个 — 客户一定问「几时送」
+            Before you call — they'll ask about delivery
           </div>
-          <BriefRow k="货" v={stockLine} />
-          <BriefRow k="交货窗口" v={windowLine} />
-          <BriefRow k="物流" v="送货前 1-3 天直接联系客户约 slot" />
+          <BriefRow k="Stock" v={stockLine} />
+          <BriefRow k="Delivery" v={windowLine} />
+          <BriefRow k="Logistics" v="Logistics calls the customer 1–3 days before delivery" />
         </div>
 
         {/* WhatsApp text (date-free, per locked template) */}
         <div className="mx-4 my-3">
           <div className="text-[10px] text-base-400 italic mb-1.5">
-            ↓ WhatsApp 讯息(照锁定规矩:不写交货日、不施压)
+            ↓ WhatsApp message (date-free, per the locked rule)
           </div>
           <pre className="whitespace-pre-wrap font-sans text-[12.5px] text-base-800 bg-success/5 border border-success/20 rounded-xl px-3 py-2.5 leading-relaxed">
             {text}
@@ -981,7 +1008,7 @@ function ChasePopover({
 function BriefRow({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex gap-2 py-0.5 text-[12.5px] text-base-800">
-      <span className="w-[64px] shrink-0 text-base-500 font-semibold">{k}</span>
+      <span className="w-[72px] shrink-0 text-base-500 font-semibold">{k}</span>
       <span className="font-semibold">{v}</span>
     </div>
   );
