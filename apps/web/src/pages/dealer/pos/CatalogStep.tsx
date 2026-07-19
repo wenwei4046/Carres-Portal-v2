@@ -305,8 +305,14 @@ export default function CatalogStep({
    *  opens the slot walker; a fully-pinned no-axes fixed bundle keeps the V1
    *  direct add. */
   function handleBundleTap(bundle: ProductBundleDto) {
-    if (bundleNeedsConfig(bundle, catalog)) setConfiguringBundle(bundle);
-    else addBundle(bundle);
+    // A custom bundle ALWAYS walks (its components live in slots — the V1
+    // direct add would see an empty components list); a fixed bundle
+    // direct-adds only when nothing needs asking.
+    if (bundle.kind === "custom" || bundleNeedsConfig(bundle, catalog)) {
+      setConfiguringBundle(bundle);
+    } else {
+      addBundle(bundle);
+    }
   }
 
   /** 0241 — walker completion: split the bundle price across the PICKED skus
