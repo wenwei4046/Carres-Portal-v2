@@ -868,6 +868,51 @@ export const attrsPwpMarkerSchema = z
   .passthrough();
 export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;
 
+// ---------------------------------------------------------------------------
+// 0239 — Product bundles (bundle pricing). Principal-owned. A bundle = a named
+// set of catalog SKUs sold together at ONE bundle price; the POS explodes it
+// into component order_lines via the pure `explodeBundle` (split Σ-exact).
+// One schema, two consumers (§9.5): the API validates these and the Promo/GWP
+// tab editor reuses the exact same shapes. DORMANT until authored + active.
+// ---------------------------------------------------------------------------
+
+/** One bundle component (mirrors the shared `BundleComponent`). */
+export const bundleComponentSchema = z
+  .object({
+    sku: z.string().trim().min(1).max(60),
+    qty: z.number().int().positive().max(99),
+  })
+  .strict();
+export type BundleComponentDto = z.infer<typeof bundleComponentSchema>;
+
+/** A `product_bundles` row DTO (mirrors the shared `ProductBundle`). */
+export const productBundleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  price: z.number(),
+  components: z.array(bundleComponentSchema),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type ProductBundleDto = z.infer<typeof productBundleSchema>;
+
+/** Create a bundle. ≥2 components (a 1-item "bundle" is just a price edit —
+ *  use SKU Master for that); `active` defaults false server-side. */
+export const productBundleInput = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    price: z.number().nonnegative(),
+    components: z.array(bundleComponentSchema).min(2).max(20),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type ProductBundleInput = z.infer<typeof productBundleInput>;
+
+/** Patch a bundle — every field of create is optional (empty body → 422). */
+export const productBundlePatchInput = productBundleInput.partial().strict();
+export type ProductBundlePatchInput = z.infer<typeof productBundlePatchInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -898,6 +943,9 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0239 — Product bundles (additive, OPTIONAL). POS sees active only; admin
+  // sees all. Pre-0239 clients that don't read this key are wholly unaffected.
+  bundles: z.array(productBundleSchema).optional(),
   // 0219 — Order Entry config (payment methods + form fields; additive,
   // OPTIONAL). The POS renders payment methods + the Customer-step form from
   // it; empty/absent → code defaults (pre-0219 behavior + Cash).

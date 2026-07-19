@@ -258,6 +258,15 @@ export {
   pwpRuleInput,
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0239 — Product bundle (bundle pricing) schemas/inputs/Dtos.
+  bundleComponentSchema,
+  productBundleSchema,
+  productBundleInput,
+  productBundlePatchInput,
+  type BundleComponentDto,
+  type ProductBundleDto,
+  type ProductBundleInput,
+  type ProductBundlePatchInput,
   // 0187 — PWP voucher ledger (Phase 8c) schemas/inputs/Dtos.
   pwpCodeStatusSchema,
   pwpCodeSchema,
@@ -848,6 +857,21 @@ export {
 } from "./pwp";
 export { pwpRuleFromRow } from "./adapters";
 export type { PwpRule } from "./domain";
+
+// 0239 — bundle pricing: the PURE explode engine (`explodeBundle`, Σ-exact
+// split shared by the POS cart add + the ERP editor preview) + the components
+// parser. The row→domain adapter (`productBundleFromRow`) is surfaced
+// top-level too (mirrors pwpRuleFromRow); the zod schemas + Dto/input types
+// live in the schemas/catalog export block.
+export {
+  explodeBundle,
+  parseBundleComponents,
+  type BundleComponent,
+  type ExplodedBundleLine,
+  type ExplodeBundleResult,
+} from "./product-bundle";
+export { productBundleFromRow } from "./adapters";
+export type { ProductBundle } from "./domain";
 
 // 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART state
 // machine). The row→domain adapter (`pwpCodeFromRow`) + the camelCase domain
