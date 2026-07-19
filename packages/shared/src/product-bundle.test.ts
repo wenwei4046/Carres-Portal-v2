@@ -106,8 +106,8 @@ describe("explodeBundle", () => {
     expect(r.ok).toBe(true);
     expect(centsTotal(r.lines)).toBe(9000);
     expect(r.lines).toEqual([
-      { slot: 0, sku: "A", qty: 1, unitPrice: 30 },
-      { slot: 1, sku: "B", qty: 2, unitPrice: 30 },
+      { slot: 0, component: 0, sku: "A", qty: 1, unitPrice: 30 },
+      { slot: 1, component: 1, sku: "B", qty: 2, unitPrice: 30 },
     ]);
   });
 

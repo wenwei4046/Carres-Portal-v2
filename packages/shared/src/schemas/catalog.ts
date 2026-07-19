@@ -885,34 +885,75 @@ export const bundleComponentSchema = z
   .strict();
 export type BundleComponentDto = z.infer<typeof bundleComponentSchema>;
 
-/** A `product_bundles` row DTO (mirrors the shared `ProductBundle`). */
+/** One customizable-bundle slot (0241; mirrors the shared `BundleSlot`).
+ *  variant 'fixed' pins the exact `sku` (exactly ONE model); 'any' lets the
+ *  customer pick any live variant of the chosen model at the POS. */
+export const bundleSlotSchema = z
+  .object({
+    label: z.string().trim().min(1).max(60).optional(),
+    qty: z.number().int().positive().max(9),
+    modelIds: z.array(z.string().uuid()).min(1).max(10),
+    variant: z.enum(["any", "fixed"]),
+    sku: z.string().trim().min(1).max(60).optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.variant === "fixed" && !v.sku)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a fixed-variant slot needs its exact SKU" });
+    if (v.variant === "fixed" && v.modelIds.length !== 1)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a fixed-variant slot pins exactly one product" });
+  });
+export type BundleSlotDto = z.infer<typeof bundleSlotSchema>;
+
+/** A `product_bundles` row DTO (mirrors the shared `ProductBundle`). `kind` /
+ *  `slots` default for pre-0241 serialized payloads; the adapter always emits. */
 export const productBundleSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   price: z.number(),
+  kind: z.enum(["fixed", "custom"]).default("fixed"),
   components: z.array(bundleComponentSchema),
+  slots: z.array(bundleSlotSchema).default([]),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
 export type ProductBundleDto = z.infer<typeof productBundleSchema>;
 
-/** Create a bundle. ≥2 components (a 1-item "bundle" is just a price edit —
- *  use SKU Master for that); `active` defaults false server-side. The RM 1M
- *  price cap keeps a typo out of numeric(14,2) AND keeps the cents math well
- *  inside float-safe integer range (mirrors the 0181 SPECIAL_MONEY bound). */
-export const productBundleInput = z
+/** Create a bundle. kind 'fixed' (default) needs ≥2 pinned components; kind
+ *  'custom' (0241) needs ≥1 slot. `active` defaults false server-side. The RM
+ *  1M price cap keeps a typo out of numeric(14,2) AND keeps the cents math
+ *  well inside float-safe integer range (mirrors the 0181 SPECIAL_MONEY bound). */
+const productBundleFields = z
   .object({
     name: z.string().trim().min(2).max(80),
     price: z.number().nonnegative().lte(1_000_000),
-    components: z.array(bundleComponentSchema).min(2).max(20),
+    kind: z.enum(["fixed", "custom"]).optional(),
+    components: z.array(bundleComponentSchema).max(20).optional(),
+    slots: z.array(bundleSlotSchema).max(10).optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })
   .strict();
+export const productBundleInput = productBundleFields.superRefine((v, ctx) => {
+  const kind = v.kind ?? "fixed";
+  if (kind === "fixed" && (v.components?.length ?? 0) < 2)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["components"],
+      message: "a fixed bundle needs at least 2 items",
+    });
+  if (kind === "custom" && (v.slots?.length ?? 0) < 1)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["slots"],
+      message: "a customizable bundle needs at least 1 item slot",
+    });
+});
 export type ProductBundleInput = z.infer<typeof productBundleInput>;
 
-/** Patch a bundle — every field of create is optional (empty body → 422). */
-export const productBundlePatchInput = productBundleInput.partial().strict();
+/** Patch a bundle — every field of create is optional (empty body → 422; the
+ *  per-kind minimums are create-time shape rules, not patch rules). */
+export const productBundlePatchInput = productBundleFields.partial().strict();
 export type ProductBundlePatchInput = z.infer<typeof productBundlePatchInput>;
 
 export const catalogResponseSchema = z.object({

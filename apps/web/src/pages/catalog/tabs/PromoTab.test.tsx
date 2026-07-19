@@ -364,6 +364,8 @@ describe("PromoTab — product bundles", () => {
     id: "bundle-1",
     name: "King Bedroom Set",
     price: 2000,
+    kind: "fixed" as const,
+    slots: [],
     components: [
       { sku: "MATT-A", qty: 1 },
       { sku: "PILLOW", qty: 1 },
@@ -394,6 +396,7 @@ describe("PromoTab — product bundles", () => {
     expect(mockCreateBundle.mock.calls[0][0]).toEqual({
       name: "King Bedroom Set",
       price: 2000,
+      kind: "fixed",
       components: [
         { sku: "MATT-A", qty: 1 },
         { sku: "PILLOW", qty: 1 },

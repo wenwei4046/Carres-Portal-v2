@@ -2804,8 +2804,10 @@ catalogRouter.post("/bundles", async (c) => {
     .insert({
       name: parsed.data.name,
       price: parsed.data.price,
-      // `components` is BundleComponent[] jsonb.
-      components: parsed.data.components,
+      // 0241 — bundle kinds; `components`/`slots` are jsonb arrays.
+      kind: parsed.data.kind ?? "fixed",
+      components: parsed.data.components ?? [],
+      slots: parsed.data.slots ?? [],
       active: parsed.data.active ?? false,
       sort_order: parsed.data.sortOrder ?? 0,
       updated_at: new Date().toISOString(),
@@ -2835,7 +2837,9 @@ catalogRouter.patch("/bundles/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) patch.name = parsed.data.name;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
+  if (parsed.data.kind !== undefined) patch.kind = parsed.data.kind;
   if (parsed.data.components !== undefined) patch.components = parsed.data.components;
+  if (parsed.data.slots !== undefined) patch.slots = parsed.data.slots;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (Object.keys(patch).length === 0) {

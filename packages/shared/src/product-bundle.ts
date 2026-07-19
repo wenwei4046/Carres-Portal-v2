@@ -31,9 +31,57 @@ export interface ExplodedBundleLine {
   /** Emit-order index — stamp into attrs (`bundle_slot`) so same-SKU lines
    *  one cent apart never merge into one cart line. */
   slot: number;
+  /** Index into the INPUT components array this line came from — lets the
+   *  caller re-attach per-component context (picked specs/attrs) even when a
+   *  qty>1 component split into two lines, or two components share a SKU. */
+  component: number;
   sku: string;
   qty: number;
   unitPrice: number;
+}
+
+/** Variant policy of a customizable-bundle slot (0241). */
+export type BundleVariantPolicy = "any" | "fixed";
+
+/**
+ * One item slot of a kind='custom' bundle (0241): the customer picks ONE of
+ * `modelIds`, then (variant 'any') any live size/variant of it — or the slot
+ * pins the exact `sku` (variant 'fixed'). `qty` units of the pick enter the
+ * order.
+ */
+export interface BundleSlot {
+  label?: string;
+  qty: number;
+  modelIds: string[];
+  variant: BundleVariantPolicy;
+  sku?: string;
+}
+
+/** Parse a `product_bundles.slots` jsonb value, dropping malformed entries
+ *  (same lenient convention as `parseBundleComponents`). */
+export function parseBundleSlots(raw: unknown): BundleSlot[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BundleSlot[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    const qty = Number(e.qty);
+    const modelIds = Array.isArray(e.modelIds)
+      ? e.modelIds.filter((m): m is string => typeof m === "string" && m.length > 0)
+      : [];
+    const variant = e.variant === "fixed" ? "fixed" : e.variant === "any" ? "any" : null;
+    if (!Number.isInteger(qty) || qty < 1 || modelIds.length === 0 || variant === null) continue;
+    const sku = typeof e.sku === "string" && e.sku.trim() !== "" ? e.sku.trim() : undefined;
+    if (variant === "fixed" && !sku) continue;
+    out.push({
+      ...(typeof e.label === "string" && e.label.trim() !== "" ? { label: e.label.trim() } : {}),
+      qty,
+      modelIds,
+      variant,
+      ...(sku ? { sku } : {}),
+    });
+  }
+  return out;
 }
 
 export interface ExplodeBundleResult {
@@ -173,7 +221,13 @@ export function explodeBundle(
     }
     // Deterministic order: higher unit price first (the +1-cent units).
     for (const cents of [...byCents.keys()].sort((a, b) => b - a)) {
-      lines.push({ slot: lines.length, sku: comp.sku, qty: byCents.get(cents)!, unitPrice: cents / 100 });
+      lines.push({
+        slot: lines.length,
+        component: i,
+        sku: comp.sku,
+        qty: byCents.get(cents)!,
+        unitPrice: cents / 100,
+      });
     }
   }
 
