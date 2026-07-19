@@ -26,26 +26,25 @@ export default function StaffManagePage({ onClose }: { onClose: () => void }) {
       data-testid="pos-staff-manage"
     >
       <div className="os-page">
-        <div className="os-head">
-          <div className="os-head__left">
-            <button
-              className="icon-btn"
-              onClick={onClose}
-              aria-label="Back"
-              data-testid="staff-manage-back"
-            >
-              <ArrowLeft size={16} strokeWidth={1.75} />
-            </button>
-            <div>
-              <div className="os-head__eyebrow">团队 · Store team</div>
-              <h1 className="os-head__title">Staff &amp; PINs</h1>
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: "4px 32px 40px", width: "100%", maxWidth: 780 }}>
-          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--fg-muted)" }}>
-            加了人、帮他设好 6 位 PIN，他就会出现在签到名单上 · Add a staff member and set
-            their 6-digit PIN — they&apos;ll appear on the sign-in screen.
+        {/* Back floats top-left; everything else lives in ONE centred column so
+            the page doesn't hug the left edge (Loo 2026-07-19). */}
+        <button
+          className="icon-btn"
+          onClick={onClose}
+          aria-label="Back"
+          data-testid="staff-manage-back"
+          style={{ position: "absolute", top: 22, left: 32 }}
+        >
+          <ArrowLeft size={16} strokeWidth={1.75} />
+        </button>
+        <div style={{ width: "100%", maxWidth: 780, margin: "0 auto", padding: "26px 32px 40px" }}>
+          <div className="os-head__eyebrow">Store team</div>
+          <h1 className="os-head__title" style={{ margin: "6px 0 10px" }}>
+            Staff &amp; PINs
+          </h1>
+          <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--fg-muted)" }}>
+            Add a staff member — their 6-digit PIN is set in the same step, so they appear on the
+            sign-in screen right away.
           </p>
           <StaffSection />
           {/* Store credential (dealer principal only — renders null otherwise). */}

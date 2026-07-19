@@ -5,24 +5,26 @@ import {
   staffPinSchema,
   type StaffColorKey,
   type StaffDto,
+  type StaffGenderDto,
   type StaffTierDto,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useCreateStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
 
 /**
- * Shared staff-admin UI (0233) — the bilingual tier labels, colour avatar,
- * STAFF_COLORS dot picker, and the Set-PIN + Add-staff modals. Reused by the
+ * Shared staff-admin UI (0233) — the tier labels, colour avatar, STAFF_COLORS
+ * dot picker, and the Set-PIN + Add-staff modals. Reused by the
  * dealer/showroom Settings staff section AND the principal Accounts staff
  * drawer so both surfaces create/manage staff identically. UI-KIT v4 surfaces
  * (token classes only — colour hexes come from the shared STAFF_COLORS map, so
- * no raw-hex literal ever appears here).
+ * no raw-hex literal ever appears here). All copy is ENGLISH ONLY (Loo
+ * 2026-07-19 — no Chinese anywhere in portal UI).
  */
 
-export const TIER_LABEL: Record<StaffTierDto, { zh: string; en: string }> = {
-  principal: { zh: "店主", en: "Owner" },
-  manager: { zh: "经理", en: "Manager" },
-  salesperson: { zh: "销售", en: "Salesperson" },
+export const TIER_LABEL: Record<StaffTierDto, string> = {
+  principal: "Owner",
+  manager: "Manager",
+  salesperson: "Salesperson",
 };
 
 /**
@@ -30,18 +32,15 @@ export const TIER_LABEL: Record<StaffTierDto, { zh: string; en: string }> = {
  * dealer = Dealer Principal / Manager / Sales Person; showroom = Sales
  * Manager / Sales Executive (no principal — that's Carres itself).
  */
-export function tierLabel(
-  tier: StaffTierDto,
-  storeKind: "dealer" | "showroom",
-): { zh: string; en: string } {
+export function tierLabel(tier: StaffTierDto, storeKind: "dealer" | "showroom"): string {
   if (storeKind === "showroom") {
-    if (tier === "manager") return { zh: "销售经理", en: "Sales Manager" };
-    if (tier === "salesperson") return { zh: "销售专员", en: "Sales Executive" };
+    if (tier === "manager") return "Sales Manager";
+    if (tier === "salesperson") return "Sales Executive";
     return TIER_LABEL.principal; // unreachable — showrooms have no principal
   }
-  if (tier === "principal") return { zh: "店主", en: "Dealer Principal" };
-  if (tier === "manager") return { zh: "经理", en: "Manager" };
-  return { zh: "销售", en: "Sales Person" };
+  if (tier === "principal") return "Dealer Principal";
+  if (tier === "manager") return "Manager";
+  return "Sales Person";
 }
 
 /** Store owner sees the whole tier ladder; a showroom's ladder caps at manager
@@ -105,10 +104,9 @@ export function StaffAvatar({
 }
 
 export function TierBadge({ tier }: { tier: StaffTierDto }) {
-  const l = TIER_LABEL[tier];
   return (
     <span className="inline-block px-2 py-[2px] rounded bg-base-100 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-base-700">
-      {l.zh} · {l.en}
+      {TIER_LABEL[tier]}
     </span>
   );
 }
@@ -313,10 +311,10 @@ export function ChangeMyPinModal({
     if (e instanceof ApiError) {
       const body = e.body as { error?: string; remaining?: number } | null;
       if (body?.error === "bad_pin") {
-        return `旧 PIN 不对 · Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
+        return `Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
       }
       if (body?.error === "pin_locked") {
-        return "试太多次,已锁定 15 分钟 · Locked, try again later";
+        return "Too many attempts — locked for 15 minutes, try again later";
       }
       return e.message;
     }
@@ -334,7 +332,7 @@ export function ChangeMyPinModal({
             { id: sid, pin },
             {
               onSuccess: () => {
-                toast.success("PIN updated · 新 PIN 已生效");
+                toast.success("PIN updated");
                 onClose();
               },
               onError: (e) =>
@@ -372,7 +370,7 @@ export function ChangeMyPinModal({
       }
     >
       <label className="flex flex-col gap-1.5">
-        <Label>Current PIN · 旧 PIN</Label>
+        <Label>Current PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -385,7 +383,7 @@ export function ChangeMyPinModal({
         />
       </label>
       <label className="flex flex-col gap-1.5">
-        <Label>New PIN · 新 PIN</Label>
+        <Label>New PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -398,7 +396,7 @@ export function ChangeMyPinModal({
         />
       </label>
       <label className="flex flex-col gap-1.5">
-        <Label>Confirm new PIN · 再输一次</Label>
+        <Label>Confirm new PIN</Label>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -425,6 +423,17 @@ export function ChangeMyPinModal({
   );
 }
 
+const inputCls =
+  "w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+const pinCls =
+  "w-full px-3 py-2.5 border border-base-200 rounded text-[15px] tracking-[0.4em] font-mono bg-white outline-none focus:border-base-700";
+
+/**
+ * Create a staff member — ONE step (Loo 2026-07-19): profile (name / email /
+ * birthday / gender, all required) + role/outlet/colour + the 6-digit PIN set
+ * right here, so there's no separate Set-PIN follow-up. The row's Set/Reset
+ * PIN action remains for later rotations.
+ */
 export function AddStaffModal({
   callerTier,
   storeKind,
@@ -444,25 +453,45 @@ export function AddStaffModal({
 }) {
   const tiers = allowedCreateTiers(callerTier, storeKind);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [gender, setGender] = useState<StaffGenderDto | "">("");
   const [phone, setPhone] = useState("");
   const [staffRole, setStaffRole] = useState<StaffTierDto>(tiers[tiers.length - 1] ?? "salesperson");
   const [color, setColor] = useState<StaffColorKey>("flame");
+  const [pin, setPin] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
   const managerLocked = callerTier === "manager";
   const [outletId, setOutletId] = useState<string>(
     managerLocked ? (callerOutletId ?? "") : (outlets[0]?.id ?? ""),
   );
   const create = useCreateStaff();
 
-  const valid = name.trim().length >= 2 && tiers.includes(staffRole);
+  const digits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const pinOk = staffPinSchema.safeParse(pin).success;
+  const pinMatch = pin === pinConfirm;
+  const valid =
+    name.trim().length >= 2 &&
+    emailOk &&
+    birthday.length > 0 &&
+    gender !== "" &&
+    tiers.includes(staffRole) &&
+    pinOk &&
+    pinMatch;
 
   function submit() {
-    if (!valid) return;
+    if (!valid || gender === "") return;
     create.mutate(
       {
         name: name.trim(),
+        email: email.trim().toLowerCase(),
+        birthday,
+        gender,
         staffRole,
         phone: phone.trim() ? phone.trim() : undefined,
         color,
+        pin,
         // Salespersons bind to an outlet; a store owner (principal tier) sees all
         // outlets, so a blank pick is legitimately "all outlets" (null).
         outletId: managerLocked
@@ -476,7 +505,7 @@ export function AddStaffModal({
       },
       {
         onSuccess: () => {
-          toast.success(`Added ${name.trim()}`);
+          toast.success(`Added ${name.trim()} — they can sign in with their PIN now`);
           onClose();
         },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not add staff"),
@@ -487,7 +516,7 @@ export function AddStaffModal({
   return (
     <ModalShell
       title="Add staff"
-      subtitle="They'll appear on the PIN screen once you set their PIN."
+      subtitle="Their PIN is set right here — they'll appear on the sign-in screen immediately."
       onClose={onClose}
       footer={
         <>
@@ -507,10 +536,48 @@ export function AddStaffModal({
           onChange={(e) => setName(e.target.value)}
           data-testid="staff-add-name"
           autoFocus
-          className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className={inputCls}
           placeholder="e.g. Aisha Rahman"
         />
       </label>
+
+      <label className="flex flex-col gap-1.5">
+        <Label>Email</Label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          data-testid="staff-add-email"
+          className={inputCls}
+          placeholder="aisha@store.com"
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <Label>Birthday</Label>
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => setBirthday(e.target.value)}
+            data-testid="staff-add-birthday"
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <Label>Gender</Label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as StaffGenderDto | "")}
+            data-testid="staff-add-gender"
+            className={inputCls}
+          >
+            <option value="">— select —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </div>
 
       <label className="flex flex-col gap-1.5">
         <Label>Phone (optional)</Label>
@@ -518,7 +585,7 @@ export function AddStaffModal({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           data-testid="staff-add-phone"
-          className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className={inputCls}
           placeholder="012-3456789"
         />
       </label>
@@ -530,16 +597,13 @@ export function AddStaffModal({
             value={staffRole}
             onChange={(e) => setStaffRole(e.target.value as StaffTierDto)}
             data-testid="staff-add-role"
-            className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className={inputCls}
           >
-            {tiers.map((t) => {
-              const l = tierLabel(t, storeKind);
-              return (
-                <option key={t} value={t}>
-                  {l.en} · {l.zh}
-                </option>
-              );
-            })}
+            {tiers.map((t) => (
+              <option key={t} value={t}>
+                {tierLabel(t, storeKind)}
+              </option>
+            ))}
           </select>
         </label>
       )}
@@ -551,7 +615,7 @@ export function AddStaffModal({
             value={outletId}
             onChange={(e) => setOutletId(e.target.value)}
             data-testid="staff-add-outlet"
-            className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className={inputCls}
           >
             <option value="">— all outlets —</option>
             {outlets.map((o) => (
@@ -567,6 +631,38 @@ export function AddStaffModal({
         <Label>Avatar colour</Label>
         <ColorDotPicker value={color} onChange={setColor} />
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <Label>6-digit PIN</Label>
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(digits(e.target.value))}
+            data-testid="staff-add-pin"
+            className={pinCls}
+            placeholder="••••••"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <Label>Confirm PIN</Label>
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={pinConfirm}
+            onChange={(e) => setPinConfirm(digits(e.target.value))}
+            data-testid="staff-add-pin-confirm"
+            className={pinCls}
+            placeholder="••••••"
+          />
+        </label>
+      </div>
+      {pinConfirm.length === 6 && !pinMatch && (
+        <div className="text-[12px] text-destructive">PINs don&apos;t match.</div>
+      )}
 
       {create.isError && (
         <div className="text-[12px] text-destructive">

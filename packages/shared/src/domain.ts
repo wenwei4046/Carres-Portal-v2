@@ -58,6 +58,10 @@ export interface Salesperson {
   staffRole: "principal" | "manager" | "salesperson";
   color: string | null;
   active: boolean;
+  // 0241 staff profile
+  email: string | null;
+  birthday: string | null;
+  gender: "male" | "female" | null;
 }
 
 export interface ProductModel {

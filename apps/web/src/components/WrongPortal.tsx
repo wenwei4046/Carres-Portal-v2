@@ -18,16 +18,16 @@ export default function WrongPortal({ role }: { role: Role }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 text-center shadow-sm" data-testid="wrong-portal">
         <p className="t-micro text-muted-foreground">WRONG DOOR</p>
-        <h1 className="t-h3 mt-2 text-foreground">这个账号属于 {label}</h1>
+        <h1 className="t-h3 mt-2 text-foreground">This account belongs to {label}</h1>
         <p className="t-small mt-2 text-muted-foreground">
-          请前往 {label} 登录使用。
+          Please sign in on {label} instead.
         </p>
         <a
           href={url}
           className="btn-primary mt-6 inline-flex w-full items-center justify-center"
           data-testid="wrong-portal-go"
         >
-          前往 {url.replace("https://", "")}
+          Go to {url.replace("https://", "")}
         </a>
         <button
           type="button"

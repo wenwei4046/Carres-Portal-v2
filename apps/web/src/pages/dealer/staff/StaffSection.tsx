@@ -141,7 +141,7 @@ function StaffRow({
             <TierBadge tier={staff.staffRole} />
           </div>
           <div className="text-[12px] text-muted-foreground">
-            {outletName} · {staff.hasPin ? "PIN set" : "未设 PIN · no PIN"}
+            {outletName} · {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
         </div>

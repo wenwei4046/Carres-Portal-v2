@@ -79,7 +79,7 @@ export default function CreateLpAccountForm({
     >
       <Field
         id="companyName"
-        label="公司名 / Company name"
+        label="Company name"
         value={form.companyName}
         onChange={(v) => setForm({ ...form, companyName: v })}
         required
@@ -87,7 +87,7 @@ export default function CreateLpAccountForm({
       />
       <Field
         id="contactNumber"
-        label="Contact number / 联络电话"
+        label="Contact number"
         value={form.contactNumber}
         onChange={(v) => setForm({ ...form, contactNumber: v })}
         required
@@ -95,7 +95,7 @@ export default function CreateLpAccountForm({
       />
       <Field
         id="address"
-        label="Address / 地址"
+        label="Address"
         value={form.address}
         onChange={(v) => setForm({ ...form, address: v })}
         required
@@ -104,7 +104,7 @@ export default function CreateLpAccountForm({
       />
       <Field
         id="password"
-        label="Password / 密码"
+        label="Password"
         value={form.password}
         onChange={(v) => setForm({ ...form, password: v })}
         required
@@ -125,7 +125,7 @@ export default function CreateLpAccountForm({
           disabled={create.isPending}
           className="btn-primary disabled:opacity-50"
         >
-          {create.isPending ? "Creating…" : "Create LP account / 新增"}
+          {create.isPending ? "Creating…" : "Create LP account"}
         </button>
       </div>
     </form>

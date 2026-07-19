@@ -111,7 +111,7 @@ function StaffRow({ staff }: { staff: StaffDto }) {
             <TierBadge tier={staff.staffRole} />
           </div>
           <div className="text-[11px] text-base-500">
-            {staff.hasPin ? "PIN set" : "未设 PIN · no PIN"}
+            {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
         </div>

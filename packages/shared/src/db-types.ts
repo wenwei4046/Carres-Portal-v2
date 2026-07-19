@@ -120,6 +120,10 @@ export interface SalespersonRow {
   staff_role: StaffTier;
   color: string | null;
   active: boolean;
+  // 0241 staff profile (optional so pre-migration rows/mocks stay valid)
+  email?: string | null;
+  birthday?: string | null;
+  gender?: "male" | "female" | null;
 }
 
 export interface ProductModelRow {
