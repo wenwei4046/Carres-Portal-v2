@@ -131,7 +131,7 @@ export default function CatalogStep({
   // POS; a bundle is addable only when every component SKU is in the (live,
   // pos_active) bundle so its catalog price is known — the explode never
   // guesses a price for an off/retired component.
-  const bundles = catalog.bundles ?? [];
+  const bundles = useMemo(() => catalog.bundles ?? [], [catalog.bundles]);
   const skuPrice = useMemo(
     () => new Map(catalog.skus.map((s) => [s.sku, s.price])),
     [catalog.skus],

@@ -897,11 +897,13 @@ export const productBundleSchema = z.object({
 export type ProductBundleDto = z.infer<typeof productBundleSchema>;
 
 /** Create a bundle. ≥2 components (a 1-item "bundle" is just a price edit —
- *  use SKU Master for that); `active` defaults false server-side. */
+ *  use SKU Master for that); `active` defaults false server-side. The RM 1M
+ *  price cap keeps a typo out of numeric(14,2) AND keeps the cents math well
+ *  inside float-safe integer range (mirrors the 0181 SPECIAL_MONEY bound). */
 export const productBundleInput = z
   .object({
     name: z.string().trim().min(2).max(80),
-    price: z.number().nonnegative(),
+    price: z.number().nonnegative().lte(1_000_000),
     components: z.array(bundleComponentSchema).min(2).max(20),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),

@@ -172,4 +172,18 @@ describe("explodeBundle", () => {
     expect(centsTotal(r.lines)).toBe(0);
     expect(r.lines.every((l) => l.unitPrice === 0)).toBe(true);
   });
+
+  it("stays Σ-exact at extreme magnitudes (float-error residue guard)", () => {
+    // The RM 1M input cap bounds the bundle; components can still be huge.
+    const comps: BundleComponent[] = [
+      { sku: "A", qty: 99 },
+      { sku: "B", qty: 99 },
+      { sku: "C", qty: 1 },
+    ];
+    const prices: Record<string, number> = { A: 999999.99, B: 777777.77, C: 0.01 };
+    const r = explodeBundle(comps, 1_000_000, (sku) => prices[sku]);
+    expect(r.ok).toBe(true);
+    expect(centsTotal(r.lines)).toBe(100_000_000);
+    expect(r.lines.every((l) => l.unitPrice >= 0)).toBe(true);
+  });
 });

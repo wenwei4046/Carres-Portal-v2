@@ -141,7 +141,9 @@ export function explodeBundle(
   }
   let residue = bundleCents - allocated;
   // Hand the residue cents to the units with the largest fractional remainder
-  // (stable: ties keep unit order).
+  // (stable: ties keep unit order). Positive residue is the normal floor case;
+  // a NEGATIVE residue can only appear via float error on extreme magnitudes —
+  // reclaim cents from the smallest-remainder units so Σ is exact regardless.
   const order = units
     .map((_, i) => i)
     .sort((a, b) => remainders[b]! - remainders[a]! || a - b);
@@ -149,6 +151,13 @@ export function explodeBundle(
     const oi = order[k]!;
     floors[oi] = floors[oi]! + 1;
     residue -= 1;
+  }
+  for (let k = order.length - 1; k >= 0 && residue < 0; k--) {
+    const oi = order[k]!;
+    if (floors[oi]! > 0) {
+      floors[oi] = floors[oi]! - 1;
+      residue += 1;
+    }
   }
 
   // Regroup consecutive same-component units with the SAME cents into lines.

@@ -448,6 +448,26 @@ describe("PromoTab — product bundles", () => {
     expect(screen.getByTestId("bundle-row-bundle-1")).toBeInTheDocument();
     expect(screen.queryByTestId("bundle-edit-bundle-1")).not.toBeInTheDocument();
   });
+
+  it("a sofa × mattress mix warns AND blocks Save (0089 mutex)", () => {
+    const SOFA_MODEL = "55555555-5555-5555-5555-555555555555";
+    const base = makeCatalog();
+    const cat = makeCatalog({
+      models: [
+        ...base.models,
+        { id: SOFA_MODEL, category: "sofa", modelKey: "sofa-x", name: "Sofa X", blurb: null, colors: null, gaps: null, sofaMode: "preset" },
+      ],
+      skus: [...base.skus, sku({ sku: "SOFA-3S", modelId: SOFA_MODEL, price: 2990 })],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("bundle-add"));
+    fireEvent.change(screen.getByTestId("bundle-name"), { target: { value: "Bad mix" } });
+    fireEvent.change(screen.getByTestId("bundle-price"), { target: { value: "4000" } });
+    fireEvent.change(screen.getByTestId("bundle-row-model-0"), { target: { value: MATTRESS_MODEL } });
+    fireEvent.change(screen.getByTestId("bundle-row-model-1"), { target: { value: SOFA_MODEL } });
+    expect(screen.getByTestId("bundle-mutex-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("bundle-save")).toBeDisabled();
+  });
 });
 
 // ---------------------------------------------------------------------------

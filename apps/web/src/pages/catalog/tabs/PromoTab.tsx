@@ -1711,18 +1711,36 @@ function BundleForm({
   const components: BundleComponent[] = rows
     .filter((r) => r.sku.trim() !== "")
     .map((r) => ({ sku: r.sku, qty: Math.max(1, Math.floor(r.qty || 1)) }));
-  const priceNum = Number(price);
+  // Round to the cent so the preview, the stored numeric(14,2) and the POS
+  // split all see the SAME figure (a "2500.005" input must not drift a cent).
+  const priceNum = Math.round(Number(price) * 100) / 100;
   const priceValid = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
-  const valid = name.trim().length >= 2 && priceValid && components.length >= 2;
 
-  // 0089 mutex heads-up: an order can't hold sofa AND mattress/bed frame, so a
-  // bundle spanning both could never be added at the POS.
+  // A component whose SKU has since been retired / removed from the catalog
+  // would ride the form invisibly (both selects render blank) — surface it and
+  // block Save until it's replaced or removed.
+  const goneSkus = components
+    .map((comp) => comp.sku)
+    .filter((code) => {
+      const s = skuBySku.get(code);
+      return !s || Boolean(s.discontinuedAt);
+    });
+
+  // 0089 mutex: an order can't hold sofa AND mattress/bed frame, so a bundle
+  // spanning both could never be added at the POS — block Save outright.
   const cats = new Set(
     components
       .map((comp) => modelById.get(skuBySku.get(comp.sku)?.modelId ?? "")?.category)
       .filter(Boolean),
   );
   const mutexConflict = cats.has("sofa") && (cats.has("mattress") || cats.has("bedframe"));
+
+  const valid =
+    name.trim().length >= 2 &&
+    priceValid &&
+    components.length >= 2 &&
+    !mutexConflict &&
+    goneSkus.length === 0;
 
   // A component that isn't POS-sellable makes the bundle card unavailable at
   // the POS (the explode refuses to guess a price) — say so while authoring.
@@ -1880,7 +1898,12 @@ function BundleForm({
       {mutexConflict && (
         <p role="alert" className="t-tiny text-danger" data-testid="bundle-mutex-warning">
           A sofa can&rsquo;t share an order with a mattress / bed frame, so this mix could never be
-          added at the POS. Keep the bundle to one family.
+          added at the POS. Keep the bundle to one family to save.
+        </p>
+      )}
+      {goneSkus.length > 0 && (
+        <p role="alert" className="t-tiny text-danger" data-testid="bundle-gone-warning">
+          No longer in the catalog: {goneSkus.join(", ")} — replace or remove those rows to save.
         </p>
       )}
       {offPosSkus.length > 0 && (
