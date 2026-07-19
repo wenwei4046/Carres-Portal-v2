@@ -834,6 +834,21 @@ describe("orders export", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
     expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
+
+  it("DEADLINE band is multi-select — two buckets can be active at once (B redesign)", () => {
+    wrap(<OperationOrdersControl />);
+    const grp = within(screen.getByTestId("filter-deadline"));
+    const overdue = grp.getByRole("button", { name: /^Overdue/ });
+    const nextWeek = grp.getByRole("button", { name: /^Next week/ });
+    fireEvent.click(overdue);
+    fireEvent.click(nextWeek);
+    expect(overdue).toHaveAttribute("aria-pressed", "true");
+    expect(nextWeek).toHaveAttribute("aria-pressed", "true");
+    // A second click clears just that one (still multi, independent).
+    fireEvent.click(overdue);
+    expect(overdue).toHaveAttribute("aria-pressed", "false");
+    expect(nextWeek).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 // ── C2 · nextActionOf — the single most-urgent next step per order ────────────
