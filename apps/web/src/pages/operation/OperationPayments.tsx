@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { RefreshCw, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  RefreshCw,
+  ChevronRight,
+  ChevronDown,
+  Lock,
+  MessageCircle,
+  Phone,
+  X,
+} from "lucide-react";
 import {
   PAYMENT_STATUSES,
   computeStorageFee,
@@ -11,24 +19,37 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate } from "@/lib/fmt-date";
 import { areaForAddress, detectState } from "@/lib/region";
+import {
+  buildCustomerChase,
+  buildCustomerReminder,
+  rmAmount,
+  salutationOf,
+} from "@/lib/wa-templates";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 
 /**
- * OperationPayments — the Master Sheet "Balance" tab, live (Jess 2026-06-12).
- * One row per active order: balance owing (from AutoCount), the storage fee
- * accruing from the ETA (MS/BF RM150/month + SOF RM200/2 weeks, manually
- * overridable), and the payment-follow-up status. All three persist to the
- * existing ops_order_control overlay via PUT /operation/orders/:id/control.
+ * OperationPayments — the Master Sheet "Balance" tab, rebuilt 2026-07-19 (Jess)
+ * as the LOOSE, stock-aware Collections Desk (§A0 golden reference).
  *
- * Migrated to the shared List archetype (Jess 2026-07-12): renders through
- * <ListPageShell> like Orders — no oversized title, the three KPIs demoted into
- * the facet-top "Summary" block, 40px rows, token-only colour. Facets: Payment
- * Status (dynamic — the real values, "Follow Up Balance" merged into Follow Up),
- * Region (from customer_address via @/lib/region), and Overdue. The data/edit
- * logic (owing + storage-fee compute, EditableNumber, status dropdown, sparse
- * upsert save) is UNCHANGED — this is a chrome migration, not a rewrite.
+ * The critical business rule baked in: **you chase the customer's money only
+ * once you can answer "when's my delivery?"** — so every row carries the STOCK
+ * & delivery signal (goods in / waiting ETA / supplier late) beside the money.
+ * The money worklist QUEUES are stock-aware: "Ready to chase" = owing AND goods
+ * in (safe to call); "Waiting stock" = owing but goods not in yet (hold the
+ * call). Chasing opens a WhatsApp popover with a pre-call brief (stock + the
+ * delivery window + "logistics contacts 1-3 days before") — the operator's
+ * verbal script — while the WhatsApp text stays date-free per the locked
+ * wa-templates rule.
+ *
+ * Loose layout: full-width white table, 52px rows, generous padding, no
+ * truncation of the customer, two-line cells. Facets are multi-select Sets with
+ * ✕-able chips. Dates via fmtDate() → "19 Jul 26, Sun" everywhere.
+ *
+ * Data/edit logic (owing + storage-fee compute, EditableNumber, status, sparse
+ * upsert PUT /operation/orders/:id/control) is unchanged; stock (line_etas +
+ * line_stock_status) + customer_phone were added to the GET select.
  */
 const PAYMENTS_KEY = ["operation", "payments"] as const;
 
@@ -41,22 +62,29 @@ interface RawCtrl {
   storage_collected_at: string | null;
   storage_waiver_status: string | null;
   extension_original_date: string | null;
+  line_etas: Record<string, string> | null;
+  line_stock_status: Record<string, string> | null;
 }
 interface RawLedgerEntry {
   amount: number | string;
   kind: PaymentKind;
+}
+interface RawLine {
+  sku: string;
+  qty: number;
 }
 interface RawPaymentRow {
   id: string;
   so: number;
   status: string;
   customer_name: string;
+  customer_phone: string | null;
   customer_address: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean | null;
   delivered_at: string | null;
   source_ref: string[] | null;
-  order_lines: { sku: string; qty: number }[] | null;
+  order_lines: RawLine[] | null;
   order_payments: RawLedgerEntry[] | null;
   ops_order_control: RawCtrl[] | RawCtrl | null;
 }
@@ -86,6 +114,74 @@ function rm(n: number): string {
   return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Phone → wa.me base link (MY-aware). Local copy of OrderDetailDrawer.waLink so
+ *  this page doesn't pull in the 6k-line drawer. */
+function waLink(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const first = phone.split(/[|,/]/)[0] ?? "";
+  let d = first.replace(/\D/g, "");
+  if (!d) return null;
+  if (d.startsWith("60")) {
+    /* already international */
+  } else if (d.startsWith("0")) {
+    d = `60${d.slice(1)}`;
+  } else {
+    d = `60${d}`;
+  }
+  return `https://wa.me/${d}`;
+}
+
+// ── Stock & delivery ─────────────────────────────────────────────────────────
+type StockState = "ready" | "waiting" | "no_eta" | "late" | "none";
+interface StockInfo {
+  state: StockState;
+  etaIso: string | null;
+}
+/** Per-order stock signal from the imported per-line data (line_etas +
+ *  line_stock_status; migration 0170). Mirrors OperationOrdersControl.stockEtaOf
+ *  but self-contained: ready = every line in · waiting = future ETA · late =
+ *  ETA passed, goods still out · no_eta = waiting, no ETA · none = untracked. */
+function stockOf(ctrl: RawCtrl | null): StockInfo {
+  const etas = ctrl?.line_etas ?? null;
+  const status = ctrl?.line_stock_status ?? null;
+  if ((!etas || Object.keys(etas).length === 0) && (!status || Object.keys(status).length === 0))
+    return { state: "none", etaIso: null };
+
+  const waitingKeys =
+    status && Object.keys(status).length > 0
+      ? Object.entries(status)
+          .filter(([, v]) => String(v).toLowerCase() !== "ready")
+          .map(([k]) => k)
+      : Object.keys(etas ?? {});
+  if (waitingKeys.length === 0) return { state: "ready", etaIso: null };
+
+  let etaIso: string | null = null;
+  if (etas) {
+    const pool = waitingKeys.map((k) => etas[k]).filter(Boolean);
+    for (const d of pool.length ? pool : Object.values(etas)) if (!etaIso || d > etaIso) etaIso = d;
+  }
+  if (!etaIso) return { state: "no_eta", etaIso: null };
+  if (etaIso < todayIso()) return { state: "late", etaIso };
+  return { state: "waiting", etaIso };
+}
+
+// ── Facet buckets ────────────────────────────────────────────────────────────
+const KV_LABEL = "Klang Valley";
+const OTHERS_LABEL = "Others";
+function regionBucket(address: string | null): string {
+  if (areaForAddress(address) === "KV") return KV_LABEL;
+  return detectState(address) ?? OTHERS_LABEL;
+}
+
+const UNSET_LABEL = "Unset";
+function payBucket(s: string | null): string {
+  const v = (s ?? "").trim();
+  if (v === "") return UNSET_LABEL;
+  if (/^follow up/i.test(v)) return "Follow Up";
+  return v;
+}
+const PAY_ORDER = [UNSET_LABEL, "Paid", "Follow Up", "Partial", "Unpaid"];
+
 /** Payment-status → pill colour. */
 function statusPill(s: string | null): string {
   switch ((s ?? "").toLowerCase()) {
@@ -93,7 +189,6 @@ function statusPill(s: string | null): string {
       return "pill-confirmed";
     case "partial":
     case "follow up":
-    case "follow up balance":
       return "pill-warning";
     case "unpaid":
       return "pill-overdue";
@@ -102,52 +197,64 @@ function statusPill(s: string | null): string {
   }
 }
 
-// ── Facet buckets ────────────────────────────────────────────────────────────
-const KV_LABEL = "Klang Valley";
-const OTHERS_LABEL = "Others";
-/** Region bucket for the state facet: Klang Valley (grouped) · each outstation
- *  state / Singapore · "Others" when the address is undetectable. Mirrors
- *  OperationOrdersControl.regionBucket. */
-function regionBucket(address: string | null): string {
-  if (areaForAddress(address) === "KV") return KV_LABEL;
-  return detectState(address) ?? OTHERS_LABEL;
+/** Multi-select toggle helper (Jess 2026-07-19 — facets are Sets). */
+function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
+  const next = new Set(prev);
+  if (next.has(v)) next.delete(v);
+  else next.add(v);
+  return next;
 }
 
-const UNSET_LABEL = "Unset";
-/** Payment-status bucket for the facet — normalises the RAW column value:
- *  blank → "Unset" (the bulk of rows are unset), and the Master-sheet raw
- *  "Follow Up Balance" merges into "Follow Up" (the importer treats them as
- *  synonymous → one bucket). Any other stored value passes through verbatim. */
-function payBucket(s: string | null): string {
-  const v = (s ?? "").trim();
-  if (v === "") return UNSET_LABEL;
-  if (/^follow up/i.test(v)) return "Follow Up";
-  return v;
-}
-/** Facet display order — real values first in a sensible collection order, then
- *  anything unexpected alphabetically. */
-const PAY_ORDER = [UNSET_LABEL, "Paid", "Follow Up", "Partial", "Unpaid"];
+// ── Queues (money worklist, stock-aware) ─────────────────────────────────────
+const QUEUES = [
+  {
+    key: "ready",
+    label: "Ready to chase",
+    dot: "bg-success",
+    desc: "Owing + goods in — safe to call (you can answer the delivery question)",
+  },
+  {
+    key: "waiting",
+    label: "Waiting stock",
+    dot: "bg-warning",
+    desc: "Owing but goods not in yet — hold the call, or chase supplier first",
+  },
+  {
+    key: "late",
+    label: "Stock late",
+    dot: "bg-danger",
+    desc: "Owing + supplier missed the ETA — chase the supplier, not the customer",
+  },
+  {
+    key: "storage",
+    label: "Storage running",
+    dot: "bg-warning",
+    desc: "A storage fee is accruing and uncollected — the collection lever",
+  },
+] as const;
+type QueueKey = (typeof QUEUES)[number]["key"];
 
 interface Row {
   id: string;
   so: number;
   customer: string;
+  phone: string | null;
   region: string;
   ref: string[];
+  lines: RawLine[];
   eta: string | null;
   etaTbd: boolean;
   delivered: boolean;
   hasMsbf: boolean;
   hasSof: boolean;
+  stock: StockInfo;
   balance: number | null;
   paymentStatus: string | null;
   payBucket: string;
   storageFrom: string | null;
   storageOverride: number | null;
-  /** computed (or overridden) storage fee + breakdown */
   storage: { msbf: number; sof: number; total: number; days: number };
   effectiveStorage: number;
-  /** Ledger (0184): goods paid (payment+deposit) + storage collected. */
   goodsPaid: number;
   storageCollected: boolean;
   goodsOwing: number;
@@ -155,6 +262,8 @@ interface Row {
   dueDate: string | null;
   overdue: boolean;
   owing: number;
+  /** delivery held: goods in, not delivered, money owing → the 🔒 on Collect $. */
+  held: boolean;
 }
 
 /** The "owing / storage" view predicate — anything still to chase. */
@@ -162,17 +271,35 @@ function isOwingRow(r: Row): boolean {
   return r.owing > 0 || (r.paymentStatus != null && r.paymentStatus.toLowerCase() !== "paid");
 }
 
+/** Does a row belong to a queue? (multi-match — an order can be in several.) */
+function inQueue(r: Row, q: QueueKey): boolean {
+  if (r.owing <= 0) return false;
+  switch (q) {
+    case "ready":
+      return r.stock.state === "ready";
+    case "waiting":
+      return r.stock.state === "waiting" || r.stock.state === "no_eta";
+    case "late":
+      return r.stock.state === "late";
+    case "storage":
+      return r.storageOwing > 0;
+  }
+}
+
 export default function OperationPayments() {
   const qc = useQueryClient();
   const [view, setView] = useState<"owing" | "all">("owing");
   const [facetOpen, setFacetOpen] = useState(true);
-  const [payFilter, setPayFilter] = useState<string | null>(null);
-  const [regionFilter, setRegionFilter] = useState<string | null>(null);
-  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [queueFilter, setQueueFilter] = useState<Set<QueueKey>>(new Set());
+  const [payFilter, setPayFilter] = useState<Set<string>>(new Set());
+  const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [chaseFor, setChaseFor] = useState<Row | null>(null);
   const today = todayIso();
 
-  const { data, isLoading, isError, error, refetch } = useQuery<{ rows: RawPaymentRow[] }>({
+  const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery<{
+    rows: RawPaymentRow[];
+  }>({
     queryKey: PAYMENTS_KEY,
     queryFn: () => apiFetch("/api/operation/payments"),
   });
@@ -206,8 +333,6 @@ export default function OperationPayments() {
       const storage = computeStorageFee({ startDate: start, asOf, hasMsbf, hasSof });
       const effectiveStorage = storageOverride ?? storage.total;
       const balance = num(ctrl?.balance);
-      // Net the payment ledger (0184): goods paid reduces the balance owing;
-      // a stamped storage_collected_at means the storage fee is cleared.
       const ledger = (r.order_payments ?? []).map((p) => ({
         amount: Number(p.amount) || 0,
         kind: p.kind,
@@ -216,23 +341,28 @@ export default function OperationPayments() {
       const goodsPaid = sum.byKind.payment + sum.byKind.deposit;
       const storageCollected = ctrl?.storage_collected_at != null;
       const goodsOwing = balance != null ? Math.max(0, balance - goodsPaid) : 0;
-      const storageOwing = storageCollected
-        ? 0
-        : Math.max(0, effectiveStorage - sum.storageCollected);
+      const storageOwing = storageCollected ? 0 : Math.max(0, effectiveStorage - sum.storageCollected);
       const dueDate = ctrl?.balance_due_date ?? null;
       const overdue = !!dueDate && dueDate < today && goodsOwing > 0;
       const paymentStatus = ctrl?.payment_status ?? null;
+      const stock = stockOf(ctrl);
+      const delivered = r.status === "delivered";
+      const owing = goodsOwing + storageOwing;
+      const held = owing > 0 && stock.state === "ready" && !delivered;
       return {
         id: r.id,
         so: r.so,
         customer: r.customer_name,
+        phone: r.customer_phone,
         region: regionBucket(r.customer_address ?? null),
         ref: (r.source_ref ?? []).filter(Boolean),
+        lines,
         eta: r.delivery_date,
         etaTbd: !!r.delivery_date_tbd,
-        delivered: r.status === "delivered",
+        delivered,
         hasMsbf,
         hasSof,
+        stock,
         balance,
         paymentStatus,
         payBucket: payBucket(paymentStatus),
@@ -246,13 +376,12 @@ export default function OperationPayments() {
         storageOwing,
         dueDate,
         overdue,
-        owing: goodsOwing + storageOwing,
+        owing,
+        held,
       };
     });
   }, [data, today]);
 
-  // View (owing / all) applied first — facet counts are computed from this base,
-  // exactly like Orders derives its facet counts from the tab-filtered set.
   const baseRows = useMemo(
     () => (view === "all" ? rows : rows.filter(isOwingRow)),
     [rows, view],
@@ -260,12 +389,12 @@ export default function OperationPayments() {
 
   const visible = useMemo(() => {
     let r = baseRows;
-    if (payFilter) r = r.filter((x) => x.payBucket === payFilter);
-    if (regionFilter) r = r.filter((x) => x.region === regionFilter);
-    if (overdueOnly) r = r.filter((x) => x.overdue);
+    if (queueFilter.size > 0) r = r.filter((x) => [...queueFilter].some((q) => inQueue(x, q)));
+    if (payFilter.size > 0) r = r.filter((x) => payFilter.has(x.payBucket));
+    if (regionFilter.size > 0) r = r.filter((x) => regionFilter.has(x.region));
     // Most owing first.
     return [...r].sort((a, b) => b.owing - a.owing);
-  }, [baseRows, payFilter, regionFilter, overdueOnly]);
+  }, [baseRows, queueFilter, payFilter, regionFilter]);
 
   const totals = useMemo(() => {
     let goodsOwing = 0;
@@ -274,14 +403,17 @@ export default function OperationPayments() {
       goodsOwing += r.goodsOwing;
       storageOwing += r.storageOwing;
     }
-    return {
-      balance: goodsOwing,
-      storage: storageOwing,
-      owing: goodsOwing + storageOwing,
-    };
+    return { balance: goodsOwing, storage: storageOwing, owing: goodsOwing + storageOwing };
   }, [visible]);
 
-  // ── Facet entries (counts from the view-filtered base) ─────────────────────
+  const queueCounts = useMemo(() => {
+    const m = new Map<QueueKey, number>();
+    for (const q of QUEUES) m.set(q.key, 0);
+    for (const r of baseRows)
+      for (const q of QUEUES) if (inQueue(r, q.key)) m.set(q.key, (m.get(q.key) ?? 0) + 1);
+    return m;
+  }, [baseRows]);
+
   const payEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of baseRows) m.set(r.payBucket, (m.get(r.payBucket) ?? 0) + 1);
@@ -309,8 +441,6 @@ export default function OperationPayments() {
     return keys.map((k) => ({ region: k, count: m.get(k) ?? 0 }));
   }, [baseRows]);
 
-  const overdueCount = useMemo(() => baseRows.filter((r) => r.overdue).length, [baseRows]);
-
   const owingCount = useMemo(() => rows.filter(isOwingRow).length, [rows]);
 
   const save = (orderId: string, patch: UpdateOpsOrderControlInput) =>
@@ -324,16 +454,24 @@ export default function OperationPayments() {
       return next;
     });
 
+  // ── Active chips (each multi-select pick = one ✕-able chip) ─────────────────
   const activeChips: ActiveChip[] = [];
-  if (payFilter) activeChips.push({ label: `Status: ${payFilter}`, onClear: () => setPayFilter(null) });
-  if (regionFilter)
-    activeChips.push({ label: `Region: ${regionFilter}`, onClear: () => setRegionFilter(null) });
-  if (overdueOnly) activeChips.push({ label: "Overdue", onClear: () => setOverdueOnly(false) });
+  for (const q of queueFilter) {
+    const def = QUEUES.find((x) => x.key === q);
+    activeChips.push({
+      label: def?.label ?? q,
+      onClear: () => setQueueFilter((prev) => toggleInSet(prev, q)),
+    });
+  }
+  for (const p of payFilter)
+    activeChips.push({ label: `Status: ${p}`, onClear: () => setPayFilter((prev) => toggleInSet(prev, p)) });
+  for (const rg of regionFilter)
+    activeChips.push({ label: rg, onClear: () => setRegionFilter((prev) => toggleInSet(prev, rg)) });
   const anyFilter = activeChips.length > 0;
   const resetFilters = () => {
-    setPayFilter(null);
-    setRegionFilter(null);
-    setOverdueOnly(false);
+    setQueueFilter(new Set());
+    setPayFilter(new Set());
+    setRegionFilter(new Set());
   };
 
   if (isError) {
@@ -344,11 +482,7 @@ export default function OperationPayments() {
           <div className="text-[12px] text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
-          >
+          <button type="button" onClick={() => void refetch()} className="btn-secondary text-[11px] py-1.5 px-3">
             Retry
           </button>
         </div>
@@ -357,322 +491,499 @@ export default function OperationPayments() {
   }
 
   return (
-    <ListPageShell
-      testId="operation-payments"
-      breadcrumb={
-        <>
-          <span>Operations</span>
-          <ChevronRight size={12} className="text-base-300" />
-          <span className="text-base-600">Payments</span>
-        </>
-      }
-      meta={
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          title="Refresh"
-          aria-label="Refresh payments"
-          className="p-1 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
-        >
-          <RefreshCw size={14} strokeWidth={2} />
-        </button>
-      }
-      title="Payments"
-      facetOpen={facetOpen}
-      onFacetToggle={() => setFacetOpen((v) => !v)}
-      toolbar={
-        <StatusTabs
-          tabs={[
-            { key: "owing", label: "Owing / storage", count: owingCount },
-            { key: "all", label: "All orders", count: rows.length },
-          ]}
-          active={view}
-          onSelect={setView}
-        />
-      }
-      toolbarRight={
-        <span className="text-[12px] text-base-500 tabular-nums" title="Rows shown / in this view">
-          {visible.length} of {baseRows.length}
-        </span>
-      }
-      activeChips={activeChips}
-      footer={
-        <>
-          <span className="tabular-nums">
-            {baseRows.length} {baseRows.length === 1 ? "order" : "orders"}
-          </span>
-          {anyFilter && (
+    <>
+      <ListPageShell
+        testId="operation-payments"
+        breadcrumb={
+          <>
+            <span>Operations</span>
+            <ChevronRight size={12} className="text-base-300" />
+            <span className="text-base-600">Payments</span>
+          </>
+        }
+        meta={
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] text-base-400">
+              Synced {dataUpdatedAt ? fmtDate(new Date(dataUpdatedAt).toISOString(), { time: true }) : "—"}
+            </span>
             <button
               type="button"
-              onClick={resetFilters}
-              className="hover:text-base-900 transition-colors"
+              onClick={() => void refetch()}
+              title="Refresh"
+              aria-label="Refresh payments"
+              className="p-1 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
             >
-              Reset filters
+              <RefreshCw size={14} strokeWidth={2} />
             </button>
-          )}
-        </>
-      }
-      facet={
-        <>
-          {/* Summary — the three demoted KPIs, facet-top like Orders. Token
-              classes only (design-standard: no raw hex in new code). */}
-          <div className="bg-white border border-base-200 rounded-[12px] p-2">
-            <div className="px-1.5 pt-0.5 pb-1 text-[11px] font-bold uppercase tracking-[0.04em] text-base-500">
-              Summary
-            </div>
-            {[
-              {
-                label: "Balance owing",
-                value: rm(totals.balance),
-                cls: totals.balance > 0 ? "text-base-900" : "text-base-600",
-              },
-              {
-                label: "Storage fees",
-                value: rm(totals.storage),
-                cls: totals.storage > 0 ? "text-warning" : "text-base-600",
-              },
-              {
-                label: "Total to collect",
-                value: rm(totals.owing),
-                cls: totals.owing > 0 ? "text-danger" : "text-base-600",
-              },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center justify-between px-1.5 py-1">
-                <span className="text-[13px] text-base-700">{s.label}</span>
-                <span className={`text-[13px] font-bold tabular-nums ${s.cls}`}>{s.value}</span>
+          </div>
+        }
+        title="Payments"
+        facetOpen={facetOpen}
+        onFacetToggle={() => setFacetOpen((v) => !v)}
+        toolbar={
+          <StatusTabs
+            tabs={[
+              { key: "owing", label: "Owing / storage", count: owingCount },
+              { key: "all", label: "All orders", count: rows.length },
+            ]}
+            active={view}
+            onSelect={setView}
+          />
+        }
+        toolbarRight={
+          <span className="text-[12px] text-base-500 tabular-nums" title="Rows shown / in this view">
+            {visible.length} of {baseRows.length}
+          </span>
+        }
+        activeChips={activeChips}
+        footer={
+          <>
+            <span className="tabular-nums">
+              {baseRows.length} {baseRows.length === 1 ? "order" : "orders"}
+            </span>
+            {anyFilter && (
+              <button type="button" onClick={resetFilters} className="hover:text-base-900 transition-colors">
+                Reset filters
+              </button>
+            )}
+          </>
+        }
+        facet={
+          <>
+            {/* Summary — the three heroes, 18px mono (§A0 money hero). */}
+            <div className="bg-white border border-base-200 rounded-[12px] p-3">
+              <div className="px-1 pb-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-500">
+                Summary
               </div>
-            ))}
-          </div>
-
-          {/* Facet groups — clickable counts (Payment Status · Region · Overdue). */}
-          <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
-            <FacetGroup
-              title="PAYMENT STATUS"
-              total={baseRows.length}
-              collapsed={collapsed.has("PAYMENT STATUS")}
-              onToggle={() => toggleGroup("PAYMENT STATUS")}
-            >
-              {payEntries.map((e) => (
-                <FacetRow
-                  key={e.key}
-                  label={e.key}
-                  count={e.count}
-                  active={payFilter === e.key}
-                  onClick={() => setPayFilter((v) => (v === e.key ? null : e.key))}
-                />
+              {[
+                {
+                  label: "Balance owing",
+                  value: totals.balance,
+                  cls: totals.balance > 0 ? "text-base-900" : "text-base-500",
+                },
+                {
+                  label: "Storage fees",
+                  value: totals.storage,
+                  cls: totals.storage > 0 ? "text-warning" : "text-base-500",
+                },
+                {
+                  label: "Total to collect",
+                  value: totals.owing,
+                  cls: totals.owing > 0 ? "text-danger" : "text-base-500",
+                },
+              ].map((s) => (
+                <div key={s.label} className="flex items-center justify-between px-1 py-1.5">
+                  <span className="text-[13px] text-base-700">{s.label}</span>
+                  <span className={`text-[18px] font-bold font-mono tabular-nums ${s.cls}`}>{rm(s.value)}</span>
+                </div>
               ))}
-            </FacetGroup>
+            </div>
 
-            <FacetGroup
-              title="REGION"
-              total={baseRows.length}
-              collapsed={collapsed.has("REGION")}
-              onToggle={() => toggleGroup("REGION")}
-            >
-              {regionEntries.map((e) => (
-                <FacetRow
-                  key={e.region}
-                  label={e.region}
-                  count={e.count}
-                  active={regionFilter === e.region}
-                  onClick={() => setRegionFilter((v) => (v === e.region ? null : e.region))}
-                />
+            <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
+              <FacetGroup
+                title="QUEUES"
+                collapsed={collapsed.has("QUEUES")}
+                onToggle={() => toggleGroup("QUEUES")}
+              >
+                {QUEUES.map((q) => (
+                  <FacetRow
+                    key={q.key}
+                    label={q.label}
+                    dotClass={q.dot}
+                    count={queueCounts.get(q.key) ?? 0}
+                    active={queueFilter.has(q.key)}
+                    title={q.desc}
+                    onClick={() => setQueueFilter((prev) => toggleInSet(prev, q.key))}
+                  />
+                ))}
+              </FacetGroup>
+
+              <FacetGroup
+                title="PAYMENT STATUS"
+                total={baseRows.length}
+                collapsed={collapsed.has("PAYMENT STATUS")}
+                onToggle={() => toggleGroup("PAYMENT STATUS")}
+              >
+                {payEntries.map((e) => (
+                  <FacetRow
+                    key={e.key}
+                    label={e.key}
+                    count={e.count}
+                    active={payFilter.has(e.key)}
+                    onClick={() => setPayFilter((prev) => toggleInSet(prev, e.key))}
+                  />
+                ))}
+              </FacetGroup>
+
+              <FacetGroup
+                title="REGION"
+                total={baseRows.length}
+                collapsed={collapsed.has("REGION")}
+                onToggle={() => toggleGroup("REGION")}
+              >
+                {regionEntries.map((e) => (
+                  <FacetRow
+                    key={e.region}
+                    label={e.region}
+                    count={e.count}
+                    active={regionFilter.has(e.region)}
+                    onClick={() => setRegionFilter((prev) => toggleInSet(prev, e.region))}
+                  />
+                ))}
+              </FacetGroup>
+            </div>
+          </>
+        }
+      >
+        {/* Listing — loose full-width white table, 52px rows, no truncation. */}
+        <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto">
+          <table className="w-full border-collapse text-[13px] table-fixed">
+            <colgroup>
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "20%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "27%" }} />
+              <col style={{ width: "22%" }} />
+            </colgroup>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-base-50 border-b border-base-200">
+                <Th>Order · Status</Th>
+                <Th>Customer</Th>
+                <Th>Owing</Th>
+                <Th>Stock &amp; delivery</Th>
+                <Th>Manage</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!isLoading && visible.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                    {anyFilter
+                      ? "No orders match these filters."
+                      : view === "owing"
+                        ? "Nothing outstanding. 🎉"
+                        : "No orders."}
+                  </td>
+                </tr>
+              )}
+              {visible.map((r) => (
+                <PaymentRow key={r.id} r={r} onSave={save} onChase={() => setChaseFor(r)} />
               ))}
-            </FacetGroup>
+            </tbody>
+          </table>
+        </div>
+      </ListPageShell>
 
-            <FacetGroup
-              title="FLAGS"
-              collapsed={collapsed.has("FLAGS")}
-              onToggle={() => toggleGroup("FLAGS")}
-            >
-              <FacetRow
-                label="Overdue"
-                count={overdueCount}
-                active={overdueOnly}
-                title="Balance past its recorded due date, still owing"
-                onClick={() => setOverdueOnly((v) => !v)}
-              />
-            </FacetGroup>
-          </div>
-        </>
-      }
-    >
-      {/* Listing — the only scroll area; white surface, 40px rows. */}
-      <div className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto">
-        <table className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden">
-          {/* Percentage colgroup (mirrors Orders) — table-fixed + w-full so the
-              table is always exactly the container width and NEVER horizontally
-              scrolls; long content ellipsis-truncates. */}
-          <colgroup>
-            <col style={{ width: "15%" }} />
-            <col style={{ width: "19%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "15%" }} />
-            <col style={{ width: "15%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "16%" }} />
-          </colgroup>
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-base-50 border-b border-base-200">
-              <Th>Order ID</Th>
-              <Th>Customer</Th>
-              <Th>ETA</Th>
-              <Th>Storage fee</Th>
-              <Th>Balance (RM)</Th>
-              <Th>Total owing</Th>
-              <Th>Payment status</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="p-12 text-center text-[12px] text-base-500">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!isLoading && visible.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-12 text-center text-[12px] text-base-500">
-                  {anyFilter
-                    ? "No orders match these filters."
-                    : view === "owing"
-                      ? "Nothing outstanding. 🎉"
-                      : "No orders."}
-                </td>
-              </tr>
-            )}
-            {visible.map((r) => (
-              <PaymentRow key={r.id} r={r} onSave={save} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </ListPageShell>
+      {chaseFor && <ChasePopover r={chaseFor} onClose={() => setChaseFor(null)} onSave={save} />}
+    </>
   );
 }
 
+// ─── Row ─────────────────────────────────────────────────────────────────────
 function PaymentRow({
+  r,
+  onSave,
+  onChase,
+}: {
+  r: Row;
+  onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
+  onChase: () => void;
+}) {
+  return (
+    <tr className="border-t border-base-100 hover:bg-base-50 align-top">
+      {/* Order · Status */}
+      <td className="px-5 py-3">
+        <div className="flex items-baseline gap-2" title={r.ref.length > 0 ? r.ref.join(" + ") : undefined}>
+          <span className="font-mono font-semibold text-base-900 text-[13px]">SO-{r.so}</span>
+          {r.ref.length > 0 && (
+            <span className="font-mono text-[11px] text-base-400">
+              {r.ref.length === 1 ? r.ref[0] : `${r.ref[0]} +${r.ref.length - 1}`}
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span className={`pill ${statusPill(r.paymentStatus)}`}>{r.paymentStatus ?? "— set —"}</span>
+          <StatusSelect r={r} onSave={onSave} />
+        </div>
+      </td>
+
+      {/* Customer + phone (no truncation) */}
+      <td className="px-5 py-3">
+        <div className="flex items-center gap-2">
+          <span className={`${cjkClassName(r.customer)} font-semibold text-base-900 text-[13.5px]`}>
+            {r.customer || "—"}
+          </span>
+          {r.delivered && <span className="text-[10px] text-success">delivered</span>}
+        </div>
+        {r.phone ? (
+          <a
+            href={waLink(r.phone) ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-info hover:underline font-mono"
+            title="Open WhatsApp to the customer"
+          >
+            <Phone size={12} strokeWidth={2} aria-hidden="true" />
+            {r.phone}
+          </a>
+        ) : (
+          <span className="mt-1.5 block text-[11px] text-base-400">no phone</span>
+        )}
+      </td>
+
+      {/* Owing hero + editable balance / storage */}
+      <td className="px-5 py-3">
+        <div
+          className={`text-[19px] font-bold font-mono tabular-nums leading-none ${
+            r.owing > 0 ? (r.storageOwing > 0 && r.goodsOwing === 0 ? "text-warning" : "text-danger") : "text-base-400"
+          }`}
+        >
+          {rm(r.owing)}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-base-500">
+          <span className="inline-flex items-center gap-1">
+            bal
+            <EditableNumber value={r.balance} placeholder="0" onSave={(v) => onSave(r.id, { balance: v })} width={60} />
+          </span>
+          <span className="inline-flex items-center gap-1">
+            storage
+            <EditableNumber
+              value={r.storageOverride}
+              placeholder={r.storage.total > 0 ? r.storage.total.toFixed(0) : "0"}
+              onSave={(v) => onSave(r.id, { storage_fee_override: v })}
+              width={52}
+            />
+            {r.storageOverride != null && (
+              <span className="text-[10px] text-warning" title={`manual — auto ${rm(r.storage.total)}`}>
+                M
+              </span>
+            )}
+            {r.storageCollected && (
+              <span className="text-[10px] text-success" title="storage collected">
+                ✓
+              </span>
+            )}
+          </span>
+        </div>
+      </td>
+
+      {/* Stock & delivery */}
+      <td className="px-5 py-3">
+        <StockCell r={r} />
+      </td>
+
+      {/* Manage */}
+      <td className="px-5 py-3">
+        {r.owing > 0 ? (
+          <button
+            type="button"
+            onClick={onChase}
+            className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
+            title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
+          >
+            {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
+            Collect $
+          </button>
+        ) : (
+          <span className="pill pill-neutral">Done</span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/** Stock badge + delivery window (the "safe to chase / what to tell them" cell). */
+function StockCell({ r }: { r: Row }) {
+  const s = r.stock;
+  const badge =
+    s.state === "ready"
+      ? { cls: "text-success", dot: "bg-success", text: "Stock in ✓" }
+      : s.state === "waiting"
+        ? { cls: "text-warning", dot: "bg-warning", text: `Waiting · ETA ${fmtDate(s.etaIso)}` }
+        : s.state === "no_eta"
+          ? { cls: "text-warning", dot: "bg-warning", text: "Waiting · no ETA" }
+          : s.state === "late"
+            ? { cls: "text-danger", dot: "bg-danger", text: `Stock late · ETA ${fmtDate(s.etaIso)}` }
+            : { cls: "text-base-400", dot: "bg-base-300", text: "Stock — not tracked" };
+
+  const windowNote =
+    s.state === "late"
+      ? "供应商迟 — 先催货,别催客户钱"
+      : s.state === "waiting" || s.state === "no_eta"
+        ? "货未到 — 报窗口给客户,别承诺死日期"
+        : r.etaTbd
+          ? "Delivery TBD"
+          : r.eta
+            ? `Deliver ~ ${fmtDate(r.eta)} · 物流送货前 1-3 天联系`
+            : "No delivery date set";
+
+  return (
+    <div>
+      <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold ${badge.cls}`}>
+        <span className={`w-2 h-2 rounded-full ${badge.dot}`} aria-hidden="true" />
+        {badge.text}
+      </span>
+      <div className="mt-1.5 text-[11.5px] text-base-500 leading-snug">{windowNote}</div>
+    </div>
+  );
+}
+
+/** Payment status dropdown — compact, sits next to the display pill. */
+function StatusSelect({
   r,
   onSave,
 }: {
   r: Row;
   onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
 }) {
-  // Secondary storage detail (auto/manual/collected) folded into a tooltip so
-  // the row stays a single 40px line.
-  const storageTitle = [
-    r.hasMsbf ? `MS/BF ${rm(r.storage.msbf)}` : null,
-    r.hasSof ? `SOF ${rm(r.storage.sof)}` : null,
-    r.storage.days > 0 ? `${r.storage.days} days since ETA` : "not past ETA",
-    r.storageOverride != null ? `manual — auto ${rm(r.storage.total)}` : null,
-    r.storageCollected ? "✓ collected" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  // Balance secondary detail (paid / due) → tooltip.
-  const balanceTitle = [
-    r.goodsPaid > 0 ? `− ${rm(r.goodsPaid)} paid` : null,
-    r.dueDate ? `${r.overdue ? "overdue" : "due"} ${fmtDateShort(r.dueDate)}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  return (
+    <select
+      value={r.paymentStatus ?? ""}
+      onChange={(e) => onSave(r.id, { payment_status: e.target.value || null })}
+      className="text-[11px] px-1.5 py-1 border border-base-200 rounded bg-white text-base-600"
+      aria-label={`Payment status for SO-${r.so}`}
+    >
+      <option value="">— set —</option>
+      {PAYMENT_STATUSES.map((s) => (
+        <option key={s} value={s}>
+          {s}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// ─── Chase popover (WhatsApp + pre-call brief) ───────────────────────────────
+function ChasePopover({
+  r,
+  onClose,
+  onSave,
+}: {
+  r: Row;
+  onClose: () => void;
+  onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
+}) {
+  // Default tone: goods delivered/held or supplier late → firmer Chase; else a
+  // gentle Reminder.
+  const [tone, setTone] = useState<"reminder" | "chase">(r.delivered || r.held ? "chase" : "reminder");
+  const salutation = salutationOf(null, r.customer);
+  const outstanding = rmAmount(r.owing);
+  const input = { salutation, ref: r.ref[0] ?? null, outstanding, lines: r.lines };
+  const text = tone === "reminder" ? buildCustomerReminder(input) : buildCustomerChase(input);
+  const wa = waLink(r.phone);
+
+  const send = () => {
+    if (wa) {
+      window.open(`${wa}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      toast.success("Opening WhatsApp — hit send");
+    } else {
+      void navigator.clipboard?.writeText(text);
+      toast.success("No number on file — message copied, paste into WhatsApp");
+    }
+    onSave(r.id, { last_chased_at: new Date().toISOString() });
+  };
+  const copy = () => {
+    void navigator.clipboard?.writeText(text);
+    toast.success("Message copied");
+  };
+
+  // Pre-call brief (the operator's verbal script — NOT the WhatsApp text).
+  const stockLine =
+    r.stock.state === "ready"
+      ? "已到仓 ✓ 可安排送"
+      : r.stock.state === "late"
+        ? `供应商迟(ETA ${fmtDate(r.stock.etaIso)} 已过)— 先催货`
+        : r.stock.state === "waiting" || r.stock.state === "no_eta"
+          ? `未到 · ETA ${fmtDate(r.stock.etaIso)}`
+          : "未追踪";
+  const windowLine = r.etaTbd ? "待定" : r.eta ? `${fmtDate(r.eta)} 前后(报范围,别报死日期)` : "未定";
 
   return (
-    <tr className="border-t border-base-100 hover:bg-base-50">
-      <td
-        className="px-3 whitespace-nowrap"
-        title={r.ref.length > 0 ? r.ref.join(" + ") : undefined}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-[480px] bg-white rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
       >
-        <span className="font-mono font-semibold text-base-900 text-[13px]">SO-{r.so}</span>
-        {r.ref.length > 0 && (
-          <span className="ml-1.5 font-mono text-[10.5px] text-base-400">
-            {r.ref.length === 1 ? r.ref[0] : `${r.ref[0]} +${r.ref.length - 1}`}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-base-100">
+          <MessageCircle size={16} className="text-success" strokeWidth={2.5} />
+          <span className="text-[13px] font-bold text-base-900">
+            催收 · {r.customer} · {r.phone ?? "no phone"}
           </span>
-        )}
-      </td>
-      <td className="px-3 max-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`${cjkClassName(r.customer)} font-medium text-base-900 truncate`}>
-            {r.customer || "—"}
-          </span>
-          {r.delivered && <span className="shrink-0 text-[10px] text-success">delivered</span>}
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex bg-base-100 rounded-full p-0.5">
+              {(["reminder", "chase"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTone(t)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold capitalize transition-colors ${
+                    tone === t ? "bg-white text-base-900 shadow-sm" : "text-base-500"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={onClose} aria-label="Close" className="text-base-400 hover:text-base-700">
+              <X size={16} />
+            </button>
+          </div>
         </div>
-      </td>
-      <td className="px-3 whitespace-nowrap text-[12px] text-base-700">
-        {r.etaTbd ? (
-          <span className="pill pill-warning">TBD</span>
-        ) : r.eta ? (
-          fmtDateShort(r.eta)
-        ) : (
-          "—"
-        )}
-      </td>
-      {/* Storage fee — computed, with a manual override input */}
-      <td className="px-3 whitespace-nowrap" title={storageTitle}>
-        <div className="flex items-center gap-1.5">
-          <EditableNumber
-            value={r.storageOverride}
-            placeholder={r.storage.total > 0 ? r.storage.total.toFixed(0) : "0"}
-            onSave={(v) => onSave(r.id, { storage_fee_override: v })}
-            prefix="RM"
-            width={64}
-          />
-          {r.storageOverride != null && (
-            <span className="text-[10px] text-warning" title={`manual — auto ${rm(r.storage.total)}`}>
-              M
-            </span>
-          )}
-          {r.storageCollected && (
-            <span className="text-[10px] text-success" title="storage collected">
-              ✓
-            </span>
-          )}
+
+        {/* Pre-call brief */}
+        <div className="mx-4 mt-3 rounded-xl border border-info/30 bg-info/5 px-3 py-2.5">
+          <div className="text-[11px] font-bold uppercase tracking-[0.04em] text-info mb-1.5">
+            📞 打电话前看这个 — 客户一定问「几时送」
+          </div>
+          <BriefRow k="货" v={stockLine} />
+          <BriefRow k="交货窗口" v={windowLine} />
+          <BriefRow k="物流" v="送货前 1-3 天直接联系客户约 slot" />
         </div>
-      </td>
-      {/* Balance — RM owing, editable (from AutoCount import or keyed) */}
-      <td className="px-3 whitespace-nowrap" title={balanceTitle || undefined}>
-        <div className="flex items-center gap-1.5">
-          <EditableNumber
-            value={r.balance}
-            placeholder="0"
-            onSave={(v) => onSave(r.id, { balance: v })}
-            prefix="RM"
-            width={78}
-          />
-          {r.overdue && (
-            <span className="text-[10px] text-destructive font-semibold">overdue</span>
-          )}
-          {!r.overdue && r.goodsPaid > 0 && (
-            <span className="text-[10px] text-success" title={`− ${rm(r.goodsPaid)} paid`}>
-              paid
-            </span>
-          )}
+
+        {/* WhatsApp text (date-free, per locked template) */}
+        <div className="mx-4 my-3">
+          <div className="text-[10px] text-base-400 italic mb-1.5">
+            ↓ WhatsApp 讯息(照锁定规矩:不写交货日、不施压)
+          </div>
+          <pre className="whitespace-pre-wrap font-sans text-[12.5px] text-base-800 bg-success/5 border border-success/20 rounded-xl px-3 py-2.5 leading-relaxed">
+            {text}
+          </pre>
         </div>
-      </td>
-      <td className="px-3 whitespace-nowrap font-semibold tabular-nums text-base-900 text-[13px]">
-        {rm(r.owing)}
-      </td>
-      {/* Payment status — dropdown */}
-      <td className="px-3 whitespace-nowrap">
-        <div className="flex items-center gap-2">
-          <span className={`pill ${statusPill(r.paymentStatus)}`}>{r.paymentStatus ?? "—"}</span>
-          <select
-            value={r.paymentStatus ?? ""}
-            onChange={(e) => onSave(r.id, { payment_status: e.target.value || null })}
-            className="text-[11px] px-1.5 py-1 border border-base-200 rounded bg-white"
-            aria-label={`Payment status for SO-${r.so}`}
+
+        <div className="flex gap-2 px-4 pb-4">
+          <button
+            type="button"
+            onClick={send}
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-success text-white rounded-lg py-2.5 text-[13px] font-bold hover:brightness-95"
           >
-            <option value="">— set —</option>
-            {PAYMENT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            <MessageCircle size={15} strokeWidth={2.5} /> Send on WhatsApp
+          </button>
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-lg border border-base-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-base-700 hover:bg-base-50"
+          >
+            Copy
+          </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
+  );
+}
+
+function BriefRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex gap-2 py-0.5 text-[12.5px] text-base-800">
+      <span className="w-[64px] shrink-0 text-base-500 font-semibold">{k}</span>
+      <span className="font-semibold">{v}</span>
+    </div>
   );
 }
 
@@ -682,13 +993,11 @@ function EditableNumber({
   value,
   placeholder,
   onSave,
-  prefix,
   width,
 }: {
   value: number | null;
   placeholder?: string;
   onSave: (v: number | null) => void;
-  prefix?: string;
   width?: number;
 }) {
   const [text, setText] = useState(value == null ? "" : String(value));
@@ -707,8 +1016,8 @@ function EditableNumber({
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-base-200 px-1.5 py-1 bg-white focus-within:border-base-700">
-      {prefix && <span className="text-[10px] text-base-400">{prefix}</span>}
+    <span className="inline-flex items-center gap-1 rounded border border-base-200 px-1.5 py-0.5 bg-white focus-within:border-base-700">
+      <span className="text-[10px] text-base-400">RM</span>
       <input
         type="text"
         inputMode="decimal"
@@ -720,7 +1029,7 @@ function EditableNumber({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         className="text-[12px] tabular-nums bg-transparent outline-none"
-        style={{ width: width ?? 80 }}
+        style={{ width: width ?? 72 }}
       />
     </span>
   );
@@ -728,28 +1037,27 @@ function EditableNumber({
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
+    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
       {children}
     </th>
   );
 }
 
 // ── Facet primitives (token-only replicas of the Orders facet look) ──────────
-/** One clickable facet row — label + count; active = flame-tint fill. Mirrors
- *  OperationOrdersControl.KanbanRow but with design-standard token classes
- *  (no raw hex) so it passes the ratchet lint. */
 function FacetRow({
   label,
   count,
   active,
   onClick,
   title,
+  dotClass,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
   title?: string;
+  dotClass?: string;
 }) {
   return (
     <button
@@ -757,30 +1065,21 @@ function FacetRow({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`w-full flex items-center gap-1.5 rounded-full text-left px-2.5 py-1.5 transition-colors ${
+      className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 transition-colors ${
         active ? "bg-signature-50" : "hover:bg-base-100"
       }`}
     >
-      <span
-        className={`flex-1 min-w-0 truncate text-[13px] ${
-          active ? "text-base-900 font-bold" : "text-base-700"
-        }`}
-      >
+      {dotClass && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />}
+      <span className={`flex-1 min-w-0 truncate text-[13px] ${active ? "text-base-900 font-bold" : "text-base-700"}`}>
         {label}
       </span>
-      <span
-        className={`text-[13px] tabular-nums shrink-0 ${
-          active ? "text-base-900 font-bold" : "text-base-500"
-        }`}
-      >
+      <span className={`text-[13px] tabular-nums shrink-0 ${active ? "text-base-900 font-bold" : "text-base-500"}`}>
         {count}
       </span>
     </button>
   );
 }
 
-/** Facet GROUP — a light title bar with the group total + collapse toggle.
- *  Mirrors OperationOrdersControl.KanbanGroup with token classes. */
 function FacetGroup({
   title,
   total,
@@ -810,9 +1109,7 @@ function FacetGroup({
           {title}
         </span>
         {total !== undefined && (
-          <span className="tabular-nums shrink-0 text-[11px] font-semibold text-base-500">
-            {total}
-          </span>
+          <span className="tabular-nums shrink-0 text-[11px] font-semibold text-base-500">{total}</span>
         )}
       </button>
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
@@ -820,8 +1117,6 @@ function FacetGroup({
   );
 }
 
-/** Owing / All view tabs — the top toolbar, replacing the old inline chips.
- *  Mirrors OperationOrdersControl.StatusTabs (ink-fill active) with tokens. */
 function StatusTabs({
   tabs,
   active,
@@ -847,11 +1142,7 @@ function StatusTabs({
             }`}
           >
             {t.label}
-            <span
-              className={`tabular-nums text-[12px] ${on ? "text-white/70" : "text-base-400"}`}
-            >
-              {t.count}
-            </span>
+            <span className={`tabular-nums text-[12px] ${on ? "text-white/70" : "text-base-400"}`}>{t.count}</span>
           </button>
         );
       })}
