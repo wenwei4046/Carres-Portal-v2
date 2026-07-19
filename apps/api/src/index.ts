@@ -43,6 +43,7 @@ import operationSuppliersRouter from "./routes/operation/suppliers";
 import operationWarehouseRouter from "./routes/operation/warehouse";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
 import salesOrderMaintenanceRouter from "./routes/operation/sales-order-maintenance";
+import bdAccountsRouter from "./routes/bd/accounts";
 import bdDealersRouter from "./routes/bd/dealers";
 import bdInquiriesRouter from "./routes/bd/inquiries";
 import partnerDashboardRouter from "./routes/partner/dashboard";
@@ -177,6 +178,7 @@ api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
 // 0174 — Sales Order Maintenance grid + shared column config.
 api.route("/operation/sales-order-maintenance", salesOrderMaintenanceRouter);
+api.route("/bd/accounts", bdAccountsRouter);
 api.route("/bd/dealers", bdDealersRouter);
 api.route("/bd/inquiries", bdInquiriesRouter);
 api.route("/partner/dashboard", partnerDashboardRouter);

@@ -136,20 +136,51 @@ function mockUser(cfg: {
   } as any;
 }
 
-/** adminClient stub — pins probes + the DEFINER rpcs. */
+/** adminClient stub — pins probes + the DEFINER rpcs. Since 2026-07-19 the
+ *  internal-HQ paths (principal / bd) also route their salespersons WRITES and
+ *  the app_users showroom probe through adminClient, so the stub covers those
+ *  chains too. */
 function mockAdmin(cfg: {
   verifyResult?: Record<string, unknown>;
   verifyError?: { message: string };
   pinRows?: Array<{ salesperson_id: string }>;
   pinById?: unknown | null;
   captureSetPin?: (args: unknown) => void;
+  appUsersShowroom?: boolean;
+  inserted?: unknown;
+  updated?: unknown;
+  captureInsert?: (row: Record<string, unknown>) => void;
+  captureUpdate?: (row: Record<string, unknown>) => void;
 } = {}) {
   return {
-    from: () => ({
-      select: () => ({
-        in: async () => ({ data: cfg.pinRows ?? [], error: null }),
-        eq: () => ({ maybeSingle: async () => ({ data: cfg.pinById ?? null, error: null }) }),
-      }),
+    from: (table: string) => ({
+      select: () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ch: any = {
+          in: async () => ({ data: cfg.pinRows ?? [], error: null }),
+          eq: () => ch,
+          maybeSingle: async () => ({ data: cfg.pinById ?? null, error: null }),
+          limit: async () => ({
+            data: table === "app_users" && cfg.appUsersShowroom ? [{ role: "showroom" }] : [],
+            error: null,
+          }),
+        };
+        return ch;
+      },
+      insert: (row: Record<string, unknown>) => {
+        cfg.captureInsert?.(row);
+        return {
+          select: () => ({ single: async () => ({ data: cfg.inserted ?? row, error: null }) }),
+        };
+      },
+      update: (row: Record<string, unknown>) => {
+        cfg.captureUpdate?.(row);
+        return {
+          eq: () => ({
+            select: () => ({ single: async () => ({ data: cfg.updated ?? row, error: null }) }),
+          }),
+        };
+      },
     }),
     rpc: async (name: string, args: unknown) => {
       if (name === "staff_verify_pin") {
@@ -268,6 +299,22 @@ describe("GET /api/staff", () => {
       env,
     );
     expect(res.status).toBe(400);
+  });
+
+  it("bd reads another store's roster via ?dealerId= → 200 (2026-07-19)", async () => {
+    vi.mocked(userClient).mockReturnValue(mockUser({ list: [spRow({ dealer_id: DEALER_B })] }));
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ pinRows: [] }));
+    const jwt = await makeJwt("bd", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/staff?dealerId=${DEALER_B}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { staff: unknown[]; storeKind: string };
+    expect(body.staff).toHaveLength(1);
+    expect(body.storeKind).toBe("dealer");
   });
 
   it("403 for a role that cannot manage staff (operation)", async () => {
@@ -582,8 +629,10 @@ describe("POST /api/staff (create)", () => {
   });
 
   it("internal principal creating a store principal for a SHOWROOM → 403", async () => {
-    vi.mocked(userClient).mockReturnValue(mockUser({ appUsersShowroom: true }));
-    vi.mocked(adminClient).mockReturnValue(mockAdmin());
+    vi.mocked(userClient).mockReturnValue(mockUser({}));
+    // resolveStoreKind probes app_users via adminClient for HQ callers
+    // (bd can't read app_users under RLS; principal shares the path).
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ appUsersShowroom: true }));
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request(`http://t/api/staff?dealerId=${DEALER_B}`, {
@@ -596,17 +645,15 @@ describe("POST /api/staff (create)", () => {
     expect(res.status).toBe(403);
   });
 
-  it("internal principal creating a manager for a dealer → 201 (dealer scope from ?dealerId=)", async () => {
+  it("internal principal creating a manager for a dealer → 201 (dealer scope from ?dealerId=, insert via adminClient)", async () => {
     let captured: Record<string, unknown> | undefined;
-    vi.mocked(userClient).mockReturnValue(
-      mockUser({
-        appUsersShowroom: false,
-        outletDealer: DEALER_B,
+    vi.mocked(userClient).mockReturnValue(mockUser({ outletDealer: DEALER_B }));
+    vi.mocked(adminClient).mockReturnValue(
+      mockAdmin({
         inserted: spRow({ id: SP2, dealer_id: DEALER_B, staff_role: "manager" }),
         captureInsert: (r) => (captured = r),
       }),
     );
-    vi.mocked(adminClient).mockReturnValue(mockAdmin());
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request(`http://t/api/staff?dealerId=${DEALER_B}`, {
@@ -619,6 +666,44 @@ describe("POST /api/staff (create)", () => {
     expect(res.status).toBe(201);
     expect(captured?.dealer_id).toBe(DEALER_B);
     expect(captured?.staff_role).toBe("manager");
+  });
+
+  // ------------------------------------------------------------------
+  // BD (2026-07-19) — principal-parity staff management via ?dealerId=.
+  // ------------------------------------------------------------------
+  it("bd creating a salesperson for a dealer → 201 (insert via adminClient)", async () => {
+    let captured: Record<string, unknown> | undefined;
+    vi.mocked(userClient).mockReturnValue(mockUser({ outletDealer: DEALER_B }));
+    vi.mocked(adminClient).mockReturnValue(
+      mockAdmin({
+        inserted: spRow({ id: SP2, dealer_id: DEALER_B }),
+        captureInsert: (r) => (captured = r),
+      }),
+    );
+    const jwt = await makeJwt("bd", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/staff?dealerId=${DEALER_B}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Sales", staffRole: "salesperson", outletId: OUTLET_1, pin: "246810" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(captured?.dealer_id).toBe(DEALER_B);
+  });
+
+  it("bd without ?dealerId= → 400", async () => {
+    const jwt = await makeJwt("bd", null);
+    const res = await app.fetch(
+      new Request("http://t/api/staff", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Sales", staffRole: "salesperson" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
   });
 
   // 0233 owner-mode (sid null, minted only by /reauth): the showroom
@@ -755,6 +840,24 @@ describe("POST /api/staff/:id/pin", () => {
       spRow({ id: MGR, staff_role: "manager", outlet_id: OUTLET_1 }),
     );
     expect(res.status).toBe(200);
+  });
+
+  // BD (2026-07-19) — principal-parity PIN reset via ?dealerId=.
+  it("bd resets a member's PIN via ?dealerId= → 200", async () => {
+    let args: unknown;
+    vi.mocked(userClient).mockReturnValue(mockUser({ byId: spRow({ id: SP1, dealer_id: DEALER_B }) }));
+    vi.mocked(adminClient).mockReturnValue(mockAdmin({ captureSetPin: (a) => (args = a) }));
+    const jwt = await makeJwt("bd", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/staff/${SP1}/pin?dealerId=${DEALER_B}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: "654321" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect((args as { p_salesperson_id: string }).p_salesperson_id).toBe(SP1);
   });
 });
 

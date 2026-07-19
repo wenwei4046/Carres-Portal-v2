@@ -13,6 +13,7 @@ import { useStaffSession } from "@/lib/staff";
 import StaffManagePage from "./staff/StaffManagePage";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
 import {
+  useBdDealers,
   useCancelOrder,
   useCatalog,
   useCreateOrder,
@@ -27,6 +28,8 @@ import {
   useReservePwpCode,
   useSalespersons,
 } from "@/lib/queries";
+import BdAccountsPage from "@/pages/bd/BdAccountsPage";
+import BdOrdersBoard from "@/pages/bd/BdOrdersBoard";
 import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
@@ -162,9 +165,16 @@ export default function DealerPos({
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
+  // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
+  // manage store staff) behind its own top-bar pill.
+  const [accountsOpen, setAccountsOpen] = useState(false);
 
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
+  // BD rides the SAME internal-operator POS as the principal on-behalf flow
+  // (in-flow dealer pick, body dealerId, staff-gate exempt); only its dealer
+  // list source + the two BD overlays differ.
+  const isBd = role === "bd";
   const userEmail = useAuth((s) => s.user?.email ?? "");
   const signOut = useAuth((s) => s.signOut);
   // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
@@ -239,15 +249,19 @@ export default function DealerPos({
   const catalogQ = useCatalog();
 
   // The in-flow dealer choices (ACTIVE dealers only — matches the live status
-  // gate). Only fetched for an internal operator; dealers never hit this route.
-  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer });
-  const pickableDealers = useMemo(
-    () =>
-      (principalDealersQ.data?.dealers ?? [])
-        .filter((d) => d.status === "active")
-        .map((d) => ({ id: d.id, name: d.name })),
-    [principalDealersQ.data],
-  );
+  // gate). Only fetched for an internal operator; dealers never hit this
+  // route. BD reads its own /api/bd/dealers (the principal route is
+  // principal-gated); both responses carry id/name/status.
+  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer && !isBd });
+  const bdDealersQ = useBdDealers({ enabled: internalPicksDealer && isBd });
+  const pickableDealers = useMemo(() => {
+    const list = isBd
+      ? (bdDealersQ.data?.dealers ?? [])
+      : (principalDealersQ.data?.dealers ?? []);
+    return list
+      .filter((d) => d.status === "active")
+      .map((d) => ({ id: d.id, name: d.name }));
+  }, [isBd, bdDealersQ.data, principalDealersQ.data]);
 
   // When an internal operator places on behalf of a picked dealer, constrain the
   // outlet + salesperson choices to THAT dealer (the lists are RLS-read-all for
@@ -909,6 +923,21 @@ export default function DealerPos({
             <ListOrdered size={13} strokeWidth={1.75} />
             <span>My orders</span>
           </button>
+          {/* BD (2026-07-19) — the Accounts overlay: open dealer accounts +
+              manage every store's staff. BD-only pill. */}
+          {isBd && (
+            <button
+              type="button"
+              onClick={() => setAccountsOpen(true)}
+              className="topbar-pill"
+              aria-label="Dealer accounts"
+              title="Dealer accounts"
+              data-testid="pos-topbar-accounts"
+            >
+              <Users size={13} strokeWidth={1.75} />
+              <span>Accounts</span>
+            </button>
+          )}
           {/* Staff management (Loo 2026-07-19) — the store owner / manager adds
               their team right from the POS; salesperson-tier sees no button. */}
           {staffMember && staffMember.tier !== "salesperson" && (
@@ -1034,7 +1063,7 @@ export default function DealerPos({
                   internalPicksDealer
                     ? {
                         dealers: pickableDealers,
-                        loading: principalDealersQ.isLoading,
+                        loading: isBd ? bdDealersQ.isLoading : principalDealersQ.isLoading,
                         value: draft.actingDealerId ?? null,
                         onPick: pickDealer,
                       }
@@ -1090,9 +1119,16 @@ export default function DealerPos({
         />
       )}
 
-      {statusOpen && (
-        <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
-      )}
+      {statusOpen &&
+        (isBd ? (
+          /* BD — the network board: every dealer, By-dealer filter, audit
+             history. The store board stays byte-identical for everyone else. */
+          <BdOrdersBoard onClose={() => setStatusOpen(false)} />
+        ) : (
+          <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
+        ))}
+
+      {accountsOpen && isBd && <BdAccountsPage onClose={() => setAccountsOpen(false)} />}
 
       {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
 

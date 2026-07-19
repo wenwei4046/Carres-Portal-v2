@@ -1,38 +1,43 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { StaffDto } from "@carres/shared";
-import { useStaffList } from "@/lib/queries";
+import { useOutlets, useStaffList } from "@/lib/queries";
 import {
   AddStaffModal,
+  EditStaffModal,
   SetPinModal,
   StaffAvatar,
   TierBadge,
 } from "@/pages/dealer/staff/staff-ui";
 
 /**
- * PrincipalStaffDrawer (0233) — Carres HQ manages a dealer/showroom store's
- * staff: list, create (tier options respect storeKind — a showroom caps at
- * manager), and reset PINs. Reuses the same Add-staff + Set-PIN modals as the
- * store's own Settings. The internal principal JWT is treated as principal-tier
- * server-side; creates thread the target `dealerId` so RLS scopes to that store.
+ * BdStaffPanel (2026-07-19) — BD manages a dealership's staff from the POS
+ * Accounts overlay: roster, add (sales manager / sales executive / dealer
+ * principal per store kind), profile edits and PIN resets. Same shared
+ * Add-staff / Set-PIN / Edit modals as the store's own Staff & PINs page and
+ * the HQ drawer — every create door collects the same data. The BD JWT acts
+ * as principal-tier server-side; every call threads the target `dealerId`.
  */
-export default function PrincipalStaffDrawer({
+export default function BdStaffPanel({
   dealerId,
-  storeKind,
   orgName,
   onClose,
 }: {
   dealerId: string;
-  storeKind: "dealer" | "showroom";
   orgName: string;
   onClose: () => void;
 }) {
   const staffQ = useStaffList(dealerId);
+  const outletsQ = useOutlets();
   const [showAdd, setShowAdd] = useState(false);
   const roster = staffQ.data?.staff ?? [];
+  const storeKind = staffQ.data?.storeKind ?? "dealer";
+  const dealerOutlets = (outletsQ.data?.outlets ?? [])
+    .filter((o) => o.dealerId === dealerId)
+    .map((o) => ({ id: o.id, name: o.name }));
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end" data-testid="principal-staff-drawer">
+    <div className="fixed inset-0 z-[100] flex justify-end" data-testid="bd-staff-panel">
       <button
         type="button"
         aria-label="Close"
@@ -42,7 +47,7 @@ export default function PrincipalStaffDrawer({
       <aside className="relative bg-white w-full max-w-[460px] h-full overflow-auto shadow-xl flex flex-col">
         <div className="px-6 pt-5 pb-4 border-b border-base-100 flex items-start justify-between gap-3">
           <div>
-            <div className="kicker text-[9px]">HQ · Staff</div>
+            <div className="kicker text-[9px]">BD · Staff</div>
             <h2 className="font-display text-[20px] mt-1 tracking-[-0.02em] font-semibold">{orgName}</h2>
             <div className="text-[12px] text-base-600 mt-1 capitalize">
               {storeKind} · manage sign-in staff &amp; PINs
@@ -59,7 +64,7 @@ export default function PrincipalStaffDrawer({
             <button
               type="button"
               onClick={() => setShowAdd(true)}
-              data-testid="principal-staff-add"
+              data-testid="bd-staff-add"
               className="px-3 py-1.5 bg-base-900 text-white text-[12px] font-semibold rounded hover:bg-base-800 cursor-pointer"
             >
               + Add staff
@@ -87,7 +92,7 @@ export default function PrincipalStaffDrawer({
         <AddStaffModal
           callerTier="principal"
           storeKind={storeKind}
-          outlets={[]}
+          outlets={dealerOutlets}
           callerOutletId={null}
           dealerId={dealerId}
           onClose={() => setShowAdd(false)}
@@ -97,12 +102,11 @@ export default function PrincipalStaffDrawer({
   );
 }
 
-// `dealerId` rides to SetPinModal — without it the HQ caller's set-pin request
-// has no target store and the server 400s (latent until 2026-07-19).
 function StaffRow({ staff, dealerId }: { staff: StaffDto; dealerId: string }) {
   const [showPin, setShowPin] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   return (
-    <li className="py-2.5 flex items-center justify-between gap-3" data-testid={`principal-staff-row-${staff.id}`}>
+    <li className="py-2.5 flex items-center justify-between gap-3" data-testid={`bd-staff-row-${staff.id}`}>
       <div className="flex items-center gap-3 min-w-0">
         <StaffAvatar color={staff.color} name={staff.name} size={30} />
         <div className="min-w-0">
@@ -112,21 +116,33 @@ function StaffRow({ staff, dealerId }: { staff: StaffDto; dealerId: string }) {
             </span>
             <TierBadge tier={staff.staffRole} />
           </div>
-          <div className="text-[11px] text-base-500">
-            {staff.hasPin ? "PIN set" : "No PIN"}
+          <div className="text-[11px] text-base-500 truncate">
+            {staff.email ?? (staff.hasPin ? "PIN set" : "No PIN")}
+            {staff.email ? ` · ${staff.hasPin ? "PIN set" : "No PIN"}` : ""}
             {!staff.active && " · inactive"}
           </div>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => setShowPin(true)}
-        data-testid={`principal-staff-setpin-${staff.id}`}
-        className="text-[11.5px] font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1 flex-shrink-0"
-      >
-        {staff.hasPin ? "Reset PIN" : "Set PIN"}
-      </button>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowEdit(true)}
+          data-testid={`bd-staff-edit-${staff.id}`}
+          className="text-[11.5px] font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowPin(true)}
+          data-testid={`bd-staff-setpin-${staff.id}`}
+          className="text-[11.5px] font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1"
+        >
+          {staff.hasPin ? "Reset PIN" : "Set PIN"}
+        </button>
+      </div>
       {showPin && <SetPinModal staff={staff} dealerId={dealerId} onClose={() => setShowPin(false)} />}
+      {showEdit && <EditStaffModal staff={staff} dealerId={dealerId} onClose={() => setShowEdit(false)} />}
     </li>
   );
 }
