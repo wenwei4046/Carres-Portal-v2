@@ -38,6 +38,7 @@ import {
   Sofa,
   Truck,
   Undo2,
+  Warehouse,
   Upload,
   User,
   X,
@@ -5160,65 +5161,80 @@ function StorageCard({
     "inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-200 rounded-[6px] px-1.5 py-0.5 bg-white";
   const soft = "pill bg-base-100 text-base-500";
 
-  type StState = "done" | "act" | "wait" | "todo";
-  const Node = ({ n, state }: { n: number; state: StState }) => (
-    <span
-      className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
-        state === "done"
-          ? "bg-base-800 text-white"
-          : state === "act"
-            ? "bg-error-soft text-danger ring-2 ring-danger"
-            : state === "wait"
-              ? "bg-warning-soft text-warning"
-              : "bg-white border-2 border-base-300 text-base-400"
-      }`}
-    >
-      {state === "done" ? <Check size={14} strokeWidth={3} /> : n}
-    </span>
-  );
-  const Row = ({
-    n,
-    state,
-    title,
-    children,
-    last,
-  }: {
-    n: number;
-    state: StState;
-    title: string;
-    children: ReactNode;
-    last?: boolean;
-  }) => (
-    <div className={`relative flex items-start gap-2.5 ${last ? "" : "pb-3"}`}>
-      {!last && (
-        <span
-          aria-hidden="true"
-          className={`absolute left-[11px] top-7 bottom-0 w-0.5 ${
-            state === "done" ? "bg-base-800" : "bg-base-200"
-          }`}
-        />
-      )}
-      <Node n={n} state={state} />
-      <div className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold text-base-900">
-          {title}
-        </span>
-        <div className="text-[12px] text-base-500">{children}</div>
-      </div>
-    </div>
-  );
+  // Grounded-card status (Loan template; Jess 2026-07-19) — the 5-node spine is
+  // retired for the ONE storage card. done / not-charging = grey (never green).
+  const stDone = delivered || !!collectedAt || waived || exempt;
+  const statusWord = delivered
+    ? "Delivered"
+    : collectedAt
+      ? "Collected"
+      : waived
+        ? "Waived"
+        : exempt
+          ? "No storage"
+          : counting
+            ? "Counting"
+            : "Not counting";
+  const statusName = delivered
+    ? "Delivered"
+    : collectedAt
+      ? "Fee collected"
+      : waived
+        ? "Fee waived"
+        : exempt
+          ? "Exempted"
+          : counting
+            ? `Day ${soFar}`
+            : "In the free week";
+  const feeDue = counting && effTotal > 0;
 
   const deadlinePassed = !!deadline && deadline < todayIso;
   const overdueDays = deadline ? Math.max(0, dayDiff(deadline, todayIso)) : 0;
 
   return (
     <div className="p-3">
-      {/* ① the anchor — the customer's promised date, ALWAYS first */}
-      <Row
-        n={1}
-        state={delivered ? "done" : deadlinePassed ? "act" : "wait"}
-        title="Promised delivery"
-      >
+      {/* Grounded storage card (Loan template; Jess 2026-07-19) — the 5-node
+          spine is retired; every fact is a labeled row. Anchor (promised
+          delivery) first; the Fee row is the money. Icon never tints (grey when
+          not charging / done). */}
+      <div className="bg-white border border-base-200 rounded-[11px] shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
+        {/* header — box · status · badge */}
+        <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <span
+              className={`h-8 w-8 shrink-0 rounded-[9px] grid place-items-center ${
+                feeDue ? "bg-primary/10 text-primary" : "bg-base-100 text-base-500"
+              }`}
+            >
+              <Warehouse size={16} />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold tracking-[0.05em] uppercase text-base-500">
+                {statusWord}
+              </div>
+              <div
+                className={`text-[13px] font-semibold truncate ${
+                  stDone || !counting ? "text-base-500" : "text-base-900"
+                }`}
+              >
+                {statusName}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {feeDue ? (
+              <span className="pill pill-warning">fee due</span>
+            ) : !stDone && counting ? null : (
+              <span className="pill bg-base-100 text-base-500">
+                {stDone ? "done" : "no fee"}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* body — labeled rows */}
+        <div className="border-t border-base-100">
+          {/* ① the anchor — the customer's promised date, ALWAYS first */}
+          <DRow k="Promised delivery">
         {deadline ? (
           <span className="inline-flex items-center gap-1.5 flex-wrap">
             <span className={chip}>{fmtDate(deadline)}</span>
@@ -5233,20 +5249,10 @@ function StorageCard({
         ) : (
           <span className={soft}>TBD</span>
         )}
-      </Row>
+          </DRow>
 
-      {/* ② the free week — restarts on a supplier-late stretch */}
-      <Row
-        n={2}
-        state={
-          !freeBase
-            ? "todo"
-            : autoAnchor && autoAnchor <= todayIso && !delivered
-              ? "done"
-              : "wait"
-        }
-        title="Free week"
-      >
+          {/* ② the free week — restarts on a supplier-late stretch */}
+          <DRow k="Free week">
         {freeBase && autoAnchor ? (
           <span className="inline-flex items-center gap-1.5 flex-wrap">
             <span className={chip}>{fmtDate(freeBase)}</span>
@@ -5261,15 +5267,11 @@ function StorageCard({
         ) : (
           <span className={soft}>—</span>
         )}
-      </Row>
+          </DRow>
 
-      {/* ③ counting from — auto, a manual date overrides */}
-      <Row
-        n={3}
-        state={exempt ? "todo" : counting ? "done" : "todo"}
-        title="Counts from"
-      >
-        <span className="inline-flex items-center gap-1.5 flex-wrap">
+          {/* ③ counting from — auto, a manual date overrides */}
+          <DRow k="Counts from">
+        <span className="inline-flex items-center gap-1.5 flex-wrap justify-end">
           {exempt ? (
             <span className={soft}>exempted</span>
           ) : (
@@ -5303,22 +5305,10 @@ function StorageCard({
             </>
           )}
         </span>
-      </Row>
+          </DRow>
 
-      {/* ④ the money */}
-      <Row
-        n={4}
-        state={
-          collectedAt || waived
-            ? "done"
-            : exempt
-              ? "todo"
-              : counting && effTotal > 0
-                ? "act"
-                : "todo"
-        }
-        title="Fee"
-      >
+          {/* ④ the money — the day-count lives in the header caption/name */}
+          <DRow k="Fee">
         {collectedAt ? (
           <span className="pill pill-confirmed">
             collected · {fmtDate(String(collectedAt).slice(0, 10))}
@@ -5337,8 +5327,7 @@ function StorageCard({
             </button>
           </span>
         ) : counting ? (
-          <span className="inline-flex items-center gap-1.5 flex-wrap">
-            <span className={soft}>day {soFar}</span>
+          <span className="inline-flex items-center gap-1.5 flex-wrap justify-end">
             {hasMsbf && (
               <span className={chip}>
                 MS/BF{" "}
@@ -5406,11 +5395,11 @@ function StorageCard({
         ) : (
           <span className={soft}>RM 0</span>
         )}
-      </Row>
+          </DRow>
 
-      {/* ⑤ when it stops */}
-      <Row n={5} state={delivered ? "done" : "todo"} title="Ends" last>
-        <span className="inline-flex items-center gap-1.5 flex-wrap">
+          {/* ⑤ when it stops */}
+          <DRow k="Ends">
+        <span className="inline-flex items-center gap-1.5 flex-wrap justify-end">
           {delivered ? (
             <span className="pill pill-confirmed">
               delivered · {fmtDate(endEff)}
@@ -5429,7 +5418,9 @@ function StorageCard({
             </>
           )}
         </span>
-      </Row>
+          </DRow>
+        </div>
+      </div>
     </div>
   );
 }
