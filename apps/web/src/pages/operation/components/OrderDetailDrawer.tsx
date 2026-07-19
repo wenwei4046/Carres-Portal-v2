@@ -1574,6 +1574,14 @@ function DrawerBody({
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
       : "—";
+  // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
+  // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
+  // the short chase-template strings only.
+  const deadlineFull = order.delivery_date_tbd
+    ? "TBD"
+    : order.delivery_date
+      ? fmtDate(order.delivery_date)
+      : "—";
   // Optional preferred-name/title for customer messages — never auto Mr/Ms.
   // Local-only for now (an ops_order_control column is deploy-gated), keyed by
   // order so it sticks across sessions on this machine.
@@ -3459,14 +3467,11 @@ function DrawerBody({
                       </MiniBadge>
                     );
                   if (order.ops_assigned_logistic)
-                    return <MiniBadge tone="waiting">Yet Scheduled</MiniBadge>;
+                    return <MiniBadge tone="waiting">Unscheduled</MiniBadge>;
                   return <MiniBadge tone="muted">No carrier</MiniBadge>;
                 })()}
-                {deadlineLabel !== "—" && (
-                  <span className="text-[13px] font-semibold tabular-nums text-base-900 whitespace-nowrap">
-                    {deadlineLabel}
-                  </span>
-                )}
+                {/* deadline date lives ONCE — on the card header below (mono);
+                    a second sans copy here read as "two fonts" (Jess). */}
               </span>
             }
           >
@@ -3483,7 +3488,7 @@ function DrawerBody({
                 const hasStockStep = goodsN > 0;
                 const onHold = balanceGate === "hold" || storageGate === "hold";
                 // The delivery status word (Jess 2026-07-19): Scheduled = a
-                // logistic ETA is set · Yet Scheduled = carrier assigned, no ETA
+                // logistic ETA is set · Unscheduled = carrier assigned, no ETA
                 // (the 89% normal state) · Delivered = done (grey, never alarms).
                 const statusWord = deliveredDone
                   ? "Delivered"
@@ -3494,7 +3499,7 @@ function DrawerBody({
                       : eta
                         ? "Scheduled"
                         : order.ops_assigned_logistic
-                          ? "Yet Scheduled"
+                          ? "Unscheduled"
                           : "No carrier";
                 return (
                   <div className="max-w-[700px]">
@@ -3531,15 +3536,9 @@ function DrawerBody({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          {deadlineLabel !== "—" && (
-                            <span
-                              className={`font-mono text-[12px] ${
-                                late && !deliveredDone ? "text-danger" : "text-base-500"
-                              }`}
-                            >
-                              {deadlineLabel}
-                            </span>
-                          )}
+                          {/* the deadline DATE lives ONCE, in the labeled
+                              "Customer deadline" row below (mono, full weekday);
+                              the header keeps only the urgency badge + DO. */}
                           {late && !deliveredDone && (
                             <span className="text-[11px] font-bold rounded-[5px] px-1.5 py-0.5 bg-[#FCEBEB] text-[#A32D2D]">
                               overdue {-(daysToDelivery ?? 0)}d
@@ -3574,14 +3573,14 @@ function DrawerBody({
                         original date snapshotted for storage) — NOT by editing
                         this date; casual "prefers Saturday" talk → NOTES. */}
                     <FieldRow label="Customer deadline">
-                      <span className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] text-base-300 whitespace-nowrap">
+                      <span className="flex items-center gap-2 min-w-0 flex-wrap justify-end">
+                        <span className="text-[11px] text-base-500 whitespace-nowrap">
                           auto · AutoCount
                         </span>
                         <span
-                          className={`text-[13px] font-semibold tabular-nums ${overDeadline && !deliveredDone ? "text-danger" : "text-base-900"}`}
+                          className={`font-mono text-[13px] font-semibold ${overDeadline && !deliveredDone ? "text-danger" : "text-base-900"}`}
                         >
-                          {deadlineLabel}
+                          {deadlineFull}
                         </span>
                         {/* paint-once: with an extension recorded, the row
                             right below already says "→ 31 Jul 26 …". */}
@@ -4493,7 +4492,7 @@ function DRow({
       className={`px-3 py-1.5 border-b border-base-100 last:border-b-0 ${
         block
           ? ""
-          : "flex items-center justify-between gap-3 min-h-9"
+          : "flex items-center justify-between gap-x-3 gap-y-1 flex-wrap min-h-9"
       }`}
     >
       <span
