@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   STAFF_COLORS,
+  minDeliveryDateISO,
   staffPinSchema,
   type StaffColorKey,
   type StaffDto,
@@ -10,6 +11,7 @@ import {
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useCreateStaff, usePatchStaff, useSetStaffPin, useVerifyPin } from "@/lib/queries";
+import BirthdayWheelField from "../pos/date-keyin/BirthdayWheelField";
 
 /**
  * Shared staff-admin UI (0233) — the tier labels, colour avatar, STAFF_COLORS
@@ -555,16 +557,16 @@ export function AddStaffModal({
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label>Birthday</Label>
-          <input
-            type="date"
+          {/* Same drum picker as the Sales Order customer birthday (Loo 2026-07-19). */}
+          <BirthdayWheelField
             value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-            data-testid="staff-add-birthday"
-            className={inputCls}
+            todayIso={minDeliveryDateISO(0)}
+            onChange={setBirthday}
+            testId="staff-add-birthday"
           />
-        </label>
+        </div>
         <label className="flex flex-col gap-1.5">
           <Label>Gender</Label>
           <select
@@ -771,16 +773,16 @@ export function EditStaffModal({
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label>Birthday</Label>
-          <input
-            type="date"
+          {/* Same drum picker as the Sales Order customer birthday (Loo 2026-07-19). */}
+          <BirthdayWheelField
             value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-            data-testid="staff-edit-birthday"
-            className={inputCls}
+            todayIso={minDeliveryDateISO(0)}
+            onChange={setBirthday}
+            testId="staff-edit-birthday"
           />
-        </label>
+        </div>
         <label className="flex flex-col gap-1.5">
           <Label>Gender</Label>
           <select

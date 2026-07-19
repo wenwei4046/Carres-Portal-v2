@@ -96,7 +96,10 @@ describe("StaffManagePage — in-POS staff management overlay", () => {
     // Profile fields are required before save enables.
     expect((screen.getByTestId("staff-edit-save") as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByTestId("staff-edit-email"), { target: { value: "SP1@Store.com" } });
-    fireEvent.change(screen.getByTestId("staff-edit-birthday"), { target: { value: "1990-01-02" } });
+    // Birthday = the shared drum picker (same as the SO customer birthday):
+    // open the wheel and Save its seed value (15 June 1990 for an empty field).
+    fireEvent.click(screen.getByTestId("staff-edit-birthday"));
+    fireEvent.click(screen.getByText("Save"));
     fireEvent.change(screen.getByTestId("staff-edit-gender"), { target: { value: "female" } });
     fireEvent.click(screen.getByTestId("staff-edit-save"));
     expect(patchMutate).toHaveBeenCalledWith(
@@ -105,7 +108,7 @@ describe("StaffManagePage — in-POS staff management overlay", () => {
         patch: {
           name: "SP In O1",
           email: "sp1@store.com",
-          birthday: "1990-01-02",
+          birthday: "1990-06-15",
           gender: "female",
           phone: null,
           color: "flame",

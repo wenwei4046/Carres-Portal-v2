@@ -14,11 +14,13 @@ import {
   type AppRole,
 } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
+import { minDeliveryDateISO } from "@carres/shared";
 import type { CreatableAppRole, StaffColorKey, StaffGenderDto, StaffTierDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
 import { ColorDotPicker, tierLabel } from "@/pages/dealer/staff/staff-ui";
+import BirthdayWheelField from "@/pages/dealer/pos/date-keyin/BirthdayWheelField";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -1116,12 +1118,12 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Birthday" error={errors.staffBirthday}>
-                  <input
-                    type="date"
+                  {/* Same drum picker as the Sales Order customer birthday. */}
+                  <BirthdayWheelField
                     value={draft.staffBirthday}
-                    onChange={(e) => set("staffBirthday", e.target.value)}
-                    data-testid="acct-staff-birthday"
-                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+                    todayIso={minDeliveryDateISO(0)}
+                    onChange={(iso) => set("staffBirthday", iso)}
+                    testId="acct-staff-birthday"
                   />
                 </Field>
                 <Field label="Gender" error={errors.staffGender}>
