@@ -142,7 +142,7 @@ export function ColorDotPicker({
   );
 }
 
-function ModalShell({
+export function ModalShell({
   title,
   subtitle,
   children,

@@ -4,6 +4,10 @@ import {
   createAccountInput,
   setAccountStatusInput,
   resetPasswordInput,
+  decideEmailChangeInputSchema,
+  emailChangeRequestFromRow,
+  EMAIL_CHANGE_REQUESTS_TABLE,
+  type EmailChangeRequestRow,
 } from "@carres/shared";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -539,6 +543,145 @@ principalAccountsRouter.post("/:id/reset-password", async (c) => {
   });
 
   return c.json({ id, ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Store email-change requests (0240, Loo 2026-07-19) — a dealer principal
+// files a login-email change from the POS (/api/account/email-change); HQ
+// decides here. Approve swaps the REAL login email (auth.admin) + app_users;
+// reject parks a note the store sees. Same service_role + audit_log pattern
+// as reset-password above.
+// ---------------------------------------------------------------------------
+
+// ---------- GET /email-change-requests — the HQ queue ----------
+principalAccountsRouter.get("/email-change-requests", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .select("*, dealers(name)")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({
+    requests: ((data ?? []) as EmailChangeRequestRow[]).map(emailChangeRequestFromRow),
+  });
+});
+
+// ---------- POST /email-change-requests/:id/approve ----------
+principalAccountsRouter.post("/email-change-requests/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const sb = adminClient(c.env);
+  const principalEmail = c.var.auth.email;
+
+  const { data: row, error: findErr } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (findErr) throw new HTTPException(500, { message: findErr.message });
+  if (!row) {
+    return c.json({ error: "not_found", code: "not_found", message: "Request not found" }, 404);
+  }
+  const req = row as EmailChangeRequestRow;
+  if (req.status !== "pending") {
+    return c.json({ error: "not_pending", message: `Request is already ${req.status}` }, 409);
+  }
+
+  // Uniqueness re-check at decision time (excluding the target's own row so a
+  // partially-applied approve stays retryable).
+  const { data: taken, error: takenErr } = await sb
+    .from("app_users")
+    .select("id")
+    .eq("email", req.requested_email)
+    .neq("id", req.user_id)
+    .maybeSingle();
+  if (takenErr) throw new HTTPException(500, { message: takenErr.message });
+  if (taken) {
+    return c.json({ error: "email_in_use", message: "Email already in use — reject with a note instead" }, 422);
+  }
+
+  // The REAL swap: auth.users first (the login), then the app_users mirror.
+  // If the mirror write fails the request stays pending — re-approving is
+  // idempotent (same email onto the same auth user).
+  const upd = await sb.auth.admin.updateUserById(req.user_id, {
+    email: req.requested_email,
+    email_confirm: true,
+  });
+  if (upd.error) {
+    return c.json(
+      { error: "rpc_failed", code: "auth_email_update_failed", message: upd.error.message },
+      500,
+    );
+  }
+  const mirror = await sb
+    .from("app_users")
+    .update({ email: req.requested_email })
+    .eq("id", req.user_id);
+  if (mirror.error) throw new HTTPException(500, { message: mirror.error.message });
+
+  const { data: decided, error: decideErr } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .update({
+      status: "approved",
+      decided_by: c.var.auth.id,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (decideErr) throw new HTTPException(500, { message: decideErr.message });
+
+  await sb.from("audit_log").insert({
+    role: "principal",
+    actor_text: principalEmail,
+    action: `Approved store email change · ${req.current_email} → ${req.requested_email}`,
+    dealer_id: req.dealer_id,
+    ref: req.user_id,
+  });
+
+  return c.json(emailChangeRequestFromRow(decided as EmailChangeRequestRow));
+});
+
+// ---------- POST /email-change-requests/:id/reject ----------
+principalAccountsRouter.post("/email-change-requests/:id/reject", async (c) => {
+  const id = c.req.param("id");
+  const parsed = decideEmailChangeInputSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_body", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid body" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const principalEmail = c.var.auth.email;
+
+  const { data: decided, error } = await sb
+    .from(EMAIL_CHANGE_REQUESTS_TABLE)
+    .update({
+      status: "rejected",
+      decision_note: parsed.data.note?.length ? parsed.data.note : null,
+      decided_by: c.var.auth.id,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  if (!decided) {
+    return c.json({ error: "not_pending", message: "No pending request with that id" }, 404);
+  }
+  const req = decided as EmailChangeRequestRow;
+
+  await sb.from("audit_log").insert({
+    role: "principal",
+    actor_text: principalEmail,
+    action: `Rejected store email change · ${req.current_email} → ${req.requested_email}${parsed.data.note ? ` · ${parsed.data.note}` : ""}`,
+    dealer_id: req.dealer_id,
+    ref: req.user_id,
+  });
+
+  return c.json(emailChangeRequestFromRow(req));
 });
 
 export default principalAccountsRouter;

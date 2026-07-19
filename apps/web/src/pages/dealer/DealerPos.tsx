@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor, resolvePaymentMethods, STRIPE_METHOD_KEY } from "@carres/shared";
@@ -10,6 +10,7 @@ import { draftTotals } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import { useStaffSession } from "@/lib/staff";
+import StaffManagePage from "./staff/StaffManagePage";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
 import {
   useCancelOrder,
@@ -157,6 +158,7 @@ export default function DealerPos({
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
 
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
@@ -859,6 +861,21 @@ export default function DealerPos({
             <ListOrdered size={13} strokeWidth={1.75} />
             <span>My orders</span>
           </button>
+          {/* Staff management (Loo 2026-07-19) — the store owner / manager adds
+              their team right from the POS; salesperson-tier sees no button. */}
+          {staffMember && staffMember.tier !== "salesperson" && (
+            <button
+              type="button"
+              onClick={() => setTeamOpen(true)}
+              className="topbar-pill"
+              aria-label="Manage staff"
+              title="员工管理 · Manage staff"
+              data-testid="pos-topbar-staff-manage"
+            >
+              <Users size={13} strokeWidth={1.75} />
+              <span>Staff</span>
+            </button>
+          )}
           {!submitted && itemCount > 0 && (
             <button
               type="button"
@@ -1029,6 +1046,8 @@ export default function DealerPos({
       {statusOpen && (
         <OrderStatusPage dealerId={effectiveActingId} onClose={() => setStatusOpen(false)} />
       )}
+
+      {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
 
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·

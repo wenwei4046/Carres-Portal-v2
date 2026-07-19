@@ -5,6 +5,8 @@ import {
   useCreateAccount,
   useCreateStaff,
   usePrincipalDealers,
+  usePrincipalEmailChanges,
+  useDecideEmailChange,
   useSetAccountStatus,
   useResetAccountPassword,
   useStaffList,
@@ -117,6 +119,9 @@ export default function PrincipalAccounts() {
         </button>
       </div>
 
+      {/* 0240 — store email-change approvals (renders only when pending). */}
+      <EmailChangeRequestsPanel />
+
       {/* KPI tiles */}
       <div className="grid gap-3 mb-[18px]" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         <KpiTile label="Total accounts" value={total} sub="across all roles" />
@@ -205,6 +210,105 @@ export default function PrincipalAccounts() {
 }
 
 // ----------------------------------------------------------------------------
+
+/**
+ * 0240 (Loo 2026-07-19) — store email-change approval queue. A dealer
+ * principal files the request from the POS; approving here performs the REAL
+ * login-email swap (service_role, /api/principal/accounts routes). Hidden
+ * entirely while nothing is pending.
+ */
+export function EmailChangeRequestsPanel() {
+  const { data } = usePrincipalEmailChanges();
+  const decide = useDecideEmailChange();
+  const pending = (data?.requests ?? []).filter((r) => r.status === "pending");
+  if (pending.length === 0) return null;
+
+  function approve(r: (typeof pending)[number]) {
+    if (
+      !confirm(
+        `批准 ${r.dealerName ?? "this store"} 的登录邮箱改为 ${r.requestedEmail}？\n` +
+          `（原 ${r.currentEmail}；批准后店铺用新邮箱登录。）`,
+      )
+    ) {
+      return;
+    }
+    decide.mutate(
+      { id: r.id, action: "approve" },
+      {
+        onSuccess: () => toast.success(`已批准 · ${r.requestedEmail} 生效`),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not approve"),
+      },
+    );
+  }
+
+  function reject(r: (typeof pending)[number]) {
+    const note = prompt(`拒绝 ${r.dealerName ?? "this store"} 的改邮箱申请 — 给店家的备注（可留空）：`);
+    if (note === null) return; // cancelled the dialog
+    decide.mutate(
+      { id: r.id, action: "reject", note: note.trim() || undefined },
+      {
+        onSuccess: () => toast.success("已拒绝，店家会看到备注"),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not reject"),
+      },
+    );
+  }
+
+  return (
+    <section
+      className="rounded-md border border-warning/40 bg-warning-soft/40 p-5 mb-[22px]"
+      data-testid="email-change-panel"
+    >
+      <h2 className="text-xs uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
+        Email change requests · 店铺邮箱修改申请 ({pending.length})
+      </h2>
+      <ul className="divide-y divide-border">
+        {pending.map((r) => (
+          <li
+            key={r.id}
+            className="py-2.5 flex items-center justify-between gap-3 flex-wrap"
+            data-testid={`email-change-row-${r.id}`}
+          >
+            <div className="min-w-0 text-sm">
+              <div className="font-medium">
+                {r.dealerName ?? "—"}
+                <span className="ml-2 text-[11px] text-muted-foreground font-normal">
+                  by {r.requestedByName ?? "Store owner"} ·{" "}
+                  {new Date(r.createdAt).toLocaleDateString("en-MY", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+              </div>
+              <div className="text-[12.5px] text-muted-foreground font-mono mt-0.5">
+                {r.currentEmail} → <span className="text-foreground">{r.requestedEmail}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => approve(r)}
+                disabled={decide.isPending}
+                data-testid={`email-change-approve-${r.id}`}
+                className="text-[12px] font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                onClick={() => reject(r)}
+                disabled={decide.isPending}
+                data-testid={`email-change-reject-${r.id}`}
+                className="text-[12px] font-semibold text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
