@@ -4884,7 +4884,7 @@ function StepBadge({ n, state }: { n: number; state: JourneyState }) {
     <span
       className={`shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ${
         state === "done"
-          ? "bg-base-800 text-white"
+          ? "bg-base-200 text-base-500"
           : state === "act"
             ? "bg-error-soft text-danger ring-1 ring-danger"
             : state === "wait"
@@ -4947,14 +4947,14 @@ function JourneyCard({
                 className={`absolute ${
                   collapsed ? "left-1/2 -translate-x-1/2" : "left-[17px]"
                 } top-8 bottom-0 w-0.5 ${
-                  groundDone ? "bg-base-800" : "bg-base-200"
+                  groundDone ? "bg-base-300" : "bg-base-200"
                 }`}
               />
             )}
             <span
               className={`relative z-[1] w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
                 st.state === "done"
-                  ? "bg-base-800 text-white"
+                  ? "bg-base-200 text-base-500"
                   : st.state === "act"
                     ? "bg-error-soft text-danger ring-2 ring-danger"
                     : st.state === "wait"
@@ -4962,7 +4962,7 @@ function JourneyCard({
                       : "bg-white border-2 border-base-300 text-base-400"
               }`}
             >
-              {st.state === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}
+              {i + 1}
             </span>
             {!collapsed && (
               <span className="min-w-0">
