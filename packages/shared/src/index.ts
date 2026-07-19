@@ -1155,3 +1155,7 @@ export * from "./schemas/account";
 // Dealer vs Showroom — the naming rule for our own stores vs external
 // resellers, and for their branches (showroom vs outlet).
 export * from "./store-kind";
+
+// Printable-document numbering (loan note / receipt / DO / invoice) — the ONE
+// scheme: PREFIX-DDMMYY-NNNN, tail derived per-order (never a counter).
+export { docNumber, docTail, amendmentSuffix, type DocNumberInput } from "./doc-number";
