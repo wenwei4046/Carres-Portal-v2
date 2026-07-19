@@ -170,14 +170,28 @@ function stageOf(o: operationOrderListRow): OperationStage {
 }
 
 /** Which control tab an order belongs to. */
-function controlTabOf(o: operationOrderListRow): SettledTab {
+function controlTabOf(
+  o: operationOrderListRow,
+  availableBySku?: Map<string, number>,
+): SettledTab {
   const s = stageOf(o);
   if (s === "delivered") return "completed";
+  // Native POS order not yet proceeded stays "placed".
+  if (s === "placed" && o.source_system !== "autocount") return "placed";
+  // In-pipeline (proceeded / autocount / confirmed / in_production / dispatched).
+  // READINESS split (Jess 2026-07-19): the pipeline stage never advances in the
+  // portal (POs are raised outside), so tabs must read the REAL state — Pending
+  // = still waiting on stock OR a delivery slot; Scheduled = stock in AND a slot
+  // booked. Needs the live free-stock map; without it we fall back to the old
+  // stage mapping (used by the param-less `=== "completed"` callers).
+  if (availableBySku) {
+    const stockReady = stockBucketOf(o, availableBySku) === "Ready";
+    const logisticBooked = !!logisticEtaOf(o);
+    return stockReady && logisticBooked ? "scheduled" : "pending";
+  }
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
   if (s === "in_production") return "pending";
-  if (s === "confirmed") return "proceed";
-  // s === "placed": entry rule splits by source.
-  return o.source_system === "autocount" ? "proceed" : "placed";
+  return "proceed"; // confirmed OR autocount-placed
 }
 
 type StockState = "ready" | "in_stock" | "need_po" | "awaiting" | "unknown";
@@ -1359,15 +1373,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
       completed: 0,
       all: orders.length,
     };
-    for (const o of orders) c[controlTabOf(o)] += 1;
+    for (const o of orders) c[controlTabOf(o, availableBySku)] += 1;
     return c;
-  }, [orders]);
+  }, [orders, availableBySku]);
 
   // Status-tab filter first; the Urgent chip + region pills layer on top (all
   // stackable). The chip/region counts are computed over the tab-filtered set
   // so they reflect the current view.
   const tabFiltered = useMemo(
-    () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
+    () =>
+      tab === "all"
+        ? orders
+        : orders.filter((o) => controlTabOf(o, availableBySku) === tab),
     [orders, tab],
   );
   // LIVE scope (B rebuild, Jess 2026-07-18): every facet count runs over OPEN
@@ -3708,7 +3725,7 @@ function OrderRow({
           <span className="text-[12px] text-base-400">Delivered</span>
         ) : (
           (() => {
-            const stage = controlTabOf(o);
+            const stage = controlTabOf(o, availableBySku);
             const { label, cls } =
               stage === "pending"
                 ? { label: "Pending", cls: "pill-warning" }
