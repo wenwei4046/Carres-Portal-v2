@@ -4,6 +4,7 @@ import type {
   CatalogOptionPoolDto,
   ProductCategory,
   ProductModelDto,
+  ProductSkuDto,
   SofaCompartmentDto,
   VariantKind,
 } from "@carres/shared";
@@ -46,6 +47,12 @@ import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
  * chips, default all selected. Creating makes the model + ONE SKU PER TICKED
  * SIZE via the existing generate-skus endpoint (one optional price seeds them
  * all); pool edits auto-follow. Untick all → the classic single-SKU flow.
+ *
+ * ADD TO EXISTING MODEL (Loo 2026-07-21) -- picking a model surfaces the SAME
+ * option chips as "New product" for its category, filtered to what the model
+ * does NOT yet carry (custom sofa → unoffered compartments; mattress/bedframe
+ * → pool sizes with no live SKU), default NONE selected — tick just the
+ * additions. Flat sofas keep the free-text variant field.
  */
 
 type Mode = "new" | "existing";
@@ -67,11 +74,15 @@ function variantKindFor(category: ProductCategory, model?: ProductModelDto): Var
 
 export default function NewSkuModal({
   models,
+  skus = [],
   sofaCompartments = [],
   optionPools = [],
   onClose,
 }: {
   models: ProductModelDto[];
+  /** Full SKU list (catalog bundle) — "Add to existing model" filters the
+   *  compartment/size chips down to what the picked model doesn't have yet. */
+  skus?: ProductSkuDto[];
   /** Compartment pool (catalog bundle) — drives the sofa "pick compartments →
    *  auto-generate SKUs" path. Optional so non-catalog callers stay valid. */
   sofaCompartments?: SofaCompartmentDto[];
@@ -102,14 +113,47 @@ export default function NewSkuModal({
   // existing-model field
   const [modelId, setModelId] = useState("");
 
+  const sortedModels = useMemo(
+    () =>
+      [...models].sort(
+        (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
+      ),
+    [models],
+  );
+  const existingModel = sortedModels.find((m) => m.id === modelId);
+  // The category the option chips key off — the picked category (new) or the
+  // picked model's (existing): "Add to existing model" surfaces the SAME chips
+  // as "New product" (Loo 2026-07-21).
+  const effectiveCategory = mode === "new" ? category : existingModel?.category;
+
+  // The picked model's LIVE SKUs (discontinued excluded — a soft-retired
+  // compartment sku re-offers cleanly, so its chip stays offerable).
+  const liveModelSkus = useMemo(
+    () =>
+      mode === "existing" && existingModel
+        ? skus.filter((s) => s.modelId === existingModel.id && !s.discontinuedAt)
+        : [],
+    [mode, skus, existingModel],
+  );
+
   // Sofa compartment pool (active only, pool order). A new sofa model defaults
-  // to offering EVERY compartment — untick what this model doesn't offer.
+  // to offering EVERY compartment — untick what this model doesn't offer. In
+  // existing mode the chips are only the compartments NOT yet offered.
   const compPool = useMemo(
     () =>
       sofaCompartments
         .filter((c) => c.active)
         .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
     [sofaCompartments],
+  );
+  const offeredCompIds = useMemo(
+    () =>
+      new Set(liveModelSkus.map((s) => s.compartmentId).filter((x): x is string => x != null)),
+    [liveModelSkus],
+  );
+  const compChoices = useMemo(
+    () => (mode === "existing" ? compPool.filter((c) => !offeredCompIds.has(c.id)) : compPool),
+    [mode, compPool, offeredCompIds],
   );
   const [selectedComps, setSelectedComps] = useState<Set<string>>(
     () => new Set(compPool.map((c) => c.id)),
@@ -121,39 +165,54 @@ export default function NewSkuModal({
   const [createdModelId, setCreatedModelId] = useState<string | null>(null);
 
   // Mattress/bedframe SIZE pool (Special Add-ons → Sizes; Loo 2026-07-06) —
-  // the size field becomes pool chips, default ALL selected. Pool edits
-  // auto-follow; other categories keep the free-text size field.
+  // the size field becomes pool chips. Keyed off effectiveCategory so the
+  // existing-model path gets the same chips; there they're filtered to sizes
+  // the model has no live SKU for yet.
   const sizePool = useMemo(() => {
     const pool =
-      category === "mattress" ? "mattress_size" : category === "bedframe" ? "bedframe_size" : null;
+      effectiveCategory === "mattress"
+        ? "mattress_size"
+        : effectiveCategory === "bedframe"
+          ? "bedframe_size"
+          : null;
     if (!pool) return [] as CatalogOptionPoolDto[];
     return optionPools
       .filter((p) => p.pool === pool && p.active)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value));
-  }, [optionPools, category]);
+  }, [optionPools, effectiveCategory]);
+  const existingSizeNames = useMemo(
+    () => new Set(liveModelSkus.map((s) => canonicalSize(s.variant).name)),
+    [liveModelSkus],
+  );
+  const sizeChoices = useMemo(
+    () =>
+      mode === "existing"
+        ? sizePool.filter((p) => !existingSizeNames.has(canonicalSize(p.value).name))
+        : sizePool,
+    [mode, sizePool, existingSizeNames],
+  );
   const [selectedSizes, setSelectedSizes] = useState<Set<string>>(
     () => new Set(sizePool.map((p) => p.value)),
   );
-  // Category flips swap the pool (mattress ↔ bedframe ↔ none) — re-default to
-  // "all of the new pool". Locked once the model exists (category is disabled).
+  // Re-default the tick state when the chips swap under it (category flip /
+  // mode flip / model pick): new mode = ALL of the pool (untick what the
+  // product doesn't offer), existing mode = NONE (tick just the additions).
+  // Locked once the model exists (category is disabled).
   useEffect(() => {
-    if (createdModelId === null) setSelectedSizes(new Set(sizePool.map((p) => p.value)));
+    if (createdModelId !== null) return;
+    if (mode === "new") {
+      setSelectedComps(new Set(compPool.map((c) => c.id)));
+      setSelectedSizes(new Set(sizePool.map((p) => p.value)));
+    } else {
+      setSelectedComps(new Set());
+      setSelectedSizes(new Set());
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
-
-  const sortedModels = useMemo(
-    () =>
-      [...models].sort(
-        (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
-      ),
-    [models],
-  );
-  const existingModel = sortedModels.find((m) => m.id === modelId);
+  }, [mode, category, modelId]);
 
   const modelKey = mode === "new" ? deriveModelKey(name) : existingModel?.modelKey ?? "";
   // Mattress/bedframe sizes get a SHORT code suffix server-side (a typed "King"
   // becomes `-K`); preview that so the code shown matches what's created.
-  const effectiveCategory = mode === "new" ? category : existingModel?.category;
   const isBedVariant = effectiveCategory === "mattress" || effectiveCategory === "bedframe";
   // Accessory / service carry NO size/variant axis (one SKU per model, Loo
   // 2026-07-11): the field is hidden, nothing to fill — the server mints the
@@ -191,29 +250,36 @@ export default function NewSkuModal({
     (Number.isFinite(costNum as number) && (costNum as number) >= 0);
 
   // Sofa compartment path (principal-only — the per-compartment offer PUT is
-  // principal-gated server-side; everyone else keeps the classic flow).
-  const compSection = mode === "new" && category === "sofa" && isPrincipal;
+  // principal-gated server-side; everyone else keeps the classic flow). In
+  // existing mode only a CUSTOM sofa model gets the chips — flat sofas keep
+  // the free-text preset variant.
+  const compSection =
+    effectiveCategory === "sofa" &&
+    isPrincipal &&
+    (mode === "new" || existingModel?.sofaMode === "custom");
   const compFlow = compSection && (selectedComps.size > 0 || createdModelId !== null);
   const firstSelectedCode = compPool.find((c) => selectedComps.has(c.id))?.code ?? "";
 
   // Mattress/bedframe size path — internal-open (generate-skus is the same
   // endpoint the Modular "New Model" uses; a non-principal generates UNPRICED).
-  const sizeSection = mode === "new" && sizePool.length > 0;
+  const sizeSection = sizePool.length > 0;
   const sizeFlow = sizeSection && (selectedSizes.size > 0 || createdModelId !== null);
   const firstSelectedSize = sizePool.find((p) => selectedSizes.has(p.value))?.value ?? "";
   // Every generated bed SKU gets its auto description server-side — preview the
   // first ticked size's so the hint shows the exact format.
-  const firstSizeDescPreview = firstSelectedSize
-    ? autoBedSkuDescription(category, name, firstSelectedSize, sizePool)
-    : null;
+  const firstSizeDescPreview =
+    firstSelectedSize && (effectiveCategory === "mattress" || effectiveCategory === "bedframe")
+      ? autoBedSkuDescription(effectiveCategory, effectiveModelName, firstSelectedSize, sizePool)
+      : null;
 
+  // Chip flows: new mode needs a typed product name; existing mode needs the
+  // picked model. Both need ≥1 tick.
+  const chipTargetOk =
+    mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel;
   const valid = compFlow
-    ? name.trim().length >= 2 && modelKey.length >= 2 && selectedComps.size > 0
+    ? chipTargetOk && selectedComps.size > 0
     : sizeFlow
-      ? name.trim().length >= 2 &&
-        modelKey.length >= 2 &&
-        selectedSizes.size > 0 &&
-        (!isPrincipal || priceOk)
+      ? chipTargetOk && selectedSizes.size > 0 && (!isPrincipal || priceOk)
       : // No-variant-axis categories (accessory / service) need no size/variant.
         (noVariantAxis || variant.trim().length > 0) &&
         // Price/cost only gate validity when the principal can actually set them.
@@ -229,11 +295,12 @@ export default function NewSkuModal({
   async function submit() {
     if (!valid) return;
     try {
-      // Sofa compartment path — create the model (sofa_mode 'custom'), then
-      // offer every ticked compartment; each offer mints its real
-      // `{MODEL_KEY}-{code}` SKU server-side ("Sofa {Name} {code}").
+      // Sofa compartment path — create the model (sofa_mode 'custom') unless
+      // adding to an existing one, then offer every ticked compartment; each
+      // offer mints its real `{MODEL_KEY}-{code}` SKU server-side
+      // ("Sofa {Name} {code}").
       if (compFlow) {
-        let sofaModelId = createdModelId;
+        let sofaModelId = mode === "existing" ? existingModel!.id : createdModelId;
         if (!sofaModelId) {
           const res = await createModel.mutateAsync({
             category,
@@ -259,15 +326,19 @@ export default function NewSkuModal({
           return;
         }
         toast.success(
-          `Created ${name.trim()} + ${ids.length} compartment SKU${ids.length === 1 ? "" : "s"}`,
+          mode === "existing"
+            ? `Added ${ids.length} compartment SKU${ids.length === 1 ? "" : "s"} to ${existingModel!.name}`
+            : `Created ${name.trim()} + ${ids.length} compartment SKU${ids.length === 1 ? "" : "s"}`,
         );
         onClose();
         return;
       }
 
       // Mattress/bedframe size path — create the model (sizes seed the Modular
-      // pool) then materialize ONE SKU PER TICKED SIZE ({MODEL_KEY}-{size}) via
-      // the idempotent generate-skus endpoint. One optional price seeds all.
+      // pool) unless adding to an existing one, then materialize ONE SKU PER
+      // TICKED SIZE ({MODEL_KEY}-{size}) via the idempotent generate-skus
+      // endpoint (which also unions new sizes into allowed_options.sizes for
+      // the sizes-active cascade). One optional price seeds all.
       if (sizeFlow) {
         // Store the FULL name (Single / Super Single / Queen / King) as the size
         // — the server keeps the SKU code short (`-K`) but the SIZE reads the
@@ -276,7 +347,7 @@ export default function NewSkuModal({
         const sizes = sizePool
           .filter((p) => selectedSizes.has(p.value))
           .map((p) => canonicalSize(p.value).name);
-        let sizeModelId = createdModelId;
+        let sizeModelId = mode === "existing" ? existingModel!.id : createdModelId;
         if (!sizeModelId) {
           const res = await createModel.mutateAsync({
             category,
@@ -293,7 +364,9 @@ export default function NewSkuModal({
           input: { variants: sizes, price: isPrincipal && priceNum > 0 ? priceNum : undefined },
         });
         toast.success(
-          `Created ${name.trim()} + ${r.generated} SKU${r.generated === 1 ? "" : "s"}`,
+          mode === "existing"
+            ? `Added ${r.generated} SKU${r.generated === 1 ? "" : "s"} to ${existingModel!.name}`
+            : `Created ${name.trim()} + ${r.generated} SKU${r.generated === 1 ? "" : "s"}`,
         );
         onClose();
         return;
@@ -401,112 +474,151 @@ export default function NewSkuModal({
                 </div>
               )}
             </label>
-            {compSection && (
-              <div className="block" data-testid="new-sku-compartments">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="label">Compartments</span>
-                  {compPool.length > 0 && (
-                    <div className="flex items-center gap-2.5">
+          </>
+        ) : (
+          <label className="block">
+            <span className="label block mb-1">Model</span>
+            <select
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              data-testid="new-sku-model"
+              className={INPUT_CLS}
+            >
+              <option value="">Select a model...</option>
+              {sortedModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {CATEGORY_LABEL[m.category]} {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {/* Option chips — shared by BOTH modes (Loo 2026-07-21): custom sofa →
+            compartment pool; mattress/bedframe → size pool. In existing mode
+            the chips are pre-filtered to what the model doesn't carry yet. */}
+        {compSection && (
+          <div className="block" data-testid="new-sku-compartments">
+            <div className="flex items-center justify-between mb-1">
+              <span className="label">Compartments</span>
+              {compChoices.length > 0 && (
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedComps(new Set(compChoices.map((c) => c.id)))}
+                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    data-testid="new-sku-comps-all"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedComps(new Set())}
+                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    data-testid="new-sku-comps-none"
+                  >
+                    None
+                  </button>
+                </div>
+              )}
+            </div>
+            {compPool.length === 0 ? (
+              <div className="t-tiny text-base-500">
+                No compartments in the pool yet — add them in Maintenance → Sofa
+                Compartments, or use the size field below for a flat sofa SKU.
+              </div>
+            ) : compChoices.length === 0 ? (
+              <div className="t-tiny text-base-500" data-testid="new-sku-comps-none-left">
+                This model already offers every pool compartment — nothing left to add.
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {compChoices.map((comp) => {
+                    const on = selectedComps.has(comp.id);
+                    return (
                       <button
+                        key={comp.id}
                         type="button"
-                        onClick={() => setSelectedComps(new Set(compPool.map((c) => c.id)))}
-                        className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
-                        data-testid="new-sku-comps-all"
+                        onClick={() =>
+                          setSelectedComps((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(comp.id)) next.delete(comp.id);
+                            else next.add(comp.id);
+                            return next;
+                          })
+                        }
+                        aria-pressed={on}
+                        title={comp.description ?? comp.code}
+                        className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                          on
+                            ? "bg-base-900 border-base-900 text-white"
+                            : "bg-white border-base-200 text-base-500 hover:border-base-400"
+                        }`}
+                        data-testid={`new-sku-comp-${comp.code}`}
                       >
-                        All
+                        {comp.code}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedComps(new Set())}
-                        className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
-                        data-testid="new-sku-comps-none"
-                      >
-                        None
-                      </button>
-                    </div>
+                    );
+                  })}
+                </div>
+                <div className="t-tiny text-base-500 mt-1.5">
+                  {selectedComps.size > 0 ? (
+                    <>
+                      Every sofa is a combination of compartments — auto-generates{" "}
+                      <span className="text-base-700 font-medium">{selectedComps.size}</span>{" "}
+                      SKU{selectedComps.size === 1 ? "" : "s"}, e.g.{" "}
+                      <span className="font-mono text-base-700">
+                        {(modelKey || "model").toUpperCase()}-{firstSelectedCode}
+                      </span>{" "}
+                      · &quot;Sofa {effectiveModelName.trim() || "…"} {firstSelectedCode}&quot;.{" "}
+                      {mode === "existing"
+                        ? "Only compartments this model doesn't offer yet are shown; prices are set per SKU in SKU Master."
+                        : "Untick what this model doesn't offer; prices are set per SKU in SKU Master."}
+                    </>
+                  ) : mode === "existing" ? (
+                    <>Tick the compartments to add — each mints its real SKU.</>
+                  ) : (
+                    <>None selected — creates a single flat sofa SKU from the size field below.</>
                   )}
                 </div>
-                {compPool.length === 0 ? (
-                  <div className="t-tiny text-base-500">
-                    No compartments in the pool yet — add them in Maintenance → Sofa
-                    Compartments, or use the size field below for a flat sofa SKU.
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap gap-1.5">
-                      {compPool.map((comp) => {
-                        const on = selectedComps.has(comp.id);
-                        return (
-                          <button
-                            key={comp.id}
-                            type="button"
-                            onClick={() =>
-                              setSelectedComps((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(comp.id)) next.delete(comp.id);
-                                else next.add(comp.id);
-                                return next;
-                              })
-                            }
-                            aria-pressed={on}
-                            title={comp.description ?? comp.code}
-                            className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
-                              on
-                                ? "bg-base-900 border-base-900 text-white"
-                                : "bg-white border-base-200 text-base-500 hover:border-base-400"
-                            }`}
-                            data-testid={`new-sku-comp-${comp.code}`}
-                          >
-                            {comp.code}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="t-tiny text-base-500 mt-1.5">
-                      {selectedComps.size > 0 ? (
-                        <>
-                          Every sofa is a combination of compartments — auto-generates{" "}
-                          <span className="text-base-700 font-medium">{selectedComps.size}</span>{" "}
-                          SKU{selectedComps.size === 1 ? "" : "s"}, e.g.{" "}
-                          <span className="font-mono text-base-700">
-                            {(modelKey || "model").toUpperCase()}-{firstSelectedCode}
-                          </span>{" "}
-                          · &quot;Sofa {name.trim() || "…"} {firstSelectedCode}&quot;. Untick what
-                          this model doesn&apos;t offer; prices are set per SKU in SKU Master.
-                        </>
-                      ) : (
-                        <>None selected — creates a single flat sofa SKU from the size field below.</>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+              </>
             )}
-            {sizeSection && (
-              <div className="block" data-testid="new-sku-sizes">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="label">Sizes</span>
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSizes(new Set(sizePool.map((p) => p.value)))}
-                      className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
-                      data-testid="new-sku-sizes-all"
-                    >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSizes(new Set())}
-                      className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
-                      data-testid="new-sku-sizes-none"
-                    >
-                      None
-                    </button>
-                  </div>
+          </div>
+        )}
+        {sizeSection && (
+          <div className="block" data-testid="new-sku-sizes">
+            <div className="flex items-center justify-between mb-1">
+              <span className="label">Sizes</span>
+              {sizeChoices.length > 0 && (
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSizes(new Set(sizeChoices.map((p) => p.value)))}
+                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    data-testid="new-sku-sizes-all"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSizes(new Set())}
+                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    data-testid="new-sku-sizes-none"
+                  >
+                    None
+                  </button>
                 </div>
+              )}
+            </div>
+            {sizeChoices.length === 0 ? (
+              <div className="t-tiny text-base-500" data-testid="new-sku-sizes-none-left">
+                This model already has a SKU for every pool size — nothing left to add.
+              </div>
+            ) : (
+              <>
                 <div className="flex flex-wrap gap-1.5">
-                  {sizePool.map((p) => {
+                  {sizeChoices.map((p) => {
                     const on = selectedSizes.has(p.value);
                     return (
                       <button
@@ -549,33 +661,20 @@ export default function NewSkuModal({
                           <span className="font-mono text-base-700">{firstSizeDescPreview}</span>
                         </>
                       )}
-                      . Untick the sizes this product doesn&apos;t come in — the list follows
-                      Special Add-ons → Sizes.
+                      .{" "}
+                      {mode === "existing"
+                        ? "Only sizes this model doesn't have yet are shown — the list follows Special Add-ons → Sizes."
+                        : "Untick the sizes this product doesn't come in — the list follows Special Add-ons → Sizes."}
                     </>
+                  ) : mode === "existing" ? (
+                    <>Tick the sizes to add — one SKU per size.</>
                   ) : (
                     <>None selected — creates a single SKU from the size field below.</>
                   )}
                 </div>
-              </div>
+              </>
             )}
-          </>
-        ) : (
-          <label className="block">
-            <span className="label block mb-1">Model</span>
-            <select
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-              data-testid="new-sku-model"
-              className={INPUT_CLS}
-            >
-              <option value="">Select a model...</option>
-              {sortedModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {CATEGORY_LABEL[m.category]} {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          </div>
         )}
 
         {/* Size path keeps ONE price field — it seeds every generated SKU. */}
@@ -608,8 +707,10 @@ export default function NewSkuModal({
 
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
             descriptions + prices all derive per compartment there) AND on the
-            size path (one SKU per ticked size instead). */}
-        {!compFlow && !sizeFlow && (
+            size path (one SKU per ticked size instead). In existing mode a
+            chip section OWNS the flow outright (no free-text fallback — the
+            additions are picked, not typed). */}
+        {!compFlow && !sizeFlow && !(mode === "existing" && (compSection || sizeSection)) && (
           <>
             {noVariantAxis ? (
               // Accessory / service: no size/variant axis — nothing to fill.
@@ -628,7 +729,7 @@ export default function NewSkuModal({
                 <input
                   value={variant}
                   onChange={(e) => setVariant(e.target.value)}
-                  placeholder={category === "sofa" ? "3-seater" : "King"}
+                  placeholder={effectiveCategory === "sofa" ? "3-seater" : "King"}
                   data-testid="new-sku-variant"
                   className={INPUT_CLS}
                 />
@@ -708,9 +809,13 @@ export default function NewSkuModal({
         onPrimary={submit}
         primary={
           compFlow
-            ? `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
+            ? mode === "existing"
+              ? `Add ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
+              : `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
             : sizeFlow
-              ? `Create model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
+              ? mode === "existing"
+                ? `Add ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
+                : `Create model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
               : mode === "new"
                 ? "Create product + SKU"
                 : "Add SKU"
