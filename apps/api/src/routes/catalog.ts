@@ -835,12 +835,17 @@ catalogRouter.patch("/skus/:id", async (c) => {
   return c.json({ sku: Adapters.productSkuFromRow(data as DB.ProductSkuRow) });
 });
 
+// Loo 2026-07-20 — Delete = the SKU is GONE for good (was a soft
+// discontinued_at stamp; Loo: "如果选择 delete，就是这个 SKU 永远消失").
+// Order/PO lines are unaffected — they store the sku as a text snapshot, no FK.
+// Soft retirement still exists as `discontinued_at` via PATCH (and the
+// compartment un-offer path keeps soft-discontinuing by design).
 catalogRouter.delete("/skus/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("product_skus")
-    .update({ discontinued_at: new Date().toISOString() })
+    .delete()
     .eq("id", id)
     .select("id")
     .maybeSingle();

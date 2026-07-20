@@ -286,12 +286,26 @@ describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", (
   });
 });
 
-describe("SkuMasterTab — Edit Prices mode (price only; cost input removed)", () => {
-  it("shows the price input but NO cost input in Edit Prices mode", () => {
+// Loo 2026-07-20 — the separate "Edit Prices" toggle is GONE: the row Edit
+// opens the Price + PWP cells too (principal only; product name stays locked).
+describe("SkuMasterTab — row Edit opens price cells (no Edit Prices button)", () => {
+  it("has no Edit Prices button; row Edit shows the price input but NO cost input", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
     expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
+    expect(screen.getByLabelText("CLOUD-KING PWP price")).toBeInTheDocument();
     expect(screen.queryByLabelText("CLOUD-KING cost")).not.toBeInTheDocument();
+  });
+
+  it("price edit commits on blur through the row Edit", async () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    const price = screen.getByLabelText("CLOUD-KING price");
+    fireEvent.change(price, { target: { value: "3999" } });
+    fireEvent.blur(price);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    expect(mockPatchMutate.mock.calls[0][0].patch).toEqual({ price: 3999 });
   });
 });
 
@@ -395,19 +409,21 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
 // full edit (Task-1 behaviour above).
 // ---------------------------------------------------------------------------
 describe("0175 — price/cost lock (non-principal read-only)", () => {
-  it("principal sees the 'Edit Prices' button", () => {
+  it("principal: row Edit opens the price cell, no lock hint shown", () => {
     mockRole = "principal";
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    expect(screen.getByTestId("sku-edit-prices")).toBeInTheDocument();
     expect(screen.queryByTestId("sku-price-lock-hint")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
   });
 
-  it("operation (non-principal) sees NO 'Edit Prices' button, shows the lock hint", () => {
+  it("operation (non-principal): lock hint shows; row Edit keeps price READ-ONLY", () => {
     mockRole = "operation";
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
     expect(screen.getByTestId("sku-price-lock-hint")).toBeInTheDocument();
-    // The row renders read-only (no inline inputs anywhere).
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    // code/description/size/category flip to inputs, but never the price cells.
+    expect(screen.getByLabelText("CLOUD-KING code")).toBeInTheDocument();
     const row = screen.getByTestId("sku-row-CLOUD-KING");
     expect(row.querySelector('input[type="number"]')).toBeNull();
   });
@@ -528,10 +544,10 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
     expect(screen.getByTestId("sku-row-LUNA-1A(LHF)")).toBeInTheDocument();
   });
 
-  it("Edit Prices: a size-cell blur PATCHes the FULL map — composed edits + ORPHANED keys preserved", async () => {
+  it("row Edit: a size-cell blur PATCHes the FULL map — composed edits + ORPHANED keys preserved", async () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
     const input32 = screen.getByLabelText("LUNA-1A(LHF) price at 32");
     fireEvent.change(input32, { target: { value: "1200" } });
     fireEvent.blur(input32);
@@ -543,10 +559,10 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
     expect(call.patch.pricesBySize).toEqual({ "24": 900, "32": 1200, "99": 555 });
   });
 
-  it("Edit Prices: blanking a size removes its key (falls back to the base price)", async () => {
+  it("row Edit: blanking a size removes its key (falls back to the base price)", async () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
     const input24 = screen.getByLabelText("LUNA-1A(LHF) price at 24");
     fireEvent.change(input24, { target: { value: "" } });
     fireEvent.blur(input24);
@@ -555,10 +571,10 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
     expect(call.patch.pricesBySize).toEqual({ "99": 555 });
   });
 
-  it("Edit Prices: blur without a change is a no-op (no PATCH)", () => {
+  it("row Edit: blur without a change is a no-op (no PATCH)", () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
     fireEvent.blur(screen.getByLabelText("LUNA-1A(LHF) price at 24"));
     expect(mockPatchMutate).not.toHaveBeenCalled();
   });

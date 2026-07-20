@@ -28,8 +28,14 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  * Row "Edit" (Loo 2026-07-06) = INLINE editing, no modal: the row's code
  * (its variant segment — the server re-derives `{MODEL_KEY}-{variant}`),
  * description, and product category flip to inputs that commit on blur.
- * "Edit Prices" separately flips the Price cells to inline inputs. Price 0
- * renders as a muted "not set" — NEVER coerced to 0.
+ * Loo 2026-07-20: the row Edit ALSO opens the Price / PWP cells (principal
+ * only, 0175) — everything on the row is editable except the product name.
+ * The separate "Edit Prices" toggle is gone. Price 0 renders as a muted
+ * "not set" — NEVER coerced to 0.
+ *
+ * "Delete N" (Loo 2026-07-20) = PERMANENT delete — the SKU row is gone for
+ * good (order/PO history keeps its sku text snapshot). Soft retirement stays
+ * available as discontinued_at via PATCH.
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -69,7 +75,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [category, setCategory] = useState<CatFilter>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -186,8 +191,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     if (selected.size === 0) return;
     if (
       !confirm(
-        `Discontinue ${selected.size} SKU${selected.size === 1 ? "" : "s"}? ` +
-          `Existing orders/POs keep working; new ones won't see them.`,
+        `Permanently delete ${selected.size} SKU${selected.size === 1 ? "" : "s"}? ` +
+          `This cannot be undone. Existing orders/POs keep their line history.`,
       )
     )
       return;
@@ -195,7 +200,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     const results = await Promise.allSettled(ids.map((id) => del.mutateAsync(id)));
     const failed = results.filter((r) => r.status === "rejected").length;
     setSelected(new Set());
-    if (failed === 0) toast.success(`Discontinued ${ids.length} SKU${ids.length === 1 ? "" : "s"}`);
+    if (failed === 0) toast.success(`Deleted ${ids.length} SKU${ids.length === 1 ? "" : "s"}`);
     else toast.error(`${ids.length - failed} done · ${failed} failed`);
   }
 
@@ -247,16 +252,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               {del.isPending ? "Working…" : `Delete ${selected.size}`}
             </button>
           )}
-          {isPrincipal ? (
-            <button
-              type="button"
-              onClick={() => setEditMode((v) => !v)}
-              className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
-              data-testid="sku-edit-prices"
-            >
-              {editMode ? "Done editing" : "Edit Prices"}
-            </button>
-          ) : (
+          {!isPrincipal && (
             <span
               className="t-tiny text-base-400 italic"
               data-testid="sku-price-lock-hint"
@@ -384,7 +380,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <SkuRowView
             key={r.sku.id}
             row={r}
-            editMode={editMode && isPrincipal}
+            canEditPrices={isPrincipal}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
             inlineEdit={inlineEditId === r.sku.id}
@@ -410,7 +406,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
 
 const SkuRowView = memo(function SkuRowView({
   row,
-  editMode,
+  canEditPrices,
   selected,
   onToggle,
   inlineEdit,
@@ -419,11 +415,13 @@ const SkuRowView = memo(function SkuRowView({
   gridCols,
 }: {
   row: FlatRow;
-  editMode: boolean;
+  /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
+  canEditPrices: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
   /** Loo 2026-07-06 — row-level inline editing (code / description / category),
-   *  toggled by the row's Edit button. No modal. */
+   *  toggled by the row's Edit button. No modal. Loo 2026-07-20: the same
+   *  toggle now also opens the Price / PWP cells (principal only). */
   inlineEdit: boolean;
   onToggleInline: (id: string) => void;
   /** 0204 — non-null = render the sofa-size grid variant (one price cell per
@@ -432,6 +430,7 @@ const SkuRowView = memo(function SkuRowView({
   gridCols: string;
 }) {
   const { sku, model, category, productName } = row;
+  const priceEdit = inlineEdit && canEditPrices;
   const patch = usePatchCatalogSku();
   const patchModel = usePatchCatalogModel();
   const discontinued = !!sku.discontinuedAt;
@@ -611,7 +610,7 @@ const SkuRowView = memo(function SkuRowView({
         {codeCell}
         {descriptionCell}
         {sku.compartmentId != null ? (
-          <CompartmentSizeCells sku={sku} sizes={sofaSizes} editMode={editMode} />
+          <CompartmentSizeCells sku={sku} sizes={sofaSizes} editMode={priceEdit} />
         ) : (
           <div
             className="text-right"
@@ -619,7 +618,7 @@ const SkuRowView = memo(function SkuRowView({
             data-testid={`sku-flat-price-${sku.sku}`}
           >
             <span className="t-tiny text-base-400 mr-1.5">flat SKU · one price</span>
-            {editMode ? (
+            {priceEdit ? (
               <input
                 type="number"
                 min={0}
@@ -703,7 +702,7 @@ const SkuRowView = memo(function SkuRowView({
 
       {/* Price */}
       <div className="text-right">
-        {editMode ? (
+        {priceEdit ? (
           <input
             type="number"
             min={0}
@@ -725,7 +724,7 @@ const SkuRowView = memo(function SkuRowView({
 
       {/* PWP Price (0186) — the reward price when this SKU is a PWP reward. */}
       <div className="text-right" data-testid={`sku-pwp-${sku.sku}`}>
-        {editMode ? (
+        {priceEdit ? (
           <input
             type="number"
             min={0}

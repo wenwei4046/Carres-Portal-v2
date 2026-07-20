@@ -590,6 +590,49 @@ describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () =>
   });
 });
 
+// Loo 2026-07-20 — SKU Delete is PERMANENT (a real DELETE, no discontinued_at
+// stamp). Models keep the soft-delete above; the compartment un-offer path
+// keeps soft-discontinuing its synced sku (asserted in the un-offer test).
+describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
+  const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
+
+  it("issues a real DELETE (no discontinued_at update) and returns ok", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { id: SKU_ID },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(recorded.find((r) => r.op === "delete" && r.table === "product_skus")).toBeTruthy();
+    expect(recorded.find((r) => r.op === "update")).toBeUndefined();
+  });
+
+  it("404s when the sku does not exist", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ writeReturn: null }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("Catalog admin — POST /api/catalog/skus", () => {
   it("derives sku as {MODEL_KEY}-{variant} (Loo 2026-06-14, dash format)", async () => {
     const recorded: AdminCall[] = [];
