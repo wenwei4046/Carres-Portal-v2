@@ -1372,6 +1372,26 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       .select("id");
     if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
     generated = (data ?? []).length;
+
+    // Loo 2026-07-21 — generating a size onto an EXISTING model must also join
+    // the sizes-active set: allowed_options.sizes drives the Modular toggle +
+    // the POS size cascade, so a size generated but absent there would exist
+    // yet never be offerable. Union (never replace) so deliberately-inactive
+    // sizes stay off; the create-model path already seeds sizes = no-op there.
+    if (isBedCategory) {
+      const missing = toInsert.map((r) => r.variant).filter((n) => !optSizes.includes(n));
+      if (missing.length > 0) {
+        const nextOpts = {
+          ...((modelRow.allowed_options as Record<string, unknown>) ?? {}),
+          sizes: [...optSizes, ...missing],
+        };
+        const { error: aoErr } = await sb
+          .from("product_models")
+          .update({ allowed_options: nextOpts })
+          .eq("id", id);
+        if (aoErr) { const m = mapPgError(aoErr); return c.json(m.body, m.status); }
+      }
+    }
   }
   return c.json({ ok: true, generated, skipped: variants.length - generated });
 });

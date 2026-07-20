@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import type { ProductModelDto, SofaCompartmentDto } from "@carres/shared";
+import type { ProductModelDto, ProductSkuDto, SofaCompartmentDto } from "@carres/shared";
 import NewSkuModal from "./NewSkuModal";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -440,5 +440,173 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
     expect(mockCreateSkuMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "" }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loo 2026-07-21 — "Add to existing model" surfaces the SAME option chips as
+// "New product", filtered to what the picked model does NOT yet carry:
+// custom sofa → unoffered compartments; mattress/bedframe → sizes with no
+// live SKU. Default NONE selected (tick just the additions); the free-text
+// variant field is gone whenever a chip section owns the flow.
+// ---------------------------------------------------------------------------
+const exModel = (
+  over: Pick<ProductModelDto, "id" | "category" | "modelKey" | "name"> &
+    Partial<ProductModelDto>,
+): ProductModelDto => ({ blurb: null, colors: null, gaps: null, sofaMode: null, ...over });
+
+const exSku = (
+  id: string,
+  modelId: string,
+  skuCode: string,
+  variant: string,
+  compartmentId: string | null = null,
+  discontinuedAt: string | null = null,
+): ProductSkuDto => ({
+  id,
+  modelId,
+  sku: skuCode,
+  variant,
+  variantKind: compartmentId ? "part" : "size",
+  price: 0,
+  cost: null,
+  supplierId: null,
+  discontinuedAt,
+  compartmentId,
+});
+
+const EXISTING_MODELS: ProductModelDto[] = [
+  exModel({ id: "m-sofa", category: "sofa", modelKey: "annsa", name: "Annsa", sofaMode: "custom" }),
+  exModel({ id: "m-flat", category: "sofa", modelKey: "oldflat", name: "Old Flat" }),
+  exModel({ id: "m-mat", category: "mattress", modelKey: "forte", name: "Forte" }),
+];
+
+// Annsa already offers c1; Forte already has Single + Queen.
+const EXISTING_SKUS: ProductSkuDto[] = [
+  exSku("s1", "m-sofa", "ANNSA-1A(LHF)", "1A(LHF)", "c1"),
+  exSku("s2", "m-mat", "FORTE-S", "Single"),
+  exSku("s3", "m-mat", "FORTE-Q", "Queen"),
+];
+
+function pickExisting(modelId: string) {
+  fireEvent.click(screen.getByTestId("new-sku-mode-existing"));
+  fireEvent.change(screen.getByTestId("new-sku-model"), { target: { value: modelId } });
+}
+
+describe("NewSkuModal — Add to existing model: option chips", () => {
+  it("custom sofa model: chips = UNOFFERED compartments only, none selected, no free-text variant", () => {
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={EXISTING_SKUS}
+        sofaCompartments={POOL}
+        onClose={vi.fn()}
+      />,
+    );
+    pickExisting("m-sofa");
+    // c1 is already offered → hidden; c2 shows, unticked.
+    expect(screen.queryByTestId("new-sku-comp-1A(LHF)")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-comp-1NA")).toHaveAttribute("aria-pressed", "false");
+    // The chip section owns the flow — no free-text fallback fields.
+    expect(screen.queryByTestId("new-sku-variant")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
+  });
+
+  it("custom sofa model: submit offers ONLY the ticked additions — never re-creates the model", async () => {
+    const onClose = vi.fn();
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={EXISTING_SKUS}
+        sofaCompartments={POOL}
+        onClose={onClose}
+      />,
+    );
+    pickExisting("m-sofa");
+    fireEvent.click(screen.getByTestId("new-sku-comp-1NA"));
+    mockOfferMutateAsync.mockResolvedValue({ offered: 1, failed: [] });
+    fireEvent.click(screen.getByText("Add 1 SKU"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateModelMutateAsync).not.toHaveBeenCalled();
+    expect(mockOfferMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-sofa",
+      compartmentIds: ["c2"],
+    });
+    expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("a DISCONTINUED compartment sku keeps its chip offerable (re-offer revives it)", () => {
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={[
+          ...EXISTING_SKUS,
+          exSku("s4", "m-sofa", "ANNSA-1NA", "1NA", "c2", "2026-07-01T00:00:00Z"),
+        ]}
+        sofaCompartments={POOL}
+        onClose={vi.fn()}
+      />,
+    );
+    pickExisting("m-sofa");
+    expect(screen.getByTestId("new-sku-comp-1NA")).toBeInTheDocument();
+  });
+
+  it("mattress model: chips = sizes WITHOUT a live SKU, none selected; submit generate-skus onto the model", async () => {
+    const onClose = vi.fn();
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={EXISTING_SKUS}
+        optionPools={SIZE_POOLS}
+        onClose={onClose}
+      />,
+    );
+    pickExisting("m-mat");
+    // Single + Queen exist → only King left.
+    expect(screen.queryByTestId("new-sku-size-S")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-size-Q")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-K")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("new-sku-variant")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("new-sku-size-K"));
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "1990" } });
+    mockGenerateSkusMutateAsync.mockResolvedValue({ ok: true, generated: 1, skipped: 0 });
+    fireEvent.click(screen.getByText("Add 1 SKU"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateModelMutateAsync).not.toHaveBeenCalled();
+    expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-mat",
+      input: { variants: ["King"], price: 1990 },
+    });
+  });
+
+  it("model already has every pool size → 'nothing left to add' hint", () => {
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={[...EXISTING_SKUS, exSku("s5", "m-mat", "FORTE-K", "King")]}
+        optionPools={SIZE_POOLS}
+        onClose={vi.fn()}
+      />,
+    );
+    pickExisting("m-mat");
+    expect(screen.getByTestId("new-sku-sizes-none-left")).toBeInTheDocument();
+  });
+
+  it("FLAT sofa model keeps the classic free-text variant field", () => {
+    render(
+      <NewSkuModal
+        models={EXISTING_MODELS}
+        skus={EXISTING_SKUS}
+        sofaCompartments={POOL}
+        onClose={vi.fn()}
+      />,
+    );
+    pickExisting("m-flat");
+    expect(screen.queryByTestId("new-sku-compartments")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
+    expect(screen.getByText("Add SKU")).toBeInTheDocument();
   });
 });

@@ -1664,6 +1664,74 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
       expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
     ]);
   });
+
+  // Loo 2026-07-21 — adding a size to an EXISTING model unions it into
+  // allowed_options.sizes (the sizes-active cascade / POS size source);
+  // deliberately-inactive existing sizes are never clobbered (union, not
+  // replace), and an already-listed size triggers no write.
+  it("unions freshly generated sizes into allowed_options.sizes", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "forte",
+            allowed_options: { sizes: ["Queen"], specials: ["X1"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb33" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = records.find((r) => r.table === "product_models" && r.op === "update");
+    // Union keeps Queen + the other allowed_options keys untouched.
+    expect(upd?.body).toEqual({
+      allowed_options: { sizes: ["Queen", "King"], specials: ["X1"] },
+    });
+  });
+
+  it("an already-listed size triggers NO allowed_options write", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "forte",
+            allowed_options: { sizes: ["King"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb34" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(records.find((r) => r.table === "product_models" && r.op === "update")).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
