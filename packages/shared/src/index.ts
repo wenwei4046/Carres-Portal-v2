@@ -947,6 +947,15 @@ export {
   type CanonicalSize,
 } from "./mattress-sizes";
 
+// Auto-generated SKU descriptions (Loo 2026-07-20): mattress/bedframe
+// `{CATEGORY}-CR-{dimensions}` (size-pool lookup) + sofa compartment
+// `Sofa {Model} {code}`. Accessory/service stay manual.
+export {
+  autoBedSkuDescription,
+  sofaSkuDescription,
+  type SizePoolDimensions,
+} from "./sku-description";
+
 // 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
 // shared by the staged-preview client and the import endpoint.
 export {

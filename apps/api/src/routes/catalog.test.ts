@@ -443,6 +443,15 @@ function buildWriteSb(opts: {
       if (mode === "write") return { data: writeError ? null : writeReturn, error: writeError };
       return { data: rows[0] ?? null, error: null };
     };
+    // Thenable — list reads awaited directly (`await sb.from(t).select().eq()`),
+    // e.g. the size-pool lookup behind the bed auto-description. Write-mode await
+    // mirrors maybeSingle so the delete-route bare await keeps its falsy error.
+    chain.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
+      resolve(
+        mode === "write"
+          ? { data: writeError ? null : writeReturn, error: writeError }
+          : { data: rows, error: null },
+      );
     void writeBody; // silenced; the recorded payload is what assertions read
     return chain;
   };
@@ -1556,6 +1565,180 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
       expect.objectContaining({ sku: "LUMI-CLASSIC-K", variant: "King" }),
       expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auto-generated SKU descriptions (Loo 2026-07-20): bed SKUs created with a
+// blank description get `{CATEGORY}-CR-{dimensions}` stamped from the
+// Maintenance size pool; a typed description always wins; accessory/service
+// stay manual (covered implicitly — no pool read runs for them).
+// ---------------------------------------------------------------------------
+
+describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)", () => {
+  const SIZE_POOL_ROWS = [
+    { pool: "mattress_size", value: "K", label: "6FT", dimensions: "183X190CM" },
+    { pool: "mattress_size", value: "SS", label: "3.5FT", dimensions: "107X190CM" },
+  ];
+
+  const skuWriteReturn = {
+    id: "00000000-0000-0000-0000-00000000bb40",
+    model_id: MODEL_ID_LIVE,
+    sku: "CARRES-CLASSIC-K",
+    variant: "King",
+    variant_kind: "size",
+    price: 1800,
+    cost: null,
+    supplier_id: "00000000-0000-0000-0000-00000000ff01",
+    discontinued_at: null,
+    pos_active: true,
+    description: "MATTRESS-CR-183X190CM",
+  };
+
+  it("POST /skus (mattress, blank description) stamps MATTRESS-CR-{dims} from the size pool", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ff01" }],
+          catalog_option_pools: SIZE_POOL_ROWS,
+        },
+        recorded,
+        writeReturn: skuWriteReturn,
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "King",
+          variantKind: "size",
+          price: 1800,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert" && r.table === "product_skus");
+    expect((insert?.payload as { description: unknown }).description).toBe(
+      "MATTRESS-CR-183X190CM",
+    );
+  });
+
+  it("POST /skus — a typed description WINS over the auto one", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ff01" }],
+          catalog_option_pools: SIZE_POOL_ROWS,
+        },
+        recorded,
+        writeReturn: { ...skuWriteReturn, description: "Hand-typed" },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "King",
+          variantKind: "size",
+          price: 1800,
+          description: "Hand-typed",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert" && r.table === "product_skus");
+    expect((insert?.payload as { description: unknown }).description).toBe("Hand-typed");
+  });
+
+  it("generate-skus stamps a per-size description on every generated bed SKU", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "lumi-classic",
+            allowed_options: {},
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+          catalog_option_pools__list: SIZE_POOL_ROWS,
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb41" },
+          { id: "00000000-0000-0000-0000-00000000bb42" },
+        ],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K", "SS"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      description: string | null;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", description: "MATTRESS-CR-183X190CM" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", description: "MATTRESS-CR-107X190CM" }),
+    ]);
+  });
+
+  it("generate-skus with NO pool dimensions leaves descriptions null (never blocks)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "lumi-classic",
+            allowed_options: {},
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+          // no catalog_option_pools__list — empty pool
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb43" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      description: string | null;
+    }[];
+    expect(rows[0]?.description).toBeNull();
   });
 });
 
