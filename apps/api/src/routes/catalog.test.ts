@@ -597,13 +597,26 @@ describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () =>
 // keeps soft-discontinuing its synced sku (asserted in the un-offer test).
 describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
   const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
+  // The route pre-fetches the target by id (compartment gate) BEFORE deleting,
+  // so every non-404 test seeds the target row in reads.product_skus. The
+  // SAME reads array later serves the post-delete count (filtered by the
+  // model_id the DELETE returned) — the mock is a static snapshot, so the
+  // last-SKU test gives the seeded target a model_id the count filter won't
+  // match (the row "left with the delete").
+  const targetRow = (over: Record<string, unknown> = {}) => ({
+    id: SKU_ID,
+    model_id: MODEL_ID_LIVE,
+    compartment_id: null,
+    ...over,
+  });
 
   it("issues a real DELETE (no discontinued_at update) and returns ok", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
         recorded,
-        writeReturn: { id: SKU_ID },
+        reads: { product_skus: [targetRow()] },
+        writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
       }),
     );
     const jwt = await makeJwt("operation", null);
@@ -617,6 +630,10 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
     expect(res.status).toBe(200);
     expect(recorded.find((r) => r.op === "delete" && r.table === "product_skus")).toBeTruthy();
     expect(recorded.find((r) => r.op === "update")).toBeUndefined();
+    // A plain (non-compartment) sku never touches the offer table.
+    expect(
+      recorded.find((r) => r.op === "delete" && r.table === "model_sofa_compartments"),
+    ).toBeUndefined();
   });
 
   it("404s when the sku does not exist", async () => {
@@ -641,7 +658,11 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
         recorded,
-        reads: { product_skus: [] }, // nothing left under the model post-delete
+        // Only the target itself, under a model_id the count filter won't
+        // match → post-delete count for MODEL_ID_LIVE reads 0.
+        reads: {
+          product_skus: [targetRow({ model_id: "00000000-0000-0000-0000-00000000dead" })],
+        },
         writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
       }),
     );
@@ -667,6 +688,7 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
         recorded,
         reads: {
           product_skus: [
+            targetRow(),
             { id: "00000000-0000-0000-0000-00000000bb02", model_id: MODEL_ID_LIVE },
           ],
         },
@@ -685,6 +707,63 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
     expect(recorded.find((r) => r.op === "delete" && r.table === "product_models")).toBeUndefined();
     const body = (await res.json()) as { ok: boolean; modelDeleted: boolean };
     expect(body.modelDeleted).toBe(false);
+  });
+
+  // Loo 2026-07-21 — deleting a COMPARTMENT sku also un-offers the compartment
+  // on its model (the Booqit HEADREST ghost: sku deleted, Modular still ON,
+  // POS builder still offering an unorderable compartment).
+  it("compartment sku (principal): deletes the model_sofa_compartments offer row too", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_skus: [
+            targetRow({ compartment_id: "00000000-0000-0000-0000-00000000cc01" }),
+            { id: "00000000-0000-0000-0000-00000000bb02", model_id: MODEL_ID_LIVE },
+          ],
+        },
+        writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // Offer removed BEFORE the sku delete (never a ghost offer).
+    const ops = recorded.filter((r) => r.op === "delete").map((r) => r.table);
+    expect(ops.indexOf("model_sofa_compartments")).toBeGreaterThanOrEqual(0);
+    expect(ops.indexOf("model_sofa_compartments")).toBeLessThan(ops.indexOf("product_skus"));
+  });
+
+  it("compartment sku (non-principal): 403 — the offer cleanup is principal-only, nothing deleted", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_skus: [
+            targetRow({ compartment_id: "00000000-0000-0000-0000-00000000cc01" }),
+          ],
+        },
+        writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(recorded.find((r) => r.op === "delete")).toBeUndefined();
   });
 });
 
