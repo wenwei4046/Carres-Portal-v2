@@ -15,6 +15,14 @@ import { emptyDraft, type WizardDraft } from "../new-order/draft";
 const ADDONS: AddonDto[] = [
   { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true },
   { key: "dispose-sofa", name: "Dispose old sofa", price: 50, active: true },
+  // 0242 — an operator-created add-on whose size list comes purely from config.
+  {
+    key: "dispose-wardrobe",
+    name: "Dispose old wardrobe",
+    price: 120,
+    active: true,
+    sizeOptions: ["Small", "Large"],
+  },
 ];
 
 function draftWith(addons: WizardDraft["addons"]): WizardDraft {
@@ -120,6 +128,27 @@ describe("AddonsPanel — per-unit disposal sizes", () => {
     );
     expect(screen.getByLabelText("Dispose old mattress size (item 1)")).toHaveValue("Queen");
     expect(screen.getByLabelText("Dispose old mattress size (item 2)")).toHaveValue("");
+  });
+
+  // 0242 — the size list is CONFIG (addons.size_options), snapshotted onto the
+  // draft at toggle time; a brand-new add-on gets its dropdown with no deploy.
+  it("config-driven add-on: toggle snapshots sizeOptions; dropdown offers the configured sizes", () => {
+    const onChange = vi.fn();
+    render(<AddonsPanel addons={ADDONS} draft={draftWith([])} onChange={onChange} />);
+    fireEvent.click(screen.getByText("Dispose old wardrobe"));
+    const next = onChange.mock.calls[0][0] as WizardDraft;
+    expect(next.addons[0]).toMatchObject({
+      key: "dispose-wardrobe",
+      sizeOptions: ["Small", "Large"],
+      attrs: {},
+    });
+
+    render(
+      <AddonsPanel addons={ADDONS} draft={draftWith(next.addons)} onChange={vi.fn()} />,
+    );
+    const select = screen.getByLabelText("Dispose old wardrobe size");
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.textContent);
+    expect(options).toEqual(["Select size…", "Small", "Large"]);
   });
 
   it("size-less disposal (sofa) renders NO size dropdown regardless of qty", () => {

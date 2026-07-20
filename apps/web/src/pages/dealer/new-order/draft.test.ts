@@ -401,6 +401,39 @@ describe("step2Valid — at least one line", () => {
     expect(disposalUnitSizes({ ...base, qty: 2, attrs: {} })).toEqual(["", ""]);
   });
 
+  // 0242 — size lists are config: a staged addon carrying sizeOptions gates
+  // regardless of its key; one with neither config nor a legacy list never does.
+  it("config-driven sizeOptions gates any addon key; no list = no gate", () => {
+    const d = validDraft();
+    d.lines = [
+      {
+        localId: "x1",
+        sku: "mattress:carres-classic:queen",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1500,
+        label: "Carres Classic · Queen",
+      },
+    ];
+    // Custom add-on with a configured list → size required.
+    d.addons = [
+      {
+        key: "dispose-wardrobe",
+        qty: 1,
+        unitPrice: 120,
+        name: "Dispose old wardrobe",
+        sizeOptions: ["Small", "Large"],
+        attrs: {},
+      },
+    ];
+    expect(step2Valid(d)).toBe(false);
+    d.addons[0].attrs = { sizes: ["Large"], size: "Large" };
+    expect(step2Valid(d)).toBe(true);
+    // Same key with NO config and no legacy entry → never gates.
+    d.addons = [{ key: "dispose-wardrobe", qty: 2, unitPrice: 120, name: "Dispose old wardrobe" }];
+    expect(step2Valid(d)).toBe(true);
+  });
+
   it("composeDisposalSizeSummary groups repeats and joins mixed sizes", () => {
     expect(composeDisposalSizeSummary(["Queen"])).toBe("Queen");
     expect(composeDisposalSizeSummary(["Queen", "Queen"])).toBe("Queen ×2");

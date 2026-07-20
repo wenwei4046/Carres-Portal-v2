@@ -1554,6 +1554,7 @@ catalogRouter.post("/addons", async (c) => {
       price: parsed.data.price,
       active: parsed.data.active ?? true,
       service_sku: parsed.data.serviceSku ?? null,
+      size_options: parsed.data.sizeOptions ?? null,
     })
     .select("*")
     .single();
@@ -1579,6 +1580,10 @@ catalogRouter.patch("/addons/:key", async (c) => {
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.serviceSku !== undefined) patch.service_sku = parsed.data.serviceSku;
+  // 0242 — null OR [] both mean "no size pick"; store [] as null for one shape.
+  if (parsed.data.sizeOptions !== undefined) {
+    patch.size_options = parsed.data.sizeOptions?.length ? parsed.data.sizeOptions : null;
+  }
   // serviceDescription is NOT an addons column — it lands on the linked SKU
   // row below. A description-only patch is therefore valid (no column patch).
   if (Object.keys(patch).length === 0 && parsed.data.serviceDescription === undefined) {

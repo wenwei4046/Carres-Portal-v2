@@ -2,10 +2,10 @@ import { Plus, X, Minus } from "lucide-react";
 import type { AddonDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
+  addonRequiresSize,
+  addonSizeOptions,
   composeDisposalSizeSummary,
-  DISPOSAL_SIZE_OPTIONS,
   disposalUnitSizes,
-  isDisposalAddon,
   type DraftAddon,
   type WizardDraft,
 } from "../new-order/draft";
@@ -46,9 +46,11 @@ export default function AddonsPanel({
     const meta = addons.find((a) => a.key === addonKey);
     if (!meta) return;
     const next: DraftAddon = { key: meta.key, qty: 1, unitPrice: meta.price, name: meta.name };
-    // Disposal add-ons need a size pick before the cart will proceed; init
-    // attrs: {} so the size dropdown renders empty + the gate stays closed.
-    if (isDisposalAddon(meta.key)) {
+    // 0242 — snapshot the addon's configured size list onto the draft (the
+    // panel + step-2 gate read it from there). Sized add-ons init attrs: {}
+    // so the dropdown renders empty + the gate stays closed.
+    if (meta.sizeOptions?.length) next.sizeOptions = meta.sizeOptions;
+    if (addonRequiresSize(next)) {
       next.attrs = {};
     }
     onChange({ ...draft, addons: [...draft.addons, next] });
@@ -61,9 +63,9 @@ export default function AddonsPanel({
         if (a.key !== addonKey) return a;
         const qty = Math.max(1, a.qty + delta);
         const next: DraftAddon = { ...a, qty };
-        // Disposal: keep one size slot per unit — qty change resizes the
+        // Sized addon: keep one size slot per unit — qty change resizes the
         // per-unit list (new units start unpicked, shrink drops the tail).
-        if (isDisposalAddon(a.key)) {
+        if (addonRequiresSize(a)) {
           const sizes = disposalUnitSizes(next);
           next.attrs = {
             ...(a.attrs ?? {}),
@@ -171,9 +173,10 @@ export default function AddonsPanel({
               <span className="pos-price text-[14px]">{rm(selected.unitPrice * selected.qty)}</span>
             </div>
 
-            {/* Disposal size gate — ONE dropdown PER UNIT (qty 2 may be one
-                Queen + one Single, Loo 2026-07-21); red border until chosen. */}
-            {isDisposalAddon(a.key) && (
+            {/* Size gate (0242 config-driven) — ONE dropdown PER UNIT (qty 2
+                may be one Queen + one Single, Loo 2026-07-21); red border
+                until chosen. */}
+            {addonRequiresSize(selected) && (
               <div className="flex flex-col gap-1.5 pt-1">
                 {disposalUnitSizes(selected).map((size, idx) => (
                   <div key={idx} className="flex items-center gap-2">
@@ -189,7 +192,7 @@ export default function AddonsPanel({
                       }`}
                     >
                       <option value="">Select size…</option>
-                      {(DISPOSAL_SIZE_OPTIONS[a.key] ?? []).map((s) => (
+                      {addonSizeOptions(selected).map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>

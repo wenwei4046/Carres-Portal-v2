@@ -227,6 +227,9 @@ export interface AddonRow {
   active: boolean;
   // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
   service_sku: string | null;
+  // 0242 — optional size list (jsonb string array). NULL/[] = no size pick;
+  // non-empty = the POS requires one size PER UNIT at checkout.
+  size_options: string[] | null;
 }
 
 /** `special_addons` (migration 0181). Per-model selling surcharge + one-level

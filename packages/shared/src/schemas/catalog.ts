@@ -139,6 +139,8 @@ export const addonSchema = z.object({
   price: z.number(),
   active: z.boolean(),
   serviceSku: serviceSkuCodeSchema.nullable().optional(),
+  // 0242 — optional size list; non-empty = checkout requires one size per unit.
+  sizeOptions: z.array(z.string()).nullable().optional(),
 });
 export type AddonDto = z.infer<typeof addonSchema>;
 
@@ -1242,6 +1244,8 @@ export const addonCreateInput = z
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
     serviceDescription: z.string().trim().max(200).optional(),
+    // 0242 — size list; null/[] = no size pick at checkout.
+    sizeOptions: z.array(z.string().trim().min(1).max(40)).max(20).nullable().optional(),
   })
   .strict();
 export type AddonCreateInput = z.infer<typeof addonCreateInput>;
@@ -1253,6 +1257,8 @@ export const addonPatchInput = z
     active: z.boolean().optional(),
     serviceSku: serviceSkuCodeSchema.nullable().optional(),
     serviceDescription: z.string().trim().max(200).optional(),
+    // 0242 — size list; null/[] clears (no size pick at checkout).
+    sizeOptions: z.array(z.string().trim().min(1).max(40)).max(20).nullable().optional(),
   })
   .strict();
 export type AddonPatchInput = z.infer<typeof addonPatchInput>;
