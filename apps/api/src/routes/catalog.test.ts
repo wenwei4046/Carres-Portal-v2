@@ -446,11 +446,13 @@ function buildWriteSb(opts: {
     // Thenable — list reads awaited directly (`await sb.from(t).select().eq()`),
     // e.g. the size-pool lookup behind the bed auto-description. Write-mode await
     // mirrors maybeSingle so the delete-route bare await keeps its falsy error.
-    chain.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
+    // Read-mode results carry `count` (= filtered row count) so the empty-model
+    // cleanup's `{ count: "exact", head: true }` probe works against `reads`.
+    chain.then = (resolve: (v: { data: unknown; error: unknown; count?: number }) => unknown) =>
       resolve(
         mode === "write"
           ? { data: writeError ? null : writeReturn, error: writeError }
-          : { data: rows, error: null },
+          : { data: rows, error: null, count: rows.length },
       );
     void writeBody; // silenced; the recorded payload is what assertions read
     return chain;
@@ -630,6 +632,59 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  // Loo 2026-07-20 — "when no more that model sku anymore": deleting a model's
+  // LAST SKU deletes the now-empty model too (its chip must leave SKU Master).
+  it("deleting the model's LAST SKU also deletes the now-empty model", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: { product_skus: [] }, // nothing left under the model post-delete
+        writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(recorded.find((r) => r.op === "delete" && r.table === "product_skus")).toBeTruthy();
+    expect(recorded.find((r) => r.op === "delete" && r.table === "product_models")).toBeTruthy();
+    const body = (await res.json()) as { ok: boolean; modelDeleted: boolean };
+    expect(body.modelDeleted).toBe(true);
+  });
+
+  it("keeps the model when OTHER SKUs (even discontinued) remain", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_skus: [
+            { id: "00000000-0000-0000-0000-00000000bb02", model_id: MODEL_ID_LIVE },
+          ],
+        },
+        writeReturn: { id: SKU_ID, model_id: MODEL_ID_LIVE },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(recorded.find((r) => r.op === "delete" && r.table === "product_models")).toBeUndefined();
+    const body = (await res.json()) as { ok: boolean; modelDeleted: boolean };
+    expect(body.modelDeleted).toBe(false);
   });
 });
 

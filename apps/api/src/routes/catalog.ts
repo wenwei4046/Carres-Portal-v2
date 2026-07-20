@@ -840,6 +840,15 @@ catalogRouter.patch("/skus/:id", async (c) => {
 // Order/PO lines are unaffected — they store the sku as a text snapshot, no FK.
 // Soft retirement still exists as `discontinued_at` via PATCH (and the
 // compartment un-offer path keeps soft-discontinuing by design).
+//
+// Loo 2026-07-20 (same day, follow-up) — deleting a model's LAST SKU deletes
+// the now-empty model too, so its chip/row leaves SKU Master + Modular with
+// it ("when no more that model sku anymore"). Every FK onto product_models is
+// ON DELETE CASCADE (verified live: product_skus / sofa_fabrics /
+// model_sofa_compartments / model_fabric_tier_overrides / sofa_combo_pricing
+// / model_default_free_gifts) and order/PO lines snapshot the sku as text, so
+// the model delete is clean. Best-effort: the SKU is already gone, so a model
+// cleanup failure never turns the response into an error.
 catalogRouter.delete("/skus/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -847,7 +856,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .from("product_skus")
     .delete()
     .eq("id", id)
-    .select("id")
+    .select("id, model_id")
     .maybeSingle();
   if (error) {
     const m = mapPgError(error);
@@ -856,7 +865,28 @@ catalogRouter.delete("/skus/:id", async (c) => {
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
-  return c.json({ ok: true });
+
+  let modelDeleted = false;
+  const modelId = (data as { model_id: string | null }).model_id;
+  if (modelId) {
+    // Any surviving row (incl. discontinued ones) keeps the model. Check-then-
+    // delete is not atomic, but catalog authoring is single-principal and the
+    // model delete would only cascade onto a SKU inserted inside that window.
+    const { count, error: cntErr } = await sb
+      .from("product_skus")
+      .select("id", { count: "exact", head: true })
+      .eq("model_id", modelId);
+    if (!cntErr && count === 0) {
+      const { data: gone } = await sb
+        .from("product_models")
+        .delete()
+        .eq("id", modelId)
+        .select("id")
+        .maybeSingle();
+      modelDeleted = gone != null;
+    }
+  }
+  return c.json({ ok: true, modelDeleted });
 });
 
 // POST /import-skus — bulk SKU import (2990s Products parity Phase 1). Faithful
