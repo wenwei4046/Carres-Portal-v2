@@ -2527,8 +2527,11 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     );
     expect(res.status).toBe(200);
     const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
-    // priceOverride null → falls back to the pool default_price (250).
-    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 250, pos_active: false });
+    // priceOverride null → seeds UNPRICED (0). The pool's default_price (the
+    // fixture carries 250) is deliberately IGNORED (Loo 2026-07-20): prices
+    // live in SKU Master only — legacy pool prices must never leak onto a
+    // fresh model's SKUs.
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: false });
   });
 
   it("PUT — unknown model → 404 fail-closed (no offered row written)", async () => {

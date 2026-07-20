@@ -62,21 +62,22 @@ export async function syncCompartmentSku(
   if (!model || !model.model_key) return notFound("model");
 
   // 2. The compartment pool row gives the code (sku suffix + variant + the
-  //    description suffix) and the fallback price.
+  //    description suffix).
   const { data: comp, error: cErr } = await sb
     .from("sofa_compartments")
-    .select("code, default_price")
+    .select("code")
     .eq("id", args.compartmentId)
     .maybeSingle();
   if (cErr) return { ok: false, ...mapPgError(cErr) };
   if (!comp) return notFound("compartment");
 
   // 3. SEED price for a first-time offer only: override wins (incl. an explicit
-  //    0), else the legacy pool default. The synced SKU's price is the
-  //    AUTHORITATIVE à-la-carte source (SKU Master — Loo, 2026-07-05), so on a
-  //    RE-offer the existing row's price is preserved (like `cost`) — a
-  //    principal's SKU-Master edit must survive un-offer → re-offer.
-  const seedPrice = args.priceOverride ?? (comp.default_price as number | null) ?? 0;
+  //    0), else UNPRICED (0). The pool's `default_price` is deliberately NOT a
+  //    fallback (Loo 2026-07-20 — legacy pool prices leaked onto fresh models'
+  //    SKUs): prices live in SKU Master only. On a RE-offer the existing row's
+  //    price is preserved (like `cost`) — a principal's SKU-Master edit must
+  //    survive un-offer → re-offer.
+  const seedPrice = args.priceOverride ?? 0;
 
   // 4. Supplier: inherit THIS model's own supplier (each sofa model has exactly
   //    one across its flat SKUs) so PO-by-sku routes the compartment to the
