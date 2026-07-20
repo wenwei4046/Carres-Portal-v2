@@ -176,6 +176,20 @@ for (const f of files) {
     }
   }
 
+  // RULE H — hand-rolled SELECTION (Jess 2026-07-20). The blue "this is the
+  // selected/pointed one" state is the single `.is-selected` class (#C2E7FF +
+  // #378ADD bar), never a hand-rolled faint blue-selection bar. Flags the
+  // `inset_3px_0_0_hsl(var(--info))` bar (0 today, after the unify).
+  if (f.endsWith(".tsx")) {
+    let m;
+    const selRe = /inset_3px_0_0_hsl\(var\(--info\)\)/g;
+    while ((m = selRe.exec(src))) {
+      errors.push(
+        `RULE H · hand-rolled selection — ${f}:${lineOf(src, m.index)} paints its own blue selection bar; use the \`.is-selected\` class (docs/UI-KIT.md §A6 — one selection blue).`,
+      );
+    }
+  }
+
   // RULE G — hand-rolled section chrome anywhere in web src (JSX/TSX only).
   if (f.endsWith(".tsx") && !f.endsWith("components/SectionPanel.tsx")) {
     let m;

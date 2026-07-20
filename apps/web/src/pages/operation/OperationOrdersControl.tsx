@@ -18,6 +18,7 @@ import {
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
 import {
@@ -3815,15 +3816,16 @@ function OrderRow({
         ) : (
           (() => {
             const stage = controlTabOf(o, availableBySku);
-            const { label, cls } =
+            const label =
               stage === "pending"
-                ? { label: "Pending", cls: "pill-warning" }
+                ? "Pending"
                 : stage === "scheduled"
-                  ? { label: "Scheduled", cls: "pill-confirmed" }
+                  ? "Scheduled"
                   : stage === "proceed"
-                    ? { label: "Proceed", cls: "pill-neutral" }
-                    : { label: "Placed", cls: "pill-neutral" };
-            return <span className={`pill ${cls}`}>{label}</span>;
+                    ? "Proceed"
+                    : "Placed";
+            // ONE shared status→pill map (no per-surface hand-roll).
+            return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
           })()
         )}
       </td>

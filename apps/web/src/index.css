@@ -349,6 +349,16 @@
   .checkbox:checked::after { transform: scale(1); }
   .checkbox.is-select:checked { background: #378ADD; border-color: #378ADD; }
 
+  /* ===== THE selection / "pointed" state (Jess 2026-07-20) — ONE class =====
+   * The single visible selection blue: #C2E7FF wash + a #378ADD inset bar.
+   * Every "this is the selected / active one" surface (drawer spine step,
+   * active tab, picked row) uses `.is-selected` — NEVER a hand-rolled faint
+   * `bg-info-soft/60` / `bg-primary/5`. Change it here → the whole app moves. */
+  .is-selected {
+    background-color: #C2E7FF;
+    box-shadow: inset 3px 0 0 #378ADD;
+  }
+
   /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the
    * dealer POS; pure presentation, no token-value changes to :root. ===== */
 

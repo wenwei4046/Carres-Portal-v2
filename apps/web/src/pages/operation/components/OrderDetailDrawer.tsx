@@ -83,6 +83,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
+import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
 import {
@@ -2558,8 +2559,8 @@ function DrawerBody({
                                  this line) = blue wash + 3px blue left bar.
                                  Hover previews selection — same colour story. */
                               pickerOpen && l.sku === activeLineSku
-                                ? "bg-info-soft/60 shadow-[inset_3px_0_0_hsl(var(--info))]"
-                                : `hover:bg-info-soft/25 ${
+                                ? "is-selected"
+                                : `hover:bg-hovertint ${
                                     pickerOpen ? "opacity-60 hover:opacity-100" : ""
                                   }`
                             }`}
@@ -4141,12 +4142,9 @@ function CustomerIdentityCard({
                   : ""}
               </span>
             )}
-            {/* State PILL (rev 9 shell spec) + the region as quiet text. */}
-            <span
-              className={`pill text-[12px] shrink-0 ${
-                statusWord === "On hold" ? "pill-warning" : "pill-neutral"
-              }`}
-            >
+            {/* State PILL — the ONE shared status→pill map (no per-surface
+                hand-roll; Pending is amber here too now). */}
+            <span className={`pill text-[12px] shrink-0 ${orderStatusPill(statusWord)}`}>
               {statusWord}
             </span>
             {regionLabel && (
@@ -5030,12 +5028,11 @@ function JourneyCard({
               collapsed
                 ? "justify-center px-0 py-1.5"
                 : "gap-2.5 px-1.5 py-1.5"
-            } ${active ? "" : "hover:bg-info-soft/50"} ${last ? "" : "pb-3"}`}
-            // Selection = the app's blue #C2E7FF (matches the Orders facet);
-            // HOVER is a faint blue tint, NEVER grey (Jess 2026-07-19: "when i
-            // point it's grey, same as the header grey"). No grey in this rail.
-            // Text stays dark ink for contrast.
-            style={active ? { backgroundColor: "#C2E7FF" } : undefined}
+            } ${active ? "is-selected" : "hover:bg-hovertint"} ${last ? "" : "pb-3"}`}
+            // Selection = the ONE `.is-selected` class (#C2E7FF wash + #378ADD
+            // bar); hover = the KIT blue hovertint, NEVER grey. Text stays dark
+            // ink for contrast. (Jess 2026-07-20: one visible selection blue,
+            // no faint hand-rolls.)
           >
             {!last && (
               <span
