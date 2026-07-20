@@ -162,16 +162,17 @@ export default function NewSkuModal({
   const codeSuffix = isBedVariant ? canonicalSize(variant.trim()).code : variant.trim();
 
   // Auto-description preview (Loo 2026-07-20) — a bed SKU created with a BLANK
-  // description gets `{CATEGORY}-CR-{dimensions}` stamped server-side (the
-  // dimensions from the Maintenance size pool). Mirror that lookup here so the
-  // modal previews exactly what will be written. Accessory/service stay manual.
+  // description gets `{Category} {Model name} {dimensions}` stamped server-side
+  // (the dimensions from the Maintenance size pool). Mirror that lookup here so
+  // the modal previews exactly what will be written. Accessory/service stay manual.
   const bedPoolEntries = useMemo(() => {
     if (!isBedVariant || !effectiveCategory) return [];
     return optionPools.filter((p) => p.pool === `${effectiveCategory}_size`);
   }, [optionPools, isBedVariant, effectiveCategory]);
+  const effectiveModelName = mode === "new" ? name : existingModel?.name ?? "";
   const autoDescPreview =
     isBedVariant && effectiveCategory && variant.trim() && description.trim() === ""
-      ? autoBedSkuDescription(effectiveCategory, variant.trim(), bedPoolEntries)
+      ? autoBedSkuDescription(effectiveCategory, effectiveModelName, variant.trim(), bedPoolEntries)
       : null;
   const codePreview = noVariantAxis
     ? modelKey.toUpperCase()
@@ -203,7 +204,7 @@ export default function NewSkuModal({
   // Every generated bed SKU gets its auto description server-side — preview the
   // first ticked size's so the hint shows the exact format.
   const firstSizeDescPreview = firstSelectedSize
-    ? autoBedSkuDescription(category, firstSelectedSize, sizePool)
+    ? autoBedSkuDescription(category, name, firstSelectedSize, sizePool)
     : null;
 
   const valid = compFlow

@@ -1570,12 +1570,12 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
 
 // ---------------------------------------------------------------------------
 // Auto-generated SKU descriptions (Loo 2026-07-20): bed SKUs created with a
-// blank description get `{CATEGORY}-CR-{dimensions}` stamped from the
-// Maintenance size pool; a typed description always wins; accessory/service
+// blank description get `{Category} {Model name} {dimensions}` stamped from
+// the Maintenance size pool; a typed description always wins; accessory/service
 // stay manual (covered implicitly — no pool read runs for them).
 // ---------------------------------------------------------------------------
 
-describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)", () => {
+describe("SKU auto-description — {Category} {Model name} {dimensions} (Loo 2026-07-20)", () => {
   const SIZE_POOL_ROWS = [
     { pool: "mattress_size", value: "K", label: "6FT", dimensions: "183X190CM" },
     { pool: "mattress_size", value: "SS", label: "3.5FT", dimensions: "107X190CM" },
@@ -1592,16 +1592,21 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
     supplier_id: "00000000-0000-0000-0000-00000000ff01",
     discontinued_at: null,
     pos_active: true,
-    description: "MATTRESS-CR-183X190CM",
+    description: "Mattress Carres Classic 183X190CM",
   };
 
-  it("POST /skus (mattress, blank description) stamps MATTRESS-CR-{dims} from the size pool", async () => {
+  it("POST /skus (mattress, blank description) stamps `Mattress {Model} {dims}` from the size pool", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
         reads: {
           product_models: [
-            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+            {
+              id: MODEL_ID_LIVE,
+              category: "mattress",
+              model_key: "carres-classic",
+              name: "Carres Classic",
+            },
           ],
           suppliers: [{ id: "00000000-0000-0000-0000-00000000ff01" }],
           catalog_option_pools: SIZE_POOL_ROWS,
@@ -1627,7 +1632,7 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
     expect(res.status).toBe(201);
     const insert = recorded.find((r) => r.op === "insert" && r.table === "product_skus");
     expect((insert?.payload as { description: unknown }).description).toBe(
-      "MATTRESS-CR-183X190CM",
+      "Mattress Carres Classic 183X190CM",
     );
   });
 
@@ -1637,7 +1642,12 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
       buildWriteSb({
         reads: {
           product_models: [
-            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+            {
+              id: MODEL_ID_LIVE,
+              category: "mattress",
+              model_key: "carres-classic",
+              name: "Carres Classic",
+            },
           ],
           suppliers: [{ id: "00000000-0000-0000-0000-00000000ff01" }],
           catalog_option_pools: SIZE_POOL_ROWS,
@@ -1674,6 +1684,7 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
           product_models: {
             category: "mattress",
             model_key: "lumi-classic",
+            name: "Lumi Classic",
             allowed_options: {},
           },
           suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
@@ -1702,8 +1713,14 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
       description: string | null;
     }[];
     expect(rows).toEqual([
-      expect.objectContaining({ sku: "LUMI-CLASSIC-K", description: "MATTRESS-CR-183X190CM" }),
-      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", description: "MATTRESS-CR-107X190CM" }),
+      expect.objectContaining({
+        sku: "LUMI-CLASSIC-K",
+        description: "Mattress Lumi Classic 183X190CM",
+      }),
+      expect.objectContaining({
+        sku: "LUMI-CLASSIC-SS",
+        description: "Mattress Lumi Classic 107X190CM",
+      }),
     ]);
   });
 
@@ -1715,6 +1732,7 @@ describe("SKU auto-description — {CATEGORY}-CR-{dimensions} (Loo 2026-07-20)",
           product_models: {
             category: "mattress",
             model_key: "lumi-classic",
+            name: "Lumi Classic",
             allowed_options: {},
           },
           suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },

@@ -630,7 +630,7 @@ catalogRouter.post("/skus", async (c) => {
   // model row so the FE doesn't need to send them.
   const { data: modelRow, error: modelErr } = await sb
     .from("product_models")
-    .select("category, model_key")
+    .select("category, model_key, name")
     .eq("id", parsed.data.modelId)
     .maybeSingle();
   if (modelErr) {
@@ -701,11 +701,11 @@ catalogRouter.post("/skus", async (c) => {
   }
 
   // Loo 2026-07-20 — auto-generate the description for mattress/bedframe SKUs
-  // when the caller didn't type one: `{CATEGORY}-CR-{dimensions}` (e.g.
-  // `MATTRESS-CR-183X190CM`), the dimensions looked up from the Maintenance
-  // size pool by this SKU's size. A typed description always wins; no pool
-  // match / no dimensions → stays null. Accessory + service stay fully manual;
-  // sofa compartment SKUs get "Sofa {Model} {code}" in the offer auto-sync.
+  // when the caller didn't type one: `{Category} {Model name} {dimensions}`
+  // (e.g. `Mattress Lumi Classic 183X190CM`), the dimensions looked up from the
+  // Maintenance size pool by this SKU's size. A typed description always wins;
+  // no pool match / no dimensions → stays null. Accessory + service stay fully
+  // manual; sofa compartment SKUs get "Sofa {Model} {code}" in the offer auto-sync.
   let description = parsed.data.description ?? null;
   if (!description && isBedSize) {
     const { data: poolRows, error: poolErr } = await sb
@@ -718,6 +718,7 @@ catalogRouter.post("/skus", async (c) => {
     }
     description = autoBedSkuDescription(
       modelRow.category,
+      (modelRow.name as string) ?? "",
       resolvedVariant.code,
       (poolRows ?? []) as { value: string; dimensions: string | null }[],
     );
@@ -1243,7 +1244,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
 
   const { data: modelRow, error: mErr } = await sb
     .from("product_models")
-    .select("category, model_key, allowed_options")
+    .select("category, model_key, name, allowed_options")
     .eq("id", id)
     .maybeSingle();
   if (mErr) { const m = mapPgError(mErr); return c.json(m.body, m.status); }
@@ -1289,9 +1290,9 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, resolve(v).code);
 
   // Loo 2026-07-20 — auto description per generated bed SKU:
-  // `{CATEGORY}-CR-{dimensions}` from the Maintenance size pool (matched by
-  // this variant's canonical size). No pool match → null; never blocks the
-  // generation. Non-bed categories don't auto-describe here.
+  // `{Category} {Model name} {dimensions}` from the Maintenance size pool
+  // (matched by this variant's canonical size). No pool match → null; never
+  // blocks the generation. Non-bed categories don't auto-describe here.
   let poolDims: { value: string; dimensions: string | null }[] = [];
   if (isBedCategory) {
     const { data: poolRows, error: poolErr } = await sb
@@ -1320,7 +1321,12 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       cost: null,
       supplier_id: supplierId,
       pos_active: true,
-      description: autoBedSkuDescription(modelRow.category, resolve(v).code, poolDims),
+      description: autoBedSkuDescription(
+        modelRow.category,
+        (modelRow.name as string) ?? "",
+        resolve(v).code,
+        poolDims,
+      ),
     }));
 
   let generated = 0;

@@ -12,54 +12,77 @@ const POOL = [
 ];
 
 describe("autoBedSkuDescription", () => {
-  it("mattress King → MATTRESS-CR-183X190CM", () => {
-    expect(autoBedSkuDescription("mattress", "King", POOL)).toBe("MATTRESS-CR-183X190CM");
+  it("mattress King → Mattress {Model} 183X190CM", () => {
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "King", POOL)).toBe(
+      "Mattress Lumi Classic 183X190CM",
+    );
   });
 
-  it("bedframe Queen → BEDFRAME-CR-152X190CM", () => {
-    expect(autoBedSkuDescription("bedframe", "Queen", POOL)).toBe("BEDFRAME-CR-152X190CM");
+  it("bedframe Queen → Bedframe {Model} 152X190CM", () => {
+    expect(autoBedSkuDescription("bedframe", "Kayu Platform", "Queen", POOL)).toBe(
+      "Bedframe Kayu Platform 152X190CM",
+    );
   });
 
   it("matches the pool row via the canonical size table (short code, full name, any case)", () => {
     // Pool stores "K"; the size can arrive as the code, the name, or a spelling.
-    expect(autoBedSkuDescription("mattress", "K", POOL)).toBe("MATTRESS-CR-183X190CM");
-    expect(autoBedSkuDescription("mattress", "king", POOL)).toBe("MATTRESS-CR-183X190CM");
-    expect(autoBedSkuDescription("mattress", "super-single", POOL)).toBe(
-      "MATTRESS-CR-107X190CM",
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "K", POOL)).toBe(
+      "Mattress Lumi Classic 183X190CM",
+    );
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "king", POOL)).toBe(
+      "Mattress Lumi Classic 183X190CM",
+    );
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "super-single", POOL)).toBe(
+      "Mattress Lumi Classic 107X190CM",
     );
     // And the reverse: a pool authored with full names still matches a short code.
     const namedPool = [{ value: "Super King", dimensions: "200x200cm" }];
-    expect(autoBedSkuDescription("bedframe", "SK", namedPool)).toBe("BEDFRAME-CR-200X200CM");
+    expect(autoBedSkuDescription("bedframe", "Kayu Platform", "SK", namedPool)).toBe(
+      "Bedframe Kayu Platform 200X200CM",
+    );
   });
 
-  it("upper-cases lower-cased pool dimensions", () => {
+  it("upper-cases lower-cased pool dimensions (model name kept as typed)", () => {
     expect(
-      autoBedSkuDescription("mattress", "K", [{ value: "K", dimensions: "183x190cm" }]),
-    ).toBe("MATTRESS-CR-183X190CM");
+      autoBedSkuDescription("mattress", "Lumi Classic", "K", [
+        { value: "K", dimensions: "183x190cm" },
+      ]),
+    ).toBe("Mattress Lumi Classic 183X190CM");
+  });
+
+  it("trims the model name", () => {
+    expect(autoBedSkuDescription("mattress", "  Lumi Classic  ", "K", POOL)).toBe(
+      "Mattress Lumi Classic 183X190CM",
+    );
   });
 
   it("returns null for non-bed categories (sofa/accessory/service stay manual or sofa-format)", () => {
     for (const cat of ["sofa", "accessory", "service"]) {
-      expect(autoBedSkuDescription(cat, "King", POOL)).toBeNull();
+      expect(autoBedSkuDescription(cat, "Angsa", "King", POOL)).toBeNull();
     }
   });
 
+  it("returns null for a blank model name (never a half-made string)", () => {
+    expect(autoBedSkuDescription("mattress", "", "King", POOL)).toBeNull();
+    expect(autoBedSkuDescription("mattress", "   ", "King", POOL)).toBeNull();
+  });
+
   it("returns null when the size has no pool row", () => {
-    expect(autoBedSkuDescription("mattress", "Custom 200", POOL)).toBeNull();
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "Custom 200", POOL)).toBeNull();
   });
 
   it("returns null when the pool row has no / blank dimensions", () => {
     expect(
-      autoBedSkuDescription("mattress", "K", [{ value: "K", dimensions: null }]),
+      autoBedSkuDescription("mattress", "Lumi Classic", "K", [{ value: "K", dimensions: null }]),
     ).toBeNull();
     expect(
-      autoBedSkuDescription("mattress", "K", [{ value: "K", dimensions: "  " }]),
+      autoBedSkuDescription("mattress", "Lumi Classic", "K", [{ value: "K", dimensions: "  " }]),
     ).toBeNull();
   });
 
   it("returns null for an empty size token / empty pool", () => {
-    expect(autoBedSkuDescription("mattress", "", POOL)).toBeNull();
-    expect(autoBedSkuDescription("mattress", "K", [])).toBeNull();
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "", POOL)).toBeNull();
+    expect(autoBedSkuDescription("mattress", "Lumi Classic", "K", [])).toBeNull();
   });
 });
 
