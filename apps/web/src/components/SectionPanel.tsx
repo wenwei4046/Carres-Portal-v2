@@ -84,7 +84,7 @@ export function SectionBand({
         aria-expanded={!collapsed}
         title={collapsed ? "Expand" : "Hide"}
         data-testid={toggleTestId}
-        className="flex-1 min-w-0 flex items-center gap-1 text-left hover:brightness-[0.97]"
+        className="flex-1 min-w-0 flex items-center gap-1 text-left rounded hover:bg-hovertint"
       >
         {collapsed ? (
           <ChevronRight size={14} className="shrink-0 text-base-500" aria-hidden="true" />

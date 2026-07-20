@@ -95,8 +95,23 @@ for (const f of files) {
   if (n > 0) currentHex[f] = n;
 }
 
+// Grey-hover ratchet (RULE I) — a GLOBAL count. Grey neutral-surface hovers
+// (hover:bg-base-50/100 · gray/slate · brightness-[0.97]) violate the KIT hover
+// law (neutral rows/nav/chips hover BLUE). Freeze the legacy count; new ones fail.
+const HOVER_GREY_RE = /hover:bg-base-(?:50|100)\b|hover:bg-gray-\d|hover:bg-slate-\d|hover:brightness-\[0\.97\]/g;
+let currentHoverGrey = 0;
+for (const f of files) {
+  if (!f.endsWith(".tsx")) continue;
+  const m = readFileSync(join(ROOT, f), "utf8").match(HOVER_GREY_RE);
+  if (m) currentHoverGrey += m.length;
+}
+
 if (UPDATE) {
-  const baseline = { hex: currentHex, listPages: files.filter((f) => f.startsWith("apps/web/src/pages/")) };
+  const baseline = {
+    hex: currentHex,
+    hoverGrey: currentHoverGrey,
+    listPages: files.filter((f) => f.startsWith("apps/web/src/pages/")),
+  };
   writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + "\n");
   console.log(`✓ baseline refrozen — ${Object.keys(currentHex).length} files carry legacy hex.`);
   process.exit(0);
@@ -108,6 +123,17 @@ if (!existsSync(BASELINE_PATH)) {
 }
 const baseline = JSON.parse(readFileSync(BASELINE_PATH, "utf8"));
 const errors = [];
+
+// ---- RULE I — grey-hover ratchet (Jess 2026-07-20) ----------------------------
+// KIT hover law: a clickable row/nav/chip hovers BLUE (`hover:bg-hovertint`),
+// never grey. Freeze the legacy grey hovers; any NEW one fails the build. Burn
+// the baseline down over time (re-run --update-baseline after a sweep).
+if (currentHoverGrey > (baseline.hoverGrey ?? Infinity)) {
+  errors.push(
+    `RULE I · grey hover — ${currentHoverGrey} grey hover(s) across web (baseline ${baseline.hoverGrey}). ` +
+      `A clickable row/nav/chip hovers BLUE: use \`hover:bg-hovertint\`, not \`hover:bg-base-50/100\` (docs/UI-KIT.md hover law).`,
+  );
+}
 
 // ---- RULE A — hex ratchet -----------------------------------------------------
 for (const [f, n] of Object.entries(currentHex)) {

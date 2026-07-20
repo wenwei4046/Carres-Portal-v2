@@ -667,7 +667,7 @@ function PanelMenu({
                   setOpen(false);
                   it.onClick();
                 }}
-                className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 hover:bg-base-50 disabled:opacity-40"
+                className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 hover:bg-hovertint disabled:opacity-40"
               >
                 {it.icon}
                 {it.label}
@@ -929,7 +929,7 @@ function ChaseNowPanel({
             key={r.key}
             className={`flex items-center gap-2 min-h-9 min-w-0 ${
               r.onOpen
-                ? "cursor-pointer rounded-[6px] -mx-1 px-1 hover:bg-base-50"
+                ? "cursor-pointer rounded-[6px] -mx-1 px-1 hover:bg-hovertint"
                 : ""
             }`}
             onClick={r.onOpen}
@@ -1022,7 +1022,7 @@ function RowManageMenu({
                   setOpen(false);
                   it.onClick();
                 }}
-                className="w-full text-left px-2.5 py-1.5 text-[12px] hover:bg-base-50 disabled:opacity-40"
+                className="w-full text-left px-2.5 py-1.5 text-[12px] hover:bg-hovertint disabled:opacity-40"
               >
                 {it.label}
               </button>
@@ -2119,7 +2119,7 @@ function DrawerBody({
           type="button"
           onClick={onClose}
           aria-label="Back to Orders"
-          className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-base-100"
+          className="shrink-0 -ml-1.5 inline-flex items-center gap-0.5 pl-1 pr-2 py-1 rounded-md text-[13px] font-medium text-base-500 hover:text-base-900 hover:bg-hovertint"
         >
           <ChevronLeft size={16} aria-hidden="true" />
           Orders
@@ -2135,7 +2135,7 @@ function DrawerBody({
               disabled={!nav.onPrev}
               aria-label="Previous order"
               title="Previous order in the list"
-              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <ChevronLeft size={16} aria-hidden="true" />
             </button>
@@ -2148,7 +2148,7 @@ function DrawerBody({
               disabled={!nav.onNext}
               aria-label="Next order"
               title="Next order in the list"
-              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <ChevronRight size={16} aria-hidden="true" />
             </button>
@@ -2159,7 +2159,7 @@ function DrawerBody({
           onClick={onFollowUpClick}
           aria-label="Add follow-up"
           title="Add a follow-up (write the issue + assign)"
-          className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-base-100 hover:text-primary shrink-0"
+          className="size-[34px] rounded-full inline-grid place-items-center text-base-600 hover:bg-hovertint hover:text-primary shrink-0"
         >
           <Flag size={16} />
         </button>
@@ -2985,7 +2985,7 @@ function DrawerBody({
             aria-label="Close warehouse stock"
             title="Close"
             onClick={() => setPickerOpen(false)}
-            className="absolute right-2 top-2 z-10 size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-base-100 hover:text-base-800"
+            className="absolute right-2 top-2 z-10 size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-hovertint hover:text-base-800"
           >
             <X size={14} />
           </button>
@@ -4169,7 +4169,7 @@ function CustomerIdentityCard({
             setErr(null);
             setEditing(true);
           }}
-          className="size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-base-100 hover:text-base-800 shrink-0"
+          className="size-7 rounded-full inline-grid place-items-center text-base-500 hover:bg-hovertint hover:text-base-800 shrink-0"
         >
           {editing ? <X size={14} /> : <Pencil size={14} />}
         </button>
@@ -5904,7 +5904,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-hovertint ${
         disabled
           ? "opacity-40 cursor-not-allowed"
           : danger
@@ -6093,7 +6093,7 @@ function ActionsMenu({
                 aria-haspopup="menu"
                 aria-expanded={dlOpen}
                 onClick={() => setDlOpen((o) => !o)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 text-base-900"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-hovertint text-base-900"
               >
                 <span className="flex items-center gap-2">
                   <span className="text-base-500 shrink-0">
@@ -6268,7 +6268,7 @@ function PrintDoButton({
       type="button"
       onClick={open}
       disabled={pending}
-      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 disabled:opacity-40 text-base-900"
+      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-hovertint disabled:opacity-40 text-base-900"
     >
       <span className="text-base-500 shrink-0">
         <FileText className="w-4 h-4" />
