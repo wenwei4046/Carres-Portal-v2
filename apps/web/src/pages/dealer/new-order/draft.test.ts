@@ -3,12 +3,15 @@ import {
   DRAFT_STORAGE_KEY,
   type WizardDraft,
   clearDraft,
+  composeDisposalSizeSummary,
   composeEmergency,
   dataUrlToBlob,
+  disposalUnitSizes,
   emptyDraft,
   loadDraft,
   saveDraft,
   step1Valid,
+  step2FirstDisposalIssue,
   step2Valid,
   step3DateFirstIssue,
   step3DateValid,
@@ -347,6 +350,63 @@ describe("step2Valid — at least one line", () => {
       { key: "dispose-old-sofa-big-sofa", qty: 1, unitPrice: 80, name: "Dispose old sofa (big sofa)" },
     ];
     expect(step2Valid(d)).toBe(true);
+  });
+
+  // Loo 2026-07-21 — qty > 1 may mix sizes (one Single + one Queen old
+  // mattress): EVERY unit needs its own size before the gate opens.
+  it("qty 2 disposal needs a size PER UNIT — one size alone no longer passes", () => {
+    const d = validDraft();
+    d.lines = [
+      {
+        localId: "x1",
+        sku: "mattress:carres-classic:queen",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1500,
+        label: "Carres Classic · Queen",
+      },
+    ];
+    // Legacy single size on qty 2 → only unit 1 covered → blocked.
+    d.addons = [{ key: "dispose-mattress", qty: 2, unitPrice: 80, name: "Dispose old mattress", attrs: { size: "Queen" } }];
+    expect(step2Valid(d)).toBe(false);
+    expect(step2FirstDisposalIssue(d)).toContain("each of the 2");
+    // Per-unit sizes complete (mixed) → ok.
+    d.addons = [
+      {
+        key: "dispose-mattress",
+        qty: 2,
+        unitPrice: 80,
+        name: "Dispose old mattress",
+        attrs: { sizes: ["Queen", "Single"], size: "Queen + Single" },
+      },
+    ];
+    expect(step2Valid(d)).toBe(true);
+    // A hole in the middle still blocks.
+    d.addons = [
+      {
+        key: "dispose-mattress",
+        qty: 3,
+        unitPrice: 80,
+        name: "Dispose old mattress",
+        attrs: { sizes: ["Queen", "", "Single"] },
+      },
+    ];
+    expect(step2Valid(d)).toBe(false);
+  });
+
+  it("disposalUnitSizes normalizes to qty length; legacy single size seeds unit 1", () => {
+    const base = { key: "dispose-mattress", unitPrice: 80, name: "Dispose old mattress" };
+    expect(disposalUnitSizes({ ...base, qty: 2, attrs: { size: "Queen" } })).toEqual(["Queen", ""]);
+    expect(disposalUnitSizes({ ...base, qty: 1, attrs: { sizes: ["Queen", "Single"] } })).toEqual(["Queen"]);
+    expect(disposalUnitSizes({ ...base, qty: 2, attrs: {} })).toEqual(["", ""]);
+  });
+
+  it("composeDisposalSizeSummary groups repeats and joins mixed sizes", () => {
+    expect(composeDisposalSizeSummary(["Queen"])).toBe("Queen");
+    expect(composeDisposalSizeSummary(["Queen", "Queen"])).toBe("Queen ×2");
+    expect(composeDisposalSizeSummary(["Queen", "Single"])).toBe("Queen + Single");
+    expect(composeDisposalSizeSummary(["Queen", ""])).toBe("Queen");
+    expect(composeDisposalSizeSummary(["", ""])).toBe("");
   });
 });
 
