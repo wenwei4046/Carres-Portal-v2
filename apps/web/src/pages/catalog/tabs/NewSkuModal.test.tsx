@@ -322,6 +322,49 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Loo 2026-07-20 — auto-generated bed descriptions: a blank description gets
+// `{CATEGORY}-CR-{dimensions}` stamped server-side (size-pool lookup). The
+// modal previews the exact value; accessory/service stay manual.
+// ---------------------------------------------------------------------------
+const SIZE_POOLS_DIMS = [
+  { id: "d1", pool: "mattress_size" as const, value: "K", label: "6FT", dimensions: "183X190CM", surcharge: null, active: true, sortOrder: 1 },
+  { id: "d2", pool: "mattress_size" as const, value: "Q", label: "5FT", dimensions: "152X190CM", surcharge: null, active: true, sortOrder: 2 },
+];
+
+describe("NewSkuModal — auto-description preview (bed SKUs)", () => {
+  it("size flow hint shows the auto description of the first ticked size", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS_DIMS} onClose={vi.fn()} />);
+    // default category = mattress; K sorts first → its desc previews.
+    expect(screen.getByTestId("new-sku-sizes")).toHaveTextContent("MATTRESS-CR-183X190CM");
+  });
+
+  it("classic path: typing a bed size previews the auto description; typing a description hides it", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS_DIMS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-sizes-none")); // fall back to classic flow
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "Queen" } });
+    expect(screen.getByTestId("new-sku-auto-desc")).toHaveTextContent("MATTRESS-CR-152X190CM");
+    // A typed description wins server-side → the auto hint disappears.
+    fireEvent.change(screen.getByPlaceholderText("MATTRESS-CR-152X190CM"), {
+      target: { value: "Hand-typed" },
+    });
+    expect(screen.queryByTestId("new-sku-auto-desc")).not.toBeInTheDocument();
+  });
+
+  it("no pool dimensions → no auto-desc preview", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-sizes-none"));
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "King" } });
+    expect(screen.queryByTestId("new-sku-auto-desc")).not.toBeInTheDocument();
+  });
+
+  it("accessory never previews an auto description (manual field)", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS_DIMS} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
+    expect(screen.queryByTestId("new-sku-auto-desc")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Loo 2026-07-11 — accessory/service carry NO size/variant axis (one SKU per
 // model): the Size/variant field is hidden, nothing to fill, and the create
 // sends an EMPTY variant (the server mints the bare MODEL_KEY as the code).

@@ -7,7 +7,7 @@ import type {
   SofaCompartmentDto,
   VariantKind,
 } from "@carres/shared";
-import { PRODUCT_CATEGORIES, canonicalSize } from "@carres/shared";
+import { PRODUCT_CATEGORIES, autoBedSkuDescription, canonicalSize } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -160,6 +160,19 @@ export default function NewSkuModal({
   // bare MODEL_KEY as the SKU code.
   const noVariantAxis = effectiveCategory === "accessory" || effectiveCategory === "service";
   const codeSuffix = isBedVariant ? canonicalSize(variant.trim()).code : variant.trim();
+
+  // Auto-description preview (Loo 2026-07-20) — a bed SKU created with a BLANK
+  // description gets `{CATEGORY}-CR-{dimensions}` stamped server-side (the
+  // dimensions from the Maintenance size pool). Mirror that lookup here so the
+  // modal previews exactly what will be written. Accessory/service stay manual.
+  const bedPoolEntries = useMemo(() => {
+    if (!isBedVariant || !effectiveCategory) return [];
+    return optionPools.filter((p) => p.pool === `${effectiveCategory}_size`);
+  }, [optionPools, isBedVariant, effectiveCategory]);
+  const autoDescPreview =
+    isBedVariant && effectiveCategory && variant.trim() && description.trim() === ""
+      ? autoBedSkuDescription(effectiveCategory, variant.trim(), bedPoolEntries)
+      : null;
   const codePreview = noVariantAxis
     ? modelKey.toUpperCase()
     : modelKey && variant.trim()
@@ -187,6 +200,11 @@ export default function NewSkuModal({
   const sizeSection = mode === "new" && sizePool.length > 0;
   const sizeFlow = sizeSection && (selectedSizes.size > 0 || createdModelId !== null);
   const firstSelectedSize = sizePool.find((p) => selectedSizes.has(p.value))?.value ?? "";
+  // Every generated bed SKU gets its auto description server-side — preview the
+  // first ticked size's so the hint shows the exact format.
+  const firstSizeDescPreview = firstSelectedSize
+    ? autoBedSkuDescription(category, firstSelectedSize, sizePool)
+    : null;
 
   const valid = compFlow
     ? name.trim().length >= 2 && modelKey.length >= 2 && selectedComps.size > 0
@@ -524,6 +542,12 @@ export default function NewSkuModal({
                       <span className="font-mono text-base-700">
                         {(modelKey || "model").toUpperCase()}-{firstSelectedSize}
                       </span>
+                      {firstSizeDescPreview && (
+                        <>
+                          {" "}· desc{" "}
+                          <span className="font-mono text-base-700">{firstSizeDescPreview}</span>
+                        </>
+                      )}
                       . Untick the sizes this product doesn&apos;t come in — the list follows
                       Special Add-ons → Sizes.
                     </>
@@ -663,9 +687,16 @@ export default function NewSkuModal({
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Shown on the SKU list + dealer picker"
+                placeholder={autoDescPreview ?? "Shown on the SKU list + dealer picker"}
                 className={INPUT_CLS}
               />
+              {autoDescPreview && (
+                <div className="t-tiny text-base-500 mt-1" data-testid="new-sku-auto-desc">
+                  Blank = auto-filled{" "}
+                  <span className="font-mono text-base-700">{autoDescPreview}</span> (from the
+                  size pool dimensions)
+                </div>
+              )}
             </label>
           </>
         )}

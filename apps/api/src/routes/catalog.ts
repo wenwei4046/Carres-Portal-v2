@@ -58,6 +58,7 @@ import {
   PRODUCT_BUNDLES,
   deriveSkuCode,
   canonicalSize,
+  autoBedSkuDescription,
   skuImportInput,
   hasPricingIntent,
   type SkuImportRow,
@@ -699,6 +700,29 @@ catalogRouter.post("/skus", async (c) => {
     supplierId = supRow.id as string;
   }
 
+  // Loo 2026-07-20 — auto-generate the description for mattress/bedframe SKUs
+  // when the caller didn't type one: `{CATEGORY}-CR-{dimensions}` (e.g.
+  // `MATTRESS-CR-183X190CM`), the dimensions looked up from the Maintenance
+  // size pool by this SKU's size. A typed description always wins; no pool
+  // match / no dimensions → stays null. Accessory + service stay fully manual;
+  // sofa compartment SKUs get "Sofa {Model} {code}" in the offer auto-sync.
+  let description = parsed.data.description ?? null;
+  if (!description && isBedSize) {
+    const { data: poolRows, error: poolErr } = await sb
+      .from(CATALOG_OPTION_POOLS)
+      .select("value, dimensions")
+      .eq("pool", `${modelRow.category}_size`);
+    if (poolErr) {
+      const m = mapPgError(poolErr);
+      return c.json(m.body, m.status);
+    }
+    description = autoBedSkuDescription(
+      modelRow.category,
+      resolvedVariant.code,
+      (poolRows ?? []) as { value: string; dimensions: string | null }[],
+    );
+  }
+
   const { data, error } = await sb
     .from("product_skus")
     .insert({
@@ -711,7 +735,7 @@ catalogRouter.post("/skus", async (c) => {
       // 0186 — principal-only PWP reward price (companion to cost). null = unset.
       pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
-      description: parsed.data.description ?? null,
+      description,
       pos_active: parsed.data.posActive ?? true,
     })
     .select("*")
@@ -1263,6 +1287,20 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   const isBedCategory = modelRow.category === "mattress" || modelRow.category === "bedframe";
   const resolve = (v: string) => (isBedCategory ? canonicalSize(v) : { code: v, name: v });
   const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, resolve(v).code);
+
+  // Loo 2026-07-20 — auto description per generated bed SKU:
+  // `{CATEGORY}-CR-{dimensions}` from the Maintenance size pool (matched by
+  // this variant's canonical size). No pool match → null; never blocks the
+  // generation. Non-bed categories don't auto-describe here.
+  let poolDims: { value: string; dimensions: string | null }[] = [];
+  if (isBedCategory) {
+    const { data: poolRows, error: poolErr } = await sb
+      .from(CATALOG_OPTION_POOLS)
+      .select("value, dimensions")
+      .eq("pool", `${modelRow.category}_size`);
+    if (poolErr) { const m = mapPgError(poolErr); return c.json(m.body, m.status); }
+    poolDims = (poolRows ?? []) as { value: string; dimensions: string | null }[];
+  }
   const wantCodes = variants.map(codeFor);
   const { data: existingRows, error: exErr } = await sb
     .from("product_skus")
@@ -1282,6 +1320,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       cost: null,
       supplier_id: supplierId,
       pos_active: true,
+      description: autoBedSkuDescription(modelRow.category, resolve(v).code, poolDims),
     }));
 
   let generated = 0;

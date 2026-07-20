@@ -1,4 +1,4 @@
-import { deriveSkuCode } from "@carres/shared";
+import { deriveSkuCode, sofaSkuDescription } from "@carres/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mapPgError } from "./route-helpers";
 
@@ -152,8 +152,9 @@ export async function syncCompartmentSku(
       supplier_id: supplierId,
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description
-      // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing").
-      description: `Sofa ${model.name} ${comp.code}`,
+      // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing"). Format lives in
+      // @carres/shared (sofaSkuDescription) with the bed auto-descriptions.
+      description: sofaSkuDescription(model.name as string, comp.code as string),
       discontinued_at: null,
     },
     { onConflict: "sku" },
