@@ -2904,13 +2904,12 @@ function DrawerBody({
                         </td>
                       </tr>
                     );
-                    // Items ALWAYS split by category (Jess 2026-07-19, supersedes
-                    // the rev17 "≤5 reads flat" call): every category present gets
-                    // its own header + rows — Mattress · Bedframe · Sofa ·
-                    // Accessory · Service. A single-line order stays flat.
-                    if (orderedLines.length <= 1) {
-                      return orderedLines.map(renderRow);
-                    }
+                    // Items ALWAYS split by category (Jess 2026-07-19/20): every
+                    // category present gets its own header + rows — Mattress ·
+                    // Bedframe · Sofa · Accessory · Service — so EVERY item
+                    // carries its category icon (Jess: even a single-line order
+                    // shows the category header + icon; the flat exception is
+                    // retired).
                     // Service lines fall to "acc" under lineCategory — split them
                     // into their OWN group so Accessory ≠ Service.
                     const groupCatOf = (
