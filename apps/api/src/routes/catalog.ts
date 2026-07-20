@@ -849,9 +849,48 @@ catalogRouter.patch("/skus/:id", async (c) => {
 // / model_default_free_gifts) and order/PO lines snapshot the sku as text, so
 // the model delete is clean. Best-effort: the SKU is already gone, so a model
 // cleanup failure never turns the response into an error.
+// Loo 2026-07-21 — deleting a COMPARTMENT sku also UN-OFFERS the compartment
+// on its model (deletes the model_sofa_compartments row): a deleted sku can't
+// be ordered, so the Modular toggle + the POS builder must stop offering it
+// (the P5 explode would fail-closed on it anyway). The offer write is
+// principal-only (0178 RLS), so a compartment sku's delete is gated to the
+// principal too — otherwise a non-principal delete would strand a ghost offer
+// RLS won't let it clean up. Offer first, sku second: if the sku delete then
+// fails, the model merely shows the compartment un-offered while the row
+// lingers in SKU Master (delete again / re-offer both recover) — never the
+// reverse (offered but unorderable).
 catalogRouter.delete("/skus/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: target, error: tErr } = await sb
+    .from("product_skus")
+    .select("id, model_id, compartment_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (tErr) {
+    const m = mapPgError(tErr);
+    return c.json(m.body, m.status);
+  }
+  if (!target) {
+    return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
+  }
+  const compartmentId = (target as { compartment_id: string | null }).compartment_id;
+  const targetModelId = (target as { model_id: string | null }).model_id;
+  if (compartmentId) {
+    principalOnly(c, SOFA_COMPARTMENT_MSG);
+    if (targetModelId) {
+      const { error: offErr } = await sb
+        .from("model_sofa_compartments")
+        .delete()
+        .eq("model_id", targetModelId)
+        .eq("compartment_id", compartmentId);
+      if (offErr) {
+        const m = mapPgError(offErr);
+        return c.json(m.body, m.status);
+      }
+    }
+  }
+
   const { data, error } = await sb
     .from("product_skus")
     .delete()
