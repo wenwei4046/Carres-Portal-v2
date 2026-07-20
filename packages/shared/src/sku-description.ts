@@ -3,8 +3,8 @@
  * on the paths that mint SKUs, so the SKU Master description column fills
  * itself instead of staying "—":
  *
- *   mattress  → `MATTRESS-CR-{dimensions}` (e.g. `MATTRESS-CR-183X190CM`)
- *   bedframe  → `BEDFRAME-CR-{dimensions}`
+ *   mattress  → `Mattress {Model name} {dimensions}` (e.g. `Mattress Lumi Classic 183X190CM`)
+ *   bedframe  → `Bedframe {Model name} {dimensions}`
  *   sofa      → `Sofa {Model name} {compartment code}` (compartment auto-sync)
  *   accessory / service → NEVER auto-generated — filled in manually.
  *
@@ -28,22 +28,28 @@ export interface SizePoolDimensions {
 }
 
 /**
- * Auto description for a mattress / bedframe SKU: `{CATEGORY}-CR-{DIMENSIONS}`.
- * Returns null for any other category, an unknown size, or a pool entry with
- * no dimensions filled in.
+ * Auto description for a mattress / bedframe SKU:
+ * `{Category} {Model name} {dimensions}` (e.g. `Mattress Lumi Classic 183X190CM`) —
+ * same shape as the sofa `Sofa {Model} {code}`. Returns null for any other
+ * category, a blank model name, an unknown size, or a pool entry with no
+ * dimensions filled in.
  */
 export function autoBedSkuDescription(
   category: string,
+  modelName: string,
   sizeToken: string,
   pool: readonly SizePoolDimensions[],
 ): string | null {
   if (category !== "mattress" && category !== "bedframe") return null;
+  const name = modelName.trim();
+  if (!name) return null;
   const wantCode = canonicalSize(sizeToken).code;
   if (!wantCode) return null;
   const entry = pool.find((p) => canonicalSize(p.value).code === wantCode);
   const dims = entry?.dimensions?.trim();
   if (!dims) return null;
-  return `${category.toUpperCase()}-CR-${dims.toUpperCase()}`;
+  const categoryWord = category.charAt(0).toUpperCase() + category.slice(1);
+  return `${categoryWord} ${name} ${dims.toUpperCase()}`;
 }
 
 /**

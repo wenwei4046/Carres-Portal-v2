@@ -948,7 +948,7 @@ export {
 } from "./mattress-sizes";
 
 // Auto-generated SKU descriptions (Loo 2026-07-20): mattress/bedframe
-// `{CATEGORY}-CR-{dimensions}` (size-pool lookup) + sofa compartment
+// `{Category} {Model name} {dimensions}` (size-pool lookup) + sofa compartment
 // `Sofa {Model} {code}`. Accessory/service stay manual.
 export {
   autoBedSkuDescription,
