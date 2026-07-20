@@ -2106,6 +2106,55 @@ describe("Maintenance — floor-config + addons role gate", () => {
     });
   });
 
+  // 0242 — size lists are config: POST/PATCH carry sizeOptions → size_options.
+  it("addons POST/PATCH write size_options (0242); empty list stores null", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          key: "dispose-wardrobe",
+          name: "Dispose old wardrobe",
+          price: 120,
+          active: true,
+          service_sku: null,
+          size_options: ["Small", "Large"],
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dispose-wardrobe",
+          name: "Dispose old wardrobe",
+          price: 120,
+          sizeOptions: ["Small", "Large"],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({ size_options: ["Small", "Large"] });
+    const created = (await res.json()) as { addon: { sizeOptions?: string[] | null } };
+    expect(created.addon.sizeOptions).toEqual(["Small", "Large"]);
+
+    const patchRes = await app.fetch(
+      new Request("http://t/api/catalog/addons/dispose-wardrobe", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sizeOptions: [] }),
+      }),
+      env,
+    );
+    expect(patchRes.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ size_options: null });
+  });
+
   it("addons POST mints the Service SKU row — UNPRICED for a non-principal (0175 lock)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(

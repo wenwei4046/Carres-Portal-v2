@@ -39,7 +39,9 @@ export default function OrderAddonsSection({
       </div>
       <p className="t-tiny text-base-500 mb-3">
         Optional services offered at checkout (e.g. disposal). Each charges
-        through its linked Service SKU.
+        through its linked Service SKU. Give an add-on Sizes (comma-separated)
+        and the POS will require one size per item at checkout; leave blank
+        for no size pick.
       </p>
 
       {adding && <AddonAddForm onDone={() => setAdding(false)} />}
@@ -47,11 +49,12 @@ export default function OrderAddonsSection({
       <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(130px,1.1fr) minmax(150px,1.4fr) 110px 150px 100px" }}
+          style={{ gridTemplateColumns: ADDON_GRID_COLS }}
         >
           <div className="label">Name</div>
           <div className="label">Description</div>
           <div className="label text-right">Price (RM)</div>
+          <div className="label">Sizes</div>
           <div className="label">Service SKU</div>
           <div className="label text-right">Actions</div>
         </div>
@@ -68,6 +71,21 @@ export default function OrderAddonsSection({
       </div>
     </section>
   );
+}
+
+// 6 tracks: name · description · price · sizes · service sku · actions
+const ADDON_GRID_COLS =
+  "minmax(130px,1.1fr) minmax(140px,1.2fr) 100px minmax(150px,1fr) 130px 90px";
+
+/** Parse a comma-separated size list into a clean deduped array.
+ *  "King, Queen,,King " → ["King","Queen"]. Empty input → []. */
+export function parseSizeList(raw: string): string[] {
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const s = part.trim();
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
 }
 
 function AddonRow({
@@ -106,6 +124,24 @@ function AddonRow({
       { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
     );
   }
+  // 0242 — comma-separated size list; blank clears (no size pick at checkout).
+  function commitSizes(raw: string) {
+    const next = parseSizeList(raw);
+    const cur = addon.sizeOptions ?? [];
+    if (next.length === cur.length && next.every((s, i) => cur[i] === s)) return;
+    patch.mutate(
+      { key: addon.key, patch: { sizeOptions: next.length ? next : null } },
+      {
+        onSuccess: () =>
+          toast.success(
+            next.length
+              ? `${addon.name} · sizes: ${next.join(", ")}`
+              : `${addon.name} · size pick removed`,
+          ),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
   function remove() {
     if (
       !confirm(
@@ -123,7 +159,7 @@ function AddonRow({
   return (
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: "minmax(130px,1.1fr) minmax(150px,1.4fr) 110px 150px 100px" }}
+      style={{ gridTemplateColumns: ADDON_GRID_COLS }}
       data-testid={`addon-row-${addon.key}`}
     >
       <input
@@ -162,6 +198,19 @@ function AddonRow({
         aria-label={`${addon.key} price`}
         className={`${INPUT_CLS} text-right t-num text-[12px]`}
       />
+      <input
+        key={`${addon.key}-sizes-${(addon.sizeOptions ?? []).join(",")}`}
+        defaultValue={(addon.sizeOptions ?? []).join(", ")}
+        placeholder="e.g. King, Queen — blank = no size"
+        onBlur={(e) => commitSizes(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${addon.key} sizes`}
+        title="Comma-separated sizes offered at checkout (one pick per item). Blank = this add-on needs no size."
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[12.5px] text-base-600 outline-none bg-transparent"
+        data-testid={`addon-sizes-${addon.key}`}
+      />
       <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="t-tiny text-base-400">—</span>}</div>
       <div className="text-right">
         <button
@@ -194,6 +243,7 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [sizes, setSizes] = useState("");
   const busy = create.isPending || patch.isPending;
 
   // Loo 2026-07-12 — the operator fills Name / Description / Price ONLY.
@@ -209,12 +259,14 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
 
   async function submit() {
     if (!valid) return;
+    const sizeList = parseSizeList(sizes);
     const body = {
       key,
       name: name.trim(),
       price: priceNum,
       serviceSku,
       ...(description.trim() ? { serviceDescription: description.trim() } : {}),
+      ...(sizeList.length ? { sizeOptions: sizeList } : {}),
     };
     try {
       await create.mutateAsync(body);
@@ -240,6 +292,7 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
             active: true,
             serviceSku: body.serviceSku,
             ...(description.trim() ? { serviceDescription: description.trim() } : {}),
+            sizeOptions: sizeList.length ? sizeList : null,
           },
         });
         toast.success(`Restored ${name}`);
@@ -282,6 +335,17 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setPrice(e.target.value)}
           className={`${INPUT_CLS} w-28`}
           data-testid="addon-price"
+        />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Sizes (optional)</span>
+        <input
+          value={sizes}
+          onChange={(e) => setSizes(e.target.value)}
+          placeholder="King, Queen — blank = no size pick"
+          title="Comma-separated. If filled, the POS requires one size per item at checkout."
+          className={`${INPUT_CLS} w-64`}
+          data-testid="addon-sizes"
         />
       </label>
       <button

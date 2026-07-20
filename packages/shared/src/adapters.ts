@@ -132,6 +132,10 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   active: r.active,
   // 0172 — link to the Service-category SKU (bare SVC- code).
   serviceSku: r.service_sku ?? null,
+  // 0242 — defensive: jsonb is free-form, keep only string entries.
+  sizeOptions: Array.isArray(r.size_options)
+    ? r.size_options.filter((s): s is string => typeof s === "string" && s.length > 0)
+    : null,
 });
 
 // 0181 — special add-on (per-model selling surcharge + jsonb option groups).

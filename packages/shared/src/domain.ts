@@ -155,6 +155,8 @@ export interface Addon {
   active: boolean;
   // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
   serviceSku?: string | null;
+  // 0242 — optional size list; non-empty = checkout requires one size per unit.
+  sizeOptions?: string[] | null;
 }
 
 /**

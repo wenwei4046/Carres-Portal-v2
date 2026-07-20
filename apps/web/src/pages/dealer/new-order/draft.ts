@@ -46,32 +46,73 @@ export interface DraftLine {
 /** Addon staged on the order. Persisted as order_addons rows on submit.
  *
  * 2026-05-19 — disposal addons carry a size tag in `attrs`. The frontend
- * (Step2Products) enforces "size required" for any key starting with
- * `dispose-`; the create_order RPC just persists whatever is sent. */
+ * enforces "size required" for disposal add-ons; the create_order RPC just
+ * persists whatever is sent.
+ *
+ * 2026-07-21 (Loo) — qty > 1 may mix sizes (one Single + one Queen old
+ * mattress): `sizes` holds ONE entry PER UNIT (length = qty) and is the
+ * structured truth; `size` is kept as the composed human summary (e.g.
+ * "Queen + Single") so every downstream reader of attrs.size — order detail,
+ * cart drawer, SO PDF, ops — renders correctly without change. */
 export interface DraftAddon {
   key: string;       // matches addons.key
   qty: number;
   unitPrice: number; // snapshot at staging time
   name: string;      // for LineList rendering
-  /** Free-form attrs jsonb. For disposal addons: { size: "King" } etc. */
-  attrs?: { size?: string } | null;
+  /** 0242 — the addon's size list SNAPSHOT at staging time (from the catalog
+   *  `addons.size_options` config; principal-editable in Order Add-ons).
+   *  Non-empty = size required per unit. Absent on legacy drafts — the
+   *  hardcoded DISPOSAL_SIZE_OPTIONS fallback covers those. */
+  sizeOptions?: string[];
+  /** Free-form attrs jsonb. For sized addons: { size, sizes } — see above. */
+  attrs?: { size?: string; sizes?: string[] } | null;
 }
 
-/** Size options keyed by disposal sub-kind. Mattress + Bedframe share one set
- *  per Loo 2026-05-19. Sofa disposal needs NO size (Loo 2026-07-12 — small /
- *  big sofa are separate add-ons now, so the size tag is redundant; the old
- *  "dispose-sofa" seating-config list is dropped). */
+/** LEGACY fallback size options keyed by disposal sub-kind (pre-0242 the size
+ *  lists were hardcoded here; Mattress + Bedframe share one set per Loo
+ *  2026-05-19). Since 0242 the authoritative list is `addons.size_options`
+ *  (config, snapshotted onto DraftAddon.sizeOptions at staging) — this table
+ *  only covers in-flight drafts staged before the cutover. */
 export const DISPOSAL_SIZE_OPTIONS: Readonly<Record<string, readonly string[]>> = {
   "dispose-mattress": ["King", "Queen", "Super Single", "Single"] as const,
   "dispose-bedframe": ["King", "Queen", "Super Single", "Single"] as const,
 };
 
-/** True when the addon requires a size pick — i.e. it HAS a size-options list.
- *  Was `key.startsWith("dispose-")`, which also trapped operator-created
- *  dispose-* add-ons behind an EMPTY size dropdown they could never satisfy
- *  (Loo 2026-07-12 — the "(big sofa)" add-on blocked the cart). */
-export function isDisposalAddon(key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(DISPOSAL_SIZE_OPTIONS, key);
+/** The size list this staged addon offers: the 0242 config snapshot first,
+ *  the legacy hardcoded table as fallback. Empty = no size pick needed. */
+export function addonSizeOptions(a: DraftAddon): readonly string[] {
+  if (a.sizeOptions?.length) return a.sizeOptions;
+  return DISPOSAL_SIZE_OPTIONS[a.key] ?? [];
+}
+
+/** True when the staged addon requires a size pick — i.e. it HAS a non-empty
+ *  size list (0242 config-driven; an add-on with no list never gates). */
+export function addonRequiresSize(a: DraftAddon): boolean {
+  return addonSizeOptions(a).length > 0;
+}
+
+/** Per-unit size list for a disposal addon, normalized to length = qty.
+ *  Reads the structured `sizes` array; a legacy draft carrying only the old
+ *  single `size` seeds unit 1 with it. Missing tail units pad as "" (unpicked). */
+export function disposalUnitSizes(a: DraftAddon): string[] {
+  const base = a.attrs?.sizes ?? (a.attrs?.size ? [a.attrs.size] : []);
+  const out: string[] = [];
+  for (let i = 0; i < a.qty; i++) out.push(base[i] ?? "");
+  return out;
+}
+
+/** Human summary of per-unit sizes for attrs.size (what documents/detail
+ *  screens render): "Queen" · "Queen ×2" · "Queen + Single". Unpicked units
+ *  are skipped; empty result = nothing picked yet. */
+export function composeDisposalSizeSummary(sizes: string[]): string {
+  const counts = new Map<string, number>();
+  for (const s of sizes) {
+    if (!s) continue;
+    counts.set(s, (counts.get(s) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([s, n]) => (n > 1 ? `${s} ×${n}` : s))
+    .join(" + ");
 }
 
 /**
@@ -454,18 +495,25 @@ export function step1FirstIssue(
 export function step2Valid(d: WizardDraft): boolean {
   if (d.lines.length === 0) return false;
   for (const a of d.addons) {
-    if (isDisposalAddon(a.key) && !a.attrs?.size) return false;
+    // 2026-07-21 — EVERY unit needs its own size (qty 2 may be Queen + Single).
+    // 0242 — which add-ons gate is config-driven (addons.size_options).
+    if (addonRequiresSize(a) && disposalUnitSizes(a).some((s) => !s)) return false;
   }
   return true;
 }
 
-/** Returns the first failing disposal addon's display label, or null when
- *  every disposal has a size. Used by the wizard footer to surface a
+/** Returns the first failing sized addon's display label, or null when
+ *  every sized-addon unit has a size. Used by the wizard footer to surface a
  *  specific reason rather than a generic "Continue" disabled state. */
 export function step2FirstDisposalIssue(d: WizardDraft): string | null {
   for (const a of d.addons) {
-    if (isDisposalAddon(a.key) && !a.attrs?.size) {
-      return `${a.name} — pick a size`;
+    if (!addonRequiresSize(a)) continue;
+    const sizes = disposalUnitSizes(a);
+    const missing = sizes.filter((s) => !s).length;
+    if (missing > 0) {
+      return a.qty > 1
+        ? `${a.name} — pick a size for each of the ${a.qty} items`
+        : `${a.name} — pick a size`;
     }
   }
   return null;

@@ -2,8 +2,10 @@ import { Plus, X, Minus } from "lucide-react";
 import type { AddonDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
-  DISPOSAL_SIZE_OPTIONS,
-  isDisposalAddon,
+  addonRequiresSize,
+  addonSizeOptions,
+  composeDisposalSizeSummary,
+  disposalUnitSizes,
   type DraftAddon,
   type WizardDraft,
 } from "../new-order/draft";
@@ -44,9 +46,11 @@ export default function AddonsPanel({
     const meta = addons.find((a) => a.key === addonKey);
     if (!meta) return;
     const next: DraftAddon = { key: meta.key, qty: 1, unitPrice: meta.price, name: meta.name };
-    // Disposal add-ons need a size pick before the cart will proceed; init
-    // attrs: {} so the size dropdown renders empty + the gate stays closed.
-    if (isDisposalAddon(meta.key)) {
+    // 0242 — snapshot the addon's configured size list onto the draft (the
+    // panel + step-2 gate read it from there). Sized add-ons init attrs: {}
+    // so the dropdown renders empty + the gate stays closed.
+    if (meta.sizeOptions?.length) next.sizeOptions = meta.sizeOptions;
+    if (addonRequiresSize(next)) {
       next.attrs = {};
     }
     onChange({ ...draft, addons: [...draft.addons, next] });
@@ -55,20 +59,44 @@ export default function AddonsPanel({
   function bumpAddonQty(addonKey: string, delta: number) {
     onChange({
       ...draft,
-      addons: draft.addons.map((a) =>
-        a.key === addonKey ? { ...a, qty: Math.max(1, a.qty + delta) } : a,
-      ),
+      addons: draft.addons.map((a) => {
+        if (a.key !== addonKey) return a;
+        const qty = Math.max(1, a.qty + delta);
+        const next: DraftAddon = { ...a, qty };
+        // Sized addon: keep one size slot per unit — qty change resizes the
+        // per-unit list (new units start unpicked, shrink drops the tail).
+        if (addonRequiresSize(a)) {
+          const sizes = disposalUnitSizes(next);
+          next.attrs = {
+            ...(a.attrs ?? {}),
+            sizes,
+            size: composeDisposalSizeSummary(sizes) || undefined,
+          };
+        }
+        return next;
+      }),
     });
   }
 
-  function setAddonSize(addonKey: string, size: string) {
+  /** 2026-07-21 (Loo) — each unit picks its own size (qty 2 can be one Queen
+   *  + one Single). `sizes` = per-unit truth; `size` stays the composed
+   *  summary every downstream attrs.size reader renders. */
+  function setAddonUnitSize(addonKey: string, unitIdx: number, size: string) {
     onChange({
       ...draft,
-      addons: draft.addons.map((a) =>
-        a.key === addonKey
-          ? { ...a, attrs: { ...(a.attrs ?? {}), size: size || undefined } }
-          : a,
-      ),
+      addons: draft.addons.map((a) => {
+        if (a.key !== addonKey) return a;
+        const sizes = disposalUnitSizes(a);
+        sizes[unitIdx] = size;
+        return {
+          ...a,
+          attrs: {
+            ...(a.attrs ?? {}),
+            sizes,
+            size: composeDisposalSizeSummary(sizes) || undefined,
+          },
+        };
+      }),
     });
   }
 
@@ -145,25 +173,33 @@ export default function AddonsPanel({
               <span className="pos-price text-[14px]">{rm(selected.unitPrice * selected.qty)}</span>
             </div>
 
-            {/* Disposal size gate — red border until chosen */}
-            {isDisposalAddon(a.key) && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="kicker text-base-400">Size</span>
-                <select
-                  value={selected.attrs?.size ?? ""}
-                  onChange={(e) => setAddonSize(a.key, e.target.value)}
-                  aria-label={`${a.name} size`}
-                  className={`flex-1 h-7 px-2 rounded-lg border text-[11.5px] bg-white outline-none focus:border-primary transition-colors ${
-                    selected.attrs?.size ? "border-base-200" : "border-destructive/60"
-                  }`}
-                >
-                  <option value="">Select size…</option>
-                  {(DISPOSAL_SIZE_OPTIONS[a.key] ?? []).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+            {/* Size gate (0242 config-driven) — ONE dropdown PER UNIT (qty 2
+                may be one Queen + one Single, Loo 2026-07-21); red border
+                until chosen. */}
+            {addonRequiresSize(selected) && (
+              <div className="flex flex-col gap-1.5 pt-1">
+                {disposalUnitSizes(selected).map((size, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="kicker text-base-400 flex-shrink-0 w-10">
+                      {selected.qty > 1 ? `Size ${idx + 1}` : "Size"}
+                    </span>
+                    <select
+                      value={size}
+                      onChange={(e) => setAddonUnitSize(a.key, idx, e.target.value)}
+                      aria-label={`${a.name} size${selected.qty > 1 ? ` (item ${idx + 1})` : ""}`}
+                      className={`flex-1 h-7 px-2 rounded-lg border text-[11.5px] bg-white outline-none focus:border-primary transition-colors ${
+                        size ? "border-base-200" : "border-destructive/60"
+                      }`}
+                    >
+                      <option value="">Select size…</option>
+                      {addonSizeOptions(selected).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
               </div>
             )}
           </div>
