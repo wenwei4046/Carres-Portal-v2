@@ -25,6 +25,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
+import { orderStatusPill } from "@/lib/status-pill";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
 import { renderReceiptPdf } from "@/lib/pdf/render";
 import { useAuth } from "@/lib/auth";
@@ -227,20 +228,8 @@ function payBucket(s: string | null): string {
 }
 const PAY_ORDER = [UNSET_LABEL, "Paid", "Follow Up", "Partial", "Unpaid"];
 
-/** Payment-status → pill colour. */
-function statusPill(s: string | null): string {
-  switch ((s ?? "").toLowerCase()) {
-    case "paid":
-      return "pill-confirmed";
-    case "partial":
-    case "follow up":
-      return "pill-warning";
-    case "unpaid":
-      return "pill-overdue";
-    default:
-      return "pill-neutral";
-  }
-}
+// Payment-status → pill colour folds into the ONE shared orderStatusPill
+// (lib/status-pill.ts) — no separate map (Jess 2026-07-20).
 
 /** Multi-select toggle helper (Jess 2026-07-19 — facets are Sets). */
 function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
@@ -769,7 +758,7 @@ function PaymentRow({
           )}
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <span className={`pill ${statusPill(r.paymentStatus)}`}>{r.paymentStatus ?? "— set —"}</span>
+          <span className={`pill ${orderStatusPill(r.paymentStatus ?? "")}`}>{r.paymentStatus ?? "— set —"}</span>
           <StatusSelect r={r} onSave={onSave} />
         </div>
       </td>
