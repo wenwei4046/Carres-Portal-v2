@@ -286,13 +286,14 @@ describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", (
   });
 });
 
-// Loo 2026-07-20 — the separate "Edit Prices" toggle is GONE: the row Edit
-// opens the Price + PWP cells too (principal only; product name stays locked).
-describe("SkuMasterTab — row Edit opens price cells (no Edit Prices button)", () => {
-  it("has no Edit Prices button; row Edit shows the price input but NO cost input", () => {
+// Loo 2026-07-20 — the separate "Edit Prices" toggle is GONE; Loo 2026-07-21 —
+// the per-row Edit moved to ONE toolbar toggle that opens every row at once,
+// Price + PWP cells included (principal only; product name stays locked).
+describe("SkuMasterTab — toolbar Edit opens price cells (no Edit Prices button)", () => {
+  it("has no Edit Prices button; toolbar Edit shows the price input but NO cost input", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
     expect(screen.getByLabelText("CLOUD-KING PWP price")).toBeInTheDocument();
     expect(screen.queryByLabelText("CLOUD-KING cost")).not.toBeInTheDocument();
@@ -300,7 +301,7 @@ describe("SkuMasterTab — row Edit opens price cells (no Edit Prices button)", 
 
   it("price edit commits on blur through the row Edit", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const price = screen.getByLabelText("CLOUD-KING price");
     fireEvent.change(price, { target: { value: "3999" } });
     fireEvent.blur(price);
@@ -323,23 +324,28 @@ describe("SkuMasterTab — no STATUS column", () => {
   });
 });
 
-describe("SkuMasterTab — inline row editing (no modal)", () => {
-  it("Edit flips the row to inline inputs (code / description / category); Done flips back", () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
-    // No dialog — inline inputs instead.
+describe("SkuMasterTab — toolbar edit-all inline editing (no modal)", () => {
+  it("Edit flips EVERY row to inline inputs (code / description / category); Done flips back", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_COST_NULL])} />));
+    // No per-row Edit button anymore — the toolbar toggle is the only door.
+    expect(screen.queryByTestId("sku-edit-CLOUD-KING")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
+    // No dialog — inline inputs instead, on ALL visible rows at once.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByLabelText("CLOUD-KING code")).toBeInTheDocument();
     expect(screen.getByLabelText("CLOUD-KING description")).toBeInTheDocument();
     expect(screen.getByTestId("sku-category-select-CLOUD-KING")).toBeInTheDocument();
-    expect(screen.getByTestId("sku-edit-CLOUD-KING")).toHaveTextContent("Done");
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    expect(screen.getByLabelText("CLOUD-QUEEN code")).toBeInTheDocument();
+    expect(screen.getByLabelText("CLOUD-QUEEN description")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-edit-all")).toHaveTextContent("Done");
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     expect(screen.queryByLabelText("CLOUD-KING code")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("CLOUD-QUEEN code")).not.toBeInTheDocument();
   });
 
   it("code edit commits the FULL code on blur (free rename, Loo 2026-07-11)", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const code = screen.getByLabelText("CLOUD-KING code");
     // The whole current code is editable — not a locked prefix + suffix.
     expect((code as HTMLInputElement).defaultValue).toBe("CLOUD-KING");
@@ -353,7 +359,7 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
 
   it("size edit commits the variant label WITHOUT touching the code", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const size = screen.getByLabelText("CLOUD-KING size");
     fireEvent.change(size, { target: { value: "King XL" } });
     fireEvent.blur(size);
@@ -363,7 +369,7 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
 
   it("clearing the size is ignored for a sized category (mattress)", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const size = screen.getByLabelText("CLOUD-KING size");
     fireEvent.change(size, { target: { value: "" } });
     fireEvent.blur(size);
@@ -374,7 +380,7 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
   it("description edit commits on blur; blank clears to null", async () => {
     const withDesc = { ...SKU_COST_SET, description: "old text" };
     render(wrap(<SkuMasterTab catalog={makeCatalog([withDesc])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const desc = screen.getByLabelText("CLOUD-KING description");
     fireEvent.change(desc, { target: { value: "  " } });
     fireEvent.blur(desc);
@@ -384,7 +390,7 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
 
   it("category change PATCHes the MODEL (moves all its SKUs)", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     fireEvent.change(screen.getByTestId("sku-category-select-CLOUD-KING"), {
       target: { value: "accessory" },
     });
@@ -396,7 +402,7 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
 
   it("unchanged blur is a no-op (no PATCH)", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     fireEvent.blur(screen.getByLabelText("CLOUD-KING code"));
     fireEvent.blur(screen.getByLabelText("CLOUD-KING description"));
     expect(mockPatchMutate).not.toHaveBeenCalled();
@@ -413,7 +419,7 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     mockRole = "principal";
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.queryByTestId("sku-price-lock-hint")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
   });
 
@@ -421,7 +427,7 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     mockRole = "operation";
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.getByTestId("sku-price-lock-hint")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     // code/description/size/category flip to inputs, but never the price cells.
     expect(screen.getByLabelText("CLOUD-KING code")).toBeInTheDocument();
     const row = screen.getByTestId("sku-row-CLOUD-KING");
@@ -547,7 +553,7 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
   it("row Edit: a size-cell blur PATCHes the FULL map — composed edits + ORPHANED keys preserved", async () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const input32 = screen.getByLabelText("LUNA-1A(LHF) price at 32");
     fireEvent.change(input32, { target: { value: "1200" } });
     fireEvent.blur(input32);
@@ -562,7 +568,7 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
   it("row Edit: blanking a size removes its key (falls back to the base price)", async () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     const input24 = screen.getByLabelText("LUNA-1A(LHF) price at 24");
     fireEvent.change(input24, { target: { value: "" } });
     fireEvent.blur(input24);
@@ -574,7 +580,7 @@ describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
   it("row Edit: blur without a change is a no-op (no PATCH)", () => {
     render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
     openSofa();
-    fireEvent.click(screen.getByTestId("sku-edit-LUNA-1A(LHF)"));
+    fireEvent.click(screen.getByTestId("sku-edit-all"));
     fireEvent.blur(screen.getByLabelText("LUNA-1A(LHF) price at 24"));
     expect(mockPatchMutate).not.toHaveBeenCalled();
   });
