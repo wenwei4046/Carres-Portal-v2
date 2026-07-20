@@ -25,13 +25,15 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  * `pos_active` itself is untouched — the Modular toggle + the POS bundle
  * filter keep reading it. Discontinued rows still dim to 50% opacity.)
  *
- * Row "Edit" (Loo 2026-07-06) = INLINE editing, no modal: the row's code
- * (its variant segment — the server re-derives `{MODEL_KEY}-{variant}`),
- * description, and product category flip to inputs that commit on blur.
- * Loo 2026-07-20: the row Edit ALSO opens the Price / PWP cells (principal
- * only, 0175) — everything on the row is editable except the product name.
- * The separate "Edit Prices" toggle is gone. Price 0 renders as a muted
+ * "Edit" (Loo 2026-07-21) = ONE toolbar toggle next to Export SKUs that flips
+ * EVERY visible row into inline editing at once — no per-row Edit button, no
+ * modal. Code / description / size / category flip to inputs that commit on
+ * blur; the Price / PWP cells open too (principal only, 0175) — everything on
+ * a row is editable except the product name. Price 0 renders as a muted
  * "not set" — NEVER coerced to 0.
+ * (History: 2026-07-06 per-row inline Edit replaced the modal; 2026-07-20 the
+ * row Edit absorbed the separate "Edit Prices" toggle; 2026-07-21 the per-row
+ * button moved to the toolbar and became edit-all.)
  *
  * "Delete N" (Loo 2026-07-20) = PERMANENT delete — the SKU row is gone for
  * good (order/PO history keeps its sku text snapshot). Soft retirement stays
@@ -43,11 +45,11 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  */
 
 const VISIBLE_CAP = 300;
-// 10 tracks: checkbox · code · desc · product · category · size · price · pwp · margin · edit
+// 9 tracks: checkbox · code · desc · product · category · size · price · pwp · margin
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px 60px";
+const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -78,9 +80,9 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  // Inline row editing (Loo 2026-07-06) — at most ONE row at a time; the Edit
-  // button toggles it. No modal.
-  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  // Edit-all (Loo 2026-07-21) — ONE toolbar toggle; while on, every visible
+  // row renders its inline inputs. No modal, no per-row toggle.
+  const [editAll, setEditAll] = useState(false);
 
   const del = useDeleteCatalogSku();
 
@@ -124,7 +126,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
   const gridCols = sofaSizeMode
-    ? `32px 170px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")} 60px`
+    ? `32px 170px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")}`
     : GRID_COLS;
 
   // Switching category invalidates a model pick from the previous category —
@@ -263,6 +265,15 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           )}
           <button
             type="button"
+            onClick={() => setEditAll((v) => !v)}
+            className={`${editAll ? "btn-primary" : "btn-secondary"} text-[12px]`}
+            title="Edit every visible SKU inline — changes commit on blur"
+            data-testid="sku-edit-all"
+          >
+            {editAll ? "Done" : "Edit"}
+          </button>
+          <button
+            type="button"
             onClick={exportCsv}
             className="btn-secondary text-[12px]"
             data-testid="sku-export"
@@ -353,7 +364,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
                   {s}
                 </div>
               ))}
-              <div className="label" />
             </>
           ) : (
             <>
@@ -365,7 +375,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label text-right">Price</div>
               <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
-              <div className="label" />
             </>
           )}
         </div>
@@ -383,8 +392,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             canEditPrices={isPrincipal}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
-            inlineEdit={inlineEditId === r.sku.id}
-            onToggleInline={(id) => setInlineEditId((cur) => (cur === id ? null : id))}
+            inlineEdit={editAll}
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
           />
@@ -411,7 +419,6 @@ const SkuRowView = memo(function SkuRowView({
   selected,
   onToggle,
   inlineEdit,
-  onToggleInline,
   sofaSizes,
   gridCols,
 }: {
@@ -420,11 +427,10 @@ const SkuRowView = memo(function SkuRowView({
   canEditPrices: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
-  /** Loo 2026-07-06 — row-level inline editing (code / description / category),
-   *  toggled by the row's Edit button. No modal. Loo 2026-07-20: the same
-   *  toggle now also opens the Price / PWP cells (principal only). */
+  /** Loo 2026-07-21 — driven by the toolbar edit-all toggle: every visible row
+   *  flips to inline inputs (code / description / size / category, plus the
+   *  Price / PWP cells for the principal) at once. No modal. */
   inlineEdit: boolean;
-  onToggleInline: (id: string) => void;
   /** 0204 — non-null = render the sofa-size grid variant (one price cell per
    *  pool size for compartment SKUs; flat SKUs span the size tracks). */
   sofaSizes: string[] | null;
@@ -539,19 +545,6 @@ const SkuRowView = memo(function SkuRowView({
     </div>
   );
 
-  const editButton = (
-    <div className="text-right">
-      <button
-        type="button"
-        onClick={() => onToggleInline(sku.id)}
-        className={`${inlineEdit ? "btn-primary" : "btn-ghost"} text-[11px]`}
-        data-testid={`sku-edit-${sku.sku}`}
-      >
-        {inlineEdit ? "Done" : "Edit"}
-      </button>
-    </div>
-  );
-
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
     if (trimmed === "") return; // empty = no change (price is non-null on the column)
@@ -639,7 +632,6 @@ const SkuRowView = memo(function SkuRowView({
             )}
           </div>
         )}
-        {editButton}
       </div>
     );
   }
@@ -764,8 +756,6 @@ const SkuRowView = memo(function SkuRowView({
           </span>
         )}
       </div>
-
-      {editButton}
     </div>
   );
 });
