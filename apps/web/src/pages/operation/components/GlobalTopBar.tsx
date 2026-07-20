@@ -114,7 +114,7 @@ export function TopBarIcons() {
           title="Alerts"
           aria-haspopup="menu"
           aria-expanded={open === "alerts"}
-          className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+          className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <Bell size={18} />
           {alerts.total > 0 && (
@@ -149,7 +149,7 @@ export function TopBarIcons() {
               <button
                 type="button"
                 onClick={goOrders}
-                className="w-full px-3 py-2 flex items-center justify-between hover:bg-base-50"
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-hovertint"
               >
                 <span className="t-micro text-info">Escalated to Jess</span>
                 <span className="t-tiny text-base-400 tabular-nums">
@@ -160,7 +160,7 @@ export function TopBarIcons() {
             <button
               type="button"
               onClick={goOrders}
-              className="w-full text-center py-2 t-small text-primary hover:bg-base-50 border-t border-base-100"
+              className="w-full text-center py-2 t-small text-primary hover:bg-hovertint border-t border-base-100"
             >
               Open Orders
             </button>
@@ -178,7 +178,7 @@ export function TopBarIcons() {
           title="Help"
           aria-haspopup="menu"
           aria-expanded={open === "help"}
-          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <HelpCircle size={18} />
         </button>
@@ -187,7 +187,7 @@ export function TopBarIcons() {
             <button
               type="button"
               onClick={() => setOpen(null)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-hovertint"
             >
               <HelpCircle size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
@@ -198,7 +198,7 @@ export function TopBarIcons() {
             <button
               type="button"
               onClick={() => setOpen(null)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-base-50"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-hovertint"
             >
               <GraduationCap size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
@@ -221,7 +221,7 @@ export function TopBarIcons() {
           title="Settings"
           aria-haspopup="dialog"
           aria-expanded={open === "settings"}
-          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <Settings size={18} />
         </button>
@@ -267,7 +267,7 @@ function AlertGroup({
               <button
                 type="button"
                 onClick={onOpen}
-                className="w-full text-left px-1 py-0.5 rounded hover:bg-base-50"
+                className="w-full text-left px-1 py-0.5 rounded hover:bg-hovertint"
               >
                 <span className="t-small text-base-700 truncate block">
                   <span className="font-mono tabular-nums">SO-{o.so}</span>
