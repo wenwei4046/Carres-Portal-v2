@@ -428,7 +428,10 @@
      facet groups AND every order-drawer panel header.) */
   /* v4 §11c — headers are DARK (the reference tables' headers are dark);
      muted is for meta only. */
-  .section-band { background: #F3F4F6; }
+  /* Panel headers darkened to base-200 (Jess 2026-07-21) so every panel header
+     reads as a header — now ONE grey with the Orders-list th + the `strong`
+     facet bands (they were #E5E7EB already; #F3F4F6 was near-invisible). */
+  .section-band { background: #E5E7EB; }
   .section-band-title { color: #374151; }
   .section-band-title-danger { color: #A32D2D; }
   .section-band-total { color: #6B7280; }
