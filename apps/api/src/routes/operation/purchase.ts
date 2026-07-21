@@ -230,12 +230,17 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
 
   const catBySku = new Map<
     string,
-    { supplierId: string | null; cost: number | null; category: ProductCategory | undefined }
+    {
+      supplierId: string | null;
+      cost: number | null;
+      category: ProductCategory | undefined;
+      modelName: string | null;
+    }
   >();
   if (lineSkus.length > 0) {
     const { data: skuRows, error: skuErr } = await sb
       .from("product_skus")
-      .select("sku, supplier_id, cost, product_models!inner(category)")
+      .select("sku, supplier_id, cost, product_models!inner(category, name)")
       .in("sku", lineSkus);
     if (skuErr) {
       const m = mapPgError(skuErr);
@@ -243,13 +248,14 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     }
     for (const s of skuRows ?? []) {
       const pm = (s as Record<string, unknown>).product_models as
-        | { category?: string | null }
+        | { category?: string | null; name?: string | null }
         | null
         | undefined;
       catBySku.set(s.sku as string, {
         supplierId: (s.supplier_id as string | null) ?? null,
         cost: s.cost != null ? Number(s.cost) : null,
         category: (pm?.category as ProductCategory | undefined) ?? undefined,
+        modelName: (pm?.name as string | null) ?? null,
       });
     }
   }
@@ -257,6 +263,8 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   // Per-SKU system cost (product_skus.cost) — DISPLAY-only, advisory. Never
   // reaches an order_line / PO / pricing path; the card just shows Σ(cost×toOrder).
   const costBySku: Record<string, number | null> = {};
+  // Per-SKU model name (product_models.name) — the human label on each place line.
+  const modelNameBySku: Record<string, string | null> = {};
 
   const demand: DemandLine[] = [];
   for (const l of lines) {
@@ -267,6 +275,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     if (!category || !PROCURABLE.includes(category) || !supplierId) continue;
 
     costBySku[l.sku as string] = cat?.cost ?? null;
+    modelNameBySku[l.sku as string] = cat?.modelName ?? null;
 
     const order = orderById.get(l.order_id as string);
     if (!order) continue;
@@ -375,6 +384,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     customerNameByOrderId,
     costBySku,
     chaseReceive,
+    modelNameBySku,
   );
 
   return c.json(purchaseTodayResponseSchema.parse(report));

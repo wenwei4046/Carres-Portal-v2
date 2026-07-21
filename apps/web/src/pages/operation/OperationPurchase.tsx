@@ -1,45 +1,48 @@
 /**
- * OperationPurchase — the Purchase / Procurement MRP cockpit (2026-07-21).
+ * OperationPurchase — the Purchase / Procurement cockpit (scale-aware rebuild
+ * 2026-07-21).
  *
- * A "what to do today" guided worklist for a no-experience operator (Jess's
- * brief, approved mock `purchase-cockpit-mock.html`). It reads GET
- * /api/operation/purchase/today (the pure net-requirements engine over live
- * demand + supply) and lays the day out as: a KPI strip, a data-guard for
- * un-plannable orders, then THREE numbered sections —
- *   ①  Place orders   — LIVE, wired to `bundles` (one card per factory).
- *   ②  Chase factory   — PLACEHOLDER (the endpoint doesn't feed this yet).
- *   ③  Receive         — PLACEHOLDER (static GRN 3-step preview).
- * plus a "Done today" recap (static).
+ * SAP-Fiori faceted list + master-detail. The per-customer "tall card" list did
+ * not scale to 500 orders, so the day is now ONE STAGE AT A TIME:
  *
- * Read-only: the "Send order to <factory>" flame is a stub — actually raising
- * the PO is a later unit. No order-write path is touched here.
+ *   KPI strip (3 cards) = the STAGE SWITCHER  →  ① Place · ② Chase · ③ Receive.
+ *   Left facet          = filter + jump; its numbers TALLY the right.
+ *   Right               = the active stage's list.
+ *   Right-side DRAWER   = the ① Place drill-in (aggregated SKU table).
+ *
+ * ① Place is ONE ROW PER SUPPLIER (`placeGroups` from the engine) — 2–4 rows
+ * even at 500 orders. Reviewing a row opens the drawer's per-SKU table.
+ *
+ * Read-only: every write affordance (Send all / Send PO / Something wrong /
+ * Chase / Check-in) is a STUB — actually raising a PO / booking a GRN is a
+ * later unit. No order-write path is touched here.
  *
  * Design: UI-KIT v4 (docs/UI-KIT.md) — ListPageShell frame, token classes only
- * (no raw hex), Lucide icons, `.pill` status tones, English-only copy.
+ * (no raw hex), Lucide icons, `.pill` status tones, `Btn`, English-only copy.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock,
   Factory,
-  Info,
   Minus,
   MessageCircle,
   PackageCheck,
   RefreshCw,
   Send,
   Truck,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type {
   ProductCategory,
-  PurchaseBundle,
   PurchaseChase,
+  PurchasePlaceGroup,
   PurchaseReceive,
   PurchaseUrgencyBucket,
 } from "@carres/shared";
@@ -51,6 +54,9 @@ import type { SupplierRow } from "@/lib/queries";
 import { usePurchaseToday, useOperationSuppliers } from "@/lib/queries";
 
 // ── Small pure helpers ───────────────────────────────────────────────────────
+
+type Stage = "place" | "chase" | "receive";
+type Attn = "overdue" | "missing" | null;
 
 /** Calendar days between two ISO dates (`to − from`), or null if either bad. */
 function daysBetween(fromIso: string | null, toIso: string | null): number | null {
@@ -108,101 +114,135 @@ function urgencyStyle(u: PurchaseUrgencyBucket): UrgencyStyle {
   }
 }
 
+/** Customer names for a place group's line "FOR" column, "+N more" when many. */
+function forSummary(
+  forOrders: PurchasePlaceGroup["lines"][number]["forOrders"],
+  max = 2,
+): string {
+  const names = forOrders
+    .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
+    .filter((s): s is string => Boolean(s));
+  if (names.length === 0) return "—";
+  if (names.length <= max) return names.join(", ");
+  return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OperationPurchase() {
   const { data, isLoading, isError, error, refetch } = usePurchaseToday();
   const suppliersQ = useOperationSuppliers();
   const [facetOpen, setFacetOpen] = useState(true);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const toggleGroup = (k: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
-      return next;
-    });
+  const [stage, setStage] = useState<Stage>("place");
+  const [supplierFilter, setSupplierFilter] = useState<string | null>(null);
+  const [attn, setAttn] = useState<Attn>(null);
+  const [drawerSupplierId, setDrawerSupplierId] = useState<string | null>(null);
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
     for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s);
     return m;
   }, [suppliersQ.data]);
-
   const supplierName = useMemo(
     () => (id: string) => supplierById.get(id)?.name ?? "Factory",
     [supplierById],
   );
 
-  const bundles = data?.bundles ?? [];
-  const bySku = data?.bySku ?? [];
   const chase = data?.chase ?? [];
   const receive = data?.receive ?? [];
   const summary = data?.summary;
   const today = data?.today ?? null;
 
-  // Advisory free stock per SKU (from the buy list) — surfaced as the "kept as
-  // ready stock, ordering fresh" note on a place-order line.
-  const freeStockBySku = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of bySku) if (s.freeStock > 0) m.set(s.sku, s.freeStock);
-    return m;
-  }, [bySku]);
+  // ① Place groups — resolve each supplier's display name (the engine leaves it
+  // null; the web maps it via useOperationSuppliers, like the rest of the page).
+  const placeGroups = useMemo(
+    () =>
+      (data?.placeGroups ?? []).map((g) => ({
+        ...g,
+        supplierName: g.supplierName ?? supplierName(g.supplierId),
+      })),
+    [data?.placeGroups, supplierName],
+  );
 
-  // ① Place orders — one card PER (bundle × supplier). A bed-set bundle can
-  // span a mattress factory + a bed-frame factory → two factory cards.
-  const placeCards = useMemo(() => {
-    const cards: Array<{
-      key: string;
-      bundle: PurchaseBundle;
-      supplierId: string;
-      items: PurchaseBundle["items"];
-    }> = [];
-    for (const b of bundles) {
-      const bySupplier = new Map<string, PurchaseBundle["items"]>();
-      for (const it of b.items) {
-        const arr = bySupplier.get(it.supplierId) ?? [];
-        arr.push(it);
-        bySupplier.set(it.supplierId, arr);
-      }
-      for (const [supplierId, items] of bySupplier) {
-        cards.push({ key: `${b.bundleKey}:${supplierId}`, bundle: b, supplierId, items });
-      }
-    }
-    return cards;
-  }, [bundles]);
+  // Switching stage resets the per-stage facet filters + closes the drawer.
+  const goStage = (s: Stage) => {
+    setStage(s);
+    setSupplierFilter(null);
+    setAttn(null);
+    setDrawerSupplierId(null);
+  };
 
-  // Facet · By factory — units still to buy, grouped by supplier.
+  // Stage counts — the KPI cards + the TODAY'S WORK facet read from these, so the
+  // left numbers always tally the right list.
+  const placeCount = placeGroups.length;
+  const placeOverdue = placeGroups.filter((g) => g.urgency === "late").length;
+  const missingCount = placeGroups.filter((g) => g.urgency === "no_deadline").length;
+  const chaseCount = chase.length;
+  const chaseLate = summary?.chaseLate ?? 0;
+  const receiveCount = receive.length;
+
+  // BY FACTORY facet — per-supplier units for the CURRENT stage.
   const byFactory = useMemo(() => {
     const m = new Map<string, number>();
-    for (const s of bySku) m.set(s.supplierId, (m.get(s.supplierId) ?? 0) + s.toOrder);
+    if (stage === "place") {
+      for (const g of placeGroups) m.set(g.supplierId, g.totalUnits);
+    } else if (stage === "chase") {
+      for (const r of chase)
+        m.set(
+          r.supplierId,
+          (m.get(r.supplierId) ?? 0) +
+            r.items.reduce((s, it) => s + it.outstanding, 0),
+        );
+    } else {
+      for (const r of receive)
+        m.set(
+          r.supplierId,
+          (m.get(r.supplierId) ?? 0) +
+            r.items.reduce((s, it) => s + it.outstanding, 0),
+        );
+    }
     return [...m.entries()]
       .map(([id, units]) => ({ id, units, name: supplierName(id) }))
       .sort((a, b) => b.units - a.units);
-  }, [bySku, supplierName]);
+  }, [stage, placeGroups, chase, receive, supplierName]);
 
-  // Facet · Raise-by schedule — bundles grouped by their raise-by date (real,
-  // derived from the engine — this is the honest "week ahead").
-  const raiseBySchedule = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const b of bundles) {
-      if (!b.raiseBy) continue;
-      m.set(b.raiseBy, (m.get(b.raiseBy) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(0, 6);
-  }, [bundles]);
-
-  // Orders that can't be planned (no deadline) — the data guard + facet alert.
-  const noDeadlineBundles = useMemo(
-    () => bundles.filter((b) => b.urgency === "no_deadline"),
-    [bundles],
+  // The active stage's filtered right list.
+  const placeShown = useMemo(
+    () =>
+      placeGroups.filter((g) => {
+        if (supplierFilter && g.supplierId !== supplierFilter) return false;
+        if (attn === "overdue" && g.urgency !== "late") return false;
+        if (attn === "missing" && g.urgency !== "no_deadline") return false;
+        return true;
+      }),
+    [placeGroups, supplierFilter, attn],
+  );
+  const chaseShown = useMemo(
+    () => chase.filter((r) => !supplierFilter || r.supplierId === supplierFilter),
+    [chase, supplierFilter],
+  );
+  const receiveShown = useMemo(
+    () => receive.filter((r) => !supplierFilter || r.supplierId === supplierFilter),
+    [receive, supplierFilter],
   );
 
-  const lateCount = summary?.late ?? 0;
-  const noDeadlineCount = summary?.no_deadline ?? 0;
-  const toPlaceBundles = summary?.toPlaceBundles ?? 0;
-  const toChase = summary?.toChase ?? 0;
-  const chaseLate = summary?.chaseLate ?? 0;
-  const toReceive = summary?.toReceive ?? 0;
+  const drawerGroup = drawerSupplierId
+    ? placeGroups.find((g) => g.supplierId === drawerSupplierId) ?? null
+    : null;
+
+  // Missing-deadline data guard — SOs (from any no-deadline group) to flag.
+  const missingSoLabels = useMemo(() => {
+    const seen = new Set<string>();
+    for (const g of placeGroups) {
+      if (g.urgency !== "no_deadline") continue;
+      for (const ln of g.lines)
+        for (const o of ln.forOrders) if (o.so) seen.add(`SO-${o.so}`);
+    }
+    return [...seen];
+  }, [placeGroups]);
+
+  const toggleSupplier = (id: string) =>
+    setSupplierFilter((cur) => (cur === id ? null : id));
 
   // ── Error state ──
   if (isError) {
@@ -254,384 +294,554 @@ export default function OperationPurchase() {
       onFacetToggle={() => setFacetOpen((v) => !v)}
       facetToggleTitle="Show overview"
       facet={
-        <>
+        <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
           {/* Needs attention (alarm) */}
-          <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
-            <FacetGroup
-              title="Needs attention"
-              danger
-              collapsed={collapsed.has("attn")}
-              onToggle={() => toggleGroup("attn")}
-            >
-              <FacetRow label="Overdue" count={lateCount} tone={lateCount > 0 ? "danger" : "muted"} />
-              <FacetRow
-                label="Missing deadline"
-                count={noDeadlineCount}
-                tone={noDeadlineCount > 0 ? "danger" : "muted"}
-              />
-            </FacetGroup>
+          <FacetGroup title="Needs attention" danger>
+            <FacetRow
+              label="Overdue"
+              count={placeOverdue}
+              tone={placeOverdue > 0 ? "danger" : "muted"}
+              active={stage === "place" && attn === "overdue"}
+              onClick={() => {
+                setStage("place");
+                setDrawerSupplierId(null);
+                setSupplierFilter(null);
+                setAttn((a) => (a === "overdue" ? null : "overdue"));
+              }}
+            />
+            <FacetRow
+              label="Missing deadline"
+              count={missingCount}
+              tone={missingCount > 0 ? "danger" : "muted"}
+              active={stage === "place" && attn === "missing"}
+              onClick={() => {
+                setStage("place");
+                setDrawerSupplierId(null);
+                setSupplierFilter(null);
+                setAttn((a) => (a === "missing" ? null : "missing"));
+              }}
+            />
+          </FacetGroup>
 
-            {/* Today's work — the ①②③ jump list */}
-            <FacetGroup
-              title="Today's work"
-              total={toPlaceBundles}
-              collapsed={collapsed.has("work")}
-              onToggle={() => toggleGroup("work")}
-            >
-              <FacetRow numbered="1" label="Place orders" count={toPlaceBundles} />
-              <FacetRow
-                numbered="2"
-                label="Chase factory"
-                count={toChase}
-                tone={toChase > 0 ? "danger" : "muted"}
-              />
-              <FacetRow numbered="3" label="Receive" count={toReceive} />
-            </FacetGroup>
+          {/* Today's work — the ①②③ stage jump (syncs with the KPI cards) */}
+          <FacetGroup title="Today's work">
+            <FacetRow
+              numbered="1"
+              label="Place orders"
+              count={placeCount}
+              active={stage === "place"}
+              onClick={() => goStage("place")}
+            />
+            <FacetRow
+              numbered="2"
+              label="Chase factory"
+              count={chaseCount}
+              tone={chaseCount > 0 ? "danger" : "muted"}
+              active={stage === "chase"}
+              onClick={() => goStage("chase")}
+            />
+            <FacetRow
+              numbered="3"
+              label="Receive"
+              count={receiveCount}
+              active={stage === "receive"}
+              onClick={() => goStage("receive")}
+            />
+          </FacetGroup>
 
-            {/* By factory · to buy */}
-            <FacetGroup
-              title="By factory · to buy"
-              collapsed={collapsed.has("factory")}
-              onToggle={() => toggleGroup("factory")}
-            >
-              {byFactory.length === 0 ? (
-                <EmptyFacetHint text="Nothing to buy" />
-              ) : (
-                byFactory.map((f) => (
-                  <FacetRow key={f.id} label={f.name} count={f.units} unit="units" />
-                ))
-              )}
-            </FacetGroup>
-
-            {/* Raise-by schedule — derived from the engine (the honest week-ahead) */}
-            <FacetGroup
-              title="Raise-by schedule"
-              collapsed={collapsed.has("sched")}
-              onToggle={() => toggleGroup("sched")}
-            >
-              {raiseBySchedule.length === 0 ? (
-                <EmptyFacetHint text="No dated bundles" />
-              ) : (
-                raiseBySchedule.map(([d, n]) => (
-                  <FacetRow key={d} label={fmtDateShort(d)} count={n} />
-                ))
-              )}
-            </FacetGroup>
-          </div>
-        </>
+          {/* By factory — units in the CURRENT stage; click filters the right */}
+          <FacetGroup
+            title={
+              stage === "place"
+                ? "By factory · to order"
+                : stage === "chase"
+                  ? "By factory · to chase"
+                  : "By factory · to receive"
+            }
+          >
+            {byFactory.length === 0 ? (
+              <EmptyFacetHint text="Nothing here" />
+            ) : (
+              byFactory.map((f) => (
+                <FacetRow
+                  key={f.id}
+                  label={f.name}
+                  count={f.units}
+                  unit="units"
+                  active={supplierFilter === f.id}
+                  onClick={() => toggleSupplier(f.id)}
+                />
+              ))
+            )}
+          </FacetGroup>
+        </div>
       }
     >
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-        <div className="mx-auto w-full max-w-[820px] flex flex-col pb-10">
-          {/* ── KPI strip ─────────────────────────────────────────────── */}
+        <div className="mx-auto w-full max-w-[860px] flex flex-col pb-10">
+          {/* ── KPI strip = STAGE SWITCHER ─────────────────────────────── */}
           <div className="grid grid-cols-3 gap-2.5">
             <KpiCard
-              value={isLoading ? "…" : toPlaceBundles}
-              label="orders to place"
-              sub={lateCount > 0 ? `${lateCount} overdue` : "on track"}
-              subTone={lateCount > 0 ? "danger" : "muted"}
+              value={isLoading ? "…" : placeCount}
+              label="To place"
+              sub={placeOverdue > 0 ? `${placeOverdue} overdue` : "on track"}
+              subTone={placeOverdue > 0 ? "danger" : "muted"}
+              active={stage === "place"}
+              onClick={() => goStage("place")}
             />
             <KpiCard
-              value={isLoading ? "…" : toChase}
-              label="factory to chase"
-              sub={chaseLate > 0 ? `${chaseLate} overdue` : "on track"}
+              value={isLoading ? "…" : chaseCount}
+              label="To chase"
+              sub={chaseLate > 0 ? `${chaseLate} late` : "on track"}
               subTone={chaseLate > 0 ? "danger" : "muted"}
+              active={stage === "chase"}
+              onClick={() => goStage("chase")}
             />
             <KpiCard
-              value={isLoading ? "…" : toReceive}
-              label="delivery to receive"
-              sub={toReceive > 0 ? "ready to book in" : "nothing arriving"}
+              value={isLoading ? "…" : receiveCount}
+              label="To receive"
+              sub={receiveCount > 0 ? "ready to book in" : "nothing arriving"}
               subTone="muted"
+              active={stage === "receive"}
+              onClick={() => goStage("receive")}
             />
           </div>
 
-          {/* ── Data guard — un-plannable orders ──────────────────────── */}
-          {noDeadlineCount > 0 && (
-            <div className="mt-3.5 rounded-[12px] border border-danger bg-error-soft px-4 py-3 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex items-start gap-2.5">
-                <AlertTriangle size={16} className="text-danger shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <div className="text-[13px] font-semibold text-danger">
-                    {noDeadlineCount} {noDeadlineCount === 1 ? "order" : "orders"} can&rsquo;t be planned yet
-                  </div>
-                  <div className="text-[12px] text-base-600 mt-0.5">
-                    {noDeadlineBundles.length > 0 && (
-                      <>
-                        {noDeadlineBundles
-                          .map((b) => (b.so ? `SO-${b.so}` : "an order"))
-                          .slice(0, 4)
-                          .join(", ")}{" "}
-                      </>
-                    )}
-                    {noDeadlineCount === 1 ? "has" : "have"} no delivery deadline — the system
-                    can&rsquo;t schedule the purchase. Ask the salesperson to set a deadline.
-                  </div>
+          {/* ── Data guard — un-plannable orders (place stage only) ───────── */}
+          {stage === "place" && missingCount > 0 && (
+            <div className="mt-3.5 rounded-[12px] border border-danger bg-error-soft px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-danger shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-danger">
+                  {missingCount} {missingCount === 1 ? "order" : "orders"} can&rsquo;t be
+                  planned yet
+                </div>
+                <div className="text-[12px] text-base-600 mt-0.5">
+                  {missingSoLabels.length > 0 && (
+                    <>{missingSoLabels.slice(0, 4).join(", ")} </>
+                  )}
+                  {missingCount === 1 ? "has" : "have"} no delivery deadline — the system
+                  can&rsquo;t schedule the purchase. Ask the salesperson to set a deadline.
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── ①  PLACE ORDERS (LIVE) ────────────────────────────────── */}
-          <StepHead
-            n="1"
-            title="Place orders"
-            subtitle="Send these to your factories now. Red = already late."
-            count={`${placeCards.length} to send`}
-            action={
-              placeCards.length > 0 ? (
-                <Btn
-                  variant="hero"
-                  size="md"
-                  icon={Send}
-                  title="Send all of today's orders to their factories (raising the POs is a later unit)"
-                  onClick={() => {
-                    /* TODO: batch PO-raise — send every factory card at once. The
-                       PO-raise action is a separate, not-yet-built unit; stub for now. */
-                  }}
-                >
-                  Send today&rsquo;s orders
-                </Btn>
-              ) : undefined
-            }
-          />
-
-          {isLoading ? (
-            <PanelHint text="Loading today's purchase plan…" />
-          ) : placeCards.length === 0 ? (
-            <div className="rounded-[14px] border border-base-200 bg-white px-5 py-8 text-center">
-              <div className="mx-auto mb-2 grid place-items-center w-9 h-9 rounded-full bg-success-soft">
-                <Check size={18} className="text-success" />
-              </div>
-              <div className="text-[13px] font-semibold text-base-900">
-                Nothing to order today
-              </div>
-              <div className="text-[12px] text-base-500 mt-1">
-                Every live order is already covered by ready stock or an open PO.
-              </div>
-            </div>
-          ) : (
-            placeCards.map((card) => (
-              <PlaceCard
-                key={card.key}
-                card={card}
-                today={today}
-                supplierName={supplierName}
-                freeStockBySku={freeStockBySku}
+          {/* ── ①  PLACE — one row per supplier ───────────────────────────── */}
+          {stage === "place" && (
+            <>
+              <StageHead
+                n="1"
+                title="Place orders"
+                subtitle="POs to send today. Red = already late."
+                count={`${placeShown.length} to send`}
+                action={
+                  placeShown.length > 0 ? (
+                    <Btn
+                      variant="hero"
+                      size="md"
+                      icon={Send}
+                      title="Send every factory order at once (raising the POs is a later unit)"
+                      onClick={() => {
+                        /* TODO: batch PO-raise — send every supplier order at once.
+                           The PO-raise action is a separate, not-yet-built unit. */
+                      }}
+                    >
+                      Send all
+                    </Btn>
+                  ) : undefined
+                }
               />
-            ))
+              {isLoading ? (
+                <PanelHint text="Loading today's purchase plan…" />
+              ) : placeShown.length === 0 ? (
+                <EmptyDone
+                  text="Nothing to order today"
+                  sub="Every live order is already covered by ready stock or an open PO."
+                />
+              ) : (
+                placeShown.map((g) => (
+                  <PlaceSupplierRow
+                    key={g.supplierId}
+                    group={g}
+                    today={today}
+                    onReview={() => setDrawerSupplierId(g.supplierId)}
+                  />
+                ))
+              )}
+            </>
           )}
 
-          {/* ── ②  CHASE FACTORY (LIVE) ───────────────────────────────── */}
-          <StepHead
-            n="2"
-            title="Chase factory"
-            subtitle="Orders you already sent, running late at the factory."
-            count={`${chase.length} late`}
-          />
-          {isLoading ? (
-            <PanelHint text="Loading the factory-chase list…" />
-          ) : chase.length === 0 ? (
-            <EmptyDone text="Nothing to chase today" sub="No factory is past its promised ready date." />
-          ) : (
-            chase.map((row) => (
-              <ChaseCard
-                key={row.poId}
-                row={row}
-                supplierName={supplierName}
-                supplier={supplierById.get(row.supplierId)}
+          {/* ── ②  CHASE ──────────────────────────────────────────────────── */}
+          {stage === "chase" && (
+            <>
+              <StageHead
+                n="2"
+                title="Chase factory"
+                subtitle="Orders you already sent, running late at the factory."
+                count={`${chaseShown.length} late`}
               />
-            ))
+              {isLoading ? (
+                <PanelHint text="Loading the factory-chase list…" />
+              ) : chaseShown.length === 0 ? (
+                <EmptyDone
+                  text="Nothing to chase today"
+                  sub="No factory is past its promised ready date."
+                />
+              ) : (
+                chaseShown.map((row) => (
+                  <ChaseCard
+                    key={row.poId}
+                    row={row}
+                    supplierName={supplierName}
+                    supplier={supplierById.get(row.supplierId)}
+                  />
+                ))
+              )}
+            </>
           )}
 
-          {/* ── ③  RECEIVE (LIVE + GRN check-in) ──────────────────────── */}
-          <StepHead
-            n="3"
-            title="Receive deliveries"
-            subtitle="Check goods in, then book them into Klang."
-            count={`${receive.length} to receive`}
-          />
-          {isLoading ? (
-            <PanelHint text="Loading arriving deliveries…" />
-          ) : receive.length === 0 ? (
-            <EmptyDone text="Nothing to receive today" sub="No factory has goods ready or arriving." />
-          ) : (
-            receive.map((row) => (
-              <ReceiveCard key={row.poId} row={row} supplierName={supplierName} />
-            ))
+          {/* ── ③  RECEIVE ────────────────────────────────────────────────── */}
+          {stage === "receive" && (
+            <>
+              <StageHead
+                n="3"
+                title="Receive deliveries"
+                subtitle="Check goods in, then book them into Klang."
+                count={`${receiveShown.length} to receive`}
+              />
+              {isLoading ? (
+                <PanelHint text="Loading arriving deliveries…" />
+              ) : receiveShown.length === 0 ? (
+                <EmptyDone
+                  text="Nothing to receive today"
+                  sub="No factory has goods ready or arriving."
+                />
+              ) : (
+                receiveShown.map((row) => (
+                  <ReceiveCard key={row.poId} row={row} supplierName={supplierName} />
+                ))
+              )}
+            </>
           )}
-
-          {/* ── DONE TODAY (static recap) ─────────────────────────────── */}
-          <div className="mt-6 flex items-center gap-2.5 mb-3">
-            <span className="grid place-items-center w-6 h-6 rounded-md bg-success text-white text-[12px] font-bold font-mono">
-              <Check size={14} />
-            </span>
-            <div>
-              <div className="text-[13px] font-bold text-base-900">Done today</div>
-              <div className="text-[12px] text-base-500">
-                Already handled — for your record.
-              </div>
-            </div>
-          </div>
-          <div className="rounded-[12px] border border-base-200 bg-white px-5 py-6 text-center text-[12px] text-base-500">
-            <CheckCircle2 size={18} className="mx-auto mb-1.5 text-base-300" />
-            Completed placements + receipts will be recorded here as the flow goes live.
-          </div>
         </div>
       </div>
+
+      {/* ── ①  Place drill-in DRAWER (aggregated SKU table) ─────────────── */}
+      {drawerGroup && (
+        <PlaceDrawer
+          group={drawerGroup}
+          today={today}
+          onClose={() => setDrawerSupplierId(null)}
+        />
+      )}
     </ListPageShell>
   );
 }
 
-// ── ①  Factory place-order card ──────────────────────────────────────────────
+// ── ①  Supplier place row (one factory PO to send) ───────────────────────────
 
-function PlaceCard({
-  card,
+function PlaceSupplierRow({
+  group,
   today,
-  supplierName,
-  freeStockBySku,
+  onReview,
 }: {
-  card: { bundle: PurchaseBundle; supplierId: string; items: PurchaseBundle["items"] };
+  group: PurchasePlaceGroup;
   today: string | null;
-  supplierName: (id: string) => string;
-  freeStockBySku: Map<string, number>;
+  onReview: () => void;
 }) {
-  const { bundle, supplierId, items } = card;
-  const u = urgencyStyle(bundle.urgency);
-  const hot = bundle.urgency === "late" || bundle.urgency === "urgent";
-  const kind = CATEGORY_KIND[items[0]?.category ?? "mattress"];
-  const name = supplierName(supplierId);
+  const u = urgencyStyle(group.urgency);
+  const hot = group.urgency === "late" || group.urgency === "urgent";
+  const kind = CATEGORY_KIND[group.categories[0] ?? "mattress"];
   const overdueDays =
-    bundle.urgency === "late" && bundle.raiseBy && today
-      ? daysBetween(bundle.raiseBy, today)
+    group.urgency === "late" && group.earliestOrderBy && today
+      ? daysBetween(group.earliestOrderBy, today)
       : null;
-  // Customer name is the card's primary label; SO number falls to the sub-line.
-  const soLabel = bundle.so ? `SO-${bundle.so}` : "Order";
-  const customer = bundle.customerName?.trim() || "";
-  const primaryLabel = customer || soLabel;
-  // System cost (advisory / display only): Σ(unit cost × units to order) on this
-  // card. Null costs count as 0 — the total is still shown.
-  const cardCost = items.reduce((sum, it) => sum + (it.cost ?? 0) * it.toOrder, 0);
 
   return (
     <div
-      className={`mb-3 rounded-[14px] bg-white overflow-hidden shadow-sm border ${
+      className={`mb-3 rounded-[14px] bg-white shadow-sm border px-4 py-3.5 flex items-center gap-4 ${
         hot ? "border-danger" : "border-base-200"
       }`}
     >
-      {/* header */}
-      <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2.5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
-            <Factory size={16} className="text-base-400 shrink-0" />
-            <span className="truncate">{name}</span>
-            <span className="text-[12px] font-medium text-base-500">· {kind}</span>
-          </div>
-          <div className="mt-1">
-            <div className="text-[13px] font-semibold text-base-900 truncate">
-              {primaryLabel}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+          <Factory size={16} className="text-base-400 shrink-0" />
+          <span className="truncate">{group.supplierName}</span>
+          <span className="text-[12px] font-medium text-base-500">· {kind}</span>
+          <span className={`pill ${u.cls} shrink-0 ml-1`}>
+            <u.Icon />
+            {u.label}
+          </span>
+        </div>
+        <div className="text-[12px] text-base-600 mt-1">
+          <span className="font-semibold text-base-800 tabular-nums">
+            {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"}
+          </span>
+          {" · "}
+          <span className="tabular-nums">
+            {group.orderCount} {group.orderCount === 1 ? "order" : "orders"}
+          </span>
+          {group.earliestOrderBy && (
+            <>
+              {" · "}
+              {group.urgency === "late" ? (
+                <span className="text-danger font-semibold">
+                  order-by {fmtDateShort(group.earliestOrderBy)}
+                  {overdueDays != null && overdueDays > 0 ? ` (${overdueDays}d late)` : ""}
+                </span>
+              ) : (
+                <>order-by from {fmtDateShort(group.earliestOrderBy)}</>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      <Btn
+        variant="box"
+        size="md"
+        icon={ArrowRight}
+        title={`Review the ${group.supplierName} order before sending`}
+        onClick={onReview}
+      >
+        Review &amp; send
+      </Btn>
+    </div>
+  );
+}
+
+// ── ①  Place drill-in drawer (aggregated SKU table) ──────────────────────────
+
+const WRONG_OPTIONS = [
+  "Supplier has no stock",
+  "Price changed",
+  "Customer cancelled",
+  "Ask manager",
+] as const;
+
+function PlaceDrawer({
+  group,
+  today,
+  onClose,
+}: {
+  group: PurchasePlaceGroup;
+  today: string | null;
+  onClose: () => void;
+}) {
+  const [wrongOpen, setWrongOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const wrongRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Close the "Something wrong?" menu on outside click.
+  useEffect(() => {
+    if (!wrongOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrongRef.current && !wrongRef.current.contains(e.target as Node))
+        setWrongOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [wrongOpen]);
+
+  const toggleRow = (sku: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(sku) ? next.delete(sku) : next.add(sku);
+      return next;
+    });
+
+  // Buy cost (advisory) = Σ(cost × need). Hidden entirely when 0 / all null.
+  const hasCost = group.lines.some((l) => l.cost != null && l.cost > 0);
+  const buyCost = group.lines.reduce((sum, l) => sum + (l.cost ?? 0) * l.need, 0);
+  const lateLines =
+    today != null
+      ? group.lines.filter((l) => l.orderBy != null && l.orderBy < today).length
+      : 0;
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true">
+      {/* backdrop */}
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-base-900/30"
+        onClick={onClose}
+      />
+      {/* panel */}
+      <div className="relative w-full max-w-[560px] h-full bg-white shadow-xl flex flex-col">
+        {/* header */}
+        <div className="shrink-0 border-b border-base-200 px-5 py-3.5 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+              <Factory size={16} className="text-base-400 shrink-0" />
+              <span className="truncate">Send order to {group.supplierName}</span>
             </div>
-            <div className="text-[12px] text-base-600">
-              {customer && (
+            <div className="text-[12px] text-base-600 mt-1">
+              <span className="font-semibold text-base-800 tabular-nums">
+                {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"}
+              </span>
+              {" · "}
+              <span className="tabular-nums">
+                {group.orderCount} {group.orderCount === 1 ? "order" : "orders"}
+              </span>
+              {" · "}
+              <span>&rarr; Klg</span>
+              {group.earliestOrderBy && (
                 <>
-                  <span className="font-medium text-base-800">{soLabel}</span>
-                  {" · "}
+                  {" · "}order-by from {fmtDateShort(group.earliestOrderBy)}
+                  {lateLines > 0 && (
+                    <span className="text-danger font-semibold"> ({lateLines} late)</span>
+                  )}
                 </>
               )}
-              {bundle.deadline ? (
-                <>deliver by {fmtDate(bundle.deadline)}</>
-              ) : (
-                <span className="text-danger">no delivery date yet</span>
-              )}
-            {bundle.raiseBy && (
-              <>
-                {" · "}
-                {bundle.urgency === "late" ? (
-                  <span className="text-danger font-semibold">
-                    was due to order {fmtDateShort(bundle.raiseBy)}
-                    {overdueDays != null && overdueDays > 0 ? ` (${overdueDays}d late)` : ""}
-                  </span>
-                ) : (
-                  <>order by {fmtDateShort(bundle.raiseBy)}</>
-                )}
-              </>
-            )}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
+            className="shrink-0 p-1 rounded hover:bg-hovertint text-base-500 hover:text-base-900 transition-colors"
+          >
+            <X size={16} />
+          </button>
         </div>
-        <span className={`pill ${u.cls} shrink-0`}>
-          <u.Icon />
-          {u.label}
-        </span>
-      </div>
 
-      {/* items */}
-      <div className="px-4 pb-1">
-        {items.map((it) => {
-          const free = freeStockBySku.get(it.sku) ?? 0;
-          return (
-            <div
-              key={it.sku}
-              className="flex items-start justify-between gap-3 py-2.5 border-t border-base-100"
-            >
-              <div className="min-w-0">
-                <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
-                <div className="text-[12px] text-base-500 mt-0.5">{it.why}</div>
-                {free > 0 && (
-                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] text-base-600 bg-base-100 rounded px-1.5 py-0.5">
-                    <Info size={12} className="text-base-400" />
-                    {free} also in Klang — kept as ready stock, ordering fresh (a manager can change
-                    this)
+        {/* aggregated SKU table */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 border-b border-base-100 sticky top-0 bg-white">
+            <span>Model / sku</span>
+            <span className="text-right">Need</span>
+            <span className="text-right">Ready</span>
+          </div>
+          {group.lines.map((l) => {
+            const open = expanded.has(l.sku);
+            return (
+              <div key={l.sku} className="border-b border-base-100">
+                <button
+                  type="button"
+                  onClick={() => toggleRow(l.sku)}
+                  className="w-full grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-5 py-2.5 text-left hover:bg-hovertint transition-colors"
+                >
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-base-900">
+                      {open ? (
+                        <ChevronDown size={13} className="shrink-0 text-base-400" />
+                      ) : (
+                        <ChevronRight size={13} className="shrink-0 text-base-400" />
+                      )}
+                      <span className="truncate">{l.modelName ?? l.sku}</span>
+                    </span>
+                    <span className="block pl-[19px] text-[11px] font-mono text-base-500 truncate">
+                      {l.sku} · for {forSummary(l.forOrders)}
+                      {l.orderBy && (
+                        <span className="text-base-400"> · order-by {fmtDateShort(l.orderBy)}</span>
+                      )}
+                    </span>
                   </span>
+                  <span className="text-[13px] font-bold font-mono text-base-900 tabular-nums text-right">
+                    &times; {l.need}
+                  </span>
+                  <span className="text-[12px] font-mono tabular-nums text-right text-base-500">
+                    {l.ready > 0 ? l.ready : "—"}
+                  </span>
+                </button>
+                {open && (
+                  <div className="px-5 pb-2.5 pl-[43px] flex flex-col gap-0.5">
+                    {l.forOrders.map((o, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-3 text-[12px] text-base-600"
+                      >
+                        <span className="truncate">
+                          {o.customerName?.trim() || (o.so ? `SO-${o.so}` : "—")}
+                        </span>
+                        {o.so && (
+                          <span className="shrink-0 font-mono text-base-400">SO-{o.so}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="text-[13px] font-bold font-mono text-base-900 whitespace-nowrap tabular-nums">
-                × {it.toOrder}
-              </div>
+            );
+          })}
+        </div>
+
+        {/* footer */}
+        <div className="shrink-0 border-t border-base-200 px-5 py-3 flex items-center justify-between gap-3 bg-base-50">
+          <div className="flex items-center gap-3 min-w-0">
+            {hasCost && (
+              <span className="text-[12px] text-base-500 whitespace-nowrap">
+                Buy cost{" "}
+                <span className="font-semibold text-base-800">
+                  RM {buyCost.toLocaleString("en-MY", { maximumFractionDigits: 0 })}
+                </span>
+              </span>
+            )}
+            <div className="relative" ref={wrongRef}>
+              <Btn
+                variant="box"
+                size="md"
+                onClick={() => setWrongOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={wrongOpen}
+              >
+                Something wrong?
+              </Btn>
+              {wrongOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-0 mb-1.5 w-[220px] rounded-[12px] border border-base-200 bg-white shadow-lg py-1 z-10"
+                >
+                  {WRONG_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        /* TODO: escape-hatch — flag this factory order (later unit). */
+                        setWrongOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-[13px] text-base-700 hover:bg-hovertint transition-colors"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          );
-        })}
-      </div>
-
-      {/* system cost — advisory, display only (never a pricing input) */}
-      <div className="px-4 pb-2 pt-1.5">
-        <span className="text-[11px] text-base-400">
-          Cost (system): RM{" "}
-          {cardCost.toLocaleString("en-MY", { maximumFractionDigits: 0 })}
-        </span>
-      </div>
-
-      {/* footer */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-base-50 border-t border-base-200">
-        <button
-          type="button"
-          title="Report a problem with this line (coming soon)"
-          className="text-[12px] text-base-500 underline underline-offset-2 hover:text-base-800"
-          onClick={() => {
-            /* TODO: escape hatch — flag / edit a to-order line (later unit). */
-          }}
-        >
-          Something wrong?
-        </button>
-        <Btn
-          variant="box"
-          size="md"
-          icon={Send}
-          title={`Send order to ${name} (raising the PO is a later unit)`}
-          onClick={() => {
-            /* TODO: raise the PO for this factory card. The PO-raise action is a
-               separate, not-yet-built unit — this button is a stub for now. */
-          }}
-        >
-          Send order to {name}
-        </Btn>
+          </div>
+          <Btn
+            variant="hero"
+            size="md"
+            icon={Send}
+            title={`Send the PO to ${group.supplierName} (raising the PO is a later unit)`}
+            onClick={() => {
+              /* TODO: raise the PO for this factory order. The PO-raise write path
+                 is a separate, not-yet-built unit — this button is a stub. */
+            }}
+          >
+            Send PO
+          </Btn>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Section head (①②③) ───────────────────────────────────────────────────────
+// ── Stage head (①②③) ─────────────────────────────────────────────────────────
 
-function StepHead({
+function StageHead({
   n,
   title,
   subtitle,
@@ -642,11 +852,10 @@ function StepHead({
   title: string;
   subtitle: string;
   count: string;
-  /** Optional right-aligned action (e.g. the section's single batch CTA). */
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 mt-6 mb-3">
+    <div className="flex items-center gap-3 mt-5 mb-3">
       <span className="grid place-items-center w-7 h-7 rounded-lg bg-base-900 text-white text-[13px] font-bold font-mono shrink-0">
         {n}
       </span>
@@ -742,7 +951,7 @@ function ChaseCard({
             <div className="text-[12px] text-base-500">
               still waiting{" "}
               <span className="font-bold font-mono text-base-900 tabular-nums">
-                × {it.outstanding}
+                &times; {it.outstanding}
               </span>
             </div>
           </div>
@@ -827,7 +1036,7 @@ function ReceiveCard({
           >
             <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
             <div className="text-[13px] font-bold font-mono text-base-900 tabular-nums">
-              × {it.outstanding}
+              &times; {it.outstanding}
             </div>
           </div>
         ))}
@@ -890,7 +1099,7 @@ function PanelHint({ text }: { text: string }) {
   );
 }
 
-/** Honest "nothing to do here ✓" empty state for the ②③ sections. */
+/** Honest "nothing to do here ✓" empty state. */
 function EmptyDone({ text, sub }: { text: string; sub: string }) {
   return (
     <div className="rounded-[14px] border border-base-200 bg-white px-5 py-8 text-center">
@@ -903,25 +1112,42 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
   );
 }
 
-// ── KPI card ─────────────────────────────────────────────────────────────────
+// ── KPI card (stage switcher) ─────────────────────────────────────────────────
 
 function KpiCard({
   value,
   label,
   sub,
   subTone,
+  active,
+  onClick,
 }: {
   value: number | string;
   label: string;
   sub: string;
   subTone: "danger" | "muted";
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="bg-white border border-base-200 rounded-[12px] shadow-sm px-4 py-3 flex flex-col gap-0.5">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`text-left bg-white rounded-[12px] shadow-sm px-4 py-3 flex flex-col gap-0.5 border transition-colors ${
+        active
+          ? "border-primary ring-1 ring-primary"
+          : "border-base-200 hover:border-base-300"
+      }`}
+    >
       <span className="text-[20px] font-bold font-mono tabular-nums leading-none text-base-900">
         {value}
       </span>
-      <span className="text-[12px] font-semibold text-base-600">{label}</span>
+      <span
+        className={`text-[12px] font-semibold ${active ? "text-primary" : "text-base-600"}`}
+      >
+        {label}
+      </span>
       <span
         className={`text-[11px] font-semibold ${
           subTone === "danger" ? "text-danger" : "text-base-400"
@@ -929,7 +1155,7 @@ function KpiCard({
       >
         {sub}
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -937,33 +1163,20 @@ function KpiCard({
 
 function FacetGroup({
   title,
-  total,
   danger,
-  collapsed,
-  onToggle,
   children,
 }: {
   title: string;
-  total?: number;
   danger?: boolean;
-  collapsed: boolean;
-  onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="mb-1">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-hovertint ${
+      <div
+        className={`w-full flex items-center gap-1 rounded-md px-2 py-1.5 ${
           danger ? "bg-error-soft" : "bg-base-100"
         }`}
       >
-        {collapsed ? (
-          <ChevronRight size={12} className="shrink-0 text-base-500" />
-        ) : (
-          <ChevronDown size={12} className="shrink-0 text-base-500" />
-        )}
         <span
           className={`uppercase flex-1 text-left text-[11px] font-bold tracking-[0.04em] ${
             danger ? "text-danger" : "text-base-900"
@@ -971,13 +1184,8 @@ function FacetGroup({
         >
           {title}
         </span>
-        {total !== undefined && (
-          <span className="tabular-nums shrink-0 text-[11px] font-semibold text-base-500">
-            {total}
-          </span>
-        )}
-      </button>
-      {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
+      </div>
+      <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>
     </div>
   );
 }
@@ -988,22 +1196,24 @@ function FacetRow({
   tone = "default",
   numbered,
   unit,
-  soon,
+  active,
+  onClick,
 }: {
   label: string;
   count: number;
   tone?: "default" | "danger" | "muted";
-  /** A small ①②③-style ordinal badge before the label. */
   numbered?: string;
-  /** A unit suffix on the count (e.g. "units"). */
   unit?: string;
-  /** Dim the row + show "soon" — a not-yet-wired jump target. */
-  soon?: boolean;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div
-      className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 ${
-        soon ? "opacity-55" : ""
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 transition-colors ${
+        active ? "bg-hovertint" : "hover:bg-hovertint"
       }`}
     >
       {numbered && (
@@ -1011,24 +1221,26 @@ function FacetRow({
           {numbered}
         </span>
       )}
-      <span className="flex-1 min-w-0 truncate text-[13px] text-base-700">{label}</span>
-      {soon ? (
-        <span className="text-[11px] text-base-400 shrink-0">soon</span>
-      ) : (
-        <span
-          className={`text-[12px] tabular-nums shrink-0 ${
-            tone === "danger"
-              ? "text-danger font-bold"
-              : tone === "muted"
-                ? "text-base-400"
-                : "text-base-500 font-semibold"
-          }`}
-        >
-          {count}
-          {unit ? <span className="text-base-400 font-normal"> {unit}</span> : null}
-        </span>
-      )}
-    </div>
+      <span
+        className={`flex-1 min-w-0 truncate text-[13px] ${
+          active ? "text-base-900 font-semibold" : "text-base-700"
+        }`}
+      >
+        {label}
+      </span>
+      <span
+        className={`text-[12px] tabular-nums shrink-0 ${
+          tone === "danger"
+            ? "text-danger font-bold"
+            : tone === "muted"
+              ? "text-base-400"
+              : "text-base-500 font-semibold"
+        }`}
+      >
+        {count}
+        {unit ? <span className="text-base-400 font-normal"> {unit}</span> : null}
+      </span>
+    </button>
   );
 }
 

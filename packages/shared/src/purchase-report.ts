@@ -91,6 +91,63 @@ export const purchaseSkuLineSchema = z.object({
 });
 export type PurchaseSkuLine = z.infer<typeof purchaseSkuLineSchema>;
 
+// ── ① Place, supplier-grouped (the scale-aware master-detail shape) ───────────
+
+/** One order a place line serves — the drill-in drawer's "FOR" column. */
+export const purchasePlaceForOrderSchema = z.object({
+  so: z.number().nullable(),
+  customerName: z.string().nullable(),
+});
+export type PurchasePlaceForOrder = z.infer<typeof purchasePlaceForOrderSchema>;
+
+/**
+ * One SKU line inside a supplier's place group — the drawer's aggregated
+ * SKU table (one row per SKU, netted across every order that needs it).
+ */
+export const purchasePlaceGroupLineSchema = z.object({
+  sku: z.string(),
+  /** `product_models.name` (the human model name) — may be null if unresolved. */
+  modelName: z.string().nullable(),
+  category: productCategorySchema,
+  /** Net units to place on a new PO for this SKU (Σ toOrder across its orders). */
+  need: z.number(),
+  /** Every order this SKU serves — the drawer's "FOR" column (+N more). */
+  forOrders: z.array(purchasePlaceForOrderSchema),
+  /** Raise-by of this SKU's MOST-URGENT order (the line's own order-by date). */
+  orderBy: z.string().nullable(),
+  /** Advisory FREE (Klg) stock for this SKU — the "ready" column. */
+  ready: z.number(),
+  /**
+   * Unit system cost (`product_skus.cost`), or `null`. DISPLAY-ONLY / advisory.
+   * The drawer's "Buy cost" total = Σ(cost × need), hidden when 0/null.
+   */
+  cost: z.number().nullable(),
+});
+export type PurchasePlaceGroupLine = z.infer<typeof purchasePlaceGroupLineSchema>;
+
+/**
+ * ① Place, ONE ROW PER SUPPLIER — the scale-aware place list. Aggregates every
+ * to-order bundle across the whole day into one row per factory (2–4 rows even
+ * at 500 orders); the drawer drills into its per-SKU `lines`.
+ */
+export const purchasePlaceGroupSchema = z.object({
+  supplierId: z.string(),
+  /** Resolved by the web via `useOperationSuppliers` — `null` from the pure engine. */
+  supplierName: z.string().nullable(),
+  /** Distinct procurable categories in this group (mattress/bedframe/sofa). */
+  categories: z.array(productCategorySchema),
+  /** Σ of every line's `need` — the row's "N units". */
+  totalUnits: z.number(),
+  /** Distinct source orders this group serves — the row's "M orders". */
+  orderCount: z.number(),
+  /** Earliest raise-by across the group's orders (the row's "order-by from"). */
+  earliestOrderBy: z.string().nullable(),
+  /** Most-urgent bucket among the group's orders (drives the row pill). */
+  urgency: purchaseUrgencyBucketSchema,
+  lines: z.array(purchasePlaceGroupLineSchema),
+});
+export type PurchasePlaceGroup = z.infer<typeof purchasePlaceGroupSchema>;
+
 // ── ② Chase / ③ Receive (open-PO read models) ────────────────────────────────
 
 /** One outstanding line on an open PO (`received_qty < qty`). */
@@ -167,6 +224,12 @@ export const purchaseTodayResponseSchema = z.object({
   today: z.string(),
   /** The "① Place orders" list — only bundles that still need a PO (toOrder > 0). */
   bundles: z.array(purchaseBundleSchema),
+  /**
+   * ① Place, aggregated to ONE ROW PER SUPPLIER (the scale-aware place list).
+   * Derived from `bundles` — a supplier appears once, its `lines` net every
+   * to-order SKU across the whole day's orders.
+   */
+  placeGroups: z.array(purchasePlaceGroupSchema),
   /** The per-supplier buy list (net-to-order per SKU). */
   bySku: z.array(purchaseSkuLineSchema),
   /** ② Chase list — open POs the factory is late on. */
@@ -322,6 +385,9 @@ export function buildPurchaseTodayReport(
     | Record<string, string | null> = {},
   costBySku: ReadonlyMap<string, number | null> | Record<string, number | null> = {},
   chaseReceive: { chase?: readonly PurchaseChase[]; receive?: readonly PurchaseReceive[] } = {},
+  modelNameBySku:
+    | ReadonlyMap<string, string | null>
+    | Record<string, string | null> = {},
 ): PurchaseTodayResponse {
   const soMap =
     soByOrderId instanceof Map
@@ -335,6 +401,10 @@ export function buildPurchaseTodayReport(
       : new Map(Object.entries(customerNameByOrderId));
   const costMap =
     costBySku instanceof Map ? costBySku : new Map(Object.entries(costBySku));
+  const modelNameMap =
+    modelNameBySku instanceof Map
+      ? modelNameBySku
+      : new Map(Object.entries(modelNameBySku));
 
   const result = computeNetRequirements(demand, supply, options);
 
@@ -443,6 +513,124 @@ export function buildPurchaseTodayReport(
           : 1,
     );
 
+  // ── ① Place, ONE ROW PER SUPPLIER — aggregate every to-order bundle across
+  // the whole day into one row per factory (scale-aware; 2–4 rows at 500 orders).
+  const freeStockBySku = new Map<string, number>();
+  for (const s of result.bySku) freeStockBySku.set(s.sku, s.freeStock);
+  // rank index → bucket (mirrors the `rank` table above; index === rank number).
+  const bucketByRank: PurchaseUrgencyBucket[] = [
+    "late",
+    "urgent",
+    "due",
+    "no_deadline",
+    "scheduled",
+    "covered",
+  ];
+
+  interface PlaceLineAcc {
+    sku: string;
+    modelName: string | null;
+    category: PurchaseBundleItem["category"];
+    need: number;
+    forOrders: PurchasePlaceForOrder[];
+    ready: number;
+    cost: number | null;
+    rank: number;
+    orderBy: string | null;
+  }
+  interface PlaceGroupAcc {
+    supplierId: string;
+    lines: Map<string, PlaceLineAcc>;
+    orderIds: Set<string>;
+    categories: Set<PurchaseBundleItem["category"]>;
+    rank: number;
+    earliestOrderBy: string | null;
+  }
+  const groupAcc = new Map<string, PlaceGroupAcc>();
+  for (const b of toPlace) {
+    const bRank = rank[b.urgency];
+    for (const it of b.items) {
+      let g = groupAcc.get(it.supplierId);
+      if (!g) {
+        g = {
+          supplierId: it.supplierId,
+          lines: new Map(),
+          orderIds: new Set(),
+          categories: new Set(),
+          rank: Number.MAX_SAFE_INTEGER,
+          earliestOrderBy: null,
+        };
+        groupAcc.set(it.supplierId, g);
+      }
+      g.orderIds.add(b.orderId);
+      g.categories.add(it.category);
+      if (bRank < g.rank) g.rank = bRank;
+      if (b.raiseBy && (g.earliestOrderBy == null || b.raiseBy < g.earliestOrderBy))
+        g.earliestOrderBy = b.raiseBy;
+
+      let ln = g.lines.get(it.sku);
+      if (!ln) {
+        ln = {
+          sku: it.sku,
+          modelName: modelNameMap.get(it.sku) ?? null,
+          category: it.category,
+          need: 0,
+          forOrders: [],
+          ready: freeStockBySku.get(it.sku) ?? 0,
+          cost: costMap.get(it.sku) ?? null,
+          rank: Number.MAX_SAFE_INTEGER,
+          orderBy: null,
+        };
+        g.lines.set(it.sku, ln);
+      }
+      ln.need += it.toOrder;
+      ln.forOrders.push({ so: b.so, customerName: b.customerName });
+      // The line's order-by = its MOST-URGENT order's raise-by (rank, then earliest).
+      if (
+        bRank < ln.rank ||
+        (bRank === ln.rank &&
+          b.raiseBy != null &&
+          (ln.orderBy == null || b.raiseBy < ln.orderBy))
+      ) {
+        ln.rank = bRank;
+        ln.orderBy = b.raiseBy;
+      }
+    }
+  }
+
+  const placeGroups: PurchasePlaceGroup[] = [...groupAcc.values()]
+    .map((g) => {
+      const lines: PurchasePlaceGroupLine[] = [...g.lines.values()]
+        .map((ln) => ({
+          sku: ln.sku,
+          modelName: ln.modelName,
+          category: ln.category,
+          need: ln.need,
+          forOrders: ln.forOrders,
+          orderBy: ln.orderBy,
+          ready: ln.ready,
+          cost: ln.cost,
+        }))
+        .sort((a, b) => b.need - a.need || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
+      return {
+        supplierId: g.supplierId,
+        supplierName: null,
+        categories: [...g.categories],
+        totalUnits: lines.reduce((sum, l) => sum + l.need, 0),
+        orderCount: g.orderIds.size,
+        earliestOrderBy: g.earliestOrderBy,
+        urgency: bucketByRank[g.rank] ?? "no_deadline",
+        lines,
+      } satisfies PurchasePlaceGroup;
+    })
+    .sort((a, b) => {
+      if (rank[a.urgency] !== rank[b.urgency]) return rank[a.urgency] - rank[b.urgency];
+      const ao = a.earliestOrderBy ?? "9999-12-31";
+      const bo = b.earliestOrderBy ?? "9999-12-31";
+      if (ao !== bo) return ao < bo ? -1 : 1;
+      return a.supplierId < b.supplierId ? -1 : 1;
+    });
+
   const chase = [...(chaseReceive.chase ?? [])];
   const receive = [...(chaseReceive.receive ?? [])];
 
@@ -467,5 +655,13 @@ export function buildPurchaseTodayReport(
     else if (b.urgency === "no_deadline") summary.no_deadline += 1;
   }
 
-  return { today: options.today.slice(0, 10), bundles: toPlace, bySku, chase, receive, summary };
+  return {
+    today: options.today.slice(0, 10),
+    bundles: toPlace,
+    placeGroups,
+    bySku,
+    chase,
+    receive,
+    summary,
+  };
 }
