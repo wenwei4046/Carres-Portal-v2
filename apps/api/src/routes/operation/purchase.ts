@@ -1,10 +1,15 @@
 import { Hono } from "hono";
 import {
   buildPurchaseTodayReport,
+  buildPurchaseChaseReceive,
   myHolidaySet,
   purchaseTodayResponseSchema,
   type DemandLine,
   type ProductCategory,
+  type PurchaseChase,
+  type PurchaseLinkedOrder,
+  type PurchasePoInput,
+  type PurchaseReceive,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
@@ -49,9 +54,115 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * ②③ read model — load every OPEN purchase order (+ its lines) and shape it into
+ * the Chase / Receive lists via the pure `buildPurchaseChaseReceive`.
+ *
+ * Bounded read: filtered to `status='open'` (a small live slice, well under the
+ * PostgREST row cap). Linked customer names come from a single batched `orders`
+ * lookup over the distinct source SOs (`po.so` + `po.so_refs[]`). userClient /
+ * RLS only — read-only, no write path.
+ */
+async function loadChaseReceive(
+  sb: ReturnType<typeof userClient>,
+): Promise<
+  | { ok: true; chase: PurchaseChase[]; receive: PurchaseReceive[] }
+  | { ok: false; err: { code?: string; message?: string; details?: string } }
+> {
+  const { data: poRows, error: poErr } = await sb
+    .from("purchase_orders")
+    .select(
+      "id, supplier_id, sup_status, status, expected_ready_date, eta_date, so, so_refs, purchase_order_lines(sku, qty, received_qty)",
+    )
+    .eq("status", "open");
+  if (poErr) return { ok: false, err: poErr };
+  const pos = poRows ?? [];
+
+  // Distinct source SOs across every open PO (po.so + po.so_refs[]).
+  const distinctSos = new Set<number>();
+  for (const p of pos) {
+    const so = (p as Record<string, unknown>).so as number | null;
+    if (typeof so === "number") distinctSos.add(so);
+    for (const ref of (((p as Record<string, unknown>).so_refs as number[] | null) ?? [])) {
+      if (typeof ref === "number") distinctSos.add(ref);
+    }
+  }
+
+  // Batched customer/deadline lookup by SO (any order — incl. autocount).
+  const orderBySo = new Map<
+    number,
+    { customerName: string | null; deliveryDate: string | null }
+  >();
+  if (distinctSos.size > 0) {
+    const { data: orderRows, error: orderErr } = await sb
+      .from("orders")
+      .select("so, customer_name, delivery_date")
+      .in("so", [...distinctSos]);
+    if (orderErr) return { ok: false, err: orderErr };
+    for (const r of orderRows ?? []) {
+      const so = Number((r as Record<string, unknown>).so);
+      orderBySo.set(so, {
+        customerName: ((r as Record<string, unknown>).customer_name as string | null) ?? null,
+        deliveryDate: ((r as Record<string, unknown>).delivery_date as string | null) ?? null,
+      });
+    }
+  }
+
+  const inputs: PurchasePoInput[] = pos.map((p) => {
+    const row = p as Record<string, unknown>;
+    const so = row.so as number | null;
+    const soRefs = (row.so_refs as number[] | null) ?? [];
+    const sos: number[] = [];
+    if (typeof so === "number") sos.push(so);
+    for (const ref of soRefs) if (typeof ref === "number" && !sos.includes(ref)) sos.push(ref);
+
+    const linkedOrders: PurchaseLinkedOrder[] = sos.map((n) => {
+      const o = orderBySo.get(n);
+      return {
+        so: n,
+        customerName: o?.customerName ?? null,
+        deliveryDate: o?.deliveryDate ?? null,
+      };
+    });
+
+    const lineRows = (row.purchase_order_lines as
+      | Array<{ sku: string; qty: number | string; received_qty: number | string }>
+      | null) ?? [];
+
+    return {
+      poId: row.id as string,
+      supplierId: row.supplier_id as string,
+      supStatus: row.sup_status as string,
+      status: row.status as string,
+      expectedReadyDate: (row.expected_ready_date as string | null) ?? null,
+      etaDate: (row.eta_date as string | null) ?? null,
+      lines: lineRows.map((l) => ({
+        sku: l.sku,
+        qty: Number(l.qty ?? 0),
+        receivedQty: Number(l.received_qty ?? 0),
+      })),
+      linkedOrders,
+    };
+  });
+
+  const { chase, receive } = buildPurchaseChaseReceive(inputs, {
+    today: todayIso(),
+    holidays: myHolidaySet(),
+  });
+  return { ok: true, chase, receive };
+}
+
 purchaseRouter.get("/today", requireOperation, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
+
+  // ── 0. ②③ Chase / Receive — over the OPEN POs, independent of ① demand. ────
+  const cr = await loadChaseReceive(sb);
+  if (!cr.ok) {
+    const m = mapPgError(cr.err);
+    return c.json(m.body, m.status);
+  }
+  const chaseReceive = { chase: cr.chase, receive: cr.receive };
 
   // ── 1. Candidate orders: live (place / proceed_order), NOT AutoCount. ──────
   // source_system is null for portal-native orders → keep those; drop only the
@@ -82,11 +193,19 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
 
   // No live orders → nothing to buy. Short-circuit (skip the supply reads).
   if (orderIds.length === 0) {
-    const empty = buildPurchaseTodayReport([], {}, {
-      today: todayIso(),
-      holidays: myHolidaySet(),
-      reviewDaysBySupplier: {},
-    });
+    const empty = buildPurchaseTodayReport(
+      [],
+      {},
+      {
+        today: todayIso(),
+        holidays: myHolidaySet(),
+        reviewDaysBySupplier: {},
+      },
+      {},
+      {},
+      {},
+      chaseReceive,
+    );
     return c.json(purchaseTodayResponseSchema.parse(empty));
   }
 
@@ -231,6 +350,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     soByOrderId,
     customerNameByOrderId,
     costBySku,
+    chaseReceive,
   );
 
   return c.json(purchaseTodayResponseSchema.parse(report));

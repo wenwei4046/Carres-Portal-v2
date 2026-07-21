@@ -33,16 +33,21 @@ import {
   PackageCheck,
   RefreshCw,
   Send,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import type {
   ProductCategory,
   PurchaseBundle,
+  PurchaseChase,
+  PurchaseReceive,
   PurchaseUrgencyBucket,
 } from "@carres/shared";
 import ListPageShell from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { buildSupplierChase } from "@/lib/wa-templates";
+import type { SupplierRow } from "@/lib/queries";
 import { usePurchaseToday, useOperationSuppliers } from "@/lib/queries";
 
 // ── Small pure helpers ───────────────────────────────────────────────────────
@@ -54,6 +59,23 @@ function daysBetween(fromIso: string | null, toIso: string | null): number | nul
   const b = new Date(`${toIso.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+/** Phone → wa.me base link (MY-aware). Local copy of OperationPayments.waLink so
+ *  this page doesn't pull in the payments module. */
+function waLink(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const first = phone.split(/[|,/]/)[0] ?? "";
+  let d = first.replace(/\D/g, "");
+  if (!d) return null;
+  if (d.startsWith("60")) {
+    /* already international */
+  } else if (d.startsWith("0")) {
+    d = `60${d.slice(1)}`;
+  } else {
+    d = `60${d}`;
+  }
+  return `https://wa.me/${d}`;
 }
 
 const CATEGORY_KIND: Record<ProductCategory, string> = {
@@ -100,14 +122,21 @@ export default function OperationPurchase() {
       return next;
     });
 
-  const supplierName = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
-    return (id: string) => m.get(id) ?? "Factory";
+  const supplierById = useMemo(() => {
+    const m = new Map<string, SupplierRow>();
+    for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s);
+    return m;
   }, [suppliersQ.data]);
+
+  const supplierName = useMemo(
+    () => (id: string) => supplierById.get(id)?.name ?? "Factory",
+    [supplierById],
+  );
 
   const bundles = data?.bundles ?? [];
   const bySku = data?.bySku ?? [];
+  const chase = data?.chase ?? [];
+  const receive = data?.receive ?? [];
   const summary = data?.summary;
   const today = data?.today ?? null;
 
@@ -171,6 +200,9 @@ export default function OperationPurchase() {
   const lateCount = summary?.late ?? 0;
   const noDeadlineCount = summary?.no_deadline ?? 0;
   const toPlaceBundles = summary?.toPlaceBundles ?? 0;
+  const toChase = summary?.toChase ?? 0;
+  const chaseLate = summary?.chaseLate ?? 0;
+  const toReceive = summary?.toReceive ?? 0;
 
   // ── Error state ──
   if (isError) {
@@ -247,8 +279,13 @@ export default function OperationPurchase() {
               onToggle={() => toggleGroup("work")}
             >
               <FacetRow numbered="1" label="Place orders" count={toPlaceBundles} />
-              <FacetRow numbered="2" label="Chase factory" count={0} soon />
-              <FacetRow numbered="3" label="Receive" count={0} soon />
+              <FacetRow
+                numbered="2"
+                label="Chase factory"
+                count={toChase}
+                tone={toChase > 0 ? "danger" : "muted"}
+              />
+              <FacetRow numbered="3" label="Receive" count={toReceive} />
             </FacetGroup>
 
             {/* By factory · to buy */}
@@ -295,15 +332,15 @@ export default function OperationPurchase() {
               subTone={lateCount > 0 ? "danger" : "muted"}
             />
             <KpiCard
-              value="—"
+              value={isLoading ? "…" : toChase}
               label="factory to chase"
-              sub="coming next"
-              subTone="muted"
+              sub={chaseLate > 0 ? `${chaseLate} overdue` : "on track"}
+              subTone={chaseLate > 0 ? "danger" : "muted"}
             />
             <KpiCard
-              value="—"
+              value={isLoading ? "…" : toReceive}
               label="delivery to receive"
-              sub="coming next"
+              sub={toReceive > 0 ? "ready to book in" : "nothing arriving"}
               subTone="muted"
             />
           </div>
@@ -384,32 +421,44 @@ export default function OperationPurchase() {
             ))
           )}
 
-          {/* ── ②  CHASE FACTORY (PLACEHOLDER) ────────────────────────── */}
+          {/* ── ②  CHASE FACTORY (LIVE) ───────────────────────────────── */}
           <StepHead
             n="2"
             title="Chase factory"
             subtitle="Orders you already sent, running late at the factory."
-            count="coming next"
+            count={`${chase.length} late`}
           />
-          <PlaceholderSection
-            Icon={MessageCircle}
-            title="Chase list — coming next"
-            body="Once a PO is raised, the factory-chase queue (late POs, one-tap WhatsApp reminder) lands here. Not wired to the backend yet."
-          />
+          {isLoading ? (
+            <PanelHint text="Loading the factory-chase list…" />
+          ) : chase.length === 0 ? (
+            <EmptyDone text="Nothing to chase today" sub="No factory is past its promised ready date." />
+          ) : (
+            chase.map((row) => (
+              <ChaseCard
+                key={row.poId}
+                row={row}
+                supplierName={supplierName}
+                supplier={supplierById.get(row.supplierId)}
+              />
+            ))
+          )}
 
-          {/* ── ③  RECEIVE (PLACEHOLDER + static GRN preview) ─────────── */}
+          {/* ── ③  RECEIVE (LIVE + GRN check-in) ──────────────────────── */}
           <StepHead
             n="3"
             title="Receive deliveries"
             subtitle="Check goods in, then book them into Klang."
-            count="coming next"
+            count={`${receive.length} to receive`}
           />
-          <PlaceholderSection
-            Icon={PackageCheck}
-            title="Receiving — coming next"
-            body="Arriving lorries will show here. The 3-step check-in below is a preview of the flow — it is not functional yet."
-          />
-          <GrnPreview />
+          {isLoading ? (
+            <PanelHint text="Loading arriving deliveries…" />
+          ) : receive.length === 0 ? (
+            <EmptyDone text="Nothing to receive today" sub="No factory has goods ready or arriving." />
+          ) : (
+            receive.map((row) => (
+              <ReceiveCard key={row.poId} row={row} supplierName={supplierName} />
+            ))
+          )}
 
           {/* ── DONE TODAY (static recap) ─────────────────────────────── */}
           <div className="mt-6 flex items-center gap-2.5 mb-3">
@@ -615,27 +664,219 @@ function StepHead({
   );
 }
 
-// ── Placeholder / hints ──────────────────────────────────────────────────────
+// ── ②  Factory chase card ────────────────────────────────────────────────────
 
-function PlaceholderSection({
-  Icon,
-  title,
-  body,
+function ChaseCard({
+  row,
+  supplierName,
+  supplier,
 }: {
-  Icon: LucideIcon;
-  title: string;
-  body: string;
+  row: PurchaseChase;
+  supplierName: (id: string) => string;
+  supplier: SupplierRow | undefined;
 }) {
+  const name = supplierName(row.supplierId);
+  const customers = row.linkedOrders
+    .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
+    .filter((s): s is string => Boolean(s));
+  const deadline = row.earliestDeliveryDate;
+
+  // WhatsApp chase — prefer the supplier's phone (prefillable wa.me deep link);
+  // fall back to the group link (open only — group links can't carry ?text=).
+  // TODO: a dedicated `suppliers.whatsapp_group_url` chase entry-point + the
+  //       original CR/TCF ref (suppliers speak the ref, not the PO uuid).
+  const waBase = waLink(supplier?.contact);
+  const groupUrl = supplier?.whatsapp_group_url?.trim() || null;
+  const chaseText = buildSupplierChase({
+    poNo: null,
+    ref: null,
+    lines: row.items.map((it) => ({ sku: it.sku, qty: it.outstanding })),
+    deadline: deadline ? fmtDateShort(deadline) : "TBD",
+  });
+  const onChase = () => {
+    if (waBase) {
+      window.open(`${waBase}?text=${encodeURIComponent(chaseText)}`, "_blank", "noopener");
+    } else if (groupUrl) {
+      window.open(groupUrl, "_blank", "noopener");
+    }
+    /* else: no contact on file — button is disabled below. */
+  };
+  const canChase = Boolean(waBase || groupUrl);
+
   return (
-    <div className="rounded-[14px] border border-dashed border-base-300 bg-white px-5 py-6">
-      <div className="flex items-start gap-3">
-        <span className="grid place-items-center w-9 h-9 rounded-full bg-base-100 shrink-0">
-          <Icon size={18} className="text-base-400" />
-        </span>
+    <div className="mb-3 rounded-[14px] bg-white overflow-hidden shadow-sm border border-danger">
+      {/* header */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2.5">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-base-700">{title}</div>
-          <div className="text-[12px] text-base-500 mt-0.5">{body}</div>
+          <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+            <Factory size={16} className="text-base-400 shrink-0" />
+            <span className="truncate">{name}</span>
+          </div>
+          <div className="text-[12px] text-base-600 mt-0.5">
+            {customers.length > 0 ? (
+              <span className="truncate">for {customers.slice(0, 3).join(", ")}</span>
+            ) : (
+              <span className="text-base-400">no linked customer</span>
+            )}
+            {deadline && (
+              <>
+                {" · "}deliver by {fmtDate(deadline)}
+              </>
+            )}
+          </div>
         </div>
+        <span className="pill pill-overdue shrink-0">
+          <AlertCircle />
+          {row.daysLate}d late
+        </span>
+      </div>
+
+      {/* items */}
+      <div className="px-4 pb-1">
+        {row.items.map((it) => (
+          <div
+            key={it.sku}
+            className="flex items-center justify-between gap-3 py-2.5 border-t border-base-100"
+          >
+            <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
+            <div className="text-[12px] text-base-500">
+              still waiting{" "}
+              <span className="font-bold font-mono text-base-900 tabular-nums">
+                × {it.outstanding}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* footer */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-base-50 border-t border-base-200">
+        <span className="text-[12px] text-base-500">
+          Promised {row.expectedReadyDate ? fmtDateShort(row.expectedReadyDate) : "—"}
+        </span>
+        <Btn
+          variant="box"
+          size="md"
+          icon={MessageCircle}
+          disabled={!canChase}
+          title={
+            canChase
+              ? `Chase ${name} on WhatsApp`
+              : "No WhatsApp contact on file for this factory"
+          }
+          onClick={onChase}
+        >
+          Chase on WhatsApp
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── ③  Receive (GRN) card ────────────────────────────────────────────────────
+
+function ReceiveCard({
+  row,
+  supplierName,
+}: {
+  row: PurchaseReceive;
+  supplierName: (id: string) => string;
+}) {
+  const name = supplierName(row.supplierId);
+  const customers = row.linkedOrders
+    .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
+    .filter((s): s is string => Boolean(s));
+  const when = row.etaDate ?? row.expectedReadyDate;
+  const totalUnits = row.items.reduce((sum, it) => sum + it.outstanding, 0);
+
+  return (
+    <div className="mb-3 rounded-[14px] bg-white overflow-hidden shadow-sm border border-base-200">
+      {/* header */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+            <Truck size={16} className="text-base-400 shrink-0" />
+            <span className="truncate">{name}</span>
+          </div>
+          <div className="text-[12px] text-base-600 mt-0.5">
+            {customers.length > 0 ? (
+              <span className="truncate">for {customers.slice(0, 3).join(", ")}</span>
+            ) : (
+              <span className="text-base-400">no linked customer</span>
+            )}
+            {when && (
+              <>
+                {" · "}
+                {row.etaDate ? "ETA" : "ready"} {fmtDate(when)}
+              </>
+            )}
+          </div>
+        </div>
+        <span className="pill pill-sent shrink-0">
+          <PackageCheck />
+          {totalUnits} to book in
+        </span>
+      </div>
+
+      {/* items */}
+      <div className="px-4 pb-1">
+        {row.items.map((it) => (
+          <div
+            key={it.sku}
+            className="flex items-center justify-between gap-3 py-2.5 border-t border-base-100"
+          >
+            <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
+            <div className="text-[13px] font-bold font-mono text-base-900 tabular-nums">
+              × {it.outstanding}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* GRN 3-step check-in (visual — Check-into-Klg is a later unit) */}
+      <GrnSteps />
+
+      {/* footer */}
+      <div className="flex items-center justify-end gap-3 px-4 py-2.5 bg-base-50 border-t border-base-200">
+        <Btn
+          variant="box"
+          size="md"
+          icon={PackageCheck}
+          title="Check these goods into Klang (booking flow is a later unit)"
+          onClick={() => {
+            /* TODO: GRN write path — receive units + attach DO + book into Klang
+               stock. This is a separate, not-yet-built unit; stub for now. */
+          }}
+        >
+          Check into Klg
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+/** The receive (GRN) 3-step check-in — a visual guide; not yet functional. */
+function GrnSteps() {
+  const steps: Array<{ n: string; label: string; hint: string }> = [
+    { n: "1", label: "How many arrived?", hint: "of ordered · fewer = partial, rest stays on the PO" },
+    { n: "2", label: "Factory DO number + photo", hint: "attach the delivery-order slip" },
+    { n: "3", label: "Book into warehouse", hint: "Klang stock updates · auto-reserved to the order" },
+  ];
+  return (
+    <div className="mx-4 mb-3 mt-1 rounded-[10px] border border-dashed border-base-200 bg-base-50/60 px-3 py-2.5">
+      <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-400 mb-1.5">
+        Check it in — 3 steps
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {steps.map((s) => (
+          <div key={s.n} className="flex items-center gap-2.5">
+            <span className="grid place-items-center w-4 h-4 rounded-full bg-base-200 text-base-600 text-[10px] font-bold font-mono shrink-0">
+              {s.n}
+            </span>
+            <span className="text-[12px] font-medium text-base-700 min-w-[150px]">{s.label}</span>
+            <span className="text-[11px] text-base-400 hidden sm:inline">{s.hint}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -649,29 +890,15 @@ function PanelHint({ text }: { text: string }) {
   );
 }
 
-/** Static, non-functional preview of the receive (GRN) 3-step flow. */
-function GrnPreview() {
-  const steps: Array<{ n: string; label: string; hint: string }> = [
-    { n: "1", label: "How many arrived?", hint: "of ordered · fewer = partial, rest stays on the PO" },
-    { n: "2", label: "Factory DO number + photo", hint: "attach the delivery-order slip" },
-    { n: "3", label: "Book into warehouse", hint: "Klang stock updates · auto-reserved to the order" },
-  ];
+/** Honest "nothing to do here ✓" empty state for the ②③ sections. */
+function EmptyDone({ text, sub }: { text: string; sub: string }) {
   return (
-    <div className="mt-3 rounded-[14px] border border-base-200 bg-white overflow-hidden opacity-70">
-      <div className="px-4 pt-3 pb-2 text-[11px] font-bold uppercase tracking-[0.05em] text-base-400">
-        Check it in — 3 steps (preview)
+    <div className="rounded-[14px] border border-base-200 bg-white px-5 py-8 text-center">
+      <div className="mx-auto mb-2 grid place-items-center w-9 h-9 rounded-full bg-success-soft">
+        <Check size={18} className="text-success" />
       </div>
-      <div className="px-4 pb-4 flex flex-col gap-2">
-        {steps.map((s) => (
-          <div key={s.n} className="flex items-center gap-3">
-            <span className="grid place-items-center w-5 h-5 rounded-full bg-base-200 text-base-600 text-[11px] font-bold font-mono shrink-0">
-              {s.n}
-            </span>
-            <span className="text-[12px] font-medium text-base-700 min-w-[160px]">{s.label}</span>
-            <span className="text-[11px] text-base-400">{s.hint}</span>
-          </div>
-        ))}
-      </div>
+      <div className="text-[13px] font-semibold text-base-900">{text}</div>
+      <div className="text-[12px] text-base-500 mt-1">{sub}</div>
     </div>
   );
 }

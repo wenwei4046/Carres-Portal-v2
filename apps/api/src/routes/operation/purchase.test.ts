@@ -9,6 +9,7 @@ import {
 } from "jose";
 import {
   buildPurchaseTodayReport,
+  buildPurchaseChaseReceive,
   myHolidaySet,
   purchaseTodayResponseSchema,
   type DemandLine,
@@ -250,6 +251,86 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     expect(parsed.summary.toPlaceBundles).toBe(1);
     expect(parsed.summary.toOrderUnits).toBe(1);
   });
+
+  it("shapes ② chase + ③ receive from the OPEN POs (independent of demand)", async () => {
+    // One order row — served by both open POs below (mock ignores filters, so
+    // it doubles as the demand read [no order_lines → no ① bundle] AND the
+    // SO-join for the chase/receive linked customer).
+    const orders = [
+      {
+        id: "ord-Z",
+        so: 1201,
+        customer_name: "陈先生",
+        status: "place",
+        source_system: null,
+        delivery_date: "2026-09-30",
+        delivery_date_tbd: false,
+        placed_at: "2026-07-01T00:00:00Z",
+        created_at: "2026-07-01T00:00:00Z",
+      },
+    ];
+    const purchase_orders = [
+      {
+        id: "po-late",
+        supplier_id: "sup-1",
+        sup_status: "in_production",
+        status: "open",
+        // Far in the past so it is ALWAYS late regardless of the test clock.
+        expected_ready_date: "2020-01-01",
+        eta_date: null,
+        so: 1201,
+        so_refs: null,
+        purchase_order_lines: [{ sku: "MAT-K", qty: 2, received_qty: 0 }],
+      },
+      {
+        id: "po-ready",
+        supplier_id: "sup-2",
+        sup_status: "ready_for_pickup",
+        status: "open",
+        expected_ready_date: "2026-06-01",
+        eta_date: "2026-08-05",
+        so: 1201,
+        so_refs: null,
+        purchase_order_lines: [{ sku: "BF-K", qty: 3, received_qty: 1 }],
+      },
+    ];
+
+    const sb = makeSb({
+      orders: { data: orders, error: null },
+      order_lines: { data: [], error: null },
+      purchase_orders: { data: purchase_orders, error: null },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const parsed = purchaseTodayResponseSchema.parse(await res.json());
+
+    // Open-PO read is scoped to status='open'.
+    expect(sb.builders.purchase_orders.eq).toHaveBeenCalledWith("status", "open");
+
+    // ② Chase — the still-making, past-due PO.
+    expect(parsed.chase).toHaveLength(1);
+    expect(parsed.chase[0].poId).toBe("po-late");
+    expect(parsed.chase[0].items).toEqual([{ sku: "MAT-K", outstanding: 2 }]);
+    expect(parsed.chase[0].daysLate).toBeGreaterThan(0);
+    expect(parsed.chase[0].earliestDeliveryDate).toBe("2026-09-30");
+    expect(parsed.chase[0].linkedOrders[0].customerName).toBe("陈先生");
+
+    // ③ Receive — goods ready; only the outstanding units (3 − 1 = 2).
+    expect(parsed.receive).toHaveLength(1);
+    expect(parsed.receive[0].poId).toBe("po-ready");
+    expect(parsed.receive[0].items).toEqual([{ sku: "BF-K", outstanding: 2 }]);
+    expect(parsed.receive[0].etaDate).toBe("2026-08-05");
+
+    expect(parsed.summary.toChase).toBe(1);
+    expect(parsed.summary.chaseLate).toBe(1);
+    expect(parsed.summary.toReceive).toBe(1);
+  });
 });
 
 // =====================================================================
@@ -367,5 +448,192 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
     // 1 demand − 1 free stock consumed = 0 to order → bundle drops.
     expect(report.bundles).toHaveLength(0);
     expect(report.summary.toPlaceBundles).toBe(0);
+  });
+
+  it("merges the chase/receive lists into the response + summary", () => {
+    const report = buildPurchaseTodayReport(
+      [],
+      {},
+      { today: "2026-07-21", holidays: myHolidaySet() },
+      {},
+      {},
+      {},
+      {
+        chase: [
+          {
+            poId: "po-1",
+            supplierId: "sup-1",
+            supStatus: "in_production",
+            expectedReadyDate: "2026-07-01",
+            items: [{ sku: "MAT-K", outstanding: 2 }],
+            linkedOrders: [{ so: 1301, customerName: "李四", deliveryDate: "2026-09-01" }],
+            daysLate: 14,
+            earliestDeliveryDate: "2026-09-01",
+          },
+        ],
+        receive: [],
+      },
+    );
+    expect(report.chase).toHaveLength(1);
+    expect(report.receive).toEqual([]);
+    expect(report.summary.toChase).toBe(1);
+    expect(report.summary.chaseLate).toBe(1);
+    expect(report.summary.toReceive).toBe(0);
+  });
+});
+
+// =====================================================================
+// ②③ open-PO shaping (pure)
+// =====================================================================
+describe("buildPurchaseChaseReceive — chase + receive shaping", () => {
+  const linked = [{ so: 1301, customerName: "李四", deliveryDate: "2026-09-01" }];
+
+  it("chases late still-making POs and lists receive for ready goods", () => {
+    const { chase, receive } = buildPurchaseChaseReceive(
+      [
+        // still-making + past-due → chase
+        {
+          poId: "po-1",
+          supplierId: "sup-1",
+          supStatus: "in_production",
+          status: "open",
+          expectedReadyDate: "2026-07-01",
+          etaDate: null,
+          lines: [{ sku: "MAT-K", qty: 2, receivedQty: 0 }],
+          linkedOrders: linked,
+        },
+        // goods ready → receive
+        {
+          poId: "po-2",
+          supplierId: "sup-2",
+          supStatus: "ready_for_pickup",
+          status: "open",
+          expectedReadyDate: "2026-06-01",
+          etaDate: "2026-08-05",
+          lines: [{ sku: "BF-K", qty: 1, receivedQty: 0 }],
+          linkedOrders: linked,
+        },
+        // fully received open PO → neither
+        {
+          poId: "po-3",
+          supplierId: "sup-1",
+          supStatus: "pending",
+          status: "open",
+          expectedReadyDate: "2026-07-01",
+          etaDate: null,
+          lines: [{ sku: "X", qty: 1, receivedQty: 1 }],
+          linkedOrders: [],
+        },
+        // still-making but NOT yet late (erd in the future) → neither
+        {
+          poId: "po-4",
+          supplierId: "sup-1",
+          supStatus: "pending",
+          status: "open",
+          expectedReadyDate: "2026-12-01",
+          etaDate: null,
+          lines: [{ sku: "Y", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+        // cancelled → excluded even though it looks chaseable
+        {
+          poId: "po-5",
+          supplierId: "sup-1",
+          supStatus: "in_production",
+          status: "cancelled",
+          expectedReadyDate: "2026-07-01",
+          etaDate: null,
+          lines: [{ sku: "Z", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+      ],
+      { today: "2026-07-21", holidays: myHolidaySet() },
+    );
+
+    expect(chase.map((r) => r.poId)).toEqual(["po-1"]);
+    expect(chase[0].items).toEqual([{ sku: "MAT-K", outstanding: 2 }]);
+    expect(chase[0].daysLate).toBeGreaterThan(0);
+    expect(chase[0].earliestDeliveryDate).toBe("2026-09-01");
+    expect(chase[0].linkedOrders[0].customerName).toBe("李四");
+
+    expect(receive.map((r) => r.poId)).toEqual(["po-2"]);
+    expect(receive[0].items).toEqual([{ sku: "BF-K", outstanding: 1 }]);
+    expect(receive[0].etaDate).toBe("2026-08-05");
+  });
+
+  it("keeps only the outstanding units on a partially-received PO", () => {
+    const { receive } = buildPurchaseChaseReceive(
+      [
+        {
+          poId: "po-p",
+          supplierId: "sup-1",
+          supStatus: "delivered",
+          status: "open",
+          expectedReadyDate: null,
+          etaDate: null,
+          lines: [
+            { sku: "A", qty: 5, receivedQty: 3 },
+            { sku: "B", qty: 2, receivedQty: 2 },
+          ],
+          linkedOrders: [],
+        },
+      ],
+      { today: "2026-07-21" },
+    );
+    expect(receive).toHaveLength(1);
+    // A has 2 outstanding; B fully received → dropped.
+    expect(receive[0].items).toEqual([{ sku: "A", outstanding: 2 }]);
+  });
+
+  it("sorts chase most-late-first and receive by soonest ETA", () => {
+    const { chase, receive } = buildPurchaseChaseReceive(
+      [
+        {
+          poId: "chase-a",
+          supplierId: "s",
+          supStatus: "pending",
+          status: "open",
+          expectedReadyDate: "2026-07-18",
+          etaDate: null,
+          lines: [{ sku: "A", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+        {
+          poId: "chase-b",
+          supplierId: "s",
+          supStatus: "pending",
+          status: "open",
+          expectedReadyDate: "2026-07-01",
+          etaDate: null,
+          lines: [{ sku: "B", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+        {
+          poId: "rec-a",
+          supplierId: "s",
+          supStatus: "shipped",
+          status: "open",
+          expectedReadyDate: null,
+          etaDate: "2026-08-20",
+          lines: [{ sku: "C", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+        {
+          poId: "rec-b",
+          supplierId: "s",
+          supStatus: "shipped",
+          status: "open",
+          expectedReadyDate: null,
+          etaDate: "2026-08-05",
+          lines: [{ sku: "D", qty: 1, receivedQty: 0 }],
+          linkedOrders: [],
+        },
+      ],
+      { today: "2026-07-21", holidays: myHolidaySet() },
+    );
+    // chase-b is more days late (earlier promised date) → first.
+    expect(chase.map((r) => r.poId)).toEqual(["chase-b", "chase-a"]);
+    // rec-b has the sooner ETA → first.
+    expect(receive.map((r) => r.poId)).toEqual(["rec-b", "rec-a"]);
   });
 });
