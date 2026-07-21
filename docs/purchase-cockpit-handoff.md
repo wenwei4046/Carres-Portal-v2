@@ -95,8 +95,9 @@ The current cards waste vertical space (tall, empty). Make it compact:
 
 ---
 
-## 6. LATER UNITS (approved direction, not built)
-- **NAV / IA merge (approved "A")**: fold Purchase + Purchase Order + Receiving into ONE "Purchasing" module (tabs: To Order / Purchase Orders / Receiving). Rename "Stock" → "Inventory" (pages: Availability [lead with free = qty−reserved] · Movements). = international ERP module shape.
+## 6. LATER UNITS (approved direction)
+- **NAV / IA merge — ✅ DONE 2026-07-21 (PR #241).** The 3 rails (Purchase Order / To Order / Receiving) are now ONE "Purchasing" sidebar item + a `PurchasingTabs` top bar (To Order · Purchase Orders · Receiving). `portal-nav.ts` has `tab?`/`activeFor?`; `PurchasingTabs.tsx` is the bar. OPEN follow-up: To Order's internal ②Chase/③Receive sections now overlap the Purchase Orders + Receiving tabs — decide if To Order becomes place-only or stays the full worklist. Merged item dropped the procurement unread badge (reattach if wanted).
+- **Rename "Stock" → "Inventory"** (pages: Availability [lead with free = qty−reserved] · Movements). = international ERP module shape. NOT built.
 - **POS ready-stock badge**: salesperson at POS sees per-SKU available stock ("✓ 3 ready · Klg") to promise fast for urgent orders — needs a controlled per-SKU available read exposed to POS (RLS-safe, not the whole stock table). Makes ready-stock-first usable.
 - **Wire the real button actions**: Send order → create a PO (currently the old "Purchase Order" page's job); Chase → real WhatsApp send + record; Check-into-Klg → real GRN write.
 - **Lead-time settings screen** (migration 0243): principal edits per-supplier normal/peak leads + review days.
