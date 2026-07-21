@@ -59,7 +59,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   const { data: orderRows, error: orderErr } = await sb
     .from("orders")
     .select(
-      "id, so, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
+      "id, so, customer_name, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
     )
     .in("status", ["place", "proceed_order"])
     .or("source_system.is.null,source_system.neq.autocount");
@@ -73,6 +73,12 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   const soByOrderId = new Map<string, number>(
     orders.map((o) => [o.id as string, Number(o.so)]),
   );
+  // Customer name per order — carried to the card's primary label (display only).
+  const customerNameByOrderId: Record<string, string | null> = {};
+  for (const o of orders) {
+    customerNameByOrderId[o.id as string] =
+      ((o.customer_name as string | null) ?? null) || null;
+  }
 
   // No live orders → nothing to buy. Short-circuit (skip the supply reads).
   if (orderIds.length === 0) {
@@ -90,7 +96,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   const { data: lineRows, error: lineErr } = await sb
     .from("order_lines")
     .select(
-      "id, order_id, sku, qty, product_skus!inner(supplier_id, product_models!inner(category))",
+      "id, order_id, sku, qty, product_skus!inner(supplier_id, cost, product_models!inner(category))",
     )
     .in("order_id", orderIds);
   if (lineErr) {
@@ -98,11 +104,16 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
+  // Per-SKU system cost (product_skus.cost) — DISPLAY-only, advisory. Never
+  // reaches an order_line / PO / pricing path; the card just shows Σ(cost×toOrder).
+  const costBySku: Record<string, number | null> = {};
+
   const demand: DemandLine[] = [];
   for (const l of lineRows ?? []) {
     const psk = (l as Record<string, unknown>).product_skus as
       | {
           supplier_id?: string | null;
+          cost?: number | string | null;
           product_models?: { category?: string | null } | null;
         }
       | null
@@ -111,6 +122,8 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     const supplierId = psk?.supplier_id ?? null;
     // Only the 3 procurable categories; a line with no supplier can't be bought.
     if (!category || !PROCURABLE.includes(category) || !supplierId) continue;
+
+    costBySku[l.sku as string] = psk?.cost != null ? Number(psk.cost) : null;
 
     const order = orderById.get(l.order_id as string);
     if (!order) continue;
@@ -216,6 +229,8 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       reviewDaysBySupplier,
     },
     soByOrderId,
+    customerNameByOrderId,
+    costBySku,
   );
 
   return c.json(purchaseTodayResponseSchema.parse(report));

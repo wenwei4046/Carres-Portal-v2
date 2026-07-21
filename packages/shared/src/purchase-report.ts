@@ -45,6 +45,12 @@ export const purchaseBundleItemSchema = z.object({
   toOrder: z.number(),
   coveredByOpenPo: z.number(),
   coveredByFreeStock: z.number(),
+  /**
+   * Unit system cost (`product_skus.cost`), or `null` when unset. DISPLAY-ONLY /
+   * advisory — never a pricing or order-path input (mirrors the cost read-model
+   * elsewhere). The per-card total = Σ(cost × toOrder) is computed by the page.
+   */
+  cost: z.number().nullable(),
   /** Human one-liner e.g. "need 3 · 1 on PO · order 2". */
   why: z.string(),
 });
@@ -56,6 +62,8 @@ export const purchaseBundleSchema = z.object({
   orderId: z.string(),
   /** Convenience SO number for the operator (from orders.so). */
   so: z.number().nullable(),
+  /** Customer name (from orders.customer_name) — the card's primary label. */
+  customerName: z.string().nullable(),
   group: z.string(),
   lineIds: z.array(z.string()),
   supplierIds: z.array(z.string()),
@@ -120,6 +128,10 @@ export function buildPurchaseTodayReport(
   supply: NetRequirementsSupply,
   options: NetRequirementsOptions,
   soByOrderId: ReadonlyMap<string, number> | Record<string, number> = {},
+  customerNameByOrderId:
+    | ReadonlyMap<string, string | null>
+    | Record<string, string | null> = {},
+  costBySku: ReadonlyMap<string, number | null> | Record<string, number | null> = {},
 ): PurchaseTodayResponse {
   const soMap =
     soByOrderId instanceof Map
@@ -127,6 +139,12 @@ export function buildPurchaseTodayReport(
       : new Map(
           Object.entries(soByOrderId).map(([k, v]) => [k, Number(v)] as const),
         );
+  const nameMap =
+    customerNameByOrderId instanceof Map
+      ? customerNameByOrderId
+      : new Map(Object.entries(customerNameByOrderId));
+  const costMap =
+    costBySku instanceof Map ? costBySku : new Map(Object.entries(costBySku));
 
   const result = computeNetRequirements(demand, supply, options);
 
@@ -152,6 +170,7 @@ export function buildPurchaseTodayReport(
             toOrder: 0,
             coveredByOpenPo: 0,
             coveredByFreeStock: 0,
+            cost: costMap.get(line.sku) ?? null,
             why: "",
           };
           bySku.set(line.sku, item);
@@ -178,6 +197,7 @@ export function buildPurchaseTodayReport(
         bundleKey: b.bundleKey,
         orderId: b.orderId,
         so: soMap.get(b.orderId) ?? null,
+        customerName: nameMap.get(b.orderId) ?? null,
         group: b.group,
         lineIds: b.lineIds,
         supplierIds: b.supplierIds,

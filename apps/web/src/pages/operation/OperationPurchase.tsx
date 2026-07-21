@@ -340,6 +340,22 @@ export default function OperationPurchase() {
             title="Place orders"
             subtitle="Send these to your factories now. Red = already late."
             count={`${placeCards.length} to send`}
+            action={
+              placeCards.length > 0 ? (
+                <Btn
+                  variant="hero"
+                  size="md"
+                  icon={Send}
+                  title="Send all of today's orders to their factories (raising the POs is a later unit)"
+                  onClick={() => {
+                    /* TODO: batch PO-raise — send every factory card at once. The
+                       PO-raise action is a separate, not-yet-built unit; stub for now. */
+                  }}
+                >
+                  Send today&rsquo;s orders
+                </Btn>
+              ) : undefined
+            }
           />
 
           {isLoading ? (
@@ -439,6 +455,13 @@ function PlaceCard({
     bundle.urgency === "late" && bundle.raiseBy && today
       ? daysBetween(bundle.raiseBy, today)
       : null;
+  // Customer name is the card's primary label; SO number falls to the sub-line.
+  const soLabel = bundle.so ? `SO-${bundle.so}` : "Order";
+  const customer = bundle.customerName?.trim() || "";
+  const primaryLabel = customer || soLabel;
+  // System cost (advisory / display only): Σ(unit cost × units to order) on this
+  // card. Null costs count as 0 — the total is still shown.
+  const cardCost = items.reduce((sum, it) => sum + (it.cost ?? 0) * it.toOrder, 0);
 
   return (
     <div
@@ -454,16 +477,22 @@ function PlaceCard({
             <span className="truncate">{name}</span>
             <span className="text-[12px] font-medium text-base-500">· {kind}</span>
           </div>
-          <div className="mt-1 text-[12px] text-base-600">
-            <span className="font-semibold text-base-800">
-              {bundle.so ? `SO-${bundle.so}` : "Order"}
-            </span>
-            {" · "}
-            {bundle.deadline ? (
-              <>deliver by {fmtDate(bundle.deadline)}</>
-            ) : (
-              <span className="text-danger">no delivery date yet</span>
-            )}
+          <div className="mt-1">
+            <div className="text-[13px] font-semibold text-base-900 truncate">
+              {primaryLabel}
+            </div>
+            <div className="text-[12px] text-base-600">
+              {customer && (
+                <>
+                  <span className="font-medium text-base-800">{soLabel}</span>
+                  {" · "}
+                </>
+              )}
+              {bundle.deadline ? (
+                <>deliver by {fmtDate(bundle.deadline)}</>
+              ) : (
+                <span className="text-danger">no delivery date yet</span>
+              )}
             {bundle.raiseBy && (
               <>
                 {" · "}
@@ -477,6 +506,7 @@ function PlaceCard({
                 )}
               </>
             )}
+            </div>
           </div>
         </div>
         <span className={`pill ${u.cls} shrink-0`}>
@@ -513,6 +543,14 @@ function PlaceCard({
         })}
       </div>
 
+      {/* system cost — advisory, display only (never a pricing input) */}
+      <div className="px-4 pb-2 pt-1.5">
+        <span className="text-[11px] text-base-400">
+          Cost (system): RM{" "}
+          {cardCost.toLocaleString("en-MY", { maximumFractionDigits: 0 })}
+        </span>
+      </div>
+
       {/* footer */}
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-base-50 border-t border-base-200">
         <button
@@ -526,7 +564,7 @@ function PlaceCard({
           Something wrong?
         </button>
         <Btn
-          variant="hero"
+          variant="box"
           size="md"
           icon={Send}
           title={`Send order to ${name} (raising the PO is a later unit)`}
@@ -549,11 +587,14 @@ function StepHead({
   title,
   subtitle,
   count,
+  action,
 }: {
   n: string;
   title: string;
   subtitle: string;
   count: string;
+  /** Optional right-aligned action (e.g. the section's single batch CTA). */
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 mt-6 mb-3">
@@ -564,9 +605,12 @@ function StepHead({
         <div className="text-[15px] font-bold text-base-900">{title}</div>
         <div className="text-[12px] text-base-500">{subtitle}</div>
       </div>
-      <span className="ml-auto shrink-0 text-[12px] font-semibold text-base-500 bg-base-100 rounded-full px-2.5 py-1 tabular-nums">
-        {count}
-      </span>
+      <div className="ml-auto shrink-0 flex items-center gap-2.5">
+        <span className="text-[12px] font-semibold text-base-500 bg-base-100 rounded-full px-2.5 py-1 tabular-nums">
+          {count}
+        </span>
+        {action}
+      </div>
     </div>
   );
 }

@@ -154,6 +154,7 @@ describe("GET /api/operation/purchase/today — assembly", () => {
       {
         id: "ord-A",
         so: 1201,
+        customer_name: "陈先生",
         status: "place",
         source_system: null,
         delivery_date: "2026-09-30",
@@ -168,14 +169,22 @@ describe("GET /api/operation/purchase/today — assembly", () => {
         order_id: "ord-A",
         sku: "MAT-K",
         qty: 1,
-        product_skus: { supplier_id: "sup-1", product_models: { category: "mattress" } },
+        product_skus: {
+          supplier_id: "sup-1",
+          cost: 800,
+          product_models: { category: "mattress" },
+        },
       },
       {
         id: "ln-b",
         order_id: "ord-A",
         sku: "BF-K",
         qty: 1,
-        product_skus: { supplier_id: "sup-1", product_models: { category: "bedframe" } },
+        product_skus: {
+          supplier_id: "sup-1",
+          cost: 500,
+          product_models: { category: "bedframe" },
+        },
       },
     ];
     // MAT-K fully covered by an open PO → toOrder 0. BF-K has free stock but
@@ -217,11 +226,15 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     const bundle = parsed.bundles[0];
     expect(bundle.group).toBe("bedset");
     expect(bundle.so).toBe(1201);
+    // Customer name is carried through to the card's primary label.
+    expect(bundle.customerName).toBe("陈先生");
     expect(bundle.lineIds.sort()).toEqual(["ln-b", "ln-m"]);
     // Only BF-K still needs a PO (MAT-K netted by the open PO).
     expect(bundle.toOrder).toBe(1);
     expect(bundle.items.map((i) => i.sku)).toEqual(["BF-K"]);
     expect(bundle.items[0].toOrder).toBe(1);
+    // System cost (product_skus.cost) rides on the item — DISPLAY only.
+    expect(bundle.items[0].cost).toBe(500);
     // raiseBy = deadline − max(lead) working days; deterministic (no `today`).
     expect(bundle.raiseBy).toBeTruthy();
 
@@ -294,6 +307,8 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
         reviewDaysBySupplier: { "sup-1": [1, 3, 5], "sup-2": [1, 3, 5] },
       },
       { o1: 1301, o2: 1302 },
+      { o1: "李四", o2: "王五" },
+      { "MAT-K": 800, "BF-K": 300, "SOF-3S": 1200 },
     );
 
     // Two bundles: the bed-set (o1) and the sofa (o2).
@@ -307,6 +322,10 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
     expect(mat.coveredByOpenPo).toBe(1);
     expect(mat.toOrder).toBe(1);
     expect(mat.why).toContain("1 on PO");
+    // Per-item system cost + per-bundle customer name are carried through.
+    expect(mat.cost).toBe(800);
+    expect(bedset.items.find((i) => i.sku === "BF-K")!.cost).toBe(300);
+    expect(bedset.customerName).toBe("李四");
     // bedset raiseBy uses the LONGER lead (mattress 10) — the slower item gates.
     expect(bedset.maxLeadDays).toBe(10);
     expect(bedset.so).toBe(1301);
@@ -316,6 +335,8 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
     expect(sofa.group).toBe("sofa");
     expect(sofa.toOrder).toBe(1);
     expect(sofa.items[0].coveredByFreeStock).toBe(0);
+    expect(sofa.items[0].cost).toBe(1200);
+    expect(sofa.customerName).toBe("王五");
     expect(report.bySku.find((s) => s.sku === "SOF-3S")!.freeStock).toBe(5);
 
     // Summary counts the to-place bundles per urgency; totals add up.
