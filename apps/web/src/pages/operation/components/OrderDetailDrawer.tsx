@@ -3,6 +3,7 @@ import {
   type MutableRefObject,
   Fragment,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -2055,6 +2056,18 @@ function DrawerBody({
   const nowStepIdx =
     nowIdx >= 0 ? nowIdx : journeySteps.findIndex((s) => s.state === "wait");
   const nowStep = nowStepIdx >= 0 ? journeySteps[nowStepIdx] : null;
+  // Open the drawer ON the current station so the highlighted step === the panel
+  // (P2, Jess: "not clear what to do"). Once per order; a later manual step click
+  // is never overridden (the ref guard trips on the first non-null render).
+  const initTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (initTabRef.current === order.id) return;
+    if (!nowStep) return;
+    initTabRef.current = order.id;
+    setTab(nowStep.tab);
+    setClickedStep(nowStepIdx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id, nowStep]);
   const nowVerb: string | null = !nowStep
     ? null
     : nowStep.tab === "items"
@@ -2253,10 +2266,12 @@ function DrawerBody({
             }
             collapsed={railCollapsed}
           />
-          {/* Chase Now (MASTER SPEC §7) — a PANEL (not a tab) between the
-              Customer block and the tab rail; hides with the collapsed rail
-              (the tab dots still carry the alerts). */}
-          {!railCollapsed && (
+          {/* Chase Now panel RETIRED from the left column (P2 clean, 2026-07-21):
+              it competed with the NOW strip + the route-map spine ("two panels,
+              don't know what to read" — Jess). Chasing now lives on the NOW
+              strip's verb + inside the Delivery / Balance station panels. Kept
+              (guarded off) so the wiring is one flag away if we fold it back. */}
+          {false && !railCollapsed && (
             <ChaseNowPanel
               rows={chaseRows}
               lastChasedAt={form.control?.last_chased_at ?? null}
@@ -2274,6 +2289,8 @@ function DrawerBody({
               activeTab={tab}
               collapsed={railCollapsed}
               steps={journeySteps}
+              actionStepIdx={nowStepIdx}
+              actionLabel={nowVerb}
             />
           )}
           <nav
@@ -2379,47 +2396,10 @@ function DrawerBody({
             own §8 status vocabulary carry the state; the work surface starts
             at the top). */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-          {/* NOW strip (P2) — the current station, pinned short + wide; the work
-              panel scrolls under it so height goes to the actual work. */}
-          {nowStep ? (
-            <div className="shrink-0 flex items-center gap-3 rounded-xl border border-base-200 bg-white px-4 py-2.5 shadow-sm">
-              <StepBadge n={nowStepIdx + 1} state={nowStep.state} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-base-400 shrink-0">Now</span>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-400 shrink-0">{nowStep.panel}</span>
-                  <span className="text-[13px] font-semibold text-base-900 truncate">{nowStep.title}</span>
-                </div>
-                <div
-                  className={`text-[12px] truncate ${
-                    nowStep.state === "act"
-                      ? "font-semibold text-danger"
-                      : nowStep.state === "wait"
-                        ? "font-medium text-warning"
-                        : "text-base-500"
-                  }`}
-                >
-                  {nowStep.sub}
-                </div>
-              </div>
-              {nowVerb && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTab(nowStep.tab);
-                    setClickedStep(nowStepIdx);
-                  }}
-                  className={`shrink-0 ${nowStep.state === "act" ? "btn-primary" : "btn-secondary"}`}
-                >
-                  {nowVerb}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="shrink-0 flex items-center gap-2 rounded-xl border border-base-200 bg-base-50 px-4 py-2 text-[13px] text-base-500">
-              All steps done — nothing to do on this order.
-            </div>
-          )}
+          {/* NOW strip RETIRED (P2 clean, 2026-07-21): it duplicated the route-
+              map spine's current node (Jess: "repeated step 2 icon … two things").
+              The action now lives ON the spine's current step (one guide, one
+              place to look — see JourneyCard actionStepIdx). */}
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           {/* 0233/0234 (add-product P3) — dealer-submitted product change
               awaiting approval. ABOVE the tab gate so it shows on EVERY tab
@@ -5063,6 +5043,8 @@ function JourneyCard({
   activeTab,
   collapsed,
   onGo,
+  actionStepIdx,
+  actionLabel,
 }: {
   steps: {
     panel: string;
@@ -5074,6 +5056,11 @@ function JourneyCard({
   activeTab: DrawerTab;
   collapsed: boolean;
   onGo: (t: DrawerTab, stepIndex: number) => void;
+  /** The ONE current step (first act, else first wait) — its node shows the
+   *  action pill so "what to do now" lives on the map itself (P2 clean, no
+   *  separate NOW strip). */
+  actionStepIdx?: number;
+  actionLabel?: string | null;
 }) {
   return (
     <div
@@ -5152,6 +5139,20 @@ function JourneyCard({
                 >
                   {st.sub}
                 </span>
+                {/* Action pill on the CURRENT step (P2) — a button-styled span
+                    (the whole node is already a <button>, so no nesting): click
+                    the step → opens its panel. This is the ONE "what to do now". */}
+                {i === actionStepIdx && actionLabel && (
+                  <span
+                    className={`inline-flex mt-1.5 rounded-lg px-3 py-1 text-[12px] font-semibold ${
+                      st.state === "act"
+                        ? "bg-base-900 text-white"
+                        : "bg-white border border-base-300 text-base-800"
+                    }`}
+                  >
+                    {actionLabel}
+                  </span>
+                )}
               </span>
             )}
           </button>
@@ -5622,14 +5623,14 @@ function MoneyCard({
     ? !totalSet
       ? "The total comes from the priced items below."
       : balanceDue > 0
-        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
+        ? `Customer still owes ${RM(balanceDue)} · collect before delivery.`
         : "All paid — you can print the receipt."
     : !totalSet
       ? collected > 0
         ? `${RM(collected)} already recorded — key what the customer owed BEFORE those payments; the system minus them for you.`
         : "Nothing owing on record. Key an amount below ONLY if this customer owes money."
       : balanceDue > 0
-        ? `Customer still owes ${RM(balanceDue)}. Each time they pay, press "+ Record payment".`
+        ? `Customer still owes ${RM(balanceDue)} · collect before delivery.`
         : "All paid — you can print the receipt.";
 
   // The keyed-total entry — the goods amount on an AutoCount order.
