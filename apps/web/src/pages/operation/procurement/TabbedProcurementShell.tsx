@@ -4,6 +4,7 @@ import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import CreatePOModal, {
   type CreatePoPrefill,
 } from "../components/CreatePOModal";
+import PurchasingTabs from "../PurchasingTabs";
 import OhanaBedFrameTab from "./OhanaBedFrameTab";
 import OhanaSofaTab from "./OhanaSofaTab";
 import NiceFutureMattressTab from "./NiceFutureMattressTab";
@@ -101,6 +102,10 @@ export default function TabbedProcurementShell() {
 
   return (
     <div className="pb-14" data-testid="tabbed-procurement-shell">
+      {/* Purchasing module bar — merges the three procurement rails (To Order /
+          Purchase Orders / Receiving) into one module; sits above this shell's
+          own per-supplier channel tabs. */}
+      <PurchasingTabs />
       {/* Page header — persists across tabs so the procurement section feels
           coherent. Mirrors the kicker/title from operationProcurement.tsx.
           The "+ New PO" button lives in the header (T42-C2 restore) rather

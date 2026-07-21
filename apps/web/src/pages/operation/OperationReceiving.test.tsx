@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OperationReceiving from "./OperationReceiving";
 
@@ -52,7 +53,20 @@ const POS = [
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+  // The page now renders the shared PurchasingTabs bar (uses router hooks), so
+  // it must mount inside a Router.
+  return render(
+    <MemoryRouter initialEntries={["/operation?tab=receiving"]}>
+      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** The page's own status tabs (To receive / Received / All) — scoped away from
+ *  the module-level PurchasingTabs bar, which is also a tablist. */
+async function statusTabs() {
+  const list = await screen.findByRole("tablist", { name: "Receiving status" });
+  return within(list).getAllByRole("tab");
 }
 
 beforeEach(() => {
@@ -71,7 +85,7 @@ beforeEach(() => {
 describe("OperationReceiving", () => {
   it("renders 3 status tabs with counts (cancelled excluded)", async () => {
     wrap(<OperationReceiving />);
-    const tabs = await screen.findAllByRole("tab");
+    const tabs = await statusTabs();
     expect(tabs).toHaveLength(3);
     // To receive = 2 open, Received = 1, All = 3 (cancelled PO-2004 excluded).
     await waitFor(() => {
@@ -95,7 +109,7 @@ describe("OperationReceiving", () => {
 
   it("'Received' tab shows received POs as Done (no Receive button)", async () => {
     wrap(<OperationReceiving />);
-    const tabs = await screen.findAllByRole("tab");
+    const tabs = await statusTabs();
     fireEvent.click(tabs[1]); // Received
     await waitFor(() => {
       expect(screen.getByText("PO-2003")).toBeInTheDocument();

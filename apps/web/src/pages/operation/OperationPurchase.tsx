@@ -48,6 +48,7 @@ import type {
 } from "@carres/shared";
 import ListPageShell from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
+import PurchasingTabs from "./PurchasingTabs";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import type { SupplierRow } from "@/lib/queries";
@@ -247,7 +248,9 @@ export default function OperationPurchase() {
   // ── Error state ──
   if (isError) {
     return (
-      <div className="px-6 py-8">
+      <div className="h-full flex flex-col">
+        <PurchasingTabs />
+        <div className="px-6 py-8">
         <div className="max-w-[560px] rounded-[12px] border border-danger bg-error-soft p-4">
           <div className="text-[13px] font-semibold text-danger mb-1">
             Couldn&rsquo;t load the purchase plan
@@ -259,13 +262,17 @@ export default function OperationPurchase() {
             Retry
           </Btn>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <ListPageShell
-      testId="operation-purchase"
+    <div className="h-full flex flex-col">
+      <PurchasingTabs />
+      <div className="flex-1 min-h-0">
+        <ListPageShell
+          testId="operation-purchase"
       breadcrumb={
         <>
           <span>Operations</span>
@@ -535,7 +542,9 @@ export default function OperationPurchase() {
           onClose={() => setDrawerSupplierId(null)}
         />
       )}
-    </ListPageShell>
+        </ListPageShell>
+      </div>
+    </div>
   );
 }
 

@@ -125,20 +125,46 @@ export default function PortalSidebar() {
     // service-notes has no mark-seen endpoint (read-only counter).
   }
 
+  // Are we on a path-driven section of this group? True for an item's own
+  // `path` (orders) OR an item's `activeFor` path matcher (Purchasing owns
+  // `/operation/procurement` via activeFor, not a `path`). Used to suppress the
+  // tab-key match for every OTHER item while a path section is showing.
+  function onPathSection(group: PortalNavGroup): boolean {
+    return group.items.some((it) => {
+      if (it.path && location.pathname.startsWith(it.path)) return true;
+      return (
+        it.activeFor?.some(
+          (m) => m.startsWith("path:") && location.pathname.startsWith(m.slice(5)),
+        ) ?? false
+      );
+    });
+  }
+
   function isItemActive(group: PortalNavGroup, item: PortalNavItem): boolean {
     if (group.area !== activeArea) return false;
     if (group.area === "finance") {
       return location.pathname === item.financePath;
     }
+
+    // Merged items (Purchasing) light up across several routes via `activeFor`:
+    // `path:<prefix>` matches the pathname; `tab:<key>` matches the `?tab=` value
+    // (but not while a path section is showing).
+    if (item.activeFor) {
+      const onPath = onPathSection(group);
+      const current = searchTab ?? group.defaultTab;
+      return item.activeFor.some((m) => {
+        if (m.startsWith("path:")) return location.pathname.startsWith(m.slice(5));
+        if (m.startsWith("tab:")) return !onPath && current === m.slice(4);
+        return false;
+      });
+    }
+
     if (item.path) {
       // operation path-driven section (orders / procurement)
       return location.pathname.startsWith(item.path);
     }
     // tab-driven: a path-driven section is active → no tab item is.
-    const onPathSection = group.items.some(
-      (it) => it.path && location.pathname.startsWith(it.path),
-    );
-    if (onPathSection) return false;
+    if (onPathSection(group)) return false;
     const current = searchTab ?? group.defaultTab;
     return current === item.key;
   }
