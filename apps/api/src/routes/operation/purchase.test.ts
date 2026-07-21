@@ -196,9 +196,16 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     const warehouses = [{ id: "wh-klg", name: "Carres Klang" }];
     const stock = [{ sku: "BF-K", qty: 3, reserved: 0, warehouse_id: "wh-klg" }];
 
+    // Catalog facts are resolved in a SEPARATE product_skus read (no FK
+    // order_lines→product_skus, so no embed). Mock it by sku.
+    const skuCatalog = [
+      { sku: "MAT-K", supplier_id: "sup-1", cost: 800, product_models: { category: "mattress" } },
+      { sku: "BF-K", supplier_id: "sup-1", cost: 500, product_models: { category: "bedframe" } },
+    ];
     const sb = makeSb({
       orders: { data: orders, error: null },
       order_lines: { data: lines, error: null },
+      product_skus: { data: skuCatalog, error: null },
       purchase_order_lines: { data: poLines, error: null },
       warehouses: { data: warehouses, error: null },
       stock_balances: { data: stock, error: null },
