@@ -950,6 +950,9 @@ interface Props {
   /** Header "+ Import from AutoCount" button → OperationApp flips to the import
    *  tab. Optional so the page renders standalone (e.g. in tests). */
   onImport?: () => void;
+  /** Landing view — the guided "Today" worklist by default; tests pass "board"
+   *  to exercise the table directly. */
+  initialView?: "today" | "board";
 }
 
 /** Columns for the top-bar export (CSV + print). Address added vs the old
@@ -1109,12 +1112,15 @@ function saveHiddenCols(s: Set<string>) {
   }
 }
 
-export default function OperationOrdersControl({ onImport }: Props) {
+export default function OperationOrdersControl({ onImport, initialView }: Props) {
   const params = useParams<{ stage?: string }>();
   const [tab, setTab] = useState<ControlTab>(
     () => tabFromStageParam(params.stage) ?? "all",
   );
   const [search, setSearch] = useState("");
+  // Today front door (2026-07-21) — the guided worklist is the DEFAULT face;
+  // "Full board" is the existing table, one click away for the deep dive.
+  const [view, setView] = useState<"today" | "board">(initialView ?? "today");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   // Share the open order with the global right rail so its Activity panel shows
   // THIS order's history (Jess 2026-06-30: Activity moved off the page).
@@ -1736,6 +1742,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const total = visible.length;
   const shown = useMemo(() => visible.slice(0, renderCount), [visible, renderCount]);
 
+  // ─── Today groups (2026-07-21) — the open work, grouped by the ONE action it
+  // needs, into the 1-2-3 station bands. Reuses nextActionOf so the Today cards,
+  // the Full-board MANAGE column, and the drawer NOW step all speak one verb.
+  // No-deadline orders can't be planned → they surface FIRST as a data fix.
+  const todayGroups = useMemo(() => {
+    const stock: { o: operationOrderListRow; na: NextAction }[] = [];
+    const delivery: { o: operationOrderListRow; na: NextAction }[] = [];
+    const money: { o: operationOrderListRow; na: NextAction }[] = [];
+    const fix: operationOrderListRow[] = [];
+    for (const o of visible) {
+      if (controlTabOf(o, availableBySku) === "completed") continue;
+      if (o.delivery_date_tbd || !o.delivery_date) {
+        fix.push(o);
+        continue;
+      }
+      const na = nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []);
+      if (na.label === "Order PO" || na.label === "Chase supplier") stock.push({ o, na });
+      else if (na.label === "Assign logistic" || na.label === "Chase logistic")
+        delivery.push({ o, na });
+      else money.push({ o, na });
+    }
+    return {
+      stock,
+      delivery,
+      money,
+      fix,
+      total: stock.length + delivery.length + money.length,
+    };
+  }, [visible, availableBySku]);
+
   // The list is the only scroll area. An IntersectionObserver sentinel at the
   // bottom appends the next batch as it scrolls into view (guarded for jsdom).
   const listBoxRef = useRef<HTMLDivElement>(null);
@@ -2165,6 +2201,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
           /* Header right cluster (ONE white header surface): search → Bell →
              HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
           <>
+            {/* Today | Full board — the guided worklist vs the deep-dive table. */}
+            <div className="inline-flex bg-base-100 rounded-lg p-0.5 gap-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setView("today")}
+                className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${view === "today" ? "bg-white text-base-900 shadow-sm" : "text-base-500 hover:text-base-800"}`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("board")}
+                className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${view === "board" ? "bg-white text-base-900 shadow-sm" : "text-base-500 hover:text-base-800"}`}
+              >
+                Full board
+              </button>
+            </div>
             <input
               type="search"
               value={search}
@@ -2178,17 +2231,26 @@ export default function OperationOrdersControl({ onImport }: Props) {
         facetOpen={kanbanOpen}
         onFacetToggle={() => setKanbanOpen((v) => !v)}
         toolbar={
-          /* STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */
-          <StatusTabs
-            tabs={TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              count: counts[t.key],
-              title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
-            }))}
-            active={tab}
-            onSelect={setTab}
-          />
+          /* STATUS pipeline tabs — Full board only. Today has no pipeline tabs
+             (it groups the open work by action, not by stage). */
+          view === "board" ? (
+            <StatusTabs
+              tabs={TABS.map((t) => ({
+                key: t.key,
+                label: t.label,
+                count: counts[t.key],
+                title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
+              }))}
+              active={tab}
+              onSelect={setTab}
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-[13px] text-base-500">
+              <span className="font-semibold text-base-900">To do today</span>
+              <span className="text-base-300">·</span>
+              <span className="tabular-nums">{todayGroups.total} open</span>
+            </div>
+          )
         }
         toolbarRight={
           /* ONE-row toolbar, right cluster: + Master · + AutoCount · ⋮. The
@@ -2752,9 +2814,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </SectionCard>
         }
       >
-          {/* Listing — the ONLY scroll area (the page stays put, only the rows
-              scroll). table-fixed + a colgroup → columns keep their width. */}
-      <div
+          {view === "board" ? (
+          /* Listing — the ONLY scroll area (the page stays put, only the rows
+             scroll). table-fixed + a colgroup → columns keep their width. */
+          <div
         ref={listBoxRef}
         className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto"
       >
@@ -2880,6 +2943,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </tbody>
         </table>
           </div>
+          ) : (
+            <TodayView
+              groups={todayGroups}
+              onOpen={(id) => setOpenOrderId(id)}
+              onOrderPo={(o) => setRaisePoOrders([o])}
+              onChaseSupplier={(o) => {
+                setChaseSupplierScope(null);
+                setChaseOrders([o]);
+              }}
+            />
+          )}
       </ListPageShell>
 
       {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
@@ -4208,6 +4282,161 @@ function Th({
     >
       {children}
     </th>
+  );
+}
+
+/** Today front door (2026-07-21) — the guided worklist: the open work grouped
+ *  into 1-2-3 station bands (① Stock ② Delivery ③ Money), each order a card with
+ *  one sentence + a specific date + ONE action button. No-deadline orders can't
+ *  be planned → they surface FIRST as a data fix. Reuses nextActionOf so the card
+ *  verb === the Full-board MANAGE verb === the drawer NOW step. */
+function TodayView({
+  groups,
+  onOpen,
+  onOrderPo,
+  onChaseSupplier,
+}: {
+  groups: {
+    stock: { o: operationOrderListRow; na: NextAction }[];
+    delivery: { o: operationOrderListRow; na: NextAction }[];
+    money: { o: operationOrderListRow; na: NextAction }[];
+    fix: operationOrderListRow[];
+    total: number;
+  };
+  onOpen: (id: string) => void;
+  onOrderPo: (o: operationOrderListRow) => void;
+  onChaseSupplier: (o: operationOrderListRow) => void;
+}) {
+  const act = (o: operationOrderListRow, na: NextAction) => {
+    if (na.label === "Order PO") onOrderPo(o);
+    else if (na.label === "Chase supplier") onChaseSupplier(o);
+    else onOpen(o.id);
+  };
+  const SECTIONS = [
+    {
+      key: "stock",
+      n: 1,
+      title: "Stock — get the goods in",
+      sub: "Not at the warehouse yet. Order from the factory, or chase a late one.",
+      rows: groups.stock,
+    },
+    {
+      key: "delivery",
+      n: 2,
+      title: "Delivery — get it to the customer",
+      sub: "Stock is in. Assign a logistic, then chase them to book a day.",
+      rows: groups.delivery,
+    },
+    {
+      key: "money",
+      n: 3,
+      title: "Money — collect before delivery",
+      sub: "Ready to close. Collect the balance first.",
+      rows: groups.money,
+    },
+  ].filter((s) => s.rows.length > 0);
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div className="max-w-[820px] mx-auto flex flex-col gap-2 pb-10">
+        {groups.fix.length > 0 && (
+          <div className="rounded-xl border border-danger/30 bg-error-soft px-4 py-3 mt-1">
+            <div className="text-[13px] font-semibold text-danger">
+              {groups.fix.length} order{groups.fix.length === 1 ? "" : "s"} can&rsquo;t be planned yet
+            </div>
+            <div className="text-[12px] text-base-600 mt-0.5">
+              No delivery date — the system can&rsquo;t tell you when to order or deliver. Set a date (ask the salesperson).
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {groups.fix.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => onOpen(o.id)}
+                  className="pill pill-overdue"
+                >
+                  SO-{o.so} · {o.customer_name ?? "—"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {groups.total === 0 && groups.fix.length === 0 && (
+          <div className="text-center text-[13px] text-base-500 py-16">
+            Nothing to do today — all clear.
+          </div>
+        )}
+        {SECTIONS.map((s) => (
+          <section key={s.key} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2.5 mt-3">
+              <span className="w-7 h-7 rounded-lg bg-base-900 text-white grid place-items-center text-[13px] font-bold tabular-nums shrink-0">
+                {s.n}
+              </span>
+              <div className="min-w-0">
+                <div className="t4-section text-base-900">{s.title}</div>
+                <div className="text-[12px] text-base-500">{s.sub}</div>
+              </div>
+              <span className="ml-auto text-[12px] font-semibold text-base-500 bg-base-100 rounded-full px-2.5 py-0.5 tabular-nums">
+                {s.rows.length}
+              </span>
+            </div>
+            {s.rows.map(({ o, na }) => (
+              <TodayCard key={o.id} o={o} na={na} onAct={() => act(o, na)} onOpen={() => onOpen(o.id)} />
+            ))}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One Today card — SO · customer · items · deadline + the ONE action button. */
+function TodayCard({
+  o,
+  na,
+  onAct,
+  onOpen,
+}: {
+  o: operationOrderListRow;
+  na: NextAction;
+  onAct: () => void;
+  onOpen: () => void;
+}) {
+  const ref = (o.source_ref ?? []).filter(Boolean)[0];
+  const loc = locationForAddress(o.customer_address ?? null);
+  const dd = daysToDue(o);
+  const items = itemTags(o.order_lines ?? []).map((t) => `${t.qty}× ${t.name}`).join(" · ") || "—";
+  const pillText = dd == null ? null : dd < 0 ? `over ${-dd}d` : dd === 0 ? "today" : `${dd}d`;
+  const heat = dd == null || dd <= 1 ? "pill-overdue" : dd <= 3 ? "pill-warning" : "pill-neutral";
+  const btnLabel = na.label === "Order PO" ? "Order stock" : na.label;
+  return (
+    <div className="rounded-xl border border-base-200 bg-white shadow-sm px-4 py-3 flex items-center gap-3">
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono text-[13px] font-bold text-base-900">SO-{o.so}</span>
+          <span
+            className={`${cjkClassName(o.customer_name ?? "")} text-[13px] font-semibold text-base-800 truncate`}
+          >
+            {o.customer_name ?? "—"}
+          </span>
+          {ref && <span className="font-mono text-[11px] text-base-400 truncate">{ref}</span>}
+          <span className="text-[11px] text-base-400 truncate">· {loc.label ?? "—"}</span>
+        </div>
+        <div className="text-[12px] text-base-500 mt-0.5 truncate">{items}</div>
+      </button>
+      <div className="text-right shrink-0">
+        {pillText && <span className={`pill ${heat} tabular-nums`}>{pillText}</span>}
+        <div className="text-[11px] text-base-500 tabular-nums mt-0.5">
+          {o.delivery_date ? fmtDate(o.delivery_date) : "TBD"}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onAct}
+        className={`shrink-0 ${na.tone === "danger" ? "btn-primary" : "btn-secondary"}`}
+      >
+        {btnLabel}
+      </button>
+    </div>
   );
 }
 

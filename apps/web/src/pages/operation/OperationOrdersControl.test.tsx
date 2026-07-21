@@ -208,7 +208,7 @@ beforeEach(() => {
 
 describe("OperationOrdersControl", () => {
   it("renders the 6 status chips (5 stages + All) with correct per-tab counts", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const g = statusGroup();
     expect(g.getAllByRole("button")).toHaveLength(6);
     // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Delivered 1.
@@ -221,7 +221,7 @@ describe("OperationOrdersControl", () => {
   });
 
   it("defaults to All and shows every order (completed 1007 sorts to the bottom)", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     expect(rowsBySo()).toEqual(
       expect.arrayContaining(["1001", "1002", "1003", "1004", "1005", "1006", "1007"]),
     );
@@ -231,7 +231,7 @@ describe("OperationOrdersControl", () => {
   });
 
   it("entry rule: AutoCount placed → Proceed, native placed → Placed", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
 
     clickStatus("Placed");
     expect(rowsBySo()).toEqual(["1001"]); // only the native-placed order
@@ -242,13 +242,13 @@ describe("OperationOrdersControl", () => {
   });
 
   it("Scheduled tab buckets both ready_to_dispatch and dispatched", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     clickStatus("Scheduled");
     expect(rowsBySo().sort()).toEqual(["1005", "1006"]);
   });
 
   it("renders an items summary from order_lines", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     clickStatus("Proceed"); // contains the AutoCount order with lines
     const row = screen
       .getAllByTestId("order-row")
@@ -262,14 +262,14 @@ describe("OperationOrdersControl", () => {
   });
 
   it("resolves the triage LP (ops_assigned_logistic) via the partners map", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     clickStatus("Pending"); // order d has ops_assigned_logistic=p-nets
     const row = screen.getAllByTestId("order-row")[0];
     expect(within(row).getByText("NETS")).toBeInTheDocument();
   });
 
   it("shows the formal joined LP name on scheduled orders", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     clickStatus("Scheduled");
     const row = screen
       .getAllByTestId("order-row")
@@ -278,7 +278,7 @@ describe("OperationOrdersControl", () => {
   });
 
   it("opens the detail drawer for the clicked order", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1003"))!;
@@ -294,7 +294,7 @@ describe("OperationOrdersControl", () => {
           <Routes>
             <Route
               path="/operation/orders/:stage"
-              element={<OperationOrdersControl />}
+              element={<OperationOrdersControl initialView="board" />}
             />
           </Routes>
         </MemoryRouter>
@@ -306,7 +306,7 @@ describe("OperationOrdersControl", () => {
 
   it("fires onImport when the import button is clicked", () => {
     const onImport = vi.fn();
-    wrap(<OperationOrdersControl onImport={onImport} />);
+    wrap(<OperationOrdersControl onImport={onImport} initialView="board" />);
     fireEvent.click(screen.getByText(/\+ AutoCount/i));
     expect(onImport).toHaveBeenCalledOnce();
   });
@@ -319,7 +319,7 @@ describe("OperationOrdersControl", () => {
       error: null,
       refetch: vi.fn(),
     };
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     expect(
       screen.getByTestId("operation-orders-control-skeleton"),
     ).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe("OperationOrdersControl · Stock column", () => {
       { sku: "SOFA-1", available: 5 },
       { sku: "BED-1", available: 3 },
     ]);
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     // every line covered (in_stock) → "Ready" dot (no qty on the cell now).
     expect(within(row).getByText("Ready")).toBeInTheDocument();
@@ -369,7 +369,7 @@ describe("OperationOrdersControl · Stock column", () => {
       { sku: "SOFA-1", available: 1 },
       { sku: "BED-1", available: 2 },
     ]);
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     // have = 3 ; need = 5 → partial arrival = waiting. C rebuild (§14): the
     // word "Waiting" is gone — the cell shows the grey ETA sub-line ("ETA —"
@@ -387,7 +387,7 @@ describe("OperationOrdersControl · Stock column", () => {
       order_lines: [{ sku: "Some Free Text Sofa", qty: 1 }],
     });
     stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 5 }]);
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
     // free-text SKU → red "No PO" (alert: a human must set readiness).
@@ -408,7 +408,7 @@ describe("OperationOrdersControl · Stock column", () => {
       order_lines: [{ sku: "SOFA-1", qty: 99 }],
     });
     stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 0 }]);
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     // secured stage → green "Ready" dot (no qty).
     expect(within(row).getByText("Ready")).toBeInTheDocument();
@@ -422,7 +422,7 @@ describe("OperationOrdersControl · Stock column", () => {
       status: "proceed_order",
       operation_stage: "in_production",
     });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     // C rebuild (§14): no "Waiting" word — the grey ETA sub-line + the state
     // attribute carry it (colour lives in the 货 dot).
@@ -439,7 +439,7 @@ describe("OperationOrdersControl · Stock column", () => {
       order_lines: [{ sku: "SOFA-1", qty: 1 }],
     });
     stockHookState.data = undefined; // not loaded yet
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
   });
@@ -490,7 +490,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       so: 3010,
       order_lines: [{ sku: "SF03-HK5535", qty: 2 }], // sofa only, free-text SKU
     });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     // Free-text SKU → red "No PO" pill; the 2 sofa units drive the core ratio.
     expect(within(row).getByText("No PO")).toBeInTheDocument();
@@ -505,7 +505,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       customer_phone: "012-3456789",
       source_ref: ["TCF2024/06-461"],
     });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
     // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
     // merge into Order, Customer absorbs Region (caption line), Logistic became
@@ -554,7 +554,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
         makeRow({ id: "live", so: 7002, delivery_date: "2026-03-26" }),
       ],
     };
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const rows = screen.getAllByTestId("order-row");
     const live = rows.find((r) => r.textContent?.includes("SO-7002"))!;
     const done = rows.find((r) => r.textContent?.includes("SO-7001"))!;
@@ -583,7 +583,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
         makeRow({ id: "s5", so: 6005, delivery_date: "2026-06-15", placed_at: "2026-06-05T00:00:00Z" }),
       ],
     };
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     // Dated rows ascend (5/30 → 6/15 → 7/1); the TBD + undated tail keeps the
     // old newest-placed-first order (s4 placed 6/4 → s3 placed 6/3).
     expect(rowsBySo()).toEqual(["6002", "6005", "6001", "6004", "6003"]);
@@ -595,7 +595,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       so: 3002,
       customer_address: "5, Lorong Y, Georgetown, Penang",
     });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("Penang")).toBeInTheDocument();
     expect(within(row).queryByText("Outstation")).not.toBeInTheDocument();
@@ -613,7 +613,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       so: 3003,
       customer_address: "12, Jln X, Shah Alam, Selangor",
     });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const row = screen.getByTestId("order-row");
     const loc = within(row).getByText("Selangor");
     expect(loc).toBeInTheDocument();
@@ -631,7 +631,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // regardless of the UTC offset (was flaky in MYT pre-dawn).
     const iso = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`;
     oneRow({ id: "r4", so: 3004, delivery_date: iso });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
@@ -648,7 +648,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     // P11: render only the first batch (30) into the DOM; the rest lazy-load as
     // the bottom sentinel scrolls into view (IntersectionObserver — not firable
     // in jsdom, so only the initial window is asserted here).
@@ -659,7 +659,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   });
 
   it("QUEUES speaks the NEXT verbs — a verb row filters to exactly its count (C-vocab)", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
     // C-vocab (Jess 2026-07-19): queue rows ARE the NEXT verbs — one
     // vocabulary across QUEUES · NEXT · Chase Now. The dead words never
@@ -686,7 +686,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
 
   it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const proceedChip = statusGroup().getByRole("button", { name: /Proceed/ });
     expect(proceedChip).toHaveAttribute(
       "title",
@@ -698,7 +698,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   // <tab>"; clicking it selects the whole filtered tab; the in-bar checkbox
   // stays put and unticks everything in place.
   it("offers cross-tab select-all + unticks in place from the bulk header", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(screen.getByLabelText("Select SO-1001"));
     fireEvent.click(screen.getByLabelText("Select SO-1002"));
     fireEvent.click(screen.getByLabelText("Select SO-1003"));
@@ -761,7 +761,7 @@ describe("orders export", () => {
   });
 
   it("bulk Export menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     // Export/print live behind the row checkboxes + the bulk-bar More ▾ menu
     // (tick one customer → More → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
@@ -786,7 +786,7 @@ describe("orders export", () => {
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
 
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Export CSV/ }));
@@ -809,7 +809,7 @@ describe("orders export", () => {
       .spyOn(window, "open")
       .mockImplementation(() => fakeWin as unknown as Window);
 
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Print \/ Save as PDF/ }));
@@ -823,7 +823,7 @@ describe("orders export", () => {
   });
 
   it("bulk Logistic ⋮ → Chase opens the partner chase review", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     // Option B: counterparty menus, not verb buttons — open Logistic ⋮ first.
     fireEvent.click(screen.getByRole("button", { name: "Logistic" }));
@@ -832,7 +832,7 @@ describe("orders export", () => {
   });
 
   it("bulk Supplier ⋮ → Chase opens the supplier chase review", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
@@ -840,7 +840,7 @@ describe("orders export", () => {
   });
 
   it("DEADLINE band is multi-select — two buckets can be active at once (B redesign)", () => {
-    wrap(<OperationOrdersControl />);
+    wrap(<OperationOrdersControl initialView="board" />);
     const grp = within(screen.getByTestId("filter-deadline"));
     const overdue = grp.getByRole("button", { name: /^Overdue/ });
     const nextWeek = grp.getByRole("button", { name: /^Next week/ });
