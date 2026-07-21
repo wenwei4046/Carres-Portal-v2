@@ -1,0 +1,359 @@
+import { Hono } from "hono";
+import {
+  buildPurchaseTodayReport,
+  buildPurchaseChaseReceive,
+  myHolidaySet,
+  purchaseTodayResponseSchema,
+  type DemandLine,
+  type ProductCategory,
+  type PurchaseChase,
+  type PurchaseLinkedOrder,
+  type PurchasePoInput,
+  type PurchaseReceive,
+} from "@carres/shared";
+import { requireOperation } from "../../lib/auth-guards";
+import { mapPgError } from "../../lib/route-helpers";
+import { userClient } from "../../lib/supabase";
+import type { AppEnv } from "../../types";
+
+/**
+ * /api/operation/purchase — the Procurement cockpit read model.
+ *
+ *   GET /today — assemble live demand + supply, run the pure net-requirements
+ *                MRP engine (packages/shared/src/net-requirements.ts), and
+ *                return the data the Purchase page's "① Place orders" section
+ *                needs (delivery bundles to raise + a per-supplier buy list).
+ *
+ * READ-ONLY reporting. userClient / RLS is the security boundary (never
+ * service_role); no order-write path, RLS policy, or migration is touched.
+ * operation + principal only (mirrors requireOperation, which admits both).
+ *
+ * Mount via `api.route("/operation/purchase", purchaseRouter)` in
+ * apps/api/src/index.ts.
+ */
+const purchaseRouter = new Hono<AppEnv>();
+
+// Effective lead time (WORKING days) per procurable category — Jess's normal
+// (non-peak) leads. Peak is OFF for now (the engine never auto-pads).
+// TODO: move to a lead_time_config table (migration 0243, pending Jess) so the
+// principal can tune these + author a per-supplier peak window.
+const DEFAULT_LEAD_DAYS: Record<string, number> = {
+  sofa: 14,
+  bedframe: 8,
+  mattress: 10,
+};
+
+const PROCURABLE: ReadonlyArray<ProductCategory> = ["sofa", "bedframe", "mattress"];
+
+// Default per-supplier review cadence = Mon / Wed / Fri.
+// TODO: make configurable per supplier (a supplier_review_days config), instead
+// of one hardcoded cadence for everyone.
+const DEFAULT_REVIEW_DAYS: readonly number[] = [1, 3, 5];
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * ②③ read model — load every OPEN purchase order (+ its lines) and shape it into
+ * the Chase / Receive lists via the pure `buildPurchaseChaseReceive`.
+ *
+ * Bounded read: filtered to `status='open'` (a small live slice, well under the
+ * PostgREST row cap). Linked customer names come from a single batched `orders`
+ * lookup over the distinct source SOs (`po.so` + `po.so_refs[]`). userClient /
+ * RLS only — read-only, no write path.
+ */
+async function loadChaseReceive(
+  sb: ReturnType<typeof userClient>,
+): Promise<
+  | { ok: true; chase: PurchaseChase[]; receive: PurchaseReceive[] }
+  | { ok: false; err: { code?: string; message?: string; details?: string } }
+> {
+  const { data: poRows, error: poErr } = await sb
+    .from("purchase_orders")
+    .select(
+      "id, supplier_id, sup_status, status, expected_ready_date, eta_date, so, so_refs, purchase_order_lines(sku, qty, received_qty)",
+    )
+    .eq("status", "open");
+  if (poErr) return { ok: false, err: poErr };
+  const pos = poRows ?? [];
+
+  // Distinct source SOs across every open PO (po.so + po.so_refs[]).
+  const distinctSos = new Set<number>();
+  for (const p of pos) {
+    const so = (p as Record<string, unknown>).so as number | null;
+    if (typeof so === "number") distinctSos.add(so);
+    for (const ref of (((p as Record<string, unknown>).so_refs as number[] | null) ?? [])) {
+      if (typeof ref === "number") distinctSos.add(ref);
+    }
+  }
+
+  // Batched customer/deadline lookup by SO (any order — incl. autocount).
+  const orderBySo = new Map<
+    number,
+    { customerName: string | null; deliveryDate: string | null }
+  >();
+  if (distinctSos.size > 0) {
+    const { data: orderRows, error: orderErr } = await sb
+      .from("orders")
+      .select("so, customer_name, delivery_date")
+      .in("so", [...distinctSos]);
+    if (orderErr) return { ok: false, err: orderErr };
+    for (const r of orderRows ?? []) {
+      const so = Number((r as Record<string, unknown>).so);
+      orderBySo.set(so, {
+        customerName: ((r as Record<string, unknown>).customer_name as string | null) ?? null,
+        deliveryDate: ((r as Record<string, unknown>).delivery_date as string | null) ?? null,
+      });
+    }
+  }
+
+  const inputs: PurchasePoInput[] = pos.map((p) => {
+    const row = p as Record<string, unknown>;
+    const so = row.so as number | null;
+    const soRefs = (row.so_refs as number[] | null) ?? [];
+    const sos: number[] = [];
+    if (typeof so === "number") sos.push(so);
+    for (const ref of soRefs) if (typeof ref === "number" && !sos.includes(ref)) sos.push(ref);
+
+    const linkedOrders: PurchaseLinkedOrder[] = sos.map((n) => {
+      const o = orderBySo.get(n);
+      return {
+        so: n,
+        customerName: o?.customerName ?? null,
+        deliveryDate: o?.deliveryDate ?? null,
+      };
+    });
+
+    const lineRows = (row.purchase_order_lines as
+      | Array<{ sku: string; qty: number | string; received_qty: number | string }>
+      | null) ?? [];
+
+    return {
+      poId: row.id as string,
+      supplierId: row.supplier_id as string,
+      supStatus: row.sup_status as string,
+      status: row.status as string,
+      expectedReadyDate: (row.expected_ready_date as string | null) ?? null,
+      etaDate: (row.eta_date as string | null) ?? null,
+      lines: lineRows.map((l) => ({
+        sku: l.sku,
+        qty: Number(l.qty ?? 0),
+        receivedQty: Number(l.received_qty ?? 0),
+      })),
+      linkedOrders,
+    };
+  });
+
+  const { chase, receive } = buildPurchaseChaseReceive(inputs, {
+    today: todayIso(),
+    holidays: myHolidaySet(),
+  });
+  return { ok: true, chase, receive };
+}
+
+purchaseRouter.get("/today", requireOperation, async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+
+  // ── 0. ②③ Chase / Receive — over the OPEN POs, independent of ① demand. ────
+  const cr = await loadChaseReceive(sb);
+  if (!cr.ok) {
+    const m = mapPgError(cr.err);
+    return c.json(m.body, m.status);
+  }
+  const chaseReceive = { chase: cr.chase, receive: cr.receive };
+
+  // ── 1. Candidate orders: live (place / proceed_order), NOT AutoCount. ──────
+  // source_system is null for portal-native orders → keep those; drop only the
+  // AutoCount archive (they don't feed procurement).
+  const { data: orderRows, error: orderErr } = await sb
+    .from("orders")
+    .select(
+      "id, so, customer_name, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
+    )
+    .in("status", ["place", "proceed_order"])
+    .or("source_system.is.null,source_system.neq.autocount");
+  if (orderErr) {
+    const m = mapPgError(orderErr);
+    return c.json(m.body, m.status);
+  }
+  const orders = orderRows ?? [];
+  const orderIds = orders.map((o) => o.id as string);
+  const orderById = new Map(orders.map((o) => [o.id as string, o]));
+  const soByOrderId = new Map<string, number>(
+    orders.map((o) => [o.id as string, Number(o.so)]),
+  );
+  // Customer name per order — carried to the card's primary label (display only).
+  const customerNameByOrderId: Record<string, string | null> = {};
+  for (const o of orders) {
+    customerNameByOrderId[o.id as string] =
+      ((o.customer_name as string | null) ?? null) || null;
+  }
+
+  // No live orders → nothing to buy. Short-circuit (skip the supply reads).
+  if (orderIds.length === 0) {
+    const empty = buildPurchaseTodayReport(
+      [],
+      {},
+      {
+        today: todayIso(),
+        holidays: myHolidaySet(),
+        reviewDaysBySupplier: {},
+      },
+      {},
+      {},
+      {},
+      chaseReceive,
+    );
+    return c.json(purchaseTodayResponseSchema.parse(empty));
+  }
+
+  // ── 2. Demand lines: join to catalog for category + supplier. ─────────────
+  // !inner drops custom/OTHERS lines whose sku isn't a catalog SKU (not
+  // procurable). Category is filtered in JS (bounded by native-order lines).
+  const { data: lineRows, error: lineErr } = await sb
+    .from("order_lines")
+    .select(
+      "id, order_id, sku, qty, product_skus!inner(supplier_id, cost, product_models!inner(category))",
+    )
+    .in("order_id", orderIds);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+
+  // Per-SKU system cost (product_skus.cost) — DISPLAY-only, advisory. Never
+  // reaches an order_line / PO / pricing path; the card just shows Σ(cost×toOrder).
+  const costBySku: Record<string, number | null> = {};
+
+  const demand: DemandLine[] = [];
+  for (const l of lineRows ?? []) {
+    const psk = (l as Record<string, unknown>).product_skus as
+      | {
+          supplier_id?: string | null;
+          cost?: number | string | null;
+          product_models?: { category?: string | null } | null;
+        }
+      | null
+      | undefined;
+    const category = psk?.product_models?.category as ProductCategory | undefined;
+    const supplierId = psk?.supplier_id ?? null;
+    // Only the 3 procurable categories; a line with no supplier can't be bought.
+    if (!category || !PROCURABLE.includes(category) || !supplierId) continue;
+
+    costBySku[l.sku as string] = psk?.cost != null ? Number(psk.cost) : null;
+
+    const order = orderById.get(l.order_id as string);
+    if (!order) continue;
+
+    const tbd = Boolean(order.delivery_date_tbd);
+    const deadline = tbd ? null : ((order.delivery_date as string | null) ?? null);
+    const placedAt = ((order.placed_at as string | null) ??
+      (order.created_at as string | null) ??
+      todayIso()) as string;
+
+    demand.push({
+      lineId: l.id as string,
+      orderId: l.order_id as string,
+      sku: l.sku as string,
+      category,
+      supplierId,
+      qty: Number(l.qty ?? 0),
+      deadline: deadline ? deadline.slice(0, 10) : null,
+      leadDays: DEFAULT_LEAD_DAYS[category] ?? 10,
+      placedAt: placedAt.slice(0, 10),
+      committed: order.status === "proceed_order",
+    });
+  }
+
+  const demandSkus = [...new Set(demand.map((d) => d.sku))];
+
+  // ── 3. Supply: open POs + free stock, restricted to the demand SKUs. ──────
+  // Restricting to demand SKUs keeps both reads well under the PostgREST row
+  // cap (bounded by the live-order SKU set, not the whole PO / stock tables).
+  const openPoBySku: Record<string, number> = {};
+  const freeStockBySku: Record<string, number> = {};
+
+  if (demandSkus.length > 0) {
+    // openPoBySku = Σ(qty − received_qty) on OPEN POs (POStatus 'received' =
+    // fully received, 'cancelled' excluded; only 'open' remains).
+    const { data: poLines, error: poErr } = await sb
+      .from("purchase_order_lines")
+      .select("sku, qty, received_qty, purchase_orders!inner(status)")
+      .in("sku", demandSkus)
+      .eq("purchase_orders.status", "open");
+    if (poErr) {
+      const m = mapPgError(poErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of poLines ?? []) {
+      const remaining = Number(r.qty ?? 0) - Number(r.received_qty ?? 0);
+      if (remaining <= 0) continue;
+      const sku = r.sku as string;
+      openPoBySku[sku] = (openPoBySku[sku] ?? 0) + remaining;
+    }
+
+    // freeStockBySku = Σ(qty − reserved) at the Klg warehouse only.
+    // Resolve the Klg warehouse by name (no `code` column exists). If exactly
+    // one matches we scope to it; otherwise we sum ALL warehouses + flag it.
+    // TODO: freeStock is ADVISORY here — the engine leaves consumeFreeStock OFF
+    // by default (make-to-order never auto-eats labelled stock without a WMS).
+    let klgWarehouseId: string | null = null;
+    const { data: whRows, error: whErr } = await sb
+      .from("warehouses")
+      .select("id, name")
+      .or("name.ilike.%klang%,name.ilike.%klg%");
+    if (whErr) {
+      const m = mapPgError(whErr);
+      return c.json(m.body, m.status);
+    }
+    // TODO(klg-resolution): 0 or >1 name matches → sum ALL warehouses' free
+    // stock as the safest default (never under-report advisory stock). Tighten
+    // once warehouses carry a stable code / the Klg row is unambiguous.
+    if ((whRows ?? []).length === 1) klgWarehouseId = whRows![0].id as string;
+
+    let stockQ = sb
+      .from("stock_balances")
+      .select("sku, qty, reserved, warehouse_id")
+      .in("sku", demandSkus);
+    if (klgWarehouseId) stockQ = stockQ.eq("warehouse_id", klgWarehouseId);
+    const { data: stockRows, error: stockErr } = await stockQ;
+    if (stockErr) {
+      const m = mapPgError(stockErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of stockRows ?? []) {
+      const free = Number(r.qty ?? 0) - Number(r.reserved ?? 0);
+      if (free <= 0) continue;
+      const sku = r.sku as string;
+      freeStockBySku[sku] = (freeStockBySku[sku] ?? 0) + free;
+    }
+  }
+
+  // Every distinct demand supplier reviews on the default Mon/Wed/Fri cadence.
+  const reviewDaysBySupplier: Record<string, readonly number[]> = {};
+  for (const supplierId of new Set(demand.map((d) => d.supplierId))) {
+    reviewDaysBySupplier[supplierId] = DEFAULT_REVIEW_DAYS;
+  }
+
+  // ── 4. Run the engine + shape the response. ───────────────────────────────
+  const report = buildPurchaseTodayReport(
+    demand,
+    { openPoBySku, freeStockBySku },
+    {
+      today: todayIso(),
+      holidays: myHolidaySet(),
+      // consumeFreeStock stays OFF (default) — free stock is advisory only.
+      reviewDaysBySupplier,
+    },
+    soByOrderId,
+    customerNameByOrderId,
+    costBySku,
+    chaseReceive,
+  );
+
+  return c.json(purchaseTodayResponseSchema.parse(report));
+});
+
+export default purchaseRouter;

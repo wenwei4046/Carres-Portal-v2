@@ -936,6 +936,60 @@ export {
 // `normalizeSkuKey` matches order_lines.sku ↔ ops_stock_items.sku across the
 // cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
 export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
+export {
+  isWorkingDay,
+  addWorkingDays,
+  subtractWorkingDays,
+  countWorkingDays,
+  DEFAULT_OFF_DAYS,
+  type IsoDate,
+  type WorkingDayOptions,
+} from "./working-days";
+export {
+  MY_HOLIDAYS_2026,
+  MY_HOLIDAYS_2027_EARLY,
+  myHolidaySet,
+  type Holiday,
+} from "./my-holidays";
+export {
+  computeNetRequirements,
+  type DemandLine,
+  type NetRequirementsSupply,
+  type NetRequirementsOptions,
+  type UrgencyBucket,
+  type DemandLineResult,
+  type SkuRequirement,
+  type BundleRequirement,
+  type NetRequirementsResult,
+} from "./net-requirements";
+export {
+  purchaseUrgencyBucketSchema,
+  purchaseBundleItemSchema,
+  purchaseBundleSchema,
+  purchaseSkuLineSchema,
+  purchaseSummarySchema,
+  purchaseTodayResponseSchema,
+  purchasePoItemSchema,
+  purchaseLinkedOrderSchema,
+  purchaseChaseSchema,
+  purchaseReceiveSchema,
+  buildPurchaseTodayReport,
+  buildPurchaseChaseReceive,
+  PURCHASE_CHASE_STATUSES,
+  PURCHASE_RECEIVE_STATUSES,
+  type PurchaseUrgencyBucket,
+  type PurchaseBundleItem,
+  type PurchaseBundle,
+  type PurchaseSkuLine,
+  type PurchaseSummary,
+  type PurchaseTodayResponse,
+  type PurchasePoItem,
+  type PurchaseLinkedOrder,
+  type PurchaseChase,
+  type PurchaseReceive,
+  type PurchasePoInput,
+  type PurchaseChaseReceiveOptions,
+} from "./purchase-report";
 
 // Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
 // name (the SIZE shown). Size auto-generation resolves through this so the code

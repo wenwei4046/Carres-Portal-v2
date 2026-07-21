@@ -17,6 +17,8 @@ import OperationDashboard from "./OperationDashboard";
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
 import OperationPayments from "./OperationPayments";
+// Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
+import OperationPurchase from "./OperationPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -297,6 +299,8 @@ export default function OperationApp() {
             {tab === "receiving" && <OperationReceiving />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
+            {/* Purchase / Procurement MRP cockpit — "what to buy today". */}
+            {tab === "purchase" && <OperationPurchase />}
             {tab === "catalog" &&
               (role === "principal" ? <ProductMaintenancePage /> : <OperationCatalogPage />)}
             {tab === "op-catalog" && <OperationCatalogPage />}
