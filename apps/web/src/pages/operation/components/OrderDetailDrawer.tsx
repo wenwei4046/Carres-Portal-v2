@@ -2047,6 +2047,31 @@ function DrawerBody({
           }`,
     },
   ];
+  // ═══ NOW strip (P2, 2026-07-21) — the ONE current station surfaced at the top
+  // of the work column: the first `act` step, else the first `wait`. Short + wide
+  // (Jess: width yes, height tight) — the panel below keeps the height. The verb
+  // is the plain action for that station (named party lives inside the panel). ═══
+  const nowIdx = journeySteps.findIndex((s) => s.state === "act");
+  const nowStepIdx =
+    nowIdx >= 0 ? nowIdx : journeySteps.findIndex((s) => s.state === "wait");
+  const nowStep = nowStepIdx >= 0 ? journeySteps[nowStepIdx] : null;
+  const nowVerb: string | null = !nowStep
+    ? null
+    : nowStep.tab === "items"
+      ? stockTone === "danger"
+        ? "Order stock"
+        : "Check stock"
+      : nowStep.tab === "delivery"
+        ? assignedLogisticName
+          ? "Chase logistic"
+          : "Assign logistic"
+        : nowStep.tab === "balance"
+          ? "Chase payment"
+          : nowStep.tab === "storage"
+            ? "Collect storage"
+            : nowStep.tab === "loan"
+              ? "Loaner back"
+              : "Open";
   // The step badge a tab header wears: the clicked step when it matches this
   // tab (Balance = 2 steps), else the tab's first step. Non-journey tabs → none.
   const stepBadgeFor = (t: DrawerTab): ReactNode => {
@@ -2353,7 +2378,49 @@ function DrawerBody({
             KPI strip is GONE — the tab dots, Chase Now panel and each tab's
             own §8 status vocabulary carry the state; the work surface starts
             at the top). */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden">
+          {/* NOW strip (P2) — the current station, pinned short + wide; the work
+              panel scrolls under it so height goes to the actual work. */}
+          {nowStep ? (
+            <div className="shrink-0 flex items-center gap-3 rounded-xl border border-base-200 bg-white px-4 py-2.5 shadow-sm">
+              <StepBadge n={nowStepIdx + 1} state={nowStep.state} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-base-400 shrink-0">Now</span>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-400 shrink-0">{nowStep.panel}</span>
+                  <span className="text-[13px] font-semibold text-base-900 truncate">{nowStep.title}</span>
+                </div>
+                <div
+                  className={`text-[12px] truncate ${
+                    nowStep.state === "act"
+                      ? "font-semibold text-danger"
+                      : nowStep.state === "wait"
+                        ? "font-medium text-warning"
+                        : "text-base-500"
+                  }`}
+                >
+                  {nowStep.sub}
+                </div>
+              </div>
+              {nowVerb && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab(nowStep.tab);
+                    setClickedStep(nowStepIdx);
+                  }}
+                  className={`shrink-0 ${nowStep.state === "act" ? "btn-primary" : "btn-secondary"}`}
+                >
+                  {nowVerb}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="shrink-0 flex items-center gap-2 rounded-xl border border-base-200 bg-base-50 px-4 py-2 text-[13px] text-base-500">
+              All steps done — nothing to do on this order.
+            </div>
+          )}
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
           {/* 0233/0234 (add-product P3) — dealer-submitted product change
               awaiting approval. ABOVE the tab gate so it shows on EVERY tab
               (Loo live-test 2026-07-18: ops couldn't find it); auto-hides
