@@ -168,6 +168,8 @@ import {
   type OrderEntryConfigDto,
   type SetOrderEntryConfigInput,
   type StoreChannel,
+  // Purchase / Procurement MRP cockpit — GET /api/operation/purchase/today.
+  type PurchaseTodayResponse,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -336,6 +338,10 @@ export const qk = {
       ["operation", "orders", id, "timeline"] as const,
     /** Phase B — recent 'escalate'-tagged annotations for Jess's exception inbox. */
     escalations: () => ["operation", "escalations"] as const,
+    /** Purchase / Procurement MRP cockpit — the "what to buy today" read model
+     *  (GET /api/operation/purchase/today). Nested under `operation` so a blunt
+     *  invalidate on `["operation"]` after a PO mutation refreshes it too. */
+    purchaseToday: () => ["operation", "purchase", "today"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
@@ -3065,6 +3071,27 @@ export function useOperationSuppliers(
     queryFn: () =>
       apiFetch<SuppliersListResponse>("/api/operation/suppliers"),
     staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+/**
+ * usePurchaseToday — GET /api/operation/purchase/today (the Procurement MRP
+ * cockpit). Read-only: assembles live demand + supply, runs the net-requirements
+ * engine, and returns the delivery bundles to raise + a per-supplier buy list +
+ * urgency summary. operation + principal only. Refetched every 60s while open so
+ * a freshly-placed order surfaces in the "① Place orders" list without a manual
+ * reload.
+ */
+export function usePurchaseToday(
+  opts?: Partial<UseQueryOptions<PurchaseTodayResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.purchaseToday(),
+    queryFn: () =>
+      apiFetch<PurchaseTodayResponse>("/api/operation/purchase/today"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     ...opts,
   });
 }
