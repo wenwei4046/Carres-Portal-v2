@@ -117,7 +117,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // Purchase / Procurement MRP cockpit (2026-07-21) — the "what to buy
       // today" guided worklist that FRONT-ENDS the Purchase Order menu: it tells
       // operation which delivery bundles to raise now, netted against open POs.
-      { key: "purchase", label: "Purchase", icon: ClipboardCheck },
+      { key: "purchase", label: "To Order", icon: ClipboardCheck },
       {
         key: "receiving",
         label: "Receiving",
