@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import ReceivePOModal from "./components/ReceivePOModal";
+import PurchasingTabs from "./PurchasingTabs";
 
 /**
  * OperationReceiving — the GRN (goods-received) station (P3 of
@@ -156,7 +157,9 @@ export default function OperationReceiving() {
 
   if (isLoading) {
     return (
-      <div className="px-9 py-8 pb-14">
+      <>
+        <PurchasingTabs />
+        <div className="px-9 py-8 pb-14">
         <div data-testid="operation-receiving-skeleton">
           <div className="h-9 w-1/3 bg-base-100 rounded animate-pulse mb-6" />
           <div className="bg-white border border-base-200 rounded">
@@ -168,13 +171,16 @@ export default function OperationReceiving() {
             ))}
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   if (isError) {
     return (
-      <div className="px-9 py-8 pb-14">
+      <>
+        <PurchasingTabs />
+        <div className="px-9 py-8 pb-14">
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load purchase orders
@@ -190,12 +196,15 @@ export default function OperationReceiving() {
             Retry
           </button>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="px-9 py-8 pb-14" data-testid="operation-receiving">
+    <>
+      <PurchasingTabs />
+      <div className="px-9 py-8 pb-14" data-testid="operation-receiving">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-[18px] flex-wrap">
         <div>
@@ -349,7 +358,8 @@ export default function OperationReceiving() {
           onClose={() => setReceivePoId(null)}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

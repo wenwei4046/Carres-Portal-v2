@@ -41,7 +41,8 @@ describe("PortalSidebar — role visibility", () => {
   it("operation sees Operations items only — no Finance / Admin", () => {
     mockRole = "operation";
     renderAt("/operation");
-    expect(screen.getByText("Purchase Order")).toBeInTheDocument();
+    // The three procurement rails merged into ONE "Purchasing" item (2026-07-21).
+    expect(screen.getByText("Purchasing")).toBeInTheDocument();
     // 0226 — operation gets the costing Operation Catalog; Product &
     // Maintenance (selling prices) is principal-only.
     expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
@@ -55,7 +56,7 @@ describe("PortalSidebar — role visibility", () => {
     renderAt("/finance/dashboard");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
     expect(screen.getByText("Reconciliation")).toBeInTheDocument();
-    expect(screen.queryByText("Purchase Order")).not.toBeInTheDocument();
+    expect(screen.queryByText("Purchasing")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
 
@@ -80,6 +81,41 @@ describe("PortalSidebar — role visibility", () => {
     renderAt("/finance/ar");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
     // Operations now collapsed.
-    expect(screen.queryByText("Purchase Order")).not.toBeInTheDocument();
+    expect(screen.queryByText("Purchasing")).not.toBeInTheDocument();
+  });
+});
+
+describe("PortalSidebar — merged Purchasing item active across its 3 routes", () => {
+  beforeEach(() => {
+    mockRole = "operation";
+  });
+
+  function purchasingLink() {
+    return screen.getByText("Purchasing").closest("a") as HTMLAnchorElement;
+  }
+
+  it("links to the To Order tab (?tab=purchase), not ?tab=purchasing", () => {
+    renderAt("/operation?tab=purchase");
+    expect(purchasingLink()).toHaveAttribute("href", "/operation?tab=purchase");
+  });
+
+  it("is active on the To Order tab (?tab=purchase)", () => {
+    renderAt("/operation?tab=purchase");
+    expect(purchasingLink().className).toContain("font-semibold");
+  });
+
+  it("is active on the Receiving tab (?tab=receiving)", () => {
+    renderAt("/operation?tab=receiving");
+    expect(purchasingLink().className).toContain("font-semibold");
+  });
+
+  it("is active on the Purchase Orders path (/operation/procurement)", () => {
+    renderAt("/operation/procurement/nice-future");
+    expect(purchasingLink().className).toContain("font-semibold");
+  });
+
+  it("is NOT active on a non-purchasing tab (e.g. ?tab=payments)", () => {
+    renderAt("/operation?tab=payments");
+    expect(purchasingLink().className).not.toContain("font-semibold");
   });
 });

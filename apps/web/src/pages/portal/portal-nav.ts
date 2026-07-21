@@ -2,8 +2,6 @@ import {
   LayoutDashboard,
   ClipboardList,
   ClipboardCheck,
-  ShoppingCart,
-  PackageCheck,
   Boxes,
   ArrowLeftRight,
   Wallet,
@@ -68,6 +66,16 @@ export interface PortalNavItem {
   icon: LucideIcon;
   /** operation only: a path-driven section reached by pathname, not `?tab=`. */
   path?: string;
+  /** operation only: the `?tab=` value this item links to when it differs from
+   *  `key`. The merged "Purchasing" item keys as `purchasing` but its click
+   *  target is the To Order tab (`?tab=purchase`). Defaults to `key`. */
+  tab?: string;
+  /** operation only: extra locations that render this item ACTIVE, beyond its
+   *  own href. Each entry is `tab:<key>` (a `?tab=` value) or `path:<prefix>`
+   *  (a pathname prefix). The merged "Purchasing" item stays lit across its
+   *  three routes: To Order (`?tab=purchase`), Purchase Orders
+   *  (`/operation/procurement`) and Receiving (`?tab=receiving`). */
+  activeFor?: ReadonlyArray<string>;
   /** finance only: the absolute route to link to. */
   financePath?: string;
   /** nav unread counter (operation area only). */
@@ -108,21 +116,17 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/orders",
         badge: "orders",
       },
+      // Purchasing (2026-07-21) — the THREE procurement rails (To Order / the
+      // Purchase Order register / Receiving) collapsed into ONE sidebar item.
+      // Its click target is the default tab, To Order (`?tab=purchase`); the
+      // shared PurchasingTabs bar at the top of each page switches between the
+      // three. `activeFor` keeps the item lit across all three routes.
       {
-        key: "procurement",
-        label: "Purchase Order",
-        icon: ShoppingCart,
-        path: "/operation/procurement",
-      },
-      // Purchase / Procurement MRP cockpit (2026-07-21) — the "what to buy
-      // today" guided worklist that FRONT-ENDS the Purchase Order menu: it tells
-      // operation which delivery bundles to raise now, netted against open POs.
-      { key: "purchase", label: "To Order", icon: ClipboardCheck },
-      {
-        key: "receiving",
-        label: "Receiving",
-        icon: PackageCheck,
-        badge: "procurement",
+        key: "purchasing",
+        label: "Purchasing",
+        icon: ClipboardCheck,
+        tab: "purchase",
+        activeFor: ["tab:purchase", "tab:receiving", "path:/operation/procurement"],
       },
       { key: "stock-onhand", label: "Stock · On Hand", icon: Boxes },
       { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
@@ -245,7 +249,7 @@ export function visibleItems(
 export function navItemHref(group: PortalNavGroup, item: PortalNavItem): string {
   if (group.area === "finance") return item.financePath ?? group.base;
   if (item.path) return item.path; // operation path-driven section
-  return `${group.base}?tab=${item.key}`;
+  return `${group.base}?tab=${item.tab ?? item.key}`;
 }
 
 /** Default landing href for an area (its dashboard / overview). */

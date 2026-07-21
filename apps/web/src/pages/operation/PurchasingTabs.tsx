@@ -1,0 +1,85 @@
+import { Link, useLocation } from "react-router-dom";
+import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "lucide-react";
+
+/**
+ * PurchasingTabs — the shared top tab bar for the merged Purchasing module
+ * (NAV/IA merge 2026-07-21).
+ *
+ * The three procurement rails used to be three separate sidebar items; they are
+ * now ONE "Purchasing" sidebar entry. This bar renders at the top of all three
+ * pages (`OperationPurchase` / `TabbedProcurementShell` / `OperationReceiving`)
+ * so switching between them feels like one module with three tabs:
+ *   • To Order        → `/operation?tab=purchase`   (OperationPurchase)
+ *   • Purchase Orders → `/operation/procurement`    (TabbedProcurementShell)
+ *   • Receiving       → `/operation?tab=receiving`  (OperationReceiving)
+ *
+ * The active tab is derived from the current location: the Purchase Orders path
+ * wins first (a nested route), otherwise the `?tab=` value selects To Order vs
+ * Receiving. It links via React Router (Link) exactly the way the sidebar +
+ * OperationApp navigate between these routes.
+ *
+ * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
+ */
+
+type PurchasingTab = "to-order" | "purchase-orders" | "receiving";
+
+interface TabDef {
+  key: PurchasingTab;
+  label: string;
+  to: string;
+  icon: LucideIcon;
+}
+
+const TABS: TabDef[] = [
+  { key: "to-order", label: "To Order", to: "/operation?tab=purchase", icon: ClipboardCheck },
+  { key: "purchase-orders", label: "Purchase Orders", to: "/operation/procurement", icon: ShoppingCart },
+  { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
+];
+
+export default function PurchasingTabs() {
+  const location = useLocation();
+  const onProcurement = location.pathname.startsWith("/operation/procurement");
+  const tabParam = new URLSearchParams(location.search).get("tab");
+  const active: PurchasingTab = onProcurement
+    ? "purchase-orders"
+    : tabParam === "receiving"
+      ? "receiving"
+      : "to-order";
+
+  return (
+    <div
+      className="shrink-0 bg-white border-b border-base-200 px-6"
+      role="tablist"
+      aria-label="Purchasing"
+      data-testid="purchasing-tabs"
+    >
+      <div className="flex gap-1">
+        {TABS.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              to={t.to}
+              role="tab"
+              aria-selected={isActive}
+              data-testid={`purchasing-tab-${t.key}`}
+              className={[
+                "relative flex items-center gap-1.5 px-4 py-3 text-[13px] transition-colors border-b-2 -mb-px",
+                isActive
+                  ? "border-primary text-base-900 font-semibold"
+                  : "border-transparent text-base-600 font-medium hover:text-base-900",
+              ].join(" ")}
+            >
+              <t.icon
+                size={14}
+                strokeWidth={2}
+                className={isActive ? "text-primary" : "text-base-400"}
+              />
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
