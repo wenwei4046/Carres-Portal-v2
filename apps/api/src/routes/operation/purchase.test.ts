@@ -199,8 +199,18 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     // Catalog facts are resolved in a SEPARATE product_skus read (no FK
     // order_lines→product_skus, so no embed). Mock it by sku.
     const skuCatalog = [
-      { sku: "MAT-K", supplier_id: "sup-1", cost: 800, product_models: { category: "mattress" } },
-      { sku: "BF-K", supplier_id: "sup-1", cost: 500, product_models: { category: "bedframe" } },
+      {
+        sku: "MAT-K",
+        supplier_id: "sup-1",
+        cost: 800,
+        product_models: { category: "mattress", name: "Cloud King" },
+      },
+      {
+        sku: "BF-K",
+        supplier_id: "sup-1",
+        cost: 500,
+        product_models: { category: "bedframe", name: "Kayu King" },
+      },
     ];
     const sb = makeSb({
       orders: { data: orders, error: null },
@@ -257,6 +267,23 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     });
     expect(parsed.summary.toPlaceBundles).toBe(1);
     expect(parsed.summary.toOrderUnits).toBe(1);
+
+    // Supplier-grouped ① Place shape: ONE row for sup-1, its lines netted with
+    // the resolved model name (product_models.name) threaded through.
+    expect(parsed.placeGroups).toHaveLength(1);
+    const group = parsed.placeGroups[0];
+    expect(group.supplierId).toBe("sup-1");
+    expect(group.categories).toEqual(["bedframe"]);
+    expect(group.totalUnits).toBe(1);
+    expect(group.orderCount).toBe(1);
+    expect(group.lines).toHaveLength(1);
+    const line = group.lines[0];
+    expect(line.sku).toBe("BF-K");
+    expect(line.modelName).toBe("Kayu King");
+    expect(line.need).toBe(1);
+    expect(line.cost).toBe(500);
+    expect(line.ready).toBe(3); // advisory free stock (not netted)
+    expect(line.forOrders).toEqual([{ so: 1201, customerName: "陈先生" }]);
   });
 
   it("shapes ② chase + ③ receive from the OPEN POs (independent of demand)", async () => {
@@ -397,6 +424,8 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
       { o1: 1301, o2: 1302 },
       { o1: "李四", o2: "王五" },
       { "MAT-K": 800, "BF-K": 300, "SOF-3S": 1200 },
+      {},
+      { "MAT-K": "Cloud King", "BF-K": "Kayu King", "SOF-3S": "Ohana 3-seat" },
     );
 
     // Two bundles: the bed-set (o1) and the sofa (o2).
@@ -430,6 +459,25 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
     // Summary counts the to-place bundles per urgency; totals add up.
     expect(report.summary.toPlaceBundles).toBe(2);
     expect(report.summary.toOrderUnits).toBe(4);
+
+    // Supplier-grouped ① Place: sup-1 (bed-set) + sup-2 (sofa). Model names
+    // threaded through onto each line; sup-1's two lines aggregate under one row.
+    expect(report.placeGroups).toHaveLength(2);
+    const g1 = report.placeGroups.find((g) => g.supplierId === "sup-1")!;
+    expect(g1.totalUnits).toBe(3);
+    expect(g1.orderCount).toBe(1);
+    expect(g1.categories.sort()).toEqual(["bedframe", "mattress"]);
+    expect(g1.lines.map((l) => l.sku).sort()).toEqual(["BF-K", "MAT-K"]);
+    expect(g1.lines.find((l) => l.sku === "MAT-K")!.modelName).toBe("Cloud King");
+    expect(g1.lines.find((l) => l.sku === "MAT-K")!.need).toBe(1);
+    expect(g1.lines.find((l) => l.sku === "BF-K")!.need).toBe(2);
+    expect(g1.lines.find((l) => l.sku === "MAT-K")!.forOrders).toEqual([
+      { so: 1301, customerName: "李四" },
+    ]);
+    const g2 = report.placeGroups.find((g) => g.supplierId === "sup-2")!;
+    expect(g2.totalUnits).toBe(1);
+    expect(g2.lines[0].modelName).toBe("Ohana 3-seat");
+    expect(g2.lines[0].ready).toBe(5); // advisory free stock
   });
 
   it("drops a fully-covered bundle from the to-place list", () => {
