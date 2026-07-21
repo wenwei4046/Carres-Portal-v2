@@ -962,6 +962,21 @@ export {
   type BundleRequirement,
   type NetRequirementsResult,
 } from "./net-requirements";
+export {
+  purchaseUrgencyBucketSchema,
+  purchaseBundleItemSchema,
+  purchaseBundleSchema,
+  purchaseSkuLineSchema,
+  purchaseSummarySchema,
+  purchaseTodayResponseSchema,
+  buildPurchaseTodayReport,
+  type PurchaseUrgencyBucket,
+  type PurchaseBundleItem,
+  type PurchaseBundle,
+  type PurchaseSkuLine,
+  type PurchaseSummary,
+  type PurchaseTodayResponse,
+} from "./purchase-report";
 
 // Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
 // name (the SIZE shown). Size auto-generation resolves through this so the code

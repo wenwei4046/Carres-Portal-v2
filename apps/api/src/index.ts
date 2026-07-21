@@ -29,6 +29,7 @@ import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
+import purchaseRouter from "./routes/operation/purchase";
 import opsStaffRouter from "./routes/operation/staff";
 import poDutyRouter from "./routes/operation/po-duty";
 import orderPaymentsRouter from "./routes/operation/order-payments";
@@ -158,6 +159,7 @@ api.route("/orders", stripeCheckoutRouter);
 api.route("/operation/orders", bulkCompleteRouter);
 // 0165 Payments panel (Master Sheet "Balance" tab) — GET list
 api.route("/operation/payments", operationPaymentsRouter);
+api.route("/operation/purchase", purchaseRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 // 0236 PO duty rotation — GET current holder / PUT manager override
