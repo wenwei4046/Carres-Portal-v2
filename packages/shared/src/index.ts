@@ -945,6 +945,12 @@ export {
   type IsoDate,
   type WorkingDayOptions,
 } from "./working-days";
+export {
+  MY_HOLIDAYS_2026,
+  MY_HOLIDAYS_2027_EARLY,
+  myHolidaySet,
+  type Holiday,
+} from "./my-holidays";
 
 // Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
 // name (the SIZE shown). Size auto-generation resolves through this so the code
