@@ -270,7 +270,7 @@ export default function OperationPurchase() {
         <>
           <span>Operations</span>
           <ChevronRight size={12} className="text-base-300" />
-          <span className="text-base-600">Purchase</span>
+          <span className="text-base-600">To Order</span>
         </>
       }
       meta={
@@ -289,7 +289,7 @@ export default function OperationPurchase() {
           </button>
         </div>
       }
-      title="Purchase"
+      title="To Order"
       facetOpen={facetOpen}
       onFacetToggle={() => setFacetOpen((v) => !v)}
       facetToggleTitle="Show overview"
