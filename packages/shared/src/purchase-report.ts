@@ -93,10 +93,15 @@ export type PurchaseSkuLine = z.infer<typeof purchaseSkuLineSchema>;
 
 // ── ① Place, supplier-grouped (the scale-aware master-detail shape) ───────────
 
-/** One order a place line serves — the drill-in drawer's "FOR" column. */
+/** One order a place line serves — the drill-in drawer's "FOR" column.
+ *  `deliveryDate` = the customer's delivery deadline (from `orders.delivery_date`),
+ *  so the web can render the DEADLINE column of the SKU table + pick the earliest
+ *  deadline across a SKU's serving orders. Optional (nullable) — an order with no
+ *  deadline set (`delivery_date_tbd`) carries null. */
 export const purchasePlaceForOrderSchema = z.object({
   so: z.number().nullable(),
   customerName: z.string().nullable(),
+  deliveryDate: z.string().nullable().optional(),
 });
 export type PurchasePlaceForOrder = z.infer<typeof purchasePlaceForOrderSchema>;
 
@@ -584,7 +589,11 @@ export function buildPurchaseTodayReport(
         g.lines.set(it.sku, ln);
       }
       ln.need += it.toOrder;
-      ln.forOrders.push({ so: b.so, customerName: b.customerName });
+      ln.forOrders.push({
+        so: b.so,
+        customerName: b.customerName,
+        deliveryDate: b.deadline,
+      });
       // The line's order-by = its MOST-URGENT order's raise-by (rank, then earliest).
       if (
         bRank < ln.rank ||

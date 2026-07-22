@@ -227,7 +227,15 @@ export default function OperationApp() {
             routed page on every operation screen. The Orders list is the ONE
             exception: its own white header surface embeds <TopBarIcons />, so
             the slim bar would duplicate them there. */}
-        {!isOrdersUrl && <GlobalTopBar />}
+        {/* Hide the slim top bar on pages that render TopBarIcons in their own
+            header surface (Orders list) or that sit under a module tab bar with
+            its own right cluster (Purchasing: To Order / Purchase Orders /
+            Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
+            two, so the module tab bar is the only chrome). */}
+        {!isOrdersUrl &&
+          !isProcurementUrl &&
+          tab !== "purchase" &&
+          tab !== "receiving" && <GlobalTopBar />}
         <div className="flex-1 min-h-0 overflow-auto">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.

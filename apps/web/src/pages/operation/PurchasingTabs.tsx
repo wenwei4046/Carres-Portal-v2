@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "lucide-react";
 
@@ -18,6 +19,12 @@ import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "luc
  * Receiving. It links via React Router (Link) exactly the way the sidebar +
  * OperationApp navigate between these routes.
  *
+ * A `right` slot renders a right-aligned cluster on the tab bar itself — used
+ * by pages under this bar to host the freshness stamp + refresh icon that
+ * would otherwise live in the ListPageShell header. This is how module-tab
+ * pages avoid duplicating the tab as a breadcrumb / big title (Jess 2026-07-22,
+ * UI-KIT §A0 "Module-tab law").
+ *
  * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
  */
 
@@ -36,7 +43,7 @@ const TABS: TabDef[] = [
   { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
 ];
 
-export default function PurchasingTabs() {
+export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
   const onProcurement = location.pathname.startsWith("/operation/procurement");
   const tabParam = new URLSearchParams(location.search).get("tab");
@@ -53,32 +60,42 @@ export default function PurchasingTabs() {
       aria-label="Purchasing"
       data-testid="purchasing-tabs"
     >
-      <div className="flex gap-1">
-        {TABS.map((t) => {
-          const isActive = t.key === active;
-          return (
-            <Link
-              key={t.key}
-              to={t.to}
-              role="tab"
-              aria-selected={isActive}
-              data-testid={`purchasing-tab-${t.key}`}
-              className={[
-                "relative flex items-center gap-1.5 px-4 py-3 text-[13px] transition-colors border-b-2 -mb-px",
-                isActive
-                  ? "border-primary text-base-900 font-semibold"
-                  : "border-transparent text-base-600 font-medium hover:text-base-900",
-              ].join(" ")}
-            >
-              <t.icon
-                size={14}
-                strokeWidth={2}
-                className={isActive ? "text-primary" : "text-base-400"}
-              />
-              {t.label}
-            </Link>
-          );
-        })}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-1">
+          {TABS.map((t) => {
+            const isActive = t.key === active;
+            return (
+              <Link
+                key={t.key}
+                to={t.to}
+                role="tab"
+                aria-selected={isActive}
+                data-testid={`purchasing-tab-${t.key}`}
+                className={[
+                  "relative flex items-center gap-1.5 px-4 py-3 text-[13px] transition-colors border-b-2 -mb-px",
+                  isActive
+                    ? "border-primary text-base-900 font-semibold"
+                    : "border-transparent text-base-600 font-medium hover:text-base-900",
+                ].join(" ")}
+              >
+                <t.icon
+                  size={14}
+                  strokeWidth={2}
+                  className={isActive ? "text-primary" : "text-base-400"}
+                />
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
+        {right && (
+          <div
+            className="shrink-0 flex items-center gap-2 pr-1"
+            data-testid="purchasing-tabs-right"
+          >
+            {right}
+          </div>
+        )}
       </div>
     </div>
   );

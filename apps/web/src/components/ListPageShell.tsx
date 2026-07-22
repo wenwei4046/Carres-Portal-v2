@@ -35,8 +35,11 @@ export interface ActiveChip {
 }
 
 interface Props {
-  /** Page title → the 56px PageHeader bar (t-h2). */
-  title: ReactNode;
+  /** Page title → the 56px PageHeader bar (t-h2). Optional: when both `title`
+   *  and `breadcrumb` are omitted the whole white header row is skipped — used
+   *  by module-tab pages (Purchasing's To Order / Purchase Orders / Receiving)
+   *  where the tab bar above IS the title. See UI-KIT §A0 "Module-tab law". */
+  title?: ReactNode;
   /** Right-side header cluster: search · Alerts · Help · the ONE hero action. */
   actions?: ReactNode;
   /** Optional breadcrumb (left) shown on a thin row above the header. */
@@ -94,6 +97,8 @@ export default function ListPageShell({
   testId,
 }: Props) {
   const hasFacet = facet != null && onFacetToggle != null;
+  const hasHeader =
+    title != null || breadcrumb != null || meta != null || titleRight != null || actions != null;
   return (
     <div
       className={`h-full flex flex-col bg-background ${className}`}
@@ -102,31 +107,34 @@ export default function ListPageShell({
       {/* Header — TWO rows (Jess 2026-07-18 round-3): row 1 = breadcrumb with
           the search/utility cluster on the SAME line (her round-2 ask); row 2 =
           the page title + freshness stamp, KEPT (round-3: "i never ask you
-          removed my 2row header — Order + synced"). */}
-      <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-1.5 text-[12px] text-base-400">
-            {breadcrumb}
+          removed my 2row header — Order + synced"). Module-tab pages skip the
+          whole block (Jess 2026-07-22, UI-KIT §A0 "Module-tab law"). */}
+      {hasHeader && (
+        <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex items-center gap-1.5 text-[12px] text-base-400">
+              {breadcrumb}
+            </div>
+            {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
           </div>
-          {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
+          <div className="flex items-baseline gap-2.5 min-w-0">
+            <div className="min-w-0 truncate t-h2 text-base-900">{title}</div>
+            {meta && (
+              <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
+                {meta}
+              </div>
+            )}
+            {/* Right cluster on the TITLE row (Jess 2026-07-19): ambient status
+                chips / announcements live in the title row's dead space instead
+                of a dedicated banner row — saves a full row on a MacBook. */}
+            {titleRight && (
+              <div className="shrink-0 ml-auto self-center flex items-center gap-1.5 min-w-0">
+                {titleRight}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-baseline gap-2.5 min-w-0">
-          <div className="min-w-0 truncate t-h2 text-base-900">{title}</div>
-          {meta && (
-            <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
-              {meta}
-            </div>
-          )}
-          {/* Right cluster on the TITLE row (Jess 2026-07-19): ambient status
-              chips / announcements live in the title row's dead space instead
-              of a dedicated banner row — saves a full row on a MacBook. */}
-          {titleRight && (
-            <div className="shrink-0 ml-auto self-center flex items-center gap-1.5 min-w-0">
-              {titleRight}
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Body split — facet aside (left) + right column (control strip + table),
           on the cream page bg. The strip lives INSIDE the right column, so it
@@ -149,7 +157,11 @@ export default function ListPageShell({
           {bulkBar ? (
             <div className="shrink-0 mb-3">{bulkBar}</div>
           ) : (
-            (toolbar || hasFacet || toolbarRight || toolbarSecondary) && (
+            // Skip the whole strip when it would render empty (Jess 2026-07-22,
+            // purchase cockpit §5.4). Facet-alone is not enough — a strip only
+            // exists when there's real content (tabs / right actions / a second
+            // row) OR the reopen toggle needs a home (facet closed).
+            (toolbar || toolbarRight || toolbarSecondary || (hasFacet && !facetOpen)) && (
               <div className="shrink-0 mb-3 bg-white border border-base-200 rounded-[12px] shadow-sm px-3 py-2.5">
                 {/* Row 1 — reopen toggle (only while collapsed; when open, the
                     facet's own control collapses it) + tabs · search + actions. */}
