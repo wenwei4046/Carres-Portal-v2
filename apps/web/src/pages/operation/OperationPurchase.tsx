@@ -58,6 +58,8 @@ import {
   Bed,
   BedDouble,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Factory,
   Info,
@@ -71,13 +73,15 @@ import {
   Truck,
   type LucideIcon,
 } from "lucide-react";
-import type {
-  ProductCategory,
-  PurchaseChase,
-  PurchasePlaceGroup,
-  PurchasePlaceGroupLine,
-  PurchaseReceive,
-  PurchaseUrgencyBucket,
+import {
+  MY_HOLIDAYS_2026,
+  MY_HOLIDAYS_2027_EARLY,
+  type ProductCategory,
+  type PurchaseChase,
+  type PurchasePlaceGroup,
+  type PurchasePlaceGroupLine,
+  type PurchaseReceive,
+  type PurchaseUrgencyBucket,
 } from "@carres/shared";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
@@ -263,10 +267,30 @@ function receiveActionLine(r: PurchaseReceive, supplierName: string): string {
 
 // ── Days-to-order strip helpers ──────────────────────────────────────────────
 
-/** 14 ISO days from today (inclusive). */
-function next14Days(todayIso: string | null): string[] {
+/** 14 ISO days from `todayIso + offset` (inclusive). Offset lets the strip nav
+ *  ± weeks via L/R chevrons (Jess 2026-07-22 · strip polish). */
+function next14Days(todayIso: string | null, offset = 0): string[] {
   if (!todayIso) return [];
-  return Array.from({ length: 14 }, (_, i) => addDaysIso(todayIso, i));
+  const base = addDaysIso(todayIso, offset);
+  return Array.from({ length: 14 }, (_, i) => addDaysIso(base, i));
+}
+
+/** Holiday name lookup — read once, used by the strip cell tooltip.
+ *  Sat/Sun detected inline via `dayOfWeek`. */
+const HOLIDAY_NAME_BY_ISO = new Map<string, string>();
+for (const h of [...MY_HOLIDAYS_2026, ...MY_HOLIDAYS_2027_EARLY]) {
+  HOLIDAY_NAME_BY_ISO.set(h.date, h.name);
+}
+
+/** Non-working day = weekend OR public holiday. Return the reason for the
+ *  cell tooltip, or null for a normal working day. */
+function nonWorkingReason(iso: string): string | null {
+  const dow = dayOfWeek(iso);
+  if (dow === 6) return "weekend (Sat)";
+  if (dow === 0) return "weekend (Sun)";
+  const ph = HOLIDAY_NAME_BY_ISO.get(iso);
+  if (ph) return `PH: ${ph}`;
+  return null;
 }
 
 interface DayBucket {
@@ -451,6 +475,10 @@ export default function OperationPurchase() {
   const [attn, setAttn] = useState<Attn>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  // Strip window offset — L/R chevrons shift the 14-day window ±7 days
+  // (Jess 2026-07-22 · strip polish). Bounded to [-30, +90] so the operator
+  // can't over-scroll into unactionable territory.
+  const [stripOffset, setStripOffset] = useState(0);
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -532,7 +560,7 @@ export default function OperationPurchase() {
   }, [stage, placeGroups, chase, receive, supplierName]);
 
   // 14-day strip — buckets by the stage's key date.
-  const stripDays = useMemo(() => next14Days(today), [today]);
+  const stripDays = useMemo(() => next14Days(today, stripOffset), [today, stripOffset]);
   const stripBuckets = useMemo(() => {
     if (stage === "place")
       return bucketByDay(
@@ -882,6 +910,10 @@ export default function OperationPurchase() {
                   setSelectedDay((cur) => (cur === iso ? null : iso))
                 }
                 leadLines={leadLines}
+                stripOffset={stripOffset}
+                onShiftPrev={() => setStripOffset((o) => Math.max(o - 7, -30))}
+                onShiftNext={() => setStripOffset((o) => Math.min(o + 7, 90))}
+                onResetToday={() => setStripOffset(0)}
               />
             )}
 
@@ -1123,31 +1155,78 @@ function DaysToOrderStrip({
   selectedDay,
   onSelectDay,
   leadLines,
+  stripOffset,
+  onShiftPrev,
+  onShiftNext,
+  onResetToday,
 }: {
   buckets: DayBucket[];
   todayIso: string;
   selectedDay: string | null;
   onSelectDay: (iso: string) => void;
   leadLines: string[];
+  stripOffset: number;
+  onShiftPrev: () => void;
+  onShiftNext: () => void;
+  onResetToday: () => void;
 }) {
+  const canGoPrev = stripOffset > -30;
+  const canGoNext = stripOffset < 90;
+  const offsetLabel =
+    stripOffset === 0
+      ? "next 14 days"
+      : stripOffset > 0
+        ? `+${stripOffset}d`
+        : `${stripOffset}d`;
   return (
     <div className="rounded-[12px] border border-base-200 bg-white shadow-sm px-3 py-2.5 shrink-0">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500">
-          Days to order (next 14 · click a day to focus)
+      <div className="flex items-center justify-between mb-2 gap-3">
+        <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 min-w-0">
+          Days to order ({offsetLabel} · click a day to focus)
           <span className="ml-2 text-[10px] font-medium text-base-400 normal-case tracking-normal">
-            Mon / Wed / Fri = review days (Mon = main)
+            Mon / Wed / Fri = review days · weekend + PH greyed
           </span>
         </div>
-        {selectedDay && (
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedDay && (
+            <button
+              type="button"
+              onClick={() => onSelectDay(selectedDay)}
+              className="text-[11px] text-base-500 hover:text-base-900 transition-colors mr-2"
+            >
+              Clear day
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onSelectDay(selectedDay)}
-            className="text-[11px] text-base-500 hover:text-base-900 transition-colors"
+            onClick={onShiftPrev}
+            disabled={!canGoPrev}
+            title="Previous 7 days"
+            aria-label="Previous 7 days"
+            className="p-1 rounded hover:bg-hovertint text-base-500 hover:text-base-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
-            Clear day
+            <ChevronLeft size={14} />
           </button>
-        )}
+          <button
+            type="button"
+            onClick={onResetToday}
+            disabled={stripOffset === 0}
+            title="Reset to today"
+            className="px-2 py-0.5 rounded text-[11px] font-semibold text-base-600 hover:text-base-900 hover:bg-hovertint transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={onShiftNext}
+            disabled={!canGoNext}
+            title="Next 7 days"
+            aria-label="Next 7 days"
+            className="p-1 rounded hover:bg-hovertint text-base-500 hover:text-base-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
       <div
         className="grid gap-1"
@@ -1157,6 +1236,7 @@ function DaysToOrderStrip({
           const isToday = b.iso === todayIso;
           const isSel = selectedDay === b.iso;
           const cadence = isCadenceDay(b.iso);
+          const nonWorking = nonWorkingReason(b.iso);
           const dateNum = String(new Date(`${b.iso}T00:00:00Z`).getUTCDate());
           // Chip colour = status semantic (Jess 2026-07-22 Q8 — colour IS the label).
           const chipCls =
@@ -1165,28 +1245,35 @@ function DaysToOrderStrip({
               : b.status === "today"
                 ? "bg-primary text-white"
                 : "bg-signature-50 text-signature-800";
+          const tooltip = nonWorking
+            ? `${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${nonWorking}${
+                b.units > 0 ? ` · ${b.units} due (won't work)` : ""
+              }`
+            : `${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${
+                b.units > 0 ? `${b.units} to send` : "nothing"
+              }${cadence ? " · review day" : ""}`;
           return (
             <button
               key={b.iso}
               type="button"
               onClick={() => onSelectDay(b.iso)}
               aria-pressed={isSel}
-              title={`${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${
-                b.units > 0 ? `${b.units} to send` : "nothing"
-              }${cadence ? " · review day" : ""}`}
+              title={tooltip}
               className={[
                 "flex flex-col items-center justify-start rounded-md py-2 transition-colors min-h-[76px]",
                 isSel
                   ? "bg-hovertint ring-1 ring-primary"
-                  : cadence
-                    ? "bg-base-50 hover:bg-hovertint"
-                    : "hover:bg-hovertint",
+                  : nonWorking
+                    ? "bg-base-100/70 hover:bg-hovertint"
+                    : cadence
+                      ? "bg-base-50 hover:bg-hovertint"
+                      : "hover:bg-hovertint",
               ].join(" ")}
             >
-              {/* Row 1 · day name (subdued) */}
+              {/* Row 1 · day name (subdued for non-working) */}
               <span
                 className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  isToday ? "text-primary" : "text-base-500"
+                  isToday ? "text-primary" : nonWorking ? "text-base-400" : "text-base-500"
                 }`}
               >
                 {dayName(b.iso)}
@@ -1197,16 +1284,30 @@ function DaysToOrderStrip({
                   {dateNum}
                 </span>
               ) : (
-                <span className="mt-0.5 text-[18px] font-bold font-mono tabular-nums text-base-900 leading-none">
+                <span
+                  className={`mt-0.5 text-[18px] font-bold font-mono tabular-nums leading-none ${
+                    nonWorking ? "text-base-400" : "text-base-900"
+                  }`}
+                >
                   {dateNum}
                 </span>
               )}
-              {/* Row 3 · count chip (only if there's content) */}
+              {/* Row 3 · count chip (only if there's content) — still shown on
+                  non-working days so late/due work isn't hidden. */}
               {b.units > 0 && (
                 <span
-                  className={`mt-1.5 inline-flex items-center justify-center rounded-full min-w-[26px] px-2 py-0.5 text-[12px] font-bold font-mono tabular-nums ${chipCls}`}
+                  className={`mt-1.5 inline-flex items-center justify-center rounded-full min-w-[26px] px-2 py-0.5 text-[12px] font-bold font-mono tabular-nums ${
+                    nonWorking ? "bg-base-200 text-base-500" : chipCls
+                  }`}
                 >
                   {b.units}
+                </span>
+              )}
+              {/* Row 4 · non-working label — tiny caption so the visual gap is
+                  labelled, not just visual. */}
+              {nonWorking && (
+                <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.04em] text-base-400 leading-none">
+                  {nonWorking.startsWith("PH:") ? "PH" : "off"}
                 </span>
               )}
             </button>
