@@ -80,14 +80,107 @@ operation@carres.com / 111  → Supabase auth (anon key via MCP get_publishable_
 
 ---
 
-## 5. NEXT = COMPACT REDESIGN (Jess's live feedback 2026-07-21 — DO THIS FIRST)
-The current cards waste vertical space (tall, empty). Make it compact:
-1. **Each supplier = ONE COMPACT COLLAPSED ROW** (not a tall card): factory · category · `N units · M orders · order-by from <date>` · urgency pill · chevron. Collapsed by default = dense, no wasted space.
-2. **Click a row → expands INLINE** (accordion) to the aggregated SKU lines; OR opens the right drawer. Pick inline-expand for density.
-3. **Left facet items MUST filter/jump the right** — RAISE-BY SCHEDULE dates + By-factory + Needs-attention are currently DEAD (clicking 23 Jul does nothing). Wire every facet item → filter the right list + tally.
-4. **REMOVE the empty white header** (the `pT` ListPageShell meta bar renders an empty white box — pass no meta / hide it).
-5. Keep KPI-as-stage-switcher, Something-wrong popover, hidden-null cost.
-6. Apply the SAME compact pattern to ② Chase + ③ Receive.
+## 5. LOCKED DESIGN (Jess 2026-07-22 · supersedes the earlier COMPACT REDESIGN brief)
+
+Full redesign specified below. All UI text follows **[`docs/COPY-STANDARD.md`](./COPY-STANDARD.md)** — read it BEFORE writing any string. Header rule (drop breadcrumb + big title on module-tab pages) is in `docs/UI-KIT.md` "Module-tab law".
+
+### 5.1 Layout — 3-pane inline split (uses width, saves height)
+
+Desktop ~1440. One screen, operator never navigates away.
+
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ [ To Order ] Purchase Orders  Receiving          Today · Wed 22 Jul  ⟳        │  ← PurchasingTabs (module label);
+│                                                                                │    freshness + refresh at right
+├───────────────────────────────────────────────────────────────────────────────┤
+│ [ ① SEND 8 ]   [ ② CHASE 5 ]   [ ③ RECEIVE 3 ]                                 │  ← KPI cards = stage switcher
+│ DAYS TO ORDER (next 14 · click a day to focus)                                 │
+│ Mon Tue Wed Thu Fri Sat Sun Mon Tue Wed Thu Fri Sat Sun                        │
+│ ● 1 ● 1 ●●●  —  ●●   —   —  ● 1  —  ●●●●  —   —   —   —                        │
+│ Today: 3 to send. 2 are late.                                                  │  ← auto-updated lead line
+├─────────────┬──────────────────────┬──────────────────────────────────────────┤
+│ FACET       │ SUPPLIER LIST        │ DETAIL (selected supplier)               │
+│ 200px       │ 380px                │ ~840px, fills vertical                   │
+│             │ 28px per row         │ SKU table + "What to do" 4-step block    │
+│ Needs attn  │ ≤ 15 rows/day        │                                          │
+│ Today's work│ NO pagination        │                                          │
+│ By factory  │ NO search            │                                          │
+└─────────────┴──────────────────────┴──────────────────────────────────────────┘
+```
+
+Header does NOT repeat "To Order" as a breadcrumb or big title — the tab is the title. Detail pane is ALWAYS visible (no drawer overlaying the list).
+
+### 5.2 Three-stage vocabulary (aligned with Orders panel)
+
+| # | Stage | Meaning | Row action-line example |
+|---|-------|---------|-------------------------|
+| ① | **Send** | Raise a PO to the factory. Source = Orders in **Proceed** state where no open PO covers the need. | `Send order to Ohana today.` |
+| ② | **Chase** | Follow up an open PO. Row copy adapts: pre-due = **Remind**, on-due or late = **Chase**. | `Remind Nice Future — PO-86 due Fri.` · `Chase Ohana — PO-88 late 2 days.` |
+| ③ | **Receive** | Goods arrived at the warehouse, check them in. | `Check in from Ohana (3 items).` |
+
+**Why "Send", not "Place":** the Orders panel already uses **Placed** for the pre-Proceed state (customer ordered, ETA not yet confirmed). Purchase ① fires AFTER Sales clicks Proceed. Calling it "Place" would collide. "Send" is one verb, matches the module name "To Order", and follows COPY-STANDARD rule 1 (verb + object). Vocabulary table lives in `docs/COPY-STANDARD.md` — grep it before inventing a new word.
+
+### 5.3 Left facet — every item must filter the right
+
+Facet groups:
+
+- **NEEDS ATTENTION** — Overdue · Missing deadline
+- **TODAY'S WORK** — ① Send · ② Chase · ③ Receive (stage switch, mirrors the KPI cards)
+- **BY FACTORY** — one row per factory in the active stage, with unit count
+
+Every click MUST (a) filter the middle list and (b) update its own tally. A row of active-filter chips + `Clear all` appears above the middle list when any facet is active.
+
+The old fuzzy buckets (This week / Next week / Later) are **retired** — replaced by the 14-day date strip (§5.4). "Specific dates only, never fuzzy buckets" is a COPY-STANDARD principle (rule 9: zero jargon → also applies to fuzzy time words).
+
+### 5.4 Days-to-order date strip
+
+14 consecutive days from today, one column per day.
+
+- **Cell content**: `● N` — N units to send that day (dots if ≤ 5, then a count).
+- **Cell status line**: `LATE` · `TODAY` · `due` · `—` (empty day).
+- **Interaction**: click a day = filter the middle list to suppliers whose earliest `order-by` equals that day. Click again to clear.
+- **Lead line under the strip**: one short sentence, auto-updated daily. Format:
+  `Today: <N> to send. <M> are late.` (≤10 words, per row action-line rule).
+
+### 5.5 Cadence — Monday-anchor consolidation (Period Lot Sizing)
+
+Suppliers get PO windows on Mon / Wed / Fri. **Monday is the anchor day; Wed and Fri fire ONLY when a deadline cannot wait to next Monday.** Fewer touches → bigger POs → better supplier terms → less admin load. International name: SAP MM "Fixed Period Requirements" (FPR) · Odoo "Purchase Agreement + Scheduled Order".
+
+Algorithm (server-side, exposed as a short header block above the date strip):
+
+```
+For each supplier's pending need:
+  lead_time    = suppliers.lead_days (working days)
+  latest_safe  = customer_deadline − lead_time  (working days back)
+
+  if latest_safe >= next_monday:
+      bucket = "Mon"        # consolidate to the anchor
+  else:
+      bucket = nearest safe day among {today, Wed, Fri}
+
+Header block:
+  This week's plan:
+    Mon 27 Jul  ● 3 factories to order   (main day)
+    Wed 29 Jul  — skip (nothing forces it)
+    Fri 31 Jul  ● 1 factory (SO-1207 deadline Sat)
+```
+
+The operator does not do this math — the system does. He just reads the plan and executes.
+
+### 5.6 Row action-line + "What to do" steps
+
+Every middle-list row ends with one plain-English action-line (≤10 words). Every detail pane shows a 3–4 step "What to do" block below the SKU table (each step ≤8 words, one verb per step). Templates + examples live in **`docs/COPY-STANDARD.md`** — do not duplicate them here.
+
+### 5.7 Scale — 1000 orders/month, max 15 suppliers/day
+
+Confirmed with Jess 2026-07-22. **15 rows × 28px = 420px in the middle list → no pagination, no search, no virtualization.** The facet's "By factory" group IS the search equivalent. Revisit only when a real day exceeds 20 suppliers.
+
+### 5.8 Retained from the earlier cut
+
+- KPI cards ARE the stage switcher — do not add a separate `<Tabs>` component.
+- "Something wrong?" popover on the detail pane stays (surfaces exceptions to the ledger).
+- Hide the cost column entirely when all values are null (COPY-STANDARD rule 4: skip the obvious).
+- Every write button remains a STUB (see §4). PO-raise / WhatsApp send / GRN write = later units (§6).
 
 ## 5b. OPEN (secondary, Jess to decide)
 - **Model names show as code** (`L1201S`,`N1001S`) = `product_models.name` holds code-ish values → friendlier names = a CATALOG DATA edit (Jess), not a page bug.

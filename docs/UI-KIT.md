@@ -61,6 +61,10 @@
 □ Gate before commit: tsc -p tsconfig.app.json · check:v4 · lint · tests (16 pre-existing fails are the baseline)
 ```
 
+**Module-tab law (LOCKED 2026-07-22, Purchase cockpit).** When a page sits under a module tab bar (like Purchasing's `To Order / Purchase Orders / Receiving`), the page does NOT render `<ListPageShell>`'s `breadcrumb` slot or the big `title` prop — they duplicate the active tab and burn ~80px of vertical space (Jess is height-constrained, not width-constrained). Move the freshness stamp (`Today · Wed 22 Jul`) and refresh icon to the RIGHT side of the tab bar; content starts immediately below. **Stand-alone pages (Orders, Stock, Payments) keep the two-row header per the date law above** — this exception is for module-tabbed pages only. Reference implementation: `docs/purchase-cockpit-handoff.md` §5.1.
+
+**Copy law (LOCKED 2026-07-22).** Before writing any button label, section title, row line, empty state, error, or tooltip in `apps/web`, read **[`docs/COPY-STANDARD.md`](COPY-STANDARD.md)** — 10 rules, row action-line template, "What to do" template, and the canonical vocabulary (never mix synonyms across pages). Every new UI string is checked against the vocabulary table in that doc; a review will reject a new synonym.
+
 ---
 
 # PART A — PORTAL (v17)
