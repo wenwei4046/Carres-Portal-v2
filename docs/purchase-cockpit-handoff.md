@@ -104,6 +104,25 @@ The current cards waste vertical space (tall, empty). Make it compact:
 
 ---
 
+## 6b. ROLLBACK RECIPE (revert everything to "original")
+
+The ENTIRE Purchase cockpit is **additive + DB-safe** → fully reversible with zero
+collateral. NO migration / NO schema / NO RLS / NO write path was touched; the only
+existing-behaviour change is the sidebar (3 procurement items → 1 "Purchasing").
+Reverting = the sidebar returns to 3 items + the To Order page disappears; nothing
+else is affected.
+
+- **"Original" = `main` at `507f3509`** (the tip BEFORE PR #237). All Purchase work =
+  PRs **#237 #238 #239 #240 #241** (merge commits `ef08153f` `e3725acb` `997ad07f`
+  `0c063d8f` `40712894`).
+- **Code rollback** (prefer `revert` — keeps history, re-advanceable):
+  `git checkout main && git revert -m 1 40712894 0c063d8f 997ad07f e3725acb ef08153f`
+  (or the blunt `git reset --hard 507f3509` + force-push, only if history rewrite is acceptable).
+- **Deploy rollback** (no code change, ~1 min, Cloudflare keeps every deploy):
+  - Web (both Pages projects): roll back to the `507f3509` deployment — carres-portal deploy id `1d7d6025`, bundle `index-BvYprcJN.js`.
+  - API Worker: `wrangler rollback` to the version before `9e0acff4` (the pre-#237 version).
+- After a rollback, re-curl the canonicals for the OLD bundle to confirm.
+
 ## 7. WORKING RULES (Jess)
 - Lead with DECISIONS, don't ping-pong questions.
 - No HTML mocks (token waste) — ASCII layout → real code → live-verify.
