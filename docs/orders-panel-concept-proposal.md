@@ -275,12 +275,198 @@ FollowUpForm opens · assignee dropdown · due date/time · description
 
 ---
 
+## Critical self-audit + executable fixes (LOCKED 2026-07-22)
+
+> Self-rated the earlier proposal 7/10 (not 10) — solid direction but weak on user research, edge cases, and executable specificity. This section spells out each fix as a **concrete step-by-step** so a fresh chat can execute without interpretation.
+
+### Fix 1 · Phase 0 · User research (INSERT before Phase 1)
+
+**Do:** Watch 2 ops staff (recommend Ching + Joy) use the current Orders panel for 15 min each, screen recording OK. Ask exactly these 5 questions after each session:
+
+1. When you open Orders, what's the FIRST thing you look for?
+2. Show me an order you're currently chasing — what's blocking it?
+3. When SO-XXXX comes in, how do you know it's YOURS to handle?
+4. What do you do if you go on MC — who picks up your work?
+5. What ONE thing about this page slows you down every day?
+
+**Owner:** Jess (schedules), Claude (writes findings doc)
+
+**Success criteria:** `docs/orders-panel-phase-0-findings.md` exists on `main` with ≥3 assumption confirmations OR challenges to the 12 LOCKED decisions.
+
+**If a LOCKED decision is challenged by findings:** don't silently change it — open a new PR with `docs/orders-panel-concept-proposal.md` amendment + ask Jess.
+
+**Time:** 1h (30 min observe · 30 min document)
+
+### Fix 2 · Verify PIC field before "My Orders" layer
+
+**Do:** SQL query before Phase 4:
+
+```sql
+select
+  count(*) filter (where assigned_to is null) as no_pic,
+  count(*) filter (where assigned_to is not null) as with_pic,
+  count(*) as total
+from orders
+where status in ('place', 'proceed_order');
+```
+
+**Success criteria:** `with_pic / total >= 0.7`. If less: (a) backfill script BEFORE Phase 4 to auto-assign PIC from `orders.placed_by_salesperson` OR (b) drop the "My Orders" layer from the 3-layer accountability model.
+
+**Owner:** Claude (writes SQL) · Jess (runs it in Supabase MCP)
+
+### Fix 3 · Success metrics section (define BEFORE Phase 1)
+
+Add to `docs/orders-panel-concept-proposal.md`:
+
+| Metric | Baseline (before) | Target (after Phase 4) | Measurement |
+|---|---|---|---|
+| **Task-find time** (staff opens portal → first meaningful click) | Measure Sat before Phase 1 (screen-record 3 staff) | ≤ 10 seconds | Same measurement post-Phase 4 |
+| **Orphan SOs** (no PIC OR no Next-action) | Query weekly | 0 by Friday each week | SQL cron report |
+| **SUS score** (System Usability Scale, 10 questions) | N/A | ≥ 70 (industry "good") | Survey 5 staff 2 weeks post-Phase 4 |
+
+**Owner:** Jess (Sat baseline · Friday orphan-check · 2-week SUS survey)
+
+### Fix 4 · Multi-track badges spec (Phase 5)
+
+**Problem:** Next-action ladder returns ONE word per SO → SO appears in ONE track only, hiding other issues.
+
+**Do:**
+
+1. Add helper in `packages/shared/src/order-track.ts`:
+   ```ts
+   export type OrderTrack = "goods" | "deliver" | "money";
+   export function tracksForOrder(o: OrderSignals): Set<OrderTrack> {
+     const t = new Set<OrderTrack>();
+     if (o.supplierOverdue || o.noPo || o.waitingStock) t.add("goods");
+     if (o.noLogistic || o.noEta || o.needsCustomerCall || o.needsSchedule) t.add("deliver");
+     if (o.balanceOwing || o.storageOverdue) t.add("money");
+     return t;
+   }
+   ```
+2. Row displays 3 dot-badges header: `● 货 ○ 送 ● 钱` — filled if in-track.
+3. Track pill count = distinct SOs where track ∈ `tracksForOrder(o)`. **SO in 2 tracks counted in BOTH.**
+4. Row action-line still shows the TOP-priority word (`Chase Ohana — PO-88 2d late.`) but the 3 dots reveal the other issues.
+
+**Success criteria:** an SO with "Supplier overdue" + "Balance owing" shows in ① 货 count AND ③ 钱 count · row has 2 filled dots.
+
+### Fix 5 · Duty-rotation admin surface (Phase 4)
+
+**Where:** `Team → Duty Board → Edit duties` button (visible to `role=principal` only).
+
+**Schema:** new table `duty_rotations`:
+```sql
+create table duty_rotations (
+  id uuid primary key default gen_random_uuid(),
+  duty_type text not null,          -- 'po_duty' · 'escalation' · 'reception' · ...
+  cadence text not null check (cadence in ('daily','weekly','monthly','quarterly')),
+  rotation_pool uuid[] not null,    -- array of salesperson.ids
+  current_holder uuid references salespersons(id),
+  next_rotation_date date not null,
+  created_at timestamptz default now(),
+  updated_by uuid references salespersons(id)
+);
+```
+
+**Auto-rotate:** Cron job (`0 1 * * *` — 09:00 MYT daily) checks `next_rotation_date <= today` → current = next-from-pool · advance `next_rotation_date`.
+
+**Manual override:** admin edits `current_holder` directly.
+
+**Success criteria:** admin can add "Warehouse gate keeper (weekly)" from the UI, assign 3 staff to the pool, see it rotate every Monday.
+
+### Fix 6 · MC trigger UI (Phase 4)
+
+**Where:** staff profile page (`/operation/staff/:id`).
+
+**Field:** `salespersons.status text default 'active' check (status in ('active','mc','resigned'))` (schema: migration 0245 — additive, safe).
+
+**Trigger — when status changes `active → mc`:**
+1. Fire RPC `reassign_open_tasks_to_buddy(staff_id)`:
+   ```sql
+   update ops_tasks
+      set assigned_to = (select buddy_id from salespersons where id = staff_id),
+          note = coalesce(note, '') || E'\n[system] Reassigned from ' || (select name from salespersons where id = staff_id) || ' (MC)'
+   where assigned_to = staff_id
+     and status in ('open', 'in_progress');
+   ```
+2. Notify buddy (bell 🔔 · in-app notification)
+3. Duty Board shows `Ching · MC Wed-Fri · buddy Joy`
+
+**On `mc → active`:** NO auto-reversal (buddy keeps unless manually reassigned — matches how humans actually pass work back).
+
+**Success criteria:** Jess clicks "Mark MC" on Ching's profile · Joy immediately sees Ching's 5 open tasks in her My Tasks panel with `[system]` note.
+
+### Fix 7 · Responsive rules (Phase 2)
+
+**Breakpoints (Tailwind conventions):**
+
+| Screen width | Layout |
+|---|---|
+| `≥ 1200px` (`xl:`) | 3-pane inline (facet 200 · list 420 · detail fills) — the LOCKED layout |
+| `900-1199px` (`lg:`) | 2-pane (facet collapses to icon toolbar 40px · list · detail) |
+| `< 900px` (`md:` and below) | 1-pane (facet as slide-over · list · detail as overlay drawer, falls back to old `OrderDetailDrawer`) |
+
+**Trigger:** `useMediaQuery` in `apps/web/src/lib/use-media.ts` (already exists per Purchase cockpit).
+
+**Success criteria:** open Orders on 1024×768 tablet · facet auto-collapses · detail opens as slide-over instead of side-panel · nothing overflows horizontally.
+
+### Fix 8 · Column consolidation with escape hatch
+
+**Default view:** single `Items` column showing `5 MS · 3 BF · 8 Sofa` inline (compact).
+
+**Escape hatch:** a `[Details view]` toggle in the table header · when on, restores the 3 separate columns (MS · BF · Sofa) — Master Sheet muscle-memory intact.
+
+**Persistence:** localStorage per staff (`orders_items_view=compact|details`) so each person's preference sticks.
+
+**Success criteria:** default = compact for new users · veterans toggle Details once and never see the compact view again.
+
+### Fix 9 · Real cost disclosure
+
+Rewrite the phased-execution section header from "~8h across 4 phases" to:
+
+> **Total real cost = 22-25h across 3-4 weeks:**
+> - Phase 0: 1h (research)
+> - Phase 1: 3h impl + 2h review/test
+> - Phase 2: 3h impl + 3h review/test (big change)
+> - Phase 3: 2h impl + 1h review/test
+> - Phase 4: 1h impl + 1h review/test
+> - Phase 5: 2h impl + 2h review/test
+> - Deploy per phase: ~15 min × 5 phases = 1.25h
+> - Contingency (fixes after Jess reviews each phase): 3-4h
+
+### Fix 10 · Locked-hard vs negotiable tiers
+
+Split the 12 LOCKED decisions into TWO tiers so fresh chat knows what it can/can't propose changes to:
+
+**Locked HARD (never touch — spec violations = revert):**
+- #2 Keep 5-stage lifecycle (danger zone #1)
+- #6 Pin vs Follow-up task split (semantic clarity)
+- #12 Page name "Orders" (no module tabs)
+- All `readinessOf` / `stockMatchKey` / `STOCK_BUCKETS` internals (danger zone #2)
+- All existing count / label formats (danger zone #1)
+
+**Locked, NEGOTIABLE if Phase 0 findings challenge OR Jess agrees:**
+- #1 3-track model (could be 4 if Service Cases wants a top slot)
+- #3 Compact 2-row header (some staff may prefer 3-row for scanability)
+- #4 3-pane inline split (could stay drawer overlay if tests too fragile)
+- #5 Right rail 4 widgets (could be 3 or 5)
+- #7 Buddy + Overflow queue (some ops teams prefer auto-reassign)
+- #8 Duty Board visible to all (could be role-gated)
+- #9 3-layer accountability (could be 2 or 4 layers)
+- #10 Days-to-deliver strip DROPPED (could re-add if Calendar too small)
+- #11 Purchase strip KEPT (different data — stable)
+
+**Rule for fresh chat:** if you want to change a NEGOTIABLE decision, open a PR amendment to this doc first with new reasoning. If you want to touch HARD-locked → ASK Jess in chat.
+
+---
+
 ## Phased execution — 4 PRs (Sat 2026-07-26 onward)
 
-- **Phase 1** (~2h · SAFE, non-structural) — copy audit + row action-line + inline What-to-do per stage. Delete old drawer verb-mixes, unify vocab (SO vs PO). Column consolidation (11 → 8). Small header hint `Deliveries today N › calendar`.
-- **Phase 2** (~3h · BIG) — 3-pane inline split (kill OrderDetailDrawer overlay). Detail always visible. Needs full tests since drawer state moves inline (~36 tests baked in per `ORDERS_LIST_SPEC.md`).
-- **Phase 3** (~2h) — 3-track pill row (top) + wire Next-action-to-track mapping (display-only, no state machine touch). 5-stage tabs stay on row 2. Compact 2-row header locked.
-- **Phase 4** (~1h) — missing-data guards + `Something wrong? (soon)` stubs per stage. Duty Board expansion (add Escalation / Standup / Reception rows on top of PO-duty). Pin vs Follow-up split. Buddy field + Overflow queue.
+- **Phase 0** (~1h · RESEARCH, before any code) — Fix 1 above. Observe 2 staff · document findings · confirm/challenge LOCKED decisions.
+- **Phase 1** (~3h impl + 2h review) — copy audit + row action-line + inline What-to-do per stage. Delete old drawer verb-mixes, unify vocab (SO vs PO). Column consolidation (11 → 8) WITH `Details view` escape hatch (Fix 8). Small header hint `Deliveries today N › calendar`.
+- **Phase 2** (~3h impl + 3h review · BIG) — 3-pane inline split (kill OrderDetailDrawer overlay). Detail always visible. Responsive rules (Fix 7 — 3-pane / 2-pane / drawer fallback). Needs full tests since drawer state moves inline (~36 tests baked in per `ORDERS_LIST_SPEC.md`).
+- **Phase 3** (~2h impl + 1h review) — 3-track pill row (top) + wire Next-action-to-track mapping (display-only, no state machine touch). 5-stage tabs stay on row 2. Compact 2-row header locked.
+- **Phase 4** (~1h impl + 1h review) — missing-data guards + `Something wrong? (soon)` stubs per stage. Duty Board expansion (Fix 5 — admin surface + rotation cron). Pin vs Follow-up split. MC trigger UI (Fix 6 — buddy inheritance + notification). Buddy field + Overflow queue.
+- **Phase 5** (~2h impl + 2h review · EDGE CASES) — Multi-track badges (Fix 4). Any Phase 0 findings that need a fix. Success-metric measurement (Fix 3 · post-implementation).
 
 **Each phase = one PR.** Review + merge + deploy independently.
 
