@@ -1,31 +1,51 @@
 /**
- * OperationPurchase — the Purchase / To-Order cockpit (LOCKED design 2026-07-22).
+ * OperationPurchase — the Purchase / To-Order cockpit (LOCKED design 2026-07-22,
+ * round-2 refinements 2026-07-22 same day).
  *
  * See `docs/purchase-cockpit-handoff.md` §5 for the full spec.
  * UI text follows `docs/COPY-STANDARD.md` (vocabulary + row action-line +
  * "What to do" step block). Header follows `docs/UI-KIT.md` "Module-tab law"
  * — the tab bar IS the title, so `<ListPageShell>` gets no breadcrumb / title.
  *
- * LAYOUT (uses width, saves height — 1000 orders/month, max 15 suppliers/day):
+ * ROUND-2 REFINEMENTS (Jess 2026-07-22, all agreed):
+ *  - Stage TABS replace KPI cards (① Send · ② Chase · ③ Receive with the same
+ *    ①/②/③ badge that appears in the facet + middle-list header — three panels,
+ *    one visual token).
+ *  - "This week's plan" panel MERGED into the days-to-order strip; the strip
+ *    now marks Mon/Wed/Fri (review cadence) and its lead line carries the
+ *    plan sentence (`Today: N to send · Mon 27: 2 · Wed 29: skip · Fri 31: skip`).
+ *  - Category ICON (Bed / BedDouble / Sofa / Factory) replaces the "mattress
+ *    factory" text tag on every row — the icon says the category, the name
+ *    stays the brand.
+ *  - Row copy: `5 units` (not `5u`), `3 SOs` (not `3 orders` — SO = customer
+ *    sales order, not PO; the two must not blur).
+ *  - Detail header: three prominent rows (`Total N units · for K SOs · deliver to Klg`,
+ *    `By size King 2 · Queen 2 · Super Single 1`, `Send by Thu 23 Jul (in 1 day)`)
+ *    so a new operator sees "how many, what sizes, by when" at a glance.
+ *  - SKU table: 7 international-standard columns (SKU · MODEL · SIZE · QTY ·
+ *    IN STOCK · DEADLINE · ORDER). No `×` prefix on QTY. `Ready` renamed to
+ *    `IN STOCK`. New `DEADLINE` = earliest customer delivery date (from the
+ *    shared schema's `deliveryDate` on each `forOrder`). `ORDER` = SO number
+ *    (with `+N more` when a SKU serves multiple SOs).
+ *  - `WhatToDo` inline horizontal (was a 4-row vertical list) — one line per
+ *    stage, saves ~50px of vertical space.
+ *  - Per-stage WhatToDo copy, correctly scoped:
+ *      ① SEND    : WhatsApp → Paste SKU list → Click Send PO here     (3 steps)
+ *      ② CHASE   : WhatsApp → Ask/update ready date → Arrange NETS → Update ETA (4)
+ *      ③ RECEIVE : Count → Photograph DO → Book into Klg → Reserve   (4 steps)
+ *    Send stage does NOT wait for supplier confirmation before sending — that
+ *    conversation happens in Chase (SAP MM's requested-vs-confirmed pattern).
+ *  - `Something wrong?` KEPT so it's not forgotten (Jess 2026-07-22) but with
+ *    `(soon)` marker + popup top note stating the options record intent but
+ *    don't act yet. Will be un-marked when the escape-hatch write path lands.
  *
- *   PurchasingTabs · [ Today · Wed 22 Jul · ⟳ ]      ← tab bar right slot
- *   ────────────────────────────────────────────────
- *   FACET   │ KPI strip (Send · Chase · Receive)     ← stage switcher
- *   240px   │ This week's plan (Mon-anchor cadence)  ← ① Send only
- *           │ Days-to-order strip (14 days)
- *           │ Today: <lead line>
- *           ├───────────────────────┬─────────────────
- *           │ MIDDLE LIST (~420px)  │ DETAIL (fills)
- *           │ ≤15 rows @ ~46px      │ SKU table + What to do
- *           └───────────────────────┴─────────────────
- *
- * VOCAB: ① Send · ② Chase · ③ Receive. Internal stage key stays `"place"`
- *        to preserve URL param + wire compatibility; all user-facing labels
- *        say Send. See COPY-STANDARD §Vocabulary for why Send ≠ Place.
+ * VOCAB: ① Send · ② Chase · ③ Receive. Internal stage key stays `"place"` to
+ *        preserve URL param + wire compat; all user-facing labels say Send. See
+ *        COPY-STANDARD §Vocabulary for why Send ≠ Place.
  *
  * Read-only: every write affordance (Send PO / Chase on WhatsApp / Check-in /
- * Something wrong) is a STUB. Actually raising a PO / booking a GRN is a
- * later unit (see handoff §6 LATER UNITS). No order-write path is touched.
+ * Something wrong) is a STUB. Actually raising a PO / booking a GRN is a later
+ * unit (see handoff §6 LATER UNITS). No order-write path is touched.
  *
  * Design: UI-KIT v4 — token classes only (no raw hex), Lucide icons, `.pill`
  * status tones, English-only copy, `Btn` primitive, date via `fmtDate()`.
@@ -34,17 +54,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
+  Bed,
+  BedDouble,
   Check,
-  ChevronDown,
-  ChevronRight,
   Clock,
   Factory,
   Info,
   MessageCircle,
   Minus,
+  Package,
   PackageCheck,
   RefreshCw,
   Send,
+  Sofa,
   Truck,
   type LucideIcon,
 } from "lucide-react";
@@ -52,12 +75,14 @@ import type {
   ProductCategory,
   PurchaseChase,
   PurchasePlaceGroup,
+  PurchasePlaceGroupLine,
   PurchaseReceive,
   PurchaseUrgencyBucket,
 } from "@carres/shared";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
+import { TopBarIcons } from "./components/GlobalTopBar";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import type { SupplierRow } from "@/lib/queries";
@@ -69,26 +94,35 @@ type Stage = "place" | "chase" | "receive";
 type Attn = "overdue" | "missing" | null;
 
 type Selection =
-  | { kind: "place"; supplierId: string }
+  | { kind: "place"; groupKey: string }
   | { kind: "chase"; poId: string }
   | { kind: "receive"; poId: string }
   | null;
+
+/** A place group split by category — each split gets a unique `groupKey` so
+ *  the middle list renders one row per (supplier × category) while the facet
+ *  still groups by supplier. When a supplier serves ≥2 procurable categories
+ *  the split produces one row per category (Jess 2026-07-22 Q3 — a sofa PO
+ *  and a bedframe PO are different documents even from the same factory). */
+type SplitPlaceGroup = PurchasePlaceGroup & {
+  groupKey: string;
+  /** Present only on split rows — undefined for suppliers with a single category. */
+  splitCategory?: ProductCategory;
+};
 
 // ── Small pure helpers ───────────────────────────────────────────────────────
 
 /** Calendar days between two ISO dates (`to − from`), or null if either bad. */
 function daysBetween(fromIso: string | null, toIso: string | null): number | null {
   if (!fromIso || !toIso) return null;
-  const a = new Date(`${fromIso.slice(0, 10)}T00:00:00`);
-  const b = new Date(`${toIso.slice(0, 10)}T00:00:00`);
+  const a = new Date(`${fromIso.slice(0, 10)}T00:00:00Z`);
+  const b = new Date(`${toIso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
-/** Return ISO of `iso + n` calendar days. Uses UTC to avoid the MYT-offset
- *  round-trip bug: a bare `T00:00:00` parse is LOCAL, but `toISOString()` is
- *  UTC, so in a UTC+8 browser the roundtrip shifts the day back by 1. Parsing
- *  as `T00:00:00Z` + `setUTCDate` keeps every day-of-year computation stable. */
+/** Return ISO of `iso + n` calendar days. UTC-consistent — see purchase.ts
+ *  history for the MYT-offset bug this parsing convention prevents. */
 function addDaysIso(iso: string, n: number): string {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -112,6 +146,12 @@ function dayLabelShort(iso: string): string {
   return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
 }
 
+/** Cadence day = Mon (1) / Wed (3) / Fri (5) — the PO review anchors. */
+function isCadenceDay(iso: string): boolean {
+  const d = dayOfWeek(iso);
+  return d === 1 || d === 3 || d === 5;
+}
+
 /** Phone → wa.me base link (MY-aware). Local copy of OperationPayments.waLink so
  *  this page doesn't pull in the payments module. */
 function waLink(phone: string | null | undefined): string | null {
@@ -129,13 +169,44 @@ function waLink(phone: string | null | undefined): string | null {
   return `https://wa.me/${d}`;
 }
 
-const CATEGORY_KIND: Record<ProductCategory, string> = {
-  mattress: "mattress factory",
-  bedframe: "bed-frame factory",
-  sofa: "sofa factory",
-  accessory: "accessory supplier",
-  service: "service",
+// ── Category icons (Jess 2026-07-22: same icon language as the Orders panel) ─
+
+function categoryIconOf(cat: ProductCategory | undefined): LucideIcon {
+  switch (cat) {
+    case "mattress":
+      return Bed;
+    case "bedframe":
+      return BedDouble;
+    case "sofa":
+      return Sofa;
+    case "accessory":
+      return Package;
+    default:
+      return Factory;
+  }
+}
+
+// ── Size code parser (SKU suffix → size code + label) ───────────────────────
+
+interface SizeInfo {
+  code: string;
+  label: string;
+}
+const SIZE_ALIASES: Record<string, SizeInfo> = {
+  Q: { code: "Q", label: "Queen" },
+  K: { code: "K", label: "King" },
+  S: { code: "S", label: "Single" },
+  SS: { code: "SS", label: "Super Single" },
+  SK: { code: "SK", label: "Super King" },
 };
+/** Parse a SIZE token from the SKU tail (`N1001S-Q` → `Q` = Queen). Returns
+ *  null when the SKU has no `-XX` suffix or the suffix is unknown. */
+function parseSize(sku: string): SizeInfo | null {
+  const parts = sku.split("-");
+  if (parts.length < 2) return null;
+  const tail = parts[parts.length - 1]?.toUpperCase() ?? "";
+  return SIZE_ALIASES[tail] ?? null;
+}
 
 interface UrgencyStyle {
   cls: string;
@@ -159,23 +230,25 @@ function urgencyStyle(u: PurchaseUrgencyBucket): UrgencyStyle {
   }
 }
 
-/** Row action-line per COPY-STANDARD row template (verb + object + when). */
+/** Row action-line per COPY-STANDARD (verb + object + when). "PO" everywhere
+ *  the reader is doing supplier work — never plain "order" (that's the customer
+ *  SO in Carres vocab). Jess 2026-07-22. */
 function placeActionLine(g: PurchasePlaceGroup, today: string | null): string {
   const name = g.supplierName ?? "the factory";
   if (g.urgency === "late" && g.earliestOrderBy && today) {
     const late = daysBetween(g.earliestOrderBy, today) ?? 0;
-    if (late > 0) return `Send order to ${name} today — ${late}d late.`;
-    return `Send order to ${name} today.`;
+    if (late > 0) return `Send PO to ${name} today — ${late}d late.`;
+    return `Send PO to ${name} today.`;
   }
-  if (g.urgency === "urgent") return `Send order to ${name} today.`;
+  if (g.urgency === "urgent") return `Send PO to ${name} today.`;
   if (g.urgency === "due" && g.earliestOrderBy) {
-    return `Prepare order to ${name} by ${dayName(g.earliestOrderBy)}.`;
+    return `Prepare PO to ${name} by ${dayName(g.earliestOrderBy)}.`;
   }
   if (g.urgency === "no_deadline")
     return `${name} — waiting on a deadline before we can plan.`;
   if (g.earliestOrderBy)
-    return `Order to ${name} from ${dayName(g.earliestOrderBy)}.`;
-  return `Review the ${name} order.`;
+    return `Send PO to ${name} from ${dayName(g.earliestOrderBy)}.`;
+  return `Review the ${name} PO.`;
 }
 
 function chaseActionLine(r: PurchaseChase, supplierName: string): string {
@@ -186,19 +259,6 @@ function chaseActionLine(r: PurchaseChase, supplierName: string): string {
 function receiveActionLine(r: PurchaseReceive, supplierName: string): string {
   const total = r.items.reduce((s, it) => s + it.outstanding, 0);
   return `Check in from ${supplierName} (${total} item${total === 1 ? "" : "s"}).`;
-}
-
-/** Customer names for a place group's line "FOR" column, "+N more" when many. */
-function forSummary(
-  forOrders: PurchasePlaceGroup["lines"][number]["forOrders"],
-  max = 2,
-): string {
-  const names = forOrders
-    .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
-    .filter((s): s is string => Boolean(s));
-  if (names.length === 0) return "—";
-  if (names.length <= max) return names.join(", ");
-  return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
 }
 
 // ── Days-to-order strip helpers ──────────────────────────────────────────────
@@ -215,7 +275,8 @@ interface DayBucket {
   status: "late" | "today" | "due" | "empty";
 }
 
-/** Bucket the ① Send groups (or ② Chase / ③ Receive rows) by their key date. */
+/** Bucket the ① Send groups (or ② Chase / ③ Receive rows) by their key date.
+ *  Anything earlier than today rolls into the today cell (labelled LATE). */
 function bucketByDay(
   days: string[],
   todayIso: string | null,
@@ -243,7 +304,7 @@ function bucketByDay(
   });
 }
 
-// ── This week's plan (Mon-anchor cadence) ────────────────────────────────────
+// ── Monday-anchor cadence (folded into the strip lead line) ─────────────────
 
 /**
  * Return the ISO of {this / next} Monday · Wednesday · Friday from `todayIso`.
@@ -254,8 +315,7 @@ function upcomingCadenceDays(todayIso: string): {
   wed: string;
   fri: string;
 } {
-  const dow = dayOfWeek(todayIso); // 0 = Sun
-  // Days from today until the next Mon (1). Sun → 1, Mon → 0, Tue → 6, …
+  const dow = dayOfWeek(todayIso);
   const dMon = (1 - dow + 7) % 7;
   const dWed = (3 - dow + 7) % 7;
   const dFri = (5 - dow + 7) % 7;
@@ -264,6 +324,120 @@ function upcomingCadenceDays(todayIso: string): {
     wed: addDaysIso(todayIso, dWed),
     fri: addDaysIso(todayIso, dFri),
   };
+}
+
+// ── Place-detail helpers: size breakdown + earliest deadline per line ────────
+
+/** Compute the by-size roll-up for a place group's SKU lines. Empty when no
+ *  SKUs parse a known size. */
+function bySizeBreakdown(
+  lines: readonly PurchasePlaceGroupLine[],
+): Array<{ code: string; label: string; qty: number }> {
+  const m = new Map<string, { label: string; qty: number }>();
+  for (const l of lines) {
+    const s = parseSize(l.sku);
+    if (!s) continue;
+    const cur = m.get(s.code);
+    if (cur) cur.qty += l.need;
+    else m.set(s.code, { label: s.label, qty: l.need });
+  }
+  return [...m.entries()]
+    .map(([code, v]) => ({ code, label: v.label, qty: v.qty }))
+    .sort((a, b) => b.qty - a.qty);
+}
+
+/** Earliest customer delivery date across a SKU line's forOrders, or null. */
+function earliestDeadline(
+  forOrders: PurchasePlaceGroupLine["forOrders"],
+): string | null {
+  const dates = forOrders
+    .map((o) => o.deliveryDate ?? null)
+    .filter((d): d is string => Boolean(d));
+  if (dates.length === 0) return null;
+  return dates.sort()[0]!;
+}
+
+/** ORDER column text: SO- or `SO-XXXX +N` when there are >1 unique SOs.
+ *  The `+N` is enough — no "more" word (Jess 2026-07-22). */
+function orderColText(forOrders: PurchasePlaceGroupLine["forOrders"]): string {
+  const sos = [...new Set(forOrders.map((o) => o.so).filter((s): s is number => s != null))];
+  if (sos.length === 0) return "—";
+  if (sos.length === 1) return `SO-${sos[0]}`;
+  return `SO-${sos[0]} +${sos.length - 1}`;
+}
+
+/** Category breakdown across a place group — `sofa 6 · bedframe 4`. Used on
+ *  the row + detail header when the supplier serves >1 procurable category. */
+function categoryBreakdown(
+  group: PurchasePlaceGroup,
+): Array<{ category: ProductCategory; units: number }> {
+  const m = new Map<ProductCategory, number>();
+  for (const l of group.lines) {
+    m.set(l.category, (m.get(l.category) ?? 0) + l.need);
+  }
+  return [...m.entries()]
+    .map(([category, units]) => ({ category, units }))
+    .sort((a, b) => b.units - a.units);
+}
+
+/** Recompute the urgency bucket for a subset of lines from its own
+ *  earliestOrderBy vs today. Mirrors the engine's rank approximately —
+ *  used by the split so a bedframe split doesn't inherit its sofa sibling's
+ *  urgency. */
+function urgencyFromOrderBy(
+  orderBy: string | null,
+  today: string | null,
+): PurchaseUrgencyBucket {
+  if (!orderBy) return "no_deadline";
+  if (!today) return "scheduled";
+  const days = daysBetween(today, orderBy);
+  if (days == null) return "scheduled";
+  if (days < 0) return "late";
+  if (days === 0) return "urgent";
+  if (days <= 3) return "due";
+  return "scheduled";
+}
+
+/** Split multi-category place groups into one row per (supplier × category).
+ *  Single-category groups pass through as-is (groupKey = supplierId). */
+function splitByCategory(
+  groups: readonly PurchasePlaceGroup[],
+  today: string | null,
+): SplitPlaceGroup[] {
+  const out: SplitPlaceGroup[] = [];
+  for (const g of groups) {
+    if (g.categories.length <= 1) {
+      out.push({ ...g, groupKey: g.supplierId });
+      continue;
+    }
+    for (const cat of g.categories) {
+      const catLines = g.lines.filter((l) => l.category === cat);
+      if (catLines.length === 0) continue;
+      const totalUnits = catLines.reduce((s, l) => s + l.need, 0);
+      const orderCount = new Set(
+        catLines.flatMap((l) =>
+          l.forOrders.map((o) => o.so).filter((x): x is number => x != null),
+        ),
+      ).size;
+      const earliestOrderBy =
+        catLines
+          .map((l) => l.orderBy)
+          .filter((d): d is string => Boolean(d))
+          .sort()[0] ?? null;
+      out.push({
+        ...g,
+        groupKey: `${g.supplierId}::${cat}`,
+        splitCategory: cat,
+        categories: [cat],
+        lines: catLines,
+        totalUnits,
+        orderCount,
+        earliestOrderBy,
+        urgency: urgencyFromOrderBy(earliestOrderBy, today),
+      });
+    }
+  }
+  return out;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -304,6 +478,13 @@ export default function OperationPurchase() {
     [data?.placeGroups, supplierName],
   );
 
+  // Split per (supplier × category) so a supplier with sofa + bedframe
+  // (e.g. Ohana) renders as two rows / two POs — Jess 2026-07-22 Q3.
+  const splitPlaceGroups = useMemo(
+    () => splitByCategory(placeGroups, data?.today ?? null),
+    [placeGroups, data?.today],
+  );
+
   // Switching stage clears the per-stage facet filters + selection + selected day.
   const goStage = (s: Stage) => {
     setStage(s);
@@ -313,16 +494,19 @@ export default function OperationPurchase() {
     setSelection(null);
   };
 
-  // Stage counts — the KPI cards + the TODAY'S WORK facet read from these, so the
-  // left numbers always tally the right list.
-  const placeCount = placeGroups.length;
-  const placeOverdue = placeGroups.filter((g) => g.urgency === "late").length;
-  const missingCount = placeGroups.filter((g) => g.urgency === "no_deadline").length;
+  // Stage counts + attention sub-counts — from SPLIT groups so a supplier with
+  // 2 categories (Ohana sofa + bedframe) counts as 2 POs to send, matching the
+  // 2 rows the operator sees in the middle list. Fixes the "3 of 2" mismatch
+  // (Jess 2026-07-22 late round).
+  const placeCount = splitPlaceGroups.length;
+  const placeOverdue = splitPlaceGroups.filter((g) => g.urgency === "late").length;
+  const missingCount = splitPlaceGroups.filter((g) => g.urgency === "no_deadline").length;
   const chaseCount = chase.length;
   const chaseLate = summary?.chaseLate ?? 0;
   const receiveCount = receive.length;
 
-  // BY FACTORY facet — per-supplier units for the CURRENT stage.
+  // BY FACTORY facet — per-supplier units for the CURRENT stage. Aggregates
+  // across splits (unsplit `placeGroups`) so a factory is still one facet row.
   const byFactory = useMemo(() => {
     const m = new Map<string, number>();
     if (stage === "place") {
@@ -347,9 +531,7 @@ export default function OperationPurchase() {
       .sort((a, b) => b.units - a.units);
   }, [stage, placeGroups, chase, receive, supplierName]);
 
-  // 14-day strip — buckets by the stage's key date. Send groups use
-  // earliestOrderBy; chase rows use expectedReadyDate (ready → arrival);
-  // receive rows use etaDate ?? expectedReadyDate.
+  // 14-day strip — buckets by the stage's key date.
   const stripDays = useMemo(() => next14Days(today), [today]);
   const stripBuckets = useMemo(() => {
     if (stage === "place")
@@ -377,27 +559,55 @@ export default function OperationPurchase() {
     );
   }, [stage, stripDays, today, placeGroups, chase, receive]);
 
-  // Lead line under the strip — plain sentence per COPY-STANDARD.
-  const leadLine = useMemo(() => {
+  // Lead line under the strip — TWO SENTENCES per Jess 2026-07-22 Q3:
+  // sentence 1 = "right now" state, sentence 2 = "this week" plan (① Send only).
+  // Returned as an array so the UI can render them on separate lines.
+  // Q1 (2026-07-22 late round): line 1 distinguishes "today late — send now"
+  // from "queue this week — none late" so the count doesn't feel contradictory
+  // with an empty today cell.
+  const leadLines = useMemo<string[]>(() => {
     if (stage === "place") {
-      if (placeCount === 0) return "Nothing to send today. Every live order is covered.";
-      const late = placeOverdue;
-      return late > 0
-        ? `Today: ${placeCount} to send. ${late} ${late === 1 ? "is" : "are"} late.`
-        : `Today: ${placeCount} to send. On track.`;
+      if (placeCount === 0)
+        return ["Nothing to send today. Every live order is covered."];
+      const line1 =
+        placeOverdue > 0
+          ? `Today: ${placeOverdue} ${placeOverdue === 1 ? "PO" : "POs"} late — send now.`
+          : `In queue: ${placeCount} ${placeCount === 1 ? "PO" : "POs"} to send this week · none late.`;
+      if (!today) return [line1];
+      const { mon, wed, fri } = upcomingCadenceDays(today);
+      const nMon = splitPlaceGroups.filter((g) => g.earliestOrderBy === mon).length;
+      const nWed = splitPlaceGroups.filter((g) => g.earliestOrderBy === wed).length;
+      const nFri = splitPlaceGroups.filter((g) => g.earliestOrderBy === fri).length;
+      const anyAligned = nMon + nWed + nFri > 0;
+      if (!anyAligned) {
+        return [
+          line1,
+          "This week: no factories align with Mon / Wed / Fri — fire off-cadence (see days above).",
+        ];
+      }
+      const cadPart = (iso: string, n: number, tag: string) =>
+        `${dayName(iso)} ${dayLabelShort(iso)} → ${
+          n > 0 ? `${n} ${n === 1 ? "factory" : "factories"}` : "skip"
+        }${tag ? ` ${tag}` : ""}`;
+      const line2 = `This week: ${cadPart(mon, nMon, "(main)")} · ${cadPart(wed, nWed, "")} · ${cadPart(fri, nFri, "")}.`;
+      return [line1, line2];
     }
     if (stage === "chase") {
-      if (chaseCount === 0) return "Nothing to chase today. No factory is late.";
-      return `Today: ${chaseCount} to chase. All past their promised date.`;
+      if (chaseCount === 0) return ["Nothing to chase today. No factory is late."];
+      return [
+        `Today: ${chaseCount} ${chaseCount === 1 ? "PO" : "POs"} to chase · all past their promised date.`,
+      ];
     }
-    if (receiveCount === 0) return "Nothing to receive today. No goods arriving.";
-    return `Today: ${receiveCount} to receive. Check in when they arrive.`;
-  }, [stage, placeCount, placeOverdue, chaseCount, receiveCount]);
+    if (receiveCount === 0) return ["Nothing to receive today. No goods arriving."];
+    return [
+      `Today: ${receiveCount} ${receiveCount === 1 ? "PO" : "POs"} to receive · check in when they arrive.`,
+    ];
+  }, [stage, placeCount, placeOverdue, chaseCount, receiveCount, today, splitPlaceGroups]);
 
-  // ── ① Send — the filtered middle list.
+  // ── Filtered lists per stage.
   const placeShown = useMemo(
     () =>
-      placeGroups.filter((g) => {
+      splitPlaceGroups.filter((g) => {
         if (supplierFilter && g.supplierId !== supplierFilter) return false;
         if (attn === "overdue" && g.urgency !== "late") return false;
         if (attn === "missing" && g.urgency !== "no_deadline") return false;
@@ -414,7 +624,7 @@ export default function OperationPurchase() {
         }
         return true;
       }),
-    [placeGroups, supplierFilter, attn, selectedDay, today],
+    [splitPlaceGroups, supplierFilter, attn, selectedDay, today],
   );
   const chaseShown = useMemo(
     () =>
@@ -422,11 +632,7 @@ export default function OperationPurchase() {
         if (supplierFilter && r.supplierId !== supplierFilter) return false;
         if (selectedDay) {
           if (selectedDay === today) {
-            if (
-              r.daysLate <= 0 &&
-              r.expectedReadyDate !== selectedDay
-            )
-              return false;
+            if (r.daysLate <= 0 && r.expectedReadyDate !== selectedDay) return false;
           } else if (r.expectedReadyDate !== selectedDay) return false;
         }
         return true;
@@ -448,16 +654,15 @@ export default function OperationPurchase() {
     [receive, supplierFilter, selectedDay, today],
   );
 
-  // Auto-select the first visible row when the list changes and the current
-  // selection isn't visible any more (so the detail pane never sits empty).
+  // Auto-select the first visible row per stage so the detail pane isn't empty.
   useEffect(() => {
     if (stage !== "place") return;
     const stillVisible =
       selection?.kind === "place" &&
-      placeShown.some((g) => g.supplierId === selection.supplierId);
+      placeShown.some((g) => g.groupKey === selection.groupKey);
     if (stillVisible) return;
     setSelection(
-      placeShown[0] ? { kind: "place", supplierId: placeShown[0].supplierId } : null,
+      placeShown[0] ? { kind: "place", groupKey: placeShown[0].groupKey } : null,
     );
   }, [stage, placeShown, selection]);
   useEffect(() => {
@@ -480,7 +685,7 @@ export default function OperationPurchase() {
 
   const selectedPlace =
     selection?.kind === "place"
-      ? placeGroups.find((g) => g.supplierId === selection.supplierId) ?? null
+      ? splitPlaceGroups.find((g) => g.groupKey === selection.groupKey) ?? null
       : null;
   const selectedChase =
     selection?.kind === "chase"
@@ -589,11 +794,11 @@ export default function OperationPurchase() {
                 />
               </FacetGroup>
 
-              {/* Today's work — the ①②③ stage jump (mirrors the KPI cards) */}
+              {/* Today's work — the ①②③ stage jump (mirrors the KPI tabs) */}
               <FacetGroup title="Today's work">
                 <FacetRow
                   numbered="1"
-                  label="Send orders"
+                  label="Send POs"
                   count={placeCount}
                   active={stage === "place"}
                   onClick={() => goStage("place")}
@@ -644,40 +849,30 @@ export default function OperationPurchase() {
           }
         >
           <div className="flex-1 min-h-0 flex flex-col gap-3">
-            {/* ── KPI strip = STAGE SWITCHER ─────────────────────────────── */}
-            <div className="grid grid-cols-3 gap-2.5 shrink-0">
-              <KpiCard
-                value={isLoading ? "…" : placeCount}
-                label="To send"
-                sub={placeOverdue > 0 ? `${placeOverdue} late` : "on track"}
-                subTone={placeOverdue > 0 ? "danger" : "muted"}
-                active={stage === "place"}
-                onClick={() => goStage("place")}
-              />
-              <KpiCard
-                value={isLoading ? "…" : chaseCount}
-                label="To chase"
-                sub={chaseLate > 0 ? `${chaseLate} late` : "on track"}
-                subTone={chaseLate > 0 ? "danger" : "muted"}
-                active={stage === "chase"}
-                onClick={() => goStage("chase")}
-              />
-              <KpiCard
-                value={isLoading ? "…" : receiveCount}
-                label="To receive"
-                sub={receiveCount > 0 ? "ready to check in" : "nothing arriving"}
-                subTone="muted"
-                active={stage === "receive"}
-                onClick={() => goStage("receive")}
-              />
-            </div>
+            {/* ── STAGE TABS = compact pill row (Jess 2026-07-22 Q1a) ────── */}
+            <StageTabs
+              stage={stage}
+              onSwitch={goStage}
+              counts={{ place: placeCount, chase: chaseCount, receive: receiveCount }}
+              subs={{
+                place:
+                  placeOverdue > 0
+                    ? `${placeOverdue} late`
+                    : placeCount > 0
+                      ? "on track"
+                      : "nothing to send",
+                chase:
+                  chaseLate > 0
+                    ? `${chaseLate} late`
+                    : chaseCount > 0
+                      ? "on track"
+                      : "nothing to chase",
+                receive: receiveCount > 0 ? "ready to check in" : "nothing arriving",
+              }}
+              loading={isLoading}
+            />
 
-            {/* ── This week's plan — Monday-anchor cadence (① Send only) ── */}
-            {stage === "place" && today && placeCount > 0 && (
-              <ThisWeeksPlan today={today} groups={placeGroups} />
-            )}
-
-            {/* ── 14-day date strip ──────────────────────────────────────── */}
+            {/* ── 14-day date strip (This week's plan merged into lead lines) ── */}
             {today && (
               <DaysToOrderStrip
                 buckets={stripBuckets}
@@ -686,7 +881,7 @@ export default function OperationPurchase() {
                 onSelectDay={(iso) =>
                   setSelectedDay((cur) => (cur === iso ? null : iso))
                 }
-                leadLine={leadLine}
+                leadLines={leadLines}
               />
             )}
 
@@ -696,13 +891,13 @@ export default function OperationPurchase() {
                 <AlertTriangle size={16} className="text-danger shrink-0 mt-0.5" />
                 <div className="min-w-0 text-[12px]">
                   <span className="font-semibold text-danger">
-                    {missingCount} {missingCount === 1 ? "order" : "orders"} can&rsquo;t be sent yet.
+                    {missingCount} {missingCount === 1 ? "SO" : "SOs"} missing a delivery deadline.
                   </span>{" "}
                   <span className="text-base-600">
                     {missingSoLabels.length > 0 && (
                       <>{missingSoLabels.slice(0, 4).join(", ")}: </>
                     )}
-                    no delivery deadline — ask the salesperson to set one.
+                    Purchase can&rsquo;t plan the PO until Sales sets one.
                   </span>
                 </div>
               </div>
@@ -732,20 +927,20 @@ export default function OperationPurchase() {
                     placeShown.length === 0 ? (
                       <EmptyDone
                         text="Nothing to send here"
-                        sub="Change or clear the filter to see other suppliers."
+                        sub="Change or clear the filter to see other factories."
                       />
                     ) : (
                       placeShown.map((g) => (
                         <PlaceListRow
-                          key={g.supplierId}
+                          key={g.groupKey}
                           group={g}
                           today={today}
                           selected={
                             selection?.kind === "place" &&
-                            selection.supplierId === g.supplierId
+                            selection.groupKey === g.groupKey
                           }
                           onSelect={() =>
-                            setSelection({ kind: "place", supplierId: g.supplierId })
+                            setSelection({ kind: "place", groupKey: g.groupKey })
                           }
                         />
                       ))
@@ -824,6 +1019,10 @@ function TodayRefresh({
   today: string | null;
   onRefresh: () => void;
 }) {
+  // Q9 Option B (Jess 2026-07-22): TopBarIcons (Alerts / Help / Settings) live
+  // here instead of in the slim GlobalTopBar — module-tab pages skip the outer
+  // bar entirely (OperationApp gates it), so this is the one place a
+  // Purchasing-page operator reaches those affordances.
   return (
     <>
       <span className="text-[12px] text-base-500 tabular-nums">
@@ -838,91 +1037,107 @@ function TodayRefresh({
       >
         <RefreshCw size={14} strokeWidth={2} />
       </button>
+      <span className="mx-1 h-4 w-px bg-base-200" aria-hidden />
+      <TopBarIcons />
     </>
   );
 }
 
-// ── This week's plan — Monday-anchor cadence block ───────────────────────────
+// ── StageTabs = compact pill row (Jess 2026-07-22 Q1a — ~40px, was ~72px) ────
 
-function ThisWeeksPlan({
-  today,
-  groups,
+function StageTabs({
+  stage,
+  onSwitch,
+  counts,
+  subs,
+  loading,
 }: {
-  today: string;
-  groups: PurchasePlaceGroup[];
+  stage: Stage;
+  onSwitch: (s: Stage) => void;
+  counts: { place: number; chase: number; receive: number };
+  subs: { place: string; chase: string; receive: string };
+  loading?: boolean;
 }) {
-  const { mon, wed, fri } = upcomingCadenceDays(today);
-  // Count groups whose earliestOrderBy falls exactly on that anchor day.
-  const countOn = (iso: string) =>
-    groups.filter((g) => g.earliestOrderBy === iso).length;
-  const nMon = countOn(mon);
-  const nWed = countOn(wed);
-  const nFri = countOn(fri);
-  const rows: Array<{ iso: string; label: string; n: number; note: string }> = [
-    { iso: mon, label: `Mon ${dayLabelShort(mon)}`, n: nMon, note: "main day" },
-    {
-      iso: wed,
-      label: `Wed ${dayLabelShort(wed)}`,
-      n: nWed,
-      note: nWed === 0 ? "skip — nothing forces it" : "backup fire",
-    },
-    {
-      iso: fri,
-      label: `Fri ${dayLabelShort(fri)}`,
-      n: nFri,
-      note: nFri === 0 ? "skip — nothing forces it" : "backup fire",
-    },
+  const tabs: Array<{
+    key: Stage;
+    n: string;
+    label: string;
+    count: number;
+    sub: string;
+  }> = [
+    { key: "place", n: "1", label: "Send", count: counts.place, sub: subs.place },
+    { key: "chase", n: "2", label: "Chase", count: counts.chase, sub: subs.chase },
+    { key: "receive", n: "3", label: "Receive", count: counts.receive, sub: subs.receive },
   ];
   return (
-    <div className="rounded-[12px] border border-base-200 bg-white shadow-sm px-4 py-2.5 shrink-0">
-      <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 mb-1.5">
-        This week&rsquo;s plan
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {rows.map((r) => (
-          <div key={r.iso} className="flex items-center gap-2 min-w-0">
-            <span className="text-[13px] font-semibold text-base-900 tabular-nums shrink-0">
-              {r.label}
+    <div className="grid grid-cols-3 gap-2 shrink-0" role="tablist" aria-label="Purchase stages">
+      {tabs.map((t) => {
+        const active = stage === t.key;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSwitch(t.key)}
+            className={[
+              "flex items-center gap-2 rounded-full px-3 py-2 border transition-colors bg-white text-left",
+              active
+                ? "border-primary ring-1 ring-primary"
+                : "border-base-200 hover:border-base-300",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "grid place-items-center w-5 h-5 rounded text-[11px] font-bold font-mono shrink-0",
+                active ? "bg-primary text-white" : "bg-base-900 text-white",
+              ].join(" ")}
+            >
+              {t.n}
             </span>
-            <span className="text-[12px] text-base-600 truncate">
-              {r.n > 0 ? (
-                <>
-                  <span className="font-semibold text-base-800 tabular-nums">
-                    {r.n} {r.n === 1 ? "factory" : "factories"}
-                  </span>{" "}
-                  <span className="text-base-500">· {r.note}</span>
-                </>
-              ) : (
-                <span className="text-base-400">— {r.note}</span>
-              )}
+            <span
+              className={`text-[13px] font-bold shrink-0 ${
+                active ? "text-primary" : "text-base-900"
+              }`}
+            >
+              {t.label}
             </span>
-          </div>
-        ))}
-      </div>
+            <span className="text-[12px] font-semibold text-base-800 tabular-nums shrink-0">
+              {loading ? "…" : `${t.count} ${t.count === 1 ? "PO" : "POs"}`}
+            </span>
+            <span className="text-[11px] text-base-500 truncate min-w-0">
+              · {loading ? "…" : t.sub}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-// ── Days-to-order strip ──────────────────────────────────────────────────────
+// ── Days-to-order strip (This week's plan merged into lead line) ─────────────
 
 function DaysToOrderStrip({
   buckets,
   todayIso,
   selectedDay,
   onSelectDay,
-  leadLine,
+  leadLines,
 }: {
   buckets: DayBucket[];
   todayIso: string;
   selectedDay: string | null;
   onSelectDay: (iso: string) => void;
-  leadLine: string;
+  leadLines: string[];
 }) {
   return (
     <div className="rounded-[12px] border border-base-200 bg-white shadow-sm px-3 py-2.5 shrink-0">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500">
           Days to order (next 14 · click a day to focus)
+          <span className="ml-2 text-[10px] font-medium text-base-400 normal-case tracking-normal">
+            Mon / Wed / Fri = review days (Mon = main)
+          </span>
         </div>
         {selectedDay && (
           <button
@@ -941,7 +1156,15 @@ function DaysToOrderStrip({
         {buckets.map((b) => {
           const isToday = b.iso === todayIso;
           const isSel = selectedDay === b.iso;
-          const empty = b.units === 0;
+          const cadence = isCadenceDay(b.iso);
+          const dateNum = String(new Date(`${b.iso}T00:00:00Z`).getUTCDate());
+          // Chip colour = status semantic (Jess 2026-07-22 Q8 — colour IS the label).
+          const chipCls =
+            b.status === "late"
+              ? "bg-error-soft text-danger"
+              : b.status === "today"
+                ? "bg-primary text-white"
+                : "bg-signature-50 text-signature-800";
           return (
             <button
               key={b.iso}
@@ -950,68 +1173,55 @@ function DaysToOrderStrip({
               aria-pressed={isSel}
               title={`${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${
                 b.units > 0 ? `${b.units} to send` : "nothing"
-              }`}
+              }${cadence ? " · review day" : ""}`}
               className={[
-                "flex flex-col items-center justify-center rounded-md py-1.5 transition-colors",
+                "flex flex-col items-center justify-start rounded-md py-2 transition-colors min-h-[76px]",
                 isSel
                   ? "bg-hovertint ring-1 ring-primary"
-                  : empty
-                    ? "hover:bg-hovertint text-base-400"
+                  : cadence
+                    ? "bg-base-50 hover:bg-hovertint"
                     : "hover:bg-hovertint",
               ].join(" ")}
             >
+              {/* Row 1 · day name (subdued) */}
               <span
-                className={`text-[10px] font-semibold ${
+                className={`text-[10px] font-semibold uppercase tracking-wide ${
                   isToday ? "text-primary" : "text-base-500"
                 }`}
               >
                 {dayName(b.iso)}
               </span>
-              <span
-                className={`text-[12px] font-mono tabular-nums leading-tight ${
-                  isToday ? "text-base-900 font-bold" : "text-base-700"
-                }`}
-              >
-                {dayLabelShort(b.iso).split(" ")[0]}
-              </span>
-              <span
-                className={`text-[13px] font-bold font-mono tabular-nums leading-tight mt-0.5 ${
-                  b.status === "late"
-                    ? "text-danger"
-                    : b.status === "today"
-                      ? "text-base-900"
-                      : b.status === "due"
-                        ? "text-base-800"
-                        : "text-base-300"
-                }`}
-              >
-                {b.units > 0 ? b.units : "—"}
-              </span>
-              <span
-                className={`text-[9px] font-bold uppercase tracking-[0.04em] leading-tight ${
-                  b.status === "late"
-                    ? "text-danger"
-                    : b.status === "today"
-                      ? "text-primary"
-                      : b.status === "due"
-                        ? "text-base-500"
-                        : "text-transparent"
-                }`}
-              >
-                {b.status === "late"
-                  ? "late"
-                  : b.status === "today"
-                    ? "today"
-                    : b.status === "due"
-                      ? "due"
-                      : "—"}
-              </span>
+              {/* Row 2 · date — filled flame circle on today, plain bold otherwise */}
+              {isToday ? (
+                <span className="mt-0.5 w-7 h-7 rounded-full bg-primary text-white grid place-items-center text-[13px] font-bold font-mono tabular-nums">
+                  {dateNum}
+                </span>
+              ) : (
+                <span className="mt-0.5 text-[18px] font-bold font-mono tabular-nums text-base-900 leading-none">
+                  {dateNum}
+                </span>
+              )}
+              {/* Row 3 · count chip (only if there's content) */}
+              {b.units > 0 && (
+                <span
+                  className={`mt-1.5 inline-flex items-center justify-center rounded-full min-w-[26px] px-2 py-0.5 text-[12px] font-bold font-mono tabular-nums ${chipCls}`}
+                >
+                  {b.units}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
-      <div className="mt-2 pt-2 border-t border-base-100 text-[12px] text-base-700">
-        {leadLine}
+      <div className="mt-2 pt-2 border-t border-base-100 text-[12px] text-base-700 flex flex-col gap-0.5">
+        {leadLines.map((line, i) => (
+          <span
+            key={i}
+            className={i === 0 ? "font-semibold text-base-900" : "text-base-600"}
+          >
+            {line}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1030,7 +1240,7 @@ function MiddleListHeader({
 }) {
   const title =
     stage === "place"
-      ? "Send orders"
+      ? "Send POs"
       : stage === "chase"
         ? "Chase factories"
         : "Receive deliveries";
@@ -1061,14 +1271,18 @@ function PlaceListRow({
   selected,
   onSelect,
 }: {
-  group: PurchasePlaceGroup;
+  group: SplitPlaceGroup;
   today: string | null;
   selected: boolean;
   onSelect: () => void;
 }) {
   const u = urgencyStyle(group.urgency);
-  const kind = CATEGORY_KIND[group.categories[0] ?? "mattress"];
   const action = placeActionLine(group, today);
+  // Post-split each group has a single category — icon + tag reflect that.
+  // Only supplier with just one category to begin with (unsplit) still shows
+  // its single icon here.
+  const cat = group.categories[0];
+  const Icon = categoryIconOf(cat);
   return (
     <button
       type="button"
@@ -1080,23 +1294,32 @@ function PlaceListRow({
       ].join(" ")}
     >
       <div className="flex items-center gap-1.5 min-w-0">
-        <Factory size={14} className="text-base-400 shrink-0" />
-        <span className={`text-[13px] truncate ${selected ? "font-bold text-base-900" : "font-semibold text-base-900"}`}>
+        <Icon size={16} className="text-base-500 shrink-0" />
+        <span
+          className={`text-[13px] truncate ${
+            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
+          }`}
+        >
           {group.supplierName}
+          {cat && (
+            <span className="ml-1 text-[11px] font-medium text-base-500">
+              · {cat}
+            </span>
+          )}
         </span>
-        <span className="text-[11px] font-medium text-base-500 shrink-0">· {kind}</span>
         <span className={`pill ${u.cls} shrink-0 ml-auto`}>
           <u.Icon />
           {u.label}
         </span>
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
+      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0 flex-wrap">
         <span className="tabular-nums shrink-0">
-          {group.totalUnits}u · {group.orderCount} {group.orderCount === 1 ? "order" : "orders"}
+          {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"} · {group.orderCount}{" "}
+          {group.orderCount === 1 ? "SO" : "SOs"}
         </span>
         {group.earliestOrderBy && (
           <span className="tabular-nums shrink-0 text-base-400">
-            · {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
+            · due {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
           </span>
         )}
       </div>
@@ -1129,8 +1352,12 @@ function ChaseListRow({
       ].join(" ")}
     >
       <div className="flex items-center gap-1.5 min-w-0">
-        <Factory size={14} className="text-base-400 shrink-0" />
-        <span className={`text-[13px] truncate ${selected ? "font-bold text-base-900" : "font-semibold text-base-900"}`}>
+        <Factory size={16} className="text-base-500 shrink-0" />
+        <span
+          className={`text-[13px] truncate ${
+            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
+          }`}
+        >
           {supplierName}
         </span>
         <span className="pill pill-overdue shrink-0 ml-auto">
@@ -1140,7 +1367,7 @@ function ChaseListRow({
       </div>
       <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
         <span className="tabular-nums shrink-0">
-          {total} {total === 1 ? "item" : "items"} still waiting
+          {total} {total === 1 ? "unit" : "units"} still waiting
         </span>
         {row.expectedReadyDate && (
           <span className="tabular-nums shrink-0 text-base-400">
@@ -1178,8 +1405,12 @@ function ReceiveListRow({
       ].join(" ")}
     >
       <div className="flex items-center gap-1.5 min-w-0">
-        <Truck size={14} className="text-base-400 shrink-0" />
-        <span className={`text-[13px] truncate ${selected ? "font-bold text-base-900" : "font-semibold text-base-900"}`}>
+        <Truck size={16} className="text-base-500 shrink-0" />
+        <span
+          className={`text-[13px] truncate ${
+            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
+          }`}
+        >
           {supplierName}
         </span>
         <span className="pill pill-sent shrink-0 ml-auto">
@@ -1220,7 +1451,7 @@ function DetailEmpty({ stage }: { stage: Stage }) {
   );
 }
 
-// ── ① Send — Detail pane (SKU table + What to do + actions) ──────────────────
+// ── ① Send — Detail pane (3-row header · 7-col SKU table · WhatToDo · actions) ─
 
 const WRONG_OPTIONS = [
   "Factory has no stock",
@@ -1233,20 +1464,16 @@ function PlaceDetail({
   group,
   today,
 }: {
-  group: PurchasePlaceGroup;
+  group: SplitPlaceGroup;
   today: string | null;
 }) {
   const [wrongOpen, setWrongOpen] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const wrongRef = useRef<HTMLDivElement | null>(null);
 
-  // Reset expand + popover when the selected supplier changes.
   useEffect(() => {
-    setExpanded(new Set());
     setWrongOpen(false);
   }, [group.supplierId]);
 
-  // Close the "Something wrong?" menu on outside click.
   useEffect(() => {
     if (!wrongOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -1257,117 +1484,162 @@ function PlaceDetail({
     return () => window.removeEventListener("mousedown", onDown);
   }, [wrongOpen]);
 
-  const toggleRow = (sku: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(sku) ? next.delete(sku) : next.add(sku);
-      return next;
-    });
-
   const hasCost = group.lines.some((l) => l.cost != null && l.cost > 0);
   const buyCost = group.lines.reduce((sum, l) => sum + (l.cost ?? 0) * l.need, 0);
-  const lateLines =
-    today != null
-      ? group.lines.filter((l) => l.orderBy != null && l.orderBy < today).length
-      : 0;
+  // Post-split, categories[] is length-1 for split rows; the parent-cat title
+  // suffix (" · sofa") echoes the row's split label so the operator sees the
+  // detail is scoped to that category's PO.
+  const visibleCats = group.categories.slice(0, 2);
+  const catBreak = categoryBreakdown(group);
+  const catSuffix = group.splitCategory ? ` (${group.splitCategory})` : "";
+
+  const bySize = bySizeBreakdown(group.lines);
+  const sendByDays =
+    group.earliestOrderBy && today ? daysBetween(today, group.earliestOrderBy) : null;
+  const sendByTone =
+    group.urgency === "late" || sendByDays === 0 ? "text-danger" : "text-base-900";
+  const sendBySubtitle = (() => {
+    if (!group.earliestOrderBy) return "";
+    if (sendByDays == null) return "";
+    if (sendByDays < 0) return `(${Math.abs(sendByDays)}d late)`;
+    if (sendByDays === 0) return "(today)";
+    if (sendByDays === 1) return "(in 1 day)";
+    return `(in ${sendByDays} days)`;
+  })();
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      {/* header */}
+      {/* header — 2 rows (Jess 2026-07-22 Q7): title + Send by inline,
+          then one dense line with total / by-size / category mix / destination. */}
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
-        <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
-          <Factory size={16} className="text-base-400 shrink-0" />
-          <span className="truncate">Send order to {group.supplierName}</span>
-        </div>
-        <div className="text-[12px] text-base-600 mt-1">
-          <span className="font-semibold text-base-800 tabular-nums">
-            {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"}
-          </span>
-          {" · "}
-          <span className="tabular-nums">
-            {group.orderCount} {group.orderCount === 1 ? "order" : "orders"}
-          </span>
-          {" · "}
-          <span>&rarr; Klg</span>
-          {group.earliestOrderBy && (
-            <>
-              {" · "}order-by from {fmtDateShort(group.earliestOrderBy)}
-              {lateLines > 0 && (
-                <span className="text-danger font-semibold"> ({lateLines} late)</span>
+        <div className="flex items-start justify-between gap-3 mb-1.5">
+          <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900 min-w-0">
+            <span className="flex items-center gap-0.5 shrink-0">
+              {visibleCats.map((cat) => {
+                const Icon = categoryIconOf(cat);
+                return <Icon key={cat} size={18} className="text-base-500" />;
+              })}
+            </span>
+            <span className="truncate">Send PO to {group.supplierName}{catSuffix}</span>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-base-500 leading-none">
+              Send by
+            </div>
+            <div className={`text-[14px] font-bold tabular-nums leading-tight ${sendByTone}`}>
+              {group.earliestOrderBy ? (
+                <>
+                  {fmtDate(group.earliestOrderBy)}{" "}
+                  <span className="text-base-500 font-medium">{sendBySubtitle}</span>
+                </>
+              ) : (
+                <span className="text-base-400">—</span>
               )}
+            </div>
+          </div>
+        </div>
+        <div className="text-[12px] text-base-800 flex items-center gap-1 flex-wrap">
+          <span className="font-bold tabular-nums">{group.totalUnits}</span>
+          <span>units · for</span>
+          <span className="font-bold tabular-nums">{group.orderCount}</span>
+          <span>{group.orderCount === 1 ? "SO" : "SOs"}</span>
+          {catBreak.length > 1 && (
+            <>
+              <span className="text-base-400">·</span>
+              {catBreak.map((b, i) => (
+                <span key={b.category}>
+                  {i > 0 && <span className="text-base-400"> · </span>}
+                  {b.category} <span className="font-bold tabular-nums">{b.units}</span>
+                </span>
+              ))}
             </>
           )}
+          {bySize.length > 0 && (
+            <>
+              <span className="text-base-400">·</span>
+              {bySize.map((s, i) => (
+                <span key={s.code}>
+                  {i > 0 && <span className="text-base-400"> · </span>}
+                  {s.label} <span className="font-bold tabular-nums">{s.qty}</span>
+                </span>
+              ))}
+            </>
+          )}
+          <span className="text-base-400">·</span>
+          <span>deliver to Klg</span>
         </div>
       </div>
 
-      {/* aggregated SKU table */}
+      {/* SKU table — 7 cols: SKU · MODEL · SIZE · QTY · IN STOCK · DEADLINE · ORDER */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 border-b border-base-100 sticky top-0 bg-white">
-          <span>Model / sku</span>
-          <span className="text-right">Need</span>
-          <span className="text-right">Ready</span>
+        <div
+          className="grid gap-x-3 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 border-b border-base-100 sticky top-0 bg-white"
+          style={{
+            gridTemplateColumns:
+              "minmax(90px, 1.1fr) minmax(80px, 1fr) 40px 46px 60px minmax(80px, 1fr) minmax(70px, 1fr)",
+          }}
+        >
+          <span>SKU</span>
+          <span>Model</span>
+          <span className="text-right">Size</span>
+          <span className="text-right">Qty</span>
+          <span className="text-right">In stock</span>
+          <span>Deadline</span>
+          <span>Order</span>
         </div>
         {group.lines.map((l) => {
-          const open = expanded.has(l.sku);
+          const size = parseSize(l.sku);
+          const deadline = earliestDeadline(l.forOrders);
+          const order = orderColText(l.forOrders);
           return (
-            <div key={l.sku} className="border-b border-base-100">
-              <button
-                type="button"
-                onClick={() => toggleRow(l.sku)}
-                className="w-full grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-4 py-2 text-left hover:bg-hovertint transition-colors"
+            <div
+              key={l.sku}
+              className="grid gap-x-3 px-4 py-2 border-b border-base-100 items-center hover:bg-hovertint transition-colors"
+              style={{
+                gridTemplateColumns:
+                  "minmax(90px, 1.1fr) minmax(80px, 1fr) 40px 46px 60px minmax(80px, 1fr) minmax(70px, 1fr)",
+              }}
+            >
+              <span className="text-[12px] font-mono font-semibold text-base-900 truncate">
+                {l.sku}
+              </span>
+              <span className="text-[12px] text-base-700 truncate">
+                {l.modelName ?? "—"}
+              </span>
+              <span className="text-[12px] font-mono font-bold text-base-800 text-right">
+                {size?.code ?? "—"}
+              </span>
+              <span className="text-[13px] font-bold font-mono tabular-nums text-base-900 text-right">
+                {l.need}
+              </span>
+              <span className="text-[12px] font-mono tabular-nums text-right text-base-500">
+                {l.ready > 0 ? l.ready : "—"}
+              </span>
+              <span
+                className={`text-[12px] tabular-nums ${
+                  deadline && today && deadline < today
+                    ? "text-danger font-semibold"
+                    : "text-base-700"
+                }`}
               >
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-[13px] font-semibold text-base-900">
-                    {open ? (
-                      <ChevronDown size={13} className="shrink-0 text-base-400" />
-                    ) : (
-                      <ChevronRight size={13} className="shrink-0 text-base-400" />
-                    )}
-                    <span className="truncate">{l.modelName ?? l.sku}</span>
-                  </span>
-                  <span className="block pl-[19px] text-[11px] font-mono text-base-500 truncate">
-                    {l.sku} · for {forSummary(l.forOrders)}
-                    {l.orderBy && (
-                      <span className="text-base-400"> · order-by {fmtDateShort(l.orderBy)}</span>
-                    )}
-                  </span>
-                </span>
-                <span className="text-[13px] font-bold font-mono text-base-900 tabular-nums text-right">
-                  &times; {l.need}
-                </span>
-                <span className="text-[12px] font-mono tabular-nums text-right text-base-500">
-                  {l.ready > 0 ? l.ready : "—"}
-                </span>
-              </button>
-              {open && (
-                <div className="px-4 pb-2 pl-[42px] flex flex-col gap-0.5">
-                  {l.forOrders.map((o, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between gap-3 text-[12px] text-base-600"
-                    >
-                      <span className="truncate">
-                        {o.customerName?.trim() || (o.so ? `SO-${o.so}` : "—")}
-                      </span>
-                      {o.so && (
-                        <span className="shrink-0 font-mono text-base-400">SO-{o.so}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                {deadline
+                  ? `${dayName(deadline)} ${dayLabelShort(deadline)}`
+                  : <span className="text-base-400">—</span>}
+              </span>
+              <span className="text-[12px] font-mono text-base-700 truncate">
+                {order}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* What to do — the 4-step block, COPY-STANDARD template */}
+      {/* What to do — inline horizontal (Jess 2026-07-22, saves vertical space) */}
       <WhatToDo
         steps={[
-          `WhatsApp ${group.supplierName}.`,
-          "Send the SKU list above.",
-          "Ask for a ready date.",
-          "Click Send PO.",
+          `WhatsApp ${group.supplierName}`,
+          "Paste SKU list above as PO",
+          "Click Send PO here to record",
         ]}
       />
 
@@ -1390,13 +1662,17 @@ function PlaceDetail({
               aria-haspopup="menu"
               aria-expanded={wrongOpen}
             >
-              Something wrong?
+              Something wrong?{" "}
+              <span className="text-base-400 font-normal">(soon)</span>
             </Btn>
             {wrongOpen && (
               <div
                 role="menu"
-                className="absolute bottom-full left-0 mb-1.5 w-[220px] rounded-[12px] border border-base-200 bg-white shadow-lg py-1 z-10"
+                className="absolute bottom-full left-0 mb-1.5 w-[260px] rounded-[12px] border border-base-200 bg-white shadow-lg py-1 z-10"
               >
+                <div className="px-3 py-2 border-b border-base-100 text-[11px] text-base-500 leading-snug">
+                  Coming soon — the options here record intent but don&rsquo;t act yet.
+                </div>
                 {WRONG_OPTIONS.map((opt) => (
                   <button
                     key={opt}
@@ -1448,8 +1724,6 @@ function ChaseDetail({
     .filter((s): s is string => Boolean(s));
   const deadline = row.earliestDeliveryDate;
 
-  // Prefer the supplier's phone (prefillable wa.me deep link); fall back to
-  // the WhatsApp group URL (open only, can't carry ?text=).
   const waBase = waLink(supplier?.contact);
   const groupUrl = supplier?.whatsapp_group_url?.trim() || null;
   const chaseText = buildSupplierChase({
@@ -1472,7 +1746,7 @@ function ChaseDetail({
       {/* header */}
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
         <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
-          <Factory size={16} className="text-base-400 shrink-0" />
+          <Factory size={18} className="text-base-500 shrink-0" />
           <span className="truncate">Chase {supplierName}</span>
           <span className="pill pill-overdue shrink-0 ml-auto">
             <AlertCircle />
@@ -1509,7 +1783,7 @@ function ChaseDetail({
             <div className="text-[12px] text-base-500">
               still waiting{" "}
               <span className="font-bold font-mono text-base-900 tabular-nums">
-                &times; {it.outstanding}
+                {it.outstanding}
               </span>
             </div>
           </div>
@@ -1518,10 +1792,10 @@ function ChaseDetail({
 
       <WhatToDo
         steps={[
-          `WhatsApp ${supplierName}.`,
-          "Ask for a new ready date.",
-          "Write it in the PO.",
-          "Tell the salesperson.",
+          `WhatsApp ${supplierName}`,
+          "Ask/update final ready date",
+          "Arrange NETS pickup once ready",
+          "Update ETA here",
         ]}
       />
 
@@ -1566,7 +1840,7 @@ function ReceiveDetail({
       {/* header */}
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
         <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
-          <Truck size={16} className="text-base-400 shrink-0" />
+          <Truck size={18} className="text-base-500 shrink-0" />
           <span className="truncate">Check in from {supplierName}</span>
           <span className="pill pill-sent shrink-0 ml-auto">
             <PackageCheck />
@@ -1597,7 +1871,7 @@ function ReceiveDetail({
           >
             <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
             <div className="text-[13px] font-bold font-mono text-base-900 tabular-nums">
-              &times; {it.outstanding}
+              {it.outstanding}
             </div>
           </div>
         ))}
@@ -1605,10 +1879,10 @@ function ReceiveDetail({
 
       <WhatToDo
         steps={[
-          "Count the goods on arrival.",
-          "Photograph the factory DO slip.",
-          "Book into Klg stock.",
-          "Reserve to the customer order.",
+          "Count goods on arrival",
+          "Photograph the DO slip",
+          "Book into Klg stock",
+          "Reserve to customer order",
         ]}
       />
 
@@ -1631,24 +1905,27 @@ function ReceiveDetail({
   );
 }
 
-// ── What to do — the 4-step block below the detail pane's items ──────────────
+// ── What to do — inline horizontal (all steps on one line with → separators) ─
 
 function WhatToDo({ steps }: { steps: string[] }) {
   return (
     <div className="shrink-0 mx-4 mb-2 mt-2 rounded-[10px] border border-dashed border-base-200 bg-base-50/70 px-3 py-2">
-      <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 mb-1.5">
-        What to do
-      </div>
-      <ol className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 flex-wrap text-[12px] text-base-700">
+        <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 shrink-0">
+          What to do
+        </span>
         {steps.map((s, i) => (
-          <li key={i} className="flex items-start gap-2 text-[12px] text-base-700">
-            <span className="grid place-items-center w-4 h-4 rounded-full bg-base-200 text-base-700 text-[10px] font-bold font-mono shrink-0 mt-0.5">
+          <span key={i} className="flex items-center gap-1 shrink-0">
+            <span className="grid place-items-center w-4 h-4 rounded-full bg-base-200 text-base-700 text-[10px] font-bold font-mono">
               {i + 1}
             </span>
-            <span className="min-w-0">{s}</span>
-          </li>
+            <span>{s}</span>
+            {i < steps.length - 1 && (
+              <ArrowRight size={12} className="text-base-400 ml-1" />
+            )}
+          </span>
         ))}
-      </ol>
+      </div>
     </div>
   );
 }
@@ -1670,53 +1947,6 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
       <div className="text-[13px] font-semibold text-base-900">{text}</div>
       <div className="text-[12px] text-base-500 mt-1">{sub}</div>
     </div>
-  );
-}
-
-// ── KPI card (stage switcher) ─────────────────────────────────────────────────
-
-function KpiCard({
-  value,
-  label,
-  sub,
-  subTone,
-  active,
-  onClick,
-}: {
-  value: number | string;
-  label: string;
-  sub: string;
-  subTone: "danger" | "muted";
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`text-left bg-white rounded-[12px] shadow-sm px-4 py-2.5 flex flex-col gap-0.5 border transition-colors ${
-        active
-          ? "border-primary ring-1 ring-primary"
-          : "border-base-200 hover:border-base-300"
-      }`}
-    >
-      <span className="text-[20px] font-bold font-mono tabular-nums leading-none text-base-900">
-        {value}
-      </span>
-      <span
-        className={`text-[12px] font-semibold ${active ? "text-primary" : "text-base-600"}`}
-      >
-        {label}
-      </span>
-      <span
-        className={`text-[11px] font-semibold ${
-          subTone === "danger" ? "text-danger" : "text-base-400"
-        }`}
-      >
-        {sub}
-      </span>
-    </button>
   );
 }
 
@@ -1808,4 +2038,3 @@ function FacetRow({
 function EmptyFacetHint({ text }: { text: string }) {
   return <div className="px-2.5 py-1.5 text-[12px] text-base-400">{text}</div>;
 }
-
