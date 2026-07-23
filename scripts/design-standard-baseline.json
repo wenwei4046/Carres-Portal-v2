@@ -36,7 +36,7 @@
     "apps/web/src/pages/principal/components/ApprovalKindBadge.tsx": 2,
     "apps/web/src/pages/principal/components/RoleChip.tsx": 4
   },
-  "hoverGrey": 92,
+  "hoverGrey": 94,
   "listPages": [
     "apps/web/src/pages/Login.tsx",
     "apps/web/src/pages/Me.tsx",
@@ -161,6 +161,7 @@
     "apps/web/src/pages/operation/OperationOrders.tsx",
     "apps/web/src/pages/operation/OperationOrdersControl.tsx",
     "apps/web/src/pages/operation/OperationPayments.tsx",
+    "apps/web/src/pages/operation/OperationPurchase.tsx",
     "apps/web/src/pages/operation/OperationReceiving.tsx",
     "apps/web/src/pages/operation/OperationServiceCases.tsx",
     "apps/web/src/pages/operation/OperationServiceNotes.tsx",
@@ -170,6 +171,7 @@
     "apps/web/src/pages/operation/OperationWarehouse.tsx",
     "apps/web/src/pages/operation/OpsStockListView.tsx",
     "apps/web/src/pages/operation/OrderEntryPage.tsx",
+    "apps/web/src/pages/operation/PurchasingTabs.tsx",
     "apps/web/src/pages/operation/components/AbandonOrderModal.tsx",
     "apps/web/src/pages/operation/components/AdjustStockModal.tsx",
     "apps/web/src/pages/operation/components/AnnotationTimeline.tsx",
@@ -288,6 +290,8 @@
     "apps/web/src/pages/supplier/SupplierIncoming.tsx",
     "apps/web/src/pages/supplier/SupplierPOs.tsx",
     "apps/web/src/pages/supplier/SupplierSKU.tsx",
-    "apps/web/src/pages/supplier/SupplierSidebar.tsx"
+    "apps/web/src/pages/supplier/SupplierSidebar.tsx",
+    "apps/web/src/pages/operation/components/PoDocumentPreview.tsx",
+    "apps/web/src/pages/operation/components/PurchaseListRow.tsx"
   ]
 }
