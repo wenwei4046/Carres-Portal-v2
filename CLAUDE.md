@@ -17,6 +17,62 @@
 
 ---
 
+## §0 Panel-work protocol (READ BEFORE ANY DESIGN / PROPOSAL / REDESIGN WORK)
+
+Any new chat asked to design, propose, redesign, critique, or execute on ANY
+panel (Orders / Purchase / Payments / Catalog / POS / Stock / any other) MUST
+follow these six steps IN ORDER, before writing a single line of code:
+
+1. **READ the relevant section of [`docs/PANEL-PROPOSALS-FOR-REVIEW.md`](docs/PANEL-PROPOSALS-FOR-REVIEW.md)**
+   using the `Read` tool. Also open the "Full spec file to attach" that section
+   names if a deeper read is warranted. This is the canonical starting point —
+   don't re-derive from memory, don't ask Loo to re-explain, read the doc.
+
+2. **PROVE you read it.** Quote **2–3 EXACT lines** (verbatim, in a blockquote)
+   from the section back to Loo. No paraphrase. No summary. No quote = no work.
+   The `Read` tool call must be visible in the transcript — Loo can check.
+
+3. **RATE the proposal against international benchmarks.** How would a
+   world-class equivalent handle this problem? Reference points:
+   - UX / product design: Linear, Notion, Stripe Dashboard, Figma, Superhuman.
+   - Ops / ERP / procurement: SAP, Odoo, NetSuite, Katana, Cin7.
+   - Commerce / retail: Shopify, Square, Lightspeed.
+   Grade the current proposal **A–F on each of**:
+   (a) clarity of business intent,
+   (b) UX for a non-technical, low-English operator,
+   (c) data-model soundness,
+   (d) international best-practice alignment.
+   Show the grades in a small table.
+
+4. **FLAG every weakness explicitly.** Do NOT soften. If a "locked decision"
+   in the doc looks wrong to you, say so with reasoning + a concrete better
+   alternative. Loo wants a peer reviewer, not a yes-man. Blindly following
+   a mediocre spec is a failure mode; call it out.
+
+5. **PROPOSE a superior redesign if you have one.** The proposals in that doc
+   are a STARTING point, not scripture — overwriting is welcome and encouraged.
+   When you have a better idea, present old vs. new side-by-side (a short table
+   or two-column ASCII sketch) and let Loo pick. Never propose more than one
+   alternative at a time (see the "no-menus, decide" feedback rule): pick your
+   single best redesign, name it decided, invite redirect only if it's wrong.
+
+6. **ONLY THEN execute** — using whichever version Loo greenlights (original,
+   your redesign, or a blend). Never skip to code before steps 1–5 land.
+
+**Failure modes that count as breaking this protocol:**
+- Claiming "I read the doc" without a `Read` tool call in the transcript.
+- Skipping the quote-back (step 2) or the rating table (step 3).
+- Softening a real weakness to sound polite (step 4).
+- Executing before Loo greenlights (step 6).
+
+Loo's verification: he can look at the transcript for the `Read` call on the
+file and the verbatim quote block. Either both are present or you didn't do it,
+regardless of what you claim. Same rule applies when the "doc" is any other
+locked spec (`ORDERS_LIST_SPEC.md`, `docs/OPS-BUILD-BRIEF.md`, `docs/UI-KIT.md`,
+`CARRES_PORTAL_V2_PLAN.md`, `docs/superpowers/plans/*.md`).
+
+---
+
 ## 1. Identity & context
 
 This is a **complete rewrite** of the existing Carres-Portal (which is in production with testimony data only — no real data to preserve). The reference design is `Carres_Portal.zip`, **extracted into `reference/` at repo root and excluded from git via `.gitignore`** — meaning Claude Code can read it freely, but it never gets committed, built, or deployed. Loo is the Chairman of HOUZS Venture Sdn Bhd; **he has no coding background and relies on Claude Code for all technical execution**. Communicate clearly, default to Chinese with English tech terms preserved (Next.js, Supabase, RLS, Hono — never translate these).
