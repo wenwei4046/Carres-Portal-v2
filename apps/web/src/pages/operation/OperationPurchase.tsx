@@ -514,7 +514,6 @@ export default function OperationPurchase() {
 
   const chase = data?.chase ?? [];
   const receive = data?.receive ?? [];
-  const summary = data?.summary;
   const today = data?.today ?? null;
 
   // ① Send groups — resolve each supplier's display name (the engine leaves it
@@ -552,7 +551,6 @@ export default function OperationPurchase() {
   const placeOverdue = splitPlaceGroups.filter((g) => g.urgency === "late").length;
   const missingCount = splitPlaceGroups.filter((g) => g.urgency === "no_deadline").length;
   const chaseCount = chase.length;
-  const chaseLate = summary?.chaseLate ?? 0;
   const receiveCount = receive.length;
 
   // BY FACTORY facet — per-supplier units for the CURRENT stage. Aggregates
@@ -899,28 +897,10 @@ export default function OperationPurchase() {
           }
         >
           <div className="flex-1 min-h-0 flex flex-col gap-3">
-            {/* ── STAGE TABS = compact pill row (Jess 2026-07-22 Q1a) ────── */}
-            <StageTabs
-              stage={stage}
-              onSwitch={goStage}
-              counts={{ place: placeCount, chase: chaseCount, receive: receiveCount }}
-              subs={{
-                place:
-                  placeOverdue > 0
-                    ? `${placeOverdue} late`
-                    : placeCount > 0
-                      ? "on track"
-                      : "nothing to send",
-                chase:
-                  chaseLate > 0
-                    ? `${chaseLate} late`
-                    : chaseCount > 0
-                      ? "on track"
-                      : "nothing to chase",
-                receive: receiveCount > 0 ? "ready to check in" : "nothing arriving",
-              }}
-              loading={isLoading}
-            />
+            {/* Jess 2026-07-23 — the 3-pill StageTabs row was removed. It
+                duplicated the facet rail's Today's work group (Send / Chase /
+                Receive with the same counts) and burned ~60px of vertical
+                space. Stage switch stays on the facet rail. */}
 
             {/* ── 14-day date strip (This week's plan merged into lead lines) ── */}
             {today && (
@@ -1131,77 +1111,8 @@ function TodayRefresh({
   );
 }
 
-// ── StageTabs = compact pill row (Jess 2026-07-22 Q1a — ~40px, was ~72px) ────
-
-function StageTabs({
-  stage,
-  onSwitch,
-  counts,
-  subs,
-  loading,
-}: {
-  stage: Stage;
-  onSwitch: (s: Stage) => void;
-  counts: { place: number; chase: number; receive: number };
-  subs: { place: string; chase: string; receive: string };
-  loading?: boolean;
-}) {
-  const tabs: Array<{
-    key: Stage;
-    n: string;
-    label: string;
-    count: number;
-    sub: string;
-  }> = [
-    { key: "place", n: "1", label: "Send", count: counts.place, sub: subs.place },
-    { key: "chase", n: "2", label: "Chase", count: counts.chase, sub: subs.chase },
-    { key: "receive", n: "3", label: "Receive", count: counts.receive, sub: subs.receive },
-  ];
-  return (
-    <div className="grid grid-cols-3 gap-2 shrink-0" role="tablist" aria-label="Purchase stages">
-      {tabs.map((t) => {
-        const active = stage === t.key;
-        return (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSwitch(t.key)}
-            className={[
-              "flex items-center gap-2 rounded-full px-3 py-2 border transition-colors bg-white text-left",
-              active
-                ? "border-primary ring-1 ring-primary"
-                : "border-base-200 hover:border-base-300",
-            ].join(" ")}
-          >
-            <span
-              className={[
-                "grid place-items-center w-5 h-5 rounded text-[11px] font-bold font-mono shrink-0",
-                active ? "bg-primary text-white" : "bg-base-900 text-white",
-              ].join(" ")}
-            >
-              {t.n}
-            </span>
-            <span
-              className={`text-[13px] font-bold shrink-0 ${
-                active ? "text-primary" : "text-base-900"
-              }`}
-            >
-              {t.label}
-            </span>
-            <span className="text-[12px] font-semibold text-base-800 tabular-nums shrink-0">
-              {loading ? "…" : `${t.count} ${t.count === 1 ? "PO" : "POs"}`}
-            </span>
-            <span className="text-[11px] text-base-500 truncate min-w-0">
-              · {loading ? "…" : t.sub}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+// StageTabs removed 2026-07-23 (Jess) — the 3-pill switcher row duplicated
+// the facet rail's Today's work group and burned ~60px of vertical space.
 
 // ── Days-to-order strip (This week's plan merged into lead line) ─────────────
 
@@ -1294,13 +1205,16 @@ function DaysToOrderStrip({
           const cadence = isCadenceDay(b.iso);
           const nonWorking = nonWorkingReason(b.iso);
           const dateNum = String(new Date(`${b.iso}T00:00:00Z`).getUTCDate());
-          // Chip colour = status semantic (Jess 2026-07-22 Q8 — colour IS the label).
+          // Jess 2026-07-23 · date and count no longer share the flame colour
+          // (both being red made them indistinguishable). Today's DATE stays
+          // flame (text-only, no filled circle — half the height). The count
+          // chip goes neutral grey by default, red only when the day is LATE
+          // (past-today work rolled into today's cell). Weekend/PH counts stay
+          // muted so late-on-weekend still surfaces without shouting.
           const chipCls =
             b.status === "late"
               ? "bg-error-soft text-danger"
-              : b.status === "today"
-                ? "bg-primary text-white"
-                : "bg-signature-50 text-signature-800";
+              : "bg-base-100 text-base-700";
           const tooltip = nonWorking
             ? `${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${nonWorking}${
                 b.units > 0 ? ` · ${b.units} due (won't work)` : ""
@@ -1316,7 +1230,7 @@ function DaysToOrderStrip({
               aria-pressed={isSel}
               title={tooltip}
               className={[
-                "flex flex-col items-center justify-start rounded-md py-2 transition-colors min-h-[76px]",
+                "flex flex-col items-center justify-start rounded-md py-1 transition-colors min-h-[52px]",
                 isSel
                   ? "bg-hovertint ring-1 ring-primary"
                   : nonWorking
@@ -1326,7 +1240,8 @@ function DaysToOrderStrip({
                       : "hover:bg-hovertint",
               ].join(" ")}
             >
-              {/* Row 1 · day name (subdued for non-working) */}
+              {/* Row 1 · day name — flame ONLY on today for the affordance
+                  (Jess 2026-07-23 · no filled today circle any more). */}
               <span
                 className={`text-[10px] font-semibold uppercase tracking-wide ${
                   isToday ? "text-primary" : nonWorking ? "text-base-400" : "text-base-500"
@@ -1334,35 +1249,35 @@ function DaysToOrderStrip({
               >
                 {dayName(b.iso)}
               </span>
-              {/* Row 2 · date — filled flame circle on today, plain bold otherwise */}
-              {isToday ? (
-                <span className="mt-0.5 w-7 h-7 rounded-full bg-primary text-white grid place-items-center text-[13px] font-bold font-mono tabular-nums">
-                  {dateNum}
-                </span>
-              ) : (
-                <span
-                  className={`mt-0.5 text-[18px] font-bold font-mono tabular-nums leading-none ${
-                    nonWorking ? "text-base-400" : "text-base-900"
-                  }`}
-                >
-                  {dateNum}
-                </span>
-              )}
-              {/* Row 3 · count chip (only if there's content) — still shown on
-                  non-working days so late/due work isn't hidden. */}
+              {/* Row 2 · date number — flame text on today, plain bold else,
+                  muted on weekend/PH. No filled circle background any more. */}
+              <span
+                className={`text-[14px] font-bold font-mono tabular-nums leading-none ${
+                  isToday
+                    ? "text-primary"
+                    : nonWorking
+                      ? "text-base-400"
+                      : "text-base-900"
+                }`}
+              >
+                {dateNum}
+              </span>
+              {/* Row 3 · count chip — neutral grey by default so it never
+                  competes visually with today's flame date. Red only when
+                  status === "late". Weekend/PH counts stay muted. */}
               {b.units > 0 && (
                 <span
-                  className={`mt-1.5 inline-flex items-center justify-center rounded-full min-w-[26px] px-2 py-0.5 text-[12px] font-bold font-mono tabular-nums ${
+                  className={`mt-0.5 inline-flex items-center justify-center rounded-full min-w-[22px] px-1.5 py-0 text-[11px] font-bold font-mono tabular-nums ${
                     nonWorking ? "bg-base-200 text-base-500" : chipCls
                   }`}
                 >
                   {b.units}
                 </span>
               )}
-              {/* Row 4 · non-working label — tiny caption so the visual gap is
-                  labelled, not just visual. */}
-              {nonWorking && (
-                <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.04em] text-base-400 leading-none">
+              {/* Row 4 · non-working label (only when there's no count above,
+                  else the OFF caption doubles up with the mute). */}
+              {nonWorking && b.units === 0 && (
+                <span className="text-[9px] font-bold uppercase tracking-[0.04em] text-base-400 leading-none">
                   {nonWorking.startsWith("PH:") ? "PH" : "off"}
                 </span>
               )}
