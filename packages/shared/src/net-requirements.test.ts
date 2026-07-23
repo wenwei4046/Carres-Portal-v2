@@ -21,6 +21,7 @@ const line = (over: Partial<DemandLine> = {}): DemandLine => ({
   leadDays: over.leadDays ?? 0,
   placedAt: over.placedAt ?? "2026-01-01",
   committed: over.committed ?? true,
+  offDays: over.offDays,
 });
 
 const opts = (over: Partial<NetRequirementsOptions> = {}): NetRequirementsOptions => ({
@@ -248,5 +249,65 @@ describe("computeNetRequirements — lead resolves through working days + holida
       opts({ holidays: ["2026-01-29"] }),
     );
     expect(r.bundles[0].raiseBy).toBe("2026-01-26");
+  });
+});
+
+describe("computeNetRequirements — arrival buffer + per-supplier work week", () => {
+  // Jan 2026 (Mon–Sat, Sun off): 24 Sat · 25 Sun(off) · 26 Mon · 27 Tue · 28 Wed
+  // · 29 Thu · 30 Fri. offDays [0,6] = 5-day week (Sat+Sun off).
+
+  it("arrival buffer pulls raise-by earlier (arrive N working days before deadline)", () => {
+    // deadline 30 Fri, buffer 2 working days (6-day wk): 29(1), 28(2) → arriveBy 28.
+    // lead 0 → raiseBy = 28.
+    const r = computeNetRequirements(
+      [line({ leadDays: 0, deadline: "2026-01-30" })],
+      {},
+      opts({ arrivalBufferDays: 2 }),
+    );
+    expect(r.bundles[0].raiseBy).toBe("2026-01-28");
+  });
+
+  it("buffer + lead stack (arriveBy then back off the lead)", () => {
+    // deadline 30, buffer 2 → arriveBy 28. lead 3 (6-day): 27(1), 26(2), 24(3) → 24.
+    const r = computeNetRequirements(
+      [line({ leadDays: 3, deadline: "2026-01-30" })],
+      {},
+      opts({ arrivalBufferDays: 2 }),
+    );
+    expect(r.bundles[0].raiseBy).toBe("2026-01-24");
+  });
+
+  it("per-line offDays: a 5-day supplier (Sat+Sun off) orders earlier than a 6-day one", () => {
+    // deadline 30, buffer 0, lead 5.
+    // 6-day (Sun off): 29,28,27,26,24 → 24.
+    const sixDay = computeNetRequirements(
+      [line({ leadDays: 5, deadline: "2026-01-30" })],
+      {},
+      opts(),
+    );
+    expect(sixDay.bundles[0].raiseBy).toBe("2026-01-24");
+    // 5-day (Sat+Sun off): 29,28,27,26,23 → 23 (earlier — Saturday is not a work day).
+    const fiveDay = computeNetRequirements(
+      [line({ leadDays: 5, deadline: "2026-01-30", offDays: [0, 6] })],
+      {},
+      opts(),
+    );
+    expect(fiveDay.bundles[0].raiseBy).toBe("2026-01-23");
+  });
+
+  it("bed-set spanning two suppliers gates on the EARLIEST leg", () => {
+    // One order: mattress (Nice Future, 5-day, lead 5 → 23) + bedframe (Ohana,
+    // 6-day, lead 5 → 24). Bundle must be ordered by the earlier leg = 23.
+    const r = computeNetRequirements(
+      [
+        line({ lineId: "M", sku: "MAT", category: "mattress", supplierId: "NF", leadDays: 5, deadline: "2026-01-30", offDays: [0, 6] }),
+        line({ lineId: "B", sku: "BED", category: "bedframe", supplierId: "OH", leadDays: 5, deadline: "2026-01-30", offDays: [0] }),
+      ],
+      {},
+      opts(),
+    );
+    const bedset = r.bundles.find((b) => b.lineIds.includes("M") && b.lineIds.includes("B"));
+    expect(bedset).toBeTruthy();
+    expect(bedset!.raiseBy).toBe("2026-01-23");
   });
 });

@@ -34,14 +34,34 @@ import type { AppEnv } from "../../types";
 const purchaseRouter = new Hono<AppEnv>();
 
 // Effective lead time (WORKING days) per procurable category — Jess's normal
-// (non-peak) leads. Peak is OFF for now (the engine never auto-pads).
-// TODO: move to a lead_time_config table (migration 0243, pending Jess) so the
-// principal can tune these + author a per-supplier peak window.
+// (non-peak) leads (corrected 2026-07-23: mattress + bedframe are 5–7 wd, sofa
+// 14 official / ~10 actual). Peak is OFF for now (the engine never auto-pads).
+// This SINGLE number drives raise-by (when to order) so we use the SAFE upper
+// bound (order early enough, never late); the shorter ACTUAL/promise number
+// (mattress/bedframe 5, sofa 10) lands as a second column with the Settings
+// table (migration 0243, pending Jess) so the principal can tune + promise the
+// shorter credible date without under-buffering the order.
 const DEFAULT_LEAD_DAYS: Record<string, number> = {
-  sofa: 14,
-  bedframe: 8,
-  mattress: 10,
+  sofa: 10, // Jess 2026-07-23: make + deliver ≈ 10 working days (14 is the padded max)
+  bedframe: 7, // Jess: 5–7 working days
+  mattress: 7, // Jess: 5–7 working days
 };
+
+// Supplier work week per category (Jess 2026-07-23): Nice Future (mattress) = 5-day
+// (Sat + Sun off); Ohana (bedframe + sofa) = 6-day (works Saturday). Drives ONLY the
+// make+deliver LEAD leg; the arrival buffer + urgency use the Carres 5-day week
+// (options.offDays below). One-supplier-per-category proxy until 0243 lands a real
+// per-supplier work_week. (Corrects daf06588, which forced the whole engine to 5-day.)
+const SUPPLIER_OFF_DAYS: Record<string, readonly number[]> = {
+  mattress: [0, 6], // Nice Future — no Saturday
+  bedframe: [0], // Ohana — works Saturday
+  sofa: [0], // Ohana — works Saturday
+};
+
+// Stock must ARRIVE this many working days before the customer deadline (Jess: the
+// editable arrival buffer — leaves time to arrange delivery / assign logistic).
+// Counted on the Carres/delivery-side week (options.offDays). Editable via 0243 later.
+const ARRIVAL_BUFFER_WORKING_DAYS = 7;
 
 const PROCURABLE: ReadonlyArray<ProductCategory> = ["sofa", "bedframe", "mattress"];
 
@@ -304,7 +324,8 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       supplierId,
       qty: Number(l.qty ?? 0),
       deadline: deadline ? deadline.slice(0, 10) : null,
-      leadDays: DEFAULT_LEAD_DAYS[category] ?? 10,
+      leadDays: DEFAULT_LEAD_DAYS[category] ?? 7,
+      offDays: SUPPLIER_OFF_DAYS[category] ?? [0],
       placedAt: placedAt.slice(0, 10),
       committed: order.status === "proceed_order",
     });
@@ -387,11 +408,15 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     {
       today: todayIso(),
       holidays: myHolidaySet(),
-      // Jess 2026-07-23 · same rationale as loadChaseReceive above —
-      // Carres suppliers are Mon–Fri, so raiseBy backs off both Sat and Sun
-      // (was Sun only, which produced Saturday send dates that fooled the
-      // operator into thinking Ohana could take a PO on the weekend).
+      // options.offDays = the CARRES / delivery-side week (Mon–Fri, 5-day). It
+      // drives the arrival buffer + the urgency buckets (we can't SEND a PO on a
+      // Carres off-day). The per-line make+deliver LEAD instead uses each line's
+      // own supplier week (DemandLine.offDays, set from SUPPLIER_OFF_DAYS) — so
+      // Ohana's Saturday counts toward its lead while Nice Future's does not.
       offDays: [0, 6],
+      // Stock must land 7 working days before the deadline (leaves time to
+      // arrange delivery). Editable via the 0243 lead-time config later.
+      arrivalBufferDays: ARRIVAL_BUFFER_WORKING_DAYS,
       // consumeFreeStock stays OFF (default) — free stock is advisory only.
       reviewDaysBySupplier,
     },

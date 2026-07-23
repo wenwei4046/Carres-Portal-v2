@@ -53,6 +53,13 @@ export interface DemandLine {
   placedAt: IsoDate;
   /** proceed_order = committed; place = pipeline. Carried through for the radar. */
   committed: boolean;
+  /**
+   * The supplier's non-working weekdays for THIS line's make leg (0=Sun…6=Sat).
+   * e.g. Nice Future (5-day) = [0,6]; Ohana (6-day) = [0]. Falls back to
+   * `options.offDays` when omitted. Lets a bed-set span two suppliers with
+   * different work weeks (each leg counts its own; the bundle takes the earliest).
+   */
+  offDays?: readonly number[];
 }
 
 export interface NetRequirementsSupply {
@@ -85,6 +92,13 @@ export interface NetRequirementsOptions extends WorkingDayOptions {
    * for its own per-line bundle (default: sofa & everything else).
    */
   bundleGroupOf?: (category: ProductCategory) => string | null;
+  /**
+   * Working days the stock must ARRIVE before the customer deadline (Jess: the
+   * editable arrival buffer, default 7 in prod; leaves time to arrange delivery
+   * / assign logistic / PayHold). Counted on the delivery-side week (`offDays`).
+   * Default 0 = arrive-on-deadline (back-compat: raise-by = deadline − lead).
+   */
+  arrivalBufferDays?: number;
 }
 
 // ── Outputs ─────────────────────────────────────────────────────────────────
@@ -328,8 +342,29 @@ export function computeNetRequirements(
       .sort();
     const deadline = deadlines.length ? deadlines[0] : null;
     const maxLeadDays = members.reduce((mx, m) => Math.max(mx, m.leadDays), 0);
-    const raiseBy =
-      deadline == null ? null : subtractWorkingDays(deadline, maxLeadDays, wdOpts);
+    // Arrival buffer: stock must land `arrivalBufferDays` working days BEFORE the
+    // deadline (Carres/delivery-side week = wdOpts), leaving time to arrange
+    // delivery. Then each member backs off its OWN lead using its OWN supplier
+    // work week (m.offDays); the bundle is ordered by the EARLIEST member
+    // raise-by (a bed-set spanning Nice Future 5-day + Ohana 6-day gates on the
+    // earlier leg — both must be ready by arriveBy).
+    const buffer = options.arrivalBufferDays ?? 0;
+    const arriveBy =
+      deadline == null ? null : subtractWorkingDays(deadline, buffer, wdOpts);
+    let raiseBy: IsoDate | null = null;
+    let promiseIfOrderedToday = today;
+    for (const m of members) {
+      const memberWd: WorkingDayOptions = {
+        holidays: options.holidays,
+        offDays: m.offDays ?? options.offDays,
+      };
+      if (arriveBy != null) {
+        const rb = subtractWorkingDays(arriveBy, m.leadDays, memberWd);
+        if (raiseBy == null || rb < raiseBy) raiseBy = rb;
+      }
+      const arrival = addWorkingDays(today, m.leadDays, memberWd);
+      if (arrival > promiseIfOrderedToday) promiseIfOrderedToday = arrival;
+    }
     const toOrder = members.reduce(
       (sum, m) => sum + (lineResults.get(m.lineId)?.toOrder ?? 0),
       0,
@@ -361,7 +396,7 @@ export function computeNetRequirements(
       deadline,
       maxLeadDays,
       raiseBy,
-      promiseIfOrderedToday: addWorkingDays(today, maxLeadDays, wdOpts),
+      promiseIfOrderedToday,
       toOrder,
       urgency,
     });

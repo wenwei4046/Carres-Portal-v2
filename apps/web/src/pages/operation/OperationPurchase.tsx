@@ -71,6 +71,7 @@ import {
   Send,
   Sofa,
   Truck,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -96,6 +97,7 @@ import {
   useOperationPos,
   useOperationWarehouse,
   useChasePoEventMutation,
+  useOperationPoDuty,
 } from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -231,20 +233,17 @@ function urgencyStyle(u: PurchaseUrgencyBucket): UrgencyStyle {
  *  SO in Carres vocab). Jess 2026-07-22. */
 function placeActionLine(g: PurchasePlaceGroup, today: string | null): string {
   const name = g.supplierName ?? "the factory";
+  if (g.urgency === "no_deadline")
+    return `${name} — waiting on a deadline before we can plan.`;
+  // ASAP model (Jess 2026-07-23): we proceed the moment a sales order lands — no
+  // holding for a review cycle. Every PO that needs raising reads "today"; the
+  // urgency PILL (Late / Due soon / Scheduled) carries how pressing it is, not
+  // the action line. Only a late one appends how many days behind we are.
   if (g.urgency === "late" && g.earliestOrderBy && today) {
     const late = daysBetween(g.earliestOrderBy, today) ?? 0;
     if (late > 0) return `Send PO to ${name} today — ${late}d late.`;
-    return `Send PO to ${name} today.`;
   }
-  if (g.urgency === "urgent") return `Send PO to ${name} today.`;
-  if (g.urgency === "due" && g.earliestOrderBy) {
-    return `Prepare PO to ${name} by ${dayName(g.earliestOrderBy)}.`;
-  }
-  if (g.urgency === "no_deadline")
-    return `${name} — waiting on a deadline before we can plan.`;
-  if (g.earliestOrderBy)
-    return `Send PO to ${name} from ${dayName(g.earliestOrderBy)}.`;
-  return `Review the ${name} PO.`;
+  return `Send PO to ${name} today.`;
 }
 
 function chaseActionLine(r: PurchaseChase, supplierName: string): string {
@@ -376,6 +375,33 @@ function splitByCategory(
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
+
+// PO duty chip on the tab bar (Jess 2026-07-23) — surfaces WHO controls
+// company-wide POs this month (货合买: one holder per month, auto-rotating via
+// /api/operation/po-duty). Hidden while the duty layer is dormant (no holder);
+// reads the same data as the right-rail Team panel. Urgent orders bypass duty.
+function PoDutyTabChip() {
+  const dutyQ = useOperationPoDuty();
+  const holder = dutyQ.data?.holder ?? null;
+  if (!holder?.name) return null;
+  const month = dutyQ.data?.month ?? "";
+  const monthLabel = month
+    ? new Date(`${month}-01T00:00:00`).toLocaleDateString("en-US", { month: "short" })
+    : "";
+  return (
+    <span
+      className="flex items-center gap-1.5 rounded-full border border-base-200 bg-base-50 px-2.5 py-1 text-[12px] text-base-600"
+      title="PO duty — one person controls company-wide POs each month (urgent orders bypass)"
+      data-testid="po-duty-chip"
+    >
+      <UserRound size={13} strokeWidth={2} className="text-base-400" />
+      <span>
+        PO duty · {monthLabel}:{" "}
+        <span className="font-semibold text-base-900">{holder.name}</span>
+      </span>
+    </span>
+  );
+}
 
 export default function OperationPurchase() {
   const { data, isLoading, isError, error, refetch } = usePurchaseToday();
@@ -638,7 +664,12 @@ export default function OperationPurchase() {
   return (
     <div className="h-full flex flex-col">
       <PurchasingTabs
-        right={<TodayRefresh today={today} onRefresh={() => void refetch()} />}
+        right={
+          <>
+            <PoDutyTabChip />
+            <TodayRefresh today={today} onRefresh={() => void refetch()} />
+          </>
+        }
       />
       <div className="flex-1 min-h-0">
         <ListPageShell
@@ -758,115 +789,135 @@ export default function OperationPurchase() {
               </div>
             )}
 
-            {/* ── Middle list + Detail pane (2-column split) ─────────────── */}
-            <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
-              {/* MIDDLE — the compact list */}
-              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
+            {/* ── Place = self-contained expanding CARDS (Jess 2026-07-23: the
+                card owns everything — click to expand its per-SKU detail + Send
+                PO inline; no separate right pane). Chase / Receive keep the
+                list + detail split. ─────────────────────────────────────────── */}
+            {stage === "place" ? (
+              <div className="flex-1 min-h-0 flex flex-col">
                 <MiddleListHeader
                   stage={stage}
-                  shownCount={
-                    stage === "place"
-                      ? placeShown.length
-                      : stage === "chase"
-                        ? chaseShown.length
-                        : receiveShown.length
-                  }
-                  totalCount={
-                    stage === "place" ? placeCount : stage === "chase" ? chaseCount : receiveCount
-                  }
+                  shownCount={placeShown.length}
+                  totalCount={placeCount}
                 />
-                <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto pt-2 pr-0.5">
                   {isLoading ? (
                     <PanelHint text="Loading today's plan…" />
-                  ) : stage === "place" ? (
-                    placeShown.length === 0 ? (
-                      <EmptyDone
-                        text="Nothing to send here"
-                        sub="Change or clear the filter to see other factories."
-                      />
-                    ) : (
-                      placeShown.map((g) => (
-                        <PlaceListRow
-                          key={g.groupKey}
-                          group={g}
-                          today={today}
-                          selected={
-                            selection?.kind === "place" &&
-                            selection.groupKey === g.groupKey
-                          }
-                          onSelect={() =>
-                            setSelection({ kind: "place", groupKey: g.groupKey })
-                          }
-                        />
-                      ))
-                    )
-                  ) : stage === "chase" ? (
-                    chaseShown.length === 0 ? (
-                      <EmptyDone
-                        text="Nothing to chase here"
-                        sub="No factory is past its promised ready date."
-                      />
-                    ) : (
-                      chaseShown.map((r) => (
-                        <ChaseListRow
-                          key={r.poId}
-                          row={r}
-                          supplierName={supplierName(r.supplierId)}
-                          selected={
-                            selection?.kind === "chase" && selection.poId === r.poId
-                          }
-                          onSelect={() => setSelection({ kind: "chase", poId: r.poId })}
-                        />
-                      ))
-                    )
-                  ) : receiveShown.length === 0 ? (
+                  ) : placeShown.length === 0 ? (
                     <EmptyDone
-                      text="Nothing to receive here"
-                      sub="No factory has goods ready or arriving."
+                      text="Nothing to send here"
+                      sub="Change or clear the filter to see other factories."
                     />
                   ) : (
-                    receiveShown.map((r) => (
-                      <ReceiveListRow
-                        key={r.poId}
-                        row={r}
-                        supplierName={supplierName(r.supplierId)}
-                        selected={selection?.kind === "receive" && selection.poId === r.poId}
-                        onSelect={() => setSelection({ kind: "receive", poId: r.poId })}
-                      />
-                    ))
+                    placeShown.map((g) => {
+                      const isSel =
+                        selection?.kind === "place" &&
+                        selection.groupKey === g.groupKey;
+                      return (
+                        <div key={g.groupKey}>
+                          <PlaceListRow
+                            group={g}
+                            today={today}
+                            selected={isSel}
+                            onSelect={() =>
+                              setSelection(
+                                isSel
+                                  ? null
+                                  : { kind: "place", groupKey: g.groupKey },
+                              )
+                            }
+                          />
+                          {isSel && selectedPlace && (
+                            <div className="-mt-1 mb-2 rounded-b-[12px] border border-t-0 border-primary/30 bg-white overflow-hidden">
+                              <PlaceDetail
+                                group={selectedPlace}
+                                today={today}
+                                onSendPo={(prefill) => {
+                                  posCountBeforeSend.current =
+                                    posQ.data?.pos.length ?? 0;
+                                  setCreatePoPrefill(prefill);
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
+            ) : (
+              <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
+                {/* MIDDLE — the compact list (Chase / Receive) */}
+                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
+                  <MiddleListHeader
+                    stage={stage}
+                    shownCount={
+                      stage === "chase" ? chaseShown.length : receiveShown.length
+                    }
+                    totalCount={stage === "chase" ? chaseCount : receiveCount}
+                  />
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    {isLoading ? (
+                      <PanelHint text="Loading today's plan…" />
+                    ) : stage === "chase" ? (
+                      chaseShown.length === 0 ? (
+                        <EmptyDone
+                          text="Nothing to chase here"
+                          sub="No factory is past its promised ready date."
+                        />
+                      ) : (
+                        chaseShown.map((r) => (
+                          <ChaseListRow
+                            key={r.poId}
+                            row={r}
+                            supplierName={supplierName(r.supplierId)}
+                            selected={
+                              selection?.kind === "chase" && selection.poId === r.poId
+                            }
+                            onSelect={() => setSelection({ kind: "chase", poId: r.poId })}
+                          />
+                        ))
+                      )
+                    ) : receiveShown.length === 0 ? (
+                      <EmptyDone
+                        text="Nothing to receive here"
+                        sub="No factory has goods ready or arriving."
+                      />
+                    ) : (
+                      receiveShown.map((r) => (
+                        <ReceiveListRow
+                          key={r.poId}
+                          row={r}
+                          supplierName={supplierName(r.supplierId)}
+                          selected={selection?.kind === "receive" && selection.poId === r.poId}
+                          onSelect={() => setSelection({ kind: "receive", poId: r.poId })}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
 
-              {/* DETAIL — the selected row's expanded view */}
-              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
-                {selectedPlace ? (
-                  <PlaceDetail
-                    group={selectedPlace}
-                    today={today}
-                    onSendPo={(prefill) => {
-                      posCountBeforeSend.current =
-                        posQ.data?.pos.length ?? 0;
-                      setCreatePoPrefill(prefill);
-                    }}
-                  />
-                ) : selectedChase ? (
-                  <ChaseDetail
-                    row={selectedChase}
-                    supplierName={supplierName(selectedChase.supplierId)}
-                    supplier={supplierById.get(selectedChase.supplierId)}
-                  />
-                ) : selectedReceive ? (
-                  <ReceiveDetail
-                    row={selectedReceive}
-                    supplierName={supplierName(selectedReceive.supplierId)}
-                    onCheckIn={(poId) => setCheckInPoId(poId)}
-                  />
-                ) : (
-                  <DetailEmpty stage={stage} />
-                )}
+                {/* DETAIL — the selected Chase / Receive row */}
+                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
+                  {selectedChase ? (
+                    <ChaseDetail
+                      row={selectedChase}
+                      supplierName={supplierName(selectedChase.supplierId)}
+                      supplier={supplierById.get(selectedChase.supplierId)}
+                    />
+                  ) : selectedReceive ? (
+                    <ReceiveDetail
+                      row={selectedReceive}
+                      supplierName={supplierName(selectedReceive.supplierId)}
+                      onCheckIn={(poId) => setCheckInPoId(poId)}
+                    />
+                  ) : (
+                    <DetailEmpty stage={stage} />
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </ListPageShell>
       </div>
@@ -1005,51 +1056,62 @@ function PlaceListRow({
   const u = urgencyStyle(group.urgency);
   const action = placeActionLine(group, today);
   // Post-split each group has a single category — icon + tag reflect that.
-  // Only supplier with just one category to begin with (unsplit) still shows
-  // its single icon here.
   const cat = group.categories[0];
   const Icon = categoryIconOf(cat);
+  // Per-card buy cost = Σ(system cost × need) — advisory only (display, never an
+  // order-path input), null costs skipped. Hidden when 0.
+  const rm = group.lines.reduce(
+    (s, l) => s + (l.cost != null ? l.cost * l.need : 0),
+    0,
+  );
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
       className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
+        "w-full text-left rounded-[12px] border p-3 mb-2 transition-colors",
+        selected
+          ? "border-primary/40 bg-hovertint"
+          : "border-base-200 bg-white hover:bg-hovertint",
       ].join(" ")}
     >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Icon size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
+      <div className="flex items-start gap-1.5 min-w-0">
+        <Icon size={16} className="text-base-500 shrink-0 mt-0.5" />
+        <span className="text-[14px] font-semibold text-base-900 truncate">
           {group.supplierName}
           {cat && (
-            <span className="ml-1 text-[11px] font-medium text-base-500">
-              · {cat}
+            <span className="ml-1 text-[12px] font-medium text-base-500">
+              — {cat}
             </span>
           )}
         </span>
-        <span className={`pill ${u.cls} shrink-0 ml-auto`}>
+        <span className="ml-auto text-[12px] text-base-500 shrink-0">
+          {group.orderCount} {group.orderCount === 1 ? "sales order" : "sales orders"}
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 min-w-0">
+        <span className={`pill ${u.cls} shrink-0`}>
           <u.Icon />
           {u.label}
         </span>
+        <span className="text-[12px] text-base-700 truncate">{action}</span>
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0 flex-wrap">
-        <span className="tabular-nums shrink-0">
-          {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"} · {group.orderCount}{" "}
-          {group.orderCount === 1 ? "SO" : "SOs"}
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-base-500">
+        <span className="tabular-nums truncate">
+          {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"}
+          {group.earliestOrderBy && (
+            <span className="text-base-400">
+              {" "}· due {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
+            </span>
+          )}
         </span>
-        {group.earliestOrderBy && (
-          <span className="tabular-nums shrink-0 text-base-400">
-            · due {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
+        {rm > 0 && (
+          <span className="tabular-nums font-semibold text-base-900 shrink-0">
+            RM {Math.round(rm).toLocaleString()}
           </span>
         )}
       </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
     </button>
   );
 }
