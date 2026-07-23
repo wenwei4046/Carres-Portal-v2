@@ -262,15 +262,6 @@ function buildPlacePrefill(group: SplitPlaceGroup): CreatePoPrefill {
   };
 }
 
-function chaseActionLine(r: PurchaseChase, supplierName: string): string {
-  if (r.daysLate > 0) return `Chase ${supplierName} — ${r.daysLate}d late.`;
-  return `Remind ${supplierName} — check ready date.`;
-}
-
-function receiveActionLine(r: PurchaseReceive, supplierName: string): string {
-  const total = r.items.reduce((s, it) => s + it.outstanding, 0);
-  return `Check in from ${supplierName} (${total} item${total === 1 ? "" : "s"}).`;
-}
 
 // Days-to-order strip helpers (next14Days · nonWorkingReason · bucketByDay ·
 // upcomingCadenceDays · DayBucket · MY_HOLIDAYS lookup) removed 2026-07-23
@@ -1108,17 +1099,39 @@ export default function OperationPurchase() {
                           sub="No factory is past its promised ready date."
                         />
                       ) : (
-                        chaseShown.map((r) => (
-                          <ChaseListRow
-                            key={r.poId}
-                            row={r}
-                            supplierName={supplierName(r.supplierId)}
-                            selected={
-                              selection?.kind === "chase" && selection.poId === r.poId
-                            }
-                            onSelect={() => setSelection({ kind: "chase", poId: r.poId })}
-                          />
-                        ))
+                        chaseShown.map((r) => {
+                          const total = r.items.reduce(
+                            (s, it) => s + it.outstanding,
+                            0,
+                          );
+                          return (
+                            <PurchaseListRow
+                              key={r.poId}
+                              Icon={Factory}
+                              title={supplierName(r.supplierId)}
+                              subtitle={`${total} unit${total === 1 ? "" : "s"} still waiting`}
+                              dateIso={r.expectedReadyDate}
+                              dateLabel="promised"
+                              urgency={
+                                r.daysLate > 0
+                                  ? {
+                                      tone: "overdue",
+                                      Icon: AlertCircle,
+                                      label: `${r.daysLate}d late`,
+                                    }
+                                  : null
+                              }
+                              selected={
+                                selection?.kind === "chase" &&
+                                selection.poId === r.poId
+                              }
+                              onSelect={() =>
+                                setSelection({ kind: "chase", poId: r.poId })
+                              }
+                              testId={`chase-row-${r.poId}`}
+                            />
+                          );
+                        })
                       )
                     ) : receiveShown.length === 0 ? (
                       <EmptyDone
@@ -1126,15 +1139,36 @@ export default function OperationPurchase() {
                         sub="No factory has goods ready or arriving."
                       />
                     ) : (
-                      receiveShown.map((r) => (
-                        <ReceiveListRow
-                          key={r.poId}
-                          row={r}
-                          supplierName={supplierName(r.supplierId)}
-                          selected={selection?.kind === "receive" && selection.poId === r.poId}
-                          onSelect={() => setSelection({ kind: "receive", poId: r.poId })}
-                        />
-                      ))
+                      receiveShown.map((r) => {
+                        const total = r.items.reduce(
+                          (s, it) => s + it.outstanding,
+                          0,
+                        );
+                        const when = r.etaDate ?? r.expectedReadyDate;
+                        return (
+                          <PurchaseListRow
+                            key={r.poId}
+                            Icon={Truck}
+                            title={supplierName(r.supplierId)}
+                            subtitle={`${total} unit${total === 1 ? "" : "s"} to check in`}
+                            dateIso={when}
+                            dateLabel={r.etaDate ? "ETA" : "ready"}
+                            urgency={{
+                              tone: "sent",
+                              Icon: PackageCheck,
+                              label: `${total} to check in`,
+                            }}
+                            selected={
+                              selection?.kind === "receive" &&
+                              selection.poId === r.poId
+                            }
+                            onSelect={() =>
+                              setSelection({ kind: "receive", poId: r.poId })
+                            }
+                            testId={`receive-row-${r.poId}`}
+                          />
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -1287,110 +1321,6 @@ function MiddleListHeader({
 // per-SKU detail were folded into `<PurchaseListRow>` + `<PoDocumentPreview>`
 // master-detail. The Send PO button moved from the row footer to the preview
 // column's flame CTA. See the Place branch above for the current render.
-
-function ChaseListRow({
-  row,
-  supplierName,
-  selected,
-  onSelect,
-}: {
-  row: PurchaseChase;
-  supplierName: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const total = row.items.reduce((s, it) => s + it.outstanding, 0);
-  const action = chaseActionLine(row, supplierName);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Factory size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
-          {supplierName}
-        </span>
-        <span className="pill pill-overdue shrink-0 ml-auto">
-          <AlertCircle />
-          {row.daysLate}d late
-        </span>
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
-        <span className="tabular-nums shrink-0">
-          {total} {total === 1 ? "unit" : "units"} still waiting
-        </span>
-        {row.expectedReadyDate && (
-          <span className="tabular-nums shrink-0 text-base-400">
-            · promised {dayLabelShort(row.expectedReadyDate)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
-    </button>
-  );
-}
-
-function ReceiveListRow({
-  row,
-  supplierName,
-  selected,
-  onSelect,
-}: {
-  row: PurchaseReceive;
-  supplierName: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const total = row.items.reduce((s, it) => s + it.outstanding, 0);
-  const when = row.etaDate ?? row.expectedReadyDate;
-  const action = receiveActionLine(row, supplierName);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Truck size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
-          {supplierName}
-        </span>
-        <span className="pill pill-sent shrink-0 ml-auto">
-          <PackageCheck />
-          {total} to check in
-        </span>
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
-        {when && (
-          <span className="tabular-nums shrink-0">
-            {row.etaDate ? "ETA" : "ready"} {dayLabelShort(when)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
-    </button>
-  );
-}
-
-// ── Detail pane — empty + per-stage variants ─────────────────────────────────
 
 function DetailEmpty({ stage }: { stage: Stage }) {
   const hint =
