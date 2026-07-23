@@ -83,6 +83,7 @@ import {
   type PurchaseUrgencyBucket,
 } from "@carres/shared";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
@@ -493,6 +494,22 @@ export default function OperationPurchase() {
   const [attn, setAttn] = useState<Attn>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  // v2 (Loo 2026-07-23): PROJECTS facet lets the operator scope to one big
+  // customer whose SOs span multiple factories (Dorsett Loft = 40 rooms →
+  // 3+ POs). Data lives in `PurchasePlaceGroupLine.forOrders[i].customerName`
+  // — zero migration; group Place rows whose lines serve that customer.
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  // Section collapse — one Set for all bands; default all expanded.
+  const [collapsedFacet, setCollapsedFacet] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleFacet = (key: string) =>
+    setCollapsedFacet((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // Send PO wire (Jess 2026-07-23) — clicking a PlaceDetail's Send PO button
   // opens the shipped CreatePOModal prefilled with the supplier + SO refs +
   // line qtys from the cockpit's plan. User then completes cost / warehouse /
@@ -556,6 +573,7 @@ export default function OperationPurchase() {
     setAttn(null);
     setSelectedDay(null);
     setSelection(null);
+    setProjectFilter(null);
   };
 
   // Stage counts + attention sub-counts — from SPLIT groups so a supplier with
@@ -594,6 +612,30 @@ export default function OperationPurchase() {
       .sort((a, b) => b.units - a.units);
   }, [stage, placeGroups, chase, receive, supplierName]);
 
+  // PROJECTS facet — Send stage only. Aggregate customer names across every
+  // line's forOrders and count unique SOs + total units. A customer showing
+  // up on 2+ SOs OR 2+ units is a "project" candidate (a hotel job, a large
+  // fit-out); ordinary walk-in single-piece buyers pass through as regular
+  // BY FACTORY rows. Sorted units-desc so the biggest job leads.
+  const projectsByCustomer = useMemo(() => {
+    const m = new Map<string, { units: number; sos: Set<number> }>();
+    for (const g of placeGroups) {
+      for (const l of g.lines) {
+        for (const o of l.forOrders) {
+          if (!o.customerName) continue;
+          const cur = m.get(o.customerName) ?? { units: 0, sos: new Set<number>() };
+          cur.units += l.need;
+          if (o.so != null) cur.sos.add(o.so);
+          m.set(o.customerName, cur);
+        }
+      }
+    }
+    return [...m.entries()]
+      .map(([name, v]) => ({ name, units: v.units, soCount: v.sos.size }))
+      .filter((p) => p.soCount >= 2 || p.units >= 2)
+      .sort((a, b) => b.units - a.units);
+  }, [placeGroups]);
+
   // 14-day strip + lead-line memos removed 2026-07-23 with the strip itself
   // (Jess). The right-rail Calendar is now the single source of date navigation
   // (full month, tab-filtered by stage). stripOffset kept as a constant above
@@ -606,6 +648,12 @@ export default function OperationPurchase() {
         if (supplierFilter && g.supplierId !== supplierFilter) return false;
         if (attn === "overdue" && g.urgency !== "late") return false;
         if (attn === "missing" && g.urgency !== "no_deadline") return false;
+        if (projectFilter) {
+          const servesProject = g.lines.some((l) =>
+            l.forOrders.some((o) => o.customerName === projectFilter),
+          );
+          if (!servesProject) return false;
+        }
         if (selectedDay) {
           // Overdue groups collapse into the "today" cell in the strip; keep
           // them visible when today is selected so the numbers match.
@@ -619,7 +667,7 @@ export default function OperationPurchase() {
         }
         return true;
       }),
-    [splitPlaceGroups, supplierFilter, attn, selectedDay, today],
+    [splitPlaceGroups, supplierFilter, attn, selectedDay, today, projectFilter],
   );
   const chaseShown = useMemo(
     () =>
@@ -718,6 +766,11 @@ export default function OperationPurchase() {
       label: `Day: ${dayName(selectedDay)} ${dayLabelShort(selectedDay)}`,
       onClear: () => setSelectedDay(null),
     });
+  if (projectFilter)
+    activeChips.push({
+      label: `Project: ${projectFilter}`,
+      onClear: () => setProjectFilter(null),
+    });
 
   const toggleSupplier = (id: string) =>
     setSupplierFilter((cur) => (cur === id ? null : id));
@@ -764,65 +817,114 @@ export default function OperationPurchase() {
           facetToggleTitle="Show overview"
           activeChips={activeChips}
           facet={
-            <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
-              {/* Needs attention (alarm) — ① Send only */}
-              <FacetGroup title="Needs attention" danger>
-                <FacetRow
-                  label="Overdue"
-                  count={placeOverdue}
-                  tone={placeOverdue > 0 ? "danger" : "muted"}
-                  active={stage === "place" && attn === "overdue"}
-                  onClick={() => {
-                    setStage("place");
-                    setSelection(null);
-                    setSupplierFilter(null);
-                    setSelectedDay(null);
-                    setAttn((a) => (a === "overdue" ? null : "overdue"));
-                  }}
-                />
-                <FacetRow
-                  label="No deadline"
-                  count={missingCount}
-                  tone={missingCount > 0 ? "danger" : "muted"}
-                  active={stage === "place" && attn === "missing"}
-                  onClick={() => {
-                    setStage("place");
-                    setSelection(null);
-                    setSupplierFilter(null);
-                    setSelectedDay(null);
-                    setAttn((a) => (a === "missing" ? null : "missing"));
-                  }}
-                />
-              </FacetGroup>
+            <SectionCard>
+              {/* NEEDS ATTENTION — alarm, ① Send only */}
+              <SectionBand
+                title="Needs attention"
+                strong
+                danger
+                collapsed={collapsedFacet.has("attn")}
+                onToggle={() => toggleFacet("attn")}
+              />
+              {!collapsedFacet.has("attn") && (
+                <div>
+                  <FacetRow
+                    label="Overdue"
+                    count={placeOverdue}
+                    tone={placeOverdue > 0 ? "danger" : "muted"}
+                    active={stage === "place" && attn === "overdue"}
+                    onClick={() => {
+                      setStage("place");
+                      setSelection(null);
+                      setSupplierFilter(null);
+                      setSelectedDay(null);
+                      setAttn((a) => (a === "overdue" ? null : "overdue"));
+                    }}
+                  />
+                  <FacetRow
+                    label="No deadline"
+                    count={missingCount}
+                    tone={missingCount > 0 ? "danger" : "muted"}
+                    active={stage === "place" && attn === "missing"}
+                    onClick={() => {
+                      setStage("place");
+                      setSelection(null);
+                      setSupplierFilter(null);
+                      setSelectedDay(null);
+                      setAttn((a) => (a === "missing" ? null : "missing"));
+                    }}
+                  />
+                </div>
+              )}
 
-              {/* Today's work — the ①②③ stage jump (mirrors the KPI tabs) */}
-              <FacetGroup title="Today's work">
-                <FacetRow
-                  numbered="1"
-                  label="Send POs"
-                  count={placeCount}
-                  active={stage === "place"}
-                  onClick={() => goStage("place")}
-                />
-                <FacetRow
-                  numbered="2"
-                  label="Chase factory"
-                  count={chaseCount}
-                  tone={chaseCount > 0 ? "danger" : "muted"}
-                  active={stage === "chase"}
-                  onClick={() => goStage("chase")}
-                />
-                <FacetRow
-                  numbered="3"
-                  label="Receive"
-                  count={receiveCount}
-                  active={stage === "receive"}
-                  onClick={() => goStage("receive")}
-                />
-              </FacetGroup>
+              {/* TODAY'S WORK — the ①②③ stage jump */}
+              <SectionBand
+                title="Today's work"
+                strong
+                collapsed={collapsedFacet.has("today")}
+                onToggle={() => toggleFacet("today")}
+              />
+              {!collapsedFacet.has("today") && (
+                <div>
+                  <FacetRow
+                    numbered="1"
+                    label="Send POs"
+                    count={placeCount}
+                    active={stage === "place"}
+                    onClick={() => goStage("place")}
+                  />
+                  <FacetRow
+                    numbered="2"
+                    label="Chase factory"
+                    count={chaseCount}
+                    tone={chaseCount > 0 ? "danger" : "muted"}
+                    active={stage === "chase"}
+                    onClick={() => goStage("chase")}
+                  />
+                  <FacetRow
+                    numbered="3"
+                    label="Receive"
+                    count={receiveCount}
+                    active={stage === "receive"}
+                    onClick={() => goStage("receive")}
+                  />
+                </div>
+              )}
 
-              {/* By factory — units in the CURRENT stage; click filters the middle */}
-              <FacetGroup
+              {/* PROJECTS — customer names spanning ≥2 SOs / ≥2 units. Send
+                  stage only. Data from PurchasePlaceGroupLine.forOrders. */}
+              {stage === "place" && projectsByCustomer.length > 0 && (
+                <>
+                  <SectionBand
+                    title="Projects"
+                    strong
+                    collapsed={collapsedFacet.has("projects")}
+                    onToggle={() => toggleFacet("projects")}
+                    total={projectsByCustomer.length}
+                  />
+                  {!collapsedFacet.has("projects") && (
+                    <div>
+                      {projectsByCustomer.map((p) => (
+                        <FacetRow
+                          key={p.name}
+                          label={p.name}
+                          count={p.units}
+                          unit="units"
+                          active={projectFilter === p.name}
+                          onClick={() =>
+                            setProjectFilter((cur) =>
+                              cur === p.name ? null : p.name,
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* BY FACTORY — units in the CURRENT stage; click filters the middle */}
+              <SectionBand
                 title={
                   stage === "place"
                     ? "By factory · to send"
@@ -830,23 +932,29 @@ export default function OperationPurchase() {
                       ? "By factory · to chase"
                       : "By factory · to receive"
                 }
-              >
-                {byFactory.length === 0 ? (
-                  <EmptyFacetHint text="Nothing here" />
-                ) : (
-                  byFactory.map((f) => (
-                    <FacetRow
-                      key={f.id}
-                      label={f.name}
-                      count={f.units}
-                      unit="units"
-                      active={supplierFilter === f.id}
-                      onClick={() => toggleSupplier(f.id)}
-                    />
-                  ))
-                )}
-              </FacetGroup>
-            </div>
+                strong
+                collapsed={collapsedFacet.has("factory")}
+                onToggle={() => toggleFacet("factory")}
+              />
+              {!collapsedFacet.has("factory") && (
+                <div>
+                  {byFactory.length === 0 ? (
+                    <EmptyFacetHint text="Nothing here" />
+                  ) : (
+                    byFactory.map((f) => (
+                      <FacetRow
+                        key={f.id}
+                        label={f.name}
+                        count={f.units}
+                        unit="units"
+                        active={supplierFilter === f.id}
+                        onClick={() => toggleSupplier(f.id)}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </SectionCard>
           }
         >
           <div className="flex-1 min-h-0 flex flex-col gap-3">
@@ -1551,36 +1659,6 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
   );
 }
 
-// ── Facet primitives (token-only, blue hover per UI-KIT hover law) ───────────
-
-function FacetGroup({
-  title,
-  danger,
-  children,
-}: {
-  title: string;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-1">
-      <div
-        className={`w-full flex items-center gap-1 rounded-md px-2 py-1.5 ${
-          danger ? "bg-error-soft" : "bg-base-100"
-        }`}
-      >
-        <span
-          className={`uppercase flex-1 text-left text-[11px] font-bold tracking-[0.04em] ${
-            danger ? "text-danger" : "text-base-900"
-          }`}
-        >
-          {title}
-        </span>
-      </div>
-      <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>
-    </div>
-  );
-}
 
 function FacetRow({
   label,
