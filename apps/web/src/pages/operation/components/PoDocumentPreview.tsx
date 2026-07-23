@@ -166,81 +166,33 @@ export function PoDocumentPreview({
         )}
       </div>
 
-      {/* 3. PDF-style PO document */}
-      <div className="shrink-0 rounded-[8px] border border-base-200 bg-white shadow-sm px-4 py-4 mb-3">
-        <div className="flex items-start justify-between mb-3 pb-3 border-b border-base-200">
-          <div>
-            <div className="text-[15px] font-bold tracking-wide text-base-900">
-              CARRES SDN BHD
-            </div>
-            <div className="text-[11px] text-base-500">Purchase Order · draft</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.06em] text-base-500">
-              Date
-            </div>
-            <div className="text-[12px] font-mono tabular-nums text-base-900">
-              {today ? fmtDate(today) : "—"}
-            </div>
-          </div>
+      {/* 3. What's in this PO — lightweight SKU list (Jess 2026-07-23:
+             letterhead removed; this preview is for the operator's decision,
+             not a print-ready invoice). */}
+      <div className="shrink-0 rounded-[8px] border border-base-200 bg-white px-3 py-2 mb-3">
+        <div className="text-[11px] uppercase tracking-[0.05em] text-base-500 mb-1">
+          What's in this PO
         </div>
-
-        <div className="grid grid-cols-2 gap-6 mb-3 text-[12px]">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] text-base-500 mb-0.5">
-              Vendor
-            </div>
-            <div className="font-semibold text-base-900">{supplierName}</div>
+        {group.lines.map((l) => (
+          <div
+            key={l.sku}
+            className="grid grid-cols-[1fr_50px] gap-2 py-1 text-[13px] border-b border-base-50 last:border-b-0"
+          >
+            <span className="font-mono tabular-nums text-base-800 truncate">
+              {l.sku}
+            </span>
+            <span className="text-right tabular-nums text-base-900 font-semibold">
+              × {l.need}
+            </span>
           </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] text-base-500 mb-0.5">
-              Ship to
-            </div>
-            <div className="text-base-800">{stockToLabel}</div>
-          </div>
-        </div>
-
-        {/* Line-item table */}
-        <div className="border-t border-b border-base-200 py-2">
-          <div className="grid grid-cols-[1fr_60px_80px] gap-2 text-[10px] uppercase tracking-[0.06em] text-base-500 mb-1">
-            <span>SKU · Item</span>
-            <span className="text-right">Qty</span>
-            <span className="text-right">Amount</span>
-          </div>
-          {group.lines.map((l) => (
-            <div
-              key={l.sku}
-              className="grid grid-cols-[1fr_60px_80px] gap-2 py-0.5 text-[12px]"
-            >
-              <span className="font-mono tabular-nums text-base-800 truncate">
-                {l.sku}
-              </span>
-              <span className="text-right tabular-nums text-base-800">{l.need}</span>
-              <span className="text-right font-mono tabular-nums text-base-800">
-                {l.cost != null
-                  ? `${(l.cost * l.need).toLocaleString("en-MY", {
-                      maximumFractionDigits: 0,
-                    })}`
-                  : "—"}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between pt-2 text-[13px]">
-          <span className="text-base-500">Total</span>
-          <span className="font-mono font-bold tabular-nums text-base-900">
-            {rm > 0
-              ? `RM ${rm.toLocaleString("en-MY", { maximumFractionDigits: 0 })}`
-              : "—"}
-          </span>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-base-200 text-[11px] text-base-500">
-          Please confirm receive.{" "}
-          {preparedByName && <>Prepared by {preparedByName} · Carres</>}
-        </div>
+        ))}
       </div>
+
+      {/* 4. Sales orders this PO covers — the evidence layer (Jess 2026-07-23:
+             list every SO with customer + delivery deadline so the operator
+             knows WHO the units are for, not just the qty). */}
+      <SalesOrdersCovered lines={group.lines} />
+
 
       {/* 4. WhatsApp preview zone */}
       <div className="shrink-0 rounded-[8px] border border-base-200 bg-base-50 px-3 py-2 mb-3">
@@ -298,6 +250,60 @@ export function PoDocumentPreview({
         >
           Send PO to {supplierName}
         </Btn>
+      </div>
+    </div>
+  );
+}
+
+/** Aggregate the SOs across every line's `forOrders` and render one row per
+ *  unique SO with customer + delivery deadline. Feeds the operator the "who
+ *  is this PO for" evidence at a glance (Jess 2026-07-23 v2). */
+function SalesOrdersCovered({ lines }: { lines: PoPreviewGroup["lines"] }) {
+  const bySo = new Map<
+    number,
+    { customerName: string | null; deliveryDate: string | null }
+  >();
+  for (const l of lines) {
+    for (const o of l.forOrders) {
+      if (o.so == null) continue;
+      const cur = bySo.get(o.so);
+      if (!cur) {
+        bySo.set(o.so, {
+          customerName: o.customerName ?? null,
+          deliveryDate: o.deliveryDate ?? null,
+        });
+      }
+    }
+  }
+  if (bySo.size === 0) return null;
+  const rows = [...bySo.entries()]
+    .map(([so, v]) => ({ so, ...v }))
+    .sort((a, b) => {
+      // Earliest delivery date first; nulls to the tail.
+      if (!a.deliveryDate && !b.deliveryDate) return a.so - b.so;
+      if (!a.deliveryDate) return 1;
+      if (!b.deliveryDate) return -1;
+      return a.deliveryDate.localeCompare(b.deliveryDate);
+    });
+  return (
+    <div className="shrink-0 rounded-[8px] border border-base-200 bg-white px-3 py-2 mb-3">
+      <div className="text-[11px] uppercase tracking-[0.05em] text-base-500 mb-1">
+        Sales orders this PO covers ({rows.length})
+      </div>
+      <div className="grid grid-cols-[70px_1fr_auto] gap-x-3 gap-y-0.5 text-[12.5px]">
+        {rows.map((r) => (
+          <div key={r.so} className="contents">
+            <span className="font-mono tabular-nums text-base-800">
+              SO-{r.so}
+            </span>
+            <span className="text-base-800 truncate">
+              {r.customerName ?? "—"}
+            </span>
+            <span className="tabular-nums text-base-600">
+              {r.deliveryDate ? fmtDate(r.deliveryDate) : "TBD"}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

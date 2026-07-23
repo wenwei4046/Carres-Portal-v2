@@ -93,6 +93,7 @@ import { PoDocumentPreview } from "./components/PoDocumentPreview";
 import { PurchaseSettingsSheet } from "./components/PurchaseSettingsSheet";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
+import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import type { SupplierRow } from "@/lib/queries";
 import {
   usePurchaseToday,
@@ -406,7 +407,6 @@ export default function OperationPurchase() {
   // customer whose SOs span multiple factories (Dorsett Loft = 40 rooms →
   // 3+ POs). Data lives in `PurchasePlaceGroupLine.forOrders[i].customerName`
   // — zero migration; group Place rows whose lines serve that customer.
-  const [projectFilter, setProjectFilter] = useState<string | null>(null);
   // v2 (Loo 2026-07-23): Purchase settings side sheet — replaces the small
   // LeadTimesButton modal. Section 1 = Lead times · 2 = Arrival buffer · 3 =
   // PO days · 4 = Duty rotation indicator (edit stays on the Team card).
@@ -442,9 +442,40 @@ export default function OperationPurchase() {
   const [checkInPoId, setCheckInPoId] = useState<string | null>(null);
   const posQ = useOperationPos();
   const warehousesQ = useOperationWarehouse();
-  // v2 (Loo 2026-07-23): the master-detail preview needs the duty holder for
-  // the "prepared by" line + the "on PO duty" badge next to Send PO.
+  // v2 (Jess 2026-07-23): the master-detail preview needs the duty holder for
+  // the "prepared by" line + the "on PO duty" badge next to Send PO. Send +
+  // Chase are the PO-duty holder (one voice to suppliers); Receive/GRN is
+  // OFFSET by one month (next month's holder) so SOD is achieved without a
+  // warehouse team — same 3-person office ops crew, different owner per stage.
   const dutyQ = useOperationPoDuty();
+  const poDutyHolder = dutyQ.data?.holder ?? null;
+  const currentMonth = dutyQ.data?.month ?? "";
+  const grnDutyHolder =
+    (dutyQ.data?.roster ?? []).find((r) => r.month > currentMonth) ?? null;
+  const poDutyChip = poDutyHolder ? (
+    <span
+      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      style={{
+        background: avatarColor(poDutyHolder.userId).bg,
+        color: avatarColor(poDutyHolder.userId).fg,
+      }}
+      title={`${poDutyHolder.name ?? poDutyHolder.email} · on PO duty`}
+    >
+      {personInitials(poDutyHolder.name, poDutyHolder.email)}
+    </span>
+  ) : null;
+  const grnDutyChip = grnDutyHolder ? (
+    <span
+      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      style={{
+        background: avatarColor(grnDutyHolder.userId).bg,
+        color: avatarColor(grnDutyHolder.userId).fg,
+      }}
+      title={`${grnDutyHolder.name ?? grnDutyHolder.email} · on GRN duty (offset-1 rotation)`}
+    >
+      {personInitials(grnDutyHolder.name, grnDutyHolder.email)}
+    </span>
+  ) : null;
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -485,7 +516,6 @@ export default function OperationPurchase() {
     setAttn(null);
     setSelectedDay(null);
     setSelection(null);
-    setProjectFilter(null);
   };
 
   // Stage counts + attention sub-counts — from SPLIT groups so a supplier with
@@ -524,30 +554,6 @@ export default function OperationPurchase() {
       .sort((a, b) => b.units - a.units);
   }, [stage, placeGroups, chase, receive, supplierName]);
 
-  // PROJECTS facet — Send stage only. Aggregate customer names across every
-  // line's forOrders and count unique SOs + total units. A customer showing
-  // up on 2+ SOs OR 2+ units is a "project" candidate (a hotel job, a large
-  // fit-out); ordinary walk-in single-piece buyers pass through as regular
-  // BY FACTORY rows. Sorted units-desc so the biggest job leads.
-  const projectsByCustomer = useMemo(() => {
-    const m = new Map<string, { units: number; sos: Set<number> }>();
-    for (const g of placeGroups) {
-      for (const l of g.lines) {
-        for (const o of l.forOrders) {
-          if (!o.customerName) continue;
-          const cur = m.get(o.customerName) ?? { units: 0, sos: new Set<number>() };
-          cur.units += l.need;
-          if (o.so != null) cur.sos.add(o.so);
-          m.set(o.customerName, cur);
-        }
-      }
-    }
-    return [...m.entries()]
-      .map(([name, v]) => ({ name, units: v.units, soCount: v.sos.size }))
-      .filter((p) => p.soCount >= 2 || p.units >= 2)
-      .sort((a, b) => b.units - a.units);
-  }, [placeGroups]);
-
   // 14-day strip + lead-line memos removed 2026-07-23 with the strip itself
   // (Jess). The right-rail Calendar is now the single source of date navigation
   // (full month, tab-filtered by stage). stripOffset kept as a constant above
@@ -560,12 +566,6 @@ export default function OperationPurchase() {
         if (supplierFilter && g.supplierId !== supplierFilter) return false;
         if (attn === "overdue" && g.urgency !== "late") return false;
         if (attn === "missing" && g.urgency !== "no_deadline") return false;
-        if (projectFilter) {
-          const servesProject = g.lines.some((l) =>
-            l.forOrders.some((o) => o.customerName === projectFilter),
-          );
-          if (!servesProject) return false;
-        }
         if (selectedDay) {
           // Overdue groups collapse into the "today" cell in the strip; keep
           // them visible when today is selected so the numbers match.
@@ -579,7 +579,7 @@ export default function OperationPurchase() {
         }
         return true;
       }),
-    [splitPlaceGroups, supplierFilter, attn, selectedDay, today, projectFilter],
+    [splitPlaceGroups, supplierFilter, attn, selectedDay, today],
   );
   const chaseShown = useMemo(
     () =>
@@ -678,11 +678,6 @@ export default function OperationPurchase() {
       label: `Day: ${dayName(selectedDay)} ${dayLabelShort(selectedDay)}`,
       onClear: () => setSelectedDay(null),
     });
-  if (projectFilter)
-    activeChips.push({
-      label: `Project: ${projectFilter}`,
-      onClear: () => setProjectFilter(null),
-    });
 
   const toggleSupplier = (id: string) =>
     setSupplierFilter((cur) => (cur === id ? null : id));
@@ -738,46 +733,12 @@ export default function OperationPurchase() {
           activeChips={activeChips}
           facet={
             <SectionCard>
-              {/* NEEDS ATTENTION — alarm, ① Send only */}
-              <SectionBand
-                title="Needs attention"
-                strong
-                danger
-                collapsed={collapsedFacet.has("attn")}
-                onToggle={() => toggleFacet("attn")}
-              />
-              {!collapsedFacet.has("attn") && (
-                <div>
-                  <FacetRow
-                    label="Overdue"
-                    count={placeOverdue}
-                    tone={placeOverdue > 0 ? "danger" : "muted"}
-                    active={stage === "place" && attn === "overdue"}
-                    onClick={() => {
-                      setStage("place");
-                      setSelection(null);
-                      setSupplierFilter(null);
-                      setSelectedDay(null);
-                      setAttn((a) => (a === "overdue" ? null : "overdue"));
-                    }}
-                  />
-                  <FacetRow
-                    label="No deadline"
-                    count={missingCount}
-                    tone={missingCount > 0 ? "danger" : "muted"}
-                    active={stage === "place" && attn === "missing"}
-                    onClick={() => {
-                      setStage("place");
-                      setSelection(null);
-                      setSupplierFilter(null);
-                      setSelectedDay(null);
-                      setAttn((a) => (a === "missing" ? null : "missing"));
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* TODAY'S WORK — the ①②③ stage jump */}
+              {/* TODAY'S WORK — 3 stages with avatar chip left (Jess 2026-07-23
+                  v2 · rev 2): chip = who's on duty for that stage. Numbers
+                  1/2/3 removed (spine implied by top-to-bottom order + label).
+                  Attention counts inline (`⚠ N late`) next to Send POs when
+                  any PO is overdue. NEEDS ATTENTION section deleted; PROJECTS
+                  section deleted. */}
               <SectionBand
                 title="Today's work"
                 strong
@@ -787,14 +748,21 @@ export default function OperationPurchase() {
               {!collapsedFacet.has("today") && (
                 <div>
                   <FacetRow
-                    numbered="1"
+                    leadingChip={poDutyChip}
                     label="Send POs"
                     count={placeCount}
+                    suffix={
+                      placeOverdue > 0 ? (
+                        <span className="text-danger font-semibold">
+                          ⚠ {placeOverdue} late
+                        </span>
+                      ) : undefined
+                    }
                     active={stage === "place"}
                     onClick={() => goStage("place")}
                   />
                   <FacetRow
-                    numbered="2"
+                    leadingChip={poDutyChip}
                     label="Chase factory"
                     count={chaseCount}
                     tone={chaseCount > 0 ? "danger" : "muted"}
@@ -802,7 +770,7 @@ export default function OperationPurchase() {
                     onClick={() => goStage("chase")}
                   />
                   <FacetRow
-                    numbered="3"
+                    leadingChip={grnDutyChip}
                     label="Receive"
                     count={receiveCount}
                     active={stage === "receive"}
@@ -811,47 +779,10 @@ export default function OperationPurchase() {
                 </div>
               )}
 
-              {/* PROJECTS — customer names spanning ≥2 SOs / ≥2 units. Send
-                  stage only. Data from PurchasePlaceGroupLine.forOrders. */}
-              {stage === "place" && projectsByCustomer.length > 0 && (
-                <>
-                  <SectionBand
-                    title="Projects"
-                    strong
-                    collapsed={collapsedFacet.has("projects")}
-                    onToggle={() => toggleFacet("projects")}
-                    total={projectsByCustomer.length}
-                  />
-                  {!collapsedFacet.has("projects") && (
-                    <div>
-                      {projectsByCustomer.map((p) => (
-                        <FacetRow
-                          key={p.name}
-                          label={p.name}
-                          count={p.units}
-                          unit="units"
-                          active={projectFilter === p.name}
-                          onClick={() =>
-                            setProjectFilter((cur) =>
-                              cur === p.name ? null : p.name,
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* BY FACTORY — units in the CURRENT stage; click filters the middle */}
+              {/* SUPPLIER (was BY FACTORY) — units in the current stage; click
+                  filters the middle list to that supplier. */}
               <SectionBand
-                title={
-                  stage === "place"
-                    ? "By factory · to send"
-                    : stage === "chase"
-                      ? "By factory · to chase"
-                      : "By factory · to receive"
-                }
+                title="Supplier"
                 strong
                 collapsed={collapsedFacet.has("factory")}
                 onToggle={() => toggleFacet("factory")}
@@ -1247,14 +1178,9 @@ function MiddleListHeader({
       : `${shownCount} of ${totalCount}`;
   return (
     <div className="shrink-0 px-3 py-2 border-b border-base-200 bg-base-50 flex items-center justify-between">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="grid place-items-center w-5 h-5 rounded bg-base-900 text-white text-[11px] font-bold font-mono shrink-0">
-          {stage === "place" ? "1" : stage === "chase" ? "2" : "3"}
-        </span>
-        <span className="text-[13px] font-semibold text-base-900 truncate">
-          {title}
-        </span>
-      </div>
+      <span className="text-[13px] font-semibold text-base-900 truncate">
+        {title}
+      </span>
       <span className="text-[11px] font-semibold text-base-500 tabular-nums shrink-0">
         {badge}
       </span>
@@ -1539,16 +1465,21 @@ function FacetRow({
   label,
   count,
   tone = "default",
-  numbered,
+  leadingChip,
   unit,
+  suffix,
   active,
   onClick,
 }: {
   label: string;
   count: number;
   tone?: "default" | "danger" | "muted";
-  numbered?: string;
+  /** Optional avatar/status chip rendered BEFORE the label (Jess 2026-07-23:
+   *  duty owner chip on the Today's work stages — chip left, label right). */
+  leadingChip?: React.ReactNode;
   unit?: string;
+  /** Optional inline suffix (e.g. "⚠ N late") shown between label and count. */
+  suffix?: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
 }) {
@@ -1561,20 +1492,19 @@ function FacetRow({
         active ? "bg-hovertint" : "hover:bg-hovertint"
       }`}
     >
-      {numbered && (
-        <span className="grid place-items-center w-[18px] h-[18px] rounded bg-base-900 text-white text-[11px] font-bold font-mono shrink-0">
-          {numbered}
-        </span>
-      )}
+      {leadingChip}
       <span
-        className={`flex-1 min-w-0 truncate text-[13px] ${
+        className={`min-w-0 truncate text-[13px] ${
           active ? "text-base-900 font-semibold" : "text-base-700"
         }`}
       >
         {label}
       </span>
+      {suffix && (
+        <span className="text-[11px] shrink-0">{suffix}</span>
+      )}
       <span
-        className={`text-[12px] tabular-nums shrink-0 ${
+        className={`ml-auto text-[12px] tabular-nums shrink-0 ${
           tone === "danger"
             ? "text-danger font-bold"
             : tone === "muted"
