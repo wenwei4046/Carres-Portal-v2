@@ -57,22 +57,15 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
-  Bed,
-  BedDouble,
   Check,
-  Clock,
   Factory,
   Info,
   MessageCircle,
-  Minus,
-  Package,
   PackageCheck,
   RefreshCw,
-  Sofa,
   SlidersHorizontal,
   Truck,
   UserRound,
-  type LucideIcon,
 } from "lucide-react";
 import {
   type ProductCategory,
@@ -171,22 +164,6 @@ function waLink(phone: string | null | undefined): string | null {
   return `https://wa.me/${d}`;
 }
 
-// ── Category icons (Jess 2026-07-22: same icon language as the Orders panel) ─
-
-function categoryIconOf(cat: ProductCategory | undefined): LucideIcon {
-  switch (cat) {
-    case "mattress":
-      return Bed;
-    case "bedframe":
-      return BedDouble;
-    case "sofa":
-      return Sofa;
-    case "accessory":
-      return Package;
-    default:
-      return Factory;
-  }
-}
 
 // ── Size code parser (SKU suffix → size code + label) ───────────────────────
 
@@ -210,27 +187,6 @@ function parseSize(sku: string): SizeInfo | null {
   return SIZE_ALIASES[tail] ?? null;
 }
 
-interface UrgencyStyle {
-  cls: string;
-  Icon: LucideIcon;
-  label: string;
-}
-function urgencyStyle(u: PurchaseUrgencyBucket): UrgencyStyle {
-  switch (u) {
-    case "late":
-      return { cls: "pill-overdue", Icon: AlertCircle, label: "Late" };
-    case "urgent":
-      return { cls: "pill-overdue", Icon: AlertCircle, label: "Send now" };
-    case "due":
-      return { cls: "pill-warning", Icon: Clock, label: "Due soon" };
-    case "scheduled":
-      return { cls: "pill-sent", Icon: Clock, label: "Scheduled" };
-    case "no_deadline":
-      return { cls: "pill-neutral", Icon: Minus, label: "No deadline" };
-    default:
-      return { cls: "pill-neutral", Icon: Minus, label: "—" };
-  }
-}
 
 
 /** Build the CreatePOModal prefill from a place group. soRefs = unique customer
@@ -638,6 +594,19 @@ export default function OperationPurchase() {
     );
   }, [stage, receiveShown, selection]);
 
+  // Group placeShown by category for the facet's nested tree under Send POs
+  // (Jess 2026-07-24 v2 rev 4 — middle-panel-into-facet refactor).
+  const placesByCategory = useMemo(() => {
+    const byCat = new Map<ProductCategory, SplitPlaceGroup[]>();
+    for (const g of placeShown) {
+      const cat = g.splitCategory ?? g.categories[0];
+      if (!cat) continue;
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat)!.push(g);
+    }
+    return [...byCat.entries()];
+  }, [placeShown]);
+
   const selectedPlace =
     selection?.kind === "place"
       ? splitPlaceGroups.find((g) => g.groupKey === selection.groupKey) ?? null
@@ -780,6 +749,83 @@ export default function OperationPurchase() {
                     active={stage === "place"}
                     onClick={() => goStage("place")}
                   />
+
+                  {/* Nested Send-POs tree — category-grouped POs (Jess
+                      2026-07-24 v2 rev 4). Only visible when Send POs is the
+                      active stage AND Today's Work isn't collapsed. Middle
+                      list panel deleted; clicking a PO here updates the
+                      preview column on the right. */}
+                  {stage === "place" && placeShown.length > 0 && (
+                    <div className="ml-3 pl-2 border-l border-base-200 my-1 space-y-1">
+                      {placesByCategory.map(([cat, groups]) => {
+                        const totalUnits = groups.reduce(
+                          (s, g) => s + g.totalUnits,
+                          0,
+                        );
+                        const anyLate = groups.some(
+                          (g) => g.urgency === "late",
+                        );
+                        const earliestIso = groups
+                          .map((g) => g.earliestOrderBy)
+                          .filter((d): d is string => Boolean(d))
+                          .sort()[0];
+                        return (
+                          <div key={cat}>
+                            <div className="flex items-center gap-1 py-1 text-[11px] uppercase tracking-[0.05em] text-base-600">
+                              <span className="font-semibold">{cat}</span>
+                              <span className="ml-auto tabular-nums font-normal">
+                                {groups.length} PO · {totalUnits} units
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px] text-base-500 pb-1">
+                              {earliestIso && (
+                                <span className="tabular-nums">
+                                  Send by {fmtDate(earliestIso)}
+                                </span>
+                              )}
+                              {anyLate && (
+                                <span className="pill pill-overdue">Late</span>
+                              )}
+                            </div>
+                            {groups.map((g) => {
+                              const isSel =
+                                selection?.kind === "place" &&
+                                selection.groupKey === g.groupKey;
+                              return (
+                                <button
+                                  key={g.groupKey}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelection(
+                                      isSel
+                                        ? null
+                                        : {
+                                            kind: "place",
+                                            groupKey: g.groupKey,
+                                          },
+                                    )
+                                  }
+                                  className={`w-full text-left rounded-md px-2 py-1 flex items-center gap-2 transition-colors ${
+                                    isSel
+                                      ? "is-selected"
+                                      : "hover:bg-hovertint"
+                                  }`}
+                                >
+                                  <span className="text-[12.5px] font-medium text-base-900 truncate">
+                                    {g.supplierName ?? "the factory"}
+                                  </span>
+                                  <span className="ml-auto shrink-0 text-[11px] tabular-nums text-base-500">
+                                    {g.totalUnits} units
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <FacetRow
                     leadingChip={poDutyChip}
                     label="Chase factory"
@@ -853,110 +899,43 @@ export default function OperationPurchase() {
               </div>
             )}
 
-            {/* ── Place = master-detail (Loo 2026-07-23): 40px compact rows on
-                the left; PDF-style PO document + WhatsApp preview on the
-                right. Chase / Receive keep their existing split. ─────────── */}
+            {/* ── Place stage · Jess 2026-07-24 (v2 rev4): the middle-panel
+                LIST is DELETED; POs are folded into the facet tree under
+                Send POs (category grouped). This body column now shows ONLY
+                the PREVIEW (PDF-style doc + SOs covered + WhatsApp draft +
+                Send flame). Chase / Receive keep the 2-column split for now
+                — their tree fold is a follow-up. */}
             {stage === "place" ? (
-              <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
-                {/* LIST — 40px compact rows (UI-KIT §A7 list default) */}
-                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
-                  <MiddleListHeader
-                    stage={stage}
-                    shownCount={placeShown.length}
-                    totalCount={placeCount}
-                  />
-                  <div className="flex-1 min-h-0 overflow-y-auto">
-                    {isLoading ? (
-                      <PanelHint text="Loading today's plan…" />
-                    ) : placeShown.length === 0 ? (
-                      <EmptyDone
-                        text="Nothing to send here"
-                        sub="Change or clear the filter to see other factories."
-                      />
-                    ) : (
-                      placeShown.map((g) => {
-                        const isSel =
-                          selection?.kind === "place" &&
-                          selection.groupKey === g.groupKey;
-                        const cat = g.splitCategory ?? g.categories[0];
-                        const Icon = categoryIconOf(cat);
-                        const catBits = cat ? ` · ${cat}` : "";
-                        const subtitle = `${g.totalUnits} unit${
-                          g.totalUnits === 1 ? "" : "s"
-                        }${catBits} · ${g.orderCount} SO${
-                          g.orderCount === 1 ? "" : "s"
-                        }`;
-                        const u = urgencyStyle(g.urgency);
-                        const urgency =
-                          g.urgency === "late" || g.urgency === "urgent"
-                            ? {
-                                tone: "overdue" as const,
-                                Icon: u.Icon,
-                                label: u.label,
-                              }
-                            : g.urgency === "due"
-                              ? {
-                                  tone: "warning" as const,
-                                  Icon: u.Icon,
-                                  label: u.label,
-                                }
-                              : g.urgency === "no_deadline"
-                                ? {
-                                    tone: "neutral" as const,
-                                    Icon: u.Icon,
-                                    label: u.label,
-                                  }
-                                : null;
-                        return (
-                          <PurchaseListRow
-                            key={g.groupKey}
-                            Icon={Icon}
-                            title={g.supplierName ?? "the factory"}
-                            subtitle={subtitle}
-                            dateIso={g.earliestOrderBy}
-                            dateLabel="Send by"
-                            urgency={urgency}
-                            selected={isSel}
-                            onSelect={() =>
-                              setSelection(
-                                isSel
-                                  ? null
-                                  : { kind: "place", groupKey: g.groupKey },
-                              )
-                            }
-                            testId={`place-row-${g.groupKey}`}
-                          />
-                        );
-                      })
+              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden p-3 flex-1">
+                {isLoading ? (
+                  <PanelHint text="Loading today's plan…" />
+                ) : selectedPlace ? (
+                  <PoDocumentPreview
+                    group={selectedPlace}
+                    today={today}
+                    earliestCustomerDeadline={earliestCustomerDeadlineOfGroup(
+                      selectedPlace,
                     )}
-                  </div>
-                </div>
-
-                {/* PREVIEW — PDF-style PO document + WhatsApp draft */}
-                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden p-3">
-                  {selectedPlace ? (
-                    <PoDocumentPreview
-                      group={selectedPlace}
-                      today={today}
-                      earliestCustomerDeadline={earliestCustomerDeadlineOfGroup(
-                        selectedPlace,
-                      )}
-                      preparedByName={dutyQ.data?.holder?.name ?? null}
-                      dutyHolderName={dutyQ.data?.holder?.name ?? null}
-                      onSendPo={(prefill) => {
-                        posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
-                        setCreatePoPrefill(prefill);
-                      }}
-                      buildPrefill={() => buildPlacePrefill(selectedPlace)}
-                      waTemplate={buildPlaceWaTemplate(
-                        selectedPlace,
-                        dutyQ.data?.holder?.name ?? null,
-                      )}
-                    />
-                  ) : (
-                    <DetailEmpty stage={stage} />
-                  )}
-                </div>
+                    preparedByName={dutyQ.data?.holder?.name ?? null}
+                    dutyHolderName={dutyQ.data?.holder?.name ?? null}
+                    onSendPo={(prefill) => {
+                      posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
+                      setCreatePoPrefill(prefill);
+                    }}
+                    buildPrefill={() => buildPlacePrefill(selectedPlace)}
+                    waTemplate={buildPlaceWaTemplate(
+                      selectedPlace,
+                      dutyQ.data?.holder?.name ?? null,
+                    )}
+                  />
+                ) : placeShown.length === 0 ? (
+                  <EmptyDone
+                    text="Nothing to send today"
+                    sub="Clear a filter or wait for the next SO to land."
+                  />
+                ) : (
+                  <DetailEmpty stage={stage} />
+                )}
               </div>
             ) : (
               <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
