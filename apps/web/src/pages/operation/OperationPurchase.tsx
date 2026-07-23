@@ -246,6 +246,36 @@ function placeActionLine(g: PurchasePlaceGroup, today: string | null): string {
   return `Send PO to ${name} today.`;
 }
 
+/** Build the CreatePOModal prefill from a place group. soRefs = unique customer
+ *  SOs; lines = planned SKUs + qty + first-SO attrs; supplierId preselects the
+ *  group. Shared by the card's Send PO and the expanded detail's Send PO. */
+function buildPlacePrefill(group: SplitPlaceGroup): CreatePoPrefill {
+  const soRefs = Array.from(
+    new Set(
+      group.lines.flatMap((l) =>
+        l.forOrders.map((o) => o.so).filter((n): n is number => n != null),
+      ),
+    ),
+  );
+  const lines = group.lines.map((l) => ({
+    sku: l.sku,
+    qty: l.need,
+    attrs:
+      (l.forOrders[0] as { attrs?: Record<string, unknown> | null } | undefined)
+        ?.attrs ?? null,
+  }));
+  return {
+    supplierId: group.supplierId,
+    soRefs: soRefs.length > 0 ? soRefs : undefined,
+    lines,
+    note: `Auto-planned from cockpit · ${group.orderCount} SO${
+      group.orderCount === 1 ? "" : "s"
+    } · ${group.totalUnits} units${
+      group.splitCategory ? ` (${group.splitCategory})` : ""
+    }`,
+  };
+}
+
 function chaseActionLine(r: PurchaseChase, supplierName: string): string {
   if (r.daysLate > 0) return `Chase ${supplierName} — ${r.daysLate}d late.`;
   return `Remind ${supplierName} — check ready date.`;
@@ -826,6 +856,11 @@ export default function OperationPurchase() {
                                   : { kind: "place", groupKey: g.groupKey },
                               )
                             }
+                            onSendPo={(prefill) => {
+                              posCountBeforeSend.current =
+                                posQ.data?.pos.length ?? 0;
+                              setCreatePoPrefill(prefill);
+                            }}
                           />
                           {isSel && selectedPlace && (
                             <div className="-mt-1 mb-2 rounded-b-[12px] border border-t-0 border-primary/30 bg-white overflow-hidden">
@@ -1042,77 +1077,111 @@ function MiddleListHeader({
   );
 }
 
+// Self-contained place CARD (Jess 2026-07-23 agreed ASCII): header + status +
+// "Stock to" + one row per SKU (buy N) + "N of N selected" + Send PO — the card
+// owns everything, no separate detail pane. Clicking the header still expands
+// the full SKU-size/deadline table below for power users.
 function PlaceListRow({
   group,
   today,
   selected,
   onSelect,
+  onSendPo,
 }: {
   group: SplitPlaceGroup;
   today: string | null;
   selected: boolean;
   onSelect: () => void;
+  onSendPo: (prefill: CreatePoPrefill) => void;
 }) {
   const u = urgencyStyle(group.urgency);
   const action = placeActionLine(group, today);
-  // Post-split each group has a single category — icon + tag reflect that.
   const cat = group.categories[0];
   const Icon = categoryIconOf(cat);
-  // Per-card buy cost = Σ(system cost × need) — advisory only (display, never an
-  // order-path input), null costs skipped. Hidden when 0.
+  // Per-card buy cost = Σ(system cost × need) — advisory only, null costs
+  // skipped. Hidden when 0.
   const rm = group.lines.reduce(
     (s, l) => s + (l.cost != null ? l.cost * l.need : 0),
     0,
   );
+  const n = group.lines.length;
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
+    <div
       className={[
-        "w-full text-left rounded-[12px] border p-3 mb-2 transition-colors",
-        selected
-          ? "border-primary/40 bg-hovertint"
-          : "border-base-200 bg-white hover:bg-hovertint",
+        "rounded-[12px] border mb-2 bg-white overflow-hidden",
+        selected ? "border-primary/40" : "border-base-200",
       ].join(" ")}
     >
-      <div className="flex items-start gap-1.5 min-w-0">
-        <Icon size={16} className="text-base-500 shrink-0 mt-0.5" />
-        <span className="text-[14px] font-semibold text-base-900 truncate">
-          {group.supplierName}
-          {cat && (
-            <span className="ml-1 text-[12px] font-medium text-base-500">
-              — {cat}
-            </span>
-          )}
-        </span>
-        <span className="ml-auto text-[12px] text-base-500 shrink-0">
-          {group.orderCount} {group.orderCount === 1 ? "sales order" : "sales orders"}
-        </span>
-      </div>
-      <div className="mt-1.5 flex items-center gap-2 min-w-0">
-        <span className={`pill ${u.cls} shrink-0`}>
-          <u.Icon />
-          {u.label}
-        </span>
-        <span className="text-[12px] text-base-700 truncate">{action}</span>
-      </div>
-      <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-base-500">
-        <span className="tabular-nums truncate">
-          {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"}
-          {group.earliestOrderBy && (
-            <span className="text-base-400">
-              {" "}· due {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
-            </span>
-          )}
-        </span>
-        {rm > 0 && (
-          <span className="tabular-nums font-semibold text-base-900 shrink-0">
-            RM {Math.round(rm).toLocaleString()}
+      {/* header — click to expand the full SKU detail below */}
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="w-full text-left p-3 hover:bg-hovertint transition-colors"
+      >
+        <div className="flex items-start gap-1.5 min-w-0">
+          <Icon size={16} className="text-base-500 shrink-0 mt-0.5" />
+          <span className="text-[14px] font-semibold text-base-900 truncate">
+            {group.supplierName}
+            {cat && (
+              <span className="ml-1 text-[12px] font-medium text-base-500">— {cat}</span>
+            )}
           </span>
-        )}
+          <span className="ml-auto text-[12px] text-base-500 shrink-0">
+            {group.orderCount} {group.orderCount === 1 ? "sales order" : "sales orders"}
+          </span>
+        </div>
+        <div className="mt-1.5 flex items-center gap-2 min-w-0">
+          <span className={`pill ${u.cls} shrink-0`}>
+            <u.Icon />
+            {u.label}
+          </span>
+          <span className="text-[12px] text-base-700 truncate">{action}</span>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-base-500">
+          <span className="truncate">Stock to: Carres Klang · NETS pickup</span>
+          {rm > 0 && (
+            <span className="tabular-nums font-semibold text-base-900 shrink-0">
+              RM {Math.round(rm).toLocaleString()}
+            </span>
+          )}
+        </div>
+      </button>
+      {/* per-SKU rows — what to buy (always on the card) */}
+      <div className="border-t border-base-100">
+        {group.lines.map((l) => (
+          <div
+            key={l.sku}
+            className="h-[38px] px-3 flex items-center gap-2 text-[12px] border-b border-base-50 last:border-b-0"
+          >
+            <Check size={14} className="text-success shrink-0" />
+            <span className="font-mono text-base-800 truncate">{l.sku}</span>
+            <span className="ml-auto text-base-600 shrink-0">
+              buy{" "}
+              <span className="font-semibold tabular-nums text-base-900">{l.need}</span>
+            </span>
+            <span className="hidden sm:inline text-base-400 shrink-0">
+              Carres Klang · NETS
+            </span>
+          </div>
+        ))}
       </div>
-    </button>
+      {/* footer — N of N selected + Send PO on the card */}
+      <div className="px-3 py-2 flex items-center justify-between border-t border-base-100">
+        <span className="text-[12px] text-base-500 tabular-nums">
+          {n} of {n} selected
+        </span>
+        <Btn
+          variant={group.urgency === "late" ? "hero" : "box"}
+          size="sm"
+          icon={Send}
+          title={`Open the PO form to raise this order to ${group.supplierName}.`}
+          onClick={() => onSendPo(buildPlacePrefill(group))}
+        >
+          Send PO
+        </Btn>
+      </div>
+    </div>
   );
 }
 
