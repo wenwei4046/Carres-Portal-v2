@@ -51,6 +51,8 @@
  * status tones, English-only copy, `Btn` primitive, date via `fmtDate()`.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   AlertCircle,
   AlertTriangle,
@@ -390,6 +392,12 @@ export default function OperationPurchase() {
   // ETA / cascade attrs (sofa fabric · bedframe color+gap) inside the modal
   // and issues the PO. On success the modal closes + purchase data refetches.
   const [createPoPrefill, setCreatePoPrefill] = useState<CreatePoPrefill | null>(null);
+  // Cross-module jump wire (Jess 2026-07-23) — after a Send PO commits, jump
+  // to the Purchase Orders tab so the operator sees the new PO land. Snap the
+  // PO-count before opening the modal; on close, refetch + compare to know
+  // if the modal was submitted (count went up) vs cancelled (unchanged).
+  const posCountBeforeSend = useRef(0);
+  const navigate = useNavigate();
   // Check in wire (Jess 2026-07-23) — clicking ReceiveDetail's Check in button
   // opens the shipped ReceivePOModal for the same PO. The modal needs the full
   // operationPoListRow (with purchase_order_lines nested) — that comes from
@@ -836,7 +844,11 @@ export default function OperationPurchase() {
                   <PlaceDetail
                     group={selectedPlace}
                     today={today}
-                    onSendPo={(prefill) => setCreatePoPrefill(prefill)}
+                    onSendPo={(prefill) => {
+                      posCountBeforeSend.current =
+                        posQ.data?.pos.length ?? 0;
+                      setCreatePoPrefill(prefill);
+                    }}
                   />
                 ) : selectedChase ? (
                   <ChaseDetail
@@ -861,9 +873,19 @@ export default function OperationPurchase() {
       {createPoPrefill && (
         <CreatePOModal
           prefill={createPoPrefill}
-          onClose={() => {
+          onClose={async () => {
             setCreatePoPrefill(null);
             void refetch();
+            const before = posCountBeforeSend.current;
+            const fresh = await posQ.refetch();
+            const after = fresh.data?.pos.length ?? before;
+            if (after > before) {
+              const n = after - before;
+              toast.success(
+                `${n} PO${n === 1 ? "" : "s"} sent — opening Purchase Orders`,
+              );
+              navigate("/operation/procurement");
+            }
           }}
         />
       )}
