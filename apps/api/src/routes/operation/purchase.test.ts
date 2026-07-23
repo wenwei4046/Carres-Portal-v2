@@ -230,14 +230,14 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     expect(res.status).toBe(200);
     const parsed = purchaseTodayResponseSchema.parse(await res.json());
 
-    // AutoCount exclusion filter is applied on the orders read.
+    // Jess 2026-07-23 · AutoCount orders now DO feed procurement — the earlier
+    // `source_system.neq.autocount` gate is gone; the `status` filter alone
+    // scopes the read.
     expect(sb.builders.orders.in).toHaveBeenCalledWith("status", [
       "place",
       "proceed_order",
     ]);
-    expect(sb.builders.orders.or).toHaveBeenCalledWith(
-      "source_system.is.null,source_system.neq.autocount",
-    );
+    expect(sb.builders.orders.or).not.toHaveBeenCalled();
 
     // ONE bed-set bundle (mattress + bedframe co-bundle in the same order).
     expect(parsed.bundles).toHaveLength(1);
