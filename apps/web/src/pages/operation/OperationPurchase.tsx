@@ -88,10 +88,16 @@ import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import CreatePOModal, { type CreatePoPrefill } from "./components/CreatePOModal";
+import ReceivePOModal from "./components/ReceivePOModal";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import type { SupplierRow } from "@/lib/queries";
-import { usePurchaseToday, useOperationSuppliers } from "@/lib/queries";
+import {
+  usePurchaseToday,
+  useOperationSuppliers,
+  useOperationPos,
+  useOperationWarehouse,
+} from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -486,6 +492,14 @@ export default function OperationPurchase() {
   // ETA / cascade attrs (sofa fabric · bedframe color+gap) inside the modal
   // and issues the PO. On success the modal closes + purchase data refetches.
   const [createPoPrefill, setCreatePoPrefill] = useState<CreatePoPrefill | null>(null);
+  // Check in wire (Jess 2026-07-23) — clicking ReceiveDetail's Check in button
+  // opens the shipped ReceivePOModal for the same PO. The modal needs the full
+  // operationPoListRow (with purchase_order_lines nested) — that comes from
+  // useOperationPos, which the Purchase Orders tab already fetches. Cockpit
+  // reuses the same list read so the two tabs stay in sync on receive events.
+  const [checkInPoId, setCheckInPoId] = useState<string | null>(null);
+  const posQ = useOperationPos();
+  const warehousesQ = useOperationWarehouse();
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -1040,6 +1054,7 @@ export default function OperationPurchase() {
                   <ReceiveDetail
                     row={selectedReceive}
                     supplierName={supplierName(selectedReceive.supplierId)}
+                    onCheckIn={(poId) => setCheckInPoId(poId)}
                   />
                 ) : (
                   <DetailEmpty stage={stage} />
@@ -1058,6 +1073,26 @@ export default function OperationPurchase() {
           }}
         />
       )}
+      {checkInPoId && (() => {
+        const po = posQ.data?.pos.find((p) => p.id === checkInPoId);
+        if (!po) return null;
+        const supplier = supplierById.get(po.supplier_id);
+        const warehouse = warehousesQ.data?.warehouses.find(
+          (w) => w.id === po.warehouse_id,
+        );
+        return (
+          <ReceivePOModal
+            po={po}
+            supplier={supplier}
+            warehouse={warehouse}
+            onClose={() => {
+              setCheckInPoId(null);
+              void refetch();
+              void posQ.refetch();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -1979,9 +2014,11 @@ function ChaseDetail({
 function ReceiveDetail({
   row,
   supplierName,
+  onCheckIn,
 }: {
   row: PurchaseReceive;
   supplierName: string;
+  onCheckIn: (poId: string) => void;
 }) {
   const customers = row.linkedOrders
     .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
@@ -2046,11 +2083,8 @@ function ReceiveDetail({
           variant="hero"
           size="md"
           icon={PackageCheck}
-          title="Check these goods into Klang (booking flow is a later unit)."
-          onClick={() => {
-            /* TODO: GRN write path — receive units + attach DO + book into Klang
-               stock. Separate, not-yet-built unit; stub for now. */
-          }}
+          title={`Open the check-in form for ${row.poId}.`}
+          onClick={() => onCheckIn(row.poId)}
         >
           Check in
         </Btn>
