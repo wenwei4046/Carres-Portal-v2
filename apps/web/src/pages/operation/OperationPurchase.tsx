@@ -87,6 +87,7 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
+import CreatePOModal, { type CreatePoPrefill } from "./components/CreatePOModal";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import type { SupplierRow } from "@/lib/queries";
@@ -479,6 +480,12 @@ export default function OperationPurchase() {
   // (Jess 2026-07-22 · strip polish). Bounded to [-30, +90] so the operator
   // can't over-scroll into unactionable territory.
   const [stripOffset, setStripOffset] = useState(0);
+  // Send PO wire (Jess 2026-07-23) — clicking a PlaceDetail's Send PO button
+  // opens the shipped CreatePOModal prefilled with the supplier + SO refs +
+  // line qtys from the cockpit's plan. User then completes cost / warehouse /
+  // ETA / cascade attrs (sofa fabric · bedframe color+gap) inside the modal
+  // and issues the PO. On success the modal closes + purchase data refetches.
+  const [createPoPrefill, setCreatePoPrefill] = useState<CreatePoPrefill | null>(null);
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -1018,7 +1025,11 @@ export default function OperationPurchase() {
               {/* DETAIL — the selected row's expanded view */}
               <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
                 {selectedPlace ? (
-                  <PlaceDetail group={selectedPlace} today={today} />
+                  <PlaceDetail
+                    group={selectedPlace}
+                    today={today}
+                    onSendPo={(prefill) => setCreatePoPrefill(prefill)}
+                  />
                 ) : selectedChase ? (
                   <ChaseDetail
                     row={selectedChase}
@@ -1038,6 +1049,15 @@ export default function OperationPurchase() {
           </div>
         </ListPageShell>
       </div>
+      {createPoPrefill && (
+        <CreatePOModal
+          prefill={createPoPrefill}
+          onClose={() => {
+            setCreatePoPrefill(null);
+            void refetch();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1564,9 +1584,11 @@ const WRONG_OPTIONS = [
 function PlaceDetail({
   group,
   today,
+  onSendPo,
 }: {
   group: SplitPlaceGroup;
   today: string | null;
+  onSendPo: (prefill: CreatePoPrefill) => void;
 }) {
   const [wrongOpen, setWrongOpen] = useState(false);
   const wrongRef = useRef<HTMLDivElement | null>(null);
@@ -1796,10 +1818,41 @@ function PlaceDetail({
           variant="hero"
           size="md"
           icon={Send}
-          title={`Send the PO to ${group.supplierName} (raising the PO is a later unit).`}
+          title={`Open the PO form to raise this order to ${group.supplierName}.`}
           onClick={() => {
-            /* TODO: raise the PO for this factory order. The PO-raise write path
-               is a separate, not-yet-built unit — this button is a stub. */
+            // Build CreatePOModal prefill from this cockpit plan. soRefs = the
+            // unique customer SOs feeding this group; lines = the planned SKUs
+            // with qty + any per-SO attrs (sofa fabric_id · bedframe
+            // color+gap). supplierId preselects the group. The modal handles
+            // cost / warehouse / ETA / cascade completion + fires
+            // useCreatePoMutation on submit.
+            const soRefs = Array.from(
+              new Set(
+                group.lines.flatMap((l) =>
+                  l.forOrders.map((o) => o.so).filter((n): n is number => n != null),
+                ),
+              ),
+            );
+            const lines = group.lines.map((l) => ({
+              sku: l.sku,
+              qty: l.need,
+              // Prefer the first SO's attrs (sofa fabric / bedframe color+gap)
+              // when the source SOs carry them; null = mattress or pre-cascade
+              // legacy — modal's cascade picker fills any gaps.
+              attrs:
+                (l.forOrders[0] as { attrs?: Record<string, unknown> | null } | undefined)
+                  ?.attrs ?? null,
+            }));
+            onSendPo({
+              supplierId: group.supplierId,
+              soRefs: soRefs.length > 0 ? soRefs : undefined,
+              lines,
+              note: `Auto-planned from cockpit · ${group.orderCount} SO${
+                group.orderCount === 1 ? "" : "s"
+              } · ${group.totalUnits} units${
+                group.splitCategory ? ` (${group.splitCategory})` : ""
+              }`,
+            });
           }}
         >
           Send PO
