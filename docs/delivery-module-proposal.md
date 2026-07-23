@@ -244,6 +244,27 @@ Rated after 2 weeks live-usage: 10/10.
 
 ---
 
+## Critical gaps found post-review (LOCKED update 2026-07-22 late round · lifts 6→9/10)
+
+Doc was rated 6/10 initially. Below are the 8 real gaps that HAVE to be spec'd before Phase 1.
+
+| # | Gap | Fix (add to appropriate Phase) |
+|---|---|---|
+| 1 | **Multi-leg delivery** (Klg → HOUZS → customer) — outstation reality TODAY, not Phase 5 | **MOVE to Phase 4a**: `delivery_legs` table (SO_id · leg_order · from_wh · to_wh · partner_id · status · picked_up_at · delivered_at). Each leg tracked independently. Migration 0250. |
+| 2 | **PayHold integration** was mentioned but not deep | **Phase 3**: `orders.payment_hold_at` computed column. Delivery `Assign partner` action queries this — if hold active, block with modal `Customer owes RM X · deliver anyway (needs Jess override) OR wait`. |
+| 3 | **Driver-side POD upload** missing — ops uploads only | **Phase 5+**: driver WhatsApp bot uploads POD photo directly to Storage bucket. Ops verifies within 24h. Requires WA Business API setup. |
+| 4 | **Customer SMS/WA notifications** (`Driver 30 min away`) missing | **Phase 5+**: WA Business API OR Twilio SMS. Optional per SO (customer preference stored). |
+| 5 | **Auto-suggest partner rules are guesses** (KV=NETS, Johor=TEOW) — no data backing | **Phase 0 MUST extract real rules** from operator interview + past 6 months delivery data. If no clear pattern → skip auto-suggest, keep manual only. |
+| 6 | **Reschedule flow** ad-hoc | **Phase 4b (new)**: `delivery_reschedules` table (SO_id · reason · rescheduled_by · rescheduled_at · new_slot). Reason dropdown: customer-not-home / weather / partner-issue / customer-request. |
+| 7 | **Partner performance dashboard** missing (`NETS on-time rate this month`) | **Phase 5+**: analytics tab · on-time% + avg delay per partner + late-payment rate to us. Powers next-quarter renegotiation. |
+| 8 | **Return delivery** (customer refuses at door) not handled | **Phase 5+**: `returned` sub-status under ③ POD queue → triggers back-into-stock flow (`stock_movements(action='return_from_customer')` + resets SO to `stock_ready` state). |
+
+**Revised phase totals:** ~22h impl + 14h review = ~36h across 5-6 weeks · 5+ PRs · Delivery 0/10 → 9/10.
+
+Multi-leg (Fix 1) is the BIGGEST change — moves Delivery from single-partner assumption to multi-leg journeys. Real for outstation Ipoh/Penang/JB deliveries TODAY.
+
+---
+
 ## Anti-drift note for next chat
 
 If a fresh chat reads this and thinks any LOCKED decision is wrong:

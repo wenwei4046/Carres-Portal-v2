@@ -338,6 +338,25 @@ Rated after 2 weeks live-usage feedback: 10/10 (only real staff usage reveals it
 
 ---
 
+## Critical gaps found post-review (LOCKED update 2026-07-22 late round · lifts 7→9/10)
+
+Doc was rated 7/10 initially. Below are the 8 real gaps that HAVE to be spec'd before Phase 1 or the module ships broken.
+
+| # | Gap | Fix (add to appropriate Phase) |
+|---|---|---|
+| 1 | **Multi-part description parser** — "1007Cody/Fab3-Queen/PC151-01/Divan 8"/Leg 2"/Gap12"" needs sophisticated parser, not "auto-parse" | **Phase 4a**: build parse-rule DSL (regex or slash-split). Sandbox tester runs on 20 real Excel lines. Must pass before running full 985-row diff. |
+| 2 | **`stock_balances` (SKU-level) vs `ops_stock_items` (per-unit) sync** — 2 tables, unclear which drives which UI | **Phase 2b**: data-model diagram in doc. `ops_stock_items` = ground truth. `stock_balances` = rollup materialized view (`select sku, warehouse_id, count(*) filter (where free) as available, count(*) filter (where reserved) as reserved from ops_stock_items group by`). Reconciliation writes to `ops_stock_items` then refreshes the view. |
+| 3 | **`Book now` at non-Own location** — reserving at `at Ohana` doesn't = customer gets it Monday | **Phase 3**: add `warehouses.is_immediately_deliverable` boolean (Own = true, Partner may be true, Supplier = false, In-transit = false). Book now warns operator: `Stock at Ohana — needs pickup before delivery. Confirm reserve?` |
+| 4 | **No mobile view** — warehouse staff use phones to count | **Phase 2**: responsive rules. `<900px` = single-column card list, facet collapses to bottom-sheet. |
+| 5 | **Return-to-supplier flow** (defective units) missing entirely | **Phase 5b (new)**: unit detail has `[ Send back ]` action → logs `stock_movements(action='return_to_supplier', reason=...)` + updates `ops_stock_items.condition='returned'` |
+| 6 | **Age indicator baseline chicken/egg** — how do we know last-reconciled-at before first reconciliation? | **Phase 1**: `stock_balances.last_reconciled_at` defaults to `GRN date` (first-time GRN = baseline). Before first reconciliation, show `⚪ never reconciled` grey. |
+| 7 | **Alias setup UX for 143 unknown SKUs** — tedious, operators drop off, feature never launches | **Phase 4b (new)**: bulk CSV template + closest-match auto-suggest (Levenshtein distance) + `[ Approve all matching ]` bulk button. Setup time from ~2h → ~15min. |
+| 8 | **NETS-managed warehouse real-time feedback** — how does NETS report deliveries back to us? | **Phase 4c (new)**: NETS integration spec — webhook OR daily CSV feed pull. Phase 0 confirms which one NETS can actually provide. |
+
+**Revised phase totals:** ~30h impl + 14h review = ~44h across 6-7 weeks · 5+ PRs · Inventory 4/10 → 9/10.
+
+---
+
 ## Anti-drift note for next chat
 
 If a fresh chat reads this and thinks any LOCKED decision is wrong:
