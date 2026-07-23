@@ -148,6 +148,12 @@ async function loadChaseReceive(
   const { chase, receive } = buildPurchaseChaseReceive(inputs, {
     today: todayIso(),
     holidays: myHolidaySet(),
+    // Jess 2026-07-23 · Carres suppliers work Mon–Fri (Ohana confirmed; the
+    // rest match). Saturday counted as a working day used to inflate `daysLate`
+    // on chase rows over long weekends. Passing offDays = [Sun, Sat] fixes it
+    // without touching the shared engine default (which the sofa/bedframe
+    // 6-day-week tests still assume).
+    offDays: [0, 6],
   });
   return { ok: true, chase, receive };
 }
@@ -381,6 +387,11 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     {
       today: todayIso(),
       holidays: myHolidaySet(),
+      // Jess 2026-07-23 · same rationale as loadChaseReceive above —
+      // Carres suppliers are Mon–Fri, so raiseBy backs off both Sat and Sun
+      // (was Sun only, which produced Saturday send dates that fooled the
+      // operator into thinking Ohana could take a PO on the weekend).
+      offDays: [0, 6],
       // consumeFreeStock stays OFF (default) — free stock is advisory only.
       reviewDaysBySupplier,
     },
