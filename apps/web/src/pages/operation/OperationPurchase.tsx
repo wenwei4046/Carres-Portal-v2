@@ -97,6 +97,7 @@ import {
   useOperationSuppliers,
   useOperationPos,
   useOperationWarehouse,
+  useChasePoEventMutation,
 } from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -1908,6 +1909,7 @@ function ChaseDetail({
   supplierName: string;
   supplier: SupplierRow | undefined;
 }) {
+  const chaseEvent = useChasePoEventMutation();
   const customers = row.linkedOrders
     .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
     .filter((s): s is string => Boolean(s));
@@ -1922,6 +1924,11 @@ function ChaseDetail({
     deadline: deadline ? fmtDateShort(deadline) : "TBD",
   });
   const onChase = () => {
+    // Jess 2026-07-23 — record the chase in audit_log BEFORE opening WA so
+    // the log lands even if the operator closes the new tab. Failure is
+    // best-effort (toasted via mutation error handler in the future); the
+    // WA link opens regardless.
+    chaseEvent.mutate({ poId: row.poId });
     if (waBase) {
       window.open(`${waBase}?text=${encodeURIComponent(chaseText)}`, "_blank", "noopener");
     } else if (groupUrl) {
