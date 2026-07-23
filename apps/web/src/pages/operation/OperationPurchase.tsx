@@ -730,9 +730,28 @@ export default function OperationPurchase() {
           facetOpen={facetOpen}
           onFacetToggle={() => setFacetOpen((v) => !v)}
           facetToggleTitle="Show overview"
+          facetWidthPx={320}
           activeChips={activeChips}
           facet={
-            <SectionCard>
+            <div className="flex flex-col gap-2 min-h-0 flex-1">
+              {/* + New PO — Gmail compose style (Jess 2026-07-23). Always
+                  visible at the top; opens CreatePOModal with EMPTY prefill
+                  so the operator can raise an ad-hoc PO (stockpile / runner /
+                  special order) not tied to a specific SO. Grey box (not
+                  flame — Send PO in the preview owns the ONE flame per page,
+                  UI-KIT §A5). */}
+              <button
+                type="button"
+                onClick={() => {
+                  posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
+                  setCreatePoPrefill({ lines: [] });
+                }}
+                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-[13px] font-semibold hover:bg-hovertint transition-colors"
+              >
+                <span className="text-[16px] leading-none">+</span> New PO
+              </button>
+
+              <SectionCard>
               {/* TODAY'S WORK — 3 stages with avatar chip left (Jess 2026-07-23
                   v2 · rev 2): chip = who's on duty for that stage. Numbers
                   1/2/3 removed (spine implied by top-to-bottom order + label).
@@ -805,7 +824,8 @@ export default function OperationPurchase() {
                   )}
                 </div>
               )}
-            </SectionCard>
+              </SectionCard>
+            </div>
           }
         >
           <div className="flex-1 min-h-0 flex flex-col gap-3">
@@ -1110,6 +1130,34 @@ export default function OperationPurchase() {
               })()
             : null
         }
+        rotationRows={(() => {
+          // PO + GRN rotation, offset-1 (Jess 2026-07-23): GRN = next month's
+          // PO holder. Roster from the po-duty API. Show up to 4 months so
+          // the operator sees the wheel turning.
+          const roster = dutyQ.data?.roster ?? [];
+          const cur = dutyQ.data?.month ?? "";
+          const sorted = [...roster].sort((a, b) => a.month.localeCompare(b.month));
+          const rows: {
+            month: string;
+            poHolderName: string | null;
+            grnHolderName: string | null;
+          }[] = [];
+          for (let i = 0; i < sorted.length; i++) {
+            const r = sorted[i]!;
+            // Only include the current month and forward.
+            if (cur && r.month < cur) continue;
+            const monthLabel = new Date(`${r.month}-01T00:00:00Z`)
+              .toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+            const grn = sorted[i + 1] ?? null;
+            rows.push({
+              month: monthLabel,
+              poHolderName: r.name ?? r.email ?? null,
+              grnHolderName: grn ? (grn.name ?? grn.email ?? null) : null,
+            });
+            if (rows.length >= 4) break;
+          }
+          return rows;
+        })()}
       />
     </div>
   );

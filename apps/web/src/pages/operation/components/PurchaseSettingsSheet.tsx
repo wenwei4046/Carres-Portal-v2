@@ -60,6 +60,12 @@ const PO_DAYS: ReadonlyArray<{ day: string; on: boolean }> = [
   { day: "Sun", on: false },
 ];
 
+export interface RotationRow {
+  month: string; // "Jul" · "Aug" · "Sep" ...
+  poHolderName: string | null;
+  grnHolderName: string | null;
+}
+
 interface PurchaseSettingsSheetProps {
   open: boolean;
   onClose: () => void;
@@ -68,6 +74,9 @@ interface PurchaseSettingsSheetProps {
   /** Duty holder end-of-term for the "until <date>" line. Human-formatted
    *  already (e.g. "31 Jul 26") to match the TeamPanel wording. Null hides. */
   dutyUntilLabel: string | null;
+  /** 3-4 upcoming months of rotation (Jess 2026-07-23: PO + GRN offset-1).
+   *  Empty array hides the rotation table. */
+  rotationRows: readonly RotationRow[];
 }
 
 function Row({
@@ -95,6 +104,7 @@ export function PurchaseSettingsSheet({
   onClose,
   dutyHolderName,
   dutyUntilLabel,
+  rotationRows,
 }: PurchaseSettingsSheetProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggle = (k: string) =>
@@ -249,10 +259,13 @@ export function PurchaseSettingsSheet({
             )}
           </SectionCard>
 
-          {/* 4. DUTY ROTATION (read-only display; editing lives on Team card) */}
+          {/* 4. DUTY ROTATION — PO + GRN offset-1 (Jess 2026-07-23):
+                 Send + Chase = PO duty (one voice to suppliers); Receive =
+                 GRN duty on the NEXT month's holder. Table read-only; the
+                 roster edit lives on the right-rail Team card. */}
           <SectionCard>
             <SectionBand
-              title="Duty rotation"
+              title="Duty rotation · PO + GRN offset-1"
               strong
               collapsed={collapsed.has("duty")}
               onToggle={() => toggle("duty")}
@@ -270,9 +283,33 @@ export function PurchaseSettingsSheet({
                   }
                   hint={dutyUntilLabel ? `until ${dutyUntilLabel}` : undefined}
                 />
+                {rotationRows.length > 0 && (
+                  <div className="mt-2">
+                    <div className="grid grid-cols-[50px_1fr_1fr] gap-x-2 px-2.5 h-6 items-center text-[10px] uppercase tracking-[0.05em] text-base-500">
+                      <span>Month</span>
+                      <span>PO (Send + Chase)</span>
+                      <span>GRN (Receive)</span>
+                    </div>
+                    {rotationRows.map((r) => (
+                      <div
+                        key={r.month}
+                        className="grid grid-cols-[50px_1fr_1fr] gap-x-2 px-2.5 h-8 items-center text-[12.5px] border-t border-base-100"
+                      >
+                        <span className="text-base-500">{r.month}</span>
+                        <span className="text-base-900">
+                          {r.poHolderName ?? "—"}
+                        </span>
+                        <span className="text-base-900">
+                          {r.grnHolderName ?? "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="px-2.5 pt-2 pb-1 text-[11px] text-base-500 leading-snug">
-                  One person controls company-wide POs each month (auto-rotates).
-                  Edit the roster on the right-rail Team card.
+                  PO duty = one voice to suppliers (Send + Chase). GRN duty =
+                  next month's holder — different person signs off received
+                  goods (segregation of duties, same 3-person crew).
                 </div>
               </div>
             )}

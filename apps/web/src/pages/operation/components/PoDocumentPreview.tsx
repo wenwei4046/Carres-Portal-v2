@@ -19,7 +19,15 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Copy, Download, Send } from "lucide-react";
+import {
+  AlertCircle,
+  Clock,
+  Copy,
+  Download,
+  MoreVertical,
+  Send,
+} from "lucide-react";
+import { toast } from "sonner";
 import type { ProductCategory } from "@carres/shared";
 import Btn from "@/components/Btn";
 import { fmtDate } from "@/lib/fmt-date";
@@ -113,7 +121,7 @@ export function PoDocumentPreview({
       : null;
 
   const supplierName = group.supplierName ?? "the factory";
-  const stockToLabel = "Balakong · AL pickup"; // TODO: wire real route on next iteration
+  const stockToLabel = "Carres Klg"; // Jess 2026-07-23: warehouse ALWAYS Carres Klg
   const cats = catLabel(group.categories);
   const isLate = group.urgency === "late" && daysLate != null && daysLate > 0;
 
@@ -166,25 +174,16 @@ export function PoDocumentPreview({
         )}
       </div>
 
-      {/* 3. What's in this PO — lightweight SKU list (Jess 2026-07-23:
-             letterhead removed; this preview is for the operator's decision,
-             not a print-ready invoice). */}
+      {/* 3. What's in this PO — lightweight SKU list with per-line ⋮ menu
+             (Jess 2026-07-23: Send separately / Push to next / Skip). The
+             letterhead is deliberately gone — this preview is for the
+             operator's decision, not a print-ready invoice. */}
       <div className="shrink-0 rounded-[8px] border border-base-200 bg-white px-3 py-2 mb-3">
         <div className="text-[11px] uppercase tracking-[0.05em] text-base-500 mb-1">
           What's in this PO
         </div>
         {group.lines.map((l) => (
-          <div
-            key={l.sku}
-            className="grid grid-cols-[1fr_50px] gap-2 py-1 text-[13px] border-b border-base-50 last:border-b-0"
-          >
-            <span className="font-mono tabular-nums text-base-800 truncate">
-              {l.sku}
-            </span>
-            <span className="text-right tabular-nums text-base-900 font-semibold">
-              × {l.need}
-            </span>
-          </div>
+          <LineRow key={l.sku} sku={l.sku} qty={l.need} />
         ))}
       </div>
 
@@ -220,7 +219,9 @@ export function PoDocumentPreview({
         />
       </div>
 
-      {/* 5. Footer — ONE flame button (Send PO) per page (UI-KIT §A5) */}
+      {/* 5. Footer — ONE flame button (Send PO) per page (UI-KIT §A5) +
+             Snooze PO (ghost, next-cycle defer with a date target — Jess
+             2026-07-23). */}
       <div className="shrink-0 flex items-center justify-end gap-2 pt-1">
         {dutyHolderName && (
           <span
@@ -230,6 +231,7 @@ export function PoDocumentPreview({
             {dutyHolderName} on PO duty
           </span>
         )}
+        <SnoozeButton supplier={supplierName} />
         <Btn
           variant="box"
           size="md"
@@ -251,6 +253,163 @@ export function PoDocumentPreview({
           Send PO to {supplierName}
         </Btn>
       </div>
+    </div>
+  );
+}
+
+/** A single SKU line with a `⋮` action menu — Send separately / Push to next
+ *  cycle / Skip. Actions are stubs (toast "coming soon") until the
+ *  line-mutation route ships; the UI shape is committed so the operator's
+ *  muscle memory forms now (Jess 2026-07-23). */
+function LineRow({ sku, qty }: { sku: string; qty: number }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const stub = (label: string) => () => {
+    toast(`${label} — coming soon`);
+    setOpen(false);
+  };
+  return (
+    <div
+      className="grid grid-cols-[1fr_50px_28px] gap-2 py-1 text-[13px] border-b border-base-50 last:border-b-0 items-center"
+      ref={wrapRef}
+    >
+      <span className="font-mono tabular-nums text-base-800 truncate">
+        {sku}
+      </span>
+      <span className="text-right tabular-nums text-base-900 font-semibold">
+        × {qty}
+      </span>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="p-1 rounded text-base-400 hover:text-base-900 hover:bg-hovertint"
+          title="Line actions"
+          aria-haspopup="menu"
+          aria-expanded={open}
+        >
+          <MoreVertical size={14} strokeWidth={2} />
+        </button>
+        {open && (
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 w-[200px] rounded-[8px] border border-base-200 bg-white shadow-lg py-1 z-10"
+          >
+            <MenuItem
+              label="Send separately"
+              hint="Split into its own PO, sent today"
+              onClick={stub("Send separately")}
+            />
+            <MenuItem
+              label="Push to next cycle"
+              hint="Hold for tomorrow's PO plan"
+              onClick={stub("Push to next cycle")}
+            />
+            <MenuItem
+              label="Skip"
+              hint="Don't buy this line this cycle"
+              onClick={stub("Skip")}
+              danger
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuItem({
+  label,
+  hint,
+  onClick,
+  danger,
+}: {
+  label: string;
+  hint: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="w-full text-left px-3 py-2 hover:bg-hovertint transition-colors"
+    >
+      <div
+        className={`text-[13px] font-medium ${
+          danger ? "text-danger" : "text-base-900"
+        }`}
+      >
+        {label}
+      </div>
+      <div className="text-[11px] text-base-500">{hint}</div>
+    </button>
+  );
+}
+
+/** Snooze the whole PO to a target date (next-cycle defer). Stub until the
+ *  snooze route ships (Jess 2026-07-23). */
+function SnoozeButton({ supplier }: { supplier: string }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const stub = (until: string) => () => {
+    toast(`Snooze ${supplier} PO until ${until} — coming soon`);
+    setOpen(false);
+  };
+  return (
+    <div className="relative" ref={wrapRef}>
+      <Btn
+        variant="box"
+        size="md"
+        icon={Clock}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Snooze
+      </Btn>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 bottom-full mb-1 w-[180px] rounded-[8px] border border-base-200 bg-white shadow-lg py-1 z-10"
+        >
+          <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.05em] text-base-500">
+            Snooze until
+          </div>
+          <MenuItem
+            label="Next PO day"
+            hint="Mon or Thu, whichever is next"
+            onClick={stub("next PO day")}
+          />
+          <MenuItem
+            label="Next week"
+            hint="7 days from today"
+            onClick={stub("next week")}
+          />
+          <MenuItem
+            label="Pick a date…"
+            hint="Choose any working day"
+            onClick={stub("a chosen date")}
+          />
+        </div>
+      )}
     </div>
   );
 }
