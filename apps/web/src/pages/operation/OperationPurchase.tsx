@@ -58,8 +58,6 @@ import {
   Bed,
   BedDouble,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Factory,
   Info,
@@ -74,8 +72,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  MY_HOLIDAYS_2026,
-  MY_HOLIDAYS_2027_EARLY,
   type ProductCategory,
   type PurchaseChase,
   type PurchasePlaceGroup,
@@ -87,10 +83,18 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
+import CreatePOModal, { type CreatePoPrefill } from "./components/CreatePOModal";
+import ReceivePOModal from "./components/ReceivePOModal";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import type { SupplierRow } from "@/lib/queries";
-import { usePurchaseToday, useOperationSuppliers } from "@/lib/queries";
+import {
+  usePurchaseToday,
+  useOperationSuppliers,
+  useOperationPos,
+  useOperationWarehouse,
+  useChasePoEventMutation,
+} from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,15 +129,7 @@ function daysBetween(fromIso: string | null, toIso: string | null): number | nul
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
-/** Return ISO of `iso + n` calendar days. UTC-consistent — see purchase.ts
- *  history for the MYT-offset bug this parsing convention prevents. */
-function addDaysIso(iso: string, n: number): string {
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-/** 0 = Sun · 1 = Mon · ... · 6 = Sat (UTC-consistent with addDaysIso). */
+/** 0 = Sun · 1 = Mon · ... · 6 = Sat (UTC-consistent). */
 function dayOfWeek(iso: string): number {
   return new Date(`${iso.slice(0, 10)}T00:00:00Z`).getUTCDay();
 }
@@ -148,12 +144,6 @@ function dayName(iso: string): string {
 function dayLabelShort(iso: string): string {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
-}
-
-/** Cadence day = Mon (1) / Wed (3) / Fri (5) — the PO review anchors. */
-function isCadenceDay(iso: string): boolean {
-  const d = dayOfWeek(iso);
-  return d === 1 || d === 3 || d === 5;
 }
 
 /** Phone → wa.me base link (MY-aware). Local copy of OperationPayments.waLink so
@@ -265,90 +255,9 @@ function receiveActionLine(r: PurchaseReceive, supplierName: string): string {
   return `Check in from ${supplierName} (${total} item${total === 1 ? "" : "s"}).`;
 }
 
-// ── Days-to-order strip helpers ──────────────────────────────────────────────
-
-/** 14 ISO days from `todayIso + offset` (inclusive). Offset lets the strip nav
- *  ± weeks via L/R chevrons (Jess 2026-07-22 · strip polish). */
-function next14Days(todayIso: string | null, offset = 0): string[] {
-  if (!todayIso) return [];
-  const base = addDaysIso(todayIso, offset);
-  return Array.from({ length: 14 }, (_, i) => addDaysIso(base, i));
-}
-
-/** Holiday name lookup — read once, used by the strip cell tooltip.
- *  Sat/Sun detected inline via `dayOfWeek`. */
-const HOLIDAY_NAME_BY_ISO = new Map<string, string>();
-for (const h of [...MY_HOLIDAYS_2026, ...MY_HOLIDAYS_2027_EARLY]) {
-  HOLIDAY_NAME_BY_ISO.set(h.date, h.name);
-}
-
-/** Non-working day = weekend OR public holiday. Return the reason for the
- *  cell tooltip, or null for a normal working day. */
-function nonWorkingReason(iso: string): string | null {
-  const dow = dayOfWeek(iso);
-  if (dow === 6) return "weekend (Sat)";
-  if (dow === 0) return "weekend (Sun)";
-  const ph = HOLIDAY_NAME_BY_ISO.get(iso);
-  if (ph) return `PH: ${ph}`;
-  return null;
-}
-
-interface DayBucket {
-  iso: string;
-  units: number;
-  status: "late" | "today" | "due" | "empty";
-}
-
-/** Bucket the ① Send groups (or ② Chase / ③ Receive rows) by their key date.
- *  Anything earlier than today rolls into the today cell (labelled LATE). */
-function bucketByDay(
-  days: string[],
-  todayIso: string | null,
-  keyDates: Array<{ date: string | null; units: number }>,
-): DayBucket[] {
-  const counts = new Map<string, number>();
-  let overflowLate = 0;
-  for (const k of keyDates) {
-    if (!k.date) continue;
-    if (todayIso && k.date < todayIso) {
-      overflowLate += k.units;
-      continue;
-    }
-    counts.set(k.date, (counts.get(k.date) ?? 0) + k.units);
-  }
-  return days.map((iso, i) => {
-    const units = (counts.get(iso) ?? 0) + (i === 0 ? overflowLate : 0);
-    let status: DayBucket["status"] = "empty";
-    if (units > 0) {
-      if (i === 0 && overflowLate > 0) status = "late";
-      else if (i === 0) status = "today";
-      else status = "due";
-    }
-    return { iso, units, status };
-  });
-}
-
-// ── Monday-anchor cadence (folded into the strip lead line) ─────────────────
-
-/**
- * Return the ISO of {this / next} Monday · Wednesday · Friday from `todayIso`.
- * If today IS one of those days, that day is returned as-is (still fireable).
- */
-function upcomingCadenceDays(todayIso: string): {
-  mon: string;
-  wed: string;
-  fri: string;
-} {
-  const dow = dayOfWeek(todayIso);
-  const dMon = (1 - dow + 7) % 7;
-  const dWed = (3 - dow + 7) % 7;
-  const dFri = (5 - dow + 7) % 7;
-  return {
-    mon: addDaysIso(todayIso, dMon),
-    wed: addDaysIso(todayIso, dWed),
-    fri: addDaysIso(todayIso, dFri),
-  };
-}
+// Days-to-order strip helpers (next14Days · nonWorkingReason · bucketByDay ·
+// upcomingCadenceDays · DayBucket · MY_HOLIDAYS lookup) removed 2026-07-23
+// alongside the strip itself — the right-rail Calendar owns all date views now.
 
 // ── Place-detail helpers: size breakdown + earliest deadline per line ────────
 
@@ -475,10 +384,20 @@ export default function OperationPurchase() {
   const [attn, setAttn] = useState<Attn>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
-  // Strip window offset — L/R chevrons shift the 14-day window ±7 days
-  // (Jess 2026-07-22 · strip polish). Bounded to [-30, +90] so the operator
-  // can't over-scroll into unactionable territory.
-  const [stripOffset, setStripOffset] = useState(0);
+  // Send PO wire (Jess 2026-07-23) — clicking a PlaceDetail's Send PO button
+  // opens the shipped CreatePOModal prefilled with the supplier + SO refs +
+  // line qtys from the cockpit's plan. User then completes cost / warehouse /
+  // ETA / cascade attrs (sofa fabric · bedframe color+gap) inside the modal
+  // and issues the PO. On success the modal closes + purchase data refetches.
+  const [createPoPrefill, setCreatePoPrefill] = useState<CreatePoPrefill | null>(null);
+  // Check in wire (Jess 2026-07-23) — clicking ReceiveDetail's Check in button
+  // opens the shipped ReceivePOModal for the same PO. The modal needs the full
+  // operationPoListRow (with purchase_order_lines nested) — that comes from
+  // useOperationPos, which the Purchase Orders tab already fetches. Cockpit
+  // reuses the same list read so the two tabs stay in sync on receive events.
+  const [checkInPoId, setCheckInPoId] = useState<string | null>(null);
+  const posQ = useOperationPos();
+  const warehousesQ = useOperationWarehouse();
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -492,7 +411,6 @@ export default function OperationPurchase() {
 
   const chase = data?.chase ?? [];
   const receive = data?.receive ?? [];
-  const summary = data?.summary;
   const today = data?.today ?? null;
 
   // ① Send groups — resolve each supplier's display name (the engine leaves it
@@ -530,7 +448,6 @@ export default function OperationPurchase() {
   const placeOverdue = splitPlaceGroups.filter((g) => g.urgency === "late").length;
   const missingCount = splitPlaceGroups.filter((g) => g.urgency === "no_deadline").length;
   const chaseCount = chase.length;
-  const chaseLate = summary?.chaseLate ?? 0;
   const receiveCount = receive.length;
 
   // BY FACTORY facet — per-supplier units for the CURRENT stage. Aggregates
@@ -559,78 +476,10 @@ export default function OperationPurchase() {
       .sort((a, b) => b.units - a.units);
   }, [stage, placeGroups, chase, receive, supplierName]);
 
-  // 14-day strip — buckets by the stage's key date.
-  const stripDays = useMemo(() => next14Days(today, stripOffset), [today, stripOffset]);
-  const stripBuckets = useMemo(() => {
-    if (stage === "place")
-      return bucketByDay(
-        stripDays,
-        today,
-        placeGroups.map((g) => ({ date: g.earliestOrderBy, units: g.totalUnits })),
-      );
-    if (stage === "chase")
-      return bucketByDay(
-        stripDays,
-        today,
-        chase.map((r) => ({
-          date: r.expectedReadyDate,
-          units: r.items.reduce((s, it) => s + it.outstanding, 0),
-        })),
-      );
-    return bucketByDay(
-      stripDays,
-      today,
-      receive.map((r) => ({
-        date: r.etaDate ?? r.expectedReadyDate,
-        units: r.items.reduce((s, it) => s + it.outstanding, 0),
-      })),
-    );
-  }, [stage, stripDays, today, placeGroups, chase, receive]);
-
-  // Lead line under the strip — TWO SENTENCES per Jess 2026-07-22 Q3:
-  // sentence 1 = "right now" state, sentence 2 = "this week" plan (① Send only).
-  // Returned as an array so the UI can render them on separate lines.
-  // Q1 (2026-07-22 late round): line 1 distinguishes "today late — send now"
-  // from "queue this week — none late" so the count doesn't feel contradictory
-  // with an empty today cell.
-  const leadLines = useMemo<string[]>(() => {
-    if (stage === "place") {
-      if (placeCount === 0)
-        return ["Nothing to send today. Every live order is covered."];
-      const line1 =
-        placeOverdue > 0
-          ? `Today: ${placeOverdue} ${placeOverdue === 1 ? "PO" : "POs"} late — send now.`
-          : `In queue: ${placeCount} ${placeCount === 1 ? "PO" : "POs"} to send this week · none late.`;
-      if (!today) return [line1];
-      const { mon, wed, fri } = upcomingCadenceDays(today);
-      const nMon = splitPlaceGroups.filter((g) => g.earliestOrderBy === mon).length;
-      const nWed = splitPlaceGroups.filter((g) => g.earliestOrderBy === wed).length;
-      const nFri = splitPlaceGroups.filter((g) => g.earliestOrderBy === fri).length;
-      const anyAligned = nMon + nWed + nFri > 0;
-      if (!anyAligned) {
-        return [
-          line1,
-          "This week: no factories align with Mon / Wed / Fri — fire off-cadence (see days above).",
-        ];
-      }
-      const cadPart = (iso: string, n: number, tag: string) =>
-        `${dayName(iso)} ${dayLabelShort(iso)} → ${
-          n > 0 ? `${n} ${n === 1 ? "factory" : "factories"}` : "skip"
-        }${tag ? ` ${tag}` : ""}`;
-      const line2 = `This week: ${cadPart(mon, nMon, "(main)")} · ${cadPart(wed, nWed, "")} · ${cadPart(fri, nFri, "")}.`;
-      return [line1, line2];
-    }
-    if (stage === "chase") {
-      if (chaseCount === 0) return ["Nothing to chase today. No factory is late."];
-      return [
-        `Today: ${chaseCount} ${chaseCount === 1 ? "PO" : "POs"} to chase · all past their promised date.`,
-      ];
-    }
-    if (receiveCount === 0) return ["Nothing to receive today. No goods arriving."];
-    return [
-      `Today: ${receiveCount} ${receiveCount === 1 ? "PO" : "POs"} to receive · check in when they arrive.`,
-    ];
-  }, [stage, placeCount, placeOverdue, chaseCount, receiveCount, today, splitPlaceGroups]);
+  // 14-day strip + lead-line memos removed 2026-07-23 with the strip itself
+  // (Jess). The right-rail Calendar is now the single source of date navigation
+  // (full month, tab-filtered by stage). stripOffset kept as a constant above
+  // so any lingering ref doesn't crash — safe no-op.
 
   // ── Filtered lists per stage.
   const placeShown = useMemo(
@@ -877,45 +726,11 @@ export default function OperationPurchase() {
           }
         >
           <div className="flex-1 min-h-0 flex flex-col gap-3">
-            {/* ── STAGE TABS = compact pill row (Jess 2026-07-22 Q1a) ────── */}
-            <StageTabs
-              stage={stage}
-              onSwitch={goStage}
-              counts={{ place: placeCount, chase: chaseCount, receive: receiveCount }}
-              subs={{
-                place:
-                  placeOverdue > 0
-                    ? `${placeOverdue} late`
-                    : placeCount > 0
-                      ? "on track"
-                      : "nothing to send",
-                chase:
-                  chaseLate > 0
-                    ? `${chaseLate} late`
-                    : chaseCount > 0
-                      ? "on track"
-                      : "nothing to chase",
-                receive: receiveCount > 0 ? "ready to check in" : "nothing arriving",
-              }}
-              loading={isLoading}
-            />
-
-            {/* ── 14-day date strip (This week's plan merged into lead lines) ── */}
-            {today && (
-              <DaysToOrderStrip
-                buckets={stripBuckets}
-                todayIso={today}
-                selectedDay={selectedDay}
-                onSelectDay={(iso) =>
-                  setSelectedDay((cur) => (cur === iso ? null : iso))
-                }
-                leadLines={leadLines}
-                stripOffset={stripOffset}
-                onShiftPrev={() => setStripOffset((o) => Math.max(o - 7, -30))}
-                onShiftNext={() => setStripOffset((o) => Math.min(o + 7, 90))}
-                onResetToday={() => setStripOffset(0)}
-              />
-            )}
+            {/* Jess 2026-07-23 — the 3-pill StageTabs row + top DaysToOrder
+                strip both removed. StageTabs duplicated the facet rail; the
+                strip is now the RIGHT-RAIL Calendar (full-month, tab-filtered
+                by Send / Chase / Receive / Deliveries — one place for all
+                dates). Stage switch stays on the facet rail. */}
 
             {/* ── Data guard — un-plannable orders (① Send stage only) ────── */}
             {stage === "place" && missingCount > 0 && (
@@ -1018,7 +833,11 @@ export default function OperationPurchase() {
               {/* DETAIL — the selected row's expanded view */}
               <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
                 {selectedPlace ? (
-                  <PlaceDetail group={selectedPlace} today={today} />
+                  <PlaceDetail
+                    group={selectedPlace}
+                    today={today}
+                    onSendPo={(prefill) => setCreatePoPrefill(prefill)}
+                  />
                 ) : selectedChase ? (
                   <ChaseDetail
                     row={selectedChase}
@@ -1029,6 +848,7 @@ export default function OperationPurchase() {
                   <ReceiveDetail
                     row={selectedReceive}
                     supplierName={supplierName(selectedReceive.supplierId)}
+                    onCheckIn={(poId) => setCheckInPoId(poId)}
                   />
                 ) : (
                   <DetailEmpty stage={stage} />
@@ -1038,6 +858,35 @@ export default function OperationPurchase() {
           </div>
         </ListPageShell>
       </div>
+      {createPoPrefill && (
+        <CreatePOModal
+          prefill={createPoPrefill}
+          onClose={() => {
+            setCreatePoPrefill(null);
+            void refetch();
+          }}
+        />
+      )}
+      {checkInPoId && (() => {
+        const po = posQ.data?.pos.find((p) => p.id === checkInPoId);
+        if (!po) return null;
+        const supplier = supplierById.get(po.supplier_id);
+        const warehouse = warehousesQ.data?.warehouses.find(
+          (w) => w.id === po.warehouse_id,
+        );
+        return (
+          <ReceivePOModal
+            po={po}
+            supplier={supplier}
+            warehouse={warehouse}
+            onClose={() => {
+              setCheckInPoId(null);
+              void refetch();
+              void posQ.refetch();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -1075,258 +924,12 @@ function TodayRefresh({
   );
 }
 
-// ── StageTabs = compact pill row (Jess 2026-07-22 Q1a — ~40px, was ~72px) ────
+// StageTabs removed 2026-07-23 (Jess) — the 3-pill switcher row duplicated
+// the facet rail's Today's work group and burned ~60px of vertical space.
+// DaysToOrderStrip removed 2026-07-23 (Jess) — the right-rail Calendar owns
+// all date navigation now (full month, tab-filtered by Send/Chase/Receive).
 
-function StageTabs({
-  stage,
-  onSwitch,
-  counts,
-  subs,
-  loading,
-}: {
-  stage: Stage;
-  onSwitch: (s: Stage) => void;
-  counts: { place: number; chase: number; receive: number };
-  subs: { place: string; chase: string; receive: string };
-  loading?: boolean;
-}) {
-  const tabs: Array<{
-    key: Stage;
-    n: string;
-    label: string;
-    count: number;
-    sub: string;
-  }> = [
-    { key: "place", n: "1", label: "Send", count: counts.place, sub: subs.place },
-    { key: "chase", n: "2", label: "Chase", count: counts.chase, sub: subs.chase },
-    { key: "receive", n: "3", label: "Receive", count: counts.receive, sub: subs.receive },
-  ];
-  return (
-    <div className="grid grid-cols-3 gap-2 shrink-0" role="tablist" aria-label="Purchase stages">
-      {tabs.map((t) => {
-        const active = stage === t.key;
-        return (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSwitch(t.key)}
-            className={[
-              "flex items-center gap-2 rounded-full px-3 py-2 border transition-colors bg-white text-left",
-              active
-                ? "border-primary ring-1 ring-primary"
-                : "border-base-200 hover:border-base-300",
-            ].join(" ")}
-          >
-            <span
-              className={[
-                "grid place-items-center w-5 h-5 rounded text-[11px] font-bold font-mono shrink-0",
-                active ? "bg-primary text-white" : "bg-base-900 text-white",
-              ].join(" ")}
-            >
-              {t.n}
-            </span>
-            <span
-              className={`text-[13px] font-bold shrink-0 ${
-                active ? "text-primary" : "text-base-900"
-              }`}
-            >
-              {t.label}
-            </span>
-            <span className="text-[12px] font-semibold text-base-800 tabular-nums shrink-0">
-              {loading ? "…" : `${t.count} ${t.count === 1 ? "PO" : "POs"}`}
-            </span>
-            <span className="text-[11px] text-base-500 truncate min-w-0">
-              · {loading ? "…" : t.sub}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
-// ── Days-to-order strip (This week's plan merged into lead line) ─────────────
-
-function DaysToOrderStrip({
-  buckets,
-  todayIso,
-  selectedDay,
-  onSelectDay,
-  leadLines,
-  stripOffset,
-  onShiftPrev,
-  onShiftNext,
-  onResetToday,
-}: {
-  buckets: DayBucket[];
-  todayIso: string;
-  selectedDay: string | null;
-  onSelectDay: (iso: string) => void;
-  leadLines: string[];
-  stripOffset: number;
-  onShiftPrev: () => void;
-  onShiftNext: () => void;
-  onResetToday: () => void;
-}) {
-  const canGoPrev = stripOffset > -30;
-  const canGoNext = stripOffset < 90;
-  const offsetLabel =
-    stripOffset === 0
-      ? "next 14 days"
-      : stripOffset > 0
-        ? `+${stripOffset}d`
-        : `${stripOffset}d`;
-  return (
-    <div className="rounded-[12px] border border-base-200 bg-white shadow-sm px-3 py-2.5 shrink-0">
-      <div className="flex items-center justify-between mb-2 gap-3">
-        <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 min-w-0">
-          Days to order ({offsetLabel} · click a day to focus)
-          <span className="ml-2 text-[10px] font-medium text-base-400 normal-case tracking-normal">
-            Mon / Wed / Fri = review days · weekend + PH greyed
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {selectedDay && (
-            <button
-              type="button"
-              onClick={() => onSelectDay(selectedDay)}
-              className="text-[11px] text-base-500 hover:text-base-900 transition-colors mr-2"
-            >
-              Clear day
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onShiftPrev}
-            disabled={!canGoPrev}
-            title="Previous 7 days"
-            aria-label="Previous 7 days"
-            className="p-1 rounded hover:bg-hovertint text-base-500 hover:text-base-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onResetToday}
-            disabled={stripOffset === 0}
-            title="Reset to today"
-            className="px-2 py-0.5 rounded text-[11px] font-semibold text-base-600 hover:text-base-900 hover:bg-hovertint transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            onClick={onShiftNext}
-            disabled={!canGoNext}
-            title="Next 7 days"
-            aria-label="Next 7 days"
-            className="p-1 rounded hover:bg-hovertint text-base-500 hover:text-base-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
-      <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${buckets.length}, minmax(0, 1fr))` }}
-      >
-        {buckets.map((b) => {
-          const isToday = b.iso === todayIso;
-          const isSel = selectedDay === b.iso;
-          const cadence = isCadenceDay(b.iso);
-          const nonWorking = nonWorkingReason(b.iso);
-          const dateNum = String(new Date(`${b.iso}T00:00:00Z`).getUTCDate());
-          // Chip colour = status semantic (Jess 2026-07-22 Q8 — colour IS the label).
-          const chipCls =
-            b.status === "late"
-              ? "bg-error-soft text-danger"
-              : b.status === "today"
-                ? "bg-primary text-white"
-                : "bg-signature-50 text-signature-800";
-          const tooltip = nonWorking
-            ? `${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${nonWorking}${
-                b.units > 0 ? ` · ${b.units} due (won't work)` : ""
-              }`
-            : `${dayName(b.iso)} ${dayLabelShort(b.iso)} — ${
-                b.units > 0 ? `${b.units} to send` : "nothing"
-              }${cadence ? " · review day" : ""}`;
-          return (
-            <button
-              key={b.iso}
-              type="button"
-              onClick={() => onSelectDay(b.iso)}
-              aria-pressed={isSel}
-              title={tooltip}
-              className={[
-                "flex flex-col items-center justify-start rounded-md py-2 transition-colors min-h-[76px]",
-                isSel
-                  ? "bg-hovertint ring-1 ring-primary"
-                  : nonWorking
-                    ? "bg-base-100/70 hover:bg-hovertint"
-                    : cadence
-                      ? "bg-base-50 hover:bg-hovertint"
-                      : "hover:bg-hovertint",
-              ].join(" ")}
-            >
-              {/* Row 1 · day name (subdued for non-working) */}
-              <span
-                className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  isToday ? "text-primary" : nonWorking ? "text-base-400" : "text-base-500"
-                }`}
-              >
-                {dayName(b.iso)}
-              </span>
-              {/* Row 2 · date — filled flame circle on today, plain bold otherwise */}
-              {isToday ? (
-                <span className="mt-0.5 w-7 h-7 rounded-full bg-primary text-white grid place-items-center text-[13px] font-bold font-mono tabular-nums">
-                  {dateNum}
-                </span>
-              ) : (
-                <span
-                  className={`mt-0.5 text-[18px] font-bold font-mono tabular-nums leading-none ${
-                    nonWorking ? "text-base-400" : "text-base-900"
-                  }`}
-                >
-                  {dateNum}
-                </span>
-              )}
-              {/* Row 3 · count chip (only if there's content) — still shown on
-                  non-working days so late/due work isn't hidden. */}
-              {b.units > 0 && (
-                <span
-                  className={`mt-1.5 inline-flex items-center justify-center rounded-full min-w-[26px] px-2 py-0.5 text-[12px] font-bold font-mono tabular-nums ${
-                    nonWorking ? "bg-base-200 text-base-500" : chipCls
-                  }`}
-                >
-                  {b.units}
-                </span>
-              )}
-              {/* Row 4 · non-working label — tiny caption so the visual gap is
-                  labelled, not just visual. */}
-              {nonWorking && (
-                <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.04em] text-base-400 leading-none">
-                  {nonWorking.startsWith("PH:") ? "PH" : "off"}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-2 pt-2 border-t border-base-100 text-[12px] text-base-700 flex flex-col gap-0.5">
-        {leadLines.map((line, i) => (
-          <span
-            key={i}
-            className={i === 0 ? "font-semibold text-base-900" : "text-base-600"}
-          >
-            {line}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ── Middle list — header + rows ──────────────────────────────────────────────
 
@@ -1564,9 +1167,11 @@ const WRONG_OPTIONS = [
 function PlaceDetail({
   group,
   today,
+  onSendPo,
 }: {
   group: SplitPlaceGroup;
   today: string | null;
+  onSendPo: (prefill: CreatePoPrefill) => void;
 }) {
   const [wrongOpen, setWrongOpen] = useState(false);
   const wrongRef = useRef<HTMLDivElement | null>(null);
@@ -1796,10 +1401,41 @@ function PlaceDetail({
           variant="hero"
           size="md"
           icon={Send}
-          title={`Send the PO to ${group.supplierName} (raising the PO is a later unit).`}
+          title={`Open the PO form to raise this order to ${group.supplierName}.`}
           onClick={() => {
-            /* TODO: raise the PO for this factory order. The PO-raise write path
-               is a separate, not-yet-built unit — this button is a stub. */
+            // Build CreatePOModal prefill from this cockpit plan. soRefs = the
+            // unique customer SOs feeding this group; lines = the planned SKUs
+            // with qty + any per-SO attrs (sofa fabric_id · bedframe
+            // color+gap). supplierId preselects the group. The modal handles
+            // cost / warehouse / ETA / cascade completion + fires
+            // useCreatePoMutation on submit.
+            const soRefs = Array.from(
+              new Set(
+                group.lines.flatMap((l) =>
+                  l.forOrders.map((o) => o.so).filter((n): n is number => n != null),
+                ),
+              ),
+            );
+            const lines = group.lines.map((l) => ({
+              sku: l.sku,
+              qty: l.need,
+              // Prefer the first SO's attrs (sofa fabric / bedframe color+gap)
+              // when the source SOs carry them; null = mattress or pre-cascade
+              // legacy — modal's cascade picker fills any gaps.
+              attrs:
+                (l.forOrders[0] as { attrs?: Record<string, unknown> | null } | undefined)
+                  ?.attrs ?? null,
+            }));
+            onSendPo({
+              supplierId: group.supplierId,
+              soRefs: soRefs.length > 0 ? soRefs : undefined,
+              lines,
+              note: `Auto-planned from cockpit · ${group.orderCount} SO${
+                group.orderCount === 1 ? "" : "s"
+              } · ${group.totalUnits} units${
+                group.splitCategory ? ` (${group.splitCategory})` : ""
+              }`,
+            });
           }}
         >
           Send PO
@@ -1820,6 +1456,7 @@ function ChaseDetail({
   supplierName: string;
   supplier: SupplierRow | undefined;
 }) {
+  const chaseEvent = useChasePoEventMutation();
   const customers = row.linkedOrders
     .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
     .filter((s): s is string => Boolean(s));
@@ -1834,6 +1471,11 @@ function ChaseDetail({
     deadline: deadline ? fmtDateShort(deadline) : "TBD",
   });
   const onChase = () => {
+    // Jess 2026-07-23 — record the chase in audit_log BEFORE opening WA so
+    // the log lands even if the operator closes the new tab. Failure is
+    // best-effort (toasted via mutation error handler in the future); the
+    // WA link opens regardless.
+    chaseEvent.mutate({ poId: row.poId });
     if (waBase) {
       window.open(`${waBase}?text=${encodeURIComponent(chaseText)}`, "_blank", "noopener");
     } else if (groupUrl) {
@@ -1926,9 +1568,11 @@ function ChaseDetail({
 function ReceiveDetail({
   row,
   supplierName,
+  onCheckIn,
 }: {
   row: PurchaseReceive;
   supplierName: string;
+  onCheckIn: (poId: string) => void;
 }) {
   const customers = row.linkedOrders
     .map((o) => o.customerName?.trim() || (o.so ? `SO-${o.so}` : null))
@@ -1993,11 +1637,8 @@ function ReceiveDetail({
           variant="hero"
           size="md"
           icon={PackageCheck}
-          title="Check these goods into Klang (booking flow is a later unit)."
-          onClick={() => {
-            /* TODO: GRN write path — receive units + attach DO + book into Klang
-               stock. Separate, not-yet-built unit; stub for now. */
-          }}
+          title={`Open the check-in form for ${row.poId}.`}
+          onClick={() => onCheckIn(row.poId)}
         >
           Check in
         </Btn>

@@ -363,6 +363,7 @@ export {
 
 export {
   assignPartnerInput,
+  chasePoEventInput,
   attachDoInput,
   receivePoWithDoInput,
   adjustStockInput,
@@ -396,6 +397,7 @@ export {
   // Migration 0107 — supplier per-thread pickup feature.
   OperationReceiveThreadsInput,
   type AssignPartnerInput,
+  type ChasePoEventInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type AdjustStockInput,

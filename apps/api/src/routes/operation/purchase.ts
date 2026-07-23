@@ -164,16 +164,20 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   }
   const chaseReceive = { chase: cr.chase, receive: cr.receive };
 
-  // ── 1. Candidate orders: live (place / proceed_order), NOT AutoCount. ──────
-  // source_system is null for portal-native orders → keep those; drop only the
-  // AutoCount archive (they don't feed procurement).
+  // ── 1. Candidate orders: live (place / proceed_order), any source. ────────
+  // Jess 2026-07-23 · Reversed the earlier AutoCount exclusion (portal-native
+  // only). AutoCount-imported orders that are still `place` / `proceed_order`
+  // are LIVE work that must feed procurement — they carry real delivery dates
+  // + real customer commitments, and Jess is importing this-week / next-week
+  // orders from AutoCount as her main flow. `.in("status", …)` already drops
+  // anything past its lifecycle (delivered / cancelled), so no `source_system`
+  // gate is needed to protect against archive noise.
   const { data: orderRows, error: orderErr } = await sb
     .from("orders")
     .select(
       "id, so, customer_name, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
     )
-    .in("status", ["place", "proceed_order"])
-    .or("source_system.is.null,source_system.neq.autocount");
+    .in("status", ["place", "proceed_order"]);
   if (orderErr) {
     const m = mapPgError(orderErr);
     return c.json(m.body, m.status);

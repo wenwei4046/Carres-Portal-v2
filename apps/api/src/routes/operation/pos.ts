@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import {
   assignPickupPartnerInput,
   cancelPoInput,
+  chasePoEventInput,
   createPoInput,
   createPosBatchInput,
   listPurchaseOrdersQuery,
@@ -1100,6 +1101,31 @@ operationPosRouter.post("/:id/reassign-warehouse", requireOperation, async (c) =
     return c.json(m.body, m.status);
   }
   return c.json({ po: data });
+});
+
+// ----- POST /:id/chase-event  record a chase (WhatsApp/phone follow-up) -----
+// Writes ONE audit_log row keyed to the PO ref. Called by the cockpit's ②
+// Chase button alongside the WhatsApp deep-link open, so we get a record of
+// every chase without a dedicated table. Optional free-text `note` captures
+// whatever the supplier said back. Best-effort — failure returns 500 but does
+// not block the client from continuing to WhatsApp.
+operationPosRouter.post("/:id/chase-event", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, chasePoEventInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const poId = c.req.param("id");
+  const noteTail = parsed.data.note ? ` · ${parsed.data.note.slice(0, 200)}` : "";
+  const { error } = await sb.from("audit_log").insert({
+    role:       c.var.auth.role,
+    actor_text: c.var.auth.email ?? null,
+    action:     `PO chased${noteTail}`,
+    ref:        poId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, chasedAt: new Date().toISOString() });
 });
 
 export default operationPosRouter;

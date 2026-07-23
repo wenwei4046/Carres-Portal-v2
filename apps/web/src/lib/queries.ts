@@ -4242,6 +4242,45 @@ export function useCreatePoMutation(
 }
 
 /**
+ * Chase-event log (Jess 2026-07-23) — Purchase cockpit's ② Chase button now
+ * records every WhatsApp/phone follow-up via audit_log. Fires ONE POST to
+ * /api/operation/pos/:poId/chase-event alongside the wa.me deep-link open,
+ * so ops has a record of who chased what supplier when — no new table,
+ * server writes an audit_log row keyed to the PO ref. Best-effort: caller
+ * still opens WA even if the log write fails.
+ */
+export interface ChaseEventResponse {
+  ok: true;
+  chasedAt: string;
+}
+export interface ChaseEventInput {
+  poId: string;
+  note?: string;
+}
+export function useChasePoEventMutation(
+  opts?: Partial<UseMutationOptions<ChaseEventResponse, ApiError, ChaseEventInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<ChaseEventResponse, ApiError, ChaseEventInput>({
+    mutationFn: ({ poId, note }) =>
+      apiFetch<ChaseEventResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId)}/chase-event`,
+        {
+          method: "POST",
+          body: JSON.stringify(note ? { note } : {}),
+        },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      // Refresh the cockpit's chase list — the row's "last chased" surface
+      // reads from this same query in a future iteration.
+      await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
  * C5.2 — Batch create POs in one atomic RPC call.
  *
  * The CreatePOModal now picks a warehouse per supplier-group (Q4=A, blank

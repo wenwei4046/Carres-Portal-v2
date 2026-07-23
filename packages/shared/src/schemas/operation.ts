@@ -21,6 +21,20 @@ export const assignPartnerInput = z.object({
 export type AssignPartnerInput = z.infer<typeof assignPartnerInput>;
 
 /**
+ * `chasePoEventInput` — POST /api/operation/pos/:id/chase-event.
+ * Records that operation chased a supplier over WhatsApp. Server writes
+ * one `audit_log` row keyed to the PO ref; no RPC — direct insert. Kept as
+ * a lightweight event log so the cockpit can show "last chased 2h ago"
+ * next to the row without a full supplier-comms table. Free-text note
+ * lets the operator capture whatever the supplier said back (optional,
+ * ≤ 200 chars, longer strings are truncated on write).
+ */
+export const chasePoEventInput = z.object({
+  note: z.string().max(200).optional(),
+}).strict();
+export type ChasePoEventInput = z.infer<typeof chasePoEventInput>;
+
+/**
  * `attachDoInput` — POST /api/operation/orders/:id/attach-do.
  * Maps to `operation_attach_do_and_deliver(order_id, do_number, do_note,
  * signed, do_file_path)` RPC (D1.dispatch step 2 + Phase 9 Day 1 file-upload
