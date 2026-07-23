@@ -70,8 +70,10 @@ import {
   RefreshCw,
   Send,
   Sofa,
+  SlidersHorizontal,
   Truck,
   UserRound,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -433,6 +435,89 @@ function PoDutyTabChip() {
   );
 }
 
+// Lead Times settings (Jess: the editable lead-time table). Reachable from the
+// Purchase tab bar. Shows the arrival buffer + per-category make+deliver leads
+// the ordering engine uses; per-supplier editing + save ships with the 0243
+// lead_time_config table.
+const MAKE_DELIVER_DAYS: ReadonlyArray<[string, number]> = [
+  ["Mattress", 7],
+  ["Bedframe", 7],
+  ["Sofa", 10],
+];
+function LeadTimesButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 rounded-full border border-base-200 bg-base-50 px-2.5 py-1 text-[12px] text-base-600 hover:text-base-900"
+        title="Lead times — arrival buffer + make/deliver days"
+      >
+        <SlidersHorizontal size={13} strokeWidth={2} className="text-base-400" />
+        Lead times
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-[420px] rounded-[14px] bg-white border border-base-200 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-base-200">
+              <span className="text-[15px] font-semibold text-base-900">Lead times</span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-base-400 hover:text-base-900"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-4 text-[13px]">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-1.5">
+                  Delivery buffer
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Stock should arrive</span>
+                  <span className="inline-flex items-center justify-center w-10 h-7 rounded-md border border-base-200 bg-base-50 font-mono tabular-nums font-semibold">
+                    7
+                  </span>
+                  <span>working days before the deadline</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-1.5">
+                  Make + deliver time (working days)
+                </div>
+                <div className="space-y-1.5">
+                  {MAKE_DELIVER_DAYS.map(([label, days]) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-base-700">{label}</span>
+                      <span className="inline-flex items-center justify-center w-10 h-7 rounded-md border border-base-200 bg-base-50 font-mono tabular-nums font-semibold">
+                        {days}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[12px] text-base-500 leading-snug">
+                Order date = deadline − buffer − make/deliver. These are the
+                values the ordering engine uses today (Nice Future runs Mon–Fri,
+                other factories Mon–Sat). Per-supplier editing + save ships with
+                the lead-time table.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function OperationPurchase() {
   const { data, isLoading, isError, error, refetch } = usePurchaseToday();
   const suppliersQ = useOperationSuppliers();
@@ -696,6 +781,7 @@ export default function OperationPurchase() {
       <PurchasingTabs
         right={
           <>
+            <LeadTimesButton />
             <PoDutyTabChip />
             <TodayRefresh today={today} onRefresh={() => void refetch()} />
           </>
@@ -1137,6 +1223,12 @@ function PlaceListRow({
             {u.label}
           </span>
           <span className="text-[12px] text-base-700 truncate">{action}</span>
+          {group.earliestOrderBy && (
+            <span className="ml-auto shrink-0 text-[11px] tabular-nums text-base-500">
+              Send by {dayName(group.earliestOrderBy)}{" "}
+              {dayLabelShort(group.earliestOrderBy)}
+            </span>
+          )}
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-base-500">
           <span className="truncate">Stock to: Carres Klang · NETS pickup</span>
