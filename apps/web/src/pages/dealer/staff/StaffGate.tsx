@@ -20,7 +20,11 @@ import SetupWizard from "./SetupWizard";
  *   • role salesperson (no token)         → auto self-token; 409 → notice + app
  *   • dealer/showroom, store not activated → forced SetupWizard
  *   • dealer/showroom, activated          → outlet picker (only if >1 outlet)
- *                                            → PIN screen
+ *                                            → PIN screen (whose outlet pill
+ *                                              can reopen the picker — the
+ *                                              chosen outlet persists per tab,
+ *                                              so an outlet added later would
+ *                                              otherwise be unreachable)
  *
  * A dormant store (no PINs set → never activated for salesperson; the
  * wizard-then-PIN for dealer/showroom) means this is the FIRST time PINs matter;
@@ -184,6 +188,7 @@ function DealerShowroomGate() {
         outletLabel={outletLabel}
         storeChannel={data.storeKind}
         onForgotPin={() => setForgotOpen(true)}
+        onSwitchOutlet={outlets.length > 1 ? () => setSessionOutlet(null) : undefined}
       />
       {forgotOpen && (
         <ForgotPinModal
