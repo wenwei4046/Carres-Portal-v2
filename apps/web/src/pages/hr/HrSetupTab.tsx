@@ -229,7 +229,7 @@ function PerModelConfig({
       {/* model picker + per-unit rate */}
       <div className="flex items-center gap-2 flex-wrap">
         <select
-          className={`${fieldCls} w-72`}
+          className={`${fieldCls} !w-72`}
           aria-label={program === "bd" ? "Product model (BD program)" : "Product model"}
           value={modelId}
           onChange={(e) => setModelId(e.target.value)}
@@ -254,7 +254,7 @@ function PerModelConfig({
               type="number"
               min={0}
               step={1}
-              className={`${fieldCls} w-28 text-right`}
+              className={`${fieldCls} !w-28 text-right`}
               aria-label="Per-unit commission amount"
               placeholder="0"
               value={perUnitDraft}
@@ -288,7 +288,7 @@ function PerModelConfig({
                 type="number"
                 min={1}
                 step={1}
-                className={`${fieldCls} w-20 text-right`}
+                className={`${fieldCls} !w-20 text-right`}
                 aria-label={`Tier ${i + 1} quantity`}
                 value={t.thresholdQty}
                 onChange={(e) =>
@@ -306,7 +306,7 @@ function PerModelConfig({
                 type="number"
                 min={0}
                 step={1}
-                className={`${fieldCls} w-28 text-right`}
+                className={`${fieldCls} !w-28 text-right`}
                 aria-label={`Tier ${i + 1} bonus`}
                 value={t.bonusAmount}
                 onChange={(e) =>
@@ -364,7 +364,7 @@ function PerModelConfig({
         {milestoneDrafts.map((m, i) => (
           <div key={i} className="flex items-center gap-2">
             <select
-              className={`${fieldCls} w-36`}
+              className={`${fieldCls} !w-36`}
               aria-label={`Milestone ${i + 1} category`}
               value={m.category}
               onChange={(e) =>
@@ -386,7 +386,7 @@ function PerModelConfig({
               type="number"
               min={1}
               step={1}
-              className={`${fieldCls} w-20 text-right`}
+              className={`${fieldCls} !w-20 text-right`}
               aria-label={`Milestone ${i + 1} quantity`}
               value={m.thresholdQty}
               onChange={(e) =>
@@ -404,7 +404,7 @@ function PerModelConfig({
               type="number"
               min={0}
               step={1}
-              className={`${fieldCls} w-28 text-right`}
+              className={`${fieldCls} !w-28 text-right`}
               aria-label={`Milestone ${i + 1} bonus`}
               value={m.bonusAmount}
               onChange={(e) =>
@@ -728,7 +728,7 @@ export default function HrSetupTab({
                       min={0}
                       max={100}
                       step={0.5}
-                      className={`${fieldCls} w-24 text-right`}
+                      className={`${fieldCls} !w-24 text-right`}
                       aria-label={`New rate for ${s.name}`}
                       placeholder={pct != null ? String(pct) : "0"}
                       value={rateDraft[s.id] ?? ""}
@@ -835,7 +835,7 @@ export default function HrSetupTab({
                     </span>
                   </div>
                   <select
-                    className={`${fieldCls} w-36 shrink-0`}
+                    className={`${fieldCls} !w-36 shrink-0`}
                     aria-label={`Position for ${u.name}`}
                     value={u.position ?? "executive"}
                     disabled={setBdPosition.isPending}
@@ -855,7 +855,7 @@ export default function HrSetupTab({
                       min={0}
                       max={100}
                       step={0.5}
-                      className={`${fieldCls} w-24 text-right`}
+                      className={`${fieldCls} !w-24 text-right`}
                       aria-label={`New BD rate for ${u.name}`}
                       placeholder={pct != null ? String(pct) : "0"}
                       value={bdRateDraft[u.id] ?? ""}
@@ -912,7 +912,7 @@ export default function HrSetupTab({
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     <select
-                      className={`${fieldCls} w-56`}
+                      className={`${fieldCls} !w-56`}
                       aria-label={`BD owner for ${d.name}`}
                       value={value}
                       onChange={(e) =>
