@@ -99,7 +99,9 @@ export default function HrApp() {
     <div className="flex min-h-screen bg-background text-foreground">
       <PortalSidebar />
       <main className="flex-1 min-w-0">
-        <div className="px-6 pb-10 max-w-[1200px] mx-auto">
+        {/* px-9 py-8 = the portal page-frame law (matches Overview/Accounts) —
+            the header needs breathing room above the kicker, not flush-top. */}
+        <div className="px-9 py-8 pb-14 max-w-[1200px] mx-auto">
           <PageHeader
             kicker="HR"
             title={title}
