@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useCatalog } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
-import { PillTabs, type PillTab } from "./components/PillTabs";
+import { PillTabs } from "./components/PillTabs";
+import {
+  CATALOG_TABS,
+  CATALOG_TAB_PARAM,
+  DEFAULT_CATALOG_TAB,
+  isCatalogTabKey,
+  type CatalogTabKey,
+} from "./catalog-tabs";
 import SkuMasterTab from "./tabs/SkuMasterTab";
 import ModularTab from "./modular/ModularTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
@@ -26,8 +33,12 @@ import PromoTab from "./tabs/PromoTab";
  *                   seat height (0179). (The old fixed-set "Overall Combo" was
  *                   removed 2026-07-06 — written in error, never used.)
  *
- * Mounts at the unchanged `'catalog'` routing key in BOTH OperationApp and
- * PrincipalApp. The single `useCatalog({ admin: true })` bundle is fetched
+ * Mounts at `/operation?tab=catalog` (principal only — 0226 gives operation
+ * the costing Operation Catalog instead); the legacy `/principal?tab=catalog`
+ * door redirects there so the rail's catalog sub-tabs are always in play. The
+ * ACTIVE tab is URL-driven via `?section=<key>` (`catalog-tabs.ts`), which the
+ * PortalSidebar's indented section links read + write too (Loo 2026-07-24).
+ * The single `useCatalog({ admin: true })` bundle is fetched
  * here and handed to every tab so the three tabs share one cache entry (the
  * admin bundle includes OFF / discontinued rows the editor needs to see).
  *
@@ -41,27 +52,6 @@ import PromoTab from "./tabs/PromoTab";
  * The prop is kept as an explicit override (tests / the legacy Principal mount).
  */
 
-type TabKey =
-  | "sku"
-  | "modular"
-  | "special"
-  | "fabrics"
-  | "delivery"
-  | "maintenance"
-  | "combos"
-  | "promo";
-
-const TABS: readonly PillTab<TabKey>[] = [
-  { key: "sku", label: "SKU Master" },
-  { key: "modular", label: "Modular" },
-  { key: "special", label: "Special Add-ons" },
-  { key: "fabrics", label: "Fabrics" },
-  { key: "delivery", label: "Delivery" },
-  { key: "maintenance", label: "Maintenance" },
-  { key: "combos", label: "Sofa Combos" },
-  { key: "promo", label: "Promo / GWP" },
-];
-
 export default function ProductMaintenancePage({
   isPrincipal: isPrincipalProp,
 }: {
@@ -73,7 +63,20 @@ export default function ProductMaintenancePage({
   // admin:true → bundle includes OFF (pos_active=false) + discontinued rows so
   // the editor can toggle them back on. The dealer-facing bundle stays filtered.
   const catalogQ = useCatalog({ admin: true });
-  const [tab, setTab] = useState<TabKey>("sku");
+  // URL-driven tab (2026-07-24): `?section=` rides alongside the shell's
+  // `?tab=catalog` so the PortalSidebar's catalog section links can deep-link a
+  // tab and highlight the live one. Pill clicks write the same param (history
+  // push — Back walks tabs). Unknown / missing → SKU Master.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get(CATALOG_TAB_PARAM);
+  const tab: CatalogTabKey = isCatalogTabKey(rawTab) ? rawTab : DEFAULT_CATALOG_TAB;
+  const setTab = (key: CatalogTabKey) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set(CATALOG_TAB_PARAM, key);
+      return next;
+    });
+  };
 
   return (
     <div className="px-9 py-8 pb-14">
@@ -85,7 +88,12 @@ export default function ProductMaintenancePage({
             Manage the SKU master, modular models, combos, and delivery / add-on config.
           </p>
         </div>
-        <PillTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="Product &amp; Maintenance" />
+        <PillTabs
+          tabs={CATALOG_TABS}
+          active={tab}
+          onChange={setTab}
+          ariaLabel="Product &amp; Maintenance"
+        />
       </div>
 
       {catalogQ.isLoading && (

@@ -119,3 +119,64 @@ describe("PortalSidebar — merged Purchasing item active across its 3 routes", 
     expect(purchasingLink().className).not.toContain("font-semibold");
   });
 });
+
+describe("PortalSidebar — Product & Maintenance catalog sub-tabs (2026-07-24)", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+  });
+
+  const SECTION_LABELS = [
+    "SKU Master",
+    "Modular",
+    "Special Add-ons",
+    "Fabrics",
+    "Delivery",
+    "Maintenance",
+    "Sofa Combos",
+    "Promo / GWP",
+  ];
+
+  function sectionLink(label: string) {
+    return screen.getByText(label).closest("a") as HTMLAnchorElement;
+  }
+
+  it("renders every catalog section link under the ACTIVE P&M item", () => {
+    renderAt("/operation?tab=catalog");
+    for (const label of SECTION_LABELS) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(sectionLink("SKU Master")).toHaveAttribute(
+      "href",
+      "/operation?tab=catalog&section=sku",
+    );
+    expect(sectionLink("Promo / GWP")).toHaveAttribute(
+      "href",
+      "/operation?tab=catalog&section=promo",
+    );
+  });
+
+  it("highlights the default section (SKU Master) when ?section= is absent", () => {
+    renderAt("/operation?tab=catalog");
+    expect(sectionLink("SKU Master").className).toContain("font-semibold");
+    expect(sectionLink("Modular").className).not.toContain("font-semibold");
+  });
+
+  it("moves the highlight with ?section=", () => {
+    renderAt("/operation?tab=catalog&section=promo");
+    expect(sectionLink("Promo / GWP").className).toContain("font-semibold");
+    expect(sectionLink("SKU Master").className).not.toContain("font-semibold");
+  });
+
+  it("hides the section links while another tab is active", () => {
+    renderAt("/operation?tab=dashboard");
+    expect(screen.queryByText("SKU Master")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sofa Combos")).not.toBeInTheDocument();
+  });
+
+  it("never shows them to operation (P&M itself is principal-only, 0226)", () => {
+    mockRole = "operation";
+    renderAt("/operation?tab=catalog");
+    expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
+    expect(screen.queryByText("SKU Master")).not.toBeInTheDocument();
+  });
+});
