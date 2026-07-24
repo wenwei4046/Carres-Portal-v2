@@ -17,10 +17,13 @@ import { mapPgError } from "./route-helpers";
  * Principal-owned + contract-safe: this runs only inside the principal-gated
  * `model_sofa_compartments` route on the principal's USER JWT (never
  * service_role), so the 0175 price-lock trigger allows the price write. The sku
- * is minted `pos_active = false` (not a standalone flat-grid product); the
- * Modular tab owns the toggle from then on — a RE-offer preserves it (like
- * price/cost), because a compartment-only sofa model needs ≥1 POS-visible sku
- * for the builder's representative cart line (Loo 2026-07-06).
+ * is minted `pos_active = true` — offering a compartment IS putting it on sale
+ * (Loo 2026-07-24: every model authored after Booqit stayed invisible in POS
+ * because the old first-insert-OFF default left the model with zero sellable
+ * skus, and the POS card gate needs ≥1). The Modular tab still owns the toggle
+ * from then on — a RE-offer of a LIVE row preserves it (like price/cost, the
+ * 2026-07-06 1A(LHF) fix), but re-offering a previously UN-offered row flips it
+ * back ON (its OFF came from the un-offer, not a principal's choice).
  */
 
 // Sofa is NOT supplierless; service/accessory are (mirror catalog.ts).
@@ -116,7 +119,7 @@ export async function syncCompartmentSku(
   const sku = deriveSkuCode(model.model_key as string, comp.code as string);
   const { data: clash, error: clashErr } = await sb
     .from("product_skus")
-    .select("compartment_id")
+    .select("compartment_id, discontinued_at")
     .eq("sku", sku)
     .maybeSingle();
   if (clashErr) return { ok: false, ...mapPgError(clashErr) };
@@ -133,15 +136,22 @@ export async function syncCompartmentSku(
   }
 
   // Upsert on the UNIQUE sku (idempotent re-offer); compartment_id (0178)
-  // links it back to its type. `price` AND `pos_active` are included ONLY on
-  // first insert — a re-offer preserves the SKU-Master-authored price (like
-  // `cost`) and the Modular-authored ON/OFF. pos_active matters: a sofa model
-  // with ONLY compartment skus needs ≥1 of them POS-visible or the builder
-  // has no representative sku to hang the cart line on (buildToDraftLine);
-  // the old always-false re-assert kept silently switching rows OFF
-  // (Loo 2026-07-06 — the 1A(LHF) mystery). First insert still defaults OFF;
-  // the principal turns rows ON in the Modular tab.
+  // links it back to its type. `price` is included ONLY on first insert — a
+  // re-offer preserves the SKU-Master-authored price (like `cost`).
+  // `pos_active` (Loo 2026-07-24 — offer = on sale):
+  //   · first insert → ON. The POS product card needs ≥1 sellable sku on the
+  //     model; the old first-insert-OFF default left every freshly authored
+  //     sofa model invisible in POS (only Booqit showed — its rows were
+  //     hand-flipped) with nothing pointing at the Modular toggle.
+  //   · re-offer of a LIVE row → preserved. Never clobber a principal's
+  //     deliberate per-sku OFF (the 2026-07-06 1A(LHF) mystery: an
+  //     always-false re-assert kept silently switching rows OFF).
+  //   · re-offer of an UN-offered (discontinued) row → back ON. Its OFF was
+  //     forced by discontinueCompartmentSku, not chosen — untick→re-tick must
+  //     round-trip to sellable or the model goes dark again.
   const isReoffer = clash != null;
+  const wasUnoffered =
+    isReoffer && (clash as { discontinued_at: string | null }).discontinued_at != null;
   const { error: upErr } = await sb.from("product_skus").upsert(
     {
       sku,
@@ -149,7 +159,11 @@ export async function syncCompartmentSku(
       compartment_id: args.compartmentId,
       variant: comp.code,
       variant_kind: "part",
-      ...(isReoffer ? {} : { price: seedPrice, pos_active: false }),
+      ...(isReoffer
+        ? wasUnoffered
+          ? { pos_active: true }
+          : {}
+        : { price: seedPrice, pos_active: true }),
       supplier_id: supplierId,
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description

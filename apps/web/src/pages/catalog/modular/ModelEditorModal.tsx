@@ -468,8 +468,9 @@ export default function ModelEditorModal({
                   ))}
                 </div>
                 <p className="t-tiny text-base-400 mt-1.5">
-                  Ticking a compartment creates its SKU in SKU Master — set the selling
-                  price there. Unticking hides it from the builder.
+                  Ticking a compartment creates its SKU in SKU Master and puts the model
+                  live in POS — set the selling price there (it starts at RM0). Unticking
+                  hides it from the builder.
                 </p>
               </div>
             )}
