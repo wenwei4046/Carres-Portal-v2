@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Inbox,
   Lock,
+  MapPin,
+  Network,
   Package2,
   Search,
   ShieldCheck,
@@ -14,16 +15,19 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { Order } from "@carres/shared";
-import { useOrders, useSalespersons } from "@/lib/queries";
+import { isShowroom, type Order } from "@carres/shared";
+import { useAuth } from "@/lib/auth";
+import { useOrders, useOutlets, usePrincipalDealers, useSalespersons } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
 import { laneOf, type Lane } from "./order-edit-scope";
 import {
+  BoardFilterDropdown,
   LANES,
   OrderCard,
   SummaryCard,
   checkConditions,
   monthLabel,
+  orderOutletOf,
   paidPct,
   rmGroup,
   sameMonth,
@@ -53,6 +57,15 @@ import PosOrderDetail from "./PosOrderDetail";
  *   Carres dealer chases — the 50% top-up gate).
  * - Second summary card compares the selected salesperson (Carres logs in as
  *   the DEALER, not a staff member, so "mine" is the picked filter).
+ *
+ * Filter cascade (Loo 2026-07-25): Store → Outlet → Salesperson.
+ * - A PRINCIPAL with no acting store ("network mode") sees every store's
+ *   orders, so the board leads with a Store dropdown grouped Our showrooms /
+ *   Dealers; salespeople only appear once a store is picked.
+ * - Any owner-level view of a store with ≥2 outlets gets an Outlet dropdown
+ *   (order → outlet via its own stamp, falling back to its salesperson's
+ *   outlet — `orderOutletOf`).
+ * - Salespeople always come LAST, scoped to the picked store/outlet.
  */
 
 /** Loo 2026-07-14. Rotate in code when it leaks. */
@@ -134,37 +147,124 @@ export default function OrderStatusPage({
   const staffTier = useStaffSession((s) => s.staff?.tier ?? null);
   const hasStaffToken = useStaffSession((s) => s.token !== null);
   const salespersonScoped = hasStaffToken && staffTier === "salesperson";
+  // Manager-tier orders are already OUTLET-scoped server-side (0233), so an
+  // outlet dropdown there would be a lying no-op — owner-level views only.
+  const outletFilterEligible = !hasStaffToken || staffTier === "principal";
+
+  // HQ network mode (Loo 2026-07-25): a PRINCIPAL opening My orders without an
+  // acting store sees every store's orders, so the board gains the cascade
+  // Store (Our showrooms / Dealers) → Outlet (when that store has ≥2) →
+  // Salesperson. Store logins / acting-principal keep the single-store board,
+  // plus the same outlet level when their own store has ≥2 outlets.
+  const role = useAuth((s) => s.role);
+  const networkMode = role === "principal" && !dealerId;
+
   const [unlocked, setUnlocked] = useState(hasStaffToken);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [storeFilter, setStoreFilter] = useState<string>("all"); // dealer id | 'all'
+  const [outletFilter, setOutletFilter] = useState<string>("all"); // outlet id | 'all'
   const [salesFilter, setSalesFilter] = useState<string>("all"); // salesperson id | 'all'
   const [period, setPeriod] = useState<"month" | "range">("month");
   const [monthAnchor, setMonthAnchor] = useState(() => new Date());
+  const [storesOpen, setStoresOpen] = useState(false);
+  const [outletsOpen, setOutletsOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
 
   const ordersQ = useOrders(dealerId ? { dealerId } : undefined, { enabled: unlocked });
   const salespersonsQ = useSalespersons(undefined, { enabled: unlocked });
+  // Store list for the network cascade — principal-gated route, never fired
+  // for store logins.
+  const storesQ = usePrincipalDealers({}, { enabled: unlocked && networkMode });
+  // Outlets are RLS-scoped: a store login gets its own rows, internal gets all.
+  const outletsQ = useOutlets({ enabled: unlocked && !salespersonScoped });
   const orders = useMemo(
     () => (ordersQ.data?.orders ?? []).filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) !== null),
     [ordersQ.data],
   );
+  const staffRows = salespersonsQ.data?.salespersons ?? [];
   const staffById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of salespersonsQ.data?.salespersons ?? []) m.set(s.id, s.name);
+    for (const s of staffRows) m.set(s.id, s.name);
     return m;
-  }, [salespersonsQ.data]);
+  }, [staffRows]);
+  const staffOutletById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const s of staffRows) m.set(s.id, s.outletId ?? null);
+    return m;
+  }, [staffRows]);
+
+  const stores = storesQ.data?.dealers ?? [];
+  const storeById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of stores) m.set(d.id, d.name);
+    return m;
+  }, [stores]);
+  const storeOptions = useMemo(
+    () =>
+      [...stores]
+        .sort(
+          (a, b) =>
+            (isShowroom(b.channel) ? 1 : 0) - (isShowroom(a.channel) ? 1 : 0) ||
+            a.name.localeCompare(b.name),
+        )
+        .map((d) => ({
+          id: d.id,
+          label: d.name,
+          group: isShowroom(d.channel) ? "Our showrooms" : "Dealers",
+        })),
+    [stores],
+  );
+
+  // The store whose board this is: the picked one (network mode), the acting
+  // one (principal on-behalf), or null for a store login — whose salesperson /
+  // outlet rows are already own-scoped by RLS.
+  const scopeStoreId = networkMode ? (storeFilter !== "all" ? storeFilter : null) : dealerId ?? null;
+
+  const scopeOutlets = useMemo(() => {
+    const all = outletsQ.data?.outlets ?? [];
+    if (networkMode) return scopeStoreId ? all.filter((o) => o.dealerId === scopeStoreId) : [];
+    if (dealerId) return all.filter((o) => o.dealerId === dealerId);
+    return all;
+  }, [outletsQ.data, networkMode, scopeStoreId, dealerId]);
+  // "if dealer got 2 outlet, can select by outlet as well" — one branch needs
+  // no picker.
+  const showOutletFilter = outletFilterEligible && scopeOutlets.length >= 2;
+
+  const scopeStaff = useMemo(() => {
+    let rows = staffRows;
+    if (networkMode) rows = scopeStoreId ? rows.filter((s) => s.dealerId === scopeStoreId) : [];
+    else if (dealerId) rows = rows.filter((s) => s.dealerId === dealerId);
+    if (outletFilter !== "all") rows = rows.filter((s) => s.outletId === outletFilter);
+    return rows;
+  }, [staffRows, networkMode, scopeStoreId, dealerId, outletFilter]);
 
   const inPeriod = (o: Order) => (period === "range" ? true : sameMonth(o.placedAt, monthAnchor));
-  const periodOrders = useMemo(() => orders.filter(inPeriod), [orders, period, monthAnchor]);
+  // Network scope: the AutoCount archive stays off the all-stores board (it
+  // would drown the Proceed lane — BdOrdersBoard rule); a picked store shows
+  // everything, exactly like that store's own board.
+  const storeOrders = useMemo(() => {
+    if (!networkMode) return orders;
+    if (storeFilter === "all") return orders.filter((o) => o.sourceSystem !== "autocount");
+    return orders.filter((o) => o.dealerId === storeFilter);
+  }, [orders, networkMode, storeFilter]);
+  const periodOrders = useMemo(() => storeOrders.filter(inPeriod), [storeOrders, period, monthAnchor]);
+  const outletOrders = useMemo(
+    () =>
+      outletFilter === "all"
+        ? periodOrders
+        : periodOrders.filter((o) => orderOutletOf(o, staffOutletById) === outletFilter),
+    [periodOrders, outletFilter, staffOutletById],
+  );
 
-  const showroom = sumRevenue(periodOrders);
+  const showroom = sumRevenue(outletOrders);
   const mineOrders =
-    salesFilter === "all" ? [] : periodOrders.filter((o) => o.salespersonId === salesFilter);
+    salesFilter === "all" ? [] : outletOrders.filter((o) => o.salespersonId === salesFilter);
   const mine = sumRevenue(mineOrders);
 
   const scoped = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return periodOrders.filter((o) => {
+    return outletOrders.filter((o) => {
       if (salesFilter !== "all" && o.salespersonId !== salesFilter) return false;
       if (!q) return true;
       return (
@@ -173,7 +273,19 @@ export default function OrderStatusPage({
         (o.customer.phone || "").includes(q)
       );
     });
-  }, [periodOrders, query, salesFilter]);
+  }, [outletOrders, query, salesFilter]);
+
+  function pickStore(id: string) {
+    setStoreFilter(id);
+    setOutletFilter("all"); // outlets + salespeople belong to the previous store
+    setSalesFilter("all");
+    setStoresOpen(false);
+  }
+  function pickOutlet(id: string) {
+    setOutletFilter(id);
+    setSalesFilter("all");
+    setOutletsOpen(false);
+  }
 
   const lanes = useMemo(
     () => ({
@@ -212,7 +324,9 @@ export default function OrderStatusPage({
                 <ArrowLeft size={16} strokeWidth={1.75} />
               </button>
               <div>
-                <div className="os-head__eyebrow">Sales view · showroom</div>
+                <div className="os-head__eyebrow">
+                  {networkMode ? "Sales view · all stores" : "Sales view · showroom"}
+                </div>
                 <h1 className="os-head__title">My orders</h1>
               </div>
             </div>
@@ -227,10 +341,16 @@ export default function OrderStatusPage({
           {/* Revenue summary */}
           <div className="os-summary">
             <SummaryCard
-              icon={Store}
-              eyebrow={`Showroom · ${period === "range" ? "All time" : monthName}`}
+              icon={networkMode && storeFilter === "all" ? Network : Store}
+              eyebrow={`${
+                networkMode
+                  ? storeFilter === "all"
+                    ? "All stores"
+                    : storeById.get(storeFilter) ?? "Store"
+                  : "Showroom"
+              } · ${period === "range" ? "All time" : monthName}`}
               rev={showroom}
-              count={periodOrders.length}
+              count={outletOrders.length}
             />
             {!salespersonScoped && (
               <SummaryCard
@@ -258,40 +378,50 @@ export default function OrderStatusPage({
                 data-testid="os-search"
               />
             </div>
-            <div className="os-people" style={salespersonScoped ? { display: "none" } : undefined}>
-              <button className="os-people__btn" onClick={() => setPeopleOpen((o) => !o)}>
-                <Users size={14} strokeWidth={1.75} />
-                <span>
-                  {salesFilter === "all" ? "All salespeople" : staffById.get(salesFilter) ?? "…"}
-                </span>
-                <ChevronDown size={13} strokeWidth={1.75} />
-              </button>
-              {peopleOpen && (
-                <div className="os-people__menu">
-                  <button
-                    className={salesFilter === "all" ? "is-on" : ""}
-                    onClick={() => {
-                      setSalesFilter("all");
-                      setPeopleOpen(false);
-                    }}
-                  >
-                    All salespeople
-                  </button>
-                  {(salespersonsQ.data?.salespersons ?? []).map((s) => (
-                    <button
-                      key={s.id}
-                      className={salesFilter === s.id ? "is-on" : ""}
-                      onClick={() => {
-                        setSalesFilter(s.id);
-                        setPeopleOpen(false);
-                      }}
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {networkMode && (
+              <BoardFilterDropdown
+                icon={Store}
+                value={storeFilter}
+                allLabel="All stores"
+                options={storeOptions}
+                open={storesOpen}
+                onToggle={() => setStoresOpen((o) => !o)}
+                onPick={pickStore}
+                testId="os-store-filter"
+                optionTestIdPrefix="os-store-option"
+              />
+            )}
+            {showOutletFilter && (
+              <BoardFilterDropdown
+                icon={MapPin}
+                value={outletFilter}
+                allLabel="All outlets"
+                options={scopeOutlets.map((o) => ({ id: o.id, label: o.name }))}
+                open={outletsOpen}
+                onToggle={() => setOutletsOpen((o) => !o)}
+                onPick={pickOutlet}
+                testId="os-outlet-filter"
+                optionTestIdPrefix="os-outlet-option"
+              />
+            )}
+            {/* Salespeople come LAST in the cascade — and only once a store is
+                on screen (network mode hides them until a store is picked). */}
+            {!salespersonScoped && (!networkMode || storeFilter !== "all") && (
+              <BoardFilterDropdown
+                icon={Users}
+                value={salesFilter}
+                allLabel="All salespeople"
+                options={scopeStaff.map((s) => ({ id: s.id, label: s.name }))}
+                open={peopleOpen}
+                onToggle={() => setPeopleOpen((o) => !o)}
+                onPick={(id) => {
+                  setSalesFilter(id);
+                  setPeopleOpen(false);
+                }}
+                testId="os-sales-filter"
+                optionTestIdPrefix="os-sales-option"
+              />
+            )}
             <div className="os-seg">
               <button className={period === "month" ? "is-on" : ""} onClick={() => setPeriod("month")}>
                 Month
@@ -353,6 +483,11 @@ export default function OrderStatusPage({
                           key={o.id}
                           order={o}
                           staffName={o.salespersonId ? staffById.get(o.salespersonId) ?? null : null}
+                          dealerName={
+                            networkMode && storeFilter === "all"
+                              ? storeById.get(o.dealerId) ?? null
+                              : null
+                          }
                           onOpen={(x) => setActiveId(x.id)}
                         />
                       ))

@@ -15,6 +15,9 @@ import type { AppEnv } from "../../types";
  *   GET /                 — dealers list with PO+GMV+outstanding stats
  *   GET /:id              — single dealer + dealer's recent 30 orders
  *   GET /orders/:so       — single order detail (line items + addons)
+ *
+ * BD sees DEALERS only (Loo 2026-07-25): every route here drops / 404s
+ * Carres' own showroom-channel stores — BD's world is the external network.
  */
 const bdDealersRouter = new Hono<AppEnv>();
 
@@ -34,11 +37,12 @@ bdDealersRouter.get("/", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  // 2026-07-19 (Loo) — BD places orders on behalf of a store too, and its
-  // picker groups Carres' own showrooms apart from external dealers. The
-  // stats RPC carries no `channel`, so pull it alongside (same shape as
-  // principal/dealers). Fail closed: a broken read must not silently turn
-  // every showroom into a dealer.
+  // Loo 2026-07-25 — BD sees DEALERS only: Carres' own showrooms are the
+  // principal's world and stay entirely off the BD surface (this ONE list
+  // feeds the BD board's store menu, the Accounts roster AND the POS
+  // on-behalf picker). The stats RPC carries no `channel`, so pull it
+  // alongside and DROP showroom rows. Fail closed: a broken channel read
+  // must not silently leak showrooms in (or reclassify them as dealers).
   const chan = await sb.from("dealers").select("id, channel");
   if (chan.error) {
     const m = mapPgError(chan.error);
@@ -47,20 +51,23 @@ bdDealersRouter.get("/", async (c) => {
   const channelById = new Map<string, string>(
     (chan.data ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dealers = (data ?? []).map((d: any) => ({
-    id: d.id,
-    name: d.name,
-    region: d.region,
-    contact: d.contact,
-    status: d.status,
-    joinedDate: d.joined_date,
-    orderCount: Number(d.order_count ?? 0),
-    gmv: Number(d.gmv ?? 0),
-    outstanding: Number(d.outstanding ?? 0),
+  const dealers = (data ?? [])
     // Unknown id → 'dealer', matching the column's own DB default.
-    channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
-  }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((d: any) => channelById.get(d.id) !== "showroom")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      region: d.region,
+      contact: d.contact,
+      status: d.status,
+      joinedDate: d.joined_date,
+      orderCount: Number(d.order_count ?? 0),
+      gmv: Number(d.gmv ?? 0),
+      outstanding: Number(d.outstanding ?? 0),
+      channel: "dealer",
+    }));
   return c.json({ dealers });
 });
 
@@ -87,21 +94,32 @@ bdDealersRouter.get("/activity", async (c) => {
   const dealerIds = Array.from(
     new Set((auditRes.data ?? []).map((a) => a.dealer_id).filter(Boolean) as string[]),
   );
-  const dealerMap = new Map<string, string>();
+  const dealerMap = new Map<string, { name: string; channel: string | null }>();
   if (dealerIds.length) {
-    const dRes = await sb.from("dealers").select("id, name").in("id", dealerIds);
-    (dRes.data ?? []).forEach((d) => dealerMap.set(d.id, d.name));
+    // Channel rides along so showroom-touching events stay off the BD feed
+    // (Loo 2026-07-25: BD sees dealers only). Fail closed on a broken read.
+    const dRes = await sb.from("dealers").select("id, name, channel").in("id", dealerIds);
+    if (dRes.error) {
+      const m = mapPgError(dRes.error);
+      return c.json(m.body, m.status);
+    }
+    (dRes.data ?? []).forEach((d) =>
+      dealerMap.set(d.id, { name: d.name, channel: (d.channel as string) ?? "dealer" }),
+    );
   }
 
-  const rows = (auditRes.data ?? []).map((a) => ({
-    id: a.id,
-    role: a.role,
-    actor: a.actor_text,
-    action: a.action,
-    dealerId: a.dealer_id,
-    dealerName: a.dealer_id ? dealerMap.get(a.dealer_id) ?? null : null,
-    occurredAt: a.occurred_at,
-  }));
+  const rows = (auditRes.data ?? [])
+    // Unknown id → treated as 'dealer' (the column default), same as the list.
+    .filter((a) => !a.dealer_id || dealerMap.get(a.dealer_id)?.channel !== "showroom")
+    .map((a) => ({
+      id: a.id,
+      role: a.role,
+      actor: a.actor_text,
+      action: a.action,
+      dealerId: a.dealer_id,
+      dealerName: a.dealer_id ? dealerMap.get(a.dealer_id)?.name ?? null : null,
+      occurredAt: a.occurred_at,
+    }));
   return c.json({ rows });
 });
 
@@ -109,6 +127,20 @@ bdDealersRouter.get("/activity", async (c) => {
 bdDealersRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // A showroom id reads as not-found for BD (Loo 2026-07-25: BD sees dealers
+  // only — the list never offers one, but the drill-down must not leak either).
+  const chanRes = await sb.from("dealers").select("channel").eq("id", id).maybeSingle();
+  if (chanRes.error) {
+    const m = mapPgError(chanRes.error);
+    return c.json(m.body, m.status);
+  }
+  if ((chanRes.data?.channel ?? "dealer") === "showroom") {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "Dealer not found" },
+      404,
+    );
+  }
 
   const dealerRes = await sb.rpc("dealer_with_stats", { p_id: id });
   if (dealerRes.error) {
@@ -207,16 +239,23 @@ bdDealersRouter.get("/orders/:so", async (c) => {
     );
   }
 
-  // Resolve dealer name for the header.
+  // Resolve dealer name for the header — and 404 a showroom's order (Loo
+  // 2026-07-25: BD sees dealers only).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const order = data as any;
   let dealerName: string | null = null;
   if (order.dealer_id) {
     const dRes = await sb
       .from("dealers")
-      .select("name")
+      .select("name, channel")
       .eq("id", order.dealer_id)
       .maybeSingle();
+    if (((dRes.data?.channel as string) ?? "dealer") === "showroom") {
+      return c.json(
+        { error: "not_found", code: "not_found", message: "Order not found" },
+        404,
+      );
+    }
     dealerName = dRes.data?.name ?? null;
   }
 

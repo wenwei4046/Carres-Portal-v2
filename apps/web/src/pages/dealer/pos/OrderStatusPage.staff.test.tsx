@@ -22,6 +22,8 @@ const ORDERS: Order[] = [order({ so: 1301, status: "place" }), order({ so: 1302,
 vi.mock("@/lib/queries", () => ({
   useOrders: () => ({ data: { orders: ORDERS, total: ORDERS.length }, isLoading: false }),
   useSalespersons: () => ({ data: { salespersons: [{ id: "sp-1", name: "Aisyah" }] } }),
+  useOutlets: () => ({ data: { outlets: [] } }),
+  usePrincipalDealers: () => ({ data: { dealers: [] } }),
 }));
 vi.mock("./PosOrderDetail", () => ({ default: () => <div /> }));
 

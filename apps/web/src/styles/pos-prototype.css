@@ -3757,12 +3757,15 @@
 .os-controls {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 12px;
+  /* The store→outlet→salesperson cascade can put THREE dropdowns on this row
+     (2026-07-25) — wrap instead of crushing the search field on ~1024px. */
+  flex-wrap: wrap;
   padding: 12px 32px 14px;
   background: color-mix(in srgb, var(--pos-bg) 90%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.os-controls .os-search { flex: 1; min-width: 0; max-width: 520px; }
+.os-controls .os-search { flex: 1; min-width: 220px; max-width: 520px; }
 .os-people { position: relative; }
 .os-people__btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -3789,6 +3792,10 @@
 }
 .os-people__menu button:hover { background: var(--pos-rail); }
 .os-people__menu button.is-on { background: color-mix(in oklab, var(--c-orange) 12%, transparent); color: var(--c-burnt); font-weight: 600; }
+.os-people__grouplab {
+  padding: 8px 12px 3px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--fg-muted);
+}
 .os-seg {
   display: inline-flex; background: var(--pos-rail);
   border-radius: 999px; padding: 3px;

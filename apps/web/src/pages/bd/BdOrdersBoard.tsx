@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Inbox,
+  MapPin,
   Network,
   Package2,
   Search,
@@ -13,13 +13,15 @@ import {
   Users,
 } from "lucide-react";
 import type { Order } from "@carres/shared";
-import { useBdDealers, useOrders, useSalespersons } from "@/lib/queries";
+import { useBdDealers, useOrders, useOutlets, useSalespersons } from "@/lib/queries";
 import { laneOf } from "@/pages/dealer/pos/order-edit-scope";
 import {
+  BoardFilterDropdown,
   LANES,
   OrderCard,
   SummaryCard,
   monthLabel,
+  orderOutletOf,
   rmGroup,
   sameMonth,
   sumRevenue,
@@ -36,10 +38,17 @@ import PosOrderDetail from "@/pages/dealer/pos/PosOrderDetail";
  *     shared showroom tablet;
  *   - summary card 1 = the network (or the picked dealer); card 2 compares
  *     the picked dealer and carries its ALL-TIME totals (dealers_with_stats);
+ *   - BD sees DEALERS only (Loo 2026-07-25): /api/bd/dealers drops Carres'
+ *     own showrooms, and the board gates its ORDERS to that dealer-id set
+ *     too — a showroom's orders never surface here (they'd otherwise ride in
+ *     on bd's internal JWT). The principal's all-stores view lives on
+ *     OrderStatusPage instead;
  *   - the dealer dropdown replaces the salesperson one until a dealer is
- *     picked (then both show — salespeople scoped to that dealer);
+ *     picked; a picked dealer with ≥2 outlets adds an Outlet level between
+ *     them, and salespeople come LAST, scoped to the picked dealer/outlet
+ *     (Loo 2026-07-25 cascade);
  *   - "All dealers" mode hides AutoCount-archive imports (they'd flood the
- *     Proceed lane); picking their dealer still shows them, store-board rules.
+ *     Proceed lane); picking their store still shows them, store-board rules.
  *
  * Card click opens the SAME PosOrderDetail drawer — BD edits under the store's
  * own lane rules (place editable · proceed locked fields · delivered
@@ -49,10 +58,12 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [dealerFilter, setDealerFilter] = useState<string>("all"); // dealer id | 'all'
+  const [outletFilter, setOutletFilter] = useState<string>("all"); // outlet id | 'all'
   const [salesFilter, setSalesFilter] = useState<string>("all"); // salesperson id | 'all'
   const [period, setPeriod] = useState<"month" | "range">("month");
   const [monthAnchor, setMonthAnchor] = useState(() => new Date());
   const [dealersOpen, setDealersOpen] = useState(false);
+  const [outletsOpen, setOutletsOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
 
   // ONE network-wide fetch (RLS: bd is internal → all orders), filtered
@@ -62,6 +73,8 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
   const ordersQ = useOrders();
   const dealersQ = useBdDealers();
   const salespersonsQ = useSalespersons();
+  // Outlets are RLS-scoped; bd is internal → every store's outlets.
+  const outletsQ = useOutlets();
 
   const dealers = dealersQ.data?.dealers ?? [];
   const dealerById = useMemo(() => {
@@ -69,26 +82,58 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
     for (const d of dealers) m.set(d.id, d.name);
     return m;
   }, [dealers]);
+  // BD sees DEALERS only (Loo 2026-07-25) — /api/bd/dealers already drops
+  // Carres' own showrooms, so the menu is a flat dealer list, and this id set
+  // gates the ORDERS below too (bd's internal JWT reads every store's orders;
+  // a showroom's must never surface on the BD board).
+  const dealerIds = useMemo(() => new Set(dealers.map((d) => d.id)), [dealers]);
+  const storeOptions = useMemo(
+    () =>
+      [...dealers]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((d) => ({ id: d.id, label: d.name })),
+    [dealers],
+  );
+  const staffRows = salespersonsQ.data?.salespersons ?? [];
   const staffById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of salespersonsQ.data?.salespersons ?? []) m.set(s.id, s.name);
+    for (const s of staffRows) m.set(s.id, s.name);
     return m;
-  }, [salespersonsQ.data]);
+  }, [staffRows]);
+  const staffOutletById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const s of staffRows) m.set(s.id, s.outletId ?? null);
+    return m;
+  }, [staffRows]);
   const dealerSalespersons = useMemo(
     () =>
       dealerFilter === "all"
         ? []
-        : (salespersonsQ.data?.salespersons ?? []).filter((s) => s.dealerId === dealerFilter),
-    [salespersonsQ.data, dealerFilter],
+        : staffRows
+            .filter((s) => s.dealerId === dealerFilter)
+            .filter((s) => outletFilter === "all" || s.outletId === outletFilter),
+    [staffRows, dealerFilter, outletFilter],
   );
+  // "if dealer got 2 outlet, can select by outlet as well" (Loo 2026-07-25).
+  const scopeOutlets = useMemo(
+    () =>
+      dealerFilter === "all"
+        ? []
+        : (outletsQ.data?.outlets ?? []).filter((o) => o.dealerId === dealerFilter),
+    [outletsQ.data, dealerFilter],
+  );
+  const showOutletFilter = scopeOutlets.length >= 2;
 
   const orders = useMemo(
     () =>
       (ordersQ.data?.orders ?? []).filter(
-        (o) => laneOf(o.status, o.operationStage, o.sourceSystem) !== null,
+        (o) =>
+          laneOf(o.status, o.operationStage, o.sourceSystem) !== null &&
+          dealerIds.has(o.dealerId),
       ),
-    [ordersQ.data],
+    [ordersQ.data, dealerIds],
   );
+  const boardLoading = ordersQ.isLoading || dealersQ.isLoading;
 
   const inPeriod = (o: Order) => (period === "range" ? true : sameMonth(o.placedAt, monthAnchor));
   // Network scope: AutoCount-archive imports stay off the all-dealers board
@@ -106,13 +151,22 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
   );
 
   const periodOrders = dealerFilter === "all" ? networkOrders : dealerOrders;
+  // Outlet narrowing applies to the LANES (the summary cards keep their fixed
+  // network-vs-store comparison semantics).
+  const outletOrders = useMemo(
+    () =>
+      outletFilter === "all"
+        ? periodOrders
+        : periodOrders.filter((o) => orderOutletOf(o, staffOutletById) === outletFilter),
+    [periodOrders, outletFilter, staffOutletById],
+  );
   const network = sumRevenue(networkOrders);
   const dealer = sumRevenue(dealerOrders);
   const dealerStats = dealerFilter === "all" ? null : dealers.find((d) => d.id === dealerFilter) ?? null;
 
   const scoped = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return periodOrders.filter((o) => {
+    return outletOrders.filter((o) => {
       if (salesFilter !== "all" && o.salespersonId !== salesFilter) return false;
       if (!q) return true;
       return (
@@ -121,7 +175,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
         (o.customer.phone || "").includes(q)
       );
     });
-  }, [periodOrders, query, salesFilter]);
+  }, [outletOrders, query, salesFilter]);
 
   const lanes = useMemo(
     () => ({
@@ -142,8 +196,14 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
 
   function pickDealer(id: string) {
     setDealerFilter(id);
-    setSalesFilter("all"); // salespeople belong to the previous dealer
+    setOutletFilter("all"); // outlets + salespeople belong to the previous store
+    setSalesFilter("all");
     setDealersOpen(false);
+  }
+  function pickOutlet(id: string) {
+    setOutletFilter(id);
+    setSalesFilter("all");
+    setOutletsOpen(false);
   }
 
   return createPortal(
@@ -206,67 +266,45 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
               data-testid="os-search"
             />
           </div>
-          <div className="os-people">
-            <button
-              className="os-people__btn"
-              onClick={() => setDealersOpen((o) => !o)}
-              data-testid="bd-dealer-filter"
-            >
-              <Store size={14} strokeWidth={1.75} />
-              <span>{dealerFilter === "all" ? "All dealers" : dealerById.get(dealerFilter) ?? "…"}</span>
-              <ChevronDown size={13} strokeWidth={1.75} />
-            </button>
-            {dealersOpen && (
-              <div className="os-people__menu">
-                <button className={dealerFilter === "all" ? "is-on" : ""} onClick={() => pickDealer("all")}>
-                  All dealers
-                </button>
-                {dealers.map((d) => (
-                  <button
-                    key={d.id}
-                    className={dealerFilter === d.id ? "is-on" : ""}
-                    onClick={() => pickDealer(d.id)}
-                    data-testid={`bd-dealer-option-${d.id}`}
-                  >
-                    {d.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <BoardFilterDropdown
+            icon={Store}
+            value={dealerFilter}
+            allLabel="All dealers"
+            options={storeOptions}
+            open={dealersOpen}
+            onToggle={() => setDealersOpen((o) => !o)}
+            onPick={pickDealer}
+            testId="bd-dealer-filter"
+            optionTestIdPrefix="bd-dealer-option"
+          />
+          {showOutletFilter && (
+            <BoardFilterDropdown
+              icon={MapPin}
+              value={outletFilter}
+              allLabel="All outlets"
+              options={scopeOutlets.map((o) => ({ id: o.id, label: o.name }))}
+              open={outletsOpen}
+              onToggle={() => setOutletsOpen((o) => !o)}
+              onPick={pickOutlet}
+              testId="os-outlet-filter"
+              optionTestIdPrefix="os-outlet-option"
+            />
+          )}
           {dealerFilter !== "all" && (
-            <div className="os-people">
-              <button className="os-people__btn" onClick={() => setPeopleOpen((o) => !o)}>
-                <Users size={14} strokeWidth={1.75} />
-                <span>{salesFilter === "all" ? "All salespeople" : staffById.get(salesFilter) ?? "…"}</span>
-                <ChevronDown size={13} strokeWidth={1.75} />
-              </button>
-              {peopleOpen && (
-                <div className="os-people__menu">
-                  <button
-                    className={salesFilter === "all" ? "is-on" : ""}
-                    onClick={() => {
-                      setSalesFilter("all");
-                      setPeopleOpen(false);
-                    }}
-                  >
-                    All salespeople
-                  </button>
-                  {dealerSalespersons.map((s) => (
-                    <button
-                      key={s.id}
-                      className={salesFilter === s.id ? "is-on" : ""}
-                      onClick={() => {
-                        setSalesFilter(s.id);
-                        setPeopleOpen(false);
-                      }}
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <BoardFilterDropdown
+              icon={Users}
+              value={salesFilter}
+              allLabel="All salespeople"
+              options={dealerSalespersons.map((s) => ({ id: s.id, label: s.name }))}
+              open={peopleOpen}
+              onToggle={() => setPeopleOpen((o) => !o)}
+              onPick={(id) => {
+                setSalesFilter(id);
+                setPeopleOpen(false);
+              }}
+              testId="os-sales-filter"
+              optionTestIdPrefix="os-sales-option"
+            />
           )}
           <div className="os-seg">
             <button className={period === "month" ? "is-on" : ""} onClick={() => setPeriod("month")}>
@@ -302,7 +340,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
                   <span className="os-lane__count">{list.length}</span>
                 </div>
                 <div className="os-lane__body">
-                  {ordersQ.isLoading ? (
+                  {boardLoading ? (
                     <div className="os-empty os-empty--plain">
                       <p>Loading…</p>
                     </div>
