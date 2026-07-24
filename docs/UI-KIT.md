@@ -239,7 +239,7 @@ dark same-hue ink; borderless (v4 §6).
 
 **⭐ FIX-ONCE STANDARDS (Jess 2026-07-20) — one value, one component, lint-enforced.** A state/selection must NEVER be hand-rolled per surface; use the ONE shared thing so it can't drift:
 - **Order STATE → pill:** call `orderStatusPill(word)` (`apps/web/src/lib/status-pill.ts`) — the SINGLE status→class map. **Pending = amber** (`pill-warning`, a live/waiting state — was wrongly grey in the drawer); Scheduled/Confirmed = green; Overdue = red; Delivered/Placed/Proceed = grey. Never hand-write `statusWord === "…" ? "pill-x" : "pill-y"`.
-- **Selection / "pointed" state → `.is-selected`** (index.css): the ONE visible selection blue = **`#C2E7FF` wash + `#378ADD` inset bar**. Applies to spine steps, active tabs, picked rows. NEVER a faint hand-roll (`bg-info-soft/60`, `bg-primary/5`, inline `#C2E7FF`). Hover = `hover:bg-hovertint` (never grey). **RULE H** in `check-design-standard.mjs` fails the build on a hand-rolled blue selection bar; the hex ratchet (RULE A) catches new inline selection hexes.
+- **Selection / "pointed" state → `.is-selected`** (index.css): the ONE visible selection blue = **`#C2E7FF` wash — WASH ONLY**. The 3px `#378ADD` corner-blue inset bar was removed 2026-07-24 (Jess: "remove the corner blue"). Applies to spine steps, active tabs, picked rows. NEVER a faint hand-roll (`bg-info-soft/60`, `bg-primary/5`, inline `#C2E7FF`). Hover = `hover:bg-hovertint` (never grey). **RULE H** in `check-design-standard.mjs` fails the build on a hand-rolled blue selection.
 - **The enforcement is what makes every chat/code obey:** a doc can be ignored, a failing build cannot. New drift → build red.
 
 **Focus dimming + pick-state circles (v4 §8d, LOCKED — the POS pattern):**

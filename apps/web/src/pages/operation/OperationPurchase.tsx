@@ -57,38 +57,36 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
-  Bed,
-  BedDouble,
   Check,
-  Clock,
   Factory,
   Info,
   MessageCircle,
-  Minus,
-  Package,
   PackageCheck,
   RefreshCw,
-  Send,
-  Sofa,
+  SlidersHorizontal,
   Truck,
-  type LucideIcon,
+  UserRound,
 } from "lucide-react";
 import {
   type ProductCategory,
   type PurchaseChase,
   type PurchasePlaceGroup,
-  type PurchasePlaceGroupLine,
   type PurchaseReceive,
   type PurchaseUrgencyBucket,
 } from "@carres/shared";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import CreatePOModal, { type CreatePoPrefill } from "./components/CreatePOModal";
 import ReceivePOModal from "./components/ReceivePOModal";
+import { PurchaseListRow } from "./components/PurchaseListRow";
+import { PoDocumentPreview } from "./components/PoDocumentPreview";
+import { PurchaseSettingsSheet } from "./components/PurchaseSettingsSheet";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
+import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import type { SupplierRow } from "@/lib/queries";
 import {
   usePurchaseToday,
@@ -96,6 +94,7 @@ import {
   useOperationPos,
   useOperationWarehouse,
   useChasePoEventMutation,
+  useOperationPoDuty,
 } from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -165,22 +164,6 @@ function waLink(phone: string | null | undefined): string | null {
   return `https://wa.me/${d}`;
 }
 
-// ── Category icons (Jess 2026-07-22: same icon language as the Orders panel) ─
-
-function categoryIconOf(cat: ProductCategory | undefined): LucideIcon {
-  switch (cat) {
-    case "mattress":
-      return Bed;
-    case "bedframe":
-      return BedDouble;
-    case "sofa":
-      return Sofa;
-    case "accessory":
-      return Package;
-    default:
-      return Factory;
-  }
-}
 
 // ── Size code parser (SKU suffix → size code + label) ───────────────────────
 
@@ -204,116 +187,43 @@ function parseSize(sku: string): SizeInfo | null {
   return SIZE_ALIASES[tail] ?? null;
 }
 
-interface UrgencyStyle {
-  cls: string;
-  Icon: LucideIcon;
-  label: string;
-}
-function urgencyStyle(u: PurchaseUrgencyBucket): UrgencyStyle {
-  switch (u) {
-    case "late":
-      return { cls: "pill-overdue", Icon: AlertCircle, label: "Late" };
-    case "urgent":
-      return { cls: "pill-overdue", Icon: AlertCircle, label: "Send now" };
-    case "due":
-      return { cls: "pill-warning", Icon: Clock, label: "Due soon" };
-    case "scheduled":
-      return { cls: "pill-sent", Icon: Clock, label: "Scheduled" };
-    case "no_deadline":
-      return { cls: "pill-neutral", Icon: Minus, label: "No deadline" };
-    default:
-      return { cls: "pill-neutral", Icon: Minus, label: "—" };
-  }
+
+
+/** Build the CreatePOModal prefill from a place group. soRefs = unique customer
+ *  SOs; lines = planned SKUs + qty + first-SO attrs; supplierId preselects the
+ *  group. Shared by the card's Send PO and the expanded detail's Send PO. */
+function buildPlacePrefill(group: SplitPlaceGroup): CreatePoPrefill {
+  const soRefs = Array.from(
+    new Set(
+      group.lines.flatMap((l) =>
+        l.forOrders.map((o) => o.so).filter((n): n is number => n != null),
+      ),
+    ),
+  );
+  const lines = group.lines.map((l) => ({
+    sku: l.sku,
+    qty: l.need,
+    attrs:
+      (l.forOrders[0] as { attrs?: Record<string, unknown> | null } | undefined)
+        ?.attrs ?? null,
+  }));
+  return {
+    supplierId: group.supplierId,
+    soRefs: soRefs.length > 0 ? soRefs : undefined,
+    lines,
+    note: `Auto-planned from cockpit · ${group.orderCount} SO${
+      group.orderCount === 1 ? "" : "s"
+    } · ${group.totalUnits} units${
+      group.splitCategory ? ` (${group.splitCategory})` : ""
+    }`,
+  };
 }
 
-/** Row action-line per COPY-STANDARD (verb + object + when). "PO" everywhere
- *  the reader is doing supplier work — never plain "order" (that's the customer
- *  SO in Carres vocab). Jess 2026-07-22. */
-function placeActionLine(g: PurchasePlaceGroup, today: string | null): string {
-  const name = g.supplierName ?? "the factory";
-  if (g.urgency === "late" && g.earliestOrderBy && today) {
-    const late = daysBetween(g.earliestOrderBy, today) ?? 0;
-    if (late > 0) return `Send PO to ${name} today — ${late}d late.`;
-    return `Send PO to ${name} today.`;
-  }
-  if (g.urgency === "urgent") return `Send PO to ${name} today.`;
-  if (g.urgency === "due" && g.earliestOrderBy) {
-    return `Prepare PO to ${name} by ${dayName(g.earliestOrderBy)}.`;
-  }
-  if (g.urgency === "no_deadline")
-    return `${name} — waiting on a deadline before we can plan.`;
-  if (g.earliestOrderBy)
-    return `Send PO to ${name} from ${dayName(g.earliestOrderBy)}.`;
-  return `Review the ${name} PO.`;
-}
-
-function chaseActionLine(r: PurchaseChase, supplierName: string): string {
-  if (r.daysLate > 0) return `Chase ${supplierName} — ${r.daysLate}d late.`;
-  return `Remind ${supplierName} — check ready date.`;
-}
-
-function receiveActionLine(r: PurchaseReceive, supplierName: string): string {
-  const total = r.items.reduce((s, it) => s + it.outstanding, 0);
-  return `Check in from ${supplierName} (${total} item${total === 1 ? "" : "s"}).`;
-}
 
 // Days-to-order strip helpers (next14Days · nonWorkingReason · bucketByDay ·
 // upcomingCadenceDays · DayBucket · MY_HOLIDAYS lookup) removed 2026-07-23
 // alongside the strip itself — the right-rail Calendar owns all date views now.
 
-// ── Place-detail helpers: size breakdown + earliest deadline per line ────────
-
-/** Compute the by-size roll-up for a place group's SKU lines. Empty when no
- *  SKUs parse a known size. */
-function bySizeBreakdown(
-  lines: readonly PurchasePlaceGroupLine[],
-): Array<{ code: string; label: string; qty: number }> {
-  const m = new Map<string, { label: string; qty: number }>();
-  for (const l of lines) {
-    const s = parseSize(l.sku);
-    if (!s) continue;
-    const cur = m.get(s.code);
-    if (cur) cur.qty += l.need;
-    else m.set(s.code, { label: s.label, qty: l.need });
-  }
-  return [...m.entries()]
-    .map(([code, v]) => ({ code, label: v.label, qty: v.qty }))
-    .sort((a, b) => b.qty - a.qty);
-}
-
-/** Earliest customer delivery date across a SKU line's forOrders, or null. */
-function earliestDeadline(
-  forOrders: PurchasePlaceGroupLine["forOrders"],
-): string | null {
-  const dates = forOrders
-    .map((o) => o.deliveryDate ?? null)
-    .filter((d): d is string => Boolean(d));
-  if (dates.length === 0) return null;
-  return dates.sort()[0]!;
-}
-
-/** ORDER column text: SO- or `SO-XXXX +N` when there are >1 unique SOs.
- *  The `+N` is enough — no "more" word (Jess 2026-07-22). */
-function orderColText(forOrders: PurchasePlaceGroupLine["forOrders"]): string {
-  const sos = [...new Set(forOrders.map((o) => o.so).filter((s): s is number => s != null))];
-  if (sos.length === 0) return "—";
-  if (sos.length === 1) return `SO-${sos[0]}`;
-  return `SO-${sos[0]} +${sos.length - 1}`;
-}
-
-/** Category breakdown across a place group — `sofa 6 · bedframe 4`. Used on
- *  the row + detail header when the supplier serves >1 procurable category. */
-function categoryBreakdown(
-  group: PurchasePlaceGroup,
-): Array<{ category: ProductCategory; units: number }> {
-  const m = new Map<ProductCategory, number>();
-  for (const l of group.lines) {
-    m.set(l.category, (m.get(l.category) ?? 0) + l.need);
-  }
-  return [...m.entries()]
-    .map(([category, units]) => ({ category, units }))
-    .sort((a, b) => b.units - a.units);
-}
 
 /** Recompute the urgency bucket for a subset of lines from its own
  *  earliestOrderBy vs today. Mirrors the engine's rank approximately —
@@ -375,7 +285,132 @@ function splitByCategory(
   return out;
 }
 
+/** Earliest customer deadline across every SO the group's lines serve — the
+ *  real pressure the operator communicates to the supplier. Feeds the late
+ *  banner on the PoDocumentPreview. */
+function earliestCustomerDeadlineOfGroup(
+  group: SplitPlaceGroup,
+): string | null {
+  const dates: string[] = [];
+  for (const l of group.lines)
+    for (const o of l.forOrders)
+      if (o.deliveryDate) dates.push(o.deliveryDate);
+  if (dates.length === 0) return null;
+  return dates.sort()[0]!;
+}
+
+/** Default WhatsApp draft — plain-English, low-literacy supplier register with
+ *  ref-first line items (Jess 2026-07-24 top-to-toe §4: suppliers recognise
+ *  their CR/TCF original ref, NOT the SO number, NOT the SKU code). Groups
+ *  the group's SKU lines by their customer REF (fallback SO-N when ref null
+ *  for a native POS order with no imported ref), one section per order. */
+function buildPlaceWaTemplate(
+  group: SplitPlaceGroup,
+  preparedByName: string | null,
+): string {
+  const supplier = group.supplierName ?? "the factory";
+  // Bucket every (line × forOrder) pair by ref/SO so each customer's PO
+  // becomes one clean block in the message. Preserves the earliest-deadline-
+  // first order (matches the ORDER column in the SKU table above).
+  interface OrderBucket {
+    key: string;
+    label: string; // "CR-2025-0812" or "SO-1234"
+    customerName: string | null;
+    deliveryDate: string | null;
+    items: Array<{ sku: string; modelName: string | null; size: string | null; qty: number }>;
+  }
+  const bucketByKey = new Map<string, OrderBucket>();
+  for (const l of group.lines) {
+    const size = parseSize(l.sku);
+    // A line's `need` is aggregated across its forOrders — split back per
+    // forOrder so the WA breakdown ties each qty to its own customer. A line
+    // with N forOrders and need M sends M ÷ N per order (integer split; any
+    // rounding residue lands on the first). Not perfect for exotic
+    // many-to-many splits but matches the operator's mental model 95% of
+    // the time. Real per-order qty lives on the source order_lines; a
+    // follow-up commit can plumb it through instead of splitting here.
+    const perOrder = l.forOrders.length > 0
+      ? Math.floor(l.need / l.forOrders.length)
+      : l.need;
+    const residue = l.forOrders.length > 0
+      ? l.need - perOrder * l.forOrders.length
+      : 0;
+    l.forOrders.forEach((o, i) => {
+      const key = o.ref ?? (o.so != null ? `SO-${o.so}` : "unknown");
+      const label = o.ref ?? (o.so != null ? `SO-${o.so}` : "—");
+      let bucket = bucketByKey.get(key);
+      if (!bucket) {
+        bucket = {
+          key,
+          label,
+          customerName: o.customerName ?? null,
+          deliveryDate: o.deliveryDate ?? null,
+          items: [],
+        };
+        bucketByKey.set(key, bucket);
+      }
+      bucket.items.push({
+        sku: l.sku,
+        modelName: l.modelName ?? null,
+        size: size?.label ?? null,
+        qty: perOrder + (i === 0 ? residue : 0),
+      });
+    });
+  }
+  const buckets = [...bucketByKey.values()].sort((a, b) => {
+    const da = a.deliveryDate ?? "9999";
+    const db = b.deliveryDate ?? "9999";
+    return da.localeCompare(db) || a.label.localeCompare(b.label);
+  });
+
+  const lines: string[] = [];
+  lines.push(`${supplier}, we place new order. Please help arrange:`);
+  lines.push("");
+  for (const b of buckets) {
+    const meta = [b.customerName, b.deliveryDate ? `deliver by ${b.deliveryDate}` : null]
+      .filter((s): s is string => Boolean(s))
+      .join(" · ");
+    lines.push(meta ? `${b.label} (${meta})` : b.label);
+    for (const it of b.items) {
+      const parts = [it.modelName, it.size].filter((s): s is string => Boolean(s));
+      const desc = parts.length > 0 ? parts.join(" ") : it.sku;
+      lines.push(`  · ${desc} × ${it.qty}`);
+    }
+    lines.push("");
+  }
+  lines.push("Please confirm receive. Thank you.");
+  lines.push(`${preparedByName ?? "Ops"} · Carres`);
+  return lines.join("\n");
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
+
+// PO duty chip on the tab bar (Jess 2026-07-23) — surfaces WHO controls
+// company-wide POs this month (货合买: one holder per month, auto-rotating via
+// /api/operation/po-duty). Hidden while the duty layer is dormant (no holder);
+// reads the same data as the right-rail Team panel. Urgent orders bypass duty.
+function PoDutyTabChip() {
+  const dutyQ = useOperationPoDuty();
+  const holder = dutyQ.data?.holder ?? null;
+  if (!holder?.name) return null;
+  const month = dutyQ.data?.month ?? "";
+  const monthLabel = month
+    ? new Date(`${month}-01T00:00:00`).toLocaleDateString("en-US", { month: "short" })
+    : "";
+  return (
+    <span
+      className="flex items-center gap-1.5 rounded-full border border-base-200 bg-base-50 px-2.5 py-1 text-[12px] text-base-600"
+      title="PO duty — one person controls company-wide POs each month (urgent orders bypass)"
+      data-testid="po-duty-chip"
+    >
+      <UserRound size={13} strokeWidth={2} className="text-base-400" />
+      <span>
+        PO duty · {monthLabel}:{" "}
+        <span className="font-semibold text-base-900">{holder.name}</span>
+      </span>
+    </span>
+  );
+}
 
 export default function OperationPurchase() {
   const { data, isLoading, isError, error, refetch } = usePurchaseToday();
@@ -386,6 +421,25 @@ export default function OperationPurchase() {
   const [attn, setAttn] = useState<Attn>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  // v2 (Loo 2026-07-23): PROJECTS facet lets the operator scope to one big
+  // customer whose SOs span multiple factories (Dorsett Loft = 40 rooms →
+  // 3+ POs). Data lives in `PurchasePlaceGroupLine.forOrders[i].customerName`
+  // — zero migration; group Place rows whose lines serve that customer.
+  // v2 (Loo 2026-07-23): Purchase settings side sheet — replaces the small
+  // LeadTimesButton modal. Section 1 = Lead times · 2 = Arrival buffer · 3 =
+  // PO days · 4 = Duty rotation indicator (edit stays on the Team card).
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Section collapse — one Set for all bands; default all expanded.
+  const [collapsedFacet, setCollapsedFacet] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleFacet = (key: string) =>
+    setCollapsedFacet((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // Send PO wire (Jess 2026-07-23) — clicking a PlaceDetail's Send PO button
   // opens the shipped CreatePOModal prefilled with the supplier + SO refs +
   // line qtys from the cockpit's plan. User then completes cost / warehouse /
@@ -406,6 +460,40 @@ export default function OperationPurchase() {
   const [checkInPoId, setCheckInPoId] = useState<string | null>(null);
   const posQ = useOperationPos();
   const warehousesQ = useOperationWarehouse();
+  // v2 (Jess 2026-07-23): the master-detail preview needs the duty holder for
+  // the "prepared by" line + the "on PO duty" badge next to Send PO. Send +
+  // Chase are the PO-duty holder (one voice to suppliers); Receive/GRN is
+  // OFFSET by one month (next month's holder) so SOD is achieved without a
+  // warehouse team — same 3-person office ops crew, different owner per stage.
+  const dutyQ = useOperationPoDuty();
+  const poDutyHolder = dutyQ.data?.holder ?? null;
+  const currentMonth = dutyQ.data?.month ?? "";
+  const grnDutyHolder =
+    (dutyQ.data?.roster ?? []).find((r) => r.month > currentMonth) ?? null;
+  const poDutyChip = poDutyHolder ? (
+    <span
+      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      style={{
+        background: avatarColor(poDutyHolder.userId).bg,
+        color: avatarColor(poDutyHolder.userId).fg,
+      }}
+      title={`${poDutyHolder.name ?? poDutyHolder.email} · on PO duty`}
+    >
+      {personInitials(poDutyHolder.name, poDutyHolder.email)}
+    </span>
+  ) : null;
+  const grnDutyChip = grnDutyHolder ? (
+    <span
+      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      style={{
+        background: avatarColor(grnDutyHolder.userId).bg,
+        color: avatarColor(grnDutyHolder.userId).fg,
+      }}
+      title={`${grnDutyHolder.name ?? grnDutyHolder.email} · on GRN duty (offset-1 rotation)`}
+    >
+      {personInitials(grnDutyHolder.name, grnDutyHolder.email)}
+    </span>
+  ) : null;
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -568,6 +656,19 @@ export default function OperationPurchase() {
     );
   }, [stage, receiveShown, selection]);
 
+  // Group placeShown by category for the facet's nested tree under Send POs
+  // (Jess 2026-07-24 v2 rev 4 — middle-panel-into-facet refactor).
+  const placesByCategory = useMemo(() => {
+    const byCat = new Map<ProductCategory, SplitPlaceGroup[]>();
+    for (const g of placeShown) {
+      const cat = g.splitCategory ?? g.categories[0];
+      if (!cat) continue;
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat)!.push(g);
+    }
+    return [...byCat.entries()];
+  }, [placeShown]);
+
   const selectedPlace =
     selection?.kind === "place"
       ? splitPlaceGroups.find((g) => g.groupKey === selection.groupKey) ?? null
@@ -638,7 +739,21 @@ export default function OperationPurchase() {
   return (
     <div className="h-full flex flex-col">
       <PurchasingTabs
-        right={<TodayRefresh today={today} onRefresh={() => void refetch()} />}
+        right={
+          <>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              title="Purchase settings — lead times, buffer, PO days, duty"
+              aria-label="Open Purchase settings"
+              className="p-1 rounded hover:text-base-900 hover:bg-hovertint transition-colors text-base-500"
+            >
+              <SlidersHorizontal size={14} strokeWidth={2} />
+            </button>
+            <PoDutyTabChip />
+            <TodayRefresh today={today} onRefresh={() => void refetch()} />
+          </>
+        }
       />
       <div className="flex-1 min-h-0">
         <ListPageShell
@@ -646,90 +761,182 @@ export default function OperationPurchase() {
           facetOpen={facetOpen}
           onFacetToggle={() => setFacetOpen((v) => !v)}
           facetToggleTitle="Show overview"
+          facetWidthPx={320}
           activeChips={activeChips}
           facet={
-            <div className="bg-white border border-base-200 rounded-[12px] p-1.5">
-              {/* Needs attention (alarm) — ① Send only */}
-              <FacetGroup title="Needs attention" danger>
-                <FacetRow
-                  label="Overdue"
-                  count={placeOverdue}
-                  tone={placeOverdue > 0 ? "danger" : "muted"}
-                  active={stage === "place" && attn === "overdue"}
-                  onClick={() => {
-                    setStage("place");
-                    setSelection(null);
-                    setSupplierFilter(null);
-                    setSelectedDay(null);
-                    setAttn((a) => (a === "overdue" ? null : "overdue"));
-                  }}
-                />
-                <FacetRow
-                  label="No deadline"
-                  count={missingCount}
-                  tone={missingCount > 0 ? "danger" : "muted"}
-                  active={stage === "place" && attn === "missing"}
-                  onClick={() => {
-                    setStage("place");
-                    setSelection(null);
-                    setSupplierFilter(null);
-                    setSelectedDay(null);
-                    setAttn((a) => (a === "missing" ? null : "missing"));
-                  }}
-                />
-              </FacetGroup>
-
-              {/* Today's work — the ①②③ stage jump (mirrors the KPI tabs) */}
-              <FacetGroup title="Today's work">
-                <FacetRow
-                  numbered="1"
-                  label="Send POs"
-                  count={placeCount}
-                  active={stage === "place"}
-                  onClick={() => goStage("place")}
-                />
-                <FacetRow
-                  numbered="2"
-                  label="Chase factory"
-                  count={chaseCount}
-                  tone={chaseCount > 0 ? "danger" : "muted"}
-                  active={stage === "chase"}
-                  onClick={() => goStage("chase")}
-                />
-                <FacetRow
-                  numbered="3"
-                  label="Receive"
-                  count={receiveCount}
-                  active={stage === "receive"}
-                  onClick={() => goStage("receive")}
-                />
-              </FacetGroup>
-
-              {/* By factory — units in the CURRENT stage; click filters the middle */}
-              <FacetGroup
-                title={
-                  stage === "place"
-                    ? "By factory · to send"
-                    : stage === "chase"
-                      ? "By factory · to chase"
-                      : "By factory · to receive"
-                }
+            <div className="flex flex-col gap-2 min-h-0 flex-1">
+              {/* + New PO — Gmail compose style (Jess 2026-07-23). Always
+                  visible at the top; opens CreatePOModal with EMPTY prefill
+                  so the operator can raise an ad-hoc PO (stockpile / runner /
+                  special order) not tied to a specific SO. Grey box (not
+                  flame — Send PO in the preview owns the ONE flame per page,
+                  UI-KIT §A5). */}
+              <button
+                type="button"
+                onClick={() => {
+                  posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
+                  setCreatePoPrefill({ lines: [] });
+                }}
+                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-[13px] font-semibold hover:bg-hovertint transition-colors"
               >
-                {byFactory.length === 0 ? (
-                  <EmptyFacetHint text="Nothing here" />
-                ) : (
-                  byFactory.map((f) => (
-                    <FacetRow
-                      key={f.id}
-                      label={f.name}
-                      count={f.units}
-                      unit="units"
-                      active={supplierFilter === f.id}
-                      onClick={() => toggleSupplier(f.id)}
-                    />
-                  ))
-                )}
-              </FacetGroup>
+                <span className="text-[16px] leading-none">+</span> New PO
+              </button>
+
+              <SectionCard>
+              {/* TODAY'S WORK — 3 stages with avatar chip left (Jess 2026-07-23
+                  v2 · rev 2): chip = who's on duty for that stage. Numbers
+                  1/2/3 removed (spine implied by top-to-bottom order + label).
+                  Attention counts inline (`⚠ N late`) next to Send POs when
+                  any PO is overdue. NEEDS ATTENTION section deleted; PROJECTS
+                  section deleted. */}
+              <SectionBand
+                title="Today's work"
+                strong
+                collapsed={collapsedFacet.has("today")}
+                onToggle={() => toggleFacet("today")}
+              />
+              {!collapsedFacet.has("today") && (
+                <div>
+                  <FacetRow
+                    leadingChip={poDutyChip}
+                    label="Send POs"
+                    count={placeCount}
+                    suffix={
+                      placeOverdue > 0 ? (
+                        <span className="text-danger font-semibold">
+                          ⚠ {placeOverdue} late
+                        </span>
+                      ) : undefined
+                    }
+                    active={stage === "place"}
+                    onClick={() => goStage("place")}
+                  />
+
+                  {/* Nested Send-POs tree — category-grouped POs (Jess
+                      2026-07-24 v2 rev 4). Only visible when Send POs is the
+                      active stage AND Today's Work isn't collapsed. Middle
+                      list panel deleted; clicking a PO here updates the
+                      preview column on the right. */}
+                  {stage === "place" && placeShown.length > 0 && (
+                    <div className="ml-3 pl-2 border-l border-base-200 my-1 space-y-1">
+                      {placesByCategory.map(([cat, groups]) => {
+                        const totalUnits = groups.reduce(
+                          (s, g) => s + g.totalUnits,
+                          0,
+                        );
+                        const anyLate = groups.some(
+                          (g) => g.urgency === "late",
+                        );
+                        const earliestIso = groups
+                          .map((g) => g.earliestOrderBy)
+                          .filter((d): d is string => Boolean(d))
+                          .sort()[0];
+                        return (
+                          <div key={cat}>
+                            {/* Category header — Jess 2026-07-24 top-to-toe §3:
+                                collapsed the old 2-row shape into ONE row.
+                                Left = CAT · N PO · N units (uppercase spine).
+                                Right = date + optional Late pill (normal case
+                                so the date reads naturally). Vertical space
+                                halved per category, ~24px saved per row × N
+                                categories = big scroll win once real data
+                                lands. */}
+                            <div className="flex items-baseline gap-1.5 py-1 pb-1 text-[11px] uppercase tracking-[0.05em] text-base-600">
+                              <span className="font-semibold">{cat}</span>
+                              <span className="tabular-nums font-normal text-base-500">
+                                · {groups.length} PO · {totalUnits} units
+                              </span>
+                              <span className="ml-auto flex items-center gap-1.5 tabular-nums font-normal text-base-500 normal-case">
+                                {earliestIso && <span>{fmtDate(earliestIso)}</span>}
+                                {anyLate && (
+                                  <span className="pill pill-overdue">Late</span>
+                                )}
+                              </span>
+                            </div>
+                            {groups.map((g) => {
+                              const isSel =
+                                selection?.kind === "place" &&
+                                selection.groupKey === g.groupKey;
+                              return (
+                                <button
+                                  key={g.groupKey}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelection(
+                                      isSel
+                                        ? null
+                                        : {
+                                            kind: "place",
+                                            groupKey: g.groupKey,
+                                          },
+                                    )
+                                  }
+                                  className={`w-full text-left rounded-md px-2 py-1 flex items-center gap-2 transition-colors ${
+                                    isSel
+                                      ? "is-selected"
+                                      : "hover:bg-hovertint"
+                                  }`}
+                                >
+                                  <span className="text-[12.5px] font-medium text-base-900 truncate">
+                                    {g.supplierName ?? "the factory"}
+                                  </span>
+                                  <span className="ml-auto shrink-0 text-[11px] tabular-nums text-base-500">
+                                    {g.totalUnits} units
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <FacetRow
+                    leadingChip={poDutyChip}
+                    label="Chase factory"
+                    count={chaseCount}
+                    tone={chaseCount > 0 ? "danger" : "muted"}
+                    active={stage === "chase"}
+                    onClick={() => goStage("chase")}
+                  />
+                  <FacetRow
+                    leadingChip={grnDutyChip}
+                    label="Receive"
+                    count={receiveCount}
+                    active={stage === "receive"}
+                    onClick={() => goStage("receive")}
+                  />
+                </div>
+              )}
+
+              {/* SUPPLIER (was BY FACTORY) — units in the current stage; click
+                  filters the middle list to that supplier. */}
+              <SectionBand
+                title="Supplier"
+                strong
+                collapsed={collapsedFacet.has("factory")}
+                onToggle={() => toggleFacet("factory")}
+              />
+              {!collapsedFacet.has("factory") && (
+                <div>
+                  {byFactory.length === 0 ? (
+                    <EmptyFacetHint text="Nothing here" />
+                  ) : (
+                    byFactory.map((f) => (
+                      <FacetRow
+                        key={f.id}
+                        label={f.name}
+                        count={f.units}
+                        unit="units"
+                        active={supplierFilter === f.id}
+                        onClick={() => toggleSupplier(f.id)}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+              </SectionCard>
             </div>
           }
         >
@@ -758,115 +965,159 @@ export default function OperationPurchase() {
               </div>
             )}
 
-            {/* ── Middle list + Detail pane (2-column split) ─────────────── */}
-            <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
-              {/* MIDDLE — the compact list */}
-              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
-                <MiddleListHeader
-                  stage={stage}
-                  shownCount={
-                    stage === "place"
-                      ? placeShown.length
-                      : stage === "chase"
-                        ? chaseShown.length
-                        : receiveShown.length
-                  }
-                  totalCount={
-                    stage === "place" ? placeCount : stage === "chase" ? chaseCount : receiveCount
-                  }
-                />
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  {isLoading ? (
-                    <PanelHint text="Loading today's plan…" />
-                  ) : stage === "place" ? (
-                    placeShown.length === 0 ? (
-                      <EmptyDone
-                        text="Nothing to send here"
-                        sub="Change or clear the filter to see other factories."
-                      />
-                    ) : (
-                      placeShown.map((g) => (
-                        <PlaceListRow
-                          key={g.groupKey}
-                          group={g}
-                          today={today}
-                          selected={
-                            selection?.kind === "place" &&
-                            selection.groupKey === g.groupKey
-                          }
-                          onSelect={() =>
-                            setSelection({ kind: "place", groupKey: g.groupKey })
-                          }
-                        />
-                      ))
-                    )
-                  ) : stage === "chase" ? (
-                    chaseShown.length === 0 ? (
-                      <EmptyDone
-                        text="Nothing to chase here"
-                        sub="No factory is past its promised ready date."
-                      />
-                    ) : (
-                      chaseShown.map((r) => (
-                        <ChaseListRow
-                          key={r.poId}
-                          row={r}
-                          supplierName={supplierName(r.supplierId)}
-                          selected={
-                            selection?.kind === "chase" && selection.poId === r.poId
-                          }
-                          onSelect={() => setSelection({ kind: "chase", poId: r.poId })}
-                        />
-                      ))
-                    )
-                  ) : receiveShown.length === 0 ? (
-                    <EmptyDone
-                      text="Nothing to receive here"
-                      sub="No factory has goods ready or arriving."
-                    />
-                  ) : (
-                    receiveShown.map((r) => (
-                      <ReceiveListRow
-                        key={r.poId}
-                        row={r}
-                        supplierName={supplierName(r.supplierId)}
-                        selected={selection?.kind === "receive" && selection.poId === r.poId}
-                        onSelect={() => setSelection({ kind: "receive", poId: r.poId })}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* DETAIL — the selected row's expanded view */}
-              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
-                {selectedPlace ? (
-                  <PlaceDetail
+            {/* ── Place stage · Jess 2026-07-24 (v2 rev4): the middle-panel
+                LIST is DELETED; POs are folded into the facet tree under
+                Send POs (category grouped). This body column now shows ONLY
+                the PREVIEW (PDF-style doc + SOs covered + WhatsApp draft +
+                Send flame). Chase / Receive keep the 2-column split for now
+                — their tree fold is a follow-up. */}
+            {stage === "place" ? (
+              <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden p-3 flex-1">
+                {isLoading ? (
+                  <PanelHint text="Loading today's plan…" />
+                ) : selectedPlace ? (
+                  <PoDocumentPreview
                     group={selectedPlace}
                     today={today}
+                    earliestCustomerDeadline={earliestCustomerDeadlineOfGroup(
+                      selectedPlace,
+                    )}
+                    preparedByName={dutyQ.data?.holder?.name ?? null}
+                    dutyHolderName={dutyQ.data?.holder?.name ?? null}
                     onSendPo={(prefill) => {
-                      posCountBeforeSend.current =
-                        posQ.data?.pos.length ?? 0;
+                      posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
                       setCreatePoPrefill(prefill);
                     }}
+                    buildPrefill={() => buildPlacePrefill(selectedPlace)}
+                    waTemplate={buildPlaceWaTemplate(
+                      selectedPlace,
+                      dutyQ.data?.holder?.name ?? null,
+                    )}
                   />
-                ) : selectedChase ? (
-                  <ChaseDetail
-                    row={selectedChase}
-                    supplierName={supplierName(selectedChase.supplierId)}
-                    supplier={supplierById.get(selectedChase.supplierId)}
-                  />
-                ) : selectedReceive ? (
-                  <ReceiveDetail
-                    row={selectedReceive}
-                    supplierName={supplierName(selectedReceive.supplierId)}
-                    onCheckIn={(poId) => setCheckInPoId(poId)}
+                ) : placeShown.length === 0 ? (
+                  <EmptyDone
+                    text="Nothing to send today"
+                    sub="Clear a filter or wait for the next SO to land."
                   />
                 ) : (
                   <DetailEmpty stage={stage} />
                 )}
               </div>
-            </div>
+            ) : (
+              <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
+                {/* MIDDLE — the compact list (Chase / Receive) */}
+                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
+                  <MiddleListHeader
+                    stage={stage}
+                    shownCount={
+                      stage === "chase" ? chaseShown.length : receiveShown.length
+                    }
+                    totalCount={stage === "chase" ? chaseCount : receiveCount}
+                  />
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    {isLoading ? (
+                      <PanelHint text="Loading today's plan…" />
+                    ) : stage === "chase" ? (
+                      chaseShown.length === 0 ? (
+                        <EmptyDone
+                          text="Nothing to chase here"
+                          sub="No factory is past its promised ready date."
+                        />
+                      ) : (
+                        chaseShown.map((r) => {
+                          const total = r.items.reduce(
+                            (s, it) => s + it.outstanding,
+                            0,
+                          );
+                          return (
+                            <PurchaseListRow
+                              key={r.poId}
+                              Icon={Factory}
+                              title={supplierName(r.supplierId)}
+                              subtitle={`${total} unit${total === 1 ? "" : "s"} still waiting`}
+                              dateIso={r.expectedReadyDate}
+                              dateLabel="promised"
+                              urgency={
+                                r.daysLate > 0
+                                  ? {
+                                      tone: "overdue",
+                                      Icon: AlertCircle,
+                                      label: `${r.daysLate}d late`,
+                                    }
+                                  : null
+                              }
+                              selected={
+                                selection?.kind === "chase" &&
+                                selection.poId === r.poId
+                              }
+                              onSelect={() =>
+                                setSelection({ kind: "chase", poId: r.poId })
+                              }
+                              testId={`chase-row-${r.poId}`}
+                            />
+                          );
+                        })
+                      )
+                    ) : receiveShown.length === 0 ? (
+                      <EmptyDone
+                        text="Nothing to receive here"
+                        sub="No factory has goods ready or arriving."
+                      />
+                    ) : (
+                      receiveShown.map((r) => {
+                        const total = r.items.reduce(
+                          (s, it) => s + it.outstanding,
+                          0,
+                        );
+                        const when = r.etaDate ?? r.expectedReadyDate;
+                        return (
+                          <PurchaseListRow
+                            key={r.poId}
+                            Icon={Truck}
+                            title={supplierName(r.supplierId)}
+                            subtitle={`${total} unit${total === 1 ? "" : "s"} to check in`}
+                            dateIso={when}
+                            dateLabel={r.etaDate ? "ETA" : "ready"}
+                            urgency={{
+                              tone: "sent",
+                              Icon: PackageCheck,
+                              label: `${total} to check in`,
+                            }}
+                            selected={
+                              selection?.kind === "receive" &&
+                              selection.poId === r.poId
+                            }
+                            onSelect={() =>
+                              setSelection({ kind: "receive", poId: r.poId })
+                            }
+                            testId={`receive-row-${r.poId}`}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* DETAIL — the selected Chase / Receive row */}
+                <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
+                  {selectedChase ? (
+                    <ChaseDetail
+                      row={selectedChase}
+                      supplierName={supplierName(selectedChase.supplierId)}
+                      supplier={supplierById.get(selectedChase.supplierId)}
+                    />
+                  ) : selectedReceive ? (
+                    <ReceiveDetail
+                      row={selectedReceive}
+                      supplierName={supplierName(selectedReceive.supplierId)}
+                      onCheckIn={(poId) => setCheckInPoId(poId)}
+                    />
+                  ) : (
+                    <DetailEmpty stage={stage} />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </ListPageShell>
       </div>
@@ -909,6 +1160,50 @@ export default function OperationPurchase() {
           />
         );
       })()}
+      <PurchaseSettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        dutyHolderName={dutyQ.data?.holder?.name ?? null}
+        dutyUntilLabel={
+          dutyQ.data?.month
+            ? (() => {
+                const y = Number(dutyQ.data.month.slice(0, 4));
+                const m = Number(dutyQ.data.month.slice(5, 7));
+                const eom = new Date(Date.UTC(y, m, 0));
+                const iso = eom.toISOString().slice(0, 10);
+                return fmtDateShort(iso);
+              })()
+            : null
+        }
+        rotationRows={(() => {
+          // PO + GRN rotation, offset-1 (Jess 2026-07-23): GRN = next month's
+          // PO holder. Roster from the po-duty API. Show up to 4 months so
+          // the operator sees the wheel turning.
+          const roster = dutyQ.data?.roster ?? [];
+          const cur = dutyQ.data?.month ?? "";
+          const sorted = [...roster].sort((a, b) => a.month.localeCompare(b.month));
+          const rows: {
+            month: string;
+            poHolderName: string | null;
+            grnHolderName: string | null;
+          }[] = [];
+          for (let i = 0; i < sorted.length; i++) {
+            const r = sorted[i]!;
+            // Only include the current month and forward.
+            if (cur && r.month < cur) continue;
+            const monthLabel = new Date(`${r.month}-01T00:00:00Z`)
+              .toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+            const grn = sorted[i + 1] ?? null;
+            rows.push({
+              month: monthLabel,
+              poHolderName: r.name ?? r.email ?? null,
+              grnHolderName: grn ? (grn.name ?? grn.email ?? null) : null,
+            });
+            if (rows.length >= 4) break;
+          }
+          return rows;
+        })()}
+      />
     </div>
   );
 }
@@ -976,14 +1271,9 @@ function MiddleListHeader({
       : `${shownCount} of ${totalCount}`;
   return (
     <div className="shrink-0 px-3 py-2 border-b border-base-200 bg-base-50 flex items-center justify-between">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="grid place-items-center w-5 h-5 rounded bg-base-900 text-white text-[11px] font-bold font-mono shrink-0">
-          {stage === "place" ? "1" : stage === "chase" ? "2" : "3"}
-        </span>
-        <span className="text-[13px] font-semibold text-base-900 truncate">
-          {title}
-        </span>
-      </div>
+      <span className="text-[13px] font-semibold text-base-900 truncate">
+        {title}
+      </span>
       <span className="text-[11px] font-semibold text-base-500 tabular-nums shrink-0">
         {badge}
       </span>
@@ -991,172 +1281,10 @@ function MiddleListHeader({
   );
 }
 
-function PlaceListRow({
-  group,
-  today,
-  selected,
-  onSelect,
-}: {
-  group: SplitPlaceGroup;
-  today: string | null;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const u = urgencyStyle(group.urgency);
-  const action = placeActionLine(group, today);
-  // Post-split each group has a single category — icon + tag reflect that.
-  // Only supplier with just one category to begin with (unsplit) still shows
-  // its single icon here.
-  const cat = group.categories[0];
-  const Icon = categoryIconOf(cat);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Icon size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
-          {group.supplierName}
-          {cat && (
-            <span className="ml-1 text-[11px] font-medium text-base-500">
-              · {cat}
-            </span>
-          )}
-        </span>
-        <span className={`pill ${u.cls} shrink-0 ml-auto`}>
-          <u.Icon />
-          {u.label}
-        </span>
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0 flex-wrap">
-        <span className="tabular-nums shrink-0">
-          {group.totalUnits} {group.totalUnits === 1 ? "unit" : "units"} · {group.orderCount}{" "}
-          {group.orderCount === 1 ? "SO" : "SOs"}
-        </span>
-        {group.earliestOrderBy && (
-          <span className="tabular-nums shrink-0 text-base-400">
-            · due {dayName(group.earliestOrderBy)} {dayLabelShort(group.earliestOrderBy)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
-    </button>
-  );
-}
-
-function ChaseListRow({
-  row,
-  supplierName,
-  selected,
-  onSelect,
-}: {
-  row: PurchaseChase;
-  supplierName: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const total = row.items.reduce((s, it) => s + it.outstanding, 0);
-  const action = chaseActionLine(row, supplierName);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Factory size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
-          {supplierName}
-        </span>
-        <span className="pill pill-overdue shrink-0 ml-auto">
-          <AlertCircle />
-          {row.daysLate}d late
-        </span>
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
-        <span className="tabular-nums shrink-0">
-          {total} {total === 1 ? "unit" : "units"} still waiting
-        </span>
-        {row.expectedReadyDate && (
-          <span className="tabular-nums shrink-0 text-base-400">
-            · promised {dayLabelShort(row.expectedReadyDate)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
-    </button>
-  );
-}
-
-function ReceiveListRow({
-  row,
-  supplierName,
-  selected,
-  onSelect,
-}: {
-  row: PurchaseReceive;
-  supplierName: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const total = row.items.reduce((s, it) => s + it.outstanding, 0);
-  const when = row.etaDate ?? row.expectedReadyDate;
-  const action = receiveActionLine(row, supplierName);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={[
-        "w-full text-left px-3 py-2 border-b border-base-100 transition-colors",
-        selected ? "bg-hovertint" : "hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Truck size={16} className="text-base-500 shrink-0" />
-        <span
-          className={`text-[13px] truncate ${
-            selected ? "font-bold text-base-900" : "font-semibold text-base-900"
-          }`}
-        >
-          {supplierName}
-        </span>
-        <span className="pill pill-sent shrink-0 ml-auto">
-          <PackageCheck />
-          {total} to check in
-        </span>
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-base-500 min-w-0">
-        {when && (
-          <span className="tabular-nums shrink-0">
-            {row.etaDate ? "ETA" : "ready"} {dayLabelShort(when)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-[12px] text-base-700 truncate">{action}</div>
-    </button>
-  );
-}
-
-// ── Detail pane — empty + per-stage variants ─────────────────────────────────
+// PlaceListRow deleted 2026-07-23 (v2 · Loo) — the expanding card + inline
+// per-SKU detail were folded into `<PurchaseListRow>` + `<PoDocumentPreview>`
+// master-detail. The Send PO button moved from the row footer to the preview
+// column's flame CTA. See the Place branch above for the current render.
 
 function DetailEmpty({ stage }: { stage: Stage }) {
   const hint =
@@ -1177,295 +1305,6 @@ function DetailEmpty({ stage }: { stage: Stage }) {
   );
 }
 
-// ── ① Send — Detail pane (3-row header · 7-col SKU table · WhatToDo · actions) ─
-
-const WRONG_OPTIONS = [
-  "Factory has no stock",
-  "Price changed",
-  "Customer cancelled",
-  "Ask manager",
-] as const;
-
-function PlaceDetail({
-  group,
-  today,
-  onSendPo,
-}: {
-  group: SplitPlaceGroup;
-  today: string | null;
-  onSendPo: (prefill: CreatePoPrefill) => void;
-}) {
-  const [wrongOpen, setWrongOpen] = useState(false);
-  const wrongRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setWrongOpen(false);
-  }, [group.supplierId]);
-
-  useEffect(() => {
-    if (!wrongOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrongRef.current && !wrongRef.current.contains(e.target as Node))
-        setWrongOpen(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [wrongOpen]);
-
-  const hasCost = group.lines.some((l) => l.cost != null && l.cost > 0);
-  const buyCost = group.lines.reduce((sum, l) => sum + (l.cost ?? 0) * l.need, 0);
-  // Post-split, categories[] is length-1 for split rows; the parent-cat title
-  // suffix (" · sofa") echoes the row's split label so the operator sees the
-  // detail is scoped to that category's PO.
-  const visibleCats = group.categories.slice(0, 2);
-  const catBreak = categoryBreakdown(group);
-  const catSuffix = group.splitCategory ? ` (${group.splitCategory})` : "";
-
-  const bySize = bySizeBreakdown(group.lines);
-  const sendByDays =
-    group.earliestOrderBy && today ? daysBetween(today, group.earliestOrderBy) : null;
-  const sendByTone =
-    group.urgency === "late" || sendByDays === 0 ? "text-danger" : "text-base-900";
-  const sendBySubtitle = (() => {
-    if (!group.earliestOrderBy) return "";
-    if (sendByDays == null) return "";
-    if (sendByDays < 0) return `(${Math.abs(sendByDays)}d late)`;
-    if (sendByDays === 0) return "(today)";
-    if (sendByDays === 1) return "(in 1 day)";
-    return `(in ${sendByDays} days)`;
-  })();
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      {/* header — 2 rows (Jess 2026-07-22 Q7): title + Send by inline,
-          then one dense line with total / by-size / category mix / destination. */}
-      <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
-        <div className="flex items-start justify-between gap-3 mb-1.5">
-          <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900 min-w-0">
-            <span className="flex items-center gap-0.5 shrink-0">
-              {visibleCats.map((cat) => {
-                const Icon = categoryIconOf(cat);
-                return <Icon key={cat} size={18} className="text-base-500" />;
-              })}
-            </span>
-            <span className="truncate">Send PO to {group.supplierName}{catSuffix}</span>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-base-500 leading-none">
-              Send by
-            </div>
-            <div className={`text-[14px] font-bold tabular-nums leading-tight ${sendByTone}`}>
-              {group.earliestOrderBy ? (
-                <>
-                  {fmtDate(group.earliestOrderBy)}{" "}
-                  <span className="text-base-500 font-medium">{sendBySubtitle}</span>
-                </>
-              ) : (
-                <span className="text-base-400">—</span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="text-[12px] text-base-800 flex items-center gap-1 flex-wrap">
-          <span className="font-bold tabular-nums">{group.totalUnits}</span>
-          <span>units · for</span>
-          <span className="font-bold tabular-nums">{group.orderCount}</span>
-          <span>{group.orderCount === 1 ? "SO" : "SOs"}</span>
-          {catBreak.length > 1 && (
-            <>
-              <span className="text-base-400">·</span>
-              {catBreak.map((b, i) => (
-                <span key={b.category}>
-                  {i > 0 && <span className="text-base-400"> · </span>}
-                  {b.category} <span className="font-bold tabular-nums">{b.units}</span>
-                </span>
-              ))}
-            </>
-          )}
-          {bySize.length > 0 && (
-            <>
-              <span className="text-base-400">·</span>
-              {bySize.map((s, i) => (
-                <span key={s.code}>
-                  {i > 0 && <span className="text-base-400"> · </span>}
-                  {s.label} <span className="font-bold tabular-nums">{s.qty}</span>
-                </span>
-              ))}
-            </>
-          )}
-          <span className="text-base-400">·</span>
-          <span>deliver to Klg</span>
-        </div>
-      </div>
-
-      {/* SKU table — 7 cols: SKU · MODEL · SIZE · QTY · IN STOCK · DEADLINE · ORDER */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div
-          className="grid gap-x-3 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 border-b border-base-100 sticky top-0 bg-white"
-          style={{
-            gridTemplateColumns:
-              "minmax(90px, 1.1fr) minmax(80px, 1fr) 40px 46px 60px minmax(80px, 1fr) minmax(70px, 1fr)",
-          }}
-        >
-          <span>SKU</span>
-          <span>Model</span>
-          <span className="text-right">Size</span>
-          <span className="text-right">Qty</span>
-          <span className="text-right">In stock</span>
-          <span>Deadline</span>
-          <span>Order</span>
-        </div>
-        {group.lines.map((l) => {
-          const size = parseSize(l.sku);
-          const deadline = earliestDeadline(l.forOrders);
-          const order = orderColText(l.forOrders);
-          return (
-            <div
-              key={l.sku}
-              className="grid gap-x-3 px-4 py-2 border-b border-base-100 items-center hover:bg-hovertint transition-colors"
-              style={{
-                gridTemplateColumns:
-                  "minmax(90px, 1.1fr) minmax(80px, 1fr) 40px 46px 60px minmax(80px, 1fr) minmax(70px, 1fr)",
-              }}
-            >
-              <span className="text-[12px] font-mono font-semibold text-base-900 truncate">
-                {l.sku}
-              </span>
-              <span className="text-[12px] text-base-700 truncate">
-                {l.modelName ?? "—"}
-              </span>
-              <span className="text-[12px] font-mono font-bold text-base-800 text-right">
-                {size?.code ?? "—"}
-              </span>
-              <span className="text-[13px] font-bold font-mono tabular-nums text-base-900 text-right">
-                {l.need}
-              </span>
-              <span className="text-[12px] font-mono tabular-nums text-right text-base-500">
-                {l.ready > 0 ? l.ready : "—"}
-              </span>
-              <span
-                className={`text-[12px] tabular-nums ${
-                  deadline && today && deadline < today
-                    ? "text-danger font-semibold"
-                    : "text-base-700"
-                }`}
-              >
-                {deadline
-                  ? `${dayName(deadline)} ${dayLabelShort(deadline)}`
-                  : <span className="text-base-400">—</span>}
-              </span>
-              <span className="text-[12px] font-mono text-base-700 truncate">
-                {order}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* What to do — inline horizontal (Jess 2026-07-22, saves vertical space) */}
-      <WhatToDo
-        steps={[
-          `WhatsApp ${group.supplierName}`,
-          "Paste SKU list above as PO",
-          "Click Send PO here to record",
-        ]}
-      />
-
-      {/* footer */}
-      <div className="shrink-0 border-t border-base-200 px-4 py-2.5 flex items-center justify-between gap-3 bg-base-50">
-        <div className="flex items-center gap-3 min-w-0">
-          {hasCost && (
-            <span className="text-[12px] text-base-500 whitespace-nowrap">
-              Buy cost{" "}
-              <span className="font-semibold text-base-800">
-                RM {buyCost.toLocaleString("en-MY", { maximumFractionDigits: 0 })}
-              </span>
-            </span>
-          )}
-          <div className="relative" ref={wrongRef}>
-            <Btn
-              variant="box"
-              size="sm"
-              onClick={() => setWrongOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={wrongOpen}
-            >
-              Something wrong?{" "}
-              <span className="text-base-400 font-normal">(soon)</span>
-            </Btn>
-            {wrongOpen && (
-              <div
-                role="menu"
-                className="absolute bottom-full left-0 mb-1.5 w-[260px] rounded-[12px] border border-base-200 bg-white shadow-lg py-1 z-10"
-              >
-                <div className="px-3 py-2 border-b border-base-100 text-[11px] text-base-500 leading-snug">
-                  Coming soon — the options here record intent but don&rsquo;t act yet.
-                </div>
-                {WRONG_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      /* TODO: escape-hatch — flag this factory order (later unit). */
-                      setWrongOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[13px] text-base-700 hover:bg-hovertint transition-colors"
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <Btn
-          variant="hero"
-          size="md"
-          icon={Send}
-          title={`Open the PO form to raise this order to ${group.supplierName}.`}
-          onClick={() => {
-            // Build CreatePOModal prefill from this cockpit plan. soRefs = the
-            // unique customer SOs feeding this group; lines = the planned SKUs
-            // with qty + any per-SO attrs (sofa fabric_id · bedframe
-            // color+gap). supplierId preselects the group. The modal handles
-            // cost / warehouse / ETA / cascade completion + fires
-            // useCreatePoMutation on submit.
-            const soRefs = Array.from(
-              new Set(
-                group.lines.flatMap((l) =>
-                  l.forOrders.map((o) => o.so).filter((n): n is number => n != null),
-                ),
-              ),
-            );
-            const lines = group.lines.map((l) => ({
-              sku: l.sku,
-              qty: l.need,
-              // Prefer the first SO's attrs (sofa fabric / bedframe color+gap)
-              // when the source SOs carry them; null = mattress or pre-cascade
-              // legacy — modal's cascade picker fills any gaps.
-              attrs:
-                (l.forOrders[0] as { attrs?: Record<string, unknown> | null } | undefined)
-                  ?.attrs ?? null,
-            }));
-            onSendPo({
-              supplierId: group.supplierId,
-              soRefs: soRefs.length > 0 ? soRefs : undefined,
-              lines,
-              note: `Auto-planned from cockpit · ${group.orderCount} SO${
-                group.orderCount === 1 ? "" : "s"
-              } · ${group.totalUnits} units${
-                group.splitCategory ? ` (${group.splitCategory})` : ""
-              }`,
-            });
-          }}
-        >
-          Send PO
-        </Btn>
-      </div>
-    </div>
-  );
-}
 
 // ── ② Chase — Detail pane ────────────────────────────────────────────────────
 
@@ -1714,51 +1553,26 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
   );
 }
 
-// ── Facet primitives (token-only, blue hover per UI-KIT hover law) ───────────
-
-function FacetGroup({
-  title,
-  danger,
-  children,
-}: {
-  title: string;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-1">
-      <div
-        className={`w-full flex items-center gap-1 rounded-md px-2 py-1.5 ${
-          danger ? "bg-error-soft" : "bg-base-100"
-        }`}
-      >
-        <span
-          className={`uppercase flex-1 text-left text-[11px] font-bold tracking-[0.04em] ${
-            danger ? "text-danger" : "text-base-900"
-          }`}
-        >
-          {title}
-        </span>
-      </div>
-      <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>
-    </div>
-  );
-}
 
 function FacetRow({
   label,
   count,
   tone = "default",
-  numbered,
+  leadingChip,
   unit,
+  suffix,
   active,
   onClick,
 }: {
   label: string;
   count: number;
   tone?: "default" | "danger" | "muted";
-  numbered?: string;
+  /** Optional avatar/status chip rendered BEFORE the label (Jess 2026-07-23:
+   *  duty owner chip on the Today's work stages — chip left, label right). */
+  leadingChip?: React.ReactNode;
   unit?: string;
+  /** Optional inline suffix (e.g. "⚠ N late") shown between label and count. */
+  suffix?: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
 }) {
@@ -1771,20 +1585,19 @@ function FacetRow({
         active ? "bg-hovertint" : "hover:bg-hovertint"
       }`}
     >
-      {numbered && (
-        <span className="grid place-items-center w-[18px] h-[18px] rounded bg-base-900 text-white text-[11px] font-bold font-mono shrink-0">
-          {numbered}
-        </span>
-      )}
+      {leadingChip}
       <span
-        className={`flex-1 min-w-0 truncate text-[13px] ${
+        className={`min-w-0 truncate text-[13px] ${
           active ? "text-base-900 font-semibold" : "text-base-700"
         }`}
       >
         {label}
       </span>
+      {suffix && (
+        <span className="text-[11px] shrink-0">{suffix}</span>
+      )}
       <span
-        className={`text-[12px] tabular-nums shrink-0 ${
+        className={`ml-auto text-[12px] tabular-nums shrink-0 ${
           tone === "danger"
             ? "text-danger font-bold"
             : tone === "muted"

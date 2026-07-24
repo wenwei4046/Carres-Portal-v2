@@ -102,6 +102,12 @@ export const purchasePlaceForOrderSchema = z.object({
   so: z.number().nullable(),
   customerName: z.string().nullable(),
   deliveryDate: z.string().nullable().optional(),
+  /** Customer-facing REF (LEAD token of `orders.source_ref[]`, e.g. "CR-2025-0812").
+   *  Suppliers recognise this REF, not the SO number, not the SKU code — the
+   *  Purchase Preview's ORDER column + the WhatsApp draft to the supplier both
+   *  key off it. Optional / nullable — an order created outside the AutoCount
+   *  import (no imported ref) carries null; UI falls back to SO-N in that case. */
+  ref: z.string().nullable().optional(),
 });
 export type PurchasePlaceForOrder = z.infer<typeof purchasePlaceForOrderSchema>;
 
@@ -393,6 +399,11 @@ export function buildPurchaseTodayReport(
   modelNameBySku:
     | ReadonlyMap<string, string | null>
     | Record<string, string | null> = {},
+  /** LEAD ref per orderId (`orders.source_ref[0]`), for the ORDER column +
+   *  WhatsApp draft. Optional — omit and every forOrder.ref is null. */
+  refByOrderId:
+    | ReadonlyMap<string, string | null>
+    | Record<string, string | null> = {},
 ): PurchaseTodayResponse {
   const soMap =
     soByOrderId instanceof Map
@@ -410,6 +421,10 @@ export function buildPurchaseTodayReport(
     modelNameBySku instanceof Map
       ? modelNameBySku
       : new Map(Object.entries(modelNameBySku));
+  const refMap =
+    refByOrderId instanceof Map
+      ? refByOrderId
+      : new Map(Object.entries(refByOrderId));
 
   const result = computeNetRequirements(demand, supply, options);
 
@@ -593,6 +608,7 @@ export function buildPurchaseTodayReport(
         so: b.so,
         customerName: b.customerName,
         deliveryDate: b.deadline,
+        ref: refMap.get(b.orderId) ?? null,
       });
       // The line's order-by = its MOST-URGENT order's raise-by (rank, then earliest).
       if (

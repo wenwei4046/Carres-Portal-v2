@@ -93,11 +93,13 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 
 ### 3.2 · Lead times (working days · editable per supplier eventually)
 
-- **Sofa:** 14 working days
-- **Bedframe:** 8 working days
-- **Mattress (Nice Future):** 10 working days (WILL STOP when subscription supplier lands)
+> **CORRECTED 2026-07-23 (Jess — supersedes the earlier 14/8/10).** Two numbers per category: an **official/safe** lead (drives raise-by = order early enough) and the shorter **actual/promise** lead (what we tell the customer).
+
+- **Mattress (Nice Future):** **5–7 working days** (WILL STOP when subscription supplier lands)
+- **Bedframe:** **5–7 working days** (same as mattress)
+- **Sofa:** **14 working days official · ~10 actual** (supplier currently sends in 10 → promise the shorter credible date, don't pad to 14)
 - **Peak OFF** — the engine NEVER auto-pads lead times for peak season. Human overrides only.
-- A lead-time settings table = migration 0243 (deferred; draft-first per §7 guardrail #8).
+- A lead-time settings table = migration 0243 (deferred; draft-first per §7 guardrail #8). Design = an **official + actual** two-column table, per category, room for per-supplier.
 
 ### 3.3 · Go-live rules (Jess 2026-07-21)
 

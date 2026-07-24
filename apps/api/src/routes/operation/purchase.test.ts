@@ -283,7 +283,9 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     expect(line.need).toBe(1);
     expect(line.cost).toBe(500);
     expect(line.ready).toBe(3); // advisory free stock (not netted)
-    expect(line.forOrders).toEqual([{ so: 1201, customerName: "陈先生" }]);
+    expect(line.forOrders).toEqual([
+      { so: 1201, customerName: "陈先生", deliveryDate: "2026-09-30", ref: null },
+    ]);
   });
 
   it("shapes ② chase + ③ receive from the OPEN POs (independent of demand)", async () => {
@@ -472,7 +474,7 @@ describe("buildPurchaseTodayReport — netting + urgency", () => {
     expect(g1.lines.find((l) => l.sku === "MAT-K")!.need).toBe(1);
     expect(g1.lines.find((l) => l.sku === "BF-K")!.need).toBe(2);
     expect(g1.lines.find((l) => l.sku === "MAT-K")!.forOrders).toEqual([
-      { so: 1301, customerName: "李四" },
+      { so: 1301, customerName: "李四", deliveryDate: "2026-08-10", ref: null },
     ]);
     const g2 = report.placeGroups.find((g) => g.supplierId === "sup-2")!;
     expect(g2.totalUnits).toBe(1);

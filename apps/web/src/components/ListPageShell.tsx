@@ -49,12 +49,15 @@ interface Props {
   /** Right-aligned cluster on the TITLE row (Jess 2026-07-19) — ambient status
    *  chips / announcements in the title row's dead space (no banner row). */
   titleRight?: ReactNode;
-  /** Facet-panel content (240px aside). Omit for a facet-less list. */
+  /** Facet-panel content (240px aside by default). Omit for a facet-less list. */
   facet?: ReactNode;
   /** Facet collapse state (owned by the page so it can persist). */
   facetOpen?: boolean;
   onFacetToggle?: () => void;
   facetToggleTitle?: string;
+  /** Optional facet aside width in px (default 240). Jess 2026-07-23:
+   *  Purchase v2 uses 320 to fit the nested Send POs → category → PO tree. */
+  facetWidthPx?: number;
   /** Control-bar content beside the facet toggle — typically the status tabs. */
   toolbar?: ReactNode;
   /** Right-aligned content on the SAME row as the tabs — typically search + the
@@ -86,6 +89,7 @@ export default function ListPageShell({
   facetOpen = true,
   onFacetToggle,
   facetToggleTitle,
+  facetWidthPx,
   toolbar,
   toolbarRight,
   toolbarSecondary,
@@ -143,7 +147,12 @@ export default function ListPageShell({
       <div className="flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5">
         {hasFacet && facetOpen && (
           <aside
-            className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
+            style={
+              facetWidthPx ? { width: `${facetWidthPx}px` } : undefined
+            }
+            className={`${
+              facetWidthPx ? "" : "w-[240px]"
+            } shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2`}
             data-testid="listshell-facet"
           >
             {facet}
