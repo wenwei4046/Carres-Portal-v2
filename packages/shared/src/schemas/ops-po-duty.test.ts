@@ -12,8 +12,10 @@ import { isOpsManager } from "./ops-order-control";
 
 // Fixed instants (UTC) with known MYT (+8) counterparts.
 const MON_MYT = new Date("2026-07-20T01:00:00Z"); // Mon 09:00 MYT
-const THU_MYT = new Date("2026-07-23T01:00:00Z"); // Thu 09:00 MYT
+const WED_MYT = new Date("2026-07-22T01:00:00Z"); // Wed 09:00 MYT
+const FRI_MYT = new Date("2026-07-24T01:00:00Z"); // Fri 09:00 MYT
 const TUE_MYT = new Date("2026-07-21T01:00:00Z"); // Tue 09:00 MYT
+const THU_MYT = new Date("2026-07-23T01:00:00Z"); // Thu 09:00 MYT — no longer a PO day
 // 23:00 MYT Sun = 15:00Z Sun — crosses the UTC/MYT date boundary going in.
 const SUN_LATE_MYT = new Date("2026-07-19T15:00:00Z");
 // 07:00 MYT on Aug 1 = 23:00Z Jul 31 — month boundary case.
@@ -27,12 +29,14 @@ describe("monthKeyMYT", () => {
 });
 
 describe("isPoDayMYT", () => {
-  it("Mon + Thu MYT are PO days", () => {
+  it("Mon + Wed + Fri MYT are PO days", () => {
     expect(isPoDayMYT(MON_MYT)).toBe(true);
-    expect(isPoDayMYT(THU_MYT)).toBe(true);
+    expect(isPoDayMYT(WED_MYT)).toBe(true);
+    expect(isPoDayMYT(FRI_MYT)).toBe(true);
   });
   it("other days are not — and the MYT shift decides the weekday", () => {
     expect(isPoDayMYT(TUE_MYT)).toBe(false);
+    expect(isPoDayMYT(THU_MYT)).toBe(false); // Thu is no longer a PO day (Jess 2026-07-24)
     expect(isPoDayMYT(SUN_LATE_MYT)).toBe(false); // Sun 23:00 MYT (Sun 15:00Z)
   });
 });
@@ -40,10 +44,12 @@ describe("isPoDayMYT", () => {
 describe("nextPoDayMYT", () => {
   it("today when today is a PO day (MYT)", () => {
     expect(nextPoDayMYT(MON_MYT)).toBe("2026-07-20");
-    expect(nextPoDayMYT(THU_MYT)).toBe("2026-07-23");
+    expect(nextPoDayMYT(WED_MYT)).toBe("2026-07-22");
+    expect(nextPoDayMYT(FRI_MYT)).toBe("2026-07-24");
   });
-  it("rolls forward to the next Mon/Thu otherwise", () => {
-    expect(nextPoDayMYT(TUE_MYT)).toBe("2026-07-23"); // Tue → Thu
+  it("rolls forward to the next Mon/Wed/Fri otherwise", () => {
+    expect(nextPoDayMYT(TUE_MYT)).toBe("2026-07-22"); // Tue → Wed
+    expect(nextPoDayMYT(THU_MYT)).toBe("2026-07-24"); // Thu → Fri
     expect(nextPoDayMYT(SUN_LATE_MYT)).toBe("2026-07-20"); // Sun 23:00 MYT → Mon
   });
 });

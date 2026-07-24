@@ -1,0 +1,32 @@
+-- 0243_ops_po_duty_reseed_aug.sql
+--
+-- Jess correction 2026-07-24 afternoon: migration 0236 seeded Aug 2026 with
+-- `liching@carres.com`, but "Li Ching" DOES NOT EXIST — the name was in a
+-- stale roster memory that Jess never confirmed. The correct Aug 2026 PO
+-- duty holder is Yu Jun (YJ · joined 2026-07-20). See architecture §3.16
+-- and memory `project-team-roster-2026-07-24.md`.
+--
+-- Rotation loop (LOCKED Jess 2026-07-24):
+--   Jul  PO=Shasha  GRN=Yu Jun    (offset-1) — 0236 already correct for PO
+--   Aug  PO=Yu Jun  GRN=Khor Yee  — THIS MIGRATION corrects the PO row
+--   Sep  PO=Khor Yee GRN=Shasha   (loop) — 0236 already correct for PO
+--
+-- Approach: DELETE the stale Aug row (whether 0236 actually inserted it or
+-- the join to `app_users.email = 'liching@carres.com'` returned no rows and
+-- silently skipped it — the delete is a no-op either way). Do NOT re-insert
+-- here: the shared login `operation@carresofficial.com` means per-user
+-- `app_users` rows for individual operators may not exist yet, and hard-
+-- coding an email like `yujun@carres.com` would silently skip the join too.
+-- Admin sets Aug via the Purchase Settings sheet (or a follow-up migration)
+-- once the identity model is finalised — see architecture §3.16 flag on
+-- `ops_po_duty.user_id` referencing `app_users.id` vs. `salespersons.id`.
+--
+-- The GRN duty rotation (Jul=Yu Jun · Aug=Khor Yee · Sep=Shasha, offset-1
+-- from PO) is NOT yet in a table — a follow-up migration will add
+-- `ops_grn_duty` mirroring this shape. Not in this migration to keep the
+-- fix scope minimal.
+--
+-- Additive · idempotent · safe to re-run · no RLS change.
+
+delete from public.ops_po_duty
+where month = '2026-08';

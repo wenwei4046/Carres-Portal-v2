@@ -6,13 +6,14 @@ import { z } from "zod";
  * Procurement policy: 人分单,货合买 — every PIC owns their customers, but
  * purchase orders are consolidated COMPANY-WIDE and controlled by ONE person
  * per calendar month, auto-rotating through the assignment pool
- * (Jul Shasha → Aug Li Ching → Sep Khor Yee → …). Management (isOpsManager)
+ * (Jul Shasha → Aug Yu Jun → Sep Khor Yee → …). Management (isOpsManager)
  * can always raise POs and can override the month's holder.
  *
- * Cadence: PO days are Monday + Thursday (MYT). The daily cron drops a
- * reminder task on the duty holder each PO-day morning. URGENT BYPASS: any
- * order whose deadline falls inside the stock lead window (MS/BF 7d, sofa 5d)
- * flags red on ANY day and must not wait for PO day.
+ * Cadence: PO days are Monday, Wednesday, Friday (MYT · Jess 2026-07-24
+ * correction — was Mon+Thu before). The daily cron drops a reminder task on
+ * the duty holder each PO-day morning. URGENT BYPASS: any order whose
+ * deadline falls inside the stock lead window (MS/BF 7d, sofa 5d) flags red
+ * on ANY day and must not wait for PO day.
  */
 
 /** Month key in MYT (UTC+8, no DST): '2026-07'. The duty calendar is a
@@ -24,8 +25,9 @@ export function monthKeyMYT(now: Date = new Date()): string {
   return `${y}-${m}`;
 }
 
-/** PO days (MYT weekday): Monday + Thursday — the Mon/Thu batching cadence. */
-export const PO_DUTY_DAYS_MYT: readonly number[] = [1, 4]; // getUTCDay() on MYT-shifted date
+/** PO days (MYT weekday): Monday + Wednesday + Friday — the Mon/Wed/Fri
+ *  batching cadence (Jess 2026-07-24 correction, was Mon+Thu = [1, 4] before). */
+export const PO_DUTY_DAYS_MYT: readonly number[] = [1, 3, 5]; // getUTCDay() on MYT-shifted date
 export function isPoDayMYT(now: Date = new Date()): boolean {
   const myt = new Date(now.getTime() + 8 * 3_600_000);
   return PO_DUTY_DAYS_MYT.includes(myt.getUTCDay());
