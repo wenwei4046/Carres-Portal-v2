@@ -1,17 +1,28 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  assignDealerBdInput,
+  computeBdCommission,
+  setBdMethodInput,
+  setBdPositionInput,
   computeCommission,
   hrAssignSalespersonInput,
   hrReportQuerySchema,
+  setBdRateInput,
   setCommissionSchemeInput,
   setMilestonesInput,
   setModelRateInput,
   setModelTiersInput,
   setStaffRateInput,
+  type BdDealer,
+  type BdDealerLine,
+  type BdRateRow,
+  type BdUser,
+  type CommissionMethod,
   type CommissionConfig,
   type CommissionLine,
   type CommissionStaff,
+  type DealerOrderAgg,
 } from "@carres/shared";
 import { requireHr } from "../lib/auth-guards";
 import { userClient } from "../lib/supabase";
@@ -34,7 +45,13 @@ interface HrSource {
   models: { id: string; name: string; category: string }[];
   lines: CommissionLine[];
   unattributed: unknown[];
-  config: CommissionConfig;
+  // 0250/0251 — BD commission
+  bdUsers?: BdUser[];
+  bdMethod?: CommissionMethod;
+  dealers?: BdDealer[];
+  dealerOrders?: DealerOrderAgg[];
+  dealerLines?: BdDealerLine[];
+  config: CommissionConfig & { bdRates?: BdRateRow[] };
 }
 
 /** GET /api/hr/report?year=2026&month=7 — the computed month report. */
@@ -59,16 +76,118 @@ hrRouter.get("/report", requireHr, async (c) => {
 
   const source = data as unknown as HrSource;
   const report = computeCommission(source.staff, source.lines, source.config);
+  const bdReport = computeBdCommission({
+    users: source.bdUsers ?? [],
+    dealers: source.dealers ?? [],
+    orders: source.dealerOrders ?? [],
+    rates: source.config.bdRates ?? [],
+    method: source.bdMethod,
+    dealerLines: source.dealerLines,
+    modelRates: source.config.modelRates,
+    modelTiers: source.config.modelTiers,
+    milestones: source.config.milestones,
+  });
 
   return c.json({
     year,
     month,
     report,
+    bdReport,
+    bdMethod: source.bdMethod ?? "percentage",
     unattributed: source.unattributed,
     staff: source.staff,
     models: source.models,
+    bdUsers: source.bdUsers ?? [],
+    dealers: source.dealers ?? [],
     config: source.config,
   });
+});
+
+/** POST /api/hr/config/bd-rate — append an effective-dated BD rate row. */
+hrRouter.post("/config/bd-rate", requireHr, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = setBdRateInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+  const { userId, pct, effectiveFrom } = parsed.data;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from("bd_commission_rates").upsert(
+    {
+      user_id: userId,
+      pct,
+      effective_from: effectiveFrom ?? new Date().toISOString().slice(0, 10),
+      updated_by: c.var.auth.id,
+    },
+    { onConflict: "user_id,effective_from" },
+  );
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true });
+});
+
+/** POST /api/hr/config/bd-method — the ONE global BD method switch (0251). */
+hrRouter.post("/config/bd-method", requireHr, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = setBdMethodInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from("bd_commission_config").upsert(
+    { id: true, method: parsed.data.method, updated_by: c.var.auth.id },
+    { onConflict: "id" },
+  );
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true });
+});
+
+/** POST /api/hr/config/bd-position — BD Executive | CBO per BD user (0251). */
+hrRouter.post("/config/bd-position", requireHr, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = setBdPositionInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from("bd_profiles").upsert(
+    { user_id: parsed.data.userId, position: parsed.data.position, updated_by: c.var.auth.id },
+    { onConflict: "user_id" },
+  );
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true });
+});
+
+/**
+ * POST /api/hr/assign-dealer-bd — set/clear a dealer's BD owner. Portfolio
+ * assignment drives money — the audited RPC, never a raw dealers update.
+ */
+hrRouter.post("/assign-dealer-bd", requireHr, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = assignDealerBdInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("hr_assign_dealer_bd", {
+    p_dealer_id: parsed.data.dealerId,
+    p_user_id: parsed.data.userId,
+  });
+  if (error) {
+    if (error.code === "42501") throw new HTTPException(403, { message: "forbidden" });
+    if (error.message.includes("dealer_not_found")) {
+      throw new HTTPException(404, { message: "dealer not found" });
+    }
+    if (error.message.includes("not_a_dealer")) {
+      throw new HTTPException(422, { message: "showrooms have no BD owner" });
+    }
+    if (error.message.includes("bd_user_mismatch")) {
+      throw new HTTPException(422, { message: "target user is not a BD account" });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+  return c.json({ ok: true });
 });
 
 /** POST /api/hr/config/scheme — set the method for a store / one outlet. */
@@ -128,15 +247,25 @@ hrRouter.post("/config/model-rate", requireHr, async (c) => {
     throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
   }
   const { modelId, perUnitAmount } = parsed.data;
+  const program = parsed.data.program ?? "staff";
 
   const sb = userClient(c.env, c.var.auth.jwt);
   if (perUnitAmount === null) {
-    const { error } = await sb.from("model_commission_rates").delete().eq("model_id", modelId);
+    const { error } = await sb
+      .from("model_commission_rates")
+      .delete()
+      .eq("model_id", modelId)
+      .eq("program", program);
     if (error) throw new HTTPException(500, { message: error.message });
   } else {
     const { error } = await sb.from("model_commission_rates").upsert(
-      { model_id: modelId, per_unit_amount: perUnitAmount, updated_by: c.var.auth.id },
-      { onConflict: "model_id" },
+      {
+        model_id: modelId,
+        program,
+        per_unit_amount: perUnitAmount,
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "model_id,program" },
     );
     if (error) throw new HTTPException(500, { message: error.message });
   }
@@ -151,14 +280,20 @@ hrRouter.post("/config/model-tiers", requireHr, async (c) => {
     throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
   }
   const { modelId, tiers } = parsed.data;
+  const program = parsed.data.program ?? "staff";
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { error: delErr } = await sb.from("model_commission_tiers").delete().eq("model_id", modelId);
+  const { error: delErr } = await sb
+    .from("model_commission_tiers")
+    .delete()
+    .eq("model_id", modelId)
+    .eq("program", program);
   if (delErr) throw new HTTPException(500, { message: delErr.message });
   if (tiers.length > 0) {
     const { error } = await sb.from("model_commission_tiers").insert(
       tiers.map((t) => ({
         model_id: modelId,
+        program,
         threshold_qty: t.thresholdQty,
         bonus_amount: t.bonusAmount,
       })),
@@ -176,17 +311,19 @@ hrRouter.post("/config/milestones", requireHr, async (c) => {
     throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
   }
   const { milestones } = parsed.data;
+  const program = parsed.data.program ?? "staff";
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error: delErr } = await sb
     .from("commission_milestones")
     .delete()
-    .gte("threshold_qty", 0); // delete-all needs a filter under PostgREST
+    .eq("program", program); // replace is scoped to ONE program's list
   if (delErr) throw new HTTPException(500, { message: delErr.message });
   if (milestones.length > 0) {
     const { error } = await sb.from("commission_milestones").insert(
       milestones.map((m) => ({
         category: m.category,
+        program,
         threshold_qty: m.thresholdQty,
         bonus_amount: m.bonusAmount,
       })),

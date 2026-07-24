@@ -396,3 +396,177 @@ describe("computeCommission — mixed / edge cases", () => {
     expect(r.directCommission).toBe(33.3); // 33.299667 -> 33.30
   });
 });
+
+// ── 0250 — BD commission ─────────────────────────────────────────────────────
+import {
+  computeBdCommission,
+  type BdDealer,
+  type BdUser,
+  type DealerOrderAgg,
+} from "./commission";
+
+describe("computeBdCommission", () => {
+  const herng: BdUser = { id: "bd-1", name: "Herng", email: "hugo@carres.com" };
+  const hq: BdUser = { id: "bd-2", name: "BD HQ", email: "bd@carres.com" };
+  const dealers: BdDealer[] = [
+    { id: "dl-1", name: "Litte Mattress", bdOwnerUserId: "bd-1" },
+    { id: "dl-2", name: "Другой Store", bdOwnerUserId: "bd-1" },
+    { id: "dl-3", name: "Orphan Dealer", bdOwnerUserId: null },
+  ];
+  const rates = [{ userId: "bd-1", pct: 2, effectiveFrom: "2026-01-01" }];
+  const order = (o: Partial<DealerOrderAgg>): DealerOrderAgg => ({
+    orderId: "o1",
+    so: 1001,
+    placedAt: "2026-07-10T00:00:00Z",
+    dealerId: "dl-1",
+    amount: 10000,
+    ...o,
+  });
+
+  it("pays pct of owned dealers' monthly sales, grouped by dealer", () => {
+    const r = computeBdCommission({
+      users: [herng, hq],
+      dealers,
+      orders: [
+        order({ orderId: "a", dealerId: "dl-1", amount: 10000 }),
+        order({ orderId: "b", dealerId: "dl-2", amount: 5000 }),
+      ],
+      rates,
+    });
+    const h = r.perBd.find((x) => x.user.id === "bd-1")!;
+    expect(h.basis).toBe(15000);
+    expect(h.commission).toBe(300); // 2%
+    expect(h.dealerCount).toBe(2);
+    expect(h.portfolio).toHaveLength(2);
+    expect(h.portfolio[0].amount).toBe(10000);
+    const other = r.perBd.find((x) => x.user.id === "bd-2")!;
+    expect(other.commission).toBe(0);
+    expect(r.totalCommission).toBe(300);
+  });
+
+  it("an unassigned dealer's sales pay nobody and the dealer is surfaced", () => {
+    const r = computeBdCommission({
+      users: [herng],
+      dealers,
+      orders: [order({ dealerId: "dl-3", amount: 9999 })],
+      rates,
+    });
+    expect(r.totalCommission).toBe(0);
+    expect(r.unassignedDealers.map((d) => d.id)).toEqual(["dl-3"]);
+  });
+
+  it("rate is picked as-of each order's date (effective-dated)", () => {
+    const r = computeBdCommission({
+      users: [herng],
+      dealers,
+      orders: [
+        order({ orderId: "a", placedAt: "2026-07-05T00:00:00Z", amount: 1000 }),
+        order({ orderId: "b", placedAt: "2026-07-20T00:00:00Z", amount: 1000 }),
+      ],
+      rates: [
+        { userId: "bd-1", pct: 2, effectiveFrom: "2026-01-01" },
+        { userId: "bd-1", pct: 4, effectiveFrom: "2026-07-15" },
+      ],
+    });
+    const h = r.perBd.find((x) => x.user.id === "bd-1")!;
+    expect(h.commission).toBe(60); // 20 + 40
+    expect(h.pctUsed).toBe(4);
+  });
+
+  it("no rate row -> RM0 (dormant)", () => {
+    const r = computeBdCommission({ users: [herng], dealers, orders: [order({})], rates: [] });
+    expect(r.totalCommission).toBe(0);
+    expect(r.perBd[0].basis).toBe(10000); // basis still visible
+  });
+});
+
+describe("computeBdCommission v2 — positions + item KPI (0251)", () => {
+  const exec: BdUser = { id: "bd-e", name: "Exec", email: "e@c.com", position: "executive" };
+  const cbo: BdUser = { id: "bd-c", name: "CBO", email: "c@c.com", position: "cbo" };
+  const dealers: BdDealer[] = [
+    { id: "dl-1", name: "Dealer One", bdOwnerUserId: "bd-e" },
+    { id: "dl-2", name: "CBO Own Store", bdOwnerUserId: "bd-c" },
+  ];
+  const rates = [
+    { userId: "bd-e", pct: 2, effectiveFrom: "2026-01-01" },
+    { userId: "bd-c", pct: 3, effectiveFrom: "2026-01-01" },
+  ];
+  const order = (o: Partial<DealerOrderAgg>): DealerOrderAgg => ({
+    orderId: "o1", so: 1001, placedAt: "2026-07-10T00:00:00Z",
+    dealerId: "dl-1", amount: 10000, ...o,
+  });
+
+  it("CBO earns the rate difference on an executive's dealer sales; own dealers at own rate", () => {
+    const r = computeBdCommission({
+      users: [exec, cbo],
+      dealers,
+      orders: [
+        order({ orderId: "a", dealerId: "dl-1", amount: 10000 }),
+        order({ orderId: "b", dealerId: "dl-2", amount: 4000 }),
+      ],
+      rates,
+    });
+    const e = r.perBd.find((x) => x.user.id === "bd-e")!;
+    const c = r.perBd.find((x) => x.user.id === "bd-c")!;
+    expect(e.directCommission).toBe(200); // 2% of 10000
+    expect(c.directCommission).toBe(120); // 3% of own 4000
+    expect(c.overrideCommission).toBe(100); // 1% diff on exec's 10000
+    expect(c.overrideDetail[0].fromStaffName).toBe("Exec");
+    expect(c.commission).toBe(220);
+    // no override chain onto the CBO's own dealer sales
+    expect(e.overrideCommission).toBe(0);
+  });
+
+  it("per_model (item KPI): per-unit + tier + milestone from program='bd' rows only", () => {
+    const dealerLines = [
+      {
+        orderId: "a", so: 1001, placedAt: "2026-07-10T00:00:00Z", dealerId: "dl-1",
+        modelId: "m-a", modelName: "Model A", category: "mattress", qty: 12, unitPrice: 1000,
+      },
+    ];
+    const r = computeBdCommission({
+      users: [exec],
+      dealers,
+      orders: [],
+      rates,
+      method: "per_model",
+      dealerLines,
+      modelRates: [
+        { modelId: "m-a", perUnitAmount: 50, program: "bd" },
+        { modelId: "m-a", perUnitAmount: 999, program: "staff" }, // staff row ignored
+      ],
+      modelTiers: [
+        { modelId: "m-a", thresholdQty: 10, bonusAmount: 100, program: "bd" },
+      ],
+      milestones: [
+        { category: "mattress", thresholdQty: 10, bonusAmount: 500, program: "bd" },
+        { category: "mattress", thresholdQty: 10, bonusAmount: 9999, program: "staff" },
+      ],
+    });
+    const e = r.perBd.find((x) => x.user.id === "bd-e")!;
+    expect(e.perModelCommission).toBe(700); // 12×50 + 100 tier
+    expect(e.milestoneCommission).toBe(500);
+    expect(e.directCommission).toBe(0); // no percentage under per_model
+    expect(e.commission).toBe(1200);
+    expect(r.method).toBe("per_model");
+  });
+
+  it("staff engine ignores program='bd' per-model rows", () => {
+    const staffKaan: CommissionStaff = {
+      id: "sp-1", name: "K", staffRole: "salesperson", active: true,
+      dealerId: "d1", outletId: null,
+    };
+    const report = computeCommission(
+      [staffKaan],
+      [line({ salespersonId: "sp-1", dealerId: "d1", outletId: null, qty: 5 })],
+      {
+        schemes: [{ dealerId: "d1", outletId: null, method: "per_model" }],
+        rates: [],
+        modelRates: [{ modelId: "model-a", perUnitAmount: 77, program: "bd" }],
+        modelTiers: [],
+        milestones: [],
+      },
+    );
+    expect(report.perStaff[0].perModelCommission).toBe(0);
+  });
+});

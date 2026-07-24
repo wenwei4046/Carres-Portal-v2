@@ -180,6 +180,17 @@ import {
   type SetModelTiersInput,
   type SetMilestonesInput,
   type HrAssignSalespersonInput,
+  // 0250 — BD commission (paid by what their assigned dealers sell).
+  type BdCommissionReport,
+  type BdUser,
+  type BdDealer,
+  type BdRateRow,
+  type SetBdRateInput,
+  type AssignDealerBdInput,
+  // 0251 — BD method switch (percentage | per_model) + executive/CBO positions.
+  type CommissionMethod,
+  type SetBdMethodInput,
+  type SetBdPositionInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -6768,7 +6779,8 @@ export function useAddAnnotation() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 0244/0245 — HR commission portal (2026-07-25). One report read + six writes.
+// 0244/0245 — HR commission portal (2026-07-25). One report read + eight writes
+// (0250 adds the BD-rate + dealer-portfolio pair).
 // All writes invalidate the whole ["hr"] sub-tree: every month report embeds
 // the live config + unattributed worklist, so any config/assign change must
 // re-derive whichever month is on screen.
@@ -6797,10 +6809,18 @@ export interface HrReportResponse {
   year: number;
   month: number;
   report: CommissionReport;
+  /** 0250 — BD commission: a BD earns a % of what their assigned dealers sell. */
+  bdReport: BdCommissionReport;
+  /** 0251 — the ONE global BD calculation method (absent config = percentage). */
+  bdMethod: CommissionMethod;
   unattributed: HrUnattributedOrder[];
   staff: CommissionStaff[];
   models: HrModelOption[];
-  config: CommissionConfig;
+  /** BD accounts (app_users role='bd') — the setup rate rows + owner selects. */
+  bdUsers: BdUser[];
+  /** Dealer-channel stores only, each carrying its current BD owner (or null). */
+  dealers: BdDealer[];
+  config: CommissionConfig & { bdRates?: BdRateRow[] };
 }
 
 export function useHrReport(
@@ -6894,6 +6914,59 @@ export function useHrAssignSalesperson() {
   return useMutation<{ ok: true }, ApiError, HrAssignSalespersonInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true }>("/api/hr/assign", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0250 — append an effective-dated BD % rate row. */
+export function useHrSetBdRate() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetBdRateInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/bd-rate", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0251 — flip the ONE global BD calculation method (percentage | per_model). */
+export function useHrSetBdMethod() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetBdMethodInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/bd-method", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0251 — set a BD user's position (executive | cbo). CBO earns the rate
+ *  difference as override on BD Executives' dealer sales. */
+export function useHrSetBdPosition() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetBdPositionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/bd-position", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0250 — set/clear a dealer's BD owner (userId null clears; audited RPC). */
+export function useHrAssignDealerBd() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, AssignDealerBdInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/assign-dealer-bd", {
         method: "POST",
         body: JSON.stringify(input),
       }),

@@ -65,15 +65,21 @@ export interface StaffRateRow {
   effectiveFrom: string; // ISO date
 }
 
+/** 0251 — per-model config rows carry a program: 'staff' (showroom) | 'bd'.
+ *  Absent = 'staff' (pre-0251 shape). */
+export type CommissionProgram = "staff" | "bd";
+
 export interface ModelRateRow {
   modelId: string;
   perUnitAmount: number;
+  program?: CommissionProgram;
 }
 
 export interface ModelTierRow {
   modelId: string;
   thresholdQty: number;
   bonusAmount: number;
+  program?: CommissionProgram;
 }
 
 export interface MilestoneRow {
@@ -81,7 +87,11 @@ export interface MilestoneRow {
   category: string | null; // null = all item categories count
   thresholdQty: number;
   bonusAmount: number;
+  program?: CommissionProgram;
 }
+
+export const rowProgram = (r: { program?: CommissionProgram }): CommissionProgram =>
+  r.program ?? "staff";
 
 export interface CommissionConfig {
   schemes: CommissionSchemeRow[];
@@ -176,8 +186,16 @@ export function resolveRate(
 export function computeCommission(
   staff: CommissionStaff[],
   lines: CommissionLine[],
-  config: CommissionConfig,
+  rawConfig: CommissionConfig,
 ): CommissionReport {
+  // 0251 — the config tables now serve both programs; staff math only ever
+  // sees the 'staff' rows (absent program = pre-0251 row = staff).
+  const config: CommissionConfig = {
+    ...rawConfig,
+    modelRates: rawConfig.modelRates.filter((r) => rowProgram(r) === "staff"),
+    modelTiers: rawConfig.modelTiers.filter((r) => rowProgram(r) === "staff"),
+    milestones: rawConfig.milestones.filter((r) => rowProgram(r) === "staff"),
+  };
   const staffById = new Map(staff.map((s) => [s.id, s]));
 
   interface Acc {
@@ -383,5 +401,351 @@ export function computeCommission(
     perStaff,
     totalCommission: round2(perStaff.reduce((s, r) => s + r.total, 0)),
     totalBasis: round2(perStaff.reduce((s, r) => s + r.basis, 0)),
+  };
+}
+
+// ── 0250 — BD commission: paid by what their dealers sell ────────────────────
+// A BD (app_users role='bd') owns dealer-channel stores via
+// dealers.bd_owner_user_id and earns an effective-dated pct of each owned
+// store's monthly pure item revenue. The dealer is the earning unit — no
+// per-salesperson attribution involved. Unassigned dealers earn nobody
+// anything (surfaced by the report so HR can see the gap).
+
+/** 0251 — two BD positions: the CBO earns the rate difference as override on
+ *  BD Executives' dealer sales (mirror of the Sales Manager rule). */
+export type BdPosition = "executive" | "cbo";
+
+export interface BdUser {
+  id: string;
+  name: string;
+  email: string;
+  position?: BdPosition; // absent = executive
+}
+
+/** One dealer-channel order LINE of the month (BD item-KPI method). */
+export interface BdDealerLine {
+  orderId: string;
+  so: number;
+  placedAt: string;
+  dealerId: string;
+  modelId: string | null;
+  modelName: string | null;
+  category: string | null;
+  qty: number;
+  unitPrice: number;
+}
+
+export interface BdDealer {
+  id: string;
+  name: string;
+  status?: string;
+  bdOwnerUserId: string | null;
+}
+
+/** One dealer-channel order of the month, pre-aggregated to pure item revenue. */
+export interface DealerOrderAgg {
+  orderId: string;
+  so: number;
+  placedAt: string;
+  dealerId: string;
+  amount: number;
+}
+
+export interface BdRateRow {
+  userId: string;
+  pct: number;
+  effectiveFrom: string;
+}
+
+export interface BdPortfolioRow {
+  dealerId: string;
+  dealerName: string;
+  orderCount: number;
+  amount: number;
+  commission: number;
+}
+
+export interface BdCommissionResult {
+  user: BdUser;
+  position: BdPosition;
+  dealerCount: number;
+  orderCount: number;
+  basis: number;
+  /** rate applied to the latest sale of the month (informational) */
+  pctUsed: number | null;
+  /** percentage method: pct of own dealers' sales */
+  directCommission: number;
+  /** percentage method: CBO's rate-difference share of executives' dealer sales */
+  overrideCommission: number;
+  overrideDetail: OverrideDetail[];
+  /** per_model (item KPI) method */
+  perModel: PerModelDetail[];
+  perModelCommission: number;
+  milestones: MilestoneHit[];
+  milestoneCommission: number;
+  /** grand total across whichever method applies */
+  commission: number;
+  portfolio: BdPortfolioRow[];
+}
+
+export interface BdCommissionReport {
+  method: CommissionMethod;
+  perBd: BdCommissionResult[];
+  unassignedDealers: BdDealer[];
+  totalCommission: number;
+  totalBasis: number;
+}
+
+export interface BdCommissionInput {
+  users: BdUser[];
+  dealers: BdDealer[];
+  /** order-level aggregates (percentage method basis) */
+  orders: DealerOrderAgg[];
+  rates: BdRateRow[];
+  /** 0251 — the global BD method switch (absent = percentage) */
+  method?: CommissionMethod;
+  /** per-line rows (per_model method); required only when method = per_model */
+  dealerLines?: BdDealerLine[];
+  /** per-model config — pass the FULL rows; only program='bd' rows are used */
+  modelRates?: ModelRateRow[];
+  modelTiers?: ModelTierRow[];
+  milestones?: MilestoneRow[];
+}
+
+function pickBdRate(rates: BdRateRow[], userId: string, asOf: string): number {
+  const asOfDay = asOf.slice(0, 10);
+  let best: BdRateRow | null = null;
+  for (const r of rates) {
+    if (r.userId !== userId) continue;
+    if (r.effectiveFrom.slice(0, 10) > asOfDay) continue;
+    if (!best || r.effectiveFrom > best.effectiveFrom) best = r;
+  }
+  return best?.pct ?? 0;
+}
+
+export function computeBdCommission(input: BdCommissionInput): BdCommissionReport {
+  const { users, dealers, orders, rates } = input;
+  const method: CommissionMethod = input.method ?? "percentage";
+  const r2 = (n: number): number => Math.round(n * 100) / 100;
+  const dealerById = new Map(dealers.map((d) => [d.id, d]));
+  const posOf = (u: BdUser): BdPosition => u.position ?? "executive";
+  const cbos = users.filter((u) => posOf(u) === "cbo");
+
+  const bdModelRates = (input.modelRates ?? []).filter((r) => rowProgram(r) === "bd");
+  const bdModelTiers = (input.modelTiers ?? []).filter((r) => rowProgram(r) === "bd");
+  const bdMilestones = (input.milestones ?? []).filter((r) => rowProgram(r) === "bd");
+  const perUnitByModel = new Map(bdModelRates.map((r) => [r.modelId, r.perUnitAmount]));
+
+  interface Acc {
+    user: BdUser;
+    orders: Set<string>;
+    basis: number;
+    direct: number;
+    override: number;
+    overrideDetail: Map<string, OverrideDetail>;
+    pctUsed: number | null;
+    lastSaleAt: string | null;
+    portfolio: Map<string, BdPortfolioRow>;
+    modelUnits: Map<string, { modelName: string; units: number }>;
+    unitsAll: number;
+    unitsByCategory: Map<string, number>;
+  }
+  const acc = new Map<string, Acc>();
+  for (const u of users) {
+    acc.set(u.id, {
+      user: u,
+      orders: new Set(),
+      basis: 0,
+      direct: 0,
+      override: 0,
+      overrideDetail: new Map(),
+      pctUsed: null,
+      lastSaleAt: null,
+      portfolio: new Map(),
+      modelUnits: new Map(),
+      unitsAll: 0,
+      unitsByCategory: new Map(),
+    });
+  }
+
+  const touchPortfolio = (
+    a: Acc,
+    dealer: BdDealer,
+    orderId: string,
+    amount: number,
+    commission: number,
+  ) => {
+    a.orders.add(orderId);
+    a.basis += amount;
+    const row = a.portfolio.get(dealer.id);
+    if (row) {
+      row.orderCount += 1;
+      row.amount += amount;
+      row.commission += commission;
+    } else {
+      a.portfolio.set(dealer.id, {
+        dealerId: dealer.id,
+        dealerName: dealer.name,
+        orderCount: 1,
+        amount,
+        commission,
+      });
+    }
+  };
+
+  if (method === "percentage") {
+    for (const o of orders) {
+      const dealer = dealerById.get(o.dealerId);
+      const owner = dealer?.bdOwnerUserId ? acc.get(dealer.bdOwnerUserId) : null;
+      if (!dealer || !owner) continue;
+      const pct = pickBdRate(rates, owner.user.id, o.placedAt);
+      const commission = (o.amount * pct) / 100;
+      owner.direct += commission;
+      if (!owner.lastSaleAt || o.placedAt >= owner.lastSaleAt) {
+        owner.lastSaleAt = o.placedAt;
+        owner.pctUsed = pct;
+      }
+      touchPortfolio(owner, dealer, o.orderId, o.amount, commission);
+
+      // CBO override — the rate DIFFERENCE on an EXECUTIVE's dealer sales,
+      // split equally among CBOs (mirror of the Sales Manager rule).
+      if (posOf(owner.user) === "executive" && cbos.length > 0) {
+        for (const cbo of cbos) {
+          const cboPct = pickBdRate(rates, cbo.id, o.placedAt);
+          const diff = cboPct - pct;
+          if (diff <= 0) continue;
+          const share = (o.amount * diff) / 100 / cbos.length;
+          const ca = acc.get(cbo.id);
+          if (!ca) continue;
+          ca.override += share;
+          const d = ca.overrideDetail.get(owner.user.id);
+          if (d) d.amount += share;
+          else
+            ca.overrideDetail.set(owner.user.id, {
+              fromStaffId: owner.user.id,
+              fromStaffName: owner.user.name,
+              amount: share,
+            });
+        }
+      }
+    }
+  } else {
+    for (const line of input.dealerLines ?? []) {
+      const dealer = dealerById.get(line.dealerId);
+      const owner = dealer?.bdOwnerUserId ? acc.get(dealer.bdOwnerUserId) : null;
+      if (!dealer || !owner) continue;
+      const amount = line.qty * line.unitPrice;
+      touchPortfolio(owner, dealer, line.orderId, amount, 0);
+      if (line.modelId) {
+        const mu = owner.modelUnits.get(line.modelId);
+        if (mu) mu.units += line.qty;
+        else
+          owner.modelUnits.set(line.modelId, {
+            modelName: line.modelName ?? line.modelId,
+            units: line.qty,
+          });
+      }
+      owner.unitsAll += line.qty;
+      if (line.category) {
+        owner.unitsByCategory.set(
+          line.category,
+          (owner.unitsByCategory.get(line.category) ?? 0) + line.qty,
+        );
+      }
+    }
+  }
+
+  const perBd: BdCommissionResult[] = [...acc.values()].map((a) => {
+    const perModel: PerModelDetail[] = [];
+    let perModelCommission = 0;
+    for (const [modelId, mu] of a.modelUnits) {
+      const perUnit = perUnitByModel.get(modelId) ?? 0;
+      const unitCommission = mu.units * perUnit;
+      let tierBonus = 0;
+      let tierThreshold: number | null = null;
+      for (const t of bdModelTiers) {
+        if (t.modelId !== modelId || t.thresholdQty > mu.units) continue;
+        if (tierThreshold === null || t.thresholdQty > tierThreshold) {
+          tierThreshold = t.thresholdQty;
+          tierBonus = t.bonusAmount;
+        }
+      }
+      perModel.push({
+        modelId,
+        modelName: mu.modelName,
+        units: mu.units,
+        perUnitAmount: perUnit,
+        unitCommission: r2(unitCommission),
+        tierBonus: r2(tierBonus),
+        tierThreshold,
+      });
+      perModelCommission += unitCommission + tierBonus;
+    }
+    perModel.sort((x, y) => y.unitCommission - x.unitCommission);
+
+    const milestones: MilestoneHit[] = [];
+    let milestoneCommission = 0;
+    const groups = new Map<string, MilestoneRow[]>();
+    for (const m of bdMilestones) {
+      const key = m.category ?? "";
+      const g = groups.get(key);
+      if (g) g.push(m);
+      else groups.set(key, [m]);
+    }
+    for (const [key, rows] of groups) {
+      const units = key === "" ? a.unitsAll : (a.unitsByCategory.get(key) ?? 0);
+      let best: MilestoneRow | null = null;
+      for (const m of rows) {
+        if (m.thresholdQty > units) continue;
+        if (!best || m.thresholdQty > best.thresholdQty) best = m;
+      }
+      if (best) {
+        milestones.push({
+          category: best.category,
+          units,
+          thresholdQty: best.thresholdQty,
+          bonusAmount: r2(best.bonusAmount),
+        });
+        milestoneCommission += best.bonusAmount;
+      }
+    }
+
+    const direct = r2(a.direct);
+    const override = r2(a.override);
+    const perModelTotal = r2(perModelCommission);
+    const milestoneTotal = r2(milestoneCommission);
+    return {
+      user: a.user,
+      position: posOf(a.user),
+      dealerCount: dealers.filter((d) => d.bdOwnerUserId === a.user.id).length,
+      orderCount: a.orders.size,
+      basis: r2(a.basis),
+      pctUsed: a.pctUsed,
+      directCommission: direct,
+      overrideCommission: override,
+      overrideDetail: [...a.overrideDetail.values()].map((d) => ({
+        ...d,
+        amount: r2(d.amount),
+      })),
+      perModel,
+      perModelCommission: perModelTotal,
+      milestones,
+      milestoneCommission: milestoneTotal,
+      commission: r2(direct + override + perModelTotal + milestoneTotal),
+      portfolio: [...a.portfolio.values()]
+        .map((p) => ({ ...p, amount: r2(p.amount), commission: r2(p.commission) }))
+        .sort((x, y) => y.amount - x.amount),
+    };
+  });
+  perBd.sort(
+    (x, y) => y.commission - x.commission || x.user.name.localeCompare(y.user.name),
+  );
+
+  return {
+    method,
+    perBd,
+    unassignedDealers: dealers.filter((d) => !d.bdOwnerUserId),
+    totalCommission: r2(perBd.reduce((s, b) => s + b.commission, 0)),
+    totalBasis: r2(perBd.reduce((s, b) => s + b.basis, 0)),
   };
 }

@@ -35,6 +35,7 @@ export type SetStaffRateInput = z.infer<typeof setStaffRateInput>;
 
 export const setModelRateInput = z.object({
   modelId: z.string().uuid(),
+  program: z.enum(["staff", "bd"]).optional(),
   /** null removes the per-unit rate for this model */
   perUnitAmount: z.number().min(0).max(1_000_000).nullable(),
 });
@@ -43,6 +44,7 @@ export type SetModelRateInput = z.infer<typeof setModelRateInput>;
 /** Replace the full tier ladder for one model in one call (small lists). */
 export const setModelTiersInput = z.object({
   modelId: z.string().uuid(),
+  program: z.enum(["staff", "bd"]).optional(),
   tiers: z
     .array(
       z.object({
@@ -56,6 +58,7 @@ export type SetModelTiersInput = z.infer<typeof setModelTiersInput>;
 
 /** Replace the full milestone list in one call (small list). */
 export const setMilestonesInput = z.object({
+  program: z.enum(["staff", "bd"]).optional(),
   milestones: z
     .array(
       z.object({
@@ -74,3 +77,37 @@ export const hrAssignSalespersonInput = z.object({
   salespersonId: z.string().uuid(),
 });
 export type HrAssignSalespersonInput = z.infer<typeof hrAssignSalespersonInput>;
+
+// ── 0250 — BD commission (paid by what their dealers sell) ───────────────────
+
+export const setBdRateInput = z.object({
+  userId: z.string().uuid(),
+  pct: z.number().min(0).max(100),
+  effectiveFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD")
+    .optional(),
+});
+export type SetBdRateInput = z.infer<typeof setBdRateInput>;
+
+/** userId null clears the dealer's BD owner. Audited RPC hr_assign_dealer_bd. */
+export const assignDealerBdInput = z.object({
+  dealerId: z.string().uuid(),
+  userId: z.string().uuid().nullable(),
+});
+export type AssignDealerBdInput = z.infer<typeof assignDealerBdInput>;
+
+// ── 0251 — BD method switch + positions; program on per-model config ─────────
+
+export const commissionProgramSchema = z.enum(["staff", "bd"]);
+
+export const setBdMethodInput = z.object({
+  method: commissionMethodSchema,
+});
+export type SetBdMethodInput = z.infer<typeof setBdMethodInput>;
+
+export const setBdPositionInput = z.object({
+  userId: z.string().uuid(),
+  position: z.enum(["executive", "cbo"]),
+});
+export type SetBdPositionInput = z.infer<typeof setBdPositionInput>;
