@@ -3,6 +3,7 @@ import {
   buildPurchaseTodayReport,
   buildPurchaseChaseReceive,
   myHolidaySet,
+  nextPoDayMYT,
   purchaseTodayResponseSchema,
   type DemandLine,
   type ProductCategory,
@@ -260,7 +261,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   // THAT embed is valid).
   const { data: lineRows, error: lineErr } = await sb
     .from("order_lines")
-    .select("id, order_id, sku, qty")
+    .select("id, order_id, sku, qty, excluded_from_plan, exclude_from_plan_until")
     .in("order_id", orderIds);
   if (lineErr) {
     const m = mapPgError(lineErr);
@@ -314,6 +315,15 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     const supplierId = cat?.supplierId ?? null;
     // Only the 3 procurable categories; a line with no supplier can't be bought.
     if (!category || !PROCURABLE.includes(category) || !supplierId) continue;
+
+    // Purchase §6 exclusion filter. Two independent gates:
+    //   · excluded_from_plan = true         → operator Skip'd (permanent)
+    //   · exclude_from_plan_until > now()  → operator pushed to next cycle
+    // Either flag = drop this line from the demand feed to the engine. When
+    // the temp exclusion expires it flows back in on the next /today call.
+    if ((l as { excluded_from_plan?: boolean }).excluded_from_plan === true) continue;
+    const excludeUntil = (l as { exclude_from_plan_until?: string | null }).exclude_from_plan_until;
+    if (excludeUntil && new Date(excludeUntil) > new Date()) continue;
 
     costBySku[l.sku as string] = cat?.cost ?? null;
     modelNameBySku[l.sku as string] = cat?.modelName ?? null;
@@ -439,7 +449,159 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     refByOrderId,
   );
 
+  // Purchase §6 · supplier-level Snooze filter. If purchase_snoozes has an
+  // unexpired row for a supplier, drop its placeGroups from the response
+  // (the supplier is "muted" until snooze_until). Chase/Receive unaffected —
+  // snooze only defers NEW PO planning, not in-flight PO follow-up.
+  const { data: snoozeRows } = await sb
+    .from("purchase_snoozes")
+    .select("supplier_id, snooze_until");
+  const nowMs = Date.now();
+  const snoozedSupplierIds = new Set(
+    (snoozeRows ?? [])
+      .filter((r) => {
+        const su = (r as { snooze_until?: string }).snooze_until;
+        return su && new Date(su).getTime() > nowMs;
+      })
+      .map((r) => (r as { supplier_id: string }).supplier_id),
+  );
+  if (snoozedSupplierIds.size > 0) {
+    report.placeGroups = report.placeGroups.filter(
+      (g) => !snoozedSupplierIds.has(g.supplierId),
+    );
+    // Recount the summary to reflect the filtered groups (a snoozed supplier
+    // stops contributing to the "N to place today" tab counts).
+    report.summary.toPlaceBundles = report.placeGroups.reduce(
+      (s, g) => s + g.orderCount,
+      0,
+    );
+    report.summary.toOrderUnits = report.placeGroups.reduce(
+      (s, g) => s + g.totalUnits,
+      0,
+    );
+  }
+
   return c.json(purchaseTodayResponseSchema.parse(report));
+});
+
+// Purchase §6 · POST /line/skip · body: { lineIds: string[] }
+// Permanently drop these order_lines from the purchase plan. Operator gesture:
+// "customer no longer wants this / cancelled / mis-ordered". Idempotent —
+// re-skipping stays skipped. RLS via userClient (operation+principal only).
+purchaseRouter.post("/line/skip", requireOperation, async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  let body: { lineIds?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const lineIds = Array.isArray(body.lineIds)
+    ? (body.lineIds.filter((x) => typeof x === "string") as string[])
+    : [];
+  if (lineIds.length === 0) {
+    return c.json({ error: "lineIds_required" }, 400);
+  }
+  const { error } = await sb
+    .from("order_lines")
+    .update({ excluded_from_plan: true })
+    .in("id", lineIds);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, skipped: lineIds.length });
+});
+
+// Purchase §6 · POST /line/push-next · body: { lineIds: string[], until?: iso }
+// Temp-skip these order_lines from the purchase plan until `until` (defaults
+// to the next Mon/Wed/Fri PO day in MYT — matching the operator's mental
+// model "revisit next cycle"). Idempotent — re-pushing extends the horizon.
+purchaseRouter.post("/line/push-next", requireOperation, async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  let body: { lineIds?: unknown; until?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const lineIds = Array.isArray(body.lineIds)
+    ? (body.lineIds.filter((x) => typeof x === "string") as string[])
+    : [];
+  if (lineIds.length === 0) {
+    return c.json({ error: "lineIds_required" }, 400);
+  }
+  const untilRaw = typeof body.until === "string" ? body.until : null;
+  // Default = next PO day MYT (Mon/Wed/Fri) at 00:00 MYT (16:00 UTC previous
+  // day). nextPoDayMYT returns YYYY-MM-DD; we convert to a UTC instant that
+  // represents "start of that MYT date".
+  let untilIso: string;
+  if (untilRaw) {
+    untilIso = untilRaw;
+  } else {
+    const dateOnly = nextPoDayMYT(new Date());
+    untilIso = `${dateOnly}T00:00:00+08:00`;
+  }
+  const { error } = await sb
+    .from("order_lines")
+    .update({ exclude_from_plan_until: untilIso })
+    .in("id", lineIds);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, pushed: lineIds.length, until: untilIso });
+});
+
+// Purchase §6 · POST /snooze · body: { supplierId: string, until: iso, reason?: string }
+// Defer the whole supplier's PO planning until `until`. Upserts on
+// supplier_id (one active snooze per supplier). Passing until in the past
+// deletes the snooze (immediate wake). Chase/Receive unaffected — snooze
+// only defers NEW PO planning, not in-flight PO follow-up.
+purchaseRouter.post("/snooze", requireOperation, async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  let body: { supplierId?: unknown; until?: unknown; reason?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const supplierId = typeof body.supplierId === "string" ? body.supplierId : "";
+  const until = typeof body.until === "string" ? body.until : "";
+  const reason = typeof body.reason === "string" ? body.reason : null;
+  if (!supplierId || !until) {
+    return c.json({ error: "supplierId_and_until_required" }, 400);
+  }
+  const untilMs = new Date(until).getTime();
+  if (Number.isNaN(untilMs)) {
+    return c.json({ error: "until_must_be_iso" }, 400);
+  }
+  // Past = wake immediately (delete the row instead of upsert).
+  if (untilMs <= Date.now()) {
+    const { error } = await sb
+      .from("purchase_snoozes")
+      .delete()
+      .eq("supplier_id", supplierId);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json({ ok: true, action: "cleared", supplierId });
+  }
+  const { error } = await sb
+    .from("purchase_snoozes")
+    .upsert(
+      { supplier_id: supplierId, snooze_until: until, reason },
+      { onConflict: "supplier_id" },
+    );
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, action: "snoozed", supplierId, until });
 });
 
 export default purchaseRouter;

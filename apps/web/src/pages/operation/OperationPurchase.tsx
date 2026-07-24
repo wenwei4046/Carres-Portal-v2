@@ -95,6 +95,9 @@ import {
   useOperationWarehouse,
   useChasePoEventMutation,
   useOperationPoDuty,
+  usePurchaseSkipLines,
+  usePurchasePushLines,
+  usePurchaseSnoozeSupplier,
 } from "@/lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -460,6 +463,12 @@ export default function OperationPurchase() {
   const [checkInPoId, setCheckInPoId] = useState<string | null>(null);
   const posQ = useOperationPos();
   const warehousesQ = useOperationWarehouse();
+  // Purchase §6 — the 3 line-⋮ actions + Snooze wired to real routes
+  // (migration 0243). Each invalidates /today on success so the plan
+  // refreshes without a manual reload.
+  const skipLines = usePurchaseSkipLines();
+  const pushLines = usePurchasePushLines();
+  const snoozeSupplier = usePurchaseSnoozeSupplier();
   // v2 (Jess 2026-07-23): the master-detail preview needs the duty holder for
   // the "prepared by" line + the "on PO duty" badge next to Send PO. Send +
   // Chase are the PO-duty holder (one voice to suppliers); Receive/GRN is
@@ -993,6 +1002,48 @@ export default function OperationPurchase() {
                       selectedPlace,
                       dutyQ.data?.holder?.name ?? null,
                     )}
+                    actions={{
+                      onSkip: (lineIds) =>
+                        skipLines.mutate(lineIds, {
+                          onSuccess: (r) =>
+                            toast.success(
+                              `Skipped ${r.skipped} line${r.skipped === 1 ? "" : "s"} — won't be bought`,
+                            ),
+                          onError: (e) => toast.error(e.message),
+                        }),
+                      onPushNext: (lineIds) =>
+                        pushLines.mutate(
+                          { lineIds },
+                          {
+                            onSuccess: (r) =>
+                              toast.success(
+                                `Pushed to the next PO day (${fmtDate(r.until.slice(0, 10))})`,
+                              ),
+                            onError: (e) => toast.error(e.message),
+                          },
+                        ),
+                      onSendSeparately: (sku) => {
+                        // Open CreatePOModal with ONLY this SKU line.
+                        const ln = selectedPlace.lines.find((l) => l.sku === sku);
+                        if (!ln) return;
+                        posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
+                        setCreatePoPrefill({
+                          supplierId: selectedPlace.supplierId,
+                          lines: [{ sku: ln.sku, qty: ln.need, attrs: null }],
+                          note: `Sent separately from cockpit · ${ln.sku} × ${ln.need}`,
+                        });
+                      },
+                      onSnooze: (untilIso) =>
+                        snoozeSupplier.mutate(
+                          {
+                            supplierId: selectedPlace.supplierId,
+                            until: untilIso,
+                          },
+                          {
+                            onError: (e) => toast.error(e.message),
+                          },
+                        ),
+                    }}
                   />
                 ) : placeShown.length === 0 ? (
                   <EmptyDone
