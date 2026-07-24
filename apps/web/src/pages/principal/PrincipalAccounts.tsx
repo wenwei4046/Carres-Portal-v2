@@ -18,8 +18,9 @@ import { ApiError } from "@/lib/api";
 // Aliased: this file already has a local `isShowroom` meaning "the ROLE being
 // created is showroom". The shared helper answers a different question — "is
 // THIS store row one of ours" — and reads `dealers.channel`.
-import { minDeliveryDateISO, isShowroom as isShowroomStore } from "@carres/shared";
+import { carresLocationName, minDeliveryDateISO, isShowroom as isShowroomStore } from "@carres/shared";
 import type { CreatableAppRole, StaffColorKey, StaffGenderDto, StaffTierDto } from "@carres/shared";
+import CarresNameInput from "@/components/CarresNameInput";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
@@ -717,7 +718,10 @@ function CreateAccountModal({
     if (!isShowroom && !draft.name.trim()) e.name = "Required";
     if (!draft.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) e.email = "Invalid email";
-    if (needsOrg && !draft.companyName.trim()) e.companyName = "Required";
+    // A showroom name composes with the fixed Carres prefix — typing nothing
+    // (or just "Carres") composes to empty, which is not a name.
+    if (needsOrg && !(isShowroom ? carresLocationName(draft.companyName) : draft.companyName.trim()))
+      e.companyName = "Required";
     // 2026-05-22 (Loo) — mirror Sales Order Step 1 address validation
     // (apps/web/src/pages/dealer/new-order/draft.ts step1FirstIssue): Line 1
     // ≥ 5 chars, state + city + postcode all picked. Line 2 stays optional.
@@ -800,23 +804,25 @@ function CreateAccountModal({
           postcode: draft.addressPostcode,
         })
       : undefined;
+    // Location names carry the fixed Carres prefix (Loo 2026-07-25): the form
+    // fields hold only the location part; compose here. A dealer's COMPANY
+    // name is its own legal entity and is never prefixed.
+    const showroomName = carresLocationName(draft.companyName);
+    const composedOutletName = carresLocationName(draft.outletName);
     create.mutate({
       // Showroom: the account's display name IS the showroom name (there's no
       // separate person to name — it's Carres' own store login).
-      name: isShowroom ? draft.companyName.trim() : draft.name.trim(),
+      name: isShowroom ? showroomName : draft.name.trim(),
       email: draft.email.trim().toLowerCase(),
       role: draft.role,
       title: isShowroom ? null : draft.title.trim() || null,
-      companyName: needsOrg ? draft.companyName.trim() : undefined,
+      companyName: needsOrg ? (isShowroom ? showroomName : draft.companyName.trim()) : undefined,
       // Region dropped from the form — API still accepts it (optional zod),
       // server-side defaults to "—" when absent (see accounts.ts dealer
       // insert). Existing dealers retain their region values.
       // outletName: send only if dealer/showroom AND non-blank; the server
       // falls back to companyName when this is omitted.
-      outletName:
-        dealerLike && draft.outletName.trim().length > 0
-          ? draft.outletName.trim()
-          : undefined,
+      outletName: dealerLike && composedOutletName ? composedOutletName : undefined,
       address: composedAddress,
       // Dealer-only business profile — a showroom (Carres' own store) sends
       // none of these; the server writes null.
@@ -1015,30 +1021,47 @@ function CreateAccountModal({
               </div>
               <Field
                 label={isShowroom ? "Showroom name" : "Company name"}
-                hint={isShowroom ? "Carres' own store · also used as the outlet + account name" : undefined}
+                hint={
+                  isShowroom
+                    ? `Carres' own store · saved as "${carresLocationName(draft.companyName) || "Carres …"}" · also the outlet + account name`
+                    : undefined
+                }
                 error={errors.companyName}
               >
-                <Input
-                  value={draft.companyName}
-                  onChange={(v) => set("companyName", v)}
-                  placeholder={
-                    draft.role === "dealer"
-                      ? "e.g. BedHouse KL Sdn Bhd"
-                      : draft.role === "showroom"
-                        ? "e.g. Carres KL Showroom"
+                {isShowroom ? (
+                  <CarresNameInput
+                    value={draft.companyName}
+                    onChange={(v) => set("companyName", v)}
+                    placeholder="e.g. Kota Damansara"
+                  />
+                ) : (
+                  <Input
+                    value={draft.companyName}
+                    onChange={(v) => set("companyName", v)}
+                    placeholder={
+                      draft.role === "dealer"
+                        ? "e.g. BedHouse KL Sdn Bhd"
                         : draft.role === "supplier"
                           ? "e.g. Ohana Industries"
                           : "e.g. JT Express"
-                  }
-                />
+                    }
+                  />
+                )}
               </Field>
               {draft.role === "dealer" && (
                 <>
-                  <Field label="Outlet name" hint="Default outlet · falls back to company name when blank">
-                    <Input
+                  <Field
+                    label="Outlet name"
+                    hint={
+                      draft.outletName.trim()
+                        ? `Default outlet · saved as "${carresLocationName(draft.outletName) || "Carres …"}"`
+                        : "Default outlet · falls back to company name when blank"
+                    }
+                  >
+                    <CarresNameInput
                       value={draft.outletName}
                       onChange={(v) => set("outletName", v)}
-                      placeholder={draft.companyName || "Same as company name"}
+                      placeholder="e.g. Mont Kiara"
                     />
                   </Field>
                   <Field label="SSM code" hint="Required · company registration number (e.g. 201801234567 or 123456-A)" error={errors.ssmCode}>

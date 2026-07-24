@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  carresLocationName,
   minDeliveryDateISO,
   staffPinSchema,
   type CreateAccountInput,
@@ -9,6 +10,7 @@ import {
   type StaffTierDto,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import CarresNameInput from "@/components/CarresNameInput";
 import { useBdCreateAccount } from "@/lib/queries";
 import BirthdayWheelField from "@/pages/dealer/pos/date-keyin/BirthdayWheelField";
 import { ColorDotPicker, ModalShell, tierLabel } from "@/pages/dealer/staff/staff-ui";
@@ -109,7 +111,9 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
       role: "dealer",
       companyName: companyName.trim(),
       region: region.trim() || undefined,
-      outletName: outletName.trim() || undefined,
+      // Location names carry the fixed Carres prefix (Loo 2026-07-25); blank
+      // still falls back to the company name server-side.
+      outletName: carresLocationName(outletName) || undefined,
       address: address.trim(),
       ssmCode: ssmCode.trim(),
       contactName: contactName.trim(),
@@ -225,12 +229,16 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
       </div>
       <label className="flex flex-col gap-1.5">
         <Label>First outlet name (optional)</Label>
-        <input
+        <CarresNameInput
           value={outletName}
-          onChange={(e) => setOutletName(e.target.value)}
-          className={inputCls}
-          placeholder="Defaults to the company name"
+          onChange={setOutletName}
+          placeholder="e.g. Mont Kiara"
         />
+        <span className="text-[11px] text-base-500">
+          {outletName.trim()
+            ? `Saved as "${carresLocationName(outletName) || "Carres …"}"`
+            : "Blank falls back to the company name"}
+        </span>
       </label>
 
       <SectionTitle>Store login (dealership principal)</SectionTitle>

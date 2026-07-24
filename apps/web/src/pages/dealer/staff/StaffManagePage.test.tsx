@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import type { StaffDto, StaffTierDto } from "@carres/shared";
 import { useStaffSession } from "@/lib/staff";
 
@@ -18,12 +18,13 @@ const ROSTER: StaffDto[] = [
 ];
 
 const patchMutate = vi.fn();
+const createOutletAsync = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useOutlets: () => ({ data: { outlets: [{ id: "o1", dealerId: "d1", name: "O1", address: "1 Jln" }, { id: "o2", dealerId: "d1", name: "O2", address: "2 Jln" }] }, isPending: false, error: null }),
   useStaffList: () => ({ data: { staff: ROSTER, activated: true, selfStaffId: null, storeKind: "dealer" }, isPending: false, error: null }),
   usePatchStaff: () => ({ mutate: patchMutate, isPending: false, isError: false, error: null }),
-  useCreateOutlet: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useCreateOutlet: () => ({ mutate: vi.fn(), mutateAsync: createOutletAsync, isPending: false }),
   useCreateStaff: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   useSetStaffPin: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
   // StoreAccountSection (0240) — inert here (no dealer-role auth in these tests).
@@ -41,6 +42,8 @@ function asTier(tier: StaffTierDto, outletId: string | null) {
 beforeEach(() => {
   useStaffSession.getState().reset();
   patchMutate.mockClear();
+  createOutletAsync.mockReset();
+  createOutletAsync.mockResolvedValue({});
 });
 afterEach(cleanup);
 
@@ -85,6 +88,21 @@ describe("StaffManagePage — in-POS staff management overlay", () => {
     render(<StaffManagePage onClose={() => {}} />);
     expect(screen.queryByTestId("staff-section")).toBeNull();
     expect(screen.queryByTestId("add-outlet")).toBeNull();
+  });
+
+  it("Add outlet composes the fixed Carres prefix into the saved name", async () => {
+    asTier("principal", null);
+    render(<StaffManagePage onClose={() => {}} />);
+    fireEvent.click(screen.getByTestId("add-outlet"));
+    // The field holds only the location; the pill locks the brand prefix.
+    fireEvent.change(screen.getByTestId("outlet-name"), { target: { value: "Mont Kiara" } });
+    fireEvent.change(screen.getByLabelText(/Address Line 1/), { target: { value: "19 Jalan Kiara" } });
+    fireEvent.change(screen.getByLabelText("State *"), { target: { value: "Selangor" } });
+    fireEvent.change(screen.getByLabelText("City / Town *"), { target: { value: "Seri Kembangan" } });
+    fireEvent.change(screen.getByLabelText("Postcode *"), { target: { value: "43300" } });
+    fireEvent.click(screen.getByTestId("outlet-submit"));
+    await waitFor(() => expect(createOutletAsync).toHaveBeenCalled());
+    expect(createOutletAsync.mock.calls[0][0].name).toBe("Carres Mont Kiara");
   });
 
   it("Edit opens a prefilled profile form and PATCHes the row", () => {
