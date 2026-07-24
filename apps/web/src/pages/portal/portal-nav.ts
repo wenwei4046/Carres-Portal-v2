@@ -25,11 +25,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
-import {
-  CATALOG_TABS,
-  CATALOG_TAB_PARAM,
-  DEFAULT_CATALOG_TAB,
-} from "@/pages/catalog/catalog-tabs";
 
 /**
  * Unified Internal Portal nav model (2026-06-30, Loo).
@@ -49,12 +44,14 @@ import {
  *   - Finance    → finance, principal
  *   - Admin      → principal only
  *
- * Catalog (`Product & Maintenance`) is DEDUPED: it lived in BOTH the old
- * Operation and Principal sidebars (same component, `isPrincipal` flag). It now
- * appears ONCE, in the Operations area, reachable by operation + principal. The
- * page derives `isPrincipal` from the live role, so the principal still gets the
- * pricing-edit affordances there. The old standalone Principal "Catalog" nav
- * entry is dropped.
+ * Catalog split (Loo 2026-07-25) — TWO isolated doors, one per money surface:
+ *   - Operations → "Operation Catalog" (`op-catalog`): the 0226 COSTING page
+ *     (SKU Master / Modular / Fabric only; buying costs).
+ *   - Admin → "Product & Maintenance" (`catalog`): the full 8-tab SELLING
+ *     page (retail / POS prices, PWP, promos) — principal-only by area.
+ * A principal hitting the old Operations door (`/operation?tab=catalog`) is
+ * forwarded to the Admin door by OperationApp; operation stays on the costing
+ * page there (stale-link fallback).
  */
 
 export type PortalArea = "operation" | "finance" | "principal";
@@ -88,19 +85,8 @@ export interface PortalNavItem {
   /** principal Approvals carries the pending-count pill. */
   pendingPill?: boolean;
   /** optional per-item narrowing of the group's roles — the item shows only
-   *  for these roles (0226: Product & Maintenance is principal-only; operation
-   *  gets the costing-focused Operation Catalog instead). */
+   *  for these roles. */
   roles?: ReadonlyArray<Role>;
-  /** tab-driven items only: the page's own tab bar mirrored into the rail as
-   *  section links, rendered indented under the item while it is ACTIVE. Each
-   *  links to `navItemHref(...)&<param>=<key>`; the page reads the same param.
-   *  Product & Maintenance carries its 8 catalog tabs this way (Loo
-   *  2026-07-24: "I want this tab show on the left bar tab as well"). */
-  sub?: {
-    param: string;
-    defaultKey: string;
-    items: ReadonlyArray<{ key: string; label: string }>;
-  };
 }
 
 export interface PortalNavGroup {
@@ -146,22 +132,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "stock-onhand", label: "Stock · On Hand", icon: Boxes },
       { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
       { key: "payments", label: "Payments", icon: Wallet },
-      // 0226 (Loo 2026-07-16) — Product & Maintenance is PRINCIPAL-ONLY: only
-      // the principal touches selling prices. Operation records buying costs
-      // in the Operation Catalog below instead.
-      {
-        key: "catalog",
-        label: "Product & Maintenance",
-        icon: BookOpen,
-        roles: ["principal"],
-        sub: {
-          param: CATALOG_TAB_PARAM,
-          defaultKey: DEFAULT_CATALOG_TAB,
-          items: CATALOG_TABS,
-        },
-      },
-      // 0226 — the operation-facing COSTING catalog (SKU Master / Modular /
-      // Fabric; prices there are buying costs, isolated from POS selling).
+      // Catalog split (Loo 2026-07-25) — Operations carries ONLY the costing
+      // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
+      // money there is buying cost, isolated from POS selling). The selling
+      // Product & Maintenance lives in the Admin area below.
       { key: "op-catalog", label: "Operation Catalog", icon: Calculator },
       { key: "suppliers", label: "Suppliers", icon: Truck },
       {
@@ -252,6 +226,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "partners", label: "Partners", icon: Network },
       { key: "audit", label: "Audit log", icon: ScrollText },
       { key: "accounts", label: "Accounts", icon: Settings },
+      // Catalog split (Loo 2026-07-25) — the SELLING catalog (retail / POS
+      // prices, PWP, promos; the full 8-tab Product & Maintenance page) is an
+      // ADMIN door: only the principal touches selling prices (0226). Costing
+      // stays in Operations as the Operation Catalog above.
+      { key: "catalog", label: "Product & Maintenance", icon: BookOpen },
     ],
   },
 ];
@@ -275,16 +254,6 @@ export function navItemHref(group: PortalNavGroup, item: PortalNavItem): string 
   if (group.area === "finance") return item.financePath ?? group.base;
   if (item.path) return item.path; // operation path-driven section
   return `${group.base}?tab=${item.tab ?? item.key}`;
-}
-
-/** The href of a section link under a tab-driven item (`item.sub`). */
-export function navSubItemHref(
-  group: PortalNavGroup,
-  item: PortalNavItem,
-  subKey: string,
-): string {
-  if (!item.sub) return navItemHref(group, item);
-  return `${navItemHref(group, item)}&${item.sub.param}=${subKey}`;
 }
 
 /** Default landing href for an area (its dashboard / overview). */

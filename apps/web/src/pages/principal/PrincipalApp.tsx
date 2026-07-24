@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PrincipalDashboard from "./PrincipalDashboard";
@@ -15,7 +15,7 @@ import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
 // (on behalf of a picked dealer) re-added to Principal 2026-06-25. The trace-
 // only PrincipalOrders page was removed 2026-07-16 — order views live in the
 // Operations area (/operation/orders).
-import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
+import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 import OrderEntryPage from "@/pages/operation/OrderEntryPage";
 
 /**
@@ -41,9 +41,6 @@ export default function PrincipalApp() {
   useEffect(() => {
     if (urlTab) setTab(urlTab);
   }, [urlTab]);
-
-  // Legacy catalog door — carry the active catalog tab through the redirect.
-  const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
 
   return (
     <div
@@ -74,20 +71,10 @@ export default function PrincipalApp() {
         {tab === "dealers" && <PrincipalDealers channel="dealer" />}
         {tab === "showrooms" && <PrincipalDealers channel="showroom" />}
         {tab === "partners" && <PrincipalPartners />}
-        {/* Catalog is DEDUPED to the Operations area (portal-nav 2026-06-30);
-            the rail's catalog section sub-tabs hang off that ONE entry, so the
-            legacy /principal?tab=catalog door forwards there (2026-07-24)
-            instead of double-mounting the page. `?section=` rides along. */}
-        {tab === "catalog" && (
-          <Navigate
-            to={`/operation?tab=catalog${
-              catalogSection
-                ? `&${CATALOG_TAB_PARAM}=${encodeURIComponent(catalogSection)}`
-                : ""
-            }`}
-            replace
-          />
-        )}
+        {/* Catalog split (Loo 2026-07-25): THIS is the selling catalog's home —
+            the Admin "Product & Maintenance" entry (retail / POS prices, all 8
+            tabs). Costing lives in Operations as the Operation Catalog. */}
+        {tab === "catalog" && <ProductMaintenancePage isPrincipal />}
         {tab === "accounts" && <PrincipalAccounts />}
         {tab === "audit" && <PrincipalAudit />}
       </main>

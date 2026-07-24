@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -25,9 +26,9 @@ import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
-import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 // 0226 — the operation-facing COSTING catalog (SKU Master / Modular / Fabric).
 import OperationCatalogPage from "@/pages/catalog/OperationCatalogPage";
+import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
 // 2026-05-19 — Stock / All orders / Suppliers moved from Principal sidebar.
 import OperationStock from "./OperationStock";
@@ -88,9 +89,10 @@ export default function OperationApp() {
     const t = setInterval(beat, 15 * 60_000);
     return () => clearInterval(t);
   }, []);
-  // 0226 (Loo 2026-07-16) — Product & Maintenance (selling prices) is
-  // principal-only; operation lands on the costing Operation Catalog instead,
-  // even on a stale `?tab=catalog` deep link.
+  // Catalog split (Loo 2026-07-25) — the selling Product & Maintenance moved
+  // to the Admin area (/principal?tab=catalog); Operations keeps only the
+  // costing Operation Catalog (0226). A stale `?tab=catalog` deep link here
+  // forwards a principal to the Admin door; operation stays on costing.
   const role = useAuth((s) => s.role);
 
   // Detect URL-driven sections. Anything under `/operation/procurement` or
@@ -132,6 +134,9 @@ export default function OperationApp() {
   // actually changes).
   const [searchParams] = useSearchParams();
   const urlTab = searchParams.get("tab");
+  // Rides along on the stale-catalog-link forward so a deep-linked tab
+  // (`?section=promo`) survives the hop to the Admin door.
+  const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
   useEffect(() => {
     if (!urlTab || isProcurementUrl || isOrdersUrl) return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
@@ -310,7 +315,18 @@ export default function OperationApp() {
             {/* Purchase / Procurement MRP cockpit — "what to buy today". */}
             {tab === "purchase" && <OperationPurchase />}
             {tab === "catalog" &&
-              (role === "principal" ? <ProductMaintenancePage /> : <OperationCatalogPage />)}
+              (role === "principal" ? (
+                <Navigate
+                  to={`/principal?tab=catalog${
+                    catalogSection
+                      ? `&${CATALOG_TAB_PARAM}=${encodeURIComponent(catalogSection)}`
+                      : ""
+                  }`}
+                  replace
+                />
+              ) : (
+                <OperationCatalogPage />
+              ))}
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}

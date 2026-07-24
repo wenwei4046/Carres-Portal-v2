@@ -67,10 +67,11 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.getByText("Operations")).toBeInTheDocument();
     expect(screen.getByText("Finance")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
-    // Active area (operation) is expanded → its items render. The principal
-    // keeps BOTH catalog entries (0226: P&M principal-only + Operation Catalog).
-    expect(screen.getByText("Product & Maintenance")).toBeInTheDocument();
+    // Active area (operation) is expanded → its items render. Catalog split
+    // (2026-07-25): Operations carries ONLY the costing Operation Catalog —
+    // the selling Product & Maintenance moved to the (collapsed) Admin area.
     expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
+    expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     // Inactive areas are collapsed → their items are hidden until clicked.
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
@@ -120,63 +121,35 @@ describe("PortalSidebar — merged Purchasing item active across its 3 routes", 
   });
 });
 
-describe("PortalSidebar — Product & Maintenance catalog sub-tabs (2026-07-24)", () => {
+describe("PortalSidebar — catalog split into two doors (2026-07-25)", () => {
   beforeEach(() => {
     mockRole = "principal";
   });
 
-  const SECTION_LABELS = [
-    "SKU Master",
-    "Modular",
-    "Special Add-ons",
-    "Fabrics",
-    "Delivery",
-    "Maintenance",
-    "Sofa Combos",
-    "Promo / GWP",
-  ];
-
-  function sectionLink(label: string) {
-    return screen.getByText(label).closest("a") as HTMLAnchorElement;
-  }
-
-  it("renders every catalog section link under the ACTIVE P&M item", () => {
-    renderAt("/operation?tab=catalog");
-    for (const label of SECTION_LABELS) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
-    expect(sectionLink("SKU Master")).toHaveAttribute(
-      "href",
-      "/operation?tab=catalog&section=sku",
-    );
-    expect(sectionLink("Promo / GWP")).toHaveAttribute(
-      "href",
-      "/operation?tab=catalog&section=promo",
-    );
+  it("Admin lists the selling Product & Maintenance (last, after Accounts)", () => {
+    renderAt("/principal?tab=dashboard");
+    const pm = screen.getByText("Product & Maintenance").closest("a") as HTMLAnchorElement;
+    expect(pm).toHaveAttribute("href", "/principal?tab=catalog");
+    // Sits at the bottom of the Admin list, below Accounts (Loo's placement).
+    const accounts = screen.getByText("Accounts").closest("a") as HTMLAnchorElement;
+    expect(
+      accounts.compareDocumentPosition(pm) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
-  it("highlights the default section (SKU Master) when ?section= is absent", () => {
-    renderAt("/operation?tab=catalog");
-    expect(sectionLink("SKU Master").className).toContain("font-semibold");
-    expect(sectionLink("Modular").className).not.toContain("font-semibold");
-  });
-
-  it("moves the highlight with ?section=", () => {
-    renderAt("/operation?tab=catalog&section=promo");
-    expect(sectionLink("Promo / GWP").className).toContain("font-semibold");
-    expect(sectionLink("SKU Master").className).not.toContain("font-semibold");
-  });
-
-  it("hides the section links while another tab is active", () => {
-    renderAt("/operation?tab=dashboard");
+  it("is active on /principal?tab=catalog — with NO section sub-links in the rail", () => {
+    renderAt("/principal?tab=catalog");
+    const pm = screen.getByText("Product & Maintenance").closest("a") as HTMLAnchorElement;
+    expect(pm.className).toContain("font-semibold");
+    // 2026-07-25: Loo dropped the indented section links — the rail stays flat.
     expect(screen.queryByText("SKU Master")).not.toBeInTheDocument();
-    expect(screen.queryByText("Sofa Combos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Promo / GWP")).not.toBeInTheDocument();
   });
 
-  it("never shows them to operation (P&M itself is principal-only, 0226)", () => {
+  it("operation never sees the selling catalog — only the costing Operation Catalog", () => {
     mockRole = "operation";
-    renderAt("/operation?tab=catalog");
+    renderAt("/operation?tab=op-catalog");
+    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
-    expect(screen.queryByText("SKU Master")).not.toBeInTheDocument();
   });
 });

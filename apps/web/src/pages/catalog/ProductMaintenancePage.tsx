@@ -33,11 +33,12 @@ import PromoTab from "./tabs/PromoTab";
  *                   seat height (0179). (The old fixed-set "Overall Combo" was
  *                   removed 2026-07-06 — written in error, never used.)
  *
- * Mounts at `/operation?tab=catalog` (principal only — 0226 gives operation
- * the costing Operation Catalog instead); the legacy `/principal?tab=catalog`
- * door redirects there so the rail's catalog sub-tabs are always in play. The
- * ACTIVE tab is URL-driven via `?section=<key>` (`catalog-tabs.ts`), which the
- * PortalSidebar's indented section links read + write too (Loo 2026-07-24).
+ * Catalog split (Loo 2026-07-25): this SELLING page (retail / POS prices) is
+ * an ADMIN door — mounts at `/principal?tab=catalog`. Costing is the separate
+ * 3-tab Operation Catalog in the Operations area; a principal's stale
+ * `/operation?tab=catalog` link forwards here. The ACTIVE tab is URL-driven
+ * via `?section=<key>` (`catalog-tabs.ts`) so deep links / refresh keep the
+ * tab; the pill bar writes the same param.
  * The single `useCatalog({ admin: true })` bundle is fetched
  * here and handed to every tab so the three tabs share one cache entry (the
  * admin bundle includes OFF / discontinued rows the editor needs to see).
@@ -63,10 +64,9 @@ export default function ProductMaintenancePage({
   // admin:true → bundle includes OFF (pos_active=false) + discontinued rows so
   // the editor can toggle them back on. The dealer-facing bundle stays filtered.
   const catalogQ = useCatalog({ admin: true });
-  // URL-driven tab (2026-07-24): `?section=` rides alongside the shell's
-  // `?tab=catalog` so the PortalSidebar's catalog section links can deep-link a
-  // tab and highlight the live one. Pill clicks write the same param (history
-  // push — Back walks tabs). Unknown / missing → SKU Master.
+  // URL-driven tab: `?section=` rides alongside the shell's `?tab=catalog` so
+  // deep links / refresh keep the tab. Pill clicks write the same param
+  // (history push — Back walks tabs). Unknown / missing → SKU Master.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get(CATALOG_TAB_PARAM);
   const tab: CatalogTabKey = isCatalogTabKey(rawTab) ? rawTab : DEFAULT_CATALOG_TAB;

@@ -1,17 +1,15 @@
 /**
- * Product & Maintenance tab registry — the ONE list behind BOTH switchers
- * (Loo 2026-07-24: the catalog tabs must show on the left rail too):
+ * Product & Maintenance tab registry + the `?section=` URL contract.
  *
- *   • the in-page pill bar (`ProductMaintenancePage` → `PillTabs`)
- *   • the PortalSidebar section links indented under "Product & Maintenance"
+ * The page's active tab is URL-driven via `?section=<key>` riding alongside
+ * the shell's `?tab=catalog` — deep links / refresh keep the tab, and the
+ * pill bar writes the param back. An unknown / missing value falls back to
+ * SKU Master so stale links never break. (The 2026-07-24 sidebar section
+ * links were removed next day — Loo 2026-07-25: no sub-columns in the rail;
+ * the registry + URL contract stay.)
  *
- * The active tab is URL-driven via `?section=<key>` (riding alongside the
- * shell's `?tab=catalog`), so the rail can deep-link a tab and both switchers
- * highlight the same one. An unknown / missing value falls back to SKU Master
- * so stale links never break.
- *
- * Import-free on purpose: `portal-nav.ts` (the sidebar model) consumes this
- * module, so it must not pull component code back in.
+ * Import-free on purpose so non-page modules (e.g. OperationApp's stale-link
+ * forward) can read the param name without pulling component code in.
  */
 
 export type CatalogTabKey =
