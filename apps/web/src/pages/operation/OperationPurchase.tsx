@@ -833,21 +833,25 @@ export default function OperationPurchase() {
                           .sort()[0];
                         return (
                           <div key={cat}>
-                            <div className="flex items-center gap-1 py-1 text-[11px] uppercase tracking-[0.05em] text-base-600">
+                            {/* Category header — Jess 2026-07-24 top-to-toe §3:
+                                collapsed the old 2-row shape into ONE row.
+                                Left = CAT · N PO · N units (uppercase spine).
+                                Right = date + optional Late pill (normal case
+                                so the date reads naturally). Vertical space
+                                halved per category, ~24px saved per row × N
+                                categories = big scroll win once real data
+                                lands. */}
+                            <div className="flex items-baseline gap-1.5 py-1 pb-1 text-[11px] uppercase tracking-[0.05em] text-base-600">
                               <span className="font-semibold">{cat}</span>
-                              <span className="ml-auto tabular-nums font-normal">
-                                {groups.length} PO · {totalUnits} units
+                              <span className="tabular-nums font-normal text-base-500">
+                                · {groups.length} PO · {totalUnits} units
                               </span>
-                            </div>
-                            <div className="flex items-center gap-1 text-[11px] text-base-500 pb-1">
-                              {earliestIso && (
-                                <span className="tabular-nums">
-                                  Send by {fmtDate(earliestIso)}
-                                </span>
-                              )}
-                              {anyLate && (
-                                <span className="pill pill-overdue">Late</span>
-                              )}
+                              <span className="ml-auto flex items-center gap-1.5 tabular-nums font-normal text-base-500 normal-case">
+                                {earliestIso && <span>{fmtDate(earliestIso)}</span>}
+                                {anyLate && (
+                                  <span className="pill pill-overdue">Late</span>
+                                )}
+                              </span>
                             </div>
                             {groups.map((g) => {
                               const isSel =
