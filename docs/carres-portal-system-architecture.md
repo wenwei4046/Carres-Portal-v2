@@ -186,6 +186,29 @@ Same 4 widgets · content adapts to LEFT context.
 
 Use these actual names in test data. Do NOT invent staff.
 
+### 3.13 · Purchase — line-change policy (LOCKED · Jess 2026-07-24)
+
+- **When a customer adds a line AFTER a PO is already sent → engine ALWAYS raises a 2nd PO.** Never auto-append to the existing PO.
+- Reason: Carres suppliers (Ohana / Nice Future) sit on WhatsApp; a 2nd PO is cheaper than chasing a supplier for a second confirmation on an in-flight PO.
+- UI: order detail shows "This order has N POs" when >1.
+- Sofa is unaffected — it's already one PO per SO by dye-lot rule.
+
+### 3.14 · Purchase — SO cancellation policy (LOCKED · Jess 2026-07-24)
+
+- **SO cancellation is NOT allowed by default.** Requires principal (Jess) approval + reason logged to `audit_log`.
+- When an approved cancellation happens with a PO already sent:
+  - **Do NOT cancel the PO.** Let production finish.
+  - **GRN the goods into stockpile (Own · Carres Klang)** as free stock.
+  - **Engine auto-suggests the next pending SO** whose demand matches — operator confirms the transfer.
+- There is NO "cancel PO + WhatsApp supplier stop" flow. Cancellation of a PO in-flight is not a supported path.
+- Rationale: sunk-cost sensitive business (storage fees charged from ETA); accepting the goods + reassigning always beats trying to reverse supplier work.
+
+### 3.15 · Purchase — stock allocation policy (LOCKED · Jess 2026-07-24)
+
+- **Allocation rule: greedy earliest-deadline-first.** Payment status does NOT influence which SO gets free stock.
+- Reason: PayHold (§3.9) already blocks delivery for unpaid customers. Adding payment tiebreaker to allocation would double-gate the same rule and complicate the engine for no operator gain.
+- Corollary: an unpaid customer CAN be assigned stock in the engine — they just can't take delivery until the money clears.
+
 ---
 
 ## §4 · Data flow diagram (cross-module interactions)
