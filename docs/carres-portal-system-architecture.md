@@ -174,17 +174,28 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 
 Same 4 widgets · content adapts to LEFT context.
 
-### 3.12 · Salesperson roster (LOCKED · real people, real names)
+### 3.12 · Operation team roster (LOCKED · corrected Jess 2026-07-24)
 
-- **Jess** — Principal / COO. Owns Product & Maintenance, principal-only actions.
+- **Jess** — Principal / COO. Owns Product & Maintenance, principal-only actions. **Monitor + escalation only — NOT in duty pool, NOT in team chip, never auto-assigned tasks.**
+- **Manly** (曼丽) — **current PO duty holder** (see §3.16 duty concept).
 - **Shasha** — active operator
-- **Samantha** — RESIGNED (do not assign new work)
-- **Joy** — starts 1 Jul, active
-- **Ching** — starts 15 Jul, active
 - **Sha** — active (reception + ops)
-- **Alvin** — recently added, staff profile backfilled 2026-07-19
+- **Alvin** — active (added 2026-07-19)
+- **Yu Jun** (YJ) — active (joined 2026-07-20)
+- **Khor Yee** (KY) — active (joins 2026-08-01)
+- **Samantha** — RESIGNED (remove from all UI)
+- ~~Li Ching · Joy~~ — **DO NOT EXIST · never did.** Delete any references in seed data, migrations, dropdowns, docs.
 
-Use these actual names in test data. Do NOT invent staff.
+Use these actual names in test data. Do NOT invent staff. **Whole operation team shares ONE login: `operation@carresofficial.com`** — no per-user auth; PIC identity is a soft in-app tag on `orders.pic`, not tied to `auth.users`.
+
+### 3.16 · PO / GRN duty concept (LOCKED · Jess 2026-07-24)
+
+- **人分单,货合买.** PIC owns the customer relationship (via `orders.pic`). Purchase orders consolidate company-wide.
+- **PO duty = ONE person handles ALL PO send + chase for the month.** Not distributed by PIC. Not a team workload split. Monthly rotation (calendar month, MYT). Management (COO / operations manager) may override.
+- **GRN duty = ANOTHER SINGLE person handles all GRN receiving for the month.** Independent slot from PO duty. Same monthly rotation model.
+- **PO days: Mon / Wed / Fri (MYT)** — the 3 batching days for bedframe + mattress. Sofa POs can go any day (one PO per SO, dye-lot). URGENT BYPASS: order deadline inside stock lead window (MS/BF 7d · Sofa 5d) fires red on ANY day, must not wait for PO day.
+- **Purchase middle panel shows TWO chips: PO duty holder + GRN duty holder.** NOT a per-person workload strip (that pattern belongs to Orders panel where PIC filters real order counts).
+- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri). Migration `0236_ops_po_duty.sql` seed (Jul Shasha → Aug Li Ching → Sep Khor Yee) is WRONG — Jul = Manly; Li Ching row is dead; Aug/Sep to be re-set by Jess.
 
 ### 3.13 · Purchase — line-change policy (LOCKED · Jess 2026-07-24)
 

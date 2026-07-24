@@ -97,7 +97,7 @@ Longest promised date = lost sales. Fight staff's habit of padding "to be safe":
 2. Engine shows the shortage (netted vs stock + open PO), grouped:
    - **Sofa** = one PO per SO (fabric dye-lot must be consistent).
    - **Bedframe + Mattress** = batch multiple SOs into one PO per supplier
-     per review window (Mon / Wed / Fri).
+     per review window (Mon / Wed / Fri (MYT · code constant lives in `packages/shared/src/schemas/ops-po-duty.ts` — currently seeded WRONG as Mon+Thu, needs fix per architecture §3.16)).
 3. Raise PO → auto-cost from the Operation Catalog cost → PO PDF (prints our
    code; suppliers understand it).
 4. Send to supplier (v1 manual PDF; improvement: one-tap WhatsApp + record sent).
@@ -110,6 +110,14 @@ Longest promised date = lost sales. Fight staff's habit of padding "to be safe":
      1 short and re-enters the At-Risk radar.
    - **Under-receive** (e.g. 3 / 5): 3 auto-reserved to the earliest-deadline
      eligible SO; remaining 2 stay as open PO shortage.
+
+## Duty concept (LOCKED 2026-07-24)
+
+- **PO duty = ONE person handles ALL PO send + chase, company-wide, per month.** Not distributed by PIC. See architecture §3.16.
+- **GRN duty = another single person** — separate slot.
+- **Manly = July PO duty holder** (owner call, supersedes migration 0236 seed).
+- Middle Purchase panel shows two chips (PO duty · GRN duty) — NOT a per-person workload strip.
+- Team login is shared: `operation@carresofficial.com`. PIC on `orders.pic` is a soft in-app tag.
 
 ## Line changes AFTER a PO is sent (LOCKED 2026-07-24)
 
