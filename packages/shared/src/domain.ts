@@ -26,7 +26,7 @@ export type { FreeItemCampaign };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd";
+  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr";
 
 export interface Dealer {
   id: string;

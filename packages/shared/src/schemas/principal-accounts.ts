@@ -36,6 +36,7 @@ export const APP_ROLES = [
   "partner",
   "finance",
   "bd",
+  "hr",
 ] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 
@@ -54,6 +55,7 @@ export const CREATABLE_APP_ROLES = [
   "partner",
   "finance",
   "bd",
+  "hr",
 ] as const;
 export type CreatableAppRole = (typeof CREATABLE_APP_ROLES)[number];
 

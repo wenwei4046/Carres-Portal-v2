@@ -65,6 +65,7 @@ import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
+import hrRouter from "./routes/hr";
 // 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
 // 0240 — store-account self-service (dealer-principal email-change requests).
@@ -140,6 +141,7 @@ api.route("/principal/dashboard", principalDashboardRouter);
 api.route("/principal/dealers", principalDealersRouter);
 api.route("/principal/partners", principalPartnersRouter);
 api.route("/salespersons", salespersonsRouter);
+api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);
 api.route("/operation/badges", operationBadgesRouter);

@@ -58,6 +58,7 @@ const ROLE_OPTIONS: { value: CreatableAppRole; label: string; hint: string }[] =
   { value: "partner",     label: "Delivery Partner", hint: "Pickup + last mile" },
   { value: "finance",     label: "Finance",       hint: "AR / AP / payments" },
   { value: "bd",          label: "Business Dev",  hint: "Inquiries + dealer growth" },
+  { value: "hr",          label: "HR",            hint: "Sales commission + staff" },
 ];
 
 const ROLE_COLORS: Record<AppRole, string> = {
@@ -70,6 +71,7 @@ const ROLE_COLORS: Record<AppRole, string> = {
   partner:     "#2f6a55",
   finance:     "#2e8a5a",
   bd:          "#6a4d8a",
+  hr:          "#a8552f",
 };
 
 export default function PrincipalAccounts() {
@@ -361,7 +363,10 @@ function KpiTile({ label, value, sub, tone }: { label: string; value: number; su
 
 function UserRow({ user }: { user: AccountRow }) {
   const initials = user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-  const roleColor = ROLE_COLORS[user.role] ?? "#5a5a5a";
+  // ROLE_COLORS is a total Record<AppRole, string>, so no fallback is needed
+  // (the old grey hex fallback was dead code — dropped to keep the RULE A
+  // hex ratchet at its baseline when the hr colour joined the record).
+  const roleColor = ROLE_COLORS[user.role];
   const roleLabel = ROLE_OPTIONS.find((r) => r.value === user.role)?.label ?? user.role;
 
   const setStatus = useSetAccountStatus(user.id);
