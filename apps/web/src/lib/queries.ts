@@ -3096,6 +3096,55 @@ export function usePurchaseToday(
   });
 }
 
+/** Purchase §6 · ⋮ Skip — permanently drop order_lines from the purchase
+ *  plan (POST /api/operation/purchase/line/skip). Invalidates /today so the
+ *  row disappears immediately. */
+export function usePurchaseSkipLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (lineIds: string[]) =>
+      apiFetch<{ ok: boolean; skipped: number }>(
+        "/api/operation/purchase/line/skip",
+        { method: "POST", body: JSON.stringify({ lineIds }) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+    },
+  });
+}
+
+/** Purchase §6 · ⋮ Push to next cycle — temp-skip order_lines until the next
+ *  Mon/Wed/Fri PO day (server default) or an explicit `until` ISO. */
+export function usePurchasePushLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { lineIds: string[]; until?: string }) =>
+      apiFetch<{ ok: boolean; pushed: number; until: string }>(
+        "/api/operation/purchase/line/push-next",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+    },
+  });
+}
+
+/** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until
+ *  `until` (ISO). Sending a past `until` clears the snooze (wake). */
+export function usePurchaseSnoozeSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { supplierId: string; until: string; reason?: string }) =>
+      apiFetch<{ ok: boolean; action: string; supplierId: string }>(
+        "/api/operation/purchase/snooze",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+    },
+  });
+}
+
 /** operation orders kanban list. Server defaults stage='all', channel='all'. */
 export function useOperationOrders(
   filters: operationOrderFilters = {},

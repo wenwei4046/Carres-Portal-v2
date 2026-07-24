@@ -52,6 +52,8 @@ export interface PoPreviewGroup {
     cost: number | null;
     /** Advisory FREE (Klg) stock for this SKU — the "In stock" column. */
     ready: number;
+    /** Source order_lines.id set — Purchase §6 line actions target these. */
+    lineIds?: readonly string[];
     forOrders: ReadonlyArray<{
       so: number | null;
       customerName: string | null;
@@ -62,6 +64,19 @@ export interface PoPreviewGroup {
       ref?: string | null;
     }>;
   }>;
+}
+
+/** Purchase §6 line-action callbacks — wired to the real POST routes by the
+ *  caller (OperationPurchase). All optional: omitted = the ⋮ items degrade to
+ *  a "coming soon" toast (previous behaviour), so tests + stories without the
+ *  mutations still render. */
+export interface PoLineActions {
+  onSkip?: (lineIds: string[]) => void;
+  onPushNext?: (lineIds: string[]) => void;
+  /** Send-separately opens CreatePOModal with ONLY this line prefilled. */
+  onSendSeparately?: (sku: string) => void;
+  /** Snooze the whole supplier until an ISO instant. */
+  onSnooze?: (untilIso: string) => void;
 }
 
 interface PoDocumentPreviewProps {
@@ -82,6 +97,8 @@ interface PoDocumentPreviewProps {
   /** WhatsApp draft — a default template composed by the caller. Editable in
    *  the textarea; the edited text is used on Send. */
   waTemplate: string;
+  /** Purchase §6 real line/snooze actions. Optional — omitted = stubs toast. */
+  actions?: PoLineActions;
 }
 
 function daysBetweenIso(fromIso: string | null, toIso: string | null): number | null {
@@ -108,6 +125,7 @@ export function PoDocumentPreview({
   onSendPo,
   buildPrefill,
   waTemplate,
+  actions,
 }: PoDocumentPreviewProps) {
   const [waText, setWaText] = useState(waTemplate);
   const waRef = useRef<HTMLTextAreaElement | null>(null);
@@ -191,7 +209,7 @@ export function PoDocumentPreview({
           <span />
         </div>
         {group.lines.map((l) => (
-          <SkuRow key={l.sku} line={l} today={today} />
+          <SkuRow key={l.sku} line={l} today={today} actions={actions} />
         ))}
       </div>
 
@@ -239,7 +257,7 @@ export function PoDocumentPreview({
             {dutyHolderName} on PO duty
           </span>
         )}
-        <SnoozeButton supplier={supplierName} />
+        <SnoozeButton supplier={supplierName} onSnooze={actions?.onSnooze} />
         <Btn
           variant="box"
           size="md"
@@ -339,9 +357,11 @@ function orderColText(
 function SkuRow({
   line,
   today,
+  actions,
 }: {
   line: PoPreviewGroup["lines"][number];
   today: string | null;
+  actions?: PoLineActions;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -358,6 +378,29 @@ function SkuRow({
     toast(`${label} — coming soon`);
     setOpen(false);
   };
+  const lineIds = [...(line.lineIds ?? [])];
+  // Real handlers when the caller wired them AND the row knows its source
+  // order_lines; otherwise degrade to the stub toast (previous behaviour).
+  const doSkip =
+    actions?.onSkip && lineIds.length > 0
+      ? () => {
+          actions.onSkip!(lineIds);
+          setOpen(false);
+        }
+      : stub("Skip");
+  const doPushNext =
+    actions?.onPushNext && lineIds.length > 0
+      ? () => {
+          actions.onPushNext!(lineIds);
+          setOpen(false);
+        }
+      : stub("Push to next cycle");
+  const doSendSeparately = actions?.onSendSeparately
+    ? () => {
+        actions.onSendSeparately!(line.sku);
+        setOpen(false);
+      }
+    : stub("Send separately");
   const sizeCode = parseSizeCode(line.sku);
   const deadline = earliestLineDeadline(line.forOrders);
   const isOverdue = !!(deadline && today && deadline < today);
@@ -412,17 +455,17 @@ function SkuRow({
             <MenuItem
               label="Send separately"
               hint="Split into its own PO, sent today"
-              onClick={stub("Send separately")}
+              onClick={doSendSeparately}
             />
             <MenuItem
               label="Push to next cycle"
-              hint="Hold for tomorrow's PO plan"
-              onClick={stub("Push to next cycle")}
+              hint="Hold until the next PO day (Mon/Wed/Fri)"
+              onClick={doPushNext}
             />
             <MenuItem
               label="Skip"
-              hint="Don't buy this line this cycle"
-              onClick={stub("Skip")}
+              hint="Don't buy this line at all"
+              onClick={doSkip}
               danger
             />
           </div>
@@ -462,9 +505,15 @@ function MenuItem({
   );
 }
 
-/** Snooze the whole PO to a target date (next-cycle defer). Stub until the
- *  snooze route ships (Jess 2026-07-23). */
-function SnoozeButton({ supplier }: { supplier: string }) {
+/** Snooze the whole supplier's PO planning to a target date (Purchase §6).
+ *  Wired to POST /snooze when `onSnooze` is provided; otherwise stubs. */
+function SnoozeButton({
+  supplier,
+  onSnooze,
+}: {
+  supplier: string;
+  onSnooze?: (untilIso: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -480,6 +529,45 @@ function SnoozeButton({ supplier }: { supplier: string }) {
     toast(`Snooze ${supplier} PO until ${until} — coming soon`);
     setOpen(false);
   };
+  /** MYT-day helpers — produce an ISO instant for "start of that MYT date". */
+  const isoForMytDate = (d: Date): string => {
+    const myt = new Date(d.getTime() + 8 * 3_600_000);
+    const y = myt.getUTCFullYear();
+    const m = String(myt.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(myt.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}T00:00:00+08:00`;
+  };
+  const nextPoDayIso = (): string => {
+    // Walk forward day-by-day until we land on a Mon/Wed/Fri (MYT).
+    const PO_DAYS = [1, 3, 5];
+    const cur = new Date();
+    for (let i = 1; i <= 7; i++) {
+      const cand = new Date(cur.getTime() + i * 86_400_000);
+      const mytDow = new Date(cand.getTime() + 8 * 3_600_000).getUTCDay();
+      if (PO_DAYS.includes(mytDow)) return isoForMytDate(cand);
+    }
+    return isoForMytDate(new Date(cur.getTime() + 7 * 86_400_000));
+  };
+  const nextWeekIso = (): string =>
+    isoForMytDate(new Date(Date.now() + 7 * 86_400_000));
+  const real = (until: string, label: string) => () => {
+    onSnooze!(until);
+    toast(`${supplier} snoozed until ${label}`);
+    setOpen(false);
+  };
+  const pickDate = () => {
+    // Minimal picker: prompt for YYYY-MM-DD (a full popover calendar is a
+    // polish follow-up; the operator knows the date they have in mind).
+    const raw = window.prompt("Snooze until (YYYY-MM-DD):");
+    if (!raw) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+      toast("Use YYYY-MM-DD, e.g. 2026-08-01");
+      return;
+    }
+    onSnooze!(`${raw.trim()}T00:00:00+08:00`);
+    toast(`${supplier} snoozed until ${raw.trim()}`);
+    setOpen(false);
+  };
   return (
     <div className="relative" ref={wrapRef}>
       <Btn
@@ -493,25 +581,25 @@ function SnoozeButton({ supplier }: { supplier: string }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 bottom-full mb-1 w-[180px] rounded-[8px] border border-base-200 bg-white shadow-lg py-1 z-10"
+          className="absolute right-0 bottom-full mb-1 w-[190px] rounded-[8px] border border-base-200 bg-white shadow-lg py-1 z-10"
         >
           <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.05em] text-base-500">
             Snooze until
           </div>
           <MenuItem
             label="Next PO day"
-            hint="Mon or Thu, whichever is next"
-            onClick={stub("next PO day")}
+            hint="Mon, Wed or Fri — whichever is next"
+            onClick={onSnooze ? real(nextPoDayIso(), "the next PO day") : stub("next PO day")}
           />
           <MenuItem
             label="Next week"
             hint="7 days from today"
-            onClick={stub("next week")}
+            onClick={onSnooze ? real(nextWeekIso(), "next week") : stub("next week")}
           />
           <MenuItem
             label="Pick a date…"
-            hint="Choose any working day"
-            onClick={stub("a chosen date")}
+            hint="Choose any date"
+            onClick={onSnooze ? pickDate : stub("a chosen date")}
           />
         </div>
       )}

@@ -133,6 +133,13 @@ export const purchasePlaceGroupLineSchema = z.object({
    * The drawer's "Buy cost" total = Σ(cost × need), hidden when 0/null.
    */
   cost: z.number().nullable(),
+  /**
+   * Every source `order_lines.id` aggregated into this SKU row. Purchase §6
+   * line-⋮ actions (Skip / Push to next cycle) target all of them — the row
+   * represents a supplier×SKU aggregation, so muting the row mutes every
+   * constituent order_line.
+   */
+  lineIds: z.array(z.string()).default([]),
 });
 export type PurchasePlaceGroupLine = z.infer<typeof purchasePlaceGroupLineSchema>;
 
@@ -557,6 +564,9 @@ export function buildPurchaseTodayReport(
     cost: number | null;
     rank: number;
     orderBy: string | null;
+    /** Every source order_line.id feeding this SKU aggregation — Purchase §6
+     *  ⋮ Skip / Push-to-next mute every constituent line. */
+    lineIds: Set<string>;
   }
   interface PlaceGroupAcc {
     supplierId: string;
@@ -569,6 +579,17 @@ export function buildPurchaseTodayReport(
   const groupAcc = new Map<string, PlaceGroupAcc>();
   for (const b of toPlace) {
     const bRank = rank[b.urgency];
+    // Pre-compute lineIds per SKU for this bundle (Purchase §6 support). A
+    // bundle can span multiple SKUs (e.g. bed-set = mattress + bedframe), so
+    // we bucket its raw lineIds by their constituent SKU via lineById.
+    const lineIdsBySku = new Map<string, string[]>();
+    for (const lineId of b.lineIds) {
+      const r = lineById.get(lineId);
+      if (!r) continue;
+      const sku = r.line.sku;
+      if (!lineIdsBySku.has(sku)) lineIdsBySku.set(sku, []);
+      lineIdsBySku.get(sku)!.push(lineId);
+    }
     for (const it of b.items) {
       let g = groupAcc.get(it.supplierId);
       if (!g) {
@@ -600,6 +621,7 @@ export function buildPurchaseTodayReport(
           cost: costMap.get(it.sku) ?? null,
           rank: Number.MAX_SAFE_INTEGER,
           orderBy: null,
+          lineIds: new Set(),
         };
         g.lines.set(it.sku, ln);
       }
@@ -610,6 +632,9 @@ export function buildPurchaseTodayReport(
         deliveryDate: b.deadline,
         ref: refMap.get(b.orderId) ?? null,
       });
+      for (const lid of lineIdsBySku.get(it.sku) ?? []) {
+        ln.lineIds.add(lid);
+      }
       // The line's order-by = its MOST-URGENT order's raise-by (rank, then earliest).
       if (
         bRank < ln.rank ||
@@ -635,6 +660,7 @@ export function buildPurchaseTodayReport(
           orderBy: ln.orderBy,
           ready: ln.ready,
           cost: ln.cost,
+          lineIds: [...ln.lineIds],
         }))
         .sort((a, b) => b.need - a.need || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
       return {
