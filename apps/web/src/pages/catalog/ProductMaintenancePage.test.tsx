@@ -46,23 +46,23 @@ describe("ProductMaintenancePage — ?section= tab contract", () => {
   afterEach(cleanup);
 
   it("defaults to SKU Master without ?section=", () => {
-    renderAt("/operation?tab=catalog");
+    renderAt("/principal?tab=catalog");
     expect(screen.getByText("SKU-TAB-BODY")).toBeInTheDocument();
   });
 
   it("mounts the tab named by ?section=", () => {
-    renderAt("/operation?tab=catalog&section=promo");
+    renderAt("/principal?tab=catalog&section=promo");
     expect(screen.getByText("PROMO-TAB-BODY")).toBeInTheDocument();
     expect(screen.queryByText("SKU-TAB-BODY")).not.toBeInTheDocument();
   });
 
   it("falls back to SKU Master on an unknown ?section=", () => {
-    renderAt("/operation?tab=catalog&section=nope");
+    renderAt("/principal?tab=catalog&section=nope");
     expect(screen.getByText("SKU-TAB-BODY")).toBeInTheDocument();
   });
 
   it("pill click writes ?section= (keeping ?tab=catalog) and swaps the body", () => {
-    renderAt("/operation?tab=catalog");
+    renderAt("/principal?tab=catalog");
     fireEvent.click(screen.getByTestId("pm-tab-modular"));
     expect(screen.getByText("MODULAR-TAB-BODY")).toBeInTheDocument();
     const search = screen.getByTestId("loc").textContent ?? "";

@@ -150,11 +150,11 @@ export default function PosSidebar({
             <Plus size={16} strokeWidth={1.75} />
             <span>New Order</span>
           </Link>
-          {/* Products lives in the Operations area (catalog dedup 2026-06-30);
-              linking the canonical door keeps the rail's catalog sub-tabs in
-              play. The old /principal?tab=catalog URL still redirects. */}
+          {/* Products = the selling Product & Maintenance, an ADMIN door since
+              the catalog split (Loo 2026-07-25). Costing lives separately in
+              Operations as the Operation Catalog. */}
           <Link
-            to="/operation?tab=catalog"
+            to="/principal?tab=catalog"
             className="cat-side__item"
             data-testid="pos-maintain-products"
           >

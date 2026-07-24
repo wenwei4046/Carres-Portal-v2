@@ -13,7 +13,6 @@ import {
   visibleGroups,
   visibleItems,
   navItemHref,
-  navSubItemHref,
   areaDefaultHref,
   type PortalArea,
   type PortalNavGroup,
@@ -288,75 +287,42 @@ export default function PortalSidebar() {
                         const cls = active
                           ? `${baseCls} bg-base-100 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
-                        // Section links (the page's own tab bar mirrored into
-                        // the rail — P&M's catalog tabs) show only while their
-                        // item is active; `?<param>=` picks the live one.
-                        const sub = active ? item.sub : undefined;
-                        const currentSub = sub
-                          ? (new URLSearchParams(location.search).get(sub.param) ??
-                            sub.defaultKey)
-                          : null;
                         return (
-                          <div key={item.key} className="flex flex-col gap-0.5">
-                            <Link
-                              to={navItemHref(group, item)}
-                              onClick={() => fireMarkSeen(item.badge)}
-                              className={cls}
-                            >
-                              {active && (
-                                <span
-                                  className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
-                                  style={{ width: 3 }}
-                                />
-                              )}
-                              <item.icon
-                                size={18}
-                                strokeWidth={2}
-                                className={`shrink-0 ${
-                                  active ? "text-primary" : "text-base-400"
-                                }`}
+                          <Link
+                            key={item.key}
+                            to={navItemHref(group, item)}
+                            onClick={() => fireMarkSeen(item.badge)}
+                            className={cls}
+                          >
+                            {active && (
+                              <span
+                                className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
+                                style={{ width: 3 }}
                               />
-                              <span className="flex-1">{item.label}</span>
-                              {item.badge && (
-                                <NavBadge
-                                  count={badgeCount[item.badge] ?? 0}
-                                  label={item.label}
-                                />
-                              )}
-                              {item.pendingPill && pendingCount > 0 && (
-                                <span
-                                  className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-[10px] font-bold text-center"
-                                  style={{ minWidth: 16 }}
-                                >
-                                  {pendingCount}
-                                </span>
-                              )}
-                            </Link>
-                            {sub && (
-                              <div
-                                role="group"
-                                aria-label={`${item.label} sections`}
-                                className="flex flex-col pb-1"
-                              >
-                                {sub.items.map((s) => {
-                                  const subActive = s.key === currentSub;
-                                  return (
-                                    <Link
-                                      key={s.key}
-                                      to={navSubItemHref(group, item, s.key)}
-                                      className={`w-full text-left pl-[43px] pr-3.5 py-[6px] rounded text-[12px] ${
-                                        subActive
-                                          ? "bg-base-100 text-base-900 font-semibold"
-                                          : "text-base-500 font-medium hover:bg-hovertint hover:text-base-800"
-                                      }`}
-                                    >
-                                      {s.label}
-                                    </Link>
-                                  );
-                                })}
-                              </div>
                             )}
-                          </div>
+                            <item.icon
+                              size={18}
+                              strokeWidth={2}
+                              className={`shrink-0 ${
+                                active ? "text-primary" : "text-base-400"
+                              }`}
+                            />
+                            <span className="flex-1">{item.label}</span>
+                            {item.badge && (
+                              <NavBadge
+                                count={badgeCount[item.badge] ?? 0}
+                                label={item.label}
+                              />
+                            )}
+                            {item.pendingPill && pendingCount > 0 && (
+                              <span
+                                className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-[10px] font-bold text-center"
+                                style={{ minWidth: 16 }}
+                              >
+                                {pendingCount}
+                              </span>
+                            )}
+                          </Link>
                         );
                       })}
                     </div>
