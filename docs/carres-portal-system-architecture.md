@@ -196,7 +196,8 @@ Use these actual names in test data. Do NOT invent staff. **Whole operation team
 - **Rotation locked:** Jul PO=Shasha / GRN=Yu Jun · Aug PO=Yu Jun / GRN=Khor Yee · Sep PO=Khor Yee / GRN=Shasha · loops.
 - **PO days: Mon / Wed / Fri (MYT)** — the 3 batching days for bedframe + mattress. Sofa POs can go any day (one PO per SO, dye-lot). URGENT BYPASS: order deadline inside stock lead window (MS/BF 7d · Sofa 5d) fires red on ANY day, must not wait for PO day.
 - **Purchase middle panel shows TWO chips: PO duty holder + GRN duty holder.** NOT a per-person workload strip (that pattern belongs to Orders panel where PIC filters real order counts).
-- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri). Migration `0236_ops_po_duty.sql` seed (Jul Shasha → Aug Li Ching → Sep Khor Yee) needs update — replace "liching@carres.com" with the Yu Jun account for Aug; Sep = Khor Yee stays.
+- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri).
+- Migration `0236_ops_po_duty.sql` seed originally wrote `Jul=Shasha · Aug=Li Ching · Sep=Khor Yee`. Prod was manually corrected on 2026-07-18 16:35 (~47min after the seed) — the Aug row was updated to `yujun@carres.com` (real account). **Prod state verified 2026-07-24 = Jul Shasha · Aug Yu Jun · Sep Khor Yee, all correct.** No follow-up migration needed. The originally-proposed 0243 reseed migration was DROPPED (would have destroyed the manual correction).
 
 ### 3.13 · Purchase — line-change policy (LOCKED · Jess 2026-07-24)
 
