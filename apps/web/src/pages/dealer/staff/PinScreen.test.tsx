@@ -125,6 +125,38 @@ describe("PinScreen", () => {
     fireEvent.click(screen.getByTestId("staff-forgot-pin"));
     expect(onForgot).toHaveBeenCalled();
   });
+
+  it("multi-outlet: the outlet pill shows the outlet name and fires onSwitchOutlet", () => {
+    const onSwitch = vi.fn();
+    render(
+      <PinScreen
+        staff={ROSTER}
+        sessionOutletId="o1"
+        dealerId="d1"
+        outletLabel="Kota Damansara"
+        onForgotPin={() => {}}
+        onSwitchOutlet={onSwitch}
+      />,
+    );
+    const pill = screen.getByTestId("staff-outlet-switch");
+    expect(pill.textContent).toMatch(/Kota Damansara/);
+    fireEvent.click(pill);
+    expect(onSwitch).toHaveBeenCalled();
+  });
+
+  it("single-outlet (no onSwitchOutlet): the eyebrow stays static — no pill", () => {
+    render(
+      <PinScreen
+        staff={ROSTER}
+        sessionOutletId="o1"
+        dealerId="d1"
+        outletLabel="Kota Damansara"
+        onForgotPin={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("staff-outlet-switch")).toBeNull();
+    expect(screen.getByText("Kota Damansara")).toBeTruthy();
+  });
 });
 
 // Guards the keypad extraction: the shared PinPad still emits os-pin-* testids

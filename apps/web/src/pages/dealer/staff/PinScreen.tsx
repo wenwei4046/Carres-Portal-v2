@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 import { branchNoun, type StaffDto, type StoreChannel } from "@carres/shared";
 import CarresLockup from "@/components/CarresLockup";
 import { ApiError } from "@/lib/api";
@@ -18,6 +18,10 @@ import { staffGateColorHex, staffInitials, TIER_LABEL } from "./staff-ui";
  * Tiles are filtered to the working outlet: a member's own outlet matches, an
  * outlet-less member (principal / floater) always shows, and a principal-tier
  * member shows in every outlet (they own the store).
+ *
+ * Multi-outlet stores get a tappable outlet pill in place of the static
+ * eyebrow: the working outlet is chosen ONCE per tab and persisted, so without
+ * it staff of an outlet added later could never reach their own tiles.
  */
 export default function PinScreen({
   staff,
@@ -26,6 +30,7 @@ export default function PinScreen({
   outletLabel,
   storeChannel = "dealer",
   onForgotPin,
+  onSwitchOutlet,
 }: {
   staff: StaffDto[];
   sessionOutletId: string | null;
@@ -34,9 +39,12 @@ export default function PinScreen({
   /** Names the branch in the empty-state copy — outlet vs showroom. */
   storeChannel?: StoreChannel;
   onForgotPin: () => void;
+  /** Set only for multi-outlet stores — reopens the outlet picker. */
+  onSwitchOutlet?: () => void;
 }) {
   const setSession = useStaffSession((s) => s.setSession);
   const [picked, setPicked] = useState<StaffDto | null>(null);
+  const branch = branchNoun(storeChannel).toLowerCase();
 
   const visible = useMemo(
     () =>
@@ -80,7 +88,20 @@ export default function PinScreen({
         <div className="staff-gate__lockup">
           <CarresLockup size={24} />
         </div>
-        <div className="staff-gate__eyebrow">{outletLabel || "Sign in"}</div>
+        {onSwitchOutlet ? (
+          <button
+            type="button"
+            className="staff-gate__outlet-switch"
+            onClick={onSwitchOutlet}
+            title={`Switch ${branch}`}
+            data-testid="staff-outlet-switch"
+          >
+            {outletLabel || `Pick ${branch}`}
+            <ChevronsUpDown size={12} strokeWidth={2} />
+          </button>
+        ) : (
+          <div className="staff-gate__eyebrow">{outletLabel || "Sign in"}</div>
+        )}
         <h2 className="staff-gate__title">Tap your name</h2>
         <p className="staff-gate__sub">
           Enter your 6-digit PIN to start. Every order is recorded under you.

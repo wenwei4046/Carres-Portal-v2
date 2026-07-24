@@ -3546,6 +3546,24 @@
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt);
   margin-bottom: 6px;
 }
+/* Multi-outlet stores: the eyebrow becomes a tappable switcher pill — the
+   working outlet persists per tab, so staff at a branch added later need a
+   way back to the picker. Pill + border so it reads pressable on touch. */
+.staff-gate__outlet-switch {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-burnt);
+  background: color-mix(in oklab, var(--c-orange) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--c-orange) 26%, transparent);
+  border-radius: 999px; padding: 5px 12px; margin-bottom: 6px;
+  cursor: pointer; transition: 120ms ease;
+}
+.staff-gate__outlet-switch:hover {
+  background: color-mix(in oklab, var(--c-orange) 16%, transparent);
+  border-color: var(--c-orange);
+}
+.staff-gate__outlet-switch:active { transform: scale(0.96); }
+.staff-gate__outlet-switch svg { flex: 0 0 auto; }
 .staff-gate__title {
   font-family: var(--font-title); font-weight: 900; font-size: 26px;
   letter-spacing: -0.01em; margin-bottom: 6px;

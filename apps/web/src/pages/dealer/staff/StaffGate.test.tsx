@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { useStaffSession } from "@/lib/staff";
 
@@ -111,6 +111,59 @@ describe("StaffGate branching", () => {
     mount();
     expect(await screen.findByTestId("app-children")).toBeTruthy();
     expect(useStaffSession.getState().token).toBeNull();
+  });
+
+  it("a persisted outlet doesn't trap staff of a later-added outlet — the PIN screen's pill reopens the picker", () => {
+    // The store activated single-outlet: o1 was auto-selected + persisted for
+    // the tab. A second outlet o2 (with its own salesperson) was added later —
+    // without the pill, the picker's sessionOutletId===null condition never
+    // fires again and that salesperson has nowhere to sign in.
+    useStaffSession.getState().setSessionOutlet("o1");
+    const member = (over: Record<string, unknown>) => ({
+      dealerId: "d1", phone: null, userId: null, color: "flame", active: true, hasPin: true, ...over,
+    });
+    staffListState.data = {
+      staff: [
+        member({ id: "own", outletId: null, name: "Owner", staffRole: "principal" }),
+        member({ id: "mgr", outletId: "o1", name: "Alvin", staffRole: "manager" }),
+        member({ id: "sp2", outletId: "o2", name: "Ahsihas", staffRole: "salesperson" }),
+      ],
+      activated: true,
+      selfStaffId: null,
+      storeKind: "dealer",
+    };
+    staffListState.isPending = false;
+    outletsState.data = { outlets: [OUTLET("o1"), OUTLET("o2")] };
+    outletsState.isPending = false;
+    mount();
+
+    // PIN screen scoped to o1 — the o2 salesperson has no tile yet.
+    expect(screen.getByTestId("staff-pin-screen")).toBeTruthy();
+    expect(screen.queryByTestId("staff-tile-sp2")).toBeNull();
+
+    // The pill reopens the picker; picking o2 surfaces them (owner crosses,
+    // the o1 manager drops out).
+    fireEvent.click(screen.getByTestId("staff-outlet-switch"));
+    expect(screen.getByTestId("staff-outlet-picker")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("staff-outlet-o2"));
+    expect(screen.getByTestId("staff-tile-sp2")).toBeTruthy();
+    expect(screen.getByTestId("staff-tile-own")).toBeTruthy();
+    expect(screen.queryByTestId("staff-tile-mgr")).toBeNull();
+  });
+
+  it("single-outlet store: no switch pill on the PIN screen", async () => {
+    staffListState.data = {
+      staff: [{ id: "s1", dealerId: "d1", outletId: "o1", name: "Ben", phone: null, userId: null, staffRole: "salesperson", color: "flame", active: true, hasPin: true }],
+      activated: true,
+      selfStaffId: null,
+      storeKind: "dealer",
+    };
+    staffListState.isPending = false;
+    outletsState.data = { outlets: [OUTLET("o1")] };
+    outletsState.isPending = false;
+    mount();
+    expect(await screen.findByTestId("staff-pin-screen")).toBeTruthy();
+    expect(screen.queryByTestId("staff-outlet-switch")).toBeNull();
   });
 
   it("a stale session from a DIFFERENT dealer is dropped (shared kiosk)", () => {
