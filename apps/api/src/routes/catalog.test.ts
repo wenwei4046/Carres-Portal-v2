@@ -2784,8 +2784,9 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     );
     expect(res.status).toBe(200);
 
-    // The synced compartment sku: real product_skus row, pos_active OFF (never in
-    // the flat POS grid), variant_kind 'part', deterministic {MODEL_KEY}-{code}
+    // The synced compartment sku: real product_skus row, pos_active ON (offer =
+    // on sale, Loo 2026-07-24 — the POS model card needs ≥1 sellable sku),
+    // variant_kind 'part', deterministic {MODEL_KEY}-{code}
     // sku, inherited supplier, the override price, compartment_id linked, and
     // the "Sofa {Model} {code}" description (Loo 2026-07-06 — names the
     // model+compartment pair, NOT the pool compartment's own description).
@@ -2798,7 +2799,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       variant_kind: "part",
       price: 280,
       supplier_id: "sup-ohana",
-      pos_active: false,
+      pos_active: true,
       description: "Sofa Ohana 1A(LHF)",
       discontinued_at: null,
     });
@@ -2843,7 +2844,77 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     // fixture carries 250) is deliberately IGNORED (Loo 2026-07-20): prices
     // live in SKU Master only — legacy pool prices must never leak onto a
     // fresh model's SKUs.
-    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: false });
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: true });
+  });
+
+  it("PUT — re-offer of a LIVE row preserves price AND pos_active (no clobber of a manual OFF)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
+          sofa_compartments: [COMP_ROW],
+          // Supplier read + collision read share the fixture; the existing
+          // compartment sku row (compartment_id set, NOT discontinued) makes
+          // this a re-offer of a live row.
+          product_skus: [
+            { model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" },
+            { sku: "OHANA-1A(LHF)", compartment_id: COMP_ID, discontinued_at: null },
+          ],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // 2026-07-06 (1A(LHF) mystery) — the SKU-Master-authored price and the
+    // Modular-authored ON/OFF both survive a live-row re-offer untouched.
+    expect(skuUpsert?.payload).not.toHaveProperty("price");
+    expect(skuUpsert?.payload).not.toHaveProperty("pos_active");
+  });
+
+  it("PUT — re-offer of a previously UN-offered row flips pos_active back ON (untick→re-tick round-trips)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
+          sofa_compartments: [COMP_ROW],
+          // The existing row was un-offered (discontinued_at set → its OFF was
+          // forced by discontinueCompartmentSku, not chosen by the principal).
+          product_skus: [
+            { model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" },
+            { sku: "OHANA-1A(LHF)", compartment_id: COMP_ID, discontinued_at: "2026-07-20T00:00:00Z" },
+          ],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // Back on sale + re-activated; price still preserved (SKU Master owns it).
+    expect(skuUpsert?.payload).toMatchObject({ pos_active: true, discontinued_at: null });
+    expect(skuUpsert?.payload).not.toHaveProperty("price");
   });
 
   it("PUT — unknown model → 404 fail-closed (no offered row written)", async () => {

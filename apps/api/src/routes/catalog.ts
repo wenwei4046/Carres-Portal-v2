@@ -365,8 +365,8 @@ catalogRouter.get("/", async (c) => {
     // Each offered row is enriched with `skuPrice` — the synced
     // `{MODEL_KEY}-{code}` compartment SKU's price (SKU Master), which is the
     // authoritative à-la-carte price source (Loo, 2026-07-05). Joined from
-    // `allSkus` (pre-pos_active-filter — compartment skus are pos_active=false
-    // by design and must still price the builder in the non-admin POS bundle).
+    // `allSkus` (pre-pos_active-filter — a compartment sku the principal
+    // toggled OFF must still price the builder in the non-admin POS bundle).
     modelSofaCompartments: (() => {
       const compSkuPrice = new Map<string, number>();
       // 0204 — the synced SKU's {size → RM} map, enriched alongside skuPrice so
