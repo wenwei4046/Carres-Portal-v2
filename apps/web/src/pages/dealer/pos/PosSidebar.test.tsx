@@ -47,8 +47,10 @@ describe("PosSidebar", () => {
     renderSidebar();
     expect(screen.getByTestId("pos-maintain")).toBeTruthy();
     expect(screen.getByTestId("pos-maintain-new-order")).toBeTruthy();
+    // Products → the canonical Operations-area catalog door (so the rail's
+    // catalog sub-tabs are in play); /principal?tab=catalog only redirects.
     expect(screen.getByTestId("pos-maintain-products").getAttribute("href")).toContain(
-      "/principal?tab=catalog",
+      "/operation?tab=catalog",
     );
     // SO Maintenance tab deleted 2026-07-12 — no Maintain link to it anymore.
     expect(screen.queryByTestId("pos-maintain-so-maintenance")).toBeNull();
