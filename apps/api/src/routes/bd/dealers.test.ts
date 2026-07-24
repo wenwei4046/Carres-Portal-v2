@@ -92,4 +92,100 @@ describe("GET /api/bd/dealers/activity", () => {
     expect(body.rows).toHaveLength(1);
     expect(body.rows[0].dealerName).toBe("AutoCount Archive (旧账)");
   });
+
+  // Loo 2026-07-25 — BD sees dealers only: a showroom-touching audit event
+  // stays off the BD activity feed.
+  it("drops events that touch a showroom-channel store", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: any = {
+      select: () => chain,
+      not: () => chain,
+      order: () => chain,
+      limit: async () => ({ data: [AUDIT_ROW], error: null }),
+      in: async () => ({
+        data: [{ id: AUDIT_ROW.dealer_id, name: "Carres Kelana Jaya", channel: "showroom" }],
+        error: null,
+      }),
+    };
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { from: () => chain, rpc: async () => ({ data: null, error: null }) } as any,
+    );
+    const jwt = await makeJwt("bd");
+    const res = await app.fetch(
+      new Request("http://t/api/bd/dealers/activity", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[] };
+    expect(body.rows).toHaveLength(0);
+  });
+});
+
+describe("GET /api/bd/dealers — dealers only (Loo 2026-07-25)", () => {
+  const DEALER_ID = "3c592174-ca17-424e-af06-4c5331c3e34a";
+  const SHOWROOM_ID = "9a592174-ca17-424e-af06-4c5331c3e34b";
+
+  function mockListUser() {
+    return {
+      rpc: async () => ({
+        data: [
+          { id: DEALER_ID, name: "litte mattress sdn bhd", region: "KV", contact: null, status: "active", joined_date: null, order_count: 2, gmv: 100, outstanding: 0 },
+          { id: SHOWROOM_ID, name: "Carres Kelana Jaya", region: "KV", contact: null, status: "active", joined_date: null, order_count: 5, gmv: 500, outstanding: 0 },
+        ],
+        error: null,
+      }),
+      from: () => ({
+        select: async () => ({
+          data: [
+            { id: DEALER_ID, channel: "dealer" },
+            { id: SHOWROOM_ID, channel: "showroom" },
+          ],
+          error: null,
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("the list DROPS showroom-channel stores entirely", async () => {
+    vi.mocked(userClient).mockReturnValue(mockListUser());
+    const jwt = await makeJwt("bd");
+    const res = await app.fetch(
+      new Request("http://t/api/bd/dealers", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { dealers: Array<{ id: string; channel: string }> };
+    expect(body.dealers).toHaveLength(1);
+    expect(body.dealers[0].id).toBe(DEALER_ID);
+    expect(body.dealers[0].channel).toBe("dealer");
+  });
+
+  it("GET /:id 404s a showroom id (no drill-down leak)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { channel: "showroom" }, error: null }),
+            }),
+          }),
+        }),
+        rpc: async () => ({ data: null, error: null }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    );
+    const jwt = await makeJwt("bd");
+    const res = await app.fetch(
+      new Request(`http://t/api/bd/dealers/${SHOWROOM_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
 });

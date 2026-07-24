@@ -1273,3 +1273,45 @@ export type {
   ServiceVisitStatus,
 } from "./domain";
 export * from "./schemas/rental";
+
+// 0244/0245 — HR commission portal: the PURE month calculator (percentage w/
+// manager override + per-model volume tiers + milestones) shared by the Hono
+// report route and any web preview. Config comes from the 0245 tables via
+// hr_commission_source.
+export {
+  computeCommission,
+  resolveMethod,
+  resolveRate,
+  type CommissionMethod,
+  type CommissionStaff,
+  type CommissionLine,
+  type CommissionSchemeRow,
+  type StaffRateRow,
+  type ModelRateRow,
+  type ModelTierRow,
+  type MilestoneRow,
+  type CommissionConfig,
+  type OverrideDetail,
+  type PerModelDetail,
+  type MilestoneHit,
+  type StaffCommissionResult,
+  type CommissionReport,
+} from "./commission";
+export {
+  commissionMethodSchema,
+  hrReportQuerySchema,
+  setCommissionSchemeInput,
+  setStaffRateInput,
+  setModelRateInput,
+  setModelTiersInput,
+  setMilestonesInput,
+  hrAssignSalespersonInput,
+  type CommissionMethodValue,
+  type HrReportQuery,
+  type SetCommissionSchemeInput,
+  type SetStaffRateInput,
+  type SetModelRateInput,
+  type SetModelTiersInput,
+  type SetMilestonesInput,
+  type HrAssignSalespersonInput,
+} from "./schemas/hr";

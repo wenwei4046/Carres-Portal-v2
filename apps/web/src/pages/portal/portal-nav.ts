@@ -23,6 +23,9 @@ import {
   Network,
   ScrollText,
   Settings,
+  HandCoins,
+  UserCheck,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -55,7 +58,7 @@ import type { Role } from "@carres/shared/domain";
  * page there (stale-link fallback).
  */
 
-export type PortalArea = "operation" | "finance" | "principal";
+export type PortalArea = "operation" | "finance" | "hr" | "principal";
 
 /** Operation badge keys surfaced as nav counters (reuses the 0083 unread set). */
 export type PortalBadge = "orders" | "procurement" | "service-notes";
@@ -205,6 +208,21 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: BarChart3,
         financePath: "/finance/reports",
       },
+    ],
+  },
+  {
+    // 0244/0245 (Loo 2026-07-25) — HR area: commission calculation for Carres'
+    // OWN sales executives (showroom-channel staff; dealers excluded by the
+    // gated hr_commission_source RPC). No base payroll — commission only.
+    area: "hr",
+    label: "HR",
+    base: "/hr",
+    roles: ["hr", "principal"],
+    defaultTab: "commission",
+    items: [
+      { key: "commission", label: "Commission", icon: HandCoins },
+      { key: "attribution", label: "Attribution", icon: UserCheck },
+      { key: "setup", label: "Commission Setup", icon: SlidersHorizontal },
     ],
   },
   {
