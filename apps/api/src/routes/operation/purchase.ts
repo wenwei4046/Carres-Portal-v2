@@ -201,7 +201,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   const { data: orderRows, error: orderErr } = await sb
     .from("orders")
     .select(
-      "id, so, customer_name, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
+      "id, so, customer_name, source_ref, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
     )
     .in("status", ["place", "proceed_order"]);
   if (orderErr) {
@@ -219,6 +219,17 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   for (const o of orders) {
     customerNameByOrderId[o.id as string] =
       ((o.customer_name as string | null) ?? null) || null;
+  }
+  // Customer-facing REF per order — LEAD token of `orders.source_ref[]` (e.g.
+  // "CR-2025-0812"). Suppliers key off this ref, not the SO number. Native
+  // (POS) orders with no imported ref carry null; UI falls back to SO-N there.
+  const refByOrderId: Record<string, string | null> = {};
+  for (const o of orders) {
+    const arr = (o as { source_ref?: unknown }).source_ref;
+    const lead = Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "string"
+      ? (arr[0] as string)
+      : null;
+    refByOrderId[o.id as string] = lead;
   }
 
   // No live orders → nothing to buy. Short-circuit (skip the supply reads).
@@ -425,6 +436,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     costBySku,
     chaseReceive,
     modelNameBySku,
+    refByOrderId,
   );
 
   return c.json(purchaseTodayResponseSchema.parse(report));
