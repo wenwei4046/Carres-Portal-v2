@@ -174,17 +174,16 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 
 Same 4 widgets · content adapts to LEFT context.
 
-### 3.12 · Operation team roster (LOCKED · corrected Jess 2026-07-24)
+### 3.12 · Operation team roster (LOCKED · corrected Jess 2026-07-24 · v2)
 
 - **Jess** — Principal / COO. Owns Product & Maintenance, principal-only actions. **Monitor + escalation only — NOT in duty pool, NOT in team chip, never auto-assigned tasks.**
-- **Manly** (曼丽) — **current PO duty holder** (see §3.16 duty concept).
-- **Shasha** — active operator
-- **Sha** — active (reception + ops)
-- **Alvin** — active (added 2026-07-19)
-- **Yu Jun** (YJ) — active (joined 2026-07-20)
-- **Khor Yee** (KY) — active (joins 2026-08-01)
-- **Samantha** — RESIGNED (remove from all UI)
-- ~~Li Ching · Joy~~ — **DO NOT EXIST · never did.** Delete any references in seed data, migrations, dropdowns, docs.
+- **Shasha** (SH · teal-mint chip) — active operator · **July PO duty** (yesterday-checkpoint truth confirmed by Jess 2026-07-24).
+- **Yu Jun** (YJ · lavender chip) — active operator · joined 2026-07-20 · **July GRN duty (offset-1 from PO)**.
+- **Khor Yee** (KY · pink chip) — active operator · joins 2026-08-01.
+- **Sha** — active (reception + ops) · in wider staff but NOT in Purchase duty pool.
+- **Alvin** — active (added 2026-07-19) · in wider staff but NOT in Purchase duty pool.
+- **Samantha** — RESIGNED (remove from all UI).
+- ~~Li Ching · Joy · Manly (曼丽)~~ — **DO NOT EXIST · never did.** Delete any references in seed data, migrations, dropdowns, docs. (Manly was my mishearing 2026-07-24 morning — Jess corrected: Shasha = July PO duty per yesterday's checkpoint.)
 
 Use these actual names in test data. Do NOT invent staff. **Whole operation team shares ONE login: `operation@carresofficial.com`** — no per-user auth; PIC identity is a soft in-app tag on `orders.pic`, not tied to `auth.users`.
 
@@ -192,10 +191,12 @@ Use these actual names in test data. Do NOT invent staff. **Whole operation team
 
 - **人分单,货合买.** PIC owns the customer relationship (via `orders.pic`). Purchase orders consolidate company-wide.
 - **PO duty = ONE person handles ALL PO send + chase for the month.** Not distributed by PIC. Not a team workload split. Monthly rotation (calendar month, MYT). Management (COO / operations manager) may override.
-- **GRN duty = ANOTHER SINGLE person handles all GRN receiving for the month.** Independent slot from PO duty. Same monthly rotation model.
+- **GRN duty = ANOTHER SINGLE person handles all GRN receiving for the month.** Independent slot from PO duty. Same monthly rotation, **offset-1 from PO** (so when Shasha is PO, Yu Jun is GRN — never same person).
+- **Duty pool for Purchase = Shasha · Yu Jun · Khor Yee only.** Sha / Alvin are wider staff but do NOT rotate on Purchase duties. Jess (COO) is monitor + escalation, never on duty.
+- **Rotation locked:** Jul PO=Shasha / GRN=Yu Jun · Aug PO=Yu Jun / GRN=Khor Yee · Sep PO=Khor Yee / GRN=Shasha · loops.
 - **PO days: Mon / Wed / Fri (MYT)** — the 3 batching days for bedframe + mattress. Sofa POs can go any day (one PO per SO, dye-lot). URGENT BYPASS: order deadline inside stock lead window (MS/BF 7d · Sofa 5d) fires red on ANY day, must not wait for PO day.
 - **Purchase middle panel shows TWO chips: PO duty holder + GRN duty holder.** NOT a per-person workload strip (that pattern belongs to Orders panel where PIC filters real order counts).
-- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri). Migration `0236_ops_po_duty.sql` seed (Jul Shasha → Aug Li Ching → Sep Khor Yee) is WRONG — Jul = Manly; Li Ching row is dead; Aug/Sep to be re-set by Jess.
+- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri). Migration `0236_ops_po_duty.sql` seed (Jul Shasha → Aug Li Ching → Sep Khor Yee) needs update — replace "liching@carres.com" with the Yu Jun account for Aug; Sep = Khor Yee stays.
 
 ### 3.13 · Purchase — line-change policy (LOCKED · Jess 2026-07-24)
 

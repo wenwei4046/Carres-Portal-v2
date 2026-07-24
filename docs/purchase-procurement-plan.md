@@ -114,8 +114,9 @@ Longest promised date = lost sales. Fight staff's habit of padding "to be safe":
 ## Duty concept (LOCKED 2026-07-24)
 
 - **PO duty = ONE person handles ALL PO send + chase, company-wide, per month.** Not distributed by PIC. See architecture §3.16.
-- **GRN duty = another single person** — separate slot.
-- **Manly = July PO duty holder** (owner call, supersedes migration 0236 seed).
+- **GRN duty = another single person, offset-1 from PO** (Jul PO=Shasha → GRN=Yu Jun).
+- **Rotation locked:** Jul PO=Shasha / GRN=Yu Jun · Aug PO=Yu Jun / GRN=Khor Yee · Sep PO=Khor Yee / GRN=Shasha · loops.
+- Duty pool for Purchase = Shasha · Yu Jun · Khor Yee only. Sha / Alvin = wider staff, do NOT rotate on Purchase duties. Jess (COO) = monitor + escalation, never on duty.
 - Middle Purchase panel shows two chips (PO duty · GRN duty) — NOT a per-person workload strip.
 - Team login is shared: `operation@carresofficial.com`. PIC on `orders.pic` is a soft in-app tag.
 
