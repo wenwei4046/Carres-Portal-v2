@@ -12,7 +12,7 @@ import {
   Store,
   Users,
 } from "lucide-react";
-import { isShowroom, type Order } from "@carres/shared";
+import type { Order } from "@carres/shared";
 import { useBdDealers, useOrders, useOutlets, useSalespersons } from "@/lib/queries";
 import { laneOf } from "@/pages/dealer/pos/order-edit-scope";
 import {
@@ -38,11 +38,16 @@ import PosOrderDetail from "@/pages/dealer/pos/PosOrderDetail";
  *     shared showroom tablet;
  *   - summary card 1 = the network (or the picked dealer); card 2 compares
  *     the picked dealer and carries its ALL-TIME totals (dealers_with_stats);
- *   - the store dropdown (grouped Our showrooms / Dealers, store-kind rule)
- *     replaces the salesperson one until a store is picked; a picked store
- *     with ≥2 outlets adds an Outlet level between them, and salespeople come
- *     LAST, scoped to the picked store/outlet (Loo 2026-07-25 cascade);
- *   - "All stores" mode hides AutoCount-archive imports (they'd flood the
+ *   - BD sees DEALERS only (Loo 2026-07-25): /api/bd/dealers drops Carres'
+ *     own showrooms, and the board gates its ORDERS to that dealer-id set
+ *     too — a showroom's orders never surface here (they'd otherwise ride in
+ *     on bd's internal JWT). The principal's all-stores view lives on
+ *     OrderStatusPage instead;
+ *   - the dealer dropdown replaces the salesperson one until a dealer is
+ *     picked; a picked dealer with ≥2 outlets adds an Outlet level between
+ *     them, and salespeople come LAST, scoped to the picked dealer/outlet
+ *     (Loo 2026-07-25 cascade);
+ *   - "All dealers" mode hides AutoCount-archive imports (they'd flood the
  *     Proceed lane); picking their store still shows them, store-board rules.
  *
  * Card click opens the SAME PosOrderDetail drawer — BD edits under the store's
@@ -77,20 +82,16 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
     for (const d of dealers) m.set(d.id, d.name);
     return m;
   }, [dealers]);
-  // Store menu grouped Our showrooms / Dealers (store-kind naming rule).
+  // BD sees DEALERS only (Loo 2026-07-25) — /api/bd/dealers already drops
+  // Carres' own showrooms, so the menu is a flat dealer list, and this id set
+  // gates the ORDERS below too (bd's internal JWT reads every store's orders;
+  // a showroom's must never surface on the BD board).
+  const dealerIds = useMemo(() => new Set(dealers.map((d) => d.id)), [dealers]);
   const storeOptions = useMemo(
     () =>
       [...dealers]
-        .sort(
-          (a, b) =>
-            (isShowroom(b.channel) ? 1 : 0) - (isShowroom(a.channel) ? 1 : 0) ||
-            a.name.localeCompare(b.name),
-        )
-        .map((d) => ({
-          id: d.id,
-          label: d.name,
-          group: isShowroom(d.channel) ? "Our showrooms" : "Dealers",
-        })),
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((d) => ({ id: d.id, label: d.name })),
     [dealers],
   );
   const staffRows = salespersonsQ.data?.salespersons ?? [];
@@ -126,10 +127,13 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
   const orders = useMemo(
     () =>
       (ordersQ.data?.orders ?? []).filter(
-        (o) => laneOf(o.status, o.operationStage, o.sourceSystem) !== null,
+        (o) =>
+          laneOf(o.status, o.operationStage, o.sourceSystem) !== null &&
+          dealerIds.has(o.dealerId),
       ),
-    [ordersQ.data],
+    [ordersQ.data, dealerIds],
   );
+  const boardLoading = ordersQ.isLoading || dealersQ.isLoading;
 
   const inPeriod = (o: Order) => (period === "range" ? true : sameMonth(o.placedAt, monthAnchor));
   // Network scope: AutoCount-archive imports stay off the all-dealers board
@@ -229,7 +233,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
         <div className="os-summary">
           <SummaryCard
             icon={Network}
-            eyebrow={`All stores · ${period === "range" ? "All time" : monthName}`}
+            eyebrow={`All dealers · ${period === "range" ? "All time" : monthName}`}
             rev={network}
             count={networkOrders.length}
           />
@@ -237,8 +241,8 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
             icon={Store}
             eyebrow={
               dealerFilter === "all"
-                ? "Pick a store to compare"
-                : `${dealerById.get(dealerFilter) ?? "Store"} · ${period === "range" ? "All time" : monthName}`
+                ? "Pick a dealer to compare"
+                : `${dealerById.get(dealerFilter) ?? "Dealer"} · ${period === "range" ? "All time" : monthName}`
             }
             rev={dealerFilter === "all" ? { products: 0, collected: 0, outstanding: 0, total: 0 } : dealer}
             count={dealerOrders.length}
@@ -265,7 +269,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
           <BoardFilterDropdown
             icon={Store}
             value={dealerFilter}
-            allLabel="All stores"
+            allLabel="All dealers"
             options={storeOptions}
             open={dealersOpen}
             onToggle={() => setDealersOpen((o) => !o)}
@@ -336,7 +340,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
                   <span className="os-lane__count">{list.length}</span>
                 </div>
                 <div className="os-lane__body">
-                  {ordersQ.isLoading ? (
+                  {boardLoading ? (
                     <div className="os-empty os-empty--plain">
                       <p>Loading…</p>
                     </div>
