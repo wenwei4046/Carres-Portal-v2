@@ -84,7 +84,83 @@ const REPORT = {
   ],
   staff: STAFF,
   models: [],
-  config: { schemes: [], rates: [], modelRates: [], modelTiers: [], milestones: [] },
+  // 0250/0251 — BD commission (paid by what their assigned dealers sell);
+  // Herng is the CBO, earning the rate difference on Alex's dealer sales.
+  bdMethod: "percentage" as const,
+  bdReport: {
+    method: "percentage" as const,
+    perBd: [
+      {
+        user: {
+          id: "6a2f8a30-0000-4000-8000-00000000b001",
+          name: "Herng Lim",
+          email: "herng@carres.com",
+          position: "cbo" as const,
+        },
+        position: "cbo" as const,
+        dealerCount: 1,
+        orderCount: 5,
+        basis: 40000,
+        pctUsed: 1.5,
+        directCommission: 500,
+        overrideCommission: 100,
+        overrideDetail: [
+          {
+            fromStaffId: "6a2f8a30-0000-4000-8000-00000000b002",
+            fromStaffName: "Alex Tan",
+            amount: 100,
+          },
+        ],
+        perModel: [],
+        perModelCommission: 0,
+        milestones: [],
+        milestoneCommission: 0,
+        commission: 600,
+        portfolio: [
+          {
+            dealerId: "6a2f8a30-0000-4000-8000-00000000d101",
+            dealerName: "Deluxe Living",
+            orderCount: 5,
+            amount: 40000,
+            commission: 600,
+          },
+        ],
+      },
+    ],
+    unassignedDealers: [],
+    totalCommission: 600,
+    totalBasis: 40000,
+  },
+  bdUsers: [
+    {
+      id: "6a2f8a30-0000-4000-8000-00000000b001",
+      name: "Herng Lim",
+      email: "herng@carres.com",
+      position: "cbo" as const,
+    },
+  ],
+  dealers: [
+    {
+      id: "6a2f8a30-0000-4000-8000-00000000d101",
+      name: "Deluxe Living",
+      status: "active",
+      bdOwnerUserId: "6a2f8a30-0000-4000-8000-00000000b001",
+    },
+  ],
+  config: {
+    schemes: [],
+    rates: [],
+    modelRates: [],
+    modelTiers: [],
+    milestones: [],
+    bdRates: [
+      {
+        userId: "6a2f8a30-0000-4000-8000-00000000b001",
+        pct: 1.5,
+        effectiveFrom: "2026-01-01",
+      },
+    ],
+  },
 };
 
 describe("HrApp", () => {
@@ -116,6 +192,16 @@ describe("HrApp", () => {
       screen.getByText(/1 order this month has no salesperson/),
     ).toBeInTheDocument();
     expect(screen.getByText("Assign now")).toBeInTheDocument();
+
+    // 0250 — the BD commission section renders the BD name + commission
+    expect(
+      screen.getByText("BD commission — paid by dealer sales"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Herng Lim")).toBeInTheDocument();
+    expect(screen.getByText("RM 600.00")).toBeInTheDocument();
+    // 0251 — the method shows under the section title + the CBO position pill
+    expect(screen.getByText("% of dealer sales")).toBeInTheDocument();
+    expect(screen.getByText("CBO")).toBeInTheDocument();
   });
 
   it("renders the attribution worklist on ?tab=attribution", async () => {
