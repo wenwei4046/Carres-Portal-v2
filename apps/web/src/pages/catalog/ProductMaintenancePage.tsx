@@ -97,10 +97,15 @@ export default function ProductMaintenancePage({
         />
       </div>
 
-      {catalogQ.isLoading && (
+      {/* 0248 — the Rental tab fetches its own /api/rental/config and never
+          reads the catalog bundle, so it renders OUTSIDE the catalogQ gate
+          (a catalog load failure must not block rental config). */}
+      {tab === "rental" && <RentalTab isPrincipal={isPrincipal} />}
+
+      {tab !== "rental" && catalogQ.isLoading && (
         <div className="t-small text-base-500">Loading catalog…</div>
       )}
-      {catalogQ.isError && !catalogQ.isLoading && (
+      {tab !== "rental" && catalogQ.isError && !catalogQ.isLoading && (
         <div className="t-small text-danger">
           Failed to load the catalog. Try refreshing — your session may have expired.
         </div>
@@ -128,8 +133,6 @@ export default function ProductMaintenancePage({
           {tab === "promo" && (
             <PromoTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
-          {/* 0248 — rent-to-own plans + service packages (Loo 2026-07-25). */}
-          {tab === "rental" && <RentalTab isPrincipal={isPrincipal} />}
         </>
       )}
     </div>

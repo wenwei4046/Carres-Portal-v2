@@ -154,7 +154,7 @@ describe("OperationRental", () => {
     expect(within(agRow).getByText("RA-1001")).toBeInTheDocument();
     expect(within(agRow).getByText("Aisyah Rahman")).toBeInTheDocument();
     expect(within(agRow).getByText("0123456789")).toBeInTheDocument();
-    expect(within(agRow).getByText("RM 59/mo · 84 mo")).toBeInTheDocument();
+    expect(within(agRow).getByText("RM 59.00/mo · 84 mo")).toBeInTheDocument();
     expect(within(agRow).getByText("Active")).toBeInTheDocument();
 
     // Unit row — linked agreement number resolves from the agreements data
@@ -193,11 +193,16 @@ describe("OperationRental", () => {
     render(<OperationRental />);
 
     // 1 of 2 agreements is active; 1 of 2 units is in rental; visits = dash.
-    const tiles = screen.getByText("Active agreements").closest("div")!
-      .parentElement!;
-    expect(within(tiles).getByText("Active agreements")).toBeInTheDocument();
-    expect(screen.getByText("Units in rental")).toBeInTheDocument();
-    expect(screen.getByText("Visits due")).toBeInTheDocument();
+    // Assert the VALUES, not just the labels — a broken filter must fail here.
+    expect(
+      within(screen.getByTestId("rental-tile-Active agreements")).getByText("1"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("rental-tile-Units in rental")).getByText("1"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("rental-tile-Visits due")).getByText("—"),
+    ).toBeInTheDocument();
   });
 
   it("shows the skeleton while either hook is pending", () => {

@@ -9,6 +9,11 @@ import {
   rentalPlanPatchSchema,
   customerInputSchema,
   phoneKeyMy,
+  CUSTOMERS,
+  SERVICE_PACKAGES,
+  RENTAL_PLANS,
+  RENTAL_AGREEMENTS,
+  RENTAL_STOCK_UNITS,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -23,19 +28,8 @@ import type { AppEnv } from "../types";
 // real boundary. Living side (customers / rental_agreements /
 // rental_stock_units) is internal-HQ read/write (RLS = is_internal()).
 // EVERY handler forwards the USER JWT (userClient) so RLS runs — NEVER
-// service_role.
-//
-// Table names are local constants for now — the shared package's rental
-// contract (row/domain/adapters/zod) is landing in parallel and does not
-// include tables.ts entries; hoist these to @carres/shared/tables when the
-// catalog settles (§9.4 no-magic-strings).
+// service_role. Table names come from @carres/shared/tables (§9.4).
 // ---------------------------------------------------------------------------
-
-const CUSTOMERS = "customers" as const;
-const SERVICE_PACKAGES = "service_packages" as const;
-const RENTAL_PLANS = "rental_plans" as const;
-const RENTAL_AGREEMENTS = "rental_agreements" as const;
-const RENTAL_STOCK_UNITS = "rental_stock_units" as const;
 
 const rentalRouter = new Hono<AppEnv>();
 
@@ -395,10 +389,11 @@ rentalRouter.get("/customers", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   let query = sb.from(CUSTOMERS).select("*");
   if (q.length >= 2) {
-    // Escape ilike wildcards (a literal %/_ must not widen the match) and drop
-    // PostgREST .or() syntax characters (comma/parens would split the clause).
+    // Escape ilike wildcards (a literal %/_ must not widen the match; PostgREST
+    // also treats * as %) and drop .or() syntax characters (comma/parens would
+    // split the clause).
     const pattern =
-      "%" + q.replace(/[,()]/g, " ").replace(/[\\%_]/g, (m) => "\\" + m) + "%";
+      "%" + q.replace(/[,()*]/g, " ").replace(/[\\%_]/g, (m) => "\\" + m) + "%";
     query = query.or(`name.ilike.${pattern},phone.ilike.${pattern}`);
   }
   const { data, error } = await query.order("created_at", { ascending: false }).limit(50);

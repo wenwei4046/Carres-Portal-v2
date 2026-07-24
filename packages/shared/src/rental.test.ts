@@ -206,3 +206,26 @@ describe("customerInputSchema", () => {
     expect(customerInputSchema.safeParse({ name: "Tan", phone: "0123456789", bogus: 1 }).success).toBe(false);
   });
 });
+
+describe("rental plan split cap (0253)", () => {
+  it("rejects supplier + commission over 100 on create", () => {
+    const over = rentalPlanInputSchema.safeParse({
+      sku: "CLOUD-K", termMonths: 84, monthlyFee: 59,
+      supplierRatePct: 60, commissionBasePct: 60,
+    });
+    expect(over.success).toBe(false);
+  });
+
+  it("rejects an over-100 pair on patch, allows a lone rate (DB CHECK backstops)", () => {
+    expect(
+      rentalPlanPatchSchema.safeParse({ supplierRatePct: 60, commissionBasePct: 60 }).success,
+    ).toBe(false);
+    expect(rentalPlanPatchSchema.safeParse({ supplierRatePct: 60 }).success).toBe(true);
+  });
+
+  it("customer email must be an email when present; null clears", () => {
+    expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "not-an-email" }).success).toBe(false);
+    expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "a@b.co" }).success).toBe(true);
+    expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: null }).success).toBe(true);
+  });
+});

@@ -33,10 +33,9 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-// The rental router is not yet mounted in src/index.ts (the orchestrator adds
-// the mount line); the test app mirrors index.ts exactly — authMiddleware on
-// the /api group + the same onError JSON shape — so these tests keep passing
-// unchanged once the real mount lands.
+// The test app mirrors index.ts exactly (authMiddleware on the /api group +
+// the same onError JSON shape) so the router is exercised the way production
+// mounts it, without importing the whole index route graph.
 function buildApp() {
   const app = new Hono<AppEnv>();
   app.onError((err, c) => {
@@ -460,6 +459,50 @@ describe("POST /api/rental/plans", () => {
     );
     expect(res.status).toBe(409);
     expect(((await res.json()) as { code?: string }).code).toBe("duplicate_plan");
+  });
+
+  it("409 plan_in_use — DELETE /plans/:id blocked by an agreements FK (23503)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        writeError: {
+          code: "23503",
+          message:
+            'update or delete on table "rental_plans" violates foreign key constraint "rental_agreements_plan_id_fkey" on table "rental_agreements"',
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/rental/plans/11111111-1111-1111-1111-000000000001", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("plan_in_use");
+  });
+
+  it("409 package_in_use — DELETE /service-packages/:id blocked by an entitlements FK (23503)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        writeError: {
+          code: "23503",
+          message:
+            'update or delete on table "service_packages" violates foreign key constraint "service_entitlements_package_id_fkey" on table "service_entitlements"',
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/rental/service-packages/11111111-1111-1111-1111-000000000002", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("package_in_use");
   });
 
   it("422 invalid_sku — unknown sku FK violation via 23503", async () => {

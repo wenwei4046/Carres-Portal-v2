@@ -5,6 +5,7 @@
 import { useMemo } from "react";
 import { useRentalAgreements, useRentalUnits } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
 import type { RentalAgreement, RentalStockUnit } from "@carres/shared/domain";
 
 /**
@@ -60,12 +61,6 @@ function statusDisplay(
   );
 }
 
-/** "59" for whole ringgit, "59.50" otherwise (row money, 13px mono). */
-function fmtRM(n: number): string {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return "—";
-  return Number.isInteger(v) ? String(v) : v.toFixed(2);
-}
 
 export default function OperationRental() {
   const agreementsQ = useRentalAgreements();
@@ -201,7 +196,7 @@ export default function OperationRental() {
                       {a.sku}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap t-num text-base-800">
-                      {`RM ${fmtRM(a.monthlyFee)}/mo · ${a.termMonths} mo`}
+                      {`${rm(a.monthlyFee)}/mo · ${a.termMonths} mo`}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-base-700">
                       {fmtDate(a.startDate)}
@@ -292,7 +287,7 @@ export default function OperationRental() {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="kpi-box">
+    <div className="kpi-box" data-testid={`rental-tile-${label}`}>
       <div className="label text-base-500">{label}</div>
       <div className="text-[18px] font-bold t-num text-base-900 mt-1">
         {value}
