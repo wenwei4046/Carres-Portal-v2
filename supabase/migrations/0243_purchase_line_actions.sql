@@ -17,7 +17,9 @@
 -- Additive + nullable/defaulted → existing lines default to excluded_from_plan
 -- false and exclude_from_plan_until null (= included = current behaviour).
 -- Existing tests + engine calls unaffected until the columns are read.
--- NOT YET APPLIED — awaiting Jess apply via MCP.
+-- APPLIED to prod via MCP apply_migration 2026-07-24 (version 0243; tail
+-- checked = 0242). First attempt failed 42804 — suppliers.id is UUID, not
+-- text; supplier_id corrected to uuid before the successful apply.
 
 alter table public.order_lines
   add column if not exists excluded_from_plan boolean not null default false,
@@ -29,7 +31,7 @@ comment on column public.order_lines.exclude_from_plan_until is
   'Purchase §6 · Push to next cycle: temp-skip this line from the purchase plan until this timestamp (defaults to the next Mon/Wed/Fri PO day). null = not pushed.';
 
 create table if not exists public.purchase_snoozes (
-  supplier_id text primary key references public.suppliers(id) on delete cascade,
+  supplier_id uuid primary key references public.suppliers(id) on delete cascade,
   snooze_until timestamptz not null,
   reason text,
   set_by_user_id uuid references public.app_users(id),
