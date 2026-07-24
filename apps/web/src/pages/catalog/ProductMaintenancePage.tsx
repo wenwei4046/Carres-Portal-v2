@@ -17,6 +17,7 @@ import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
 import FabricsTab from "./tabs/FabricsTab";
 import DeliveryTab from "./tabs/DeliveryTab";
 import PromoTab from "./tabs/PromoTab";
+import RentalTab from "./tabs/RentalTab";
 
 /**
  * Product & Maintenance — the rebuilt Catalog page (0169-0173). Replaces the
@@ -127,6 +128,8 @@ export default function ProductMaintenancePage({
           {tab === "promo" && (
             <PromoTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
+          {/* 0248 — rent-to-own plans + service packages (Loo 2026-07-25). */}
+          {tab === "rental" && <RentalTab isPrincipal={isPrincipal} />}
         </>
       )}
     </div>

@@ -884,3 +884,183 @@ export const inquiryFromRow = (r: DB.InquiryRow): D.Inquiry => ({
   linkedDealerId: r.linked_dealer_id,
   createdAt: r.created_at,
 });
+
+// ---------------------------------------------------------------------------
+// Rental + Service Plan base (migrations 0247-0249, 2026-07-25)
+// ---------------------------------------------------------------------------
+
+/** Nullable Postgres numeric → number | null (PostgREST may serialize numerics
+ *  as strings; null stays null so the UI can tell "unset" from 0). */
+const numOrNull = (v: number | null): number | null => (v == null ? null : Number(v));
+
+/** Maps a `customers` row (0247) to the camelCase domain shape. */
+export const customerFromRow = (r: DB.CustomerRow): D.Customer => ({
+  id: r.id,
+  name: r.name,
+  phone: r.phone,
+  phoneKey: r.phone_key,
+  email: r.email,
+  address: r.address,
+  notes: r.notes,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  createdBy: r.created_by,
+});
+
+/**
+ * Maps a `service_packages` row (0248) to the camelCase domain shape. `price`
+ * is Postgres numeric → `Number()` (PostgREST may serialize it as a string);
+ * the integer columns get the same treatment (mirrors freeItemCampaignFromRow).
+ */
+export const servicePackageFromRow = (r: DB.ServicePackageRow): D.ServicePackage => ({
+  id: r.id,
+  name: r.name,
+  serviceType: r.service_type,
+  durationMonths: Number(r.duration_months),
+  visitsPerYear: Number(r.visits_per_year),
+  price: Number(r.price),
+  sku: r.sku,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/**
+ * Maps a `rental_plans` row (0248) to the camelCase domain shape. The money /
+ * rate columns are Postgres numeric → `Number()`.
+ */
+export const rentalPlanFromRow = (r: DB.RentalPlanRow): D.RentalPlan => ({
+  id: r.id,
+  sku: r.sku,
+  termMonths: Number(r.term_months),
+  monthlyFee: Number(r.monthly_fee),
+  supplierRatePct: Number(r.supplier_rate_pct),
+  commissionBasePct: Number(r.commission_base_pct),
+  includedPackageId: r.included_package_id,
+  active: r.active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/**
+ * Maps a `rental_agreements` row (0249) to the camelCase domain shape. The
+ * snapshot money/rate columns are Postgres numeric → `Number()`;
+ * `buyout_amount` is nullable numeric (null preserved).
+ */
+export const rentalAgreementFromRow = (r: DB.RentalAgreementRow): D.RentalAgreement => ({
+  id: r.id,
+  agreementNo: r.agreement_no,
+  customerId: r.customer_id,
+  dealerId: r.dealer_id,
+  salespersonId: r.salesperson_id,
+  orderId: r.order_id,
+  planId: r.plan_id,
+  sku: r.sku,
+  termMonths: Number(r.term_months),
+  monthlyFee: Number(r.monthly_fee),
+  supplierRatePct: Number(r.supplier_rate_pct),
+  commissionBasePct: Number(r.commission_base_pct),
+  startDate: r.start_date,
+  status: r.status,
+  buyoutAt: r.buyout_at,
+  buyoutAmount: numOrNull(r.buyout_amount),
+  ownershipTransferAt: r.ownership_transfer_at,
+  ownershipDocUrl: r.ownership_doc_url,
+  stripeCustomerId: r.stripe_customer_id,
+  stripeSubscriptionId: r.stripe_subscription_id,
+  notes: r.notes,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  createdBy: r.created_by,
+});
+
+/**
+ * Maps a `rental_billings` row (0249) to the camelCase domain shape. The
+ * nullable numerics (`paid_amount` / `supplier_share` / `commission_share`)
+ * preserve null (unset ≠ 0).
+ */
+export const rentalBillingFromRow = (r: DB.RentalBillingRow): D.RentalBilling => ({
+  id: r.id,
+  agreementId: r.agreement_id,
+  seq: Number(r.seq),
+  dueDate: r.due_date,
+  amountDue: Number(r.amount_due),
+  status: r.status,
+  paidAt: r.paid_at,
+  paidAmount: numOrNull(r.paid_amount),
+  method: r.method,
+  reference: r.reference,
+  supplierShare: numOrNull(r.supplier_share),
+  commissionShare: numOrNull(r.commission_share),
+  stripeInvoiceId: r.stripe_invoice_id,
+  recordedBy: r.recorded_by,
+  createdAt: r.created_at,
+});
+
+/** Maps a `rental_stock_units` row (0249) to the camelCase domain shape. */
+export const rentalStockUnitFromRow = (r: DB.RentalStockUnitRow): D.RentalStockUnit => ({
+  id: r.id,
+  unitCode: r.unit_code,
+  sku: r.sku,
+  agreementId: r.agreement_id,
+  customerId: r.customer_id,
+  status: r.status,
+  deployedAt: r.deployed_at,
+  returnedAt: r.returned_at,
+  warrantyUntil: r.warranty_until,
+  notes: r.notes,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/** Maps a `service_entitlements` row (0249) to the camelCase domain shape. */
+export const serviceEntitlementFromRow = (
+  r: DB.ServiceEntitlementRow,
+): D.ServiceEntitlement => ({
+  id: r.id,
+  customerId: r.customer_id,
+  packageId: r.package_id,
+  source: r.source,
+  agreementId: r.agreement_id,
+  orderId: r.order_id,
+  visitsTotal: Number(r.visits_total),
+  visitsUsed: Number(r.visits_used),
+  startsOn: r.starts_on,
+  expiresOn: r.expires_on,
+  status: r.status,
+  createdAt: r.created_at,
+  createdBy: r.created_by,
+});
+
+/** Maps a `service_visits` row (0249) to the camelCase domain shape. */
+export const serviceVisitFromRow = (r: DB.ServiceVisitRow): D.ServiceVisit => ({
+  id: r.id,
+  entitlementId: r.entitlement_id,
+  seq: Number(r.seq),
+  dueDate: r.due_date,
+  scheduledDate: r.scheduled_date,
+  partner: r.partner,
+  unitId: r.unit_id,
+  status: r.status,
+  completedAt: r.completed_at,
+  completedBy: r.completed_by,
+  photoUrl: r.photo_url,
+  notes: r.notes,
+  createdAt: r.created_at,
+});
+
+/** Maps a `rental_unit_events` row (0249) to the camelCase domain shape. */
+export const rentalUnitEventFromRow = (r: DB.RentalUnitEventRow): D.RentalUnitEvent => ({
+  id: r.id,
+  unitId: r.unit_id,
+  eventType: r.event_type,
+  visitId: r.visit_id,
+  description: r.description,
+  photoUrl: r.photo_url,
+  actor: r.actor,
+  occurredAt: r.occurred_at,
+});

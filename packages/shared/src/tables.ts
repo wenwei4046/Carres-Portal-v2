@@ -143,3 +143,23 @@ export const OPS_ORDER_CONTROL = "ops_order_control" as const;
 
 // Migration 0174 — SO Maintenance shared column-config table.
 export const SALES_ORDER_GRID_CONFIG = "sales_order_grid_config" as const;
+
+// ---------------------------------------------------------------------------
+// Rental + Service Plan base (migrations 0247-0249)
+// ---------------------------------------------------------------------------
+// 0247 — the FIRST customer entity (phone_key = MY-aware canonical phone,
+// UNIQUE). 0248 — principal-authored config: service packages (duration ×
+// visits/year, optional sellable SKU) + rental plans (rent-to-own term ×
+// monthly fee + split rates, UNIQUE(sku, term_months)). 0249 — the living
+// side: agreements ('RA-…') + monthly billings + the rented-asset registry
+// ('RU-…') + the service entitlement/visit engine + per-unit event trail.
+// All DORMANT until the POS rental lane ships.
+export const CUSTOMERS            = "customers" as const;
+export const SERVICE_PACKAGES     = "service_packages" as const;
+export const RENTAL_PLANS         = "rental_plans" as const;
+export const RENTAL_AGREEMENTS    = "rental_agreements" as const;
+export const RENTAL_BILLINGS      = "rental_billings" as const;
+export const RENTAL_STOCK_UNITS   = "rental_stock_units" as const;
+export const SERVICE_ENTITLEMENTS = "service_entitlements" as const;
+export const SERVICE_VISITS       = "service_visits" as const;
+export const RENTAL_UNIT_EVENTS   = "rental_unit_events" as const;

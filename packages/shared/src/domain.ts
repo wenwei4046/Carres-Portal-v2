@@ -945,3 +945,242 @@ export type ThreadReadinessRow = {
   pickupDoNumber: string | null;
   skuLines: Array<{ sku: string; qty: number }>;
 };
+
+// ---------------------------------------------------------------------------
+// Rental + Service Plan base (migrations 0247-0249, 2026-07-25)
+// ---------------------------------------------------------------------------
+
+/** `service_packages.service_type` — what kind of service the package sells. */
+export type ServicePackageType = "cleaning" | "repair" | "other";
+
+/**
+ * `rental_agreements.status` lifecycle: active → completed →
+ * ownership_transferred; early exit = buyout_pending (settle the remaining
+ * months in one payment); default → defaulted/repossessed while the residual
+ * settles slowly.
+ */
+export type RentalAgreementStatus =
+  | "active"
+  | "buyout_pending"
+  | "completed"
+  | "ownership_transferred"
+  | "defaulted"
+  | "repossessed"
+  | "cancelled";
+
+/** `rental_billings.status` — one monthly billing row's collection state. */
+export type RentalBillingStatus = "due" | "paid" | "overdue" | "waived" | "written_off";
+
+/** `rental_stock_units.status` — where the physical rented asset is. */
+export type RentalUnitStatus =
+  | "allocated"
+  | "in_rental"
+  | "returned"
+  | "refurbishing"
+  | "transferred"
+  | "retired";
+
+/** `service_entitlements.status` — the entitlement engine's lifecycle. */
+export type ServiceEntitlementStatus = "active" | "exhausted" | "expired" | "cancelled";
+
+/** `service_visits.status` — one visit's scheduling lifecycle. */
+export type ServiceVisitStatus = "pending" | "scheduled" | "completed" | "skipped" | "cancelled";
+
+/**
+ * One `customers` row (migration 0247) — the FIRST customer entity.
+ * `customerFromRow` maps it. `phoneKey` is the MY-aware canonical phone
+ * (pwp_phone_key family), UNIQUE per customer; `phone` stays as typed.
+ */
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  phoneKey: string;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+}
+
+/**
+ * One `service_packages` row (migration 0248) — duration (months) ×
+ * visits-per-year, optional sellable SKU link, standalone price (0 =
+ * free-attach only). `servicePackageFromRow` maps it.
+ */
+export interface ServicePackage {
+  id: string;
+  name: string;
+  serviceType: ServicePackageType;
+  durationMonths: number;
+  visitsPerYear: number;
+  price: number;
+  sku: string | null;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/**
+ * One `rental_plans` row (migration 0248) — a rent-to-own offer on ONE sku:
+ * term × monthly fee + the per-collection split rates + an optionally included
+ * free service package. `rentalPlanFromRow` maps it.
+ */
+export interface RentalPlan {
+  id: string;
+  sku: string;
+  termMonths: number;
+  monthlyFee: number;
+  supplierRatePct: number;
+  commissionBasePct: number;
+  includedPackageId: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/**
+ * One `rental_agreements` row (migration 0249) — a signed rent-to-own
+ * agreement ('RA-1001…'). sku/term/fee/split are signup SNAPSHOTS (a later
+ * plan re-price never rewrites a live agreement). `rentalAgreementFromRow`
+ * maps it.
+ */
+export interface RentalAgreement {
+  id: string;
+  agreementNo: string;
+  customerId: string;
+  dealerId: string | null;
+  salespersonId: string | null;
+  orderId: string | null;
+  planId: string | null;
+  sku: string;
+  termMonths: number;
+  monthlyFee: number;
+  supplierRatePct: number;
+  commissionBasePct: number;
+  startDate: string;
+  status: RentalAgreementStatus;
+  buyoutAt: string | null;
+  buyoutAmount: number | null;
+  ownershipTransferAt: string | null;
+  ownershipDocUrl: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+}
+
+/**
+ * One `rental_billings` row (migration 0249) — one month of an agreement's
+ * schedule; the finance split (`supplierShare` / `commissionShare`) is
+ * recorded at collection time. `rentalBillingFromRow` maps it.
+ */
+export interface RentalBilling {
+  id: string;
+  agreementId: string;
+  seq: number;
+  dueDate: string;
+  amountDue: number;
+  status: RentalBillingStatus;
+  paidAt: string | null;
+  paidAmount: number | null;
+  method: string | null;
+  reference: string | null;
+  supplierShare: number | null;
+  commissionShare: number | null;
+  stripeInvoiceId: string | null;
+  recordedBy: string | null;
+  createdAt: string;
+}
+
+/**
+ * One `rental_stock_units` row (migration 0249) — a rented-out Carres asset
+ * ('RU-1001…') with its own deploy/return/warranty state.
+ * `rentalStockUnitFromRow` maps it.
+ */
+export interface RentalStockUnit {
+  id: string;
+  unitCode: string;
+  sku: string;
+  agreementId: string | null;
+  customerId: string | null;
+  status: RentalUnitStatus;
+  deployedAt: string | null;
+  returnedAt: string | null;
+  warrantyUntil: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/**
+ * One `service_entitlements` row (migration 0249) — the ONE service engine
+ * with multiple sources (rental / purchase / free_gift / manual).
+ * `serviceEntitlementFromRow` maps it.
+ */
+export interface ServiceEntitlement {
+  id: string;
+  customerId: string;
+  packageId: string | null;
+  source: "rental" | "purchase" | "free_gift" | "manual";
+  agreementId: string | null;
+  orderId: string | null;
+  visitsTotal: number;
+  visitsUsed: number;
+  startsOn: string;
+  expiresOn: string | null;
+  status: ServiceEntitlementStatus;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+/**
+ * One `service_visits` row (migration 0249) — one pre-generated visit of an
+ * entitlement. `partner` is free-text until the cleaning-partner tab ships.
+ * `serviceVisitFromRow` maps it.
+ */
+export interface ServiceVisit {
+  id: string;
+  entitlementId: string;
+  seq: number;
+  dueDate: string;
+  scheduledDate: string | null;
+  partner: string | null;
+  unitId: string | null;
+  status: ServiceVisitStatus;
+  completedAt: string | null;
+  completedBy: string | null;
+  photoUrl: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+/**
+ * One `rental_unit_events` row (migration 0249) — the unit's append-only
+ * service/warranty event trail. `rentalUnitEventFromRow` maps it.
+ */
+export interface RentalUnitEvent {
+  id: string;
+  unitId: string;
+  eventType:
+    | "deployed"
+    | "service"
+    | "warranty_claim"
+    | "repair"
+    | "returned"
+    | "refurbished"
+    | "transferred"
+    | "note";
+  visitId: string | null;
+  description: string | null;
+  photoUrl: string | null;
+  actor: string | null;
+  occurredAt: string;
+}

@@ -48,4 +48,32 @@
 
 P0 decisions above → P1 `customers` + entitlement engine (shared foundation) → P2 P&M Rental & Service tab (dormant) → P3 POS sell (rental lane + service attach) → P4 billing/dunning (Jess line per locked spec) → P5 ops Services/Collections tabs (Jess line) → P6 customer check (staff lookup → OTP page).
 
-— Draft by Loo's line 2026-07-25, pending Loo's answers + reconciliation with Jess.
+---
+
+## LOCKED by Loo (2026-07-25, same day) — answers to the decision list
+
+1. **Collection = Stripe auto-debit.** Rental products sync to Stripe (Product + recurring monthly Price); Stripe issues the invoices too. See the Stripe capability notes below.
+2. **RENT-TO-OWN**: after month 84 is paid, the system automatically issues the customer a **request-to-buy form to sign** → ownership transfers to the customer.
+3. **Default**: Carres repossesses the unit; the residual can settle slowly afterwards. **Early exit = BUYOUT**: e.g. at month 50 the customer pays the remaining term in one shot.
+4. **Service packages are OURS to set, by visit count**: some 2/year, some 3/year, some 4/year — `visits_per_year` is configurable per package (not fixed at 3).
+5. **Everyone can sell it.** Commission = % of each month's collected revenue. A big HIERARCHY comes later (→ the parallel HR line's 0245_hr_commission work); for now a **flat base**: e.g. of RM45–59 collected, **20% to the dealer/salesperson**. Separately a **fixed supplier rate**: of every RM59 collected, **49% to the supplier**. Both recorded in finance per collection (rental_billings.supplier_share / commission_share).
+6. **Rented-out unit = a rent-out ASSET**: it has left the warehouse (DO'd out) but sits "in the middle of rental stock" → its own registry (`rental_stock_units`, RU-codes), each unit tracks its full service records + warranty claims via `rental_unit_events`.
+7. **Cleaning-partner tab: NEXT phase** — base first (visits carry a free-text partner until then).
+
+## Stripe capability notes (to live-verify once the MCP OAuth completes)
+
+- **Recurring monthly in MYR**: Stripe Billing subscriptions — supported. A fixed 84-month term uses a **subscription schedule** (phase with 84 iterations, end_behavior=cancel).
+- **Product sync**: one Stripe Product per rentable SKU + a recurring monthly Price (e.g. RM59/mo); plan authoring in the P&M Rental tab pushes/updates the Stripe object (sell-lane phase).
+- **"Auto-debit" reality in Malaysia**: Stripe MY recurring = **card-on-file** (credit/debit). FPX is one-time only (no recurring mandate); DuitNow AutoDebit / bank eMandate is NOT on Stripe — if true bank-account debiting is required later, that's a different rail (e.g. Curlec). Day-1: card recurring via Stripe + manual transfer fallback recorded at POS.
+- **Invoices**: every subscription cycle auto-generates a **Stripe Invoice** (hosted page + PDF + email). ⚠ Stripe does NOT file Malaysia LHDN MyInvois e-invoices — that compliance layer stays ours (consolidated e-invoice or middleware; open item).
+- **Failed payments**: Stripe Smart Retries + `invoice.payment_failed` webhooks feed the dunning ladder (the locked D0/3/7/14/21/30/60 cadence).
+- Existing wiring to extend: 0223 stripe-checkout route + `/stripe` webhook in apps/api.
+
+## Base SHIPPED (this line, 2026-07-25) — migrations 0247-0249
+
+- **0247_customers** — the first customer entity (canonical `phone_key`, one row per phone).
+- **0248_rental_config** — `service_packages` (duration × visits/year × price × optional service SKU) + `rental_plans` (sku × term × monthly fee + supplier_rate_pct / commission_base_pct + included package). Principal-only writes.
+- **0249_rental_agreements** — `rental_agreements` (RA-1001…, full rent-to-own status machine incl. buyout/ownership_transferred/repossessed + stripe_customer_id/stripe_subscription_id stubs) + `rental_billings` (per-month schedule + supplier/commission split fields + stripe_invoice_id) + `rental_stock_units` (RU-1001… asset registry) + `rental_unit_events` (service/warranty history) + `service_entitlements` + `service_visits`. All RLS internal-only, all DORMANT.
+- Web: P&M **Rental** tab (`?section=rental`, config editors) + internal-portal **Rental** page (`?tab=rental`, agreements + units registry, read-only). API: `/api/rental/*` config CRUD (principal) + registry reads (internal).
+
+**Next phases**: ① POS rental sell lane + Stripe product sync/subscription create + entitlement minting (incl. free-gift attach), ② billing/dunning engine (Jess line's locked cadence), ③ cleaning-partner tab + visit scheduling ops, ④ customer check surface (staff lookup → OTP page), ⑤ LHDN e-invoice decision.

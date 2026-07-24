@@ -86,6 +86,7 @@ import activityRouter from "./routes/operation/activity";
 // Migration 0223 — Stripe online collection (POS checkout links + webhook).
 import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
+import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runPoDutyCron } from "./cron/po-duty";
 import type { AppEnv, Bindings } from "./types";
@@ -209,6 +210,8 @@ api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);
+// 0247-0249 — Rental + Service Plan base (config CRUD + registry reads)
+api.route("/rental", rentalRouter);
 
 app.route("/api", api);
 
