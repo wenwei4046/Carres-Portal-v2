@@ -300,22 +300,84 @@ function earliestCustomerDeadlineOfGroup(
 }
 
 /** Default WhatsApp draft — plain-English, low-literacy supplier register with
- *  ref-first line items (memory `reference_supplier_chase`: suppliers recognise
- *  their CR/TCF original ref, not our SO number). Editable in the preview. */
+ *  ref-first line items (Jess 2026-07-24 top-to-toe §4: suppliers recognise
+ *  their CR/TCF original ref, NOT the SO number, NOT the SKU code). Groups
+ *  the group's SKU lines by their customer REF (fallback SO-N when ref null
+ *  for a native POS order with no imported ref), one section per order. */
 function buildPlaceWaTemplate(
   group: SplitPlaceGroup,
   preparedByName: string | null,
 ): string {
   const supplier = group.supplierName ?? "the factory";
+  // Bucket every (line × forOrder) pair by ref/SO so each customer's PO
+  // becomes one clean block in the message. Preserves the earliest-deadline-
+  // first order (matches the ORDER column in the SKU table above).
+  interface OrderBucket {
+    key: string;
+    label: string; // "CR-2025-0812" or "SO-1234"
+    customerName: string | null;
+    deliveryDate: string | null;
+    items: Array<{ sku: string; modelName: string | null; size: string | null; qty: number }>;
+  }
+  const bucketByKey = new Map<string, OrderBucket>();
+  for (const l of group.lines) {
+    const size = parseSize(l.sku);
+    // A line's `need` is aggregated across its forOrders — split back per
+    // forOrder so the WA breakdown ties each qty to its own customer. A line
+    // with N forOrders and need M sends M ÷ N per order (integer split; any
+    // rounding residue lands on the first). Not perfect for exotic
+    // many-to-many splits but matches the operator's mental model 95% of
+    // the time. Real per-order qty lives on the source order_lines; a
+    // follow-up commit can plumb it through instead of splitting here.
+    const perOrder = l.forOrders.length > 0
+      ? Math.floor(l.need / l.forOrders.length)
+      : l.need;
+    const residue = l.forOrders.length > 0
+      ? l.need - perOrder * l.forOrders.length
+      : 0;
+    l.forOrders.forEach((o, i) => {
+      const key = o.ref ?? (o.so != null ? `SO-${o.so}` : "unknown");
+      const label = o.ref ?? (o.so != null ? `SO-${o.so}` : "—");
+      let bucket = bucketByKey.get(key);
+      if (!bucket) {
+        bucket = {
+          key,
+          label,
+          customerName: o.customerName ?? null,
+          deliveryDate: o.deliveryDate ?? null,
+          items: [],
+        };
+        bucketByKey.set(key, bucket);
+      }
+      bucket.items.push({
+        sku: l.sku,
+        modelName: l.modelName ?? null,
+        size: size?.label ?? null,
+        qty: perOrder + (i === 0 ? residue : 0),
+      });
+    });
+  }
+  const buckets = [...bucketByKey.values()].sort((a, b) => {
+    const da = a.deliveryDate ?? "9999";
+    const db = b.deliveryDate ?? "9999";
+    return da.localeCompare(db) || a.label.localeCompare(b.label);
+  });
+
   const lines: string[] = [];
   lines.push(`${supplier}, we place new order. Please help arrange:`);
   lines.push("");
-  for (const l of group.lines) {
-    const size = parseSize(l.sku);
-    const sz = size ? ` ${size.label}` : "";
-    lines.push(`  ${l.sku}${sz} × ${l.need}`);
+  for (const b of buckets) {
+    const meta = [b.customerName, b.deliveryDate ? `deliver by ${b.deliveryDate}` : null]
+      .filter((s): s is string => Boolean(s))
+      .join(" · ");
+    lines.push(meta ? `${b.label} (${meta})` : b.label);
+    for (const it of b.items) {
+      const parts = [it.modelName, it.size].filter((s): s is string => Boolean(s));
+      const desc = parts.length > 0 ? parts.join(" ") : it.sku;
+      lines.push(`  · ${desc} × ${it.qty}`);
+    }
+    lines.push("");
   }
-  lines.push("");
   lines.push("Please confirm receive. Thank you.");
   lines.push(`${preparedByName ?? "Ops"} · Carres`);
   return lines.join("\n");
