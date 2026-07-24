@@ -64,10 +64,15 @@ function order(over: Partial<Order> & { so: number; status: Order["status"] }): 
 
 const ORDERS: Order[] = [
   order({ so: 1301, status: "place" }),
-  order({ so: 1302, status: "proceed_order", paid: 3000 }),
+  // Carries no outlet stamp — outlet attribution falls back to its
+  // salesperson (Aisyah @ Mont Kiara).
+  order({ so: 1302, status: "proceed_order", paid: 3000, salespersonId: "sp-1" }),
   // AutoCount archive row — must stay OFF the All-dealers board.
   order({ so: 1099, status: "place", sourceSystem: "autocount", dealerId: DEALER_ARCHIVE }),
 ];
+
+const OUT_1 = "00000000-0000-0000-0000-000000000o01";
+const OUT_2 = "00000000-0000-0000-0000-000000000o02";
 
 vi.mock("@/lib/queries", () => ({
   useOrders: () => ({ data: { orders: ORDERS, total: ORDERS.length }, isLoading: false }),
@@ -84,6 +89,7 @@ vi.mock("@/lib/queries", () => ({
           orderCount: 2,
           gmv: 7185,
           outstanding: 3592,
+          channel: "dealer",
         },
         {
           id: DEALER_ARCHIVE,
@@ -95,13 +101,24 @@ vi.mock("@/lib/queries", () => ({
           orderCount: 184,
           gmv: 0,
           outstanding: 0,
+          channel: "showroom",
         },
       ],
     },
     isLoading: false,
   }),
   useSalespersons: () => ({
-    data: { salespersons: [{ id: "sp-1", name: "Aisyah", dealerId: DEALER_A }] },
+    data: {
+      salespersons: [{ id: "sp-1", name: "Aisyah", dealerId: DEALER_A, outletId: OUT_2 }],
+    },
+  }),
+  useOutlets: () => ({
+    data: {
+      outlets: [
+        { id: OUT_1, dealerId: DEALER_A, name: "Cheras", address: "" },
+        { id: OUT_2, dealerId: DEALER_A, name: "Mont Kiara", address: "" },
+      ],
+    },
   }),
 }));
 vi.mock("@/pages/dealer/pos/PosOrderDetail", () => ({
@@ -122,7 +139,31 @@ describe("BdOrdersBoard", () => {
     // The owning store is named on every card in All-dealers mode.
     expect(within(place).getByTestId("os-card-dealer").textContent).toContain("Kelana Jaya");
     // Compare card waits for a pick.
-    expect(screen.getByText("Pick a dealer to compare")).toBeTruthy();
+    expect(screen.getByText("Pick a store to compare")).toBeTruthy();
+  });
+
+  it("groups the store menu into Our showrooms / Dealers (store-kind rule)", () => {
+    render(<BdOrdersBoard onClose={() => {}} />);
+    fireEvent.click(screen.getByTestId("bd-dealer-filter"));
+    expect(screen.getByText("Our showrooms")).toBeTruthy();
+    expect(screen.getByText("Dealers")).toBeTruthy();
+    expect(screen.getByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`)).toBeTruthy();
+  });
+
+  it("a picked store with ≥2 outlets gains the outlet level; picking one narrows via stamp + salesperson fallback", () => {
+    render(<BdOrdersBoard onClose={() => {}} />);
+    // Archive store has no outlets → no outlet dropdown.
+    fireEvent.click(screen.getByTestId("bd-dealer-filter"));
+    fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`));
+    expect(screen.queryByTestId("os-outlet-filter")).toBeNull();
+    // Kelana Jaya has 2 → dropdown appears; Mont Kiara keeps only the
+    // salesperson-fallback row (1302 via Aisyah), 1301 has no outlet at all.
+    fireEvent.click(screen.getByTestId("bd-dealer-filter"));
+    fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_A}`));
+    fireEvent.click(screen.getByTestId("os-outlet-filter"));
+    fireEvent.click(screen.getByTestId(`os-outlet-option-${OUT_2}`));
+    expect(screen.queryByTestId("os-card-1301")).toBeNull();
+    expect(screen.getByTestId("os-card-1302")).toBeTruthy();
   });
 
   it("picking a dealer scopes the board, shows its archive rows + the all-time footnote", () => {
