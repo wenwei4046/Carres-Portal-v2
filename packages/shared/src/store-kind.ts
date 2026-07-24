@@ -33,3 +33,25 @@ export function storeNoun(channel: string | null | undefined): "Dealer" | "Showr
 export function branchNoun(channel: string | null | undefined): "Outlet" | "Showroom" {
   return isShowroom(channel) ? "Showroom" : "Outlet";
 }
+
+/**
+ * Fixed brand prefix on location names (Loo 2026-07-25): every new outlet /
+ * showroom is "Carres <location>" — the form locks the prefix and the user
+ * types only the location ("Mont Kiara" → "Carres Mont Kiara").
+ */
+export const CARRES_NAME_PREFIX = "Carres";
+
+/**
+ * Compose the stored branch name from the typed location part. A typed-in
+ * leading "Carres" is stripped first (any case, followed by space/dash or
+ * alone), so a user who types the full name anyway never produces
+ * "Carres Carres X". An empty location composes to "" — callers treat that
+ * as not-filled-in.
+ */
+export function carresLocationName(location: string): string {
+  const loc = location
+    .trim()
+    .replace(/^carres(?=[\s-]|$)[\s-]*/i, "")
+    .trim();
+  return loc ? `${CARRES_NAME_PREFIX} ${loc}` : "";
+}

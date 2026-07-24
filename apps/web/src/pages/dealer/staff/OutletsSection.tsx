@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { branchNoun, type StaffTierDto, type StoreChannel } from "@carres/shared";
+import { branchNoun, carresLocationName, type StaffTierDto, type StoreChannel } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import CarresNameInput from "@/components/CarresNameInput";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useCreateOutlet, useOutlets, useStaffList } from "@/lib/queries";
@@ -109,8 +110,12 @@ function AddOutletModal({
   });
   const create = useCreateOutlet();
 
+  // Every new branch is "Carres <location>" — the field locks the prefix and
+  // the user types only the location (Loo 2026-07-25).
+  const composedName = carresLocationName(name);
+
   const valid =
-    name.trim().length >= 1 &&
+    composedName.length >= 1 &&
     addr.addressLine1.trim().length >= 5 &&
     !!addr.addressState &&
     !!addr.addressCity &&
@@ -127,8 +132,8 @@ function AddOutletModal({
       postcode: addr.addressPostcode,
     });
     try {
-      await create.mutateAsync({ name: name.trim(), address });
-      toast.success(`Added ${branch.toLowerCase()} "${name.trim()}"`);
+      await create.mutateAsync({ name: composedName, address });
+      toast.success(`Added ${branch.toLowerCase()} "${composedName}"`);
       onClose();
     } catch (e) {
       toast.error(
@@ -161,15 +166,18 @@ function AddOutletModal({
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
             {branch} name <span className="text-destructive">*</span>
           </span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            data-testid="outlet-name"
-            className="w-full mt-1 px-2.5 py-2 border border-border rounded text-sm outline-none"
-            placeholder="e.g. Mont Kiara branch"
-            autoFocus
-          />
+          <div className="mt-1">
+            <CarresNameInput
+              value={name}
+              onChange={setName}
+              placeholder="e.g. Mont Kiara"
+              testId="outlet-name"
+              autoFocus
+            />
+          </div>
+          <span className="block text-[11px] text-muted-foreground mt-1">
+            Saved as {composedName || `Carres …`}
+          </span>
         </label>
 
         <div className="mb-4">
