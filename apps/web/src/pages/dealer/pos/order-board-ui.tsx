@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   CircleDashed,
   MapPin,
   Receipt,
@@ -257,6 +258,97 @@ export function SummaryCard({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Cascade filter pieces (store → outlet → salesperson) ---------- */
+
+/**
+ * Which outlet an order belongs to: the order's own stamp first, falling back
+ * to its salesperson's outlet — most pre-PIN-era rows carry no `outlet_id`
+ * (14/51 in prod, 2026-07-25), so the fallback keeps the outlet filter useful
+ * on older orders. A staff transfer re-attributes those fallback rows; the
+ * stamped ones never move.
+ */
+export function orderOutletOf(
+  o: Order,
+  staffOutletById: Map<string, string | null>,
+): string | null {
+  return o.outletId ?? (o.salespersonId ? staffOutletById.get(o.salespersonId) ?? null : null);
+}
+
+export interface BoardFilterOption {
+  id: string;
+  label: string;
+  /** Options sharing a group render under an uppercase header — the store
+   *  menu's "Our showrooms" / "Dealers" split (store-kind.ts naming rule). */
+  group?: string;
+}
+
+/**
+ * One dropdown of the board's filter cascade (Loo 2026-07-25: store →
+ * outlet → salesperson). Same `.os-people` anatomy the salespeople picker
+ * always had, plus optional group headers. Controlled: the board owns the
+ * value/open state so it can reset the levels below a pick.
+ */
+export function BoardFilterDropdown({
+  icon: Icon,
+  value,
+  allLabel,
+  options,
+  open,
+  onToggle,
+  onPick,
+  testId,
+  optionTestIdPrefix,
+}: {
+  icon: typeof Store;
+  /** `'all'` or an option id. */
+  value: string;
+  allLabel: string;
+  options: BoardFilterOption[];
+  open: boolean;
+  onToggle: () => void;
+  /** Receives `'all'` or the picked option id. */
+  onPick: (id: string) => void;
+  testId?: string;
+  optionTestIdPrefix?: string;
+}) {
+  const current = value === "all" ? allLabel : options.find((o) => o.id === value)?.label ?? "…";
+  const groups = [...new Set(options.map((o) => o.group).filter((g): g is string => !!g))];
+  const renderOption = (o: BoardFilterOption) => (
+    <button
+      key={o.id}
+      className={value === o.id ? "is-on" : ""}
+      onClick={() => onPick(o.id)}
+      data-testid={optionTestIdPrefix ? `${optionTestIdPrefix}-${o.id}` : undefined}
+    >
+      {o.label}
+    </button>
+  );
+  return (
+    <div className="os-people">
+      <button className="os-people__btn" onClick={onToggle} data-testid={testId}>
+        <Icon size={14} strokeWidth={1.75} />
+        <span>{current}</span>
+        <ChevronDown size={13} strokeWidth={1.75} />
+      </button>
+      {open && (
+        <div className="os-people__menu">
+          <button className={value === "all" ? "is-on" : ""} onClick={() => onPick("all")}>
+            {allLabel}
+          </button>
+          {groups.length > 0
+            ? groups.map((g) => (
+                <div key={g} style={{ display: "contents" }}>
+                  <div className="os-people__grouplab">{g}</div>
+                  {options.filter((o) => o.group === g).map(renderOption)}
+                </div>
+              ))
+            : options.map(renderOption)}
+        </div>
+      )}
     </div>
   );
 }
