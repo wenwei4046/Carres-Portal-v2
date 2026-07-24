@@ -1030,3 +1030,232 @@ export interface PoPickupEventsRow {
   ack_role: "partner" | "operation";
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Rental + Service Plan base (migrations 0247-0249, 2026-07-25)
+// ---------------------------------------------------------------------------
+
+/**
+ * `customers` (migration 0247) — the FIRST customer entity. `phone_key` is the
+ * MY-aware canonical phone (same helper family as pwp_phone_key, computed
+ * app-side) and is UNIQUE: one customer per canonical phone. Raw `phone` stays
+ * as typed for display/callback. Internal-only RLS until the sell phase.
+ */
+export interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string;
+  phone_key: string;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+/**
+ * `service_packages` (migration 0248) — a cleaning-service product: duration
+ * (months) × visits-per-year, optionally linked to a sellable service-category
+ * SKU and priced for standalone sale (price 0 = free-attach only).
+ * Principal-owned; DORMANT until authored.
+ */
+export interface ServicePackageRow {
+  id: string;
+  name: string;
+  service_type: "cleaning" | "repair" | "other";
+  duration_months: number;
+  visits_per_year: number;
+  price: number;
+  sku: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `rental_plans` (migration 0248) — a rent-to-own offer on ONE sellable sku:
+ * term_months × monthly_fee plus the per-collection revenue split
+ * (supplier_rate_pct → supplier; commission_base_pct → the flat seller base —
+ * the full commission HIERARCHY lives in the HR line, not here). A plan can
+ * bundle a service package for free (`included_package_id`). UNIQUE(sku,
+ * term_months). Principal-owned; `active` defaults false (DORMANT).
+ */
+export interface RentalPlanRow {
+  id: string;
+  sku: string;
+  term_months: number;
+  monthly_fee: number;
+  supplier_rate_pct: number;
+  commission_base_pct: number;
+  included_package_id: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `rental_agreements` (migration 0249) — one signed rent-to-own agreement
+ * (`agreement_no` 'RA-1001…'). sku/term/fee/split are SNAPSHOTS at signup (a
+ * later plan re-price never rewrites a live agreement). Lifecycle: active →
+ * completed → ownership_transferred; early exit = buyout_pending (settle the
+ * remaining months in one payment); default → defaulted/repossessed while the
+ * residual settles. Stripe columns are wired when the Stripe sell lane ships.
+ */
+export interface RentalAgreementRow {
+  id: string;
+  agreement_no: string;
+  customer_id: string;
+  dealer_id: string | null;
+  salesperson_id: string | null;
+  order_id: string | null;
+  plan_id: string | null;
+  sku: string;
+  term_months: number;
+  monthly_fee: number;
+  supplier_rate_pct: number;
+  commission_base_pct: number;
+  start_date: string;
+  status:
+    | "active"
+    | "buyout_pending"
+    | "completed"
+    | "ownership_transferred"
+    | "defaulted"
+    | "repossessed"
+    | "cancelled";
+  buyout_at: string | null;
+  buyout_amount: number | null;
+  ownership_transfer_at: string | null;
+  ownership_doc_url: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+/**
+ * `rental_billings` (migration 0249) — the agreement's monthly billing
+ * schedule, one row per month (`UNIQUE(agreement_id, seq)`). Every collected
+ * month records the finance split at collection time (`supplier_share` /
+ * `commission_share` — see the pure `rentalMonthlySplit`).
+ */
+export interface RentalBillingRow {
+  id: string;
+  agreement_id: string;
+  seq: number;
+  due_date: string;
+  amount_due: number;
+  status: "due" | "paid" | "overdue" | "waived" | "written_off";
+  paid_at: string | null;
+  paid_amount: number | null;
+  method: string | null;
+  reference: string | null;
+  supplier_share: number | null;
+  commission_share: number | null;
+  stripe_invoice_id: string | null;
+  recorded_by: string | null;
+  created_at: string;
+}
+
+/**
+ * `rental_stock_units` (migration 0249) — the rented-out asset registry
+ * (`unit_code` 'RU-1001…'): a deployed mattress has LEFT the warehouse but is
+ * still a Carres ASSET until ownership transfers. Own service/warranty event
+ * history via `rental_unit_events`.
+ */
+export interface RentalStockUnitRow {
+  id: string;
+  unit_code: string;
+  sku: string;
+  agreement_id: string | null;
+  customer_id: string | null;
+  status:
+    | "allocated"
+    | "in_rental"
+    | "returned"
+    | "refurbishing"
+    | "transferred"
+    | "retired";
+  deployed_at: string | null;
+  returned_at: string | null;
+  warranty_until: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `service_entitlements` (migration 0249) — ONE engine, multiple sources:
+ * included with a rental, bought as a service SKU, gifted free with a grand
+ * product, or granted manually. Visits pre-generate on mint (see
+ * `serviceVisitsTotal` / `serviceVisitIntervalMonths`); CHECK enforces
+ * visits_used <= visits_total.
+ */
+export interface ServiceEntitlementRow {
+  id: string;
+  customer_id: string;
+  package_id: string | null;
+  source: "rental" | "purchase" | "free_gift" | "manual";
+  agreement_id: string | null;
+  order_id: string | null;
+  visits_total: number;
+  visits_used: number;
+  starts_on: string;
+  expires_on: string | null;
+  status: "active" | "exhausted" | "expired" | "cancelled";
+  created_at: string;
+  created_by: string | null;
+}
+
+/**
+ * `service_visits` (migration 0249) — one scheduled/completed visit of an
+ * entitlement (`UNIQUE(entitlement_id, seq)`). `partner` stays free-text until
+ * the cleaning-partner tab ships (then an FK). Completion logs onto the
+ * physical unit's `rental_unit_events` trail.
+ */
+export interface ServiceVisitRow {
+  id: string;
+  entitlement_id: string;
+  seq: number;
+  due_date: string;
+  scheduled_date: string | null;
+  partner: string | null;
+  unit_id: string | null;
+  status: "pending" | "scheduled" | "completed" | "skipped" | "cancelled";
+  completed_at: string | null;
+  completed_by: string | null;
+  photo_url: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+/**
+ * `rental_unit_events` (migration 0249) — append-only per-unit event trail
+ * (the unit's service/warranty history, Loo's ask). `visit_id` links a
+ * 'service' event back to the completed service visit.
+ */
+export interface RentalUnitEventRow {
+  id: string;
+  unit_id: string;
+  event_type:
+    | "deployed"
+    | "service"
+    | "warranty_claim"
+    | "repair"
+    | "returned"
+    | "refurbished"
+    | "transferred"
+    | "note";
+  visit_id: string | null;
+  description: string | null;
+  photo_url: string | null;
+  actor: string | null;
+  occurred_at: string;
+}

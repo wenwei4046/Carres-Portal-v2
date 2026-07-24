@@ -20,7 +20,8 @@ export type CatalogTabKey =
   | "delivery"
   | "maintenance"
   | "combos"
-  | "promo";
+  | "promo"
+  | "rental";
 
 export interface CatalogTab {
   key: CatalogTabKey;
@@ -41,6 +42,7 @@ export const CATALOG_TABS: readonly CatalogTab[] = [
   { key: "maintenance", label: "Maintenance" },
   { key: "combos", label: "Sofa Combos" },
   { key: "promo", label: "Promo / GWP" },
+  { key: "rental", label: "Rental" },
 ];
 
 export function isCatalogTabKey(value: string | null): value is CatalogTabKey {

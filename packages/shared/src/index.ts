@@ -1231,6 +1231,49 @@ export * from "./store-kind";
 // scheme: PREFIX-DDMMYY-NNNN, tail derived per-order (never a counter).
 export { docNumber, docTail, amendmentSuffix, type DocNumberInput } from "./doc-number";
 
+// Rental + Service Plan base (0247-0249) — customers, service packages, rental
+// plans, agreements/billings, the rented-asset registry + the service
+// entitlement/visit engine. The PURE plan math (visit cadence + contract value
+// + the Σ-exact monthly split) lives in ./rental; the row→domain adapters +
+// camelCase domain types are surfaced top-level (mirrors pwpRuleFromRow /
+// productBundleFromRow); the zod input schemas live in schemas/rental.
+export {
+  serviceVisitsTotal,
+  serviceVisitIntervalMonths,
+  rentalContractValue,
+  rentalMonthlySplit,
+  type RentalMonthlySplit,
+} from "./rental";
+export {
+  customerFromRow,
+  servicePackageFromRow,
+  rentalPlanFromRow,
+  rentalAgreementFromRow,
+  rentalBillingFromRow,
+  rentalStockUnitFromRow,
+  serviceEntitlementFromRow,
+  serviceVisitFromRow,
+  rentalUnitEventFromRow,
+} from "./adapters";
+export type {
+  Customer,
+  ServicePackage,
+  RentalPlan,
+  RentalAgreement,
+  RentalBilling,
+  RentalStockUnit,
+  ServiceEntitlement,
+  ServiceVisit,
+  RentalUnitEvent,
+  ServicePackageType,
+  RentalAgreementStatus,
+  RentalBillingStatus,
+  RentalUnitStatus,
+  ServiceEntitlementStatus,
+  ServiceVisitStatus,
+} from "./domain";
+export * from "./schemas/rental";
+
 // 0244/0245 — HR commission portal: the PURE month calculator (percentage w/
 // manager override + per-model volume tiers + milestones) shared by the Hono
 // report route and any web preview. Config comes from the 0245 tables via

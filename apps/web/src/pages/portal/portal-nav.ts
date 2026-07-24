@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Boxes,
   ArrowLeftRight,
+  Repeat,
   Wallet,
   BookOpen,
   Calculator,
@@ -135,6 +136,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "stock-onhand", label: "Stock · On Hand", icon: Boxes },
       { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
       { key: "payments", label: "Payments", icon: Wallet },
+      // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
+      // the deployed-unit asset registry. Dormant until the POS rental lane.
+      { key: "rental", label: "Rental", icon: Repeat },
       // Catalog split (Loo 2026-07-25) — Operations carries ONLY the costing
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling

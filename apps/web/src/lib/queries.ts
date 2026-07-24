@@ -55,6 +55,12 @@ import {
   type SofaComboDto,
   type SofaComboCreateInput,
   type SofaComboPatchInput,
+  type ServicePackage,
+  type ServicePackageInput,
+  type RentalPlan,
+  type RentalPlanInput,
+  type RentalAgreement,
+  type RentalStockUnit,
   type SofaCompartmentDto,
   type SofaCompartmentCreateInput,
   type SofaCompartmentPatchInput,
@@ -227,6 +233,13 @@ export const qk = {
   pwpAvailable: (sel: { phone?: string | null; code?: string | null; name?: string | null }) =>
     ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null, sel.name ?? null] as const,
   pwpByOrder: (orderId: string) => ["pwp-codes", "by-order", orderId] as const,
+  // 0247-0249 — Rental + Service Plan base. Blast ["rental"] to refresh the
+  // whole module after a config write.
+  rental: {
+    config: () => ["rental", "config"] as const,
+    agreements: () => ["rental", "agreements"] as const,
+    units: () => ["rental", "units"] as const,
+  },
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -6778,6 +6791,44 @@ export function useAddAnnotation() {
   });
 }
 
+/* ── 0247-0249 · Rental + Service Plan base (Loo 2026-07-25) ─────────────────
+ * Config (service packages + rent-to-own plans, authored in the P&M Rental
+ * tab, principal-only server-side) and the read-only registry (agreements +
+ * deployed units) for the internal Rental page. Every config mutation blasts
+ * the ["rental"] sub-tree. */
+
+export interface RentalConfigResponse {
+  servicePackages: ServicePackage[];
+  rentalPlans: RentalPlan[];
+}
+
+/** Agreements list item — the API embeds the customer's name/phone. */
+export type RentalAgreementListItem = RentalAgreement & {
+  customerName: string | null;
+  customerPhone: string | null;
+};
+
+export function useRentalConfig(opts?: Partial<UseQueryOptions<RentalConfigResponse>>) {
+  return useQuery({
+    queryKey: qk.rental.config(),
+    queryFn: () => apiFetch<RentalConfigResponse>("/api/rental/config"),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useRentalAgreements(
+  opts?: Partial<UseQueryOptions<{ agreements: RentalAgreementListItem[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.rental.agreements(),
+    queryFn: () =>
+      apiFetch<{ agreements: RentalAgreementListItem[] }>("/api/rental/agreements"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 0244/0245 — HR commission portal (2026-07-25). One report read + eight writes
 // (0250 adds the BD-rate + dealer-portfolio pair).
@@ -6836,6 +6887,83 @@ export function useHrReport(
     placeholderData: keepPreviousData,
     ...opts,
   });
+}
+
+export function useRentalUnits(
+  opts?: Partial<UseQueryOptions<{ units: RentalStockUnit[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.rental.units(),
+    queryFn: () => apiFetch<{ units: RentalStockUnit[] }>("/api/rental/units"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+function useRentalConfigMutation<TData, TVars>(
+  mutationFn: (vars: TVars) => Promise<TData>,
+) {
+  const qc = useQueryClient();
+  return useMutation<TData, ApiError, TVars>({
+    mutationFn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["rental"] });
+    },
+  });
+}
+
+export function useCreateServicePackage() {
+  return useRentalConfigMutation((input: ServicePackageInput) =>
+    apiFetch<{ servicePackage: ServicePackage }>("/api/rental/service-packages", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export function usePatchServicePackage() {
+  return useRentalConfigMutation(
+    ({ id, patch }: { id: string; patch: Partial<ServicePackageInput> }) =>
+      apiFetch<{ servicePackage: ServicePackage }>(`/api/rental/service-packages/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+  );
+}
+
+export function useDeleteServicePackage() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ ok: boolean }>(`/api/rental/service-packages/${id}`, {
+      method: "DELETE",
+    }),
+  );
+}
+
+export function useCreateRentalPlan() {
+  return useRentalConfigMutation((input: RentalPlanInput) =>
+    apiFetch<{ plan: RentalPlan }>("/api/rental/plans", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export function usePatchRentalPlan() {
+  return useRentalConfigMutation(
+    ({ id, patch }: { id: string; patch: Partial<RentalPlanInput> }) =>
+      apiFetch<{ plan: RentalPlan }>(`/api/rental/plans/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+  );
+}
+
+export function useDeleteRentalPlan() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ ok: boolean }>(`/api/rental/plans/${id}`, {
+      method: "DELETE",
+    }),
+  );
 }
 
 function useHrInvalidate() {

@@ -17,10 +17,21 @@ import {
   sofaComboFromRow,
   sofaCompartmentFromRow,
   specialDeliveryFeeRuleFromRow,
+  // Rental + Service Plan base (0247-0249).
+  customerFromRow,
+  servicePackageFromRow,
+  rentalPlanFromRow,
+  rentalAgreementFromRow,
+  rentalBillingFromRow,
+  rentalStockUnitFromRow,
+  serviceEntitlementFromRow,
+  serviceVisitFromRow,
+  rentalUnitEventFromRow,
 } from "./adapters";
 import type {
   CatalogOptionPoolRow,
   CatalogFabricRow,
+  CustomerRow,
   DeliveryFeeConfigRow,
   FreeItemCampaignRow,
   ModelDefaultFreeGiftsRow,
@@ -30,7 +41,15 @@ import type {
   PwpCodeRow,
   PwpDiscoverRow,
   PwpRuleRow,
+  RentalAgreementRow,
+  RentalBillingRow,
+  RentalPlanRow,
+  RentalStockUnitRow,
+  RentalUnitEventRow,
   SalespersonRow,
+  ServiceEntitlementRow,
+  ServicePackageRow,
+  ServiceVisitRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
   SpecialDeliveryFeeRuleRow,
@@ -1181,5 +1200,261 @@ describe("salespersonFromRow (0233 staff PIN login)", () => {
     expect(d.staffRole).toBe("salesperson");
     expect(d.color).toBeNull();
     expect(d.active).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rental + Service Plan base (0247-0249) — one snake→camel round-trip per
+// adapter (numeric coercion + null preservation).
+// ---------------------------------------------------------------------------
+
+describe("rental + service plan adapters (0247-0249)", () => {
+  it("customerFromRow maps the 0247 row snake→camel", () => {
+    const row: CustomerRow = {
+      id: "00000000-0000-0000-0000-0000000c0001",
+      name: "Tan Mei Ling",
+      phone: "012-3456789",
+      phone_key: "123456789",
+      email: null,
+      address: "123 Jalan Sample, 50000 KL",
+      notes: null,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: "2026-07-25T00:00:00Z",
+      created_by: null,
+    };
+    expect(customerFromRow(row)).toEqual({
+      id: "00000000-0000-0000-0000-0000000c0001",
+      name: "Tan Mei Ling",
+      phone: "012-3456789",
+      phoneKey: "123456789",
+      email: null,
+      address: "123 Jalan Sample, 50000 KL",
+      notes: null,
+      createdAt: "2026-07-25T00:00:00Z",
+      updatedAt: "2026-07-25T00:00:00Z",
+      createdBy: null,
+    });
+  });
+
+  it("servicePackageFromRow coerces price/integers via Number() (PostgREST strings)", () => {
+    const row: ServicePackageRow = {
+      id: "00000000-0000-0000-0000-0000000a0001",
+      name: "Annual Clean",
+      service_type: "cleaning",
+      duration_months: "12" as unknown as number,
+      visits_per_year: 3,
+      price: "199.90" as unknown as number,
+      sku: null,
+      active: true,
+      sort_order: 0,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: "2026-07-25T00:00:00Z",
+      updated_by: null,
+    };
+    const out = servicePackageFromRow(row);
+    expect(out.serviceType).toBe("cleaning");
+    expect(out.durationMonths).toBe(12);
+    expect(out.visitsPerYear).toBe(3);
+    expect(out.price).toBe(199.9);
+    expect(out.sku).toBeNull();
+    expect(out.sortOrder).toBe(0);
+  });
+
+  it("rentalPlanFromRow coerces the fee/rate numerics and keeps includedPackageId null", () => {
+    const row: RentalPlanRow = {
+      id: "00000000-0000-0000-0000-0000000b0001",
+      sku: "M-CLOUD-KING",
+      term_months: 84,
+      monthly_fee: "59.00" as unknown as number,
+      supplier_rate_pct: "49.00" as unknown as number,
+      commission_base_pct: 20,
+      included_package_id: null,
+      active: false,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: "2026-07-25T00:00:00Z",
+      updated_by: null,
+    };
+    const out = rentalPlanFromRow(row);
+    expect(out.sku).toBe("M-CLOUD-KING");
+    expect(out.termMonths).toBe(84);
+    expect(out.monthlyFee).toBe(59);
+    expect(out.supplierRatePct).toBe(49);
+    expect(out.commissionBasePct).toBe(20);
+    expect(out.includedPackageId).toBeNull();
+    expect(out.active).toBe(false);
+  });
+
+  it("rentalAgreementFromRow maps the snapshot columns and preserves null buyout_amount", () => {
+    const row: RentalAgreementRow = {
+      id: "00000000-0000-0000-0000-0000000d0001",
+      agreement_no: "RA-1001",
+      customer_id: "00000000-0000-0000-0000-0000000c0001",
+      dealer_id: null,
+      salesperson_id: null,
+      order_id: null,
+      plan_id: "00000000-0000-0000-0000-0000000b0001",
+      sku: "M-CLOUD-KING",
+      term_months: 84,
+      monthly_fee: "59.00" as unknown as number,
+      supplier_rate_pct: 49,
+      commission_base_pct: 20,
+      start_date: "2026-08-01",
+      status: "active",
+      buyout_at: null,
+      buyout_amount: null,
+      ownership_transfer_at: null,
+      ownership_doc_url: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      notes: null,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: "2026-07-25T00:00:00Z",
+      created_by: null,
+    };
+    const out = rentalAgreementFromRow(row);
+    expect(out.agreementNo).toBe("RA-1001");
+    expect(out.customerId).toBe("00000000-0000-0000-0000-0000000c0001");
+    expect(out.planId).toBe("00000000-0000-0000-0000-0000000b0001");
+    expect(out.monthlyFee).toBe(59);
+    expect(out.status).toBe("active");
+    expect(out.buyoutAmount).toBeNull();
+    expect(out.startDate).toBe("2026-08-01");
+  });
+
+  it("rentalBillingFromRow coerces amount_due and null-preserves the split shares", () => {
+    const row: RentalBillingRow = {
+      id: "00000000-0000-0000-0000-0000000e0001",
+      agreement_id: "00000000-0000-0000-0000-0000000d0001",
+      seq: 1,
+      due_date: "2026-08-01",
+      amount_due: "59.00" as unknown as number,
+      status: "due",
+      paid_at: null,
+      paid_amount: null,
+      method: null,
+      reference: null,
+      supplier_share: null,
+      commission_share: null,
+      stripe_invoice_id: null,
+      recorded_by: null,
+      created_at: "2026-07-25T00:00:00Z",
+    };
+    const out = rentalBillingFromRow(row);
+    expect(out.seq).toBe(1);
+    expect(out.amountDue).toBe(59);
+    expect(out.status).toBe("due");
+    expect(out.paidAmount).toBeNull();
+    expect(out.supplierShare).toBeNull();
+    expect(out.commissionShare).toBeNull();
+    // A collected row coerces the recorded split figures.
+    const paid = rentalBillingFromRow({
+      ...row,
+      status: "paid",
+      paid_amount: "59.00" as unknown as number,
+      supplier_share: "28.91" as unknown as number,
+      commission_share: "11.80" as unknown as number,
+    });
+    expect(paid.paidAmount).toBe(59);
+    expect(paid.supplierShare).toBe(28.91);
+    expect(paid.commissionShare).toBe(11.8);
+  });
+
+  it("rentalStockUnitFromRow maps the unit registry row snake→camel", () => {
+    const row: RentalStockUnitRow = {
+      id: "00000000-0000-0000-0000-0000000f0001",
+      unit_code: "RU-1001",
+      sku: "M-CLOUD-KING",
+      agreement_id: "00000000-0000-0000-0000-0000000d0001",
+      customer_id: null,
+      status: "in_rental",
+      deployed_at: "2026-08-02",
+      returned_at: null,
+      warranty_until: "2031-08-02",
+      notes: null,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: "2026-07-25T00:00:00Z",
+      updated_by: null,
+    };
+    const out = rentalStockUnitFromRow(row);
+    expect(out.unitCode).toBe("RU-1001");
+    expect(out.agreementId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.customerId).toBeNull();
+    expect(out.status).toBe("in_rental");
+    expect(out.deployedAt).toBe("2026-08-02");
+    expect(out.warrantyUntil).toBe("2031-08-02");
+  });
+
+  it("serviceEntitlementFromRow coerces the visit counters via Number()", () => {
+    const row: ServiceEntitlementRow = {
+      id: "00000000-0000-0000-0000-000000010001",
+      customer_id: "00000000-0000-0000-0000-0000000c0001",
+      package_id: "00000000-0000-0000-0000-0000000a0001",
+      source: "rental",
+      agreement_id: "00000000-0000-0000-0000-0000000d0001",
+      order_id: null,
+      visits_total: "21" as unknown as number,
+      visits_used: 0,
+      starts_on: "2026-08-01",
+      expires_on: null,
+      status: "active",
+      created_at: "2026-07-25T00:00:00Z",
+      created_by: null,
+    };
+    const out = serviceEntitlementFromRow(row);
+    expect(out.source).toBe("rental");
+    expect(out.visitsTotal).toBe(21);
+    expect(out.visitsUsed).toBe(0);
+    expect(out.startsOn).toBe("2026-08-01");
+    expect(out.expiresOn).toBeNull();
+    expect(out.orderId).toBeNull();
+  });
+
+  it("serviceVisitFromRow maps a pending visit snake→camel", () => {
+    const row: ServiceVisitRow = {
+      id: "00000000-0000-0000-0000-000000020001",
+      entitlement_id: "00000000-0000-0000-0000-000000010001",
+      seq: 1,
+      due_date: "2026-12-01",
+      scheduled_date: null,
+      partner: "SparkleClean",
+      unit_id: "00000000-0000-0000-0000-0000000f0001",
+      status: "pending",
+      completed_at: null,
+      completed_by: null,
+      photo_url: null,
+      notes: null,
+      created_at: "2026-07-25T00:00:00Z",
+    };
+    const out = serviceVisitFromRow(row);
+    expect(out.entitlementId).toBe("00000000-0000-0000-0000-000000010001");
+    expect(out.seq).toBe(1);
+    expect(out.dueDate).toBe("2026-12-01");
+    expect(out.scheduledDate).toBeNull();
+    expect(out.partner).toBe("SparkleClean");
+    expect(out.unitId).toBe("00000000-0000-0000-0000-0000000f0001");
+    expect(out.status).toBe("pending");
+  });
+
+  it("rentalUnitEventFromRow maps the event trail row snake→camel", () => {
+    const row: RentalUnitEventRow = {
+      id: "00000000-0000-0000-0000-000000030001",
+      unit_id: "00000000-0000-0000-0000-0000000f0001",
+      event_type: "service",
+      visit_id: "00000000-0000-0000-0000-000000020001",
+      description: "Visit 1 completed — deep clean",
+      photo_url: null,
+      actor: null,
+      occurred_at: "2026-12-01T10:00:00Z",
+    };
+    expect(rentalUnitEventFromRow(row)).toEqual({
+      id: "00000000-0000-0000-0000-000000030001",
+      unitId: "00000000-0000-0000-0000-0000000f0001",
+      eventType: "service",
+      visitId: "00000000-0000-0000-0000-000000020001",
+      description: "Visit 1 completed — deep clean",
+      photoUrl: null,
+      actor: null,
+      occurredAt: "2026-12-01T10:00:00Z",
+    });
   });
 });
