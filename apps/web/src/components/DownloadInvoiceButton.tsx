@@ -34,7 +34,8 @@ type Role =
   | "partner"
   | "supplier"
   | "principal"
-  | "bd";
+  | "bd"
+  | "hr";
 
 const ALLOWED: ReadonlySet<Role> = new Set([
   "operation",

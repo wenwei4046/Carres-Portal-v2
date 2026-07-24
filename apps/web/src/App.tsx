@@ -14,6 +14,7 @@ import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
+import HrApp from "@/pages/hr/HrApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
 import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
@@ -39,6 +40,7 @@ function HomeRedirect() {
   if (role === "finance") return <Navigate to="/finance" replace />;
   if (role === "supplier") return <Navigate to="/supplier" replace />;
   if (role === "bd") return <Navigate to="/bd" replace />;
+  if (role === "hr") return <Navigate to="/hr" replace />;
   if (role === "dealer" || role === "salesperson" || role === "showroom") return <Navigate to="/dealer" replace />;
   return <Navigate to="/me" replace />;
 }
@@ -142,6 +144,18 @@ export default function App() {
             <RequireAuth>
               <RequireRole roles={["bd"]}>
                 <BDApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/hr/*"
+          element={
+            <RequireAuth>
+              {/* 0244/0245 — HR commission portal. Principal admitted like the
+                  other internal areas (boss-sees-all invariant). */}
+              <RequireRole roles={["hr", "principal"]}>
+                <HrApp />
               </RequireRole>
             </RequireAuth>
           }

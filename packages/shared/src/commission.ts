@@ -1,0 +1,387 @@
+/**
+ * 0245 — HR commission engine (2026-07-25, Loo).
+ *
+ * PURE month calculator for Carres' OWN sales executives (showroom-channel
+ * stores only — the hr_commission_source RPC pre-filters, this module never
+ * sees dealer-channel data). No base payroll, no statutory deductions.
+ *
+ * Two methods, resolved per outlet (commission_scheme_config; a store-level
+ * default row has outletId null):
+ *
+ *   'percentage' — pct of PURE ITEM REVENUE. The source already excludes
+ *     order_addons (delivery / dispose-* service fees) and service-category
+ *     lines, so basis = Σ qty × unitPrice of what reaches this engine.
+ *     Rates are effective-dated per staff (picked as-of each order's date).
+ *     Manager override: a manager-tier staff earns (own pct − seller pct) on
+ *     every salesperson-tier sale in their outlet; own sales pay own pct.
+ *     Multiple managers in one outlet split the override equally.
+ *
+ *   'per_model' — per-unit RM amount per product model + per-model volume tier
+ *     bonus (HIGHEST reached threshold pays, not cumulative) + overall
+ *     quantity milestones (optional category filter; within one category
+ *     group the highest reached threshold pays).
+ *
+ * Unconfigured anything resolves to RM0 — the whole feature is dormant until
+ * HR authors config rows.
+ */
+
+export type CommissionMethod = "percentage" | "per_model";
+
+export interface CommissionStaff {
+  id: string;
+  name: string;
+  staffRole: "principal" | "manager" | "salesperson";
+  active: boolean;
+  dealerId: string;
+  outletId: string | null;
+  storeName?: string | null;
+  outletName?: string | null;
+}
+
+/** One product order-line of the month, already attributed + pre-filtered. */
+export interface CommissionLine {
+  orderId: string;
+  so: number;
+  placedAt: string; // ISO timestamp
+  salespersonId: string | null;
+  dealerId: string;
+  outletId: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  category: string | null;
+  qty: number;
+  unitPrice: number;
+}
+
+export interface CommissionSchemeRow {
+  dealerId: string;
+  outletId: string | null;
+  method: CommissionMethod;
+}
+
+export interface StaffRateRow {
+  salespersonId: string;
+  pct: number;
+  effectiveFrom: string; // ISO date
+}
+
+export interface ModelRateRow {
+  modelId: string;
+  perUnitAmount: number;
+}
+
+export interface ModelTierRow {
+  modelId: string;
+  thresholdQty: number;
+  bonusAmount: number;
+}
+
+export interface MilestoneRow {
+  id?: string;
+  category: string | null; // null = all item categories count
+  thresholdQty: number;
+  bonusAmount: number;
+}
+
+export interface CommissionConfig {
+  schemes: CommissionSchemeRow[];
+  rates: StaffRateRow[];
+  modelRates: ModelRateRow[];
+  modelTiers: ModelTierRow[];
+  milestones: MilestoneRow[];
+}
+
+export interface OverrideDetail {
+  fromStaffId: string;
+  fromStaffName: string;
+  amount: number;
+}
+
+export interface PerModelDetail {
+  modelId: string;
+  modelName: string;
+  units: number;
+  perUnitAmount: number;
+  unitCommission: number;
+  tierBonus: number;
+  tierThreshold: number | null;
+}
+
+export interface MilestoneHit {
+  category: string | null;
+  units: number;
+  thresholdQty: number;
+  bonusAmount: number;
+}
+
+export interface StaffCommissionResult {
+  staff: CommissionStaff;
+  orderCount: number;
+  /** percentage-method item revenue this staff personally sold */
+  basis: number;
+  /** rate applied to the LAST sale of the month (informational) */
+  pctUsed: number | null;
+  directCommission: number;
+  overrideCommission: number;
+  overrideDetail: OverrideDetail[];
+  perModel: PerModelDetail[];
+  perModelCommission: number;
+  milestones: MilestoneHit[];
+  milestoneCommission: number;
+  total: number;
+}
+
+export interface CommissionReport {
+  perStaff: StaffCommissionResult[];
+  totalCommission: number;
+  totalBasis: number;
+}
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** outlet-specific scheme row wins; store default (outletId null) is the fallback. */
+export function resolveMethod(
+  schemes: CommissionSchemeRow[],
+  dealerId: string,
+  outletId: string | null,
+): CommissionMethod {
+  if (outletId) {
+    const outletRow = schemes.find(
+      (s) => s.dealerId === dealerId && s.outletId === outletId,
+    );
+    if (outletRow) return outletRow.method;
+  }
+  const storeRow = schemes.find(
+    (s) => s.dealerId === dealerId && s.outletId === null,
+  );
+  return storeRow?.method ?? "percentage";
+}
+
+/** Latest rate whose effectiveFrom <= asOf; no row -> 0 (dormant). */
+export function resolveRate(
+  rates: StaffRateRow[],
+  salespersonId: string,
+  asOf: string,
+): number {
+  const asOfDay = asOf.slice(0, 10);
+  let best: StaffRateRow | null = null;
+  for (const r of rates) {
+    if (r.salespersonId !== salespersonId) continue;
+    if (r.effectiveFrom.slice(0, 10) > asOfDay) continue;
+    if (!best || r.effectiveFrom > best.effectiveFrom) best = r;
+  }
+  return best?.pct ?? 0;
+}
+
+export function computeCommission(
+  staff: CommissionStaff[],
+  lines: CommissionLine[],
+  config: CommissionConfig,
+): CommissionReport {
+  const staffById = new Map(staff.map((s) => [s.id, s]));
+
+  interface Acc {
+    staff: CommissionStaff;
+    orders: Set<string>;
+    basis: number;
+    pctUsed: number | null;
+    lastSaleAt: string | null;
+    direct: number;
+    override: number;
+    overrideDetail: Map<string, OverrideDetail>;
+    modelUnits: Map<string, { modelName: string; units: number }>;
+    milestoneUnitsAll: number;
+    milestoneUnitsByCategory: Map<string, number>;
+  }
+  const acc = new Map<string, Acc>();
+  const accFor = (s: CommissionStaff): Acc => {
+    let a = acc.get(s.id);
+    if (!a) {
+      a = {
+        staff: s,
+        orders: new Set(),
+        basis: 0,
+        pctUsed: null,
+        lastSaleAt: null,
+        direct: 0,
+        override: 0,
+        overrideDetail: new Map(),
+        modelUnits: new Map(),
+        milestoneUnitsAll: 0,
+        milestoneUnitsByCategory: new Map(),
+      };
+      acc.set(s.id, a);
+    }
+    return a;
+  };
+  // every showroom staff shows in the report, even at RM0
+  for (const s of staff) accFor(s);
+
+  for (const line of lines) {
+    if (!line.salespersonId) continue; // unattributed — surfaced separately
+    const seller = staffById.get(line.salespersonId);
+    if (!seller) continue; // attributed to a non-showroom / unknown staff
+    const a = accFor(seller);
+    a.orders.add(line.orderId);
+
+    const method = resolveMethod(
+      config.schemes,
+      line.dealerId,
+      line.outletId ?? seller.outletId,
+    );
+    const amount = line.qty * line.unitPrice;
+
+    if (method === "percentage") {
+      const pct = resolveRate(config.rates, seller.id, line.placedAt);
+      a.basis += amount;
+      a.direct += (amount * pct) / 100;
+      if (!a.lastSaleAt || line.placedAt >= a.lastSaleAt) {
+        a.lastSaleAt = line.placedAt;
+        a.pctUsed = pct;
+      }
+
+      // manager override — only over salesperson-tier sales, same outlet
+      if (seller.staffRole === "salesperson") {
+        const managers = staff.filter(
+          (m) =>
+            m.staffRole === "manager" &&
+            m.active &&
+            m.dealerId === seller.dealerId &&
+            (m.outletId ?? null) === (line.outletId ?? seller.outletId ?? null),
+        );
+        if (managers.length > 0) {
+          for (const mgr of managers) {
+            const mgrPct = resolveRate(config.rates, mgr.id, line.placedAt);
+            const diff = mgrPct - pct;
+            if (diff <= 0) continue;
+            const share = (amount * diff) / 100 / managers.length;
+            const ma = accFor(mgr);
+            ma.override += share;
+            const d = ma.overrideDetail.get(seller.id);
+            if (d) d.amount += share;
+            else
+              ma.overrideDetail.set(seller.id, {
+                fromStaffId: seller.id,
+                fromStaffName: seller.name,
+                amount: share,
+              });
+          }
+        }
+      }
+    } else {
+      // per_model — needs a resolvable model
+      if (line.modelId) {
+        const mu = a.modelUnits.get(line.modelId);
+        if (mu) mu.units += line.qty;
+        else
+          a.modelUnits.set(line.modelId, {
+            modelName: line.modelName ?? line.modelId,
+            units: line.qty,
+          });
+      }
+      a.milestoneUnitsAll += line.qty;
+      if (line.category) {
+        a.milestoneUnitsByCategory.set(
+          line.category,
+          (a.milestoneUnitsByCategory.get(line.category) ?? 0) + line.qty,
+        );
+      }
+    }
+  }
+
+  const modelRateById = new Map(
+    config.modelRates.map((r) => [r.modelId, r.perUnitAmount]),
+  );
+
+  const perStaff: StaffCommissionResult[] = [];
+  for (const a of acc.values()) {
+    const perModel: PerModelDetail[] = [];
+    let perModelCommission = 0;
+    for (const [modelId, mu] of a.modelUnits) {
+      const perUnit = modelRateById.get(modelId) ?? 0;
+      const unitCommission = mu.units * perUnit;
+      // highest reached tier pays
+      let tierBonus = 0;
+      let tierThreshold: number | null = null;
+      for (const t of config.modelTiers) {
+        if (t.modelId !== modelId || t.thresholdQty > mu.units) continue;
+        if (tierThreshold === null || t.thresholdQty > tierThreshold) {
+          tierThreshold = t.thresholdQty;
+          tierBonus = t.bonusAmount;
+        }
+      }
+      perModel.push({
+        modelId,
+        modelName: mu.modelName,
+        units: mu.units,
+        perUnitAmount: perUnit,
+        unitCommission: round2(unitCommission),
+        tierBonus: round2(tierBonus),
+        tierThreshold,
+      });
+      perModelCommission += unitCommission + tierBonus;
+    }
+    perModel.sort((x, y) => y.unitCommission - x.unitCommission);
+
+    // milestones: group by category key; highest reached per group pays
+    const milestones: MilestoneHit[] = [];
+    let milestoneCommission = 0;
+    const groups = new Map<string, MilestoneRow[]>();
+    for (const m of config.milestones) {
+      const key = m.category ?? "";
+      const g = groups.get(key);
+      if (g) g.push(m);
+      else groups.set(key, [m]);
+    }
+    for (const [key, rows] of groups) {
+      const units =
+        key === ""
+          ? a.milestoneUnitsAll
+          : (a.milestoneUnitsByCategory.get(key) ?? 0);
+      let best: MilestoneRow | null = null;
+      for (const m of rows) {
+        if (m.thresholdQty > units) continue;
+        if (!best || m.thresholdQty > best.thresholdQty) best = m;
+      }
+      if (best) {
+        milestones.push({
+          category: best.category,
+          units,
+          thresholdQty: best.thresholdQty,
+          bonusAmount: round2(best.bonusAmount),
+        });
+        milestoneCommission += best.bonusAmount;
+      }
+    }
+
+    const direct = round2(a.direct);
+    const override = round2(a.override);
+    const perModelTotal = round2(perModelCommission);
+    const milestoneTotal = round2(milestoneCommission);
+    perStaff.push({
+      staff: a.staff,
+      orderCount: a.orders.size,
+      basis: round2(a.basis),
+      pctUsed: a.pctUsed,
+      directCommission: direct,
+      overrideCommission: override,
+      overrideDetail: [...a.overrideDetail.values()].map((d) => ({
+        ...d,
+        amount: round2(d.amount),
+      })),
+      perModel,
+      perModelCommission: perModelTotal,
+      milestones,
+      milestoneCommission: milestoneTotal,
+      total: round2(direct + override + perModelTotal + milestoneTotal),
+    });
+  }
+
+  perStaff.sort((x, y) => y.total - x.total || x.staff.name.localeCompare(y.staff.name));
+
+  return {
+    perStaff,
+    totalCommission: round2(perStaff.reduce((s, r) => s + r.total, 0)),
+    totalBasis: round2(perStaff.reduce((s, r) => s + r.basis, 0)),
+  };
+}

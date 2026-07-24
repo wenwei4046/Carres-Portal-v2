@@ -38,7 +38,8 @@ type Role =
   | "partner"
   | "supplier"
   | "principal"
-  | "bd";
+  | "bd"
+  | "hr";
 
 // Loo 2026-05-12 ~20:00 — operation dropped from the deny list (they
 // surface this on their own drawer when handing over a delivery). Partner

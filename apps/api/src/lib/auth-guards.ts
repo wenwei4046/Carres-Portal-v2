@@ -77,6 +77,21 @@ export const requireFinance: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 /**
+ * 0244/0245 (2026-07-25) — admits `hr` OR `principal`. Mirrors the role gate
+ * inside the HR RPCs (`hr_commission_source` / `hr_assign_salesperson`:
+ * `if app_role() not in ('hr','principal') then raise '42501'`) and the RLS
+ * on the commission config tables. HR is deliberately NOT in is_internal():
+ * it reaches order data only through those explicitly-gated RPCs.
+ */
+export const requireHr: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "hr" && role !== "principal") {
+    throw new HTTPException(403, { message: "HR or Principal only" });
+  }
+  await next();
+};
+
+/**
  * Phase 6 — admits `supplier` only. Mirrors the role gate inside every
  * Phase 6 supplier RPC (migration 0066: `if app_role() <> 'supplier' then
  * raise '42501'`). RLS plus the cross-supplier guard inside the RPCs

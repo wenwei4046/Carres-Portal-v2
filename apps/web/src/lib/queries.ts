@@ -170,6 +170,16 @@ import {
   type StoreChannel,
   // Purchase / Procurement MRP cockpit — GET /api/operation/purchase/today.
   type PurchaseTodayResponse,
+  // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
+  type CommissionReport,
+  type CommissionStaff,
+  type CommissionConfig,
+  type SetCommissionSchemeInput,
+  type SetStaffRateInput,
+  type SetModelRateInput,
+  type SetModelTiersInput,
+  type SetMilestonesInput,
+  type HrAssignSalespersonInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -402,6 +412,11 @@ export const qk = {
   // that shared this prefix was deleted 2026-07-12; the key stays stable.)
   salesOrderGrid: {
     entryConfig: () => ["sales-order-grid", "entry-config"] as const,
+  },
+  // 0244/0245 — HR commission portal. Nested so config/assign mutations can
+  // blast the whole `["hr"]` sub-tree (every month report embeds the config).
+  hr: {
+    report: (year: number, month: number) => ["hr", "report", year, month] as const,
   },
 };
 
@@ -2189,7 +2204,8 @@ export type AppRole =
   | "supplier"
   | "partner"
   | "finance"
-  | "bd";
+  | "bd"
+  | "hr";
 
 export interface AccountRow {
   id: string;
@@ -6748,5 +6764,139 @@ export function useAddAnnotation() {
       // resolved note is added — else the star stays stale in the list view.
       void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0244/0245 — HR commission portal (2026-07-25). One report read + six writes.
+// All writes invalidate the whole ["hr"] sub-tree: every month report embeds
+// the live config + unattributed worklist, so any config/assign change must
+// re-derive whichever month is on screen.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One unattributed order row of the month (GET /api/hr/report). */
+export interface HrUnattributedOrder {
+  orderId: string;
+  so: number;
+  placedAt: string;
+  dealerId: string;
+  outletId: string | null;
+  storeName: string | null;
+  customerName: string | null;
+  amount: number;
+}
+
+export interface HrModelOption {
+  id: string;
+  name: string;
+  category: string;
+}
+
+/** GET /api/hr/report?year&month response envelope. */
+export interface HrReportResponse {
+  year: number;
+  month: number;
+  report: CommissionReport;
+  unattributed: HrUnattributedOrder[];
+  staff: CommissionStaff[];
+  models: HrModelOption[];
+  config: CommissionConfig;
+}
+
+export function useHrReport(
+  year: number,
+  month: number,
+  opts?: Partial<UseQueryOptions<HrReportResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.report(year, month),
+    queryFn: () =>
+      apiFetch<HrReportResponse>(`/api/hr/report?year=${year}&month=${month}`),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    ...opts,
+  });
+}
+
+function useHrInvalidate() {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: ["hr"] });
+}
+
+/** Set the commission method for a store (outletId null) / one outlet. */
+export function useHrSetScheme() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetCommissionSchemeInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/scheme", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Append an effective-dated staff % rate row. */
+export function useHrSetStaffRate() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetStaffRateInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/staff-rate", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Upsert (or null = remove) a model's per-unit RM rate. */
+export function useHrSetModelRate() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetModelRateInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/model-rate", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Replace one model's volume tier ladder. */
+export function useHrSetModelTiers() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetModelTiersInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/model-tiers", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Replace the overall milestone list. */
+export function useHrSetMilestones() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetMilestonesInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/config/milestones", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Attribute an unattributed order to a salesperson (audited RPC). */
+export function useHrAssignSalesperson() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, HrAssignSalespersonInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/assign", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
   });
 }

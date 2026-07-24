@@ -24,7 +24,7 @@ type AuthActions = {
 
 const VALID_ROLES = [
   "principal", "dealer", "salesperson", "showroom",
-  "operation", "supplier", "partner", "finance", "bd",
+  "operation", "supplier", "partner", "finance", "bd", "hr",
 ] as const;
 
 // Supabase Auth Hook (custom_access_token_hook) injects role/entity ids into
