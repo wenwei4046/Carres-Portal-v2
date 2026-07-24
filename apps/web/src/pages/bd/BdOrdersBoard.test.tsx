@@ -1,8 +1,11 @@
 /**
  * BdOrdersBoard — the BD network "My orders" board (2026-07-19): every
- * dealer's orders on the store board's 3 lanes, By-dealer filter, dealer
+ * DEALER's orders on the store board's 3 lanes, By-dealer filter, dealer
  * chips on cards, AutoCount-archive rows hidden in All-dealers mode, and the
- * all-time footnote when a dealer is picked.
+ * all-time footnote when a dealer is picked. BD sees dealers ONLY (Loo
+ * 2026-07-25): /api/bd/dealers drops showrooms, and the board additionally
+ * gates its orders to that dealer-id set — mocked here with an order whose
+ * store is NOT in the list (a showroom's), which must never surface.
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -76,12 +79,15 @@ const OUT_2 = "00000000-0000-0000-0000-000000000o02";
 
 vi.mock("@/lib/queries", () => ({
   useOrders: () => ({ data: { orders: ORDERS, total: ORDERS.length }, isLoading: false }),
+  // /api/bd/dealers is dealers-only since 2026-07-25 — the showroom-channel
+  // archive store never reaches the client, so it is NOT in this mock; its
+  // order (#1099) below must stay off the board via the dealer-id gate.
   useBdDealers: () => ({
     data: {
       dealers: [
         {
           id: DEALER_A,
-          name: "Kelana Jaya",
+          name: "litte mattress sdn bhd",
           region: "KV",
           contact: null,
           status: "active",
@@ -90,18 +96,6 @@ vi.mock("@/lib/queries", () => ({
           gmv: 7185,
           outstanding: 3592,
           channel: "dealer",
-        },
-        {
-          id: DEALER_ARCHIVE,
-          name: "AutoCount Archive",
-          region: null,
-          contact: null,
-          status: "active",
-          joinedDate: null,
-          orderCount: 184,
-          gmv: 0,
-          outstanding: 0,
-          channel: "showroom",
         },
       ],
     },
@@ -126,7 +120,7 @@ vi.mock("@/pages/dealer/pos/PosOrderDetail", () => ({
 }));
 
 describe("BdOrdersBoard", () => {
-  it("shows the network lanes with dealer chips; AutoCount rows stay off the All-dealers board", () => {
+  it("shows the dealer lanes with dealer chips; off-list (showroom) orders never surface", () => {
     render(<BdOrdersBoard onClose={() => {}} />);
     // No PIN gate for the BD HQ login.
     expect(screen.queryByTestId("os-pin-gate")).toBeNull();
@@ -134,30 +128,31 @@ describe("BdOrdersBoard", () => {
     const place = screen.getByTestId("os-lane-place");
     expect(within(place).getByTestId("os-card-1301")).toBeTruthy();
     expect(within(screen.getByTestId("os-lane-proceed")).getByTestId("os-card-1302")).toBeTruthy();
-    // Archive import hidden in All-dealers mode.
+    // #1099 belongs to a store NOT in the BD dealers list (a showroom) — the
+    // dealer-id gate keeps it off the board in every mode.
     expect(screen.queryByTestId("os-card-1099")).toBeNull();
-    // The owning store is named on every card in All-dealers mode.
-    expect(within(place).getByTestId("os-card-dealer").textContent).toContain("Kelana Jaya");
+    // The owning dealer is named on every card in All-dealers mode.
+    expect(within(place).getByTestId("os-card-dealer").textContent).toContain(
+      "litte mattress sdn bhd",
+    );
     // Compare card waits for a pick.
-    expect(screen.getByText("Pick a store to compare")).toBeTruthy();
+    expect(screen.getByText("Pick a dealer to compare")).toBeTruthy();
   });
 
-  it("groups the store menu into Our showrooms / Dealers (store-kind rule)", () => {
+  it("the dealer menu is a FLAT dealers-only list — no showroom group, no showroom option", () => {
     render(<BdOrdersBoard onClose={() => {}} />);
     fireEvent.click(screen.getByTestId("bd-dealer-filter"));
-    expect(screen.getByText("Our showrooms")).toBeTruthy();
-    expect(screen.getByText("Dealers")).toBeTruthy();
-    expect(screen.getByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`)).toBeTruthy();
+    // "All dealers" = the button label + the menu's all-option.
+    expect(screen.getAllByText("All dealers").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId(`bd-dealer-option-${DEALER_A}`)).toBeTruthy();
+    expect(screen.queryByText("Our showrooms")).toBeNull();
+    expect(screen.queryByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`)).toBeNull();
   });
 
-  it("a picked store with ≥2 outlets gains the outlet level; picking one narrows via stamp + salesperson fallback", () => {
+  it("a picked dealer with ≥2 outlets gains the outlet level; picking one narrows via stamp + salesperson fallback", () => {
     render(<BdOrdersBoard onClose={() => {}} />);
-    // Archive store has no outlets → no outlet dropdown.
-    fireEvent.click(screen.getByTestId("bd-dealer-filter"));
-    fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`));
-    expect(screen.queryByTestId("os-outlet-filter")).toBeNull();
-    // Kelana Jaya has 2 → dropdown appears; Mont Kiara keeps only the
-    // salesperson-fallback row (1302 via Aisyah), 1301 has no outlet at all.
+    // litte mattress has 2 outlets → dropdown appears; Mont Kiara keeps only
+    // the salesperson-fallback row (1302 via Aisyah), 1301 has no outlet.
     fireEvent.click(screen.getByTestId("bd-dealer-filter"));
     fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_A}`));
     fireEvent.click(screen.getByTestId("os-outlet-filter"));
@@ -166,17 +161,16 @@ describe("BdOrdersBoard", () => {
     expect(screen.getByTestId("os-card-1302")).toBeTruthy();
   });
 
-  it("picking a dealer scopes the board, shows its archive rows + the all-time footnote", () => {
+  it("picking a dealer scopes the board + shows the all-time footnote", () => {
     render(<BdOrdersBoard onClose={() => {}} />);
     fireEvent.click(screen.getByTestId("bd-dealer-filter"));
-    fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_ARCHIVE}`));
+    fireEvent.click(screen.getByTestId(`bd-dealer-option-${DEALER_A}`));
 
-    // Store-board semantics inside one dealer: the AutoCount row shows now.
-    expect(screen.getByTestId("os-card-1099")).toBeTruthy();
-    // The other dealer's orders are gone.
-    expect(screen.queryByTestId("os-card-1301")).toBeNull();
+    expect(screen.getByTestId("os-card-1301")).toBeTruthy();
+    // The off-list showroom order stays hidden even inside a picked dealer.
+    expect(screen.queryByTestId("os-card-1099")).toBeNull();
     // All-time footnote from dealers_with_stats.
-    expect(screen.getByTestId("os-sumcard-footnote").textContent).toContain("184 orders");
+    expect(screen.getByTestId("os-sumcard-footnote").textContent).toContain("2 orders");
   });
 
   it("card click opens the shared PosOrderDetail drawer", () => {
