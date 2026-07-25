@@ -207,6 +207,7 @@ import {
   type SetTeamPositionInput,
   type SetReportsToInput,
   type SetStaffCodeInput,
+  type UpsertOrgDepartmentInput,
   type UpsertOrgPositionInput,
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
@@ -7282,6 +7283,19 @@ export function useHrUpsertPosition() {
   return useMutation<{ ok: true; id: string }, ApiError, UpsertOrgPositionInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true; id: string }>("/api/hr/team/positions", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0259 — create / rename / retire a department (the chart's columns). */
+export function useHrUpsertDepartment() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; id: string }, ApiError, UpsertOrgDepartmentInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; id: string }>("/api/hr/team/departments", {
         method: "POST",
         body: JSON.stringify(input),
       }),

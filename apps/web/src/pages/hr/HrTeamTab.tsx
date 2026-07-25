@@ -1,6 +1,6 @@
 // design-standard: not-a-list-page — the Team hierarchy editor inside the HR
 // tabbed shell; the page header lives in HrApp.
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,7 @@ import {
   STAFF_TIER_RANK,
   isTeamInternalRole,
   type HrCreateTeamAccountInput,
+  type OrgDepartment,
   type OrgPosition,
   type PositionBand,
   type TeamAccount,
@@ -26,6 +27,7 @@ import {
   useHrSetStaffCode,
   useHrSetTeamPosition,
   useHrTeam,
+  useHrUpsertDepartment,
   useHrUpsertPosition,
 } from "@/lib/queries";
 
@@ -541,20 +543,304 @@ function AddShowroomStaffModal({
 }
 
 // ----------------------------------------------------------------------------
-// d. Positions registry editor
+// Department chart (0259) — management team on top, one column per department
 // ----------------------------------------------------------------------------
 
-function PositionsCard({ positions }: { positions: OrgPosition[] }) {
-  const upsert = useHrUpsertPosition();
+function ChartPersonCard({
+  name,
+  detail,
+  code,
+}: {
+  name: string;
+  detail: string | null;
+  code: string | null;
+}) {
+  return (
+    <div className="bg-white border border-base-200 rounded px-3 py-1.5 min-w-0">
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span className="text-[13px] font-semibold text-base-900 truncate">{name}</span>
+        {code && (
+          <span className="font-mono text-[11px] tabular-nums text-base-400 shrink-0">{code}</span>
+        )}
+      </div>
+      {detail && <div className="text-[11px] text-base-500 truncate">{detail}</div>}
+    </div>
+  );
+}
+
+/** Band rank inside a department column — managers on top. */
+const CHART_BAND_RANK: Record<string, number> = { c_level: 0, manager: 1, executive: 2 };
+
+function DepartmentChartCard({
+  internalAccounts,
+  showroomStaff,
+  positions,
+  departments,
+}: {
+  internalAccounts: TeamAccount[];
+  showroomStaff: TeamShowroomStaff[];
+  positions: OrgPosition[];
+  departments: OrgDepartment[];
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const posById = useMemo(() => new Map(positions.map((p) => [p.id, p])), [positions]);
+  const active = internalAccounts.filter((a) => a.status === "active");
+  const cLevel = active
+    .filter((a) => a.band === "c_level")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const rest = active.filter((a) => a.band !== "c_level");
+
+  const byDept = useMemo(() => {
+    const groups = new Map<string, TeamAccount[]>();
+    const unassigned: TeamAccount[] = [];
+    for (const a of rest) {
+      const deptId = a.positionId ? (posById.get(a.positionId)?.departmentId ?? null) : null;
+      if (deptId) {
+        const g = groups.get(deptId);
+        if (g) g.push(a);
+        else groups.set(deptId, [a]);
+      } else {
+        unassigned.push(a);
+      }
+    }
+    const rank = (a: TeamAccount) => CHART_BAND_RANK[a.band ?? ""] ?? 9;
+    for (const g of groups.values()) g.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    unassigned.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    return { groups, unassigned };
+  }, [rest, posById]);
+
+  const staffByStore = useMemo(() => {
+    const groups = new Map<string, TeamShowroomStaff[]>();
+    for (const s of showroomStaff.filter((s) => s.active)) {
+      const g = groups.get(s.storeName);
+      if (g) g.push(s);
+      else groups.set(s.storeName, [s]);
+    }
+    for (const g of groups.values()) {
+      g.sort(
+        (a, b) =>
+          (STAFF_TIER_RANK[a.staffRole] ?? 9) - (STAFF_TIER_RANK[b.staffRole] ?? 9) ||
+          a.name.localeCompare(b.name),
+      );
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [showroomStaff]);
+
+  const deptColumns = departments
+    .filter((d) => d.active)
+    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+
+  const column = (title: string, count: number, body: ReactNode) => (
+    <div key={title} className="rounded border border-base-200 bg-base-50 min-w-0">
+      <div className="flex items-baseline justify-between px-3 py-2 border-b border-base-200">
+        <span className="text-[12px] font-semibold text-base-900 uppercase tracking-wide truncate">
+          {title}
+        </span>
+        <span className="text-[11px] text-base-500 tabular-nums shrink-0">{count}</span>
+      </div>
+      <div className="p-2 flex flex-col gap-1.5">{body}</div>
+    </div>
+  );
+
+  return (
+    <SectionCard>
+      <SectionBand
+        title="Department chart"
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((v) => !v)}
+      />
+      {!collapsed && (
+        <div className="p-4" data-testid="hr-department-chart">
+          {/* Management team — sits ON TOP of every department. */}
+          {cLevel.length > 0 && (
+            <div className="pb-4 mb-4 border-b border-dashed border-base-200">
+              <div className="t-micro text-base-500 text-center mb-2">Management team</div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {cLevel.map((a) => (
+                  <ChartPersonCard
+                    key={a.id}
+                    name={a.name}
+                    detail={a.positionName}
+                    code={a.staffCode}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}
+          >
+            {deptColumns.map((d) => {
+              const members = byDept.groups.get(d.id) ?? [];
+              return column(
+                d.name,
+                members.length,
+                members.length === 0 ? (
+                  <div className="text-[11px] text-base-400 px-1 py-2 text-center">No one yet</div>
+                ) : (
+                  members.map((a) => (
+                    <ChartPersonCard
+                      key={a.id}
+                      name={a.name}
+                      detail={a.positionName}
+                      code={a.staffCode}
+                    />
+                  ))
+                ),
+              );
+            })}
+            {staffByStore.length > 0 &&
+              column(
+                "Showrooms",
+                staffByStore.reduce((n, [, rows]) => n + rows.length, 0),
+                staffByStore.map(([store, rows]) => (
+                  <div key={store} className="flex flex-col gap-1.5">
+                    <div className="t-micro text-base-500 px-1">{store}</div>
+                    {rows.map((s) => (
+                      <ChartPersonCard
+                        key={s.id}
+                        name={s.name}
+                        detail={SHOWROOM_TIER_POSITION[s.staffRole] ?? s.staffRole}
+                        code={s.staffCode}
+                      />
+                    ))}
+                  </div>
+                )),
+              )}
+            {byDept.unassigned.length > 0 &&
+              column(
+                "Unassigned",
+                byDept.unassigned.length,
+                byDept.unassigned.map((a) => (
+                  <ChartPersonCard
+                    key={a.id}
+                    name={a.name}
+                    detail={a.positionName ?? "No position yet"}
+                    code={a.staffCode}
+                  />
+                )),
+              )}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Departments registry editor (0259)
+// ----------------------------------------------------------------------------
+
+function DepartmentsCard({ departments }: { departments: OrgDepartment[] }) {
+  const upsert = useHrUpsertDepartment();
   const [collapsed, setCollapsed] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newBand, setNewBand] = useState<PositionBand>("executive");
 
   const add = () => {
     const name = newName.trim();
     if (name === "") return;
     upsert.mutate(
-      { name, band: newBand },
+      { name },
+      {
+        onSuccess: () => {
+          toast.success(`Department added · ${name}`);
+          setNewName("");
+        },
+        onError: (e) => toast.error(e.message || "Save failed"),
+      },
+    );
+  };
+
+  return (
+    <SectionCard>
+      <SectionBand
+        title="Departments"
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((v) => !v)}
+        total={departments.filter((d) => d.active).length}
+      />
+      {!collapsed && (
+        <div className="p-2 flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5 px-1">
+            {departments.map((d) => (
+              <span
+                key={d.id}
+                className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-0.5 rounded-full border text-[12px] ${
+                  d.active
+                    ? "border-base-200 bg-base-50 text-base-900"
+                    : "border-dashed border-base-300 text-base-400 line-through"
+                }`}
+              >
+                {d.name}
+                <button
+                  type="button"
+                  title={d.active ? `Retire ${d.name}` : `Restore ${d.name}`}
+                  onClick={() =>
+                    upsert.mutate(
+                      { id: d.id, name: d.name, active: !d.active },
+                      {
+                        onSuccess: () =>
+                          toast.success(d.active ? `${d.name} retired` : `${d.name} restored`),
+                        onError: (e) => toast.error(e.message || "Save failed"),
+                      },
+                    )
+                  }
+                  className="w-5 h-5 rounded-full inline-flex items-center justify-center text-base-400 hover:text-base-900 hover:bg-base-200"
+                >
+                  {d.active ? "×" : "+"}
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 pt-1 px-1">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="New department name"
+              className={`${fieldCls} !w-[220px]`}
+            />
+            <Btn icon={Plus} size="sm" onClick={add} disabled={newName.trim() === "" || upsert.isPending}>
+              Add department
+            </Btn>
+          </div>
+          <div className="text-[11px] text-base-400 px-1 pb-1">
+            A position joins a department in the Positions card below; the chart
+            follows automatically. C-level seats stay department-less — they top
+            the chart.
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// d. Positions registry editor
+// ----------------------------------------------------------------------------
+
+function PositionsCard({
+  positions,
+  departments,
+}: {
+  positions: OrgPosition[];
+  departments: OrgDepartment[];
+}) {
+  const upsert = useHrUpsertPosition();
+  const [collapsed, setCollapsed] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newBand, setNewBand] = useState<PositionBand>("executive");
+  const [newDept, setNewDept] = useState("");
+
+  const activeDepts = departments.filter((d) => d.active);
+
+  const add = () => {
+    const name = newName.trim();
+    if (name === "") return;
+    upsert.mutate(
+      { name, band: newBand, departmentId: newDept === "" ? null : newDept },
       {
         onSuccess: () => {
           toast.success(`Position added · ${name}`);
@@ -575,22 +861,56 @@ function PositionsCard({ positions }: { positions: OrgPosition[] }) {
       />
       {!collapsed && (
         <div className="p-2 flex flex-col gap-2">
-          {POSITION_BAND_ORDER.map((band) => (
-            <div key={band}>
-              <div className="t-micro text-base-500 px-1 mb-1">{POSITION_BAND_LABEL[band]}</div>
-              <div className="flex flex-wrap gap-1.5 px-1">
-                {positions
-                  .filter((p) => p.band === band)
-                  .map((p) => (
-                    <span
+          {POSITION_BAND_ORDER.map((band) => {
+            const rows = positions.filter((p) => p.band === band);
+            if (rows.length === 0) return null;
+            return (
+              <div key={band}>
+                <div className="t-micro text-base-500 px-1 mb-1">{POSITION_BAND_LABEL[band]}</div>
+                <div className="flex flex-col">
+                  {rows.map((p) => (
+                    <div
                       key={p.id}
-                      className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-0.5 rounded-full border text-[12px] ${
-                        p.active
-                          ? "border-base-200 bg-base-50 text-base-900"
-                          : "border-dashed border-base-300 text-base-400 line-through"
-                      }`}
+                      className="flex items-center gap-2 h-8 px-1 rounded hover:bg-hovertint min-w-0"
                     >
-                      {p.name}
+                      <span
+                        className={`flex-1 min-w-0 truncate text-[13px] ${
+                          p.active ? "text-base-900" : "text-base-400 line-through"
+                        }`}
+                      >
+                        {p.name}
+                      </span>
+                      {/* Department link — the chart's column for this position.
+                          C-level seats top the chart, so no picker there. */}
+                      {band !== "c_level" && (
+                        <select
+                          value={p.departmentId ?? ""}
+                          disabled={!p.active}
+                          onChange={(e) =>
+                            upsert.mutate(
+                              {
+                                id: p.id,
+                                name: p.name,
+                                band: p.band,
+                                departmentId: e.target.value === "" ? null : e.target.value,
+                              },
+                              {
+                                onSuccess: () => toast.success(`Department updated · ${p.name}`),
+                                onError: (err) => toast.error(err.message || "Save failed"),
+                              },
+                            )
+                          }
+                          className={`${fieldCls} !h-7 !w-[190px] shrink-0 text-[12px]`}
+                          aria-label={`Department of ${p.name}`}
+                        >
+                          <option value="">— no department —</option>
+                          {activeDepts.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         type="button"
                         title={p.active ? `Retire ${p.name}` : `Restore ${p.name}`}
@@ -604,32 +924,46 @@ function PositionsCard({ positions }: { positions: OrgPosition[] }) {
                             },
                           )
                         }
-                        className="w-5 h-5 rounded-full inline-flex items-center justify-center text-base-400 hover:text-base-900 hover:bg-base-200"
+                        className="w-6 h-6 shrink-0 rounded-full inline-flex items-center justify-center text-base-400 hover:text-base-900 hover:bg-base-200"
                       >
                         {p.active ? "×" : "+"}
                       </button>
-                    </span>
+                    </div>
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex items-center gap-2 pt-1 px-1">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
               placeholder="New position name"
-              className={`${fieldCls} !w-[220px]`}
+              className={`${fieldCls} !w-[200px]`}
             />
             <select
               value={newBand}
               onChange={(e) => setNewBand(e.target.value as PositionBand)}
-              className={`${fieldCls} !w-[140px]`}
+              className={`${fieldCls} !w-[130px]`}
               aria-label="Band of the new position"
             >
               {POSITION_BAND_ORDER.map((b) => (
                 <option key={b} value={b}>
                   {POSITION_BAND_LABEL[b]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={newDept}
+              onChange={(e) => setNewDept(e.target.value)}
+              className={`${fieldCls} !w-[170px]`}
+              aria-label="Department of the new position"
+            >
+              <option value="">— no department —</option>
+              {activeDepts.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
                 </option>
               ))}
             </select>
@@ -700,6 +1034,14 @@ export default function HrTeamTab() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Department chart (0259) — the org at a glance */}
+      <DepartmentChartCard
+        internalAccounts={internalAccounts}
+        showroomStaff={data.showroomStaff}
+        positions={data.positions}
+        departments={data.departments ?? []}
+      />
+
       {/* a. Carres Team */}
       <SectionCard>
         <SectionBand
@@ -815,8 +1157,9 @@ export default function HrTeamTab() {
         )}
       </SectionCard>
 
-      {/* d. Positions registry + change history */}
-      <PositionsCard positions={data.positions} />
+      {/* d. Departments + Positions registries + change history */}
+      <DepartmentsCard departments={data.departments ?? []} />
+      <PositionsCard positions={data.positions} departments={data.departments ?? []} />
 
       <SectionCard>
         <SectionBand

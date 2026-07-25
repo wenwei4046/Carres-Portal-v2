@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import HrTeamTab from "./HrTeamTab";
@@ -33,10 +33,15 @@ function wrap(ui: React.ReactNode) {
   );
 }
 
+const DEPARTMENTS = [
+  { id: "7f000000-0000-4000-8000-000000000001", name: "Sales", sort: 0, active: true },
+  { id: "7f000000-0000-4000-8000-000000000002", name: "Operation", sort: 1, active: true },
+];
+
 const POSITIONS = [
-  { id: "7b000000-0000-4000-8000-000000000001", name: "Chairman", band: "c_level" as const, sort: 0, active: true },
-  { id: "7b000000-0000-4000-8000-000000000002", name: "COO", band: "c_level" as const, sort: 1, active: true },
-  { id: "7b000000-0000-4000-8000-000000000003", name: "Admin Assistant", band: "executive" as const, sort: 22, active: true },
+  { id: "7b000000-0000-4000-8000-000000000001", name: "Chairman", band: "c_level" as const, sort: 0, active: true, departmentId: null },
+  { id: "7b000000-0000-4000-8000-000000000002", name: "COO", band: "c_level" as const, sort: 1, active: true, departmentId: null },
+  { id: "7b000000-0000-4000-8000-000000000003", name: "Admin Assistant", band: "executive" as const, sort: 22, active: true, departmentId: DEPARTMENTS[1].id },
 ];
 
 const TEAM = {
@@ -138,6 +143,7 @@ const TEAM = {
     },
   ],
   positions: POSITIONS,
+  departments: DEPARTMENTS,
   history: [
     {
       id: "7e000000-0000-4000-8000-000000000001",
@@ -161,21 +167,22 @@ describe("HrTeamTab", () => {
 
     render(wrap(<HrTeamTab />));
 
-    // band group renders C-level people with their codes
-    await waitFor(() => expect(screen.getByText("Loo")).toBeInTheDocument());
-    expect(screen.getByText("CR001")).toBeInTheDocument();
+    // band group renders C-level people with their codes (name/code now also
+    // render inside the Department chart — multiple hits are correct)
+    await waitFor(() => expect(screen.getAllByText("Loo").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("CR001").length).toBeGreaterThanOrEqual(1);
     // "Jess" shows on her row AND in the history line — both are wanted
     expect(screen.getAllByText("Jess").length).toBeGreaterThanOrEqual(1);
     // no-position internal account falls into the unassigned group
-    expect(screen.getByText("No position yet")).toBeInTheDocument();
+    expect(screen.getAllByText("No position yet").length).toBeGreaterThanOrEqual(1);
     // her name also appears as a reports-to option on other rows
     expect(screen.getAllByText("Khor Yee").length).toBeGreaterThanOrEqual(1);
 
     // showroom staff: derived position labels + minted codes
-    expect(screen.getByText("Mayson")).toBeInTheDocument();
-    expect(screen.getByText("Sales Manager")).toBeInTheDocument();
-    expect(screen.getByText("Sales Executive")).toBeInTheDocument();
-    expect(screen.getByText("CR008")).toBeInTheDocument();
+    expect(screen.getAllByText("Mayson").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Sales Manager").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Sales Executive").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("CR008").length).toBeGreaterThanOrEqual(1);
 
     // external account listed without a staff code, with its org
     expect(screen.getByText("Ohana · Sales")).toBeInTheDocument();
@@ -186,6 +193,43 @@ describe("HrTeamTab", () => {
     expect(screen.getAllByText("Chairman").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("— → COO")).toBeInTheDocument();
     expect(screen.getByText("by Loo")).toBeInTheDocument();
+  });
+
+  it("department chart groups people under their position's department (0259)", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url === "/api/hr/team") {
+        return {
+          ...TEAM,
+          accounts: TEAM.accounts.map((a) =>
+            a.name === "Khor Yee"
+              ? {
+                  ...a,
+                  positionId: POSITIONS[2].id,
+                  positionName: "Admin Assistant",
+                  band: "executive" as const,
+                }
+              : a,
+          ),
+        };
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrTeamTab />));
+    await waitFor(() => expect(screen.getByTestId("hr-department-chart")).toBeInTheDocument());
+    const chart = screen.getByTestId("hr-department-chart");
+    // c_level people top the chart under "Management team"
+    expect(within(chart).getByText("Management team")).toBeInTheDocument();
+    expect(within(chart).getByText("Loo")).toBeInTheDocument();
+    // Khor Yee (Admin Assistant → Operation) lands in the Operation column
+    expect(within(chart).getByText("Operation")).toBeInTheDocument();
+    expect(within(chart).getByText("Khor Yee")).toBeInTheDocument();
+    // empty Sales column still renders; showroom staff get their own column
+    expect(within(chart).getByText("Sales")).toBeInTheDocument();
+    expect(within(chart).getByText("Showrooms")).toBeInTheDocument();
+    expect(within(chart).getByText("Mayson")).toBeInTheDocument();
+    // everyone has a position+department here — no Unassigned column
+    expect(within(chart).queryByText("Unassigned")).toBeNull();
   });
 
   it("dealer-side staff exclusion note is always visible", async () => {

@@ -7,6 +7,7 @@ import {
   setReportsToInput,
   setStaffCodeInput,
   setTeamPositionInput,
+  upsertOrgDepartmentInput,
   upsertOrgPositionInput,
   type HrTeamSource,
 } from "@carres/shared";
@@ -132,7 +133,7 @@ hrTeamRouter.post("/positions", requireHr, async (c) => {
   if (!parsed.success) {
     throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
   }
-  const { id, name, band, sort, active } = parsed.data;
+  const { id, name, band, sort, active, departmentId } = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
   if (id) {
@@ -143,6 +144,7 @@ hrTeamRouter.post("/positions", requireHr, async (c) => {
         band,
         ...(sort !== undefined ? { sort } : {}),
         ...(active !== undefined ? { active } : {}),
+        ...(departmentId !== undefined ? { department_id: departmentId } : {}),
         updated_by: c.var.auth.id,
       })
       .eq("id", id);
@@ -154,11 +156,55 @@ hrTeamRouter.post("/positions", requireHr, async (c) => {
   }
   const { data, error } = await sb
     .from("org_positions")
-    .insert({ name, band, sort: sort ?? 0, active: active ?? true, updated_by: c.var.auth.id })
+    .insert({
+      name,
+      band,
+      sort: sort ?? 0,
+      active: active ?? true,
+      department_id: departmentId ?? null,
+      updated_by: c.var.auth.id,
+    })
     .select("id")
     .single();
   if (error) {
     if (error.code === "23505") throw new HTTPException(422, { message: "position name already exists" });
+    throw new HTTPException(500, { message: error.message });
+  }
+  return c.json({ ok: true, id: (data as { id: string }).id }, 201);
+});
+
+/** POST /api/hr/team/departments — create / rename / retire a department (0259). */
+hrTeamRouter.post("/departments", requireHr, async (c) => {
+  const parsed = upsertOrgDepartmentInput.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+  const { id, name, sort, active } = parsed.data;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  if (id) {
+    const { error } = await sb
+      .from("org_departments")
+      .update({
+        name,
+        ...(sort !== undefined ? { sort } : {}),
+        ...(active !== undefined ? { active } : {}),
+        updated_by: c.var.auth.id,
+      })
+      .eq("id", id);
+    if (error) {
+      if (error.code === "23505") throw new HTTPException(422, { message: "department name already exists" });
+      throw new HTTPException(500, { message: error.message });
+    }
+    return c.json({ ok: true, id });
+  }
+  const { data, error } = await sb
+    .from("org_departments")
+    .insert({ name, sort: sort ?? 0, active: active ?? true, updated_by: c.var.auth.id })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") throw new HTTPException(422, { message: "department name already exists" });
     throw new HTTPException(500, { message: error.message });
   }
   return c.json({ ok: true, id: (data as { id: string }).id }, 201);
