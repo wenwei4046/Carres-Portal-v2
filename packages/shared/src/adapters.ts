@@ -44,6 +44,8 @@ export const salespersonFromRow = (r: DB.SalespersonRow): D.Salesperson => ({
   email: r.email ?? null,
   birthday: r.birthday ?? null,
   gender: r.gender ?? null,
+  // HR Team hierarchy — CRnnn staff code (showroom staff only)
+  staffCode: r.staff_code ?? null,
 });
 
 export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({

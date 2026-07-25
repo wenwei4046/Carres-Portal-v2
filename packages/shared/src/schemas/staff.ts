@@ -25,6 +25,18 @@ import { salespersonSchema } from "./catalog";
 export const staffTierSchema = z.enum(["principal", "manager", "salesperson"]);
 export type StaffTierDto = z.infer<typeof staffTierSchema>;
 
+/**
+ * Sequence = hierarchy (Loo 2026-07-19): highest level first. Shared so every
+ * consumer (staff roster route, HR Team page) sorts the SAME way — this
+ * constant moved here from apps/api/routes/staff.ts (PR #222) when the HR
+ * hierarchy work needed it too. Unknown tiers sink to the bottom.
+ */
+export const STAFF_TIER_RANK: Record<string, number> = {
+  principal: 0,
+  manager: 1,
+  salesperson: 2,
+};
+
 /** Header carrying the staff session token on every authed API call. */
 export const STAFF_TOKEN_HEADER = "X-Staff-Token";
 

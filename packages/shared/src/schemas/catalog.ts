@@ -1041,6 +1041,8 @@ export const salespersonSchema = z.object({
   email: z.string().nullable().default(null),
   birthday: z.string().nullable().default(null),
   gender: z.enum(["male", "female"]).nullable().default(null),
+  // HR Team hierarchy — CRnnn code (showroom staff only; dealer staff = null).
+  staffCode: z.string().nullable().default(null),
 });
 export type SalespersonDto = z.infer<typeof salespersonSchema>;
 

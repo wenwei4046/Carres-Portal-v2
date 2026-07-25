@@ -165,6 +165,20 @@ export async function handleCreateAccount(
     // outlet. zod already caps showroom at manager.
     if (body.initialStaff) {
       const st = body.initialStaff;
+      // HR Team hierarchy (2026-07-25): showroom floor staff are OUR staff —
+      // mint the company-wide CRnnn code at birth. Dealer staff carry none.
+      let staffCode: string | null = null;
+      if (channel === "showroom") {
+        const codeRes = await sb.rpc("next_staff_code");
+        if (codeRes.error) {
+          await sb.from("dealers").delete().eq("id", dealerId);
+          return c.json(
+            { error: "rpc_failed", code: "staff_code_failed", message: codeRes.error.message },
+            500,
+          );
+        }
+        staffCode = codeRes.data as string;
+      }
       const staffInsert = await sb
         .from("salespersons")
         .insert({
@@ -179,6 +193,7 @@ export async function handleCreateAccount(
           gender: st.gender ?? null,
           phone: st.phone ?? null,
           color: st.color ?? null,
+          staff_code: staffCode,
         })
         .select("id")
         .single();

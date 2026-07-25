@@ -109,7 +109,13 @@ principalAccountsRouter.get("/", async (c) => {
 // ---------- POST / — create ----------
 // Body moved verbatim to lib/create-account.ts (2026-07-19) so the BD portal
 // can mount the SAME door restricted to role=dealer (/api/bd/accounts).
-principalAccountsRouter.post("/", (c) => handleCreateAccount(c, { actorRole: "principal" }));
+// 2026-07-25 (Loo) — HR Team is THE account door now: every non-store user
+// (operation/finance/hr/bd/principal/supplier/partner) is minted at
+// /api/hr/team/accounts. This door keeps ONLY the store credentials —
+// dealer + showroom — because stores are entities, not people.
+principalAccountsRouter.post("/", (c) =>
+  handleCreateAccount(c, { actorRole: "principal", allowedRoles: ["dealer", "showroom"] }),
+);
 
 // ---------- POST /:id/status — disable / re-enable ----------
 principalAccountsRouter.post("/:id/status", async (c) => {

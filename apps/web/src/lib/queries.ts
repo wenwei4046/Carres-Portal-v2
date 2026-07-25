@@ -197,6 +197,14 @@ import {
   type CommissionMethod,
   type SetBdMethodInput,
   type SetBdPositionInput,
+  // HR Team hierarchy (Phase 1) — org registry + THE account door.
+  type HrTeamSource,
+  type SetTeamPositionInput,
+  type SetReportsToInput,
+  type SetStaffCodeInput,
+  type UpsertOrgPositionInput,
+  type HrCreateTeamAccountInput,
+  type HrCreateShowroomStaffInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
@@ -441,6 +449,7 @@ export const qk = {
   // blast the whole `["hr"]` sub-tree (every month report embeds the config).
   hr: {
     report: (year: number, month: number) => ["hr", "report", year, month] as const,
+    team: () => ["hr", "team"] as const,
   },
 };
 
@@ -7095,6 +7104,97 @@ export function useHrAssignDealerBd() {
   return useMutation<{ ok: true }, ApiError, AssignDealerBdInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true }>("/api/hr/assign-dealer-bd", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR Team hierarchy (Phase 1, 2026-07-25) — org registry + THE account door.
+// Reads go through the gated hr_team_source RPC; every write invalidates the
+// whole ["hr"] sub-tree (the commission report joins the same staff universe).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useHrTeam(opts?: Partial<UseQueryOptions<HrTeamSource>>) {
+  return useQuery({
+    queryKey: qk.hr.team(),
+    queryFn: () => apiFetch<HrTeamSource>("/api/hr/team"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useHrSetTeamPosition() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetTeamPositionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/team/position", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrSetReportsTo() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetReportsToInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/team/reports-to", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrSetStaffCode() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetStaffCodeInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/team/staff-code", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrUpsertPosition() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; id: string }, ApiError, UpsertOrgPositionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; id: string }>("/api/hr/team/positions", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrCreateTeamAccount() {
+  const invalidate = useHrInvalidate();
+  return useMutation<
+    { id: string; email: string; name: string; role: string; staffCode: string | null },
+    ApiError,
+    HrCreateTeamAccountInput
+  >({
+    mutationFn: (input) =>
+      apiFetch("/api/hr/team/accounts", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrCreateShowroomStaff() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ id: string; staffCode: string }, ApiError, HrCreateShowroomStaffInput>({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; staffCode: string }>("/api/hr/team/showroom-staff", {
         method: "POST",
         body: JSON.stringify(input),
       }),

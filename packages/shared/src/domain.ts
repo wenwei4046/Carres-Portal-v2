@@ -63,6 +63,8 @@ export interface Salesperson {
   email: string | null;
   birthday: string | null;
   gender: "male" | "female" | null;
+  // HR Team hierarchy — CRnnn staff code (showroom staff only)
+  staffCode: string | null;
 }
 
 export interface ProductModel {
