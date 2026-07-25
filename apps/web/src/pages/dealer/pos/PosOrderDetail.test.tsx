@@ -463,8 +463,8 @@ describe("add product (0231)", () => {
   });
 });
 
-describe("item description (Loo 2026-07-25 — cart parity)", () => {
-  it("renders gap, sku code and the option/special add-on rows like the cart", () => {
+describe("item description (Loo 2026-07-25 — one line, no point form)", () => {
+  it("renders variant + gap + option picks + specials as ONE muted line", () => {
     renderDrawer(
       order({
         lines: [
@@ -486,15 +486,11 @@ describe("item description (Loo 2026-07-25 — cart parity)", () => {
         ],
       }),
     );
-    // Muted detail = variant · gap (cart's "Super Single · gap 12"" row).
-    expect(screen.getByText('King · gap 12"')).toBeTruthy();
-    // The mono SKU code renders on its own row.
-    expect(screen.getByText("SKU-1")).toBeTruthy();
-    // Options + specials render via the SAME SpecialsSummary the cart uses.
-    const summary = screen.getByTestId("specials-summary");
-    expect(within(summary).getByText('+ Divan 8"')).toBeTruthy();
-    expect(within(summary).getByText('+ Leg 2"')).toBeTruthy();
-    expect(within(summary).getByText("+ USB port · +RM 50")).toBeTruthy();
+    // ONE line: variant · gap · options · specials — no per-item RM, no SKU
+    // code row, no "+"-prefixed sub-rows.
+    expect(screen.getByText('King · gap 12" · Divan 8" · Leg 2" · USB port')).toBeTruthy();
+    expect(screen.queryByTestId("specials-summary")).toBeNull();
+    expect(screen.queryByText("SKU-1")).toBeNull();
   });
 });
 
