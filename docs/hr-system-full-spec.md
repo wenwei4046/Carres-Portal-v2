@@ -3,6 +3,19 @@
 > Status: **RATIFIED 2026-07-26 (Loo)** — HR-P2…P6 approved; **HR-P7 + HR-P8 CUT**
 > ("no need p7, p8"); D3/D4/D5 therefore moot. Standing law added by Loo: **every
 > phase must have its UX/UI design done and shown BEFORE implementation starts.**
+>
+> **HR-P3 CUT (Loo, same day)** — native orders always carry a salesperson
+> (verified: 18/18 native have salesperson_id; the 37 blanks are ALL AutoCount
+> testimonial imports). The change-with-reason correction door survives as a
+> micro-add inside HR-P5 (the run-lock guard needs it anyway). Remaining build
+> order: **P2 → P4 → P5 → P6.**
+>
+> **4 NEW PROPOSALS pending Loo's pick** (mocked in the design artifact):
+> **O1 Overview** (HR landing digest: month money + needs-a-human rail + one-click
+> "mark 37 AutoCount blanks as legacy", size S) · **O2 Appraisals** (semi-annual,
+> scorecard-anchored, needs P5+P6 live first, size M) · **O3 Claims** (receipt +
+> approve inbox + rides the statement CSV, size M) · **O4 My HR** (staff
+> self-service, GATED on the email restructure, size M).
 > Produced by the hr-hierarchy line via an 8-agent ultracode workflow: 4 current-state
 > readers (web UI / API+engines / data model / decisions+CFs) → 3 independent designs
 > (people-ops-first · performance-first · ERP-integration-first) → 1 completeness critic.
