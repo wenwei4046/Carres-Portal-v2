@@ -1339,3 +1339,4 @@ export {
   type SetMilestonesInput,
   type HrAssignSalespersonInput,
 } from "./schemas/hr";
+export * from "./schemas/hr-team";

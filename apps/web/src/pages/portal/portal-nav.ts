@@ -223,6 +223,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "commission", label: "Commission", icon: HandCoins },
       { key: "attribution", label: "Attribution", icon: UserCheck },
       { key: "setup", label: "Commission Setup", icon: SlidersHorizontal },
+      // Team hierarchy (Loo 2026-07-25) — the org registry + THE account door:
+      // every new user except dealers is minted here.
+      { key: "team", label: "Team", icon: Users },
     ],
   },
   {

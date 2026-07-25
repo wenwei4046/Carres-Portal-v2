@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import HrCommissionTab from "./HrCommissionTab";
 import HrAttributionTab from "./HrAttributionTab";
 import HrSetupTab from "./HrSetupTab";
+import HrTeamTab from "./HrTeamTab";
 
 /**
  * HR (HQ Internal) shell — sidebar + `?tab=` switched content
@@ -81,7 +82,9 @@ export default function HrApp() {
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
   const tab =
-    rawTab === "attribution" || rawTab === "setup" ? rawTab : "commission";
+    rawTab === "attribution" || rawTab === "setup" || rawTab === "team"
+      ? rawTab
+      : "commission";
 
   const [ym, setYm] = useState<YearMonth>(() => {
     const now = new Date();
@@ -89,11 +92,13 @@ export default function HrApp() {
   });
 
   const title =
-    tab === "setup"
-      ? "Commission Setup"
-      : tab === "attribution"
-        ? `Attribution · ${monthLabel(ym)}`
-        : `Commission · ${monthLabel(ym)}`;
+    tab === "team"
+      ? "Team"
+      : tab === "setup"
+        ? "Commission Setup"
+        : tab === "attribution"
+          ? `Attribution · ${monthLabel(ym)}`
+          : `Commission · ${monthLabel(ym)}`;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -107,7 +112,7 @@ export default function HrApp() {
             title={title}
             className="mb-4"
             actions={
-              tab !== "setup" ? (
+              tab !== "setup" && tab !== "team" ? (
                 <MonthStepper value={ym} onChange={setYm} />
               ) : undefined
             }
@@ -119,6 +124,7 @@ export default function HrApp() {
             <HrAttributionTab year={ym.year} month={ym.month} />
           )}
           {tab === "setup" && <HrSetupTab year={ym.year} month={ym.month} />}
+          {tab === "team" && <HrTeamTab />}
         </div>
       </main>
     </div>

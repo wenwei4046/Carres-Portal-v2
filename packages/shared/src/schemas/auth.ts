@@ -22,7 +22,7 @@ export const meResponseSchema = z.object({
   email: z.string().email(),
   role: z.enum([
     "principal", "dealer", "salesperson", "showroom",
-    "operation", "supplier", "partner", "finance", "bd",
+    "operation", "supplier", "partner", "finance", "bd", "hr",
   ]),
   dealerId: z.string().uuid().nullable(),
   supplierId: z.string().uuid().nullable(),

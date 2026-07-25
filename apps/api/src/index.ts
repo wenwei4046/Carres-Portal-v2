@@ -66,6 +66,7 @@ import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
 import hrRouter from "./routes/hr";
+import hrTeamRouter from "./routes/hr-team";
 // 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
 // 0240 — store-account self-service (dealer-principal email-change requests).
@@ -142,6 +143,9 @@ api.route("/principal/dashboard", principalDashboardRouter);
 api.route("/principal/dealers", principalDealersRouter);
 api.route("/principal/partners", principalPartnersRouter);
 api.route("/salespersons", salespersonsRouter);
+// Team hierarchy mounts BEFORE the sibling /hr router (Hono flattens
+// sub-apps; explicit path avoids any /hr/* overlap ambiguity).
+api.route("/hr/team", hrTeamRouter);
 api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);

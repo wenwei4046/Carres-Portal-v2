@@ -10,6 +10,7 @@ import {
   staffListResponseSchema,
   staffReauthInputSchema,
   staffSessionResponseSchema,
+  STAFF_TIER_RANK,
   updateStaffInputSchema,
   verifyPinInputSchema,
   type StaffTierDto,
@@ -148,11 +149,10 @@ staffRouter.get("/", async (c) => {
   // Sequence = hierarchy (Loo 2026-07-19): highest level first — Dealer
   // Principal → Manager → Salesperson — then A-Z within a tier. One sort here
   // orders EVERY consumer (Staff & PINs list, PIN sign-in tiles, HQ Staff
-  // drawer, setup wizard).
-  const TIER_RANK: Record<string, number> = { principal: 0, manager: 1, salesperson: 2 };
+  // drawer, setup wizard). Rank constant is shared with the HR Team page.
   rows.sort(
     (a, b) =>
-      (TIER_RANK[a.staff_role] ?? 9) - (TIER_RANK[b.staff_role] ?? 9) ||
+      (STAFF_TIER_RANK[a.staff_role] ?? 9) - (STAFF_TIER_RANK[b.staff_role] ?? 9) ||
       a.name.localeCompare(b.name),
   );
 
@@ -363,7 +363,9 @@ staffRouter.post("/", async (c) => {
   }
   const input = parsed.data;
 
-  // Tier authority.
+  // Tier authority. storeKind is hoisted — the principal cap AND the CRnnn
+  // staff-code mint below both branch on it.
+  const storeKind = await resolveStoreKind(c, caller.dealerId, caller.internalHq);
   let outletId: string | null = input.outletId ?? null;
   if (caller.tier === "manager") {
     // sid === null ⇔ owner-mode: the password-proven store credential minted
@@ -382,11 +384,8 @@ staffRouter.post("/", async (c) => {
     }
   } else {
     // principal-tier — showrooms have no store-principal (Carres is theirs).
-    if (input.staffRole === "principal") {
-      const storeKind = await resolveStoreKind(c, caller.dealerId, caller.internalHq);
-      if (storeKind === "showroom") {
-        throw new HTTPException(403, { message: "Showroom stores cannot have a store principal" });
-      }
+    if (input.staffRole === "principal" && storeKind === "showroom") {
+      throw new HTTPException(403, { message: "Showroom stores cannot have a store principal" });
     }
   }
 
@@ -409,6 +408,16 @@ staffRouter.post("/", async (c) => {
     }
   }
 
+  // HR Team hierarchy (2026-07-25): showroom floor staff are OUR staff — every
+  // create door mints their company-wide CRnnn code. Dealer-side staff never
+  // carry one. Minting is a service_role-only DB fn (one sequence, no races).
+  let staffCode: string | null = null;
+  if (storeKind === "showroom") {
+    const codeRes = await adminClient(c.env).rpc("next_staff_code");
+    if (codeRes.error) throw new HTTPException(500, { message: codeRes.error.message });
+    staffCode = codeRes.data as string;
+  }
+
   const { data, error } = await writeSb
     .from("salespersons")
     .insert({
@@ -423,6 +432,7 @@ staffRouter.post("/", async (c) => {
       email: input.email ?? null,
       birthday: input.birthday ?? null,
       gender: input.gender ?? null,
+      staff_code: staffCode,
     })
     .select("*")
     .single();

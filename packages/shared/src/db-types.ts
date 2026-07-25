@@ -125,6 +125,9 @@ export interface SalespersonRow {
   email?: string | null;
   birthday?: string | null;
   gender?: "male" | "female" | null;
+  // HR Team hierarchy — CRnnn code for Carres' OWN showroom staff (optional:
+  // dealer-side staff never carry one)
+  staff_code?: string | null;
 }
 
 export interface ProductModelRow {

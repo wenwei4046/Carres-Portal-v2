@@ -62,6 +62,15 @@ const ROLE_OPTIONS: { value: CreatableAppRole; label: string; hint: string }[] =
   { value: "hr",          label: "HR",            hint: "Sales commission + staff" },
 ];
 
+// 2026-07-25 (Loo) — HR Team is THE account door now: every non-store user
+// (operation / finance / hr / bd / principal / supplier / partner) is minted
+// at HR → Team. This modal keeps ONLY the store credentials — dealer +
+// showroom — because stores are entities, not people. The API enforces the
+// same set (`allowedRoles` on the principal door).
+const CREATE_ROLE_OPTIONS = ROLE_OPTIONS.filter(
+  (r) => r.value === "dealer" || r.value === "showroom",
+);
+
 const ROLE_COLORS: Record<AppRole, string> = {
   principal:   "#D64F20", // var(--primary) — terracotta
   dealer:      "#3c5a78",
@@ -865,7 +874,8 @@ function CreateAccountModal({
             New account
           </h2>
           <div className="text-[12px] text-base-600 mt-1">
-            Provision portal access. Choose a role; we'll set up the right permissions.
+            Store credentials only — dealers and our showrooms. Every other
+            user (staff, supplier, partner) is added in HR → Team.
           </div>
         </div>
 
@@ -873,7 +883,7 @@ function CreateAccountModal({
           {/* Role picker grid */}
           <Field label="Role" hint={roleMeta?.hint}>
             <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
-              {ROLE_OPTIONS.map((r) => {
+              {CREATE_ROLE_OPTIONS.map((r) => {
                 const isActive = draft.role === r.value;
                 return (
                   <button

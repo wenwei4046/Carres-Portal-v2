@@ -203,7 +203,11 @@ describe("POST /api/bd/accounts", () => {
 });
 
 describe("POST /api/principal/accounts (shared handler regression)", () => {
-  it("principal still creates a SUPPLIER through the extracted handler → 201, audit role=principal", async () => {
+  // 2026-07-25 (Loo) — HR Team became THE account door for every non-store
+  // user; the principal Accounts door keeps ONLY dealer + showroom. A supplier
+  // create here must now bounce with role_not_allowed (it lives at
+  // /api/hr/team/accounts).
+  it("supplier is no longer creatable through the Accounts door → 403 role_not_allowed", async () => {
     const admin = mockAdminCreate();
     vi.mocked(adminClient).mockReturnValue(admin);
     const res = await post("/api/principal/accounts", await makeJwt("principal"), {
@@ -213,10 +217,27 @@ describe("POST /api/principal/accounts (shared handler regression)", () => {
       companyName: "Supp Co",
       tempPassword: "hunter2-strong",
     });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("role_not_allowed");
+    expect(admin.inserts["suppliers"]).toBeUndefined();
+  });
+
+  it("principal still creates a SHOWROOM store through the extracted handler → 201", async () => {
+    const admin = mockAdminCreate();
+    vi.mocked(adminClient).mockReturnValue(admin);
+    const res = await post("/api/principal/accounts", await makeJwt("principal"), {
+      name: "Store Login",
+      email: "store@carres.com",
+      role: "showroom",
+      companyName: "Carres Uptown",
+      address: "12 Jalan Uptown, PJ",
+      tempPassword: "hunter2-strong",
+    });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { role: string; supplierId: string | null };
-    expect(body.role).toBe("supplier");
-    expect(admin.inserts["suppliers"]?.[0]?.name).toBe("Supp Co");
+    const body = (await res.json()) as { role: string };
+    expect(body.role).toBe("showroom");
+    expect(admin.inserts["dealers"]?.[0]?.channel).toBe("showroom");
     expect(admin.inserts["audit_log"]?.[0]?.role).toBe("principal");
   });
 
