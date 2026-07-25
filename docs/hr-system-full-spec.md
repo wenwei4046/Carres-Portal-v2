@@ -1,6 +1,8 @@
 # Carres HR System — Full Spec (v1, 2026-07-26)
 
-> Status: **PROPOSAL — awaiting Loo's 拍板** on the 5 decisions in §7.
+> Status: **RATIFIED 2026-07-26 (Loo)** — HR-P2…P6 approved; **HR-P7 + HR-P8 CUT**
+> ("no need p7, p8"); D3/D4/D5 therefore moot. Standing law added by Loo: **every
+> phase must have its UX/UI design done and shown BEFORE implementation starts.**
 > Produced by the hr-hierarchy line via an 8-agent ultracode workflow: 4 current-state
 > readers (web UI / API+engines / data model / decisions+CFs) → 3 independent designs
 > (people-ops-first · performance-first · ERP-integration-first) → 1 completeness critic.
