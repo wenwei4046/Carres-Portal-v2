@@ -657,3 +657,5 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Evidence**: new drawer test (gap + mono SKU + `+ Divan 8"` / `+ Leg 2"` / `+ USB port · +RM 50`) — PosOrderDetail 30/30 · full web suite 16 fail = §17.7 baseline, zero new · build + design-standard lint clean.
 
 **Deploy (main tip `cbe1cbd`)**: web `index-DHBpOvLW.js` → carres-portal `dcdd82b3` + carres-pos `7762129b` (`--branch=main`); all 4 canonicals verified first curl; dist `SERVICE_ROLE` grep 0. API untouched (Worker stays `5a0659a1`).
+
+**Follow-up same night · PR #285 (merge `a0b2f98`)** — Loo screenshot: the taller configured line bodies left `.os-item`'s `align-items: center` floating the 48px photo / qty / price mid-block. Fix = top-align like `.cart-item`, SpecialsSummary rows restyled to the drawer's 11px muted scale (`.os-item__extras`), edit pencil optically centered on the name row (-6px). Deployed: web `index-Bh3vCypO.js` → carres-portal `d92cb021` + carres-pos `ef46b79c` (erp edge lagged ~1 min before serving the new bundle).
