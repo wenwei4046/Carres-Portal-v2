@@ -657,6 +657,11 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Evidence**: new drawer test (gap + mono SKU + `+ Divan 8"` / `+ Leg 2"` / `+ USB port · +RM 50`) — PosOrderDetail 30/30 · full web suite 16 fail = §17.7 baseline, zero new · build + design-standard lint clean.
 
 
+**Follow-up same night · PR #285 (merge `a0b2f98`)** — Loo screenshot: the taller configured line bodies left `.os-item`'s `align-items: center` floating the 48px photo / qty / price mid-block. Fix = top-align like `.cart-item`, SpecialsSummary rows restyled to the drawer's 11px muted scale (`.os-item__extras`), edit pencil optically centered on the name row (-6px). Deployed: web `index-Bh3vCypO.js` → carres-portal `d92cb021` + carres-pos `ef46b79c` (erp edge lagged ~1 min before serving the new bundle).
+
+**Second follow-up same night · PR #288 (merge `7787593`)** — Loo refined the drawer format: no point-form rows, no repeated product identity. The item config is now ONE muted wrapped line — `King · gap 14" · Divan 8" · Leg 4" · Fabric BF-12 · Front Drawer (2 Drawers) · …` — built by `lineConfigBits` (flat attrs + `options[]` + `specials[]` + `✎ remark`); the mono SKU-code row and the per-item `+RM` amounts are dropped (price already folded into the line total). The CART and the SO PDF deliberately keep their multi-line "+ …" form — only the drawer went one-line. Deployed: web `index-DD_5TYgd.js` → carres-portal `f5bb61fd` + carres-pos `2beecda7`, all 4 canonicals verified.
+
+
 ## 2026-07-25 (night ②) · Proceed-lane item CHANGE submissions + service add-ons on the add doors (PR #287, migration 0257 — NOT yet applied)
 
 **Ask (Loo, S0-1256 screenshot)**: (1) "Submit product change" 只能加 item — it must also let the store CHANGE an original Sales Order item (choose change vs add). (2) Service SKUs (Dispose old sofa / Dispose old mattress) can't be added post-create — "它也是其中一个 SKU", same setting as opening a sales order.
