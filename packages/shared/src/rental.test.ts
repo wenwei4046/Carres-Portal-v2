@@ -6,6 +6,7 @@ import {
   serviceVisitsTotal,
 } from "./rental";
 import {
+  createRentalAgreementInputSchema,
   customerInputSchema,
   rentalPlanInputSchema,
   rentalPlanPatchSchema,
@@ -227,5 +228,47 @@ describe("rental plan split cap (0253)", () => {
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "not-an-email" }).success).toBe(false);
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "a@b.co" }).success).toBe(true);
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: null }).success).toBe(true);
+  });
+});
+
+describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
+  const valid = {
+    planId: "00000000-0000-0000-0000-0000000b0001",
+    customerName: "Tan Mei Ling",
+    customerPhone: "012-3456789",
+  };
+
+  it("accepts the minimal signup (plan + mandatory customer name/phone)", () => {
+    const out = createRentalAgreementInputSchema.parse(valid);
+    expect(out.planId).toBe(valid.planId);
+    expect(out.customerName).toBe("Tan Mei Ling");
+    expect(out.startDate).toBeUndefined();
+  });
+
+  it("accepts the full payload (dealer on-behalf, salesperson, start date, notes)", () => {
+    const out = createRentalAgreementInputSchema.parse({
+      ...valid,
+      customerEmail: "mei@example.com",
+      customerAddress: "123 Jalan Sample, 50000 KL",
+      dealerId: "00000000-0000-0000-0000-0000000e0001",
+      salespersonId: "00000000-0000-0000-0000-0000000f0001",
+      startDate: "2026-08-01",
+      notes: "Pilot signup",
+    });
+    expect(out.startDate).toBe("2026-08-01");
+  });
+
+  it("rejects a missing/blank customer, a non-uuid plan, a malformed date and unknown keys", () => {
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, customerName: "  " }).success).toBe(false);
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, customerPhone: "1234" }).success).toBe(false);
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, planId: "not-a-uuid" }).success).toBe(false);
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, startDate: "01-08-2026" }).success).toBe(false);
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, monthlyFee: 1 }).success).toBe(false);
+  });
+
+  it("never carries money — a fee/split field is an unknown key by .strict()", () => {
+    expect(
+      createRentalAgreementInputSchema.safeParse({ ...valid, supplierRatePct: 0 }).success,
+    ).toBe(false);
   });
 });

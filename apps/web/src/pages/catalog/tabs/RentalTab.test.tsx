@@ -35,6 +35,7 @@ const mockDeletePkg = vi.fn();
 const mockCreatePlan = vi.fn();
 const mockPatchPlan = vi.fn();
 const mockDeletePlan = vi.fn();
+const mockSyncPlan = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useRentalConfig: () => configState,
@@ -44,6 +45,7 @@ vi.mock("@/lib/queries", () => ({
   useCreateRentalPlan: () => ({ mutate: mockCreatePlan, mutateAsync: vi.fn(), isPending: false }),
   usePatchRentalPlan: () => ({ mutate: mockPatchPlan, mutateAsync: vi.fn(), isPending: false }),
   useDeleteRentalPlan: () => ({ mutate: mockDeletePlan, mutateAsync: vi.fn(), isPending: false }),
+  useSyncRentalPlanStripe: () => ({ mutate: mockSyncPlan, mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // --- fixtures ---------------------------------------------------------------
@@ -238,5 +240,30 @@ describe("RentalTab — service packages", () => {
     fireEvent.click(screen.getByTestId("pkg-active-pkg-1"));
     expect(mockPatchPkg).toHaveBeenCalledTimes(1);
     expect(mockPatchPkg.mock.calls[0][0]).toEqual({ id: "pkg-1", patch: { active: false } });
+  });
+});
+
+describe("RentalTab — Stripe sync column (0255)", () => {
+  it("a synced plan shows the Synced pill; no Sync button", () => {
+    setConfig([], [makePlan({ stripeProductId: "prod_X", stripePriceId: "price_X" })]);
+    render(<RentalTab isPrincipal={true} />);
+    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Synced");
+    expect(screen.queryByTestId("plan-sync-plan-1")).not.toBeInTheDocument();
+  });
+
+  it("an unsynced plan shows Not synced + the principal Sync retry fires the mutation", () => {
+    setConfig([], [makePlan({ stripeProductId: null, stripePriceId: null })]);
+    render(<RentalTab isPrincipal={true} />);
+    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Not synced");
+    fireEvent.click(screen.getByTestId("plan-sync-plan-1"));
+    expect(mockSyncPlan).toHaveBeenCalledTimes(1);
+    expect(mockSyncPlan.mock.calls[0][0]).toBe("plan-1");
+  });
+
+  it("non-principal sees the status pill but no Sync button", () => {
+    setConfig([], [makePlan({ stripePriceId: null })]);
+    render(<RentalTab isPrincipal={false} />);
+    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Not synced");
+    expect(screen.queryByTestId("plan-sync-plan-1")).not.toBeInTheDocument();
   });
 });
