@@ -23,13 +23,25 @@ export interface WizardTopbarCtx {
 export default function ConfigureTopbarBrand({
   ctx,
   onBack,
+  compact = false,
 }: {
   ctx: WizardTopbarCtx;
   onBack: () => void;
+  /** Loo 2026-07-26 (2990s reference) — the SOFA header shares ONE row with
+   *  the size/mode tabs + PWP bar + total, so it takes the logo + crumb ONLY
+   *  (no step pills); the ← arrow stays beside it like the 2990s. */
+  compact?: boolean;
 }) {
   return (
     <div
-      style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flexShrink: 0 }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        minWidth: 0,
+        // Compact rides the packed sofa header row — let the crumb give way.
+        flexShrink: compact ? 1 : 0,
+      }}
       data-testid="cfg-topbar-brand"
     >
       <button
@@ -49,19 +61,21 @@ export default function ConfigureTopbarBrand({
         POS · {ctx.contextLabel}
       </span>
       {/* Same class as the real topbar's step rail — single-source type. */}
-      <span className="pos-topbar__center" style={{ justifyContent: "flex-start" }}>
-        {STEPS.map((label, i) => (
-          <span
-            key={label}
-            className={`pos-topbar__step ${i === 0 ? "is-active" : ""}`}
-            aria-current={i === 0 ? "step" : undefined}
-            style={{ cursor: "default", whiteSpace: "nowrap" }}
-          >
-            <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
-            {label}
-          </span>
-        ))}
-      </span>
+      {!compact && (
+        <span className="pos-topbar__center" style={{ justifyContent: "flex-start" }}>
+          {STEPS.map((label, i) => (
+            <span
+              key={label}
+              className={`pos-topbar__step ${i === 0 ? "is-active" : ""}`}
+              aria-current={i === 0 ? "step" : undefined}
+              style={{ cursor: "default", whiteSpace: "nowrap" }}
+            >
+              <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
+              {label}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

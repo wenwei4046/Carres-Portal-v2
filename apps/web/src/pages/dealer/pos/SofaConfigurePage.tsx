@@ -858,36 +858,28 @@ export default function SofaConfigurePage({
 
   return createPortal(
     <div
-      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
+      className="pos-proto cfg-root"
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
       aria-label={`Configure ${model.name}`}
       data-testid="sofa-configure-page"
     >
-      {/* Wizard context (Loo 2026-07-26): the POS topbar strip rides its OWN
-          row — the sofa header (heights + mode tabs + PWP bar + total) is far
-          too dense to share a row with it. Logo = back; the ← arrow goes. */}
-      {wizardTopbar && (
-        <div className="cfg-wizardbar">
-          <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
-        </div>
-      )}
-      {/* Header — the design's cfg-header with the sofa-flow crumb: back
-          arrow (non-wizard) · eyebrow/model · mode tabs (rail pill pair) ·
-          live total. */}
+      {/* Header — the design's cfg-header with the sofa-flow crumb. Wizard
+          context (Loo 2026-07-26, 2990s reference): ONE row — compact brand
+          (logo + POS · store, no step pills) beside the ← arrow, then the
+          usual eyebrow/model · mode tabs (rail pill pair) · live total. */}
       <div className="cfg-header cfg-header--icon">
-        {!wizardTopbar && (
-          <button
-            className="cfg-header__back"
-            type="button"
-            onClick={onClose}
-            aria-label="Back to catalog"
-            data-testid="sofa-configure-back"
-          >
-            <ArrowLeft size={16} strokeWidth={1.75} />
-          </button>
-        )}
+        {wizardTopbar && <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} compact />}
+        <button
+          className="cfg-header__back"
+          type="button"
+          onClick={onClose}
+          aria-label="Back to catalog"
+          data-testid="sofa-configure-back"
+        >
+          <ArrowLeft size={16} strokeWidth={1.75} />
+        </button>
         <div className="sof-flow__headerCrumb" style={{ minWidth: 0 }}>
           <span className="sof-flow__crumbDepth">
             <span className="sof-flow__crumbDot" />
