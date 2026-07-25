@@ -25,7 +25,9 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
  *   - role:    current user role; button hides on operation/partner/supplier
  *   - variant: "primary" matches the Submit-class buttons (filled
  *              terracotta), "secondary" matches the outline-class
- *              buttons (default; less visual weight inside detail drawers)
+ *              buttons (default; less visual weight inside detail drawers),
+ *              "pos" renders the .pos-proto ghost pill (`.btn .btn--ghost`)
+ *              for the My-orders drawer footer (2026-07-25, Loo)
  *   - className: optional extra Tailwind classes for layout tweaks
  */
 
@@ -50,7 +52,7 @@ interface Props {
   orderId: string;
   so: number;
   role: Role;
-  variant?: "primary" | "secondary" | "menuitem";
+  variant?: "primary" | "secondary" | "menuitem" | "pos";
   className?: string;
 }
 
@@ -100,6 +102,24 @@ export default function DownloadSalesOrderButton({
           <FileText className="w-4 h-4" />
         </span>
         {busy ? "Opening…" : "Sales Order PDF"}
+      </button>
+    );
+  }
+
+  // POS my-orders drawer footer (2026-07-25, Loo) — os-* styled ghost pill so
+  // the button sits native next to Save changes / Move to Proceed. Same
+  // fetch-render-open flow; only the shell differs (.pos-proto contract).
+  if (variant === "pos") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className="btn btn--ghost"
+        data-testid={`download-sales-order-${so}`}
+      >
+        <FileText size={16} />
+        {busy ? "Opening…" : "View sales order"}
       </button>
     );
   }
