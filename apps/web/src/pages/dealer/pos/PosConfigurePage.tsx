@@ -768,19 +768,24 @@ export default function PosConfigurePage({
 
   return createPortal(
     <div
-      className="pos-proto cfg-root"
+      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
       aria-label={`Configure ${model.name}`}
       data-testid="pos-configure-page"
     >
-      {/* Header — brand strip (wizard) / back arrow · live summary · live
-          total (+ breakdown pop) · CTA */}
-      <div className="cfg-header cfg-header--icon">
-        {wizardTopbar ? (
+      {/* Wizard context (Loo 2026-07-26): the POS topbar strip rides its OWN
+          row — the logo is the way back; the ← arrow goes away. */}
+      {wizardTopbar && (
+        <div className="cfg-wizardbar">
           <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
-        ) : (
+        </div>
+      )}
+      {/* Header — back arrow (non-wizard) · live summary · live total
+          (+ breakdown pop) · CTA */}
+      <div className="cfg-header cfg-header--icon">
+        {!wizardTopbar && (
           <button
             className="cfg-header__back"
             onClick={onClose}
