@@ -944,7 +944,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                       <div className="os-item__name">{model?.name ?? line.sku}</div>
                       {detail && <div className="os-item__detail">{detail}</div>}
                       <div className="os-item__detail font-mono">{line.sku}</div>
-                      <SpecialsSummary attrs={line.attrs} />
+                      <SpecialsSummary attrs={line.attrs} className="os-item__extras" />
                     </div>
                     <div className="os-item__qty">×{line.qty}</div>
                     <div className="os-item__price">
