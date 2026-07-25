@@ -727,3 +727,12 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Deploy (union tip `3db49b9f`, AFTER 0259 applied)**: api Worker `19a3a6e1` (unauth /api/hr/team → 401 ✓; union carries #291's 0258 api) · web `index-D7Ejw5bd.js` → carres-portal `b43cf6b5` + carres-pos `3f4b4143`; all 4 canonicals verified (carres-portal pair edge lagged ~2 min); dist `SERVICE_ROLE` grep 0.
 
 **Also this session (not shipped)**: hierarchy Phase 2 permissions proposal presented to Loo — replace `OPS_MANAGER_EMAILS`/`isPoDutyEditor`/`OPS_GENERIC_EMAILS` hardcodes with position-band reads (`my_org_position()` self-only DEFINER fn, PO-duty editor = the "Operation Manager" seat, legacy email list as transition fallback). Awaiting his call.
+
+
+## 2026-07-26 · Customer sub-step pills clickable (PR #297, web-only, deployed)
+
+**Ask (Loo, 02 Customer screenshot)**: the Customer / Address / Emergency / Target date pills should jump on click — Next/Previous stay, the pills become a shortcut ("我已经在 Emergency 的时候，直接点 Customer 就跳去 Customer Tab").
+
+**Fix**: pills are `<button>`s. Backward always free (data stays; Next re-validates forward). Forward walks the SAME per-step gates Next enforces — `canAdvance` parametrized to `canAdvanceAt(i)`, `maxReachable` chains from the current step; unreachable pills are `disabled`. CSS `button.step-pill` overrides UA font/colour/GrayText so the look is byte-identical to the div era — the only visual change is the pointer cursor.
+
+**Evidence**: CustomerStep 19/19 (+3: backward jump / gated forward / gate-passing forward — race/gender/birthday are defaultRequired, the valid-draft fixture must fill them) · full web 1488/1504 (16 = §17.7 baseline) · build + design-standard clean. **Ship**: PR #297 (`2be6da75`) → web `index-Cuu6viJe.js` → carres-portal `1187e4c9` + carres-pos `c393e050`; 4 canonicals ✓; full bundle 4,024,543 bytes marker ✓ SERVICE_ROLE 0. **Gotcha worth keeping: right after a Pages deploy the asset URL can briefly return the SPA `_redirects` fallback (index.html, ~1.7KB) while the edge propagates — a "bundle" download under 3MB is the fallback, not the bundle; retry until the size is real before grepping markers.**
