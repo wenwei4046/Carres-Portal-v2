@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Circle,
   Info,
+  Minus,
   PackageCheck,
   Paperclip,
   Pencil,
@@ -23,6 +24,7 @@ import {
   minDeliveryDateISO,
   resolvePaymentMethods,
   type Order,
+  type OrderAddon,
   type OrderLine,
   type ProductModelDto,
   type TopUpOrderInput,
@@ -38,6 +40,7 @@ import {
   useAddOrderLines,
   useCancelOrderChangeRequest,
   useCatalog,
+  useEditOrderAddon,
   useOrder,
   useOrderChangeRequests,
   useProceedOrder,
@@ -51,7 +54,7 @@ import {
 import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-display";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { newLocalId } from "../new-order/configurators";
-import type { DraftAddon, DraftLine } from "../new-order/draft";
+import { composeDisposalSizeSummary, type DraftAddon, type DraftLine } from "../new-order/draft";
 import {
   OPTION_KIND_LABEL,
   optionsFromAttrs,
@@ -353,6 +356,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     targetLines: Array<{ id?: string; sku: string; qty: number; unitPrice?: number; label?: string }>;
     oldTotal: number;
   } | null>(null);
+  // 0258 — service add-on edit (qty + per-unit sizes): place lane applies
+  // directly; the proceed lane files an edit_addon change request.
+  const editAddonMut = useEditOrderAddon(id);
+  const [addonEditing, setAddonEditing] = useState<{
+    id: string;
+    name: string;
+    oldQty: number;
+    oldSize: string | null;
+    qty: number;
+    sizes: string[];
+    sizeOptions: string[];
+  } | null>(null);
+  const [addonErr, setAddonErr] = useState<string | null>(null);
   const editIndex = useMemo(
     () =>
       catalog
@@ -609,6 +625,63 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       });
     } catch (e) {
       setAddErr(replaceErrorCopy(e));
+    }
+  }
+
+  // ── 0258 SERVICE add-on edit (qty + per-unit sizes; DELIVERY* locked) ─────
+  function startEditAddon(a: OrderAddon, label: string) {
+    if (!a.id) return;
+    const cfg = catalog?.addons.find((x) => x.key === a.addonKey);
+    const sizeOptions = cfg?.sizeOptions ?? [];
+    const attrs = (a.attrs ?? {}) as { sizes?: unknown; size?: unknown };
+    const rawSizes = Array.isArray(attrs.sizes)
+      ? (attrs.sizes as unknown[]).filter((s): s is string => typeof s === "string")
+      : [];
+    const sizes =
+      sizeOptions.length > 0
+        ? Array.from({ length: a.qty }, (_, i) =>
+            rawSizes[i] ?? (a.qty === 1 && typeof attrs.size === "string" ? attrs.size : ""),
+          )
+        : [];
+    setAddonErr(null);
+    setAddonEditing({
+      id: a.id,
+      name: label,
+      oldQty: a.qty,
+      oldSize: typeof attrs.size === "string" ? attrs.size : null,
+      qty: a.qty,
+      sizes,
+      sizeOptions,
+    });
+  }
+
+  async function handleSaveAddon() {
+    if (!addonEditing) return;
+    const t = addonEditing;
+    const needSizes = t.sizeOptions.length > 0;
+    if (needSizes && (t.sizes.length !== t.qty || t.sizes.some((s) => !s))) return;
+    const attrs = needSizes
+      ? { sizes: t.sizes, size: composeDisposalSizeSummary(t.sizes) || undefined }
+      : null;
+    setAddonErr(null);
+    try {
+      if (scope?.editableProceed) {
+        // Proceed lane — files an edit_addon change request (HQ approves).
+        await submitChangeMut.mutateAsync({
+          kind: "edit_addon",
+          targetAddonId: t.id,
+          qty: t.qty,
+          attrs,
+          label: t.name,
+          oldQty: t.oldQty,
+          oldSize: t.oldSize,
+        });
+      } else {
+        await editAddonMut.mutateAsync({ addonId: t.id, input: { qty: t.qty, attrs } });
+      }
+      setAddonEditing(null);
+    } catch (e) {
+      setAddonErr(addErrorCopy(e));
     }
   }
 
@@ -1076,8 +1149,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                   typeof a.attrs === "object" && a.attrs !== null && typeof (a.attrs as { size?: unknown }).size === "string"
                     ? ((a.attrs as { size: string }).size)
                     : null;
+                // 0258 — service add-ons get the pencil too (Loo: "service
+                // sku need to be editable as well"); DELIVERY* rows are
+                // server-computed and stay locked.
+                const editable =
+                  (scope.editablePlaced || (scope.editableProceed && !pendingChange)) &&
+                  !DELIVERY_ADDON_LABELS[a.addonKey] &&
+                  !!a.id;
                 return (
-                  <div key={a.id} className="os-item">
+                  <div
+                    key={a.id}
+                    className="os-item"
+                    style={editable ? { gridTemplateColumns: "48px 1fr auto auto auto" } : undefined}
+                  >
                     <div className="os-item__photo">
                       <span style={{ display: "grid", placeItems: "center", height: "100%", color: "var(--fg-muted)" }}>+</span>
                     </div>
@@ -1090,6 +1174,17 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                       <sup>RM</sup>
                       {rm(a.unitPrice * a.qty)}
                     </div>
+                    {editable && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => startEditAddon(a, label)}
+                        aria-label={`Edit ${label}`}
+                        data-testid="pos-od-edit-addon"
+                      >
+                        <Pencil size={16} strokeWidth={1.75} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -1170,10 +1265,12 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 <span className="t-tiny" style={{ color: "var(--fg-muted)" }}>
                   {pendingChange.kind === "replace_lines"
                     ? "Item change pending HQ approval"
-                    : `Product change pending HQ approval · ${
-                        (pendingChange.payload.lines ?? []).length +
-                        (pendingChange.payload.addons ?? []).length
-                      } item(s)`}
+                    : pendingChange.kind === "edit_addon"
+                      ? "Add-on change pending HQ approval"
+                      : `Product change pending HQ approval · ${
+                          (pendingChange.payload.lines ?? []).length +
+                          (pendingChange.payload.addons ?? []).length
+                        } item(s)`}
                 </span>
                 <button
                   type="button"
@@ -1728,6 +1825,133 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
           />
         )}
 
+        {/* 0258 — service add-on edit modal (qty + per-unit sizes). */}
+        {addonEditing && (
+          <div
+            className="fixed inset-0 z-[120] grid place-items-center bg-base-900/55 p-4"
+            onClick={() => setAddonEditing(null)}
+            data-testid="pos-od-addon-modal"
+          >
+            <div
+              className="w-full max-w-[400px] bg-white rounded-md shadow-md p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="kicker mb-1">Edit add-on</p>
+              <h3 className="t-h4 mb-3">{addonEditing.name}</h3>
+              <div className="flex items-center justify-between mb-1">
+                <span className="t-small text-base-600">Quantity</span>
+                <div className="flex items-center gap-1 border border-base-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    disabled={addonEditing.qty <= addonEditing.oldQty}
+                    onClick={() =>
+                      setAddonEditing((p) => {
+                        if (!p) return p;
+                        const qty = Math.max(p.oldQty, p.qty - 1);
+                        return {
+                          ...p,
+                          qty,
+                          sizes: p.sizeOptions.length > 0 ? p.sizes.slice(0, qty) : p.sizes,
+                        };
+                      })
+                    }
+                    className="w-8 h-8 flex items-center justify-center hover:bg-hovertint disabled:opacity-40"
+                    aria-label="Decrease quantity"
+                    data-testid="pos-od-addon-minus"
+                  >
+                    <Minus size={13} strokeWidth={2} />
+                  </button>
+                  <span className="font-mono text-[13px] w-6 text-center">{addonEditing.qty}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAddonEditing((p) => {
+                        if (!p) return p;
+                        const qty = Math.min(99, p.qty + 1);
+                        const sizes = p.sizeOptions.length > 0 ? [...p.sizes] : p.sizes;
+                        if (p.sizeOptions.length > 0) {
+                          while (sizes.length < qty) sizes.push("");
+                        }
+                        return { ...p, qty, sizes };
+                      })
+                    }
+                    className="w-8 h-8 flex items-center justify-center hover:bg-hovertint"
+                    aria-label="Increase quantity"
+                    data-testid="pos-od-addon-plus"
+                  >
+                    <Plus size={13} strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+              <p className="t-tiny text-base-500 mb-3">
+                Quantity can only stay or increase — reductions go through HQ.
+              </p>
+              {addonEditing.sizeOptions.length > 0 && (
+                <div className="flex flex-col gap-1.5 mb-3">
+                  {addonEditing.sizes.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="kicker text-base-400 flex-shrink-0 w-12">
+                        {addonEditing.qty > 1 ? `Size ${i + 1}` : "Size"}
+                      </span>
+                      <select
+                        value={s}
+                        onChange={(e) =>
+                          setAddonEditing((p) => {
+                            if (!p) return p;
+                            const sizes = [...p.sizes];
+                            sizes[i] = e.target.value;
+                            return { ...p, sizes };
+                          })
+                        }
+                        aria-label={`${addonEditing.name} size${
+                          addonEditing.qty > 1 ? ` (item ${i + 1})` : ""
+                        }`}
+                        className={`flex-1 h-8 px-2 rounded-lg border text-[12px] bg-white outline-none focus:border-primary ${
+                          s ? "border-base-200" : "border-destructive/60"
+                        }`}
+                      >
+                        <option value="">Select size…</option>
+                        {addonEditing.sizeOptions.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {addonErr && (
+                <p className="t-tiny text-danger mb-2" data-testid="pos-od-addon-err">
+                  {addonErr}
+                </p>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setAddonEditing(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={
+                    editAddonMut.isPending ||
+                    submitChangeMut.isPending ||
+                    (addonEditing.sizeOptions.length > 0 && addonEditing.sizes.some((s) => !s))
+                  }
+                  onClick={handleSaveAddon}
+                  data-testid="pos-od-addon-save"
+                >
+                  {scope.editableProceed ? "Submit for approval" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 0234 — View request: the submitted lines + edit/cancel actions. */}
         {viewChangeOpen && pendingChange && (
           <div
@@ -1742,9 +1966,30 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               <p className="kicker mb-1">
                 {pendingChange.kind === "replace_lines"
                   ? "Item change · pending HQ approval"
-                  : "Product change · pending HQ approval"}
+                  : pendingChange.kind === "edit_addon"
+                    ? "Add-on change · pending HQ approval"
+                    : "Product change · pending HQ approval"}
               </p>
-              {pendingChange.kind === "replace_lines" ? (
+              {pendingChange.kind === "edit_addon" ? (
+                <div data-testid="pos-od-change-editaddon">
+                  <div className="flex items-center justify-between t-small text-base-500 py-1 line-through">
+                    <span>
+                      {(pendingChange.payload.label as string | undefined) ?? "Add-on"} ×
+                      {pendingChange.payload.oldQty ?? "?"}
+                      {pendingChange.payload.oldSize ? ` · ${pendingChange.payload.oldSize}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between t-small text-base-800 py-1">
+                    <span>
+                      → ×{pendingChange.payload.qty ?? "?"}
+                      {typeof (pendingChange.payload.attrs as { size?: unknown } | null | undefined)
+                        ?.size === "string"
+                        ? ` · ${(pendingChange.payload.attrs as { size: string }).size}`
+                        : ""}
+                    </span>
+                  </div>
+                </div>
+              ) : pendingChange.kind === "replace_lines" ? (
                 <div data-testid="pos-od-change-replace">
                   {((pendingChange.payload.targetLines ?? []) as Array<{
                     sku?: string;
@@ -1833,10 +2078,10 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 >
                   Cancel request
                 </button>
-                {/* 0257 — an item-change edits by cancel + re-pencil (the
-                    overlay can't seed a replace); only add requests edit
+                {/* 0257/0258 — item/add-on changes edit by cancel + re-pencil
+                    (the overlay can't seed them); only add requests edit
                     in place. */}
-                {pendingChange.kind !== "replace_lines" && (
+                {pendingChange.kind === "add_lines" && (
                   <button
                     type="button"
                     className="btn btn--primary btn--sm"

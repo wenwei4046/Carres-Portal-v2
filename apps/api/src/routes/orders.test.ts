@@ -3175,6 +3175,10 @@ function replaceRequestRow(over: Record<string, unknown> = {}) {
   });
 }
 
+// 0258 — service add-on edit fixtures.
+const ADDON_ROW_ID = "55555555-5555-5555-5555-555555555501";
+const editAddonUrl = `http://t/api/orders/${PROCEED_ID}/addons/${ADDON_ROW_ID}/edit`;
+
 describe("0257 — service add-ons on the add doors", () => {
   it("direct add: addons-only body prices from the addons config and passes p_addons_append", async () => {
     const sb = buildSbForProceed({
@@ -3340,6 +3344,148 @@ describe("0257 — replace_lines change requests", () => {
     const lines = args.p_lines as Array<Record<string, unknown>>;
     expect(lines[0].sku).toBe("SKU-ADD-1");
     expect(lines[0].unit_price).toBe(250); // fresh catalog price at APPROVAL time
+  });
+
+  it("direct addon edit — POST /:id/addons/:addonId/edit calls edit_order_addon", async () => {
+    const sb = buildSbForProceed({ fetchedRow: addOrderRow() });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editAddonUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ qty: 2, attrs: { sizes: ["King", "Queen"], size: "King + Queen" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("edit_order_addon");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_addon_id).toBe(ADDON_ROW_ID);
+    expect(args.p_qty).toBe(2);
+    expect(args.p_source).toBe("direct");
+    expect((args.p_attrs as { sizes?: string[] }).sizes).toEqual(["King", "Queen"]);
+  });
+
+  it("direct addon edit 422 wrong_status once the order proceeded (friendly gate)", async () => {
+    const sb = buildSbForProceed({ fetchedRow: addOrderRow({ status: "proceed_order" }) });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editAddonUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ qty: 2 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(body.error).toBe("edit_addon_blocked");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("direct addon edit 422 passthrough of the RPC's downsell_blocked (qty reduction)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      rpcError: {
+        code: "22023",
+        message: "quantity can only stay or increase — reductions go through HQ",
+        details: "downsell_blocked",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editAddonUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ qty: 1 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("downsell_blocked");
+  });
+
+  it("submit edit_addon — passes p_kind + the qty/size payload", async () => {
+    const sb = buildSbForProceed({
+      tables: {
+        order_change_requests: {
+          single: requestRow({
+            kind: "edit_addon",
+            payload: { targetAddonId: ADDON_ROW_ID, qty: 2 },
+          }),
+        },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "edit_addon",
+          targetAddonId: ADDON_ROW_ID,
+          qty: 2,
+          attrs: { sizes: ["King", "Queen"], size: "King + Queen" },
+          label: "Dispose old mattress",
+          oldQty: 1,
+          oldSize: "King",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("submit_order_change_request");
+    const args = sb._rpcCalls[0].args as {
+      p_kind?: string;
+      p_payload?: { targetAddonId?: string; qty?: number; oldQty?: number };
+    };
+    expect(args.p_kind).toBe("edit_addon");
+    expect(args.p_payload?.targetAddonId).toBe(ADDON_ROW_ID);
+    expect(args.p_payload?.qty).toBe(2);
+    expect(args.p_payload?.oldQty).toBe(1);
+  });
+
+  it("decide APPROVE on edit_addon — applies via edit_order_addon p_source=change_request", async () => {
+    const sb = buildSbForProceed({
+      tables: {
+        order_change_requests: {
+          single: requestRow({
+            kind: "edit_addon",
+            payload: {
+              targetAddonId: ADDON_ROW_ID,
+              qty: 3,
+              attrs: { sizes: ["King", "Queen", "Single"], size: "King + Queen + Single" },
+              label: "Dispose old mattress",
+              oldQty: 1,
+            },
+          }),
+        },
+        orders: { single: addOrderRow({ status: "proceed_order" }) },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("edit_order_addon");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_addon_id).toBe(ADDON_ROW_ID);
+    expect(args.p_qty).toBe(3);
+    expect(args.p_source).toBe("change_request");
+    expect(args.p_change_request_id).toBe(REQ_ID);
   });
 
   it("decide APPROVE 422 line_in_production when the target line already has a thread", async () => {

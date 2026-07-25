@@ -624,14 +624,21 @@ export interface OrderHistory {
 export interface OrderChangeRequest {
   id: string;
   orderId: string;
-  /** 0257 — 'replace_lines' = proceed-lane "change an original item". */
-  kind: "add_lines" | "replace_lines";
+  /** 0257 — 'replace_lines' = proceed-lane "change an original item".
+   *  0258 — 'edit_addon' = qty/size edit on a service add-on row. */
+  kind: "add_lines" | "replace_lines" | "edit_addon";
   payload: {
     lines?: Array<Record<string, unknown>>;
     addons?: Array<Record<string, unknown>>;
     targetLineIds?: string[];
     targetLines?: Array<Record<string, unknown>>;
     line?: Record<string, unknown>;
+    targetAddonId?: string;
+    qty?: number;
+    attrs?: Record<string, unknown> | null;
+    label?: string;
+    oldQty?: number;
+    oldSize?: string | null;
   };
   status: "pending" | "approved" | "rejected" | "cancelled";
   requestedBy: string | null;

@@ -20,6 +20,8 @@ const h = vi.hoisted(() => ({
   // 0257 — proceed-lane pencil files a replace_lines change request.
   submitChangeMutateAsync: vi.fn(async () => ({})),
   changeRequests: [] as unknown[],
+  // 0258 — service add-on edit.
+  editAddonMutateAsync: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -41,6 +43,8 @@ vi.mock("@/lib/queries", () => ({
   }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  // 0258 — service add-on edit.
+  useEditOrderAddon: () => ({ mutateAsync: h.editAddonMutateAsync, isPending: false }),
 }));
 // 0255 — the edit surface mounts the real configure pages; stub them so the
 // drawer tests stay light. The bed stub can emit an UP-priced or DOWN-priced
@@ -104,7 +108,11 @@ const CATALOG = {
     },
   ],
   sofaFabrics: [],
-  addons: [],
+  // 0258 — the service add-on edit modal reads sizeOptions from this config.
+  addons: [
+    { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true, sizeOptions: ["King", "Queen"] },
+    { key: "dispose-sofa", name: "Dispose old sofa", price: 50, active: true, sizeOptions: null },
+  ],
   floorConfig: { id: 1, freeUpToFloor: 3, perFloorPerItem: 20 },
 } as unknown as CatalogResponse;
 
@@ -188,8 +196,34 @@ beforeEach(() => {
   h.unproceedMutateAsync.mockClear();
   h.replaceMutateAsync.mockClear();
   h.submitChangeMutateAsync.mockClear();
+  h.editAddonMutateAsync.mockClear();
   h.changeRequests = [];
 });
+
+/** 0258 — an order carrying one editable service row + one DELIVERY row. */
+function orderWithAddons(over: Partial<Order> = {}): Order {
+  return order({
+    addons: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a1",
+        orderId: "00000000-0000-0000-0000-000000001201",
+        addonKey: "dispose-sofa",
+        qty: 1,
+        unitPrice: 50,
+        attrs: null,
+      },
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a2",
+        orderId: "00000000-0000-0000-0000-000000001201",
+        addonKey: "DELIVERY",
+        qty: 1,
+        unitPrice: 250,
+        attrs: null,
+      },
+    ],
+    ...over,
+  } as Partial<Order>);
+}
 
 describe("place lane", () => {
   it("renders the 5-chip checklist and an enabled Move to Proceed when all checks pass", async () => {
@@ -386,6 +420,77 @@ describe("line edit (0255)", () => {
       }),
     );
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
+  });
+
+  // 0258 — service add-on rows get the pencil too; DELIVERY* stays locked.
+  it("addon pencil edits qty directly in the place lane (DELIVERY row locked)", async () => {
+    renderDrawer(orderWithAddons());
+    const pencils = screen.getAllByTestId("pos-od-edit-addon");
+    expect(pencils).toHaveLength(1); // dispose-sofa only — DELIVERY has none
+    fireEvent.click(pencils[0]);
+    expect(screen.getByTestId("pos-od-addon-modal")).toBeTruthy();
+    // qty 1 → 2 (minus disabled at the original qty — up-sell law).
+    expect((screen.getByTestId("pos-od-addon-minus") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId("pos-od-addon-plus"));
+    fireEvent.click(screen.getByTestId("pos-od-addon-save"));
+    await waitFor(() =>
+      expect(h.editAddonMutateAsync).toHaveBeenCalledWith({
+        addonId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a1",
+        input: { qty: 2, attrs: null },
+      }),
+    );
+    expect(h.submitChangeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("a sized addon gates Save until every unit has a size; composes attrs.sizes", async () => {
+    renderDrawer(
+      orderWithAddons({
+        addons: [
+          {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a3",
+            orderId: "00000000-0000-0000-0000-000000001201",
+            addonKey: "dispose-mattress",
+            qty: 1,
+            unitPrice: 80,
+            attrs: { sizes: ["King"], size: "King" },
+          },
+        ],
+      } as Partial<Order>),
+    );
+    fireEvent.click(screen.getByTestId("pos-od-edit-addon"));
+    fireEvent.click(screen.getByTestId("pos-od-addon-plus"));
+    const save = screen.getByTestId("pos-od-addon-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true); // unit 2 has no size yet
+    fireEvent.change(screen.getByLabelText("Dispose old mattress size (item 2)"), {
+      target: { value: "Queen" },
+    });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(h.editAddonMutateAsync).toHaveBeenCalledWith({
+        addonId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a3",
+        input: { qty: 2, attrs: { sizes: ["King", "Queen"], size: "King + Queen" } },
+      }),
+    );
+  });
+
+  it("proceed-lane addon pencil files an edit_addon change request", async () => {
+    renderDrawer(orderWithAddons({ status: "proceed_order", operationStage: "confirmed" }));
+    fireEvent.click(screen.getByTestId("pos-od-edit-addon"));
+    fireEvent.click(screen.getByTestId("pos-od-addon-plus"));
+    fireEvent.click(screen.getByTestId("pos-od-addon-save"));
+    await waitFor(() =>
+      expect(h.submitChangeMutateAsync).toHaveBeenCalledWith({
+        kind: "edit_addon",
+        targetAddonId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a1",
+        qty: 2,
+        attrs: null,
+        label: "Dispose old sofa",
+        oldQty: 1,
+        oldSize: null,
+      }),
+    );
+    expect(h.editAddonMutateAsync).not.toHaveBeenCalled();
   });
 
   it("proceed pencil hides while a change request is pending; delivered hides it too", () => {
