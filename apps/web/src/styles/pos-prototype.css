@@ -4173,10 +4173,6 @@
 .os-item__qty { margin-top: 2px; }
 /* The edit pencil (36px circle) optically centers on the 16px name row. */
 .os-item > .icon-btn { margin-top: -6px; }
-/* Option / special add-on rows under a line (SpecialsSummary) — drawer-scale
-   type: same 11px muted as .os-item__detail, tight 2px stack. */
-.os-item__extras { margin-top: 3px; display: flex; flex-direction: column; gap: 2px; }
-.os-item__extras > div { font-size: 11px; color: var(--fg-muted); }
 .os-item__photo {
   width: 48px; height: 48px; border-radius: 10px;
   background: var(--c-paper, #EFEAE2) center/cover no-repeat;
