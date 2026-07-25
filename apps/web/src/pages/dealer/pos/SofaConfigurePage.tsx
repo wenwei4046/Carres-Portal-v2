@@ -58,6 +58,7 @@ import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 import SofaPlanView, { PLAN_PAD } from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
+import ConfigureTopbarBrand, { type WizardTopbarCtx } from "./ConfigureTopbarBrand";
 
 /**
  * Full-page sofa configurator (2990s parity — clicking a modular sofa card
@@ -295,6 +296,7 @@ export default function SofaConfigurePage({
   editLine,
   onAdd,
   onClose,
+  wizardTopbar,
 }: {
   model: ProductModelDto;
   meta: ModelMeta | undefined;
@@ -332,6 +334,9 @@ export default function SofaConfigurePage({
   editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
+  /** Loo 2026-07-26 — wizard context: render the POS topbar strip (logo =
+   *  back) instead of the ← arrow. Absent outside the wizard. */
+  wizardTopbar?: WizardTopbarCtx;
 }) {
   // 0201/0202-wiring — the Maintenance-authored option sources:
   //   COMBO heights (quick-pick tabs) = ACTIVE `sofa_size` ∩ canonical axis;
@@ -860,18 +865,23 @@ export default function SofaConfigurePage({
       aria-label={`Configure ${model.name}`}
       data-testid="sofa-configure-page"
     >
-      {/* Header — the design's cfg-header with the sofa-flow crumb: back ·
-          eyebrow/model · mode tabs (rail pill pair) · live total. */}
+      {/* Header — the design's cfg-header with the sofa-flow crumb: brand
+          strip (wizard) / back arrow · eyebrow/model · mode tabs (rail pill
+          pair) · live total. */}
       <div className="cfg-header cfg-header--icon">
-        <button
-          className="cfg-header__back"
-          type="button"
-          onClick={onClose}
-          aria-label="Back to catalog"
-          data-testid="sofa-configure-back"
-        >
-          <ArrowLeft size={16} strokeWidth={1.75} />
-        </button>
+        {wizardTopbar ? (
+          <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
+        ) : (
+          <button
+            className="cfg-header__back"
+            type="button"
+            onClick={onClose}
+            aria-label="Back to catalog"
+            data-testid="sofa-configure-back"
+          >
+            <ArrowLeft size={16} strokeWidth={1.75} />
+          </button>
+        )}
         <div className="sof-flow__headerCrumb" style={{ minWidth: 0 }}>
           <span className="sof-flow__crumbDepth">
             <span className="sof-flow__crumbDot" />

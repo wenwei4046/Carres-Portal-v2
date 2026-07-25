@@ -102,6 +102,45 @@ describe("PosConfigurePage — mattress", () => {
   });
 });
 
+// Loo 2026-07-26 — inside the wizard the header carries the POS topbar strip
+// and the CARRES logo is the way back; outside it keeps the ← arrow.
+describe("PosConfigurePage — wizard topbar strip", () => {
+  it("renders the brand strip when wizardTopbar is passed; logo click = back", () => {
+    const onClose = vi.fn();
+    render(
+      <PosConfigurePage
+        model={mattressModel()}
+        meta={undefined}
+        skus={mattressSkus}
+        onAdd={vi.fn()}
+        onClose={onClose}
+        wizardTopbar={{ contextLabel: "Carres Mont Kiara" }}
+      />,
+    );
+    expect(screen.queryByTestId("cfg-back")).toBeNull(); // arrow replaced
+    const strip = screen.getByTestId("cfg-topbar-brand");
+    expect(strip.textContent).toContain("POS · Carres Mont Kiara");
+    expect(strip.textContent).toContain("Cart");
+    expect(strip.textContent).toContain("Confirmed");
+    fireEvent.click(screen.getByTestId("cfg-topbar-logo"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the plain ← arrow when no wizard context is passed (edit / add overlay)", () => {
+    render(
+      <PosConfigurePage
+        model={mattressModel()}
+        meta={undefined}
+        skus={mattressSkus}
+        onAdd={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("cfg-back")).toBeTruthy();
+    expect(screen.queryByTestId("cfg-topbar-brand")).toBeNull();
+  });
+});
+
 describe("PosConfigurePage — bed frame", () => {
   it("carries gap in attrs + label; NO colour picker (finish comes from fabric)", () => {
     const onAdd = vi.fn();

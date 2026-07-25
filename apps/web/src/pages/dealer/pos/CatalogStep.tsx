@@ -53,6 +53,7 @@ export default function CatalogStep({
   customerPhone,
   pwpAvailableVouchers,
   onApplyVoucherCode,
+  topbarContext,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -60,6 +61,9 @@ export default function CatalogStep({
   onProceed: () => void;
   cartOpen: boolean;
   onCartOpenChange: (open: boolean) => void;
+  /** Loo 2026-07-26 — the topbar's `POS · {store}` label; presence turns on
+   *  the configure pages' brand strip (logo = back to catalog). */
+  topbarContext?: string;
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (from /pwp-codes/mine),
    *  feeding the CartDrawer voucher rail. Optional: absent → no voucher rail
    *  (DORMANT byte-identical). */
@@ -570,6 +574,7 @@ export default function CatalogStep({
               editLine={editing}
               onAdd={emitLine}
               onClose={closeConfigure}
+              wizardTopbar={topbarContext ? { contextLabel: topbarContext } : undefined}
             />
           );
         }
@@ -603,6 +608,7 @@ export default function CatalogStep({
               editLine={editing}
               onAdd={emitLine}
               onClose={closeConfigure}
+              wizardTopbar={topbarContext ? { contextLabel: topbarContext } : undefined}
             />
           );
         }

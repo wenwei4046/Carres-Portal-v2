@@ -1084,6 +1084,7 @@ export default function DealerPos({
               draft={draft}
               onChange={setDraft}
               catalog={catalogQ.data}
+              topbarContext={contextLabel}
               onProceed={() => {
                 setCustomerSubStep(0);
                 setStep(2);
