@@ -52,6 +52,11 @@ import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-di
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { newLocalId } from "../new-order/configurators";
 import type { DraftAddon, DraftLine } from "../new-order/draft";
+import {
+  OPTION_KIND_LABEL,
+  optionsFromAttrs,
+  specialsFromAttrs,
+} from "../new-order/special-addons-picker";
 import AddProductOverlay from "./AddProductOverlay";
 import { buildCatalogIndex } from "./catalog-index";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
@@ -114,6 +119,30 @@ function lineTag(attrs: OrderLine["attrs"]): "GWP" | "Free item" | "PWP" | null 
   if (attrs.free_item) return "Free item";
   if (attrs.pwp) return "PWP";
   return null;
+}
+
+/** The full configuration as ONE muted line (Loo 2026-07-25: "no point form —
+ *  variant · gap · Divan 8" · Leg 4" · …"). Flat attrs (colour/gap/fabric) +
+ *  option picks + special add-ons + remark, no per-item RM (already folded
+ *  into the line price) and no SKU code (the name is the row title). */
+function lineConfigBits(attrs: OrderLine["attrs"]): string[] {
+  if (!attrs) return [];
+  const bits: string[] = [];
+  if (typeof attrs.color === "string" && attrs.color) bits.push(attrs.color);
+  if (typeof attrs.gap === "string" && attrs.gap) bits.push(`gap ${attrs.gap}`);
+  if (typeof attrs.fabric_name === "string" && attrs.fabric_name) bits.push(attrs.fabric_name);
+  for (const o of optionsFromAttrs(attrs)) {
+    const kind = OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option";
+    bits.push(`${kind} ${o.value ?? ""}`.trim());
+  }
+  if (typeof attrs.leg_height === "string" && attrs.leg_height) bits.push(`Leg ${attrs.leg_height}`);
+  for (const s of specialsFromAttrs(attrs)) {
+    const desc = s.soDescription || s.label || s.code || "Add-on";
+    const choices = (s.choiceLabels ?? []).filter(Boolean);
+    bits.push(choices.length ? `${desc} (${choices.join(", ")})` : desc);
+  }
+  if (typeof attrs.remark === "string" && attrs.remark) bits.push(`✎ ${attrs.remark}`);
+  return bits;
 }
 
 function errCode(e: unknown): string | null {
@@ -984,6 +1013,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 const line = row.line;
                 const { sku, model } = skuMeta(line.sku);
                 const tag = lineTag(line.attrs);
+                const detail = [sku?.variant, ...lineConfigBits(line.attrs), tag]
+                  .filter(Boolean)
+                  .join(" · ");
                 const free = tag === "GWP" || tag === "Free item";
                 // 0255 — pencil on configurator-backed rows (mattress/bedframe);
                 // free/promo/bundle rows stay pencil-less. 0257 — the proceed
@@ -1008,10 +1040,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                     </div>
                     <div className="os-item__body">
                       <div className="os-item__name">{model?.name ?? line.sku}</div>
-                      <div className="os-item__detail">
-                        {[sku?.variant, line.sku].filter(Boolean).join(" · ")}
-                        {tag ? ` · ${tag}` : ""}
-                      </div>
+                      {detail && <div className="os-item__detail">{detail}</div>}
                     </div>
                     <div className="os-item__qty">×{line.qty}</div>
                     <div className="os-item__price">

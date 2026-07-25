@@ -641,8 +641,23 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Deploy (main tip `3f4fc05`)**: api Worker `5a0659a1` (unauth POST /lines/replace → 401 ✓ on api.carresofficial.com) · web `index-D28s7AGb.js` → carres-portal `6e1f66d1` + carres-pos `7439ff89` (`--branch=main`); all 4 canonicals verified first curl; live bundle downloaded in full (4,006,086 bytes) — edit + promo-guard markers present, `SERVICE_ROLE` 0.
 
+---
 
-## 2026-07-25 (night) · Proceed-lane item CHANGE submissions + service add-ons on the add doors (PR #287, migration 0257 — NOT yet applied)
+**2026-07-25 night · Full product description on order detail + Sales Order PDF — cart parity · PR #283 (merge `cbe1cbd`) · web-only, no migration · worktree `order-detail-line-description`**
+
+**Ask (Loo, 3 screenshots)**: the POS cart's line description is the reference — model name, `Super Single · gap 12"`, mono SKU code, `+ Divan 8"` / `+ Leg 2"`. The order-detail drawer (PosOrderDetail) showed only `Single · CODY-S`; the Sales Order PDF printed gap/color/fabric but dropped the Divan/Leg option picks and special add-ons.
+
+**Root cause**: the configuration was never lost — it all rides `order_lines.attrs` (`gap` verbatim, `options[]` divan/leg/fabric picks from the 0201/0202 wiring, `specials[]`, `remark`). The cart renders it via `SpecialsSummary` (special-addons-picker); the drawer and the PDF simply never consumed those attrs.
+
+**Fix**:
+- `PosOrderDetail.tsx` — standard item rows now render: muted detail = `variant · color · gap · fabric` (new `lineConfigBits`, mirrors the PDF's `attrsDescription` bits) + GWP/PWP tag, the SKU code on its own `font-mono` row (cart layout), and the **same `SpecialsSummary` component the cart uses** — the two surfaces can never drift. Sofa-build group rows already had cart parity via `row.spec`.
+- `sales-order-template.tsx` — new `optionSpecialSubs()` prints the option (`+ Divan 8"`), sofa-build leg (skipped when `sofa_spec` already carries it), special add-on and `Remark:` sub-lines under the Description column, reusing `optionsFromAttrs`/`specialsFromAttrs` + the now-exported `OPTION_KIND_LABEL` from special-addons-picker.
+- Scope deliberately limited to the two circled surfaces: DealerOrderDetail (ERP) and invoice/DO/PO PDF templates untouched.
+
+**Evidence**: new drawer test (gap + mono SKU + `+ Divan 8"` / `+ Leg 2"` / `+ USB port · +RM 50`) — PosOrderDetail 30/30 · full web suite 16 fail = §17.7 baseline, zero new · build + design-standard lint clean.
+
+
+## 2026-07-25 (night ②) · Proceed-lane item CHANGE submissions + service add-ons on the add doors (PR #287, migration 0257 — NOT yet applied)
 
 **Ask (Loo, S0-1256 screenshot)**: (1) "Submit product change" 只能加 item — it must also let the store CHANGE an original Sales Order item (choose change vs add). (2) Service SKUs (Dispose old sofa / Dispose old mattress) can't be added post-create — "它也是其中一个 SKU", same setting as opening a sales order.
 

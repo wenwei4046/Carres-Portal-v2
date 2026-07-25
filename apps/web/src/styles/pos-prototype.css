@@ -4166,8 +4166,13 @@
 .os-item {
   display: grid;
   grid-template-columns: 48px 1fr auto auto;
-  gap: 12px; align-items: center;
+  /* Top-aligned like .cart-item — a configured line (gap + Divan/Leg/specials)
+     grows tall, and a centered photo/qty/price float weirdly mid-block. */
+  gap: 12px; align-items: start;
 }
+.os-item__qty { margin-top: 2px; }
+/* The edit pencil (36px circle) optically centers on the 16px name row. */
+.os-item > .icon-btn { margin-top: -6px; }
 .os-item__photo {
   width: 48px; height: 48px; border-radius: 10px;
   background: var(--c-paper, #EFEAE2) center/cover no-repeat;

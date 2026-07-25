@@ -509,6 +509,37 @@ describe("add product (0231)", () => {
   });
 });
 
+describe("item description (Loo 2026-07-25 — one line, no point form)", () => {
+  it("renders variant + gap + option picks + specials as ONE muted line", () => {
+    renderDrawer(
+      order({
+        lines: [
+          {
+            id: "00000000-0000-0000-0000-00000000l001",
+            orderId: "00000000-0000-0000-0000-000000001201",
+            sku: "SKU-1",
+            qty: 1,
+            attrs: {
+              gap: '12"',
+              options: [
+                { kind: "divan_height", value: '8"', surcharge: 0 },
+                { kind: "bedframe_leg_height", value: '2"', surcharge: 0 },
+              ],
+              specials: [{ code: "USB", soDescription: "USB port", surcharge: 50 }],
+            },
+            unitPrice: 1500,
+          },
+        ],
+      }),
+    );
+    // ONE line: variant · gap · options · specials — no per-item RM, no SKU
+    // code row, no "+"-prefixed sub-rows.
+    expect(screen.getByText('King · gap 12" · Divan 8" · Leg 2" · USB port')).toBeTruthy();
+    expect(screen.queryByTestId("specials-summary")).toBeNull();
+    expect(screen.queryByText("SKU-1")).toBeNull();
+  });
+});
+
 describe("structured address (0230)", () => {
   it("seeds the cascading picker from the stored parts", () => {
     renderDrawer(

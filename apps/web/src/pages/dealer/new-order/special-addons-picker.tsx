@@ -94,7 +94,7 @@ interface OptionAttrLine {
   surcharge?: number;
 }
 
-const OPTION_KIND_LABEL: Record<string, string> = {
+export const OPTION_KIND_LABEL: Record<string, string> = {
   divan_height: "Divan",
   bedframe_leg_height: "Leg",
   sofa_leg_height: "Leg",
