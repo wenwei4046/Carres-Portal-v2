@@ -577,6 +577,21 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Deploy (same session, main tip `115e0ac`)**: web `index-Cvt09dlF.js` → carres-portal `f79b1f71` + carres-pos `d2ff6223` (`--branch=main`); all 4 canonicals verified serving it on first curl; live bundle downloaded to file — `View sales order` marker present, `SERVICE_ROLE` 0. API untouched.
 
+## 2026-07-25 late · HR Team hierarchy Phase 1 (PR #276, migration 0254, worktree `hr-hierarchy`)
+
+**Ask (Loo)**: "我需要一个 hierarchy system 在 HR 里面 + scan 现有所有户口权限跟员工职位" → 后追加 "把 account 全部转过来在这个 team 这里，以后加 user 全部从这里来（dealer 例外——独立个体，dealer 的 staff 也不进 hierarchy）；所有 staff 要有 staff code（CR001 格式）；职位要有 Executive / Manager / C-level 三层"。
+
+**Scan 结论（动工依据）**: 15 个 app_users 散 8 role（hr role 存在但 0 用户）；"层级"散在 4 种互不兼容的编码——staff.ts 里的 TIER_RANK 局部常量、bd_profiles.position（空表）、OPS_MANAGER_EMAILS email 名单、isPoDutyEditor 单人硬编码；全 codebase 无任何 reporting-line 字段；`meResponseSchema` 漏 'hr'（第一个 HR 登录 /me 必炸的 live bug）。
+
+- **DB (0254_hr_team_hierarchy, applied tail 0253→0254)**: `org_positions`(band c_level/manager/executive, 12 seed) + `org_position_history`(职位更替 append-only) + `app_users.staff_code/position_id/reports_to_user_id` + `salespersons.staff_code` + `org_staff_code_seq`(CRnnn, next_staff_code() service_role-only, 跨两表唯一由 constraint trigger 保) + keyhole RPCs `hr_team_source` / `hr_set_position` / `hr_set_reports_to` / `hr_set_staff_code`(全部 gate hr/principal + audit_log; is_internal() 依旧不放宽——0244 law)。Backfill: CR001=Loo/Chairman · CR002=Jess/COO · CR003/004=Khor Yee/Yu Jun(Admin Assistant) · CR005/006=Shasha/Samantha · CR007=Herng(BD Executive) · CR008/009=Mayson/kaan(showroom)；通用号(operation@/finance@/BD@)不派码。
+- **API**: 新 `/api/hr/team/*`(7 routes, requireHr)——source 读 + position/reports-to/staff-code 写 + positions registry 直写(RLS) + `/accounts`(开 operation/finance/hr/bd/principal/supplier/partner; principal-role 只有 principal 能开; 内部 role 自动 mint CR code + hire history) + `/showroom-staff`(验 channel='showroom', cap manager, mint code)。**Accounts 门收窄**: principal 门 `allowedRoles=['dealer','showroom']`(店户口 only)；staff.ts POST + create-account initialStaff 在 showroom 店一律 mint staff_code(每个创建门都派码)。
+- **Web**: HR 第 4 tab **Team**(HrTeamTab, portal-nav +1)——Carres Team 按 band 分组行内编辑 position/reports-to/code · Showroom staff 按店梯子(tier→Sales Manager/Executive 映射) · External & store accounts · Positions registry 编辑器 · Position changes 历史 · Add user / Add showroom staff 两个 modal。PrincipalAccounts create modal 只剩 Dealer/Showroom 两个 tile + 指路文案。
+- **shared**: `schemas/hr-team.ts`(band/position/code/create 契约 + HrTeamSource 类型) · STAFF_TIER_RANK 从 staff.ts 局部常量升入 shared(staff.ts 改 import) · `meResponseSchema` 补 'hr'(live bug fix) · salespersonSchema/adapter/domain +staffCode。
+- **合同变更测试**: bd/accounts.test.ts 的旧 regression("principal 门能开 supplier")按新合同改写成 403 role_not_allowed + 新增 showroom 店正向 201。
+- **Evidence**: shared 991/991 · api 1472/1475(3=§17.7 baseline) · web 1453/1469(16=baseline, 0 新增) · api tsc + web FULL build + lint + check:v4 全净 · +17 api hr-team tests + 2 web tab tests。
+- **Deploy (main tip `609f22a`)**: api Worker `d1c9ed89-7b7b-4d06-ac30-e857a407b4a4`(/api/hr/team unauth 401 ✓) · web `index-CXRKezvK.js` → carres-portal `77a6d490` + carres-pos `c6838eda`; 4 canonical 全验(pos.carresofficial.com edge 滞后 ~2min 后跟上); erp bundle 完整下载 3,982,808 bytes: SERVICE_ROLE 0 · hr/team marker 1。**~2 分钟后被平行线 PR #275 的 union deploy(`8503184` → `index-Cjl110n-.js` / Worker `c00ae4fc`, 含本 PR 全部代码)取代——重验 4 canonical + Worker deployments 时序确认 union 在线, 无功能丢失。**
+- **Phase 2 (未做, 要 Loo 拍板再开)**: 把 OPS_MANAGER_EMAILS / isPoDutyEditor 等 email 硬编码换成读 hierarchy(权限改动, 涉 RLS 单独审)。**注意**: 第一个 hr role 户口现在可以开了(/me bug 已修), 从 Team 门开。
+
 ## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (PR #275, migration 0255 DRAFTED — NOT yet applied/deployed)
 
 **Ask (Loo)**: "open a worktree, continue the checkpoint of rental program and service line" — resuming checkpoint `20260725-144857-rental-service-plan-base.md`, whose Remaining-Work #1 is this exact segment: the POS rental sell lane + Stripe product/subscription sync + entitlement minting.
