@@ -462,8 +462,11 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
 // (b) Rental plans (rent-to-own)
 // ---------------------------------------------------------------------------
 
+// 10 columns must fit the 1120px shell minus card padding (Loo 2026-07-25 —
+// the Stripe column pushed MANAGE off the card edge). Mins sum ≈976px incl.
+// the 9 gaps; the row container scrolls horizontally as the backstop.
 const PLAN_GRID =
-  "minmax(120px,1.2fr) 70px 90px 110px 80px 100px minmax(110px,1fr) 110px 70px 120px";
+  "minmax(110px,1.2fr) 56px 80px 90px 70px 90px minmax(100px,1fr) 110px 52px 110px";
 
 function RentalPlansSection({
   plans,
@@ -500,7 +503,9 @@ function RentalPlansSection({
         </Modal>
       )}
 
-      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
+      {/* overflow-x-auto (not hidden): a viewport the grid mins outgrow scrolls
+          inside the card instead of clipping the MANAGE column (UI-KIT law). */}
+      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-x-auto">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
           style={{ gridTemplateColumns: PLAN_GRID }}
@@ -604,7 +609,7 @@ function PlanRow({
       <div className="text-right t-num text-[12px]">{plan.supplierRatePct}%</div>
       <div className="text-right t-num text-[12px]">{plan.commissionBasePct}%</div>
       <div className="t-tiny text-base-500 truncate">{includedName}</div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {plan.stripePriceId ? (
           <span className="pill pill-confirmed" data-testid={`plan-stripe-${plan.id}`}>
             Synced
