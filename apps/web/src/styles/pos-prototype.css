@@ -690,6 +690,11 @@
 }
 .step-pill.is-active { background: var(--pos-panel, #fff); border-color: var(--c-orange); }
 .step-pill.is-done   { background: rgba(47,93,79,0.08); }
+/* Clickable pills (Loo 2026-07-26): the pills are <button>s now — jump
+   straight to a sub-step. Keep the exact div-era look (override UA button
+   font/color incl. the :disabled GrayText); affordance = cursor only. */
+button.step-pill { cursor: pointer; color: inherit; font: inherit; text-align: left; }
+button.step-pill:disabled { cursor: default; color: inherit; }
 .step-pill__num {
   width: 24px; height: 24px; border-radius: 999px;
   background: var(--line-strong); color: var(--c-cream);
