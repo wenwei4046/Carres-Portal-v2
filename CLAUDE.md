@@ -398,17 +398,17 @@ Don't burn an hour spinning. Surface and ask.
 
 | | |
 |---|---|
-| Active work | Phase 10 post-launch + parallel initiatives. Latest ships (2026-07-25): **Rental + Service Plan BASE** (PR #268, migrations 0247-0249+0253, all DORMANT — next: POS sell lane + Stripe) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252) · BD dealers-only (#262) · My-orders board cascade (#259). 2990s Products 9-tab parity COMPLETE (P1-P8, PRs #38-#45, 0181-0188, dormant until authored). Sofa compartment engine LIVE (P1-P5; 10 sofa models live 2026-07-24). |
+| Active work | Phase 10 post-launch + parallel initiatives. Latest ships (2026-07-25): **HR Team hierarchy P1** (PR #276, 0254 — Team tab = org registry + THE account door; Phase 2 = 权限接 hierarchy, email 名单退役) · **Rental + Service Plan BASE** (PR #268, migrations 0247-0249+0253, all DORMANT — next: POS sell lane + Stripe) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252). 2990s Products 9-tab parity COMPLETE (P1-P8, PRs #38-#45, 0181-0188, dormant until authored). Sofa compartment engine LIVE (P1-P5; 10 sofa models live 2026-07-24). |
 | Project started | 2026-05-02 |
 | Web URLs | https://carres-portal.pages.dev · POS/ERP domain split (2026-07-18): `pos.carresofficial.com` (dealer/showroom/bd) + `erp.carresofficial.com` (internal); TWO Pages projects (`carres-portal` + `carres-pos`), ONE build |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev (+ api.carresofficial.com) |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **Tail = 0253** (verified on prod at apply 2026-07-25): 0244-0246 HR · 0247-0249+0253 Rental · 0250-0252 BD commission. **Rules that survive**: (1) before numbering ANY migration, `list_migrations` the remote tracker tail first — guardrail #8; collisions renumber at apply (0239/0241 lessons). (2) Migrations apply manually via MCP; tracker keys on timestamp, so dual-numbered FILES (0165/0166/0233/0241…) are cosmetic — never renumber applied files. (3) Full per-migration history → archive doc + worklog. |
+| Latest migration | **Tail = 0254** (verified on prod at apply 2026-07-25): 0254 HR Team hierarchy · 0244-0246 HR · 0247-0249+0253 Rental · 0250-0252 BD commission. **Rules that survive**: (1) before numbering ANY migration, `list_migrations` the remote tracker tail first — guardrail #8; collisions renumber at apply (0239/0241 lessons). (2) Migrations apply manually via MCP; tracker keys on timestamp, so dual-numbered FILES (0165/0166/0233/0241…) are cosmetic — never renumber applied files. (3) Full per-migration history → archive doc + worklog. |
 | Catalog state | 11 suppliers · 171 product_models · ~1150 product_skus (1013 AutoCount + SVC + minted compartment skus; 123 compartment skus flipped ON 2026-07-24, mostly RM0 pending pricing). Bundles: 1 active (King Bedroom Set RM2500). PWP/free-gift/delivery-fee/rental config tables exist, dormant until authored. |
 | Orders state | ~190 orders (153 AutoCount archive + natives). `dealers.channel` is THE showroom-vs-dealer authority (PR #226). |
 | Test count | Baselines + pre-existing fails → §17.7. Run full suites before merge; ZERO new failures is the bar. |
-| Web bundle | **LIVE = `index-Cvt09dlF.js` from main tip `115e0ac`** (PR #273 POS SO number + View-SO button; carres-portal `f79b1f71` + carres-pos `d2ff6223`; all 4 canonical domains verified; `SERVICE_ROLE` grep 0). **Deploy rules (Loo, permanent)**: NEVER deploy prod from a feature branch — merge to origin/main, deploy from the main tip; before ANY Pages deploy `git fetch` + `git log HEAD..origin/main` must be empty (union tip), deploy to BOTH Pages projects `--branch=main`, RE-curl all 4 canonicals after (~15s edge lag); a piped `curl \| grep` on the ~3.9 MB bundle truncates and reports a FALSE 0 — download to a file before grepping markers. bundle-size CF still open (§17.5). |
-| API bundle | **LIVE = Worker `e76ccfee` from main tip `6d64305`** (PR #268 `/api/rental/*`; unauth 401 live-verified). Same union-tip rule as web. |
+| Web bundle | **LIVE = `index-CXRKezvK.js` from main tip `609f22a`** (PR #276 HR Team hierarchy; carres-portal `77a6d490` + carres-pos `c6838eda`; all 4 canonical domains verified; full-bundle download 3,982,808 bytes, `SERVICE_ROLE` grep 0). **Deploy rules (Loo, permanent)**: NEVER deploy prod from a feature branch — merge to origin/main, deploy from the main tip; before ANY Pages deploy `git fetch` + `git log HEAD..origin/main` must be empty (union tip), deploy to BOTH Pages projects `--branch=main`, RE-curl all 4 canonicals after (~15s edge lag); a piped `curl \| grep` on the ~3.9 MB bundle truncates and reports a FALSE 0 — download to a file before grepping markers. bundle-size CF still open (§17.5). |
+| API bundle | **LIVE = Worker `d1c9ed89` from main tip `609f22a`** (PR #276 `/api/hr/team/*`; unauth 401 live-verified). Same union-tip rule as web. |
 
 ### 17.2 Phase timeline
 
@@ -434,6 +434,7 @@ Don't burn an hour spinning. Surface and ask.
 | BD portal = the POS | ✅ | 2026-07-19 | PR #225 |
 | HR role + Commission portal (staff + BD commission calc) | ✅ base | 2026-07-25 | 0244-0246 · 0250-0252 |
 | Rental + Service Plan (rent-to-own; BASE shipped, dormant; next = POS sell lane + Stripe) | 🔵 BASE live | 2026-07-25 | PR #268 · 0247-0249+0253 |
+| HR Team hierarchy P1 (org registry + CRnnn staff codes + Team = THE account door; P2 = 权限接 hierarchy) | ✅ P1 live | 2026-07-25 | PR #276 · 0254 |
 
 ### 17.3 Phase 10 work-log
 
@@ -454,6 +455,7 @@ Don't burn an hour spinning. Surface and ask.
 - **2026-07-19** · Showroom minimal account creation (PR #206) · Bundle pricing (PR #208, 0239) · POS owner self-service + email-change approval (PR #204, 0240) · Staff profile + one-step PIN + **English-only UI rule** (PR #209, 0241) · Showrooms split + stores born active (PR #226 — **LESSON: run the BUILD, not just `tsc`; default tsconfig ≠ tsconfig.app.json**) · BD portal = the POS (PR #225) · Staff Edit (PR #216) · HQ Accounts parity + manual passwords (PR #219) · birthday drum picker (PR #221) · staff roster hierarchy sort (PR #222). **RULE (Loo): NEVER deploy prod from a feature branch.**
 - **2026-07-24** · Offer = on sale — compartment first-insert `pos_active=true`, 123 rows flipped, 10 sofa models live (PR #253) · Catalog tabs in sidebar (PR #251, superseded next day)
 - **2026-07-25** · Catalog two-doors split (PR #254) · PIN sign-in outlet switch (PR #256) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252) · Carres outlet-name prefix (PR #258) · My-orders board Store→Outlet→Salesperson cascade (PR #259) · BD sees dealers only (PR #262) · **Rental + Service Plan BASE** (PR #268, 0247-0249+0253; also `docs/rental-service-plan-proposal.md`)
+- **2026-07-25 late** · **HR Team hierarchy P1** (PR #276, 0254, worktree `hr-hierarchy`) — Team tab = org registry (3 bands) + CRnnn staff codes (CR001-CR009 backfilled) + reports_to + 职位更替 history + **Team = THE account door** (principal Accounts 门收窄到 dealer/showroom 店户口); 顺手修 meResponseSchema 漏 'hr' 的 live bug; STAFF_TIER_RANK 移入 shared
 - **2026-07-25 (late)** · My-orders board speaks SO numbers (`#1256`→`SO-1256` on drawer/card/overlay/Stripe modal + WhatsApp copy) + View sales order button in every drawer-footer lane (PR #273, web-only, deployed same session)
 
 ### 17.4 Business model (locked 2026-05-03)
