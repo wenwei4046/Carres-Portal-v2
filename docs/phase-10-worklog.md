@@ -703,3 +703,27 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Fix**: `lineConfigBits` moved from PosOrderDetail into `special-addons-picker` (ONE shared source — drawer + PDF can never drift); the PDF's `attrsDescription` + `optionSpecialSubs` (multi-line, RM-carrying) deleted in favour of one muted `configLine` — `gap 17" · Divan 10" · Leg 2" · Fabric BF-03 · … · ✎ remark`, no per-item RM. Sofa rows keep `sofa_spec` (fabric/leg live inside; only the remark bit rides). ADD-ON sub drops the `Size:` prefix (bare `King`, drawer parity); follow-up remark now `✎ Follow-up of SO-…`.
 
 **Evidence**: affected suites 140/140 · full web 1484/1500 (16 = §17.7 baseline) · build + design-standard clean. **Ship**: PR #293 (`c3ac251e`) → web `index-BYxwMJyA.js` → carres-portal `d51bc036` + carres-pos `3597bdb5`; 4 canonicals ✓ (carres-pos.pages.dev edge lagged ~1 min); full bundle 4,017,729 bytes — new `✎ Follow-up` marker present, old `Size:` prefix zero, `SERVICE_ROLE` 0. api/DB untouched.
+
+---
+
+**2026-07-25 night ⑤ · HR departments + Department chart (hierarchy Phase 1b) · PR #295 (merge `3db49b9f`) · migration 0259 applied · worktree `hr-hierarchy`**
+
+**Ask (Loo)**: "now got what position? and go where to add new position? then I want have department chart as well." First two answered from live data + P1 UI (12 seed positions, 4 filled; add-position lives in Team → Positions card); the third is this ship.
+
+**Migration 0259 `org_departments`** (tail pre-checked — 0258 had just been taken by the parallel order-change line, guardrail #8 catch again; `hr_team_source()` verified single-overload before REPLACE):
+- `org_departments` (name unique, sort, active) — RLS = the org_positions hr/principal keyhole, exact mirror.
+- `org_positions.department_id` FK (`on delete set null`). Seeded Sales / Operation / Finance / HR / Business Development and mapped the 0254 ladder; **C-level seats deliberately department-less** — the management team renders ON TOP of the chart, not inside a column.
+- `hr_team_source()` v2 — same zero-arg signature, adds `departments[]` + `departmentId` on positions.
+
+**API**: `POST /api/hr/team/departments` upsert (mirror of `/positions`, direct RLS table write); `/positions` now carries `department_id`.
+
+**Team tab**:
+- **Department chart** card at the top: Management team (C-level) centered strip → `auto-fit minmax(190px,1fr)` grid with one column per active department (members via position→department, manager band before executive) → a **Showrooms** column grouped by store (tier-derived labels) → an **Unassigned** bucket so HR sees who still needs filing. Chart shows active people only.
+- **Positions card**: chips → rows; every non-C-level row gets a department `select`; add-row gains band + department pickers.
+- **Departments card**: chip add/retire, same pattern as positions used to be.
+
+**Evidence**: HrTeamTab 3/3 (new chart-grouping case) · api hr-team 17/17 · shared 1002/1002 · full web 16 fail / api 3 fail = §17.7 baseline, zero new · web build + api tsc clean.
+
+**Deploy (union tip `3db49b9f`, AFTER 0259 applied)**: api Worker `19a3a6e1` (unauth /api/hr/team → 401 ✓; union carries #291's 0258 api) · web `index-D7Ejw5bd.js` → carres-portal `b43cf6b5` + carres-pos `3f4b4143`; all 4 canonicals verified (carres-portal pair edge lagged ~2 min); dist `SERVICE_ROLE` grep 0.
+
+**Also this session (not shipped)**: hierarchy Phase 2 permissions proposal presented to Loo — replace `OPS_MANAGER_EMAILS`/`isPoDutyEditor`/`OPS_GENERIC_EMAILS` hardcodes with position-band reads (`my_org_position()` self-only DEFINER fn, PO-duty editor = the "Operation Manager" seat, legacy email list as transition fallback). Awaiting his call.
