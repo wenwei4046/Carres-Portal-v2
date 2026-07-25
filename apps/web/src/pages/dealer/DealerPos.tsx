@@ -890,7 +890,23 @@ export default function DealerPos({
       {/* Top bar — prototype .pos-topbar (Loo's Claude Design 2026-07-04). */}
       <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-          <span className="pos-wordmark">CARRES</span>
+          {/* Loo 2026-07-26 — the logo is the "home" button: back to the
+              catalog. Mid-wizard it just returns to step 1 (draft kept, same
+              as the 01 Cart crumb); after a submitted order it starts the
+              next sale (full reset — jumping back with the old cart still
+              loaded would invite an accidental duplicate order). */}
+          <button
+            type="button"
+            className="pos-wordmark"
+            onClick={() => {
+              if (submitted) startAnotherOrder();
+              else if (step !== 1) setStep(1);
+            }}
+            aria-label="Back to catalog"
+            data-testid="pos-logo-home"
+          >
+            CARRES
+          </button>
           <span
             className="pos-topbar__crumb"
             style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}

@@ -105,6 +105,9 @@
   border-bottom: 1px solid var(--line);
   z-index: 30;
 }
+/* The wordmark is a <button> now (Loo 2026-07-26: click = back to catalog) —
+   neutralise the UA button chrome; the class supplies all the type styles. */
+button.pos-wordmark { background: none; border: 0; padding: 0; cursor: pointer; }
 .pos-wordmark {
   display: inline-flex; align-items: center;
   color: var(--c-burnt);
