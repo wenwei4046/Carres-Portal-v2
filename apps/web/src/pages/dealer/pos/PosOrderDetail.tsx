@@ -55,11 +55,7 @@ import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-di
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { newLocalId } from "../new-order/configurators";
 import { composeDisposalSizeSummary, type DraftAddon, type DraftLine } from "../new-order/draft";
-import {
-  OPTION_KIND_LABEL,
-  optionsFromAttrs,
-  specialsFromAttrs,
-} from "../new-order/special-addons-picker";
+import { lineConfigBits } from "../new-order/special-addons-picker";
 import AddProductOverlay from "./AddProductOverlay";
 import { buildCatalogIndex } from "./catalog-index";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
@@ -124,29 +120,8 @@ function lineTag(attrs: OrderLine["attrs"]): "GWP" | "Free item" | "PWP" | null 
   return null;
 }
 
-/** The full configuration as ONE muted line (Loo 2026-07-25: "no point form —
- *  variant · gap · Divan 8" · Leg 4" · …"). Flat attrs (colour/gap/fabric) +
- *  option picks + special add-ons + remark, no per-item RM (already folded
- *  into the line price) and no SKU code (the name is the row title). */
-function lineConfigBits(attrs: OrderLine["attrs"]): string[] {
-  if (!attrs) return [];
-  const bits: string[] = [];
-  if (typeof attrs.color === "string" && attrs.color) bits.push(attrs.color);
-  if (typeof attrs.gap === "string" && attrs.gap) bits.push(`gap ${attrs.gap}`);
-  if (typeof attrs.fabric_name === "string" && attrs.fabric_name) bits.push(attrs.fabric_name);
-  for (const o of optionsFromAttrs(attrs)) {
-    const kind = OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option";
-    bits.push(`${kind} ${o.value ?? ""}`.trim());
-  }
-  if (typeof attrs.leg_height === "string" && attrs.leg_height) bits.push(`Leg ${attrs.leg_height}`);
-  for (const s of specialsFromAttrs(attrs)) {
-    const desc = s.soDescription || s.label || s.code || "Add-on";
-    const choices = (s.choiceLabels ?? []).filter(Boolean);
-    bits.push(choices.length ? `${desc} (${choices.join(", ")})` : desc);
-  }
-  if (typeof attrs.remark === "string" && attrs.remark) bits.push(`✎ ${attrs.remark}`);
-  return bits;
-}
+// lineConfigBits — the ONE-muted-line config formula — moved to
+// special-addons-picker (0258 follow-up): the SO PDF prints the SAME line now.
 
 function errCode(e: unknown): string | null {
   if (e instanceof ApiError) {

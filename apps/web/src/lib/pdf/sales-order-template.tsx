@@ -16,11 +16,7 @@
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import {
-  OPTION_KIND_LABEL,
-  optionsFromAttrs,
-  specialsFromAttrs,
-} from "@/pages/dealer/new-order/special-addons-picker";
+import { lineConfigBits } from "@/pages/dealer/new-order/special-addons-picker";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
@@ -217,63 +213,21 @@ function formatMoney(value: number, currency: string): string {
   })}`;
 }
 
-/** Pretty-print line attrs: bedframe `{color, gap}`, sofa
- *  `{fabric_name, fabric_surcharge}`, mattress `{mode}`. Returns null when
- *  nothing useful to print (mattress preset on its own). */
-function attrsDescription(attrs: Record<string, unknown> | null): string | null {
+/** The item configuration as ONE muted line — the SAME formula the POS
+ *  order-detail drawer renders (`lineConfigBits`, Loo 2026-07-25 "sales order
+ *  description want same formula as well"): `gap 17" · Divan 10" · Leg 2" ·
+ *  Fabric BF-03 · … · ✎ remark`, no point-form rows, no per-item RM (already
+ *  folded into the line price). A sofa-build row prints its `sofa_spec`
+ *  instead (fabric/leg live inside the spec) — only the remark bit rides
+ *  along there. */
+function configLine(attrs: Record<string, unknown> | null): string | null {
   if (!attrs) return null;
-  const bits: string[] = [];
-  const color = attrs["color"];
-  if (typeof color === "string" && color.length > 0) bits.push(color);
-  const gap = attrs["gap"];
-  if (typeof gap === "string" && gap.length > 0) bits.push(`gap ${gap}`);
-  const fabricName = attrs["fabric_name"];
-  if (typeof fabricName === "string" && fabricName.length > 0) {
-    const surcharge = attrs["fabric_surcharge"];
-    if (typeof surcharge === "number" && surcharge > 0) {
-      bits.push(`${fabricName} (+RM ${surcharge})`);
-    } else {
-      bits.push(fabricName);
-    }
+  if (typeof attrs["sofa_spec"] === "string" && attrs["sofa_spec"]) {
+    const remark = typeof attrs["remark"] === "string" && attrs["remark"] ? attrs["remark"] : null;
+    return remark ? `✎ ${remark}` : null;
   }
+  const bits = lineConfigBits(attrs);
   return bits.length > 0 ? bits.join(" · ") : null;
-}
-
-/** Option / special-add-on / remark sub-lines — the SAME rows the POS cart +
- *  order detail render via SpecialsSummary ("+ Divan 8″" / "+ Leg 2″" / picked
- *  specials), so the printed document reads exactly like the cart (Loo
- *  2026-07-25). Sofa-build leg is skipped when `sofa_spec` already carries it. */
-function optionSpecialSubs(attrs: Record<string, unknown> | null): string[] {
-  if (!attrs) return [];
-  const fmtSur = (n: unknown): string =>
-    typeof n === "number" && n !== 0
-      ? ` · ${n < 0 ? "-" : "+"}RM ${Math.abs(n).toLocaleString()}`
-      : "";
-  const out: string[] = [];
-  for (const o of optionsFromAttrs(attrs)) {
-    out.push(
-      `+ ${OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option"} ${o.value ?? ""}${
-        o.label ? ` — ${o.label}` : ""
-      }${fmtSur(o.surcharge)}`,
-    );
-  }
-  const legHeight = attrs["leg_height"];
-  if (!attrs["sofa_spec"] && typeof legHeight === "string" && legHeight) {
-    out.push(`+ Leg ${legHeight}${fmtSur(attrs["leg_surcharge"])}`);
-  }
-  for (const s of specialsFromAttrs(attrs)) {
-    const desc = s.soDescription || s.label || s.code || "Add-on";
-    const choices = (s.choiceLabels ?? []).filter(Boolean);
-    out.push(
-      `+ ${desc}${choices.length ? ` (${choices.join(", ")})` : ""}${fmtSur(s.surcharge)}`,
-    );
-  }
-  const remark = typeof attrs["remark"] === "string" && attrs["remark"] ? attrs["remark"] : null;
-  const remarkSur = typeof attrs["remark_surcharge"] === "number" ? attrs["remark_surcharge"] : 0;
-  if (remark || remarkSur !== 0) {
-    out.push(`Remark: ${remark ?? "Price adjustment"}${fmtSur(remarkSur)}`);
-  }
-  return out;
 }
 
 /** Sofa-build group sub-line (Loo 2026-07-19) — the server regroups a built
@@ -303,15 +257,17 @@ function freeMarkerLine(attrs: Record<string, unknown> | null): string | null {
   return null;
 }
 
-/** Muted add-on sub-line: disposal size tag + delivery follow-up remark. */
+/** Muted add-on sub-line: disposal size tag + delivery follow-up remark —
+ *  same formula as the drawer's addon detail (the bare size, no "Size:"
+ *  prefix). */
 function addonAttrsDescription(attrs: Record<string, unknown> | null | undefined): string | null {
   if (!attrs) return null;
   const bits: string[] = [];
   const size = attrs["size"];
-  if (typeof size === "string" && size.length > 0) bits.push(`Size: ${size}`);
+  if (typeof size === "string" && size.length > 0) bits.push(size);
   const followUp = attrs["cross_category_source_so"];
   if (typeof followUp === "string" && followUp.length > 0) {
-    bits.push(`Remark: Follow-up of ${followUp}`);
+    bits.push(`✎ Follow-up of ${followUp}`);
   }
   return bits.length > 0 ? bits.join(" · ") : null;
 }
@@ -478,7 +434,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         {lines.map((line, idx) => {
             const isLast = idx === lines.length - 1 && addons.length === 0;
             const sofaSub = sofaSpecLine(line.attrs);
-            const variantSub = attrsDescription(line.attrs);
+            const configSub = configLine(line.attrs);
             const pwpSub = pwpMarkerLine(line.attrs);
             const freeSub = freeMarkerLine(line.attrs);
             let issuedSubs: Voucher[] = [];
@@ -496,12 +452,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <View style={[styles.descCell, styles.colDesc]}>
                   <Text style={styles.descMain}>{line.description}</Text>
                   {sofaSub ? <Text style={styles.descSub}>{sofaSub}</Text> : null}
-                  {variantSub ? <Text style={styles.descSub}>{variantSub}</Text> : null}
-                  {optionSpecialSubs(line.attrs).map((t, i) => (
-                    <Text key={`os-${i}`} style={styles.descSub}>
-                      {t}
-                    </Text>
-                  ))}
+                  {configSub ? <Text style={styles.descSub}>{configSub}</Text> : null}
                   {pwpSub ? <Text style={styles.descSubAccent}>{pwpSub}</Text> : null}
                   {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}
                   {issuedSubs.map((v) => (

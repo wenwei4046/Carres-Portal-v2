@@ -108,6 +108,32 @@ export function optionsFromAttrs(attrs: Record<string, unknown> | null | undefin
   return Array.isArray(o) ? (o as OptionAttrLine[]) : [];
 }
 
+/** The full configuration as ONE muted line's bits (Loo 2026-07-25: "no point
+ *  form — variant · gap · Divan 8" · Leg 4" · …"). Flat attrs (colour / gap /
+ *  fabric) + option picks + special add-ons + remark, no per-item RM (already
+ *  folded into the line price). Shared by the POS order-detail drawer AND the
+ *  Sales Order PDF ("same formula", Loo 2026-07-25) — the two surfaces can
+ *  never drift. Callers prepend the variant themselves when they need it. */
+export function lineConfigBits(attrs: Record<string, unknown> | null | undefined): string[] {
+  if (!attrs) return [];
+  const bits: string[] = [];
+  if (typeof attrs.color === "string" && attrs.color) bits.push(attrs.color);
+  if (typeof attrs.gap === "string" && attrs.gap) bits.push(`gap ${attrs.gap}`);
+  if (typeof attrs.fabric_name === "string" && attrs.fabric_name) bits.push(attrs.fabric_name);
+  for (const o of optionsFromAttrs(attrs)) {
+    const kind = OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option";
+    bits.push(`${kind} ${o.value ?? ""}`.trim());
+  }
+  if (typeof attrs.leg_height === "string" && attrs.leg_height) bits.push(`Leg ${attrs.leg_height}`);
+  for (const s of specialsFromAttrs(attrs)) {
+    const desc = s.soDescription || s.label || s.code || "Add-on";
+    const choices = (s.choiceLabels ?? []).filter(Boolean);
+    bits.push(choices.length ? `${desc} (${choices.join(", ")})` : desc);
+  }
+  if (typeof attrs.remark === "string" && attrs.remark) bits.push(`✎ ${attrs.remark}`);
+  return bits;
+}
+
 /** Render a line's picked special add-ons AND option picks (divan / leg /
  *  fabric — 0201/0202 wiring) as compact description rows (cart + order
  *  detail). A sofa-build leg (`attrs.leg_height`) renders too. Renders
