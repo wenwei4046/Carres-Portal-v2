@@ -858,20 +858,26 @@ export default function SofaConfigurePage({
 
   return createPortal(
     <div
-      className="pos-proto cfg-root"
+      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
       aria-label={`Configure ${model.name}`}
       data-testid="sofa-configure-page"
     >
-      {/* Header — the design's cfg-header with the sofa-flow crumb: brand
-          strip (wizard) / back arrow · eyebrow/model · mode tabs (rail pill
-          pair) · live total. */}
-      <div className="cfg-header cfg-header--icon">
-        {wizardTopbar ? (
+      {/* Wizard context (Loo 2026-07-26): the POS topbar strip rides its OWN
+          row — the sofa header (heights + mode tabs + PWP bar + total) is far
+          too dense to share a row with it. Logo = back; the ← arrow goes. */}
+      {wizardTopbar && (
+        <div className="cfg-wizardbar">
           <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
-        ) : (
+        </div>
+      )}
+      {/* Header — the design's cfg-header with the sofa-flow crumb: back
+          arrow (non-wizard) · eyebrow/model · mode tabs (rail pill pair) ·
+          live total. */}
+      <div className="cfg-header cfg-header--icon">
+        {!wizardTopbar && (
           <button
             className="cfg-header__back"
             type="button"
