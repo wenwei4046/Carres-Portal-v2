@@ -10,6 +10,7 @@ import {
   Info,
   PackageCheck,
   Paperclip,
+  Pencil,
   Plus,
   QrCode,
   Save,
@@ -23,6 +24,7 @@ import {
   resolvePaymentMethods,
   type Order,
   type OrderLine,
+  type ProductModelDto,
   type TopUpOrderInput,
   type UpdateOrderInput,
 } from "@carres/shared";
@@ -39,17 +41,23 @@ import {
   useOrder,
   useOrderChangeRequests,
   useProceedOrder,
+  useReplaceOrderLines,
   useSubmitOrderChangeRequest,
   useUpdateOrderChangeRequest,
   useTopUpOrder,
   useUnproceedOrder,
   useUpdateOrder,
 } from "@/lib/queries";
-import { groupSofaBuildLines } from "@/lib/sofa-build-display";
+import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-display";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
+import { newLocalId } from "../new-order/configurators";
 import type { DraftLine } from "../new-order/draft";
 import AddProductOverlay from "./AddProductOverlay";
+import { buildCatalogIndex } from "./catalog-index";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
+import { draftFromOrderLine, draftFromSofaGroup, orderLineEditKind } from "./order-line-edit";
+import PosConfigurePage from "./PosConfigurePage";
+import SofaConfigurePage from "./SofaConfigurePage";
 import StripeCollectModal from "./StripeCollectModal";
 
 /**
@@ -153,6 +161,37 @@ function addErrorCopy(e: unknown): string {
   if (code === "special_price_drift" || code === "options_price_drift")
     return "Prices changed since this screen loaded — reopen the product and reconfigure.";
   return e instanceof Error ? e.message : "Could not add the product.";
+}
+
+/** 0255 — line-EDIT failure copy. `downsell_blocked` keeps the server's
+ *  message (it carries the real RM figures). */
+function replaceErrorCopy(e: unknown): string {
+  const code = errCode(e);
+  if (code === "downsell_blocked")
+    return e instanceof Error && e.message
+      ? e.message
+      : "The new configuration is below the original price — edits can only upgrade the order.";
+  if (code === "wrong_status")
+    return "Products can only be edited while the order is in Order placed.";
+  if (code === "line_not_editable") return "Free, promo and bundle items can't be edited.";
+  if (code === "promo_entitlement_broken")
+    return (
+      "This item backs a promo or printed voucher on this order — the new configuration " +
+      "would no longer qualify for it. Cancel the promo with HQ first."
+    );
+  if (code === "line_not_found")
+    return "The item is no longer on this order — refresh and retry.";
+  if (code === "partial_sofa_group")
+    return "This sofa must be edited as a whole build — refresh and retry.";
+  if (code === "mixed_category_lines")
+    return "Sofa can't mix with mattress / bed frame in one order.";
+  if (code === "unknown_or_inactive_sku")
+    return "This product is no longer available — refresh and retry.";
+  if (code === "sofa_price_drift")
+    return "The sofa price changed since this screen loaded — rebuild and retry.";
+  if (code === "special_price_drift" || code === "options_price_drift")
+    return "Prices changed since this screen loaded — reopen the product and reconfigure.";
+  return e instanceof Error ? e.message : "Could not update the product.";
 }
 
 function unproceedErrorCopy(e: unknown): string {
@@ -270,6 +309,40 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const addLinesMut = useAddOrderLines(id);
   const [addOpen, setAddOpen] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
+  // 0255 — line EDIT (Loo 2026-07-25): the pencil re-opens the item's
+  // configure surface seeded with its stored configuration; Save replaces
+  // the row(s) server-side, up-sell only.
+  const replaceMut = useReplaceOrderLines(id);
+  const [editing, setEditing] = useState<{
+    kind: "bed_mattress" | "sofa_build";
+    model: ProductModelDto;
+    draft: DraftLine;
+    targetIds: string[];
+    oldTotal: number;
+  } | null>(null);
+  const editIndex = useMemo(
+    () =>
+      catalog
+        ? buildCatalogIndex(catalog, catalog.fabricTierConfig, catalog.modelFabricTierOverrides)
+        : null,
+    [catalog],
+  );
+  // PWP-preview context inside the configure surface = the order's OTHER
+  // rows (the edited row excluded — CatalogStep's edit convention).
+  const editCartLines = useMemo<DraftLine[]>(() => {
+    if (!editing) return [];
+    const excluded = new Set(editing.targetIds);
+    return (order?.lines ?? [])
+      .filter((l) => !(l.id && excluded.has(l.id)))
+      .map((l) => ({
+        localId: l.id ?? newLocalId(),
+        sku: l.sku,
+        qty: l.qty,
+        attrs: l.attrs,
+        unitPrice: l.unitPrice,
+        label: l.sku,
+      }));
+  }, [editing, order?.lines]);
   // 0233 — P3 proceed-lane submission + pending banner.
   const changeReqQ = useOrderChangeRequests(id);
   const submitChangeMut = useSubmitOrderChangeRequest(id);
@@ -361,6 +434,74 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       setAddOpen(false);
     } catch (e) {
       setAddErr(addErrorCopy(e));
+    }
+  }
+
+  // ── 0255 line EDIT ────────────────────────────────────────────────────────
+  function startEditLine(line: OrderLine) {
+    if (!catalog || !line.id) return;
+    const kind = orderLineEditKind(line, catalog);
+    if (!kind) return;
+    const sku = catalog.skus.find((s) => s.sku === line.sku);
+    const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
+    if (!model) return;
+    setAddErr(null);
+    setEditing({
+      kind,
+      model,
+      draft: draftFromOrderLine(line),
+      targetIds: [line.id],
+      oldTotal: line.unitPrice * line.qty,
+    });
+  }
+
+  function startEditGroup(row: SofaBuildGroupRow) {
+    if (!catalog || !row.lines.every((l) => l.id)) return;
+    const draft = draftFromSofaGroup(row, catalog);
+    if (!draft) return;
+    const sku = catalog.skus.find((s) => s.sku === draft.sku);
+    const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
+    if (!model) return;
+    setAddErr(null);
+    setEditing({
+      kind: "sofa_build",
+      model,
+      draft,
+      targetIds: row.lines.map((l) => l.id as string),
+      oldTotal: row.totalPrice,
+    });
+  }
+
+  async function handleReplace(newLine: DraftLine) {
+    if (!editing) return;
+    const target = editing;
+    setEditing(null);
+    // Client precheck of THE rule (server re-enforces): edits only up-sell.
+    const newTotal = newLine.unitPrice * newLine.qty;
+    if (newTotal < target.oldTotal) {
+      setAddErr(
+        `The new configuration totals RM ${rm(newTotal)}, below the original ` +
+          `RM ${rm(target.oldTotal)} — edits can only upgrade the order.`,
+      );
+      return;
+    }
+    const isBuild = Boolean((newLine.attrs as Record<string, unknown> | null)?.sofa_build);
+    setAddErr(null);
+    try {
+      // sku/qty/attrs go up — the client preview price stays local (server
+      // catalog authority) EXCEPT on a sofa BUILD, whose preview unitPrice
+      // feeds the server drift gate (same contract as add).
+      await replaceMut.mutateAsync({
+        targetLineIds: target.targetIds,
+        line: {
+          sku: newLine.sku,
+          qty: newLine.qty,
+          attrs: newLine.attrs ?? null,
+          ...(isBuild ? { unitPrice: newLine.unitPrice } : {}),
+        },
+      });
+    } catch (e) {
+      setAddErr(replaceErrorCopy(e));
     }
   }
 
@@ -718,8 +859,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               {rows.map((row, i) => {
                 if (row.kind === "sofa_build") {
                   const { model } = skuMeta(row.lines[0]?.sku ?? "");
+                  // 0255 — the pencil shows only when the group can round-trip
+                  // (geometry stamps intact, no promo markers) in the place lane.
+                  const editable =
+                    scope.editablePlaced &&
+                    !!catalog &&
+                    row.lines.every((l) => l.id) &&
+                    draftFromSofaGroup(row, catalog) !== null;
                   return (
-                    <div key={row.buildKey} className="os-item">
+                    <div
+                      key={row.buildKey}
+                      className="os-item"
+                      style={editable ? { gridTemplateColumns: "48px 1fr auto auto auto" } : undefined}
+                    >
                       <div
                         className="os-item__photo"
                         style={model?.photoUrl ? { backgroundImage: `url(${model.photoUrl})` } : undefined}
@@ -735,6 +887,17 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                         <sup>RM</sup>
                         {rm(row.totalPrice)}
                       </div>
+                      {editable && (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          onClick={() => startEditGroup(row)}
+                          aria-label="Edit sofa build"
+                          data-testid="pos-od-edit-build"
+                        >
+                          <Pencil size={16} strokeWidth={1.75} />
+                        </button>
+                      )}
                     </div>
                   );
                 }
@@ -742,8 +905,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 const { sku, model } = skuMeta(line.sku);
                 const tag = lineTag(line.attrs);
                 const free = tag === "GWP" || tag === "Free item";
+                // 0255 — pencil on configurator-backed rows (mattress/bedframe)
+                // in the place lane; free/promo/bundle rows stay pencil-less.
+                const editable =
+                  scope.editablePlaced &&
+                  !!catalog &&
+                  !!line.id &&
+                  orderLineEditKind(line, catalog) !== null;
                 return (
-                  <div key={line.id ?? i} className="os-item">
+                  <div
+                    key={line.id ?? i}
+                    className="os-item"
+                    style={editable ? { gridTemplateColumns: "48px 1fr auto auto auto" } : undefined}
+                  >
                     <div
                       className="os-item__photo"
                       style={model?.photoUrl ? { backgroundImage: `url(${model.photoUrl})` } : undefined}
@@ -768,6 +942,17 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                         </>
                       )}
                     </div>
+                    {editable && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => startEditLine(line)}
+                        aria-label="Edit item"
+                        data-testid="pos-od-edit-line"
+                      >
+                        <Pencil size={16} strokeWidth={1.75} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -903,8 +1088,13 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 Last product change rejected · {lastRejected.decisionNote}
               </p>
             )}
-            {addErr && !addOpen && (
-              <div className="os-detail__err" style={{ marginTop: 8 }}>
+            {replaceMut.isPending && (
+              <p className="t-tiny" style={{ color: "var(--fg-muted)", marginTop: 8 }}>
+                Updating item…
+              </p>
+            )}
+            {addErr && !addOpen && !editing && (
+              <div className="os-detail__err" style={{ marginTop: 8 }} data-testid="pos-od-items-err">
                 {addErr}
               </div>
             )}
@@ -1350,6 +1540,55 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             customerPhone={order.customer.phone ?? null}
             onClose={() => setStripeOpen(false)}
           />
+        )}
+
+        {/* 0255 — line EDIT: the item's configure surface, seeded from its
+            stored configuration (editLine), full-screen over the drawer (same
+            z-nesting trick as AddProductOverlay). onAdd REPLACES the row(s)
+            server-side; up-sell only. */}
+        {editing && catalog && editIndex && (
+          <div className="fixed inset-0 z-[110]" data-testid="pos-od-edit-surface">
+            {editing.kind === "bed_mattress" ? (
+              <PosConfigurePage
+                key={editing.draft.localId}
+                model={editing.model}
+                meta={editIndex.meta.get(editing.model.id)}
+                skus={editIndex.skusByModel.get(editing.model.id) ?? []}
+                specialAddons={catalog.specialAddons}
+                optionPools={catalog.optionPools}
+                fabrics={catalog.fabrics}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                catalog={catalog}
+                cartLines={editCartLines}
+                editLine={editing.draft}
+                onAdd={handleReplace}
+                onClose={() => setEditing(null)}
+              />
+            ) : (
+              <SofaConfigurePage
+                key={editing.draft.localId}
+                model={editing.model}
+                meta={editIndex.meta.get(editing.model.id)}
+                skus={editIndex.skusByModel.get(editing.model.id) ?? []}
+                fabrics={editIndex.fabricsByModel.get(editing.model.id) ?? []}
+                masterFabrics={catalog.fabrics}
+                optionPools={catalog.optionPools}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                sofaCompartments={catalog.sofaCompartments ?? []}
+                modelCompartments={(catalog.modelSofaCompartments ?? []).filter(
+                  (mc) => mc.modelId === editing.model.id,
+                )}
+                sofaCombos={catalog.sofaCombos ?? []}
+                catalog={catalog}
+                cartLines={editCartLines}
+                editLine={editing.draft}
+                onAdd={handleReplace}
+                onClose={() => setEditing(null)}
+              />
+            )}
+          </div>
         )}
 
         {addOpen && catalog && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addOrderLinesInputSchema, updateOrderInputSchema } from "./orders";
+import { addOrderLinesInputSchema, replaceOrderLinesInputSchema, updateOrderInputSchema } from "./orders";
 
 // 0220 — POS proceed-lane edits: customer.email joins the editable set.
 describe("updateOrderInputSchema.customer.email (0220)", () => {
@@ -36,6 +36,41 @@ describe("updateOrderInputSchema.customer.email (0220)", () => {
     const long = `${"a".repeat(315)}@x.com`; // 321 chars
     const res = updateOrderInputSchema.safeParse({ customer: { email: long } });
     expect(res.success).toBe(false);
+  });
+});
+
+// 0255 — line EDIT: target row id(s) + ONE re-configured replacement line.
+describe("replaceOrderLinesInputSchema (0255)", () => {
+  it("parses a single-target flat edit and a sofa-group edit (multi target + preview price)", () => {
+    const flat = replaceOrderLinesInputSchema.parse({
+      targetLineIds: ["6a51f4a1-0000-4000-8000-000000000001"],
+      line: { sku: "MAT-1", qty: 1, attrs: { gap: "None" } },
+    });
+    expect(flat.targetLineIds).toHaveLength(1);
+    const build = replaceOrderLinesInputSchema.parse({
+      targetLineIds: [
+        "6a51f4a1-0000-4000-8000-000000000001",
+        "6a51f4a1-0000-4000-8000-000000000002",
+      ],
+      line: { sku: "LOTTI-1A", qty: 1, attrs: { sofa_build: {} }, unitPrice: 4200 },
+    });
+    expect(build.line.unitPrice).toBe(4200);
+  });
+
+  it("rejects non-uuid targets, an empty target list, and a missing line", () => {
+    expect(
+      replaceOrderLinesInputSchema.safeParse({ targetLineIds: ["nope"], line: { sku: "S", qty: 1 } })
+        .success,
+    ).toBe(false);
+    expect(
+      replaceOrderLinesInputSchema.safeParse({ targetLineIds: [], line: { sku: "S", qty: 1 } })
+        .success,
+    ).toBe(false);
+    expect(
+      replaceOrderLinesInputSchema.safeParse({
+        targetLineIds: ["6a51f4a1-0000-4000-8000-000000000001"],
+      }).success,
+    ).toBe(false);
   });
 });
 

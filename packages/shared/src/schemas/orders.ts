@@ -452,28 +452,38 @@ export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
  *  the configurator selections. Free markers are always rejected; a
  *  voucher-CODED pwp claim (attrs.pwp.code) is rejected (code-less stateless
  *  claims only — vouchers ride the wizard / a new order). */
+const orderLineInputItemSchema = z.object({
+  sku: z.string().trim().min(1),
+  qty: z.number().int().min(1).max(99),
+  attrs: z.record(z.unknown()).nullable().optional(),
+  /** P2 — the client PREVIEW total for a sofa BUILD line only: the sofa
+   *  recompute's ±0.5% drift gate compares it against the fresh server
+   *  figure (create-route contract). IGNORED on every non-build line —
+   *  flat lines stay fully server-priced. */
+  unitPrice: z.number().nonnegative().optional(),
+  /** P3 — human-readable line label for the operator's approval view
+   *  (e.g. "Cloud Mattress · Queen"). Display-only: never persisted on
+   *  the order_line (the RPC reads sku/qty/attrs/unit_price only). */
+  label: z.string().max(120).optional(),
+});
+
 export const addOrderLinesInputSchema = z.object({
-  lines: z
-    .array(
-      z.object({
-        sku: z.string().trim().min(1),
-        qty: z.number().int().min(1).max(99),
-        attrs: z.record(z.unknown()).nullable().optional(),
-        /** P2 — the client PREVIEW total for a sofa BUILD line only: the sofa
-         *  recompute's ±0.5% drift gate compares it against the fresh server
-         *  figure (create-route contract). IGNORED on every non-build line —
-         *  flat lines stay fully server-priced. */
-        unitPrice: z.number().nonnegative().optional(),
-        /** P3 — human-readable line label for the operator's approval view
-         *  (e.g. "Cloud Mattress · Queen"). Display-only: never persisted on
-         *  the order_line (the RPC reads sku/qty/attrs/unit_price only). */
-        label: z.string().max(120).optional(),
-      }),
-    )
-    .min(1)
-    .max(10),
+  lines: z.array(orderLineInputItemSchema).min(1).max(10),
 });
 export type AddOrderLinesInput = z.infer<typeof addOrderLinesInputSchema>;
+
+/** 0255 — Order line EDIT (Loo 2026-07-25): re-configure an existing
+ *  PLACE-lane item via the pencil on the My-orders drawer. `targetLineIds`
+ *  names the row(s) being replaced — ONE flat line, or the FULL exploded
+ *  sofa group (every row sharing the sofa_build_key). `line` is the
+ *  re-configured replacement, priced through the SAME server pipeline as an
+ *  add. The one business rule — up-sell only (new total ≥ old total) — is
+ *  enforced in the RPC (details `downsell_blocked`). */
+export const replaceOrderLinesInputSchema = z.object({
+  targetLineIds: z.array(z.string().uuid()).min(1).max(30),
+  line: orderLineInputItemSchema,
+});
+export type ReplaceOrderLinesInput = z.infer<typeof replaceOrderLinesInputSchema>;
 
 /** 0233 — P3 change-request lifecycle. */
 export const orderChangeRequestStatusSchema = z.enum([

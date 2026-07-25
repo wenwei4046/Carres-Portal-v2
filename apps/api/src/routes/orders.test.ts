@@ -2712,6 +2712,249 @@ describe("POST /api/orders/:id/lines", () => {
 });
 
 // =============================================================================
+// POST /api/orders/:id/lines/replace — line EDIT (0255): re-configure one
+// item (or a whole exploded sofa group) on a place-lane order, up-sell only.
+// Same mock-limitation posture as the add tests (dormant engine paths).
+// =============================================================================
+
+const replaceLinesUrl = `http://t/api/orders/${PROCEED_ID}/lines/replace`;
+const TARGET_LINE_ID = "33333333-3333-3333-3333-333333333301";
+
+function replaceTargetRow(over: Record<string, unknown> = {}) {
+  return {
+    id: TARGET_LINE_ID,
+    sku: "SKU-OLD",
+    qty: 1,
+    attrs: null,
+    unit_price: 100,
+    ...over,
+  };
+}
+
+describe("POST /api/orders/:id/lines/replace", () => {
+  it("200 — re-prices from the FRESH catalog and calls replace_order_lines with the target ids", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [replaceTargetRow()],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // Client price is ignored on a flat line — server prices 250 (> old 100).
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "SKU-ADD-1", qty: 1, attrs: null, unitPrice: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("replace_order_lines");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_old_line_ids).toEqual([TARGET_LINE_ID]);
+    const lines = args.p_lines as Array<Record<string, unknown>>;
+    expect(lines).toHaveLength(1);
+    expect(lines[0].sku).toBe("SKU-ADD-1");
+    expect(lines[0].unit_price).toBe(250);
+    expect(args.p_addons_replace).toBeNull();
+  });
+
+  it("422 downsell_blocked from the friendly precheck (server price below the old total)", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      // Old row cost RM 500 — the fresh catalog prices the replacement at 250.
+      orderLineRows: [replaceTargetRow({ unit_price: 500 })],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "SKU-ADD-1", qty: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("downsell_blocked");
+    expect(body.error).toBe("replace_blocked");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 line_not_editable when the target carries a free/promo/bundle marker", async () => {
+    for (const attrs of [
+      { free_gift: true },
+      { free_item: true },
+      { pwp: { ruleId: "r" } },
+      { bundle_group: "bg-1" },
+      { combo_key: "ck-1" },
+    ]) {
+      const sb = buildSbForProceed({
+        fetchedRow: addOrderRow(),
+        orderLineRows: [replaceTargetRow({ attrs })],
+        productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+          product_models: { category: string } | null;
+        }>,
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request(replaceLinesUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetLineIds: [TARGET_LINE_ID],
+            line: { sku: "SKU-ADD-1", qty: 1 },
+          }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe("line_not_editable");
+      expect(sb._rpcCalls).toHaveLength(0);
+    }
+  });
+
+  it("422 line_not_found when a target id is not on this order", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [replaceTargetRow()],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: ["44444444-4444-4444-4444-444444444404"],
+          line: { sku: "SKU-ADD-1", qty: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("line_not_found");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 wrong_status from the early gate when the order already proceeded", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow({ status: "proceed_order" }),
+      orderLineRows: [replaceTargetRow()],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "SKU-ADD-1", qty: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(body.error).toBe("replace_blocked");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("400 when the replacement carries a server-exclusive free marker", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [replaceTargetRow()],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "SKU-ADD-1", qty: 1, attrs: { free_gift: true } },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 passthrough of the RPC's authoritative downsell_blocked", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      orderLineRows: [replaceTargetRow()],
+      productSkuCategoryRows: [addSkuRow()] as unknown as Array<{
+        product_models: { category: string } | null;
+      }>,
+      rpcError: {
+        code: "22023",
+        message: "replacement total RM 250 is below the original RM 300 — upgrades only",
+        details: "downsell_blocked",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "SKU-ADD-1", qty: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("downsell_blocked");
+    expect(body.error).toBe("replace_blocked");
+  });
+
+  it("401 without Authorization header", async () => {
+    const res = await app.fetch(
+      new Request(replaceLinesUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLineIds: [TARGET_LINE_ID],
+          line: { sku: "S", qty: 1 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+// =============================================================================
 // Order change requests (P3, 0233) — proceed-lane submission + ops decide.
 // =============================================================================
 

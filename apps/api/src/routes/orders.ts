@@ -5,6 +5,7 @@ import {
   Adapters,
   DB,
   addOrderLinesInputSchema,
+  replaceOrderLinesInputSchema,
   decideOrderChangeRequestInputSchema,
   type AddOrderLinesInput,
   autocountImportInput,
@@ -45,6 +46,10 @@ import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free
 import { recomputePwpLines } from "../lib/pwp-recompute";
 import { claimPwpCodesForLines } from "../lib/pwp-codes-claim";
 import { sweepReservedForSubmit } from "../lib/pwp-carry-forward";
+import {
+  checkPromoEntitlementAfterEdit,
+  matchEarnedGiftRows,
+} from "../lib/replace-lines-helpers";
 import type { AppEnv } from "../types";
 
 /**
@@ -2267,6 +2272,13 @@ async function computeAddLinesWriteSet(
   id: string,
   inputLines: AddOrderLinesInput["lines"],
   ord: { customer_phone: string | null },
+  // 0255/0256 (line EDIT) — a REPLACE prices its new line against the cart
+  // MINUS the row(s) being replaced (mutex / PWP context / gifts / delivery
+  // all see the post-replace cart). The gift stage runs as on an add: the
+  // replacement earns its own gifts; the OLD line's gift rows ride in the
+  // route's excluded/removed set (wizard semantics — gifts leave with their
+  // line).
+  opts?: { excludeLineIds?: ReadonlySet<string> },
 ): Promise<Response | AddLinesWriteSet> {
   // Marker guards: free markers are minted server-side only; a voucher-CODED
   // pwp claim is wizard-scoped (0187's claim → stamp → sweep lifecycle exists
@@ -2303,17 +2315,20 @@ async function computeAddLinesWriteSet(
   // carry the recompute's operator inputs. RLS scopes the reads.
   const exLinesR = await sb
     .from("order_lines")
-    .select("sku, qty, attrs, unit_price")
+    .select("id, sku, qty, attrs, unit_price")
     .eq("order_id", id);
   if (exLinesR.error) throw new HTTPException(500, { message: exLinesR.error.message });
   const existingLines = (
     (exLinesR.data ?? []) as Array<{
+      id: string;
       sku: string;
       qty: number;
       attrs: Record<string, unknown> | null;
       unit_price: number | string;
     }>
-  ).map((r) => ({ sku: r.sku, qty: r.qty, attrs: r.attrs, unitPrice: Number(r.unit_price) }));
+  )
+    .filter((r) => !opts?.excludeLineIds?.has(r.id))
+    .map((r) => ({ sku: r.sku, qty: r.qty, attrs: r.attrs, unitPrice: Number(r.unit_price) }));
   const exAddonsR = await sb
     .from("order_addons")
     .select("addon_key, qty, unit_price, attrs")
@@ -2713,6 +2728,206 @@ ordersRouter.post("/:id/lines", async (c) => {
     p_addons_replace: out.pAddonsReplace,
   });
   const errRes = addLinesRpcError(c, rpcError, "add_lines_blocked");
+  if (errRes) return errRes;
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
+/** POST /api/orders/:id/lines/replace — line EDIT (0255, Loo 2026-07-25):
+ *  re-configure ONE existing item on a PLACE-lane order. `targetLineIds`
+ *  names the row being replaced (or the FULL exploded sofa group); the
+ *  replacement is priced through the SAME pipeline as an add (gift stage
+ *  skipped — the old line's RM0 gift rows stay). Up-sell only: a replacement
+ *  priced below the replaced rows 422s `downsell_blocked` (friendly here,
+ *  authoritative in the RPC). */
+ordersRouter.post("/:id/lines/replace", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  if (!idCheck.success || !idCheck.data) {
+    throw new HTTPException(404, { message: "Order not found" });
+  }
+  const id: string = idCheck.data;
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = replaceOrderLinesInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+  const targetIds = parsed.data.targetLineIds;
+
+  const sb = userClient(c.env, auth.jwt);
+  const orderR = await sb
+    .from("orders")
+    .select("id, status, operation_stage, source_system, customer_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (orderR.error) throw new HTTPException(500, { message: orderR.error.message });
+  const ord = orderR.data as {
+    id: string;
+    status: string;
+    operation_stage: string | null;
+    source_system: string | null;
+    customer_phone: string | null;
+  } | null;
+  if (!ord) throw new HTTPException(404, { message: "Order not found" });
+  // Early friendly gate (the RPC re-checks authoritatively).
+  if (ord.status !== "place" || ord.operation_stage !== null || ord.source_system === "autocount") {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "wrong_status",
+        message: "Products can only be edited while the order is in Order placed",
+      },
+      422,
+    );
+  }
+
+  // Target rows: must all exist on this order; free / promo / bundle / combo
+  // rows are never editable (their prices are minted by promo/bundle law).
+  // Read the order's full line set and pick the targets in JS — same read
+  // shape as the pipeline's existing-lines fetch.
+  const targetR = await sb
+    .from("order_lines")
+    .select("id, sku, qty, attrs, unit_price")
+    .eq("order_id", id);
+  if (targetR.error) throw new HTTPException(500, { message: targetR.error.message });
+  const allRows = (targetR.data ?? []) as Array<{
+    id: string;
+    sku: string;
+    qty: number;
+    attrs: Record<string, unknown> | null;
+    unit_price: number | string;
+  }>;
+  const rowById = new Map(allRows.map((r) => [r.id, r]));
+  const targets = targetIds.flatMap((tid) => {
+    const r = rowById.get(tid);
+    return r ? [r] : [];
+  });
+  if (targets.length !== targetIds.length) {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "line_not_found",
+        message: "The item is no longer on this order — refresh and retry.",
+      },
+      422,
+    );
+  }
+  for (const t of targets) {
+    const a = t.attrs ?? {};
+    if (a.free_gift || a.free_item || a.pwp || a.bundle_group || a.combo_key) {
+      return c.json(
+        {
+          error: "replace_blocked",
+          code: "line_not_editable",
+          message: "Free, promo and bundle items can't be edited.",
+        },
+        422,
+      );
+    }
+  }
+  const oldTotal = targets.reduce((s, t) => s + Number(t.unit_price) * t.qty, 0);
+
+  // 0256 — wizard gift semantics: the target's RM0 gift rows leave WITH it.
+  // Re-derive what the OLD configuration earns under TODAY's gift config and
+  // match those emissions against the persisted rows; unmatched rows (config
+  // changed since create) STAY — the customer keeps what was promised.
+  const oldGiftResolve = await resolveDefaultFreeGiftLines(
+    sb,
+    targets.map((t) => ({
+      sku: t.sku,
+      qty: t.qty,
+      attrs: t.attrs,
+      unitPrice: Number(t.unit_price),
+    })),
+  );
+  if (oldGiftResolve.status === "server_error") {
+    throw new HTTPException(500, { message: oldGiftResolve.message });
+  }
+  const giftRowIds = matchEarnedGiftRows(
+    oldGiftResolve.lines,
+    allRows.map((r) => ({
+      id: r.id,
+      sku: r.sku,
+      qty: r.qty,
+      attrs: r.attrs,
+      unitPrice: Number(r.unit_price),
+    })),
+    new Set(targetIds),
+  );
+  const removedIds = [...targetIds, ...giftRowIds];
+  const removedSet = new Set(removedIds);
+
+  const out = await computeAddLinesWriteSet(c, sb, id, [parsed.data.line], ord, {
+    excludeLineIds: removedSet,
+  });
+  if (out instanceof Response) return out;
+
+  // 0256 — promo-integrity guard: the up-sell gate alone can't stop an edit
+  // from pulling the trigger units out from under this order's PWP rewards /
+  // printed vouchers (2× Queen → 1× King raises the total but halves the
+  // entitlement). Never claw back what the customer holds — BLOCK instead.
+  const postEditLines = [
+    ...allRows
+      .filter((r) => !removedSet.has(r.id))
+      .map((r) => ({ sku: r.sku, qty: r.qty, attrs: r.attrs })),
+    ...out.pLines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: (l.attrs ?? null) as Record<string, unknown> | null,
+    })),
+  ];
+  const promoCheck = await checkPromoEntitlementAfterEdit(sb, id, postEditLines);
+  if (promoCheck.status === "server_error") {
+    throw new HTTPException(500, { message: promoCheck.message });
+  }
+  if (promoCheck.status === "blocked") {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "promo_entitlement_broken",
+        message: promoCheck.message,
+      },
+      422,
+    );
+  }
+
+  // Friendly up-sell precheck with the real figures (the RPC re-enforces on
+  // the DB rows under the order lock).
+  const newTotal = out.pLines.reduce((s, l) => s + l.unit_price * l.qty, 0);
+  if (newTotal < oldTotal) {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "downsell_blocked",
+        message:
+          `The new configuration totals RM ${newTotal.toFixed(2)}, below the original ` +
+          `RM ${oldTotal.toFixed(2)} — edits can only upgrade the order.`,
+        oldTotal,
+        newTotal,
+      },
+      422,
+    );
+  }
+
+  const { error: rpcError } = await sb.rpc("replace_order_lines", {
+    p_order_id: id,
+    p_old_line_ids: removedIds,
+    p_lines: out.pLines,
+    p_addons_replace: out.pAddonsReplace,
+  });
+  const errRes = addLinesRpcError(c, rpcError, "replace_blocked");
   if (errRes) return errRes;
   return c.json(await fetchAndShapeOrder(sb, id));
 });

@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   proceedMutateAsync: vi.fn(async () => ({})),
   unproceedMutateAsync: vi.fn(async () => ({})),
   addLinesMutateAsync: vi.fn(async () => ({})),
+  replaceMutateAsync: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -27,11 +28,37 @@ vi.mock("@/lib/queries", () => ({
   useUnproceedOrder: () => ({ mutateAsync: h.unproceedMutateAsync, isPending: false }),
   // 0231 — add-product P1.
   useAddOrderLines: () => ({ mutateAsync: h.addLinesMutateAsync, isPending: false }),
+  // 0255 — line EDIT.
+  useReplaceOrderLines: () => ({ mutateAsync: h.replaceMutateAsync, isPending: false }),
   // 0233 — add-product P3 (submission flow).
   useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
   useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+}));
+// 0255 — the edit surface mounts the real configure pages; stub them so the
+// drawer tests stay light. The bed stub can emit an UP-priced or DOWN-priced
+// replacement to exercise the up-sell precheck.
+vi.mock("./PosConfigurePage", () => ({
+  default: (p: { onAdd: (l: unknown) => void; onClose: () => void }) => (
+    <div data-testid="stub-configure-page">
+      <button
+        data-testid="stub-emit-up"
+        onClick={() =>
+          p.onAdd({ localId: "x", sku: "SKU-1", qty: 1, attrs: { gap: "None" }, unitPrice: 5000, label: "up" })
+        }
+      />
+      <button
+        data-testid="stub-emit-down"
+        onClick={() =>
+          p.onAdd({ localId: "x", sku: "SKU-1", qty: 1, attrs: null, unitPrice: 1, label: "down" })
+        }
+      />
+    </div>
+  ),
+}));
+vi.mock("./SofaConfigurePage", () => ({
+  default: () => <div data-testid="stub-sofa-page" />,
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",
@@ -153,6 +180,7 @@ beforeEach(() => {
   h.topUpMutateAsync.mockClear();
   h.proceedMutateAsync.mockClear();
   h.unproceedMutateAsync.mockClear();
+  h.replaceMutateAsync.mockClear();
 });
 
 describe("place lane", () => {
@@ -315,6 +343,60 @@ describe("SO identity + Sales Order doc (2026-07-25, Loo)", () => {
     const foot = screen.getByTestId("pos-od-foot-delivered");
     expect(within(foot).getByText("Delivered · managed in backend portal.")).toBeTruthy();
     expect(within(foot).getByTestId("download-sales-order-1201")).toBeTruthy();
+  });
+});
+
+describe("line edit (0255)", () => {
+  it("place lane shows the pencil; clicking opens the seeded configure surface", () => {
+    renderDrawer(order());
+    const pencil = screen.getByTestId("pos-od-edit-line");
+    fireEvent.click(pencil);
+    expect(screen.getByTestId("pos-od-edit-surface")).toBeTruthy();
+    expect(screen.getByTestId("stub-configure-page")).toBeTruthy();
+  });
+
+  it("proceed + delivered lanes hide the pencil", () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
+    expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
+    renderDrawer(order({ status: "delivered", paid: 3000 }));
+    expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
+  });
+
+  it("free / bundle rows carry no pencil even in the place lane", () => {
+    const base = order();
+    renderDrawer(
+      order({
+        lines: [
+          { ...base.lines![0]!, attrs: { free_gift: true } },
+        ],
+      }),
+    );
+    expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
+  });
+
+  it("an UP-priced re-configure calls the replace mutation with the target id", async () => {
+    renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-edit-line"));
+    fireEvent.click(screen.getByTestId("stub-emit-up"));
+    await waitFor(() =>
+      expect(h.replaceMutateAsync).toHaveBeenCalledWith({
+        targetLineIds: ["00000000-0000-0000-0000-00000000l001"],
+        line: { sku: "SKU-1", qty: 1, attrs: { gap: "None" } },
+      }),
+    );
+    // Surface closes on success.
+    expect(screen.queryByTestId("pos-od-edit-surface")).toBeNull();
+  });
+
+  it("a DOWN-priced re-configure is blocked client-side (up-sell only) — no request", async () => {
+    renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-edit-line"));
+    fireEvent.click(screen.getByTestId("stub-emit-down"));
+    await waitFor(() => expect(screen.getByTestId("pos-od-items-err")).toBeTruthy());
+    expect(screen.getByTestId("pos-od-items-err").textContent).toContain(
+      "edits can only upgrade the order",
+    );
+    expect(h.replaceMutateAsync).not.toHaveBeenCalled();
   });
 });
 
