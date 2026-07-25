@@ -507,3 +507,72 @@ describe("CustomerStep — Target-date sub-step (Loo 2026-07-12)", () => {
     );
   });
 });
+
+// Loo 2026-07-26 — the step pills are buttons now: jump straight to a
+// sub-step. Backward is always free; forward walks the same per-step gates
+// Next enforces.
+describe("CustomerStep — clickable step pills", () => {
+  it("clicking an earlier pill jumps straight back (Emergency → Customer)", () => {
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        initialSubStep={2}
+      />,
+    );
+    expect(screen.getByTestId("pos-customer-chip-3").className).toContain("is-active");
+    fireEvent.click(screen.getByTestId("pos-customer-chip-1"));
+    expect(screen.getByTestId("pos-customer-chip-1").className).toContain("is-active");
+    // The Customer form really is up.
+    expect(screen.getByTestId("pos-customer-name")).toBeTruthy();
+  });
+
+  it("a forward pill stays disabled while the gates in between fail", () => {
+    wrap(
+      <CustomerStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+      />,
+    );
+    const chip4 = screen.getByTestId("pos-customer-chip-4") as HTMLButtonElement;
+    expect(chip4.disabled).toBe(true);
+    fireEvent.click(chip4);
+    expect(screen.getByTestId("pos-customer-chip-1").className).toContain("is-active");
+  });
+
+  it("a forward pill is clickable once every gate before it passes", () => {
+    const d = emptyDraft();
+    d.outletId = "o1";
+    d.salespersonId = "s1";
+    d.customer.name = "Tan Mei";
+    d.customer.phone = "0123456789";
+    d.customer.email = "tan@example.com";
+    d.customer.race = "Chinese";
+    d.customer.gender = "Female";
+    d.customer.birthday = "1990-01-01";
+    d.customer.addressUnknown = true; // address gate satisfied
+    wrap(
+      <CustomerStep
+        draft={d}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+      />,
+    );
+    // Customer + Address gates pass → Emergency (chip 3) is reachable.
+    const chip3 = screen.getByTestId("pos-customer-chip-3") as HTMLButtonElement;
+    expect(chip3.disabled).toBe(false);
+    fireEvent.click(chip3);
+    expect(screen.getByTestId("pos-customer-chip-3").className).toContain("is-active");
+  });
+});

@@ -229,10 +229,11 @@ export default function CustomerStep({
 
   // Per-sub-step advance gates (mirror draft.ts step1FirstIssue's groups).
   // 0219 — toggleable builtins gate per the resolved config; required custom
-  // fields gate their own tab.
-  function canAdvance(): boolean {
+  // fields gate their own tab. Parametrized (Loo 2026-07-26) so the clickable
+  // step pills can walk the SAME gates Next enforces.
+  function canAdvanceAt(idx: 0 | 1 | 2 | 3): boolean {
     if (dealerPending) return false;
-    if (stepIdx === 0) {
+    if (idx === 0) {
       const emailOk = custB["email"]?.required
         ? EMAIL_RE.test(c.email.trim())
         : !c.email.trim() || EMAIL_RE.test(c.email.trim());
@@ -248,7 +249,7 @@ export default function CustomerStep({
         customsValid(custTab)
       );
     }
-    if (stepIdx === 1) {
+    if (idx === 1) {
       const addressOk =
         c.addressUnknown ||
         (c.addressLine1.trim().length >= 5 &&
@@ -265,7 +266,7 @@ export default function CustomerStep({
           !!c.billingPostcode);
       return addressOk && billingOk && customsValid(addrTab);
     }
-    if (stepIdx === 2) {
+    if (idx === 2) {
       const blockOk =
         !emergencyBlock?.required ||
         (c.emergencyName.trim().length >= 2 &&
@@ -284,11 +285,28 @@ export default function CustomerStep({
       customsValid(targetTab)
     );
   }
+  function canAdvance(): boolean {
+    return canAdvanceAt(stepIdx);
+  }
 
   function next() {
     if (!canAdvance()) return;
     if (stepIdx < 3) setStepIdx((stepIdx + 1) as 0 | 1 | 2 | 3);
     else onProceed?.();
+  }
+
+  // Clickable step pills (Loo 2026-07-26): jump straight to a sub-step.
+  // BACKWARD is always free (data stays; Next re-validates on the way
+  // forward). FORWARD walks the SAME per-step gates Next enforces — you can
+  // only land past screens that currently validate, exactly like tapping
+  // Next repeatedly.
+  let maxReachable: 0 | 1 | 2 | 3 = stepIdx;
+  while (maxReachable < 3 && canAdvanceAt(maxReachable)) {
+    maxReachable = (maxReachable + 1) as 0 | 1 | 2 | 3;
+  }
+  function jumpTo(target: 0 | 1 | 2 | 3) {
+    if (target === stepIdx) return;
+    if (target < stepIdx || target <= maxReachable) setStepIdx(target);
   }
 
   return (
@@ -310,18 +328,25 @@ export default function CustomerStep({
         </p>
 
         <div className="steps">
-          {PHASE1_STEPS.map((label, i) => (
-            <div
-              key={label}
-              className={`step-pill ${stepIdx === i ? "is-active" : ""} ${stepIdx > i ? "is-done" : ""}`}
-              data-testid={`pos-customer-chip-${i + 1}`}
-            >
-              <span className="step-pill__num">
-                {stepIdx > i ? <Check size={11} strokeWidth={3} /> : i + 1}
-              </span>
-              <span className="step-pill__label">{label}</span>
-            </div>
-          ))}
+          {PHASE1_STEPS.map((label, i) => {
+            const idx = i as 0 | 1 | 2 | 3;
+            const clickable = idx < stepIdx || idx <= maxReachable;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => jumpTo(idx)}
+                disabled={!clickable}
+                className={`step-pill ${stepIdx === i ? "is-active" : ""} ${stepIdx > i ? "is-done" : ""}`}
+                data-testid={`pos-customer-chip-${i + 1}`}
+              >
+                <span className="step-pill__num">
+                  {stepIdx > i ? <Check size={11} strokeWidth={3} /> : i + 1}
+                </span>
+                <span className="step-pill__label">{label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Store card — internal operator picks who this sale belongs to.
