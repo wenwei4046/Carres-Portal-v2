@@ -33,6 +33,11 @@ vi.mock("@/lib/storage", () => ({
 vi.mock("@/lib/auth", () => ({
   useAuth: (sel: (s: { role: string | null }) => unknown) => sel({ role: h.role }),
 }));
+// DownloadSalesOrderButton (footer) rides in @/lib/pdf/render — keep
+// @react-pdf/renderer out of the jsdom graph (covered in its own test file).
+vi.mock("@/lib/pdf/render", () => ({
+  renderSalesOrderPdf: vi.fn(),
+}));
 
 const CATALOG = {
   models: [],

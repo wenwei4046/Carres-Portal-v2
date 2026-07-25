@@ -26,6 +26,7 @@ import {
   type TopUpOrderInput,
   type UpdateOrderInput,
 } from "@carres/shared";
+import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
@@ -659,6 +660,21 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       ? "Order placed"
       : "Proceed";
 
+  // 2026-07-25 (Loo) — every lane's footer ends with the customer-facing
+  // Sales Order doc (same PDF the ThankYou page offers). The button hides
+  // itself for partner/supplier; neither reaches this board, so the fallback
+  // role only covers the pre-hydration frame.
+  const viewSoBtn = (
+    <div className="os-detail__cta" style={{ marginTop: 10 }}>
+      <DownloadSalesOrderButton
+        variant="pos"
+        orderId={order.id}
+        so={order.so}
+        role={viewerRole ?? "dealer"}
+      />
+    </div>
+  );
+
   const rows = groupSofaBuildLines(order.lines ?? []);
   const pieces = rows.reduce((s, r) => s + (r.kind === "line" ? r.line.qty : 1), 0);
 
@@ -679,7 +695,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
         <div className="os-detail__head">
           <div>
             <div className="os-detail__eyebrow">Order · {laneLabel}</div>
-            <div className="os-detail__title">#{order.so}</div>
+            {/* 2026-07-25 (Loo) — the official document number, not the 2990s
+                `#` code: matches the Sales Order PDF + every ERP surface. */}
+            <div className="os-detail__title">SO-{order.so}</div>
             <div className="os-detail__sub">
               {order.customer.name || "Walk-in"} · placed {daysAgo(order.placedAt)} by{" "}
               {staffName ?? "—"}
@@ -1260,6 +1278,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 <ArrowRight size={16} />
               </button>
             </div>
+            {viewSoBtn}
           </div>
         )}
 
@@ -1299,18 +1318,25 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                   </button>
                 )}
               </div>
+              {viewSoBtn}
             </div>
           ) : (
-            <div className="os-detail__foot os-detail__foot--info" data-testid="pos-od-foot-locked">
-              <Info size={16} strokeWidth={1.75} />
-              Locked · HQ operation handling
+            <div className="os-detail__foot" data-testid="pos-od-foot-locked">
+              <div className="os-detail__foot--info">
+                <Info size={16} strokeWidth={1.75} />
+                Locked · HQ operation handling
+              </div>
+              {viewSoBtn}
             </div>
           ))}
 
         {scope.isDeliveredLane && (
-          <div className="os-detail__foot os-detail__foot--info" data-testid="pos-od-foot-delivered">
-            <PackageCheck size={16} strokeWidth={1.75} />
-            Delivered · managed in backend portal.
+          <div className="os-detail__foot" data-testid="pos-od-foot-delivered">
+            <div className="os-detail__foot--info">
+              <PackageCheck size={16} strokeWidth={1.75} />
+              Delivered · managed in backend portal.
+            </div>
+            {viewSoBtn}
           </div>
         )}
 
