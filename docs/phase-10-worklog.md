@@ -564,7 +564,7 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Next phases**: ① POS rental sell lane + Stripe product/subscription sync + entitlement minting (incl. P7 free-gift attach), ② billing/dunning engine (Jess line's locked D0/3/7/14/21/30/60 + Credit Bureau), ③ cleaning-partner tab + visit scheduling, ④ customer check surface (staff lookup → OTP page), ⑤ LHDN e-invoice decision.
 
-## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (migration 0254 DRAFTED, branch `worktree-rental-pos-sell-lane`, NOT yet applied/deployed)
+## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (PR #275, migration 0254 DRAFTED — NOT yet applied/deployed)
 
 **Ask (Loo)**: "open a worktree, continue the checkpoint of rental program and service line" — resuming checkpoint `20260725-144857-rental-service-plan-base.md`, whose Remaining-Work #1 is this exact segment: the POS rental sell lane + Stripe product/subscription sync + entitlement minting.
 
