@@ -46,8 +46,19 @@ export const upsertOrgPositionInput = z.object({
   band: positionBandSchema,
   sort: z.number().int().min(0).max(9999).optional(),
   active: z.boolean().optional(),
+  /** 0259 — the department this position belongs to; null = none (C-level). */
+  departmentId: z.string().uuid().optional().nullable(),
 });
 export type UpsertOrgPositionInput = z.infer<typeof upsertOrgPositionInput>;
+
+/** 0259 — create / rename / retire a department (mirrors positions). */
+export const upsertOrgDepartmentInput = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1).max(80),
+  sort: z.number().int().min(0).max(9999).optional(),
+  active: z.boolean().optional(),
+});
+export type UpsertOrgDepartmentInput = z.infer<typeof upsertOrgDepartmentInput>;
 
 /** hr_set_position — positionId null clears. Audited + history row (职位更替). */
 export const setTeamPositionInput = z.object({
@@ -175,6 +186,16 @@ export interface OrgPosition {
   band: PositionBand;
   sort: number;
   active: boolean;
+  /** 0259 — owning department; null for C-level / unassigned positions. */
+  departmentId?: string | null;
+}
+
+/** 0259 — a department (the chart's columns). */
+export interface OrgDepartment {
+  id: string;
+  name: string;
+  sort: number;
+  active: boolean;
 }
 
 export interface PositionHistoryEntry {
@@ -194,6 +215,8 @@ export interface HrTeamSource {
   showroomStores: { id: string; name: string }[];
   showroomStaff: TeamShowroomStaff[];
   positions: OrgPosition[];
+  /** 0259 — departments; absent on a pre-0259 server (render chart w/o columns). */
+  departments?: OrgDepartment[];
   history: PositionHistoryEntry[];
 }
 
