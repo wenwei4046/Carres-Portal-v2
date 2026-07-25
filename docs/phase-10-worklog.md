@@ -741,3 +741,12 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 ## 2026-07-26 ② · CARRES wordmark = home button (PR #299, web-only, deployed)
 
 **Ask (Loo, topbar screenshot)**: press the logo → back to the catalog page. **Fix**: `.pos-wordmark` becomes a `<button>` — mid-wizard it returns to step 1 with the draft kept (same as the already-clickable `01 Cart` crumb, bigger target); on the Thank-you screen it runs the SAME full reset as New order (jumping back with the old cart loaded would invite a duplicate order). CSS neutralises UA button chrome; look unchanged. **Ship**: PR #299 (`688c9ddf`) → web `index-_N6HZi_7.js` → carres-portal `00184e28` + carres-pos `e650c77a`; 4 canonicals ✓; full bundle 4,024,653 bytes marker ✓ SERVICE_ROLE 0. Full web 16 fail = §17.7 baseline.
+
+
+## 2026-07-26 ③ · Configure pages carry the POS topbar strip (PR #301, web-only, deployed)
+
+**Ask (Loo, two screenshots)**: the circled topbar block (CARRES logo + `POS · store` + 01/02/03 crumbs) should also sit on the product configure page; pressing the logo = back to catalog — no hunting for the small ← arrow.
+
+**Fix**: new `ConfigureTopbarBrand` replaces the arrow on PosConfigurePage + SofaConfigurePage **when opened from the wizard** (CatalogStep passes `topbarContext` down from DealerPos — the same label the real topbar shows). Logo click = onClose (back to catalog); crumbs static (01 Cart active — configuring lives inside step 1; the real topbar offers no forward jumps from step 1 either). **Outside the wizard** (order-detail edit pencil, AddProductOverlay) no wizard context → the plain arrow stays. Typography single-sourced from the `pos-wordmark`/`pos-topbar__*` classes. Design-standard catch: the hex rule flagged `PR #299` in a comment as a 3-digit colour — avoid `#NNN` in web-app comments.
+
+**Evidence**: PosConfigurePage 13/13 (+2: strip + logo=back; no-context keeps the arrow) · SofaConfigurePage 42/42 · CatalogStep 7/7 · full web 1490/1506 (16 = §17.7 baseline). **Ship**: PR #301 (`d9f96641`) → web `index-BEoh8CxQ.js` → carres-portal `2deacae0` + carres-pos `3112581f`; 4 canonicals ✓; full bundle 4,025,766 bytes marker ✓ SERVICE_ROLE 0.
