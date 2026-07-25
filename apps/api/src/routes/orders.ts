@@ -6,6 +6,7 @@ import {
   DB,
   addOrderLinesInputSchema,
   replaceOrderLinesInputSchema,
+  editOrderAddonInputSchema,
   decideOrderChangeRequestInputSchema,
   submitOrderChangeRequestInputSchema,
   type AddOrderLinesInput,
@@ -3060,6 +3061,77 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
+/** POST /api/orders/:id/addons/:addonId/edit — 0258 (Loo: "service sku need
+ *  to be editable as well"): qty/size edit on ONE dealer-chosen order_addons
+ *  row, PLACE lane direct. The RPC is the authority (place gate, DELIVERY*
+ *  never editable, up-sell law qty ≥ current, 0242 size law vs the live
+ *  addons config); the route stays thin — parse, friendly place gate, apply. */
+ordersRouter.post("/:id/addons/:addonId/edit", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  const addonCheck = z.string().uuid().safeParse(c.req.param("addonId"));
+  if (!idCheck.success || !addonCheck.success) {
+    throw new HTTPException(404, { message: "Not found" });
+  }
+  const id = idCheck.data;
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = editOrderAddonInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const orderR = await sb
+    .from("orders")
+    .select("id, status, operation_stage, source_system, customer_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (orderR.error) throw new HTTPException(500, { message: orderR.error.message });
+  const ord = orderR.data as {
+    id: string;
+    status: string;
+    operation_stage: string | null;
+    source_system: string | null;
+  } | null;
+  if (!ord) throw new HTTPException(404, { message: "Order not found" });
+  // Early friendly gate (the RPC re-checks authoritatively).
+  if (ord.status !== "place" || ord.operation_stage !== null || ord.source_system === "autocount") {
+    return c.json(
+      {
+        error: "edit_addon_blocked",
+        code: "wrong_status",
+        message: "Add-ons can only be edited while the order is in Order placed",
+      },
+      422,
+    );
+  }
+
+  const { error: rpcError } = await sb.rpc("edit_order_addon", {
+    p_order_id: id,
+    p_addon_id: addonCheck.data,
+    p_qty: parsed.data.qty,
+    p_attrs: parsed.data.attrs ?? null,
+    p_source: "direct",
+    p_change_request_id: null,
+  });
+  const errRes = addLinesRpcError(c, rpcError, "edit_addon_blocked");
+  if (errRes) return errRes;
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
 /** GET /api/orders/:id/change-requests — RLS-scoped list (dealer own /
  *  internal all), newest first. Powers the POS pending banner + ops panel. */
 ordersRouter.get("/:id/change-requests", async (c) => {
@@ -3154,7 +3226,7 @@ ordersRouter.post("/:id/change-requests", async (c) => {
   }
   const sb = userClient(c.env, auth.jwt);
 
-  let pKind: "add_lines" | "replace_lines";
+  let pKind: "add_lines" | "replace_lines" | "edit_addon";
   let pPayload: Record<string, unknown>;
   if (parsed.data.kind === "replace_lines") {
     const gate = submitLineMarkerGates(c, [parsed.data.line]);
@@ -3164,6 +3236,18 @@ ordersRouter.post("/:id/change-requests", async (c) => {
       targetLineIds: parsed.data.targetLineIds,
       targetLines: parsed.data.targetLines ?? [],
       line: parsed.data.line,
+    };
+  } else if (parsed.data.kind === "edit_addon") {
+    // 0258 — the RPC owns the guards (row on this order, not DELIVERY*,
+    // up-sell qty law) and fails at SUBMIT with the same detail codes.
+    pKind = "edit_addon";
+    pPayload = {
+      targetAddonId: parsed.data.targetAddonId,
+      qty: parsed.data.qty,
+      attrs: parsed.data.attrs ?? null,
+      label: parsed.data.label,
+      oldQty: parsed.data.oldQty,
+      oldSize: parsed.data.oldSize ?? null,
     };
   } else {
     const gate = submitLineMarkerGates(c, parsed.data.lines);
@@ -3256,6 +3340,15 @@ ordersRouter.post("/:id/change-requests/:reqId/edit", async (c) => {
       targetLineIds: parsed.data.targetLineIds,
       targetLines: parsed.data.targetLines ?? [],
       line: parsed.data.line,
+    };
+  } else if (parsed.data.kind === "edit_addon") {
+    pPayload = {
+      targetAddonId: parsed.data.targetAddonId,
+      qty: parsed.data.qty,
+      attrs: parsed.data.attrs ?? null,
+      label: parsed.data.label,
+      oldQty: parsed.data.oldQty,
+      oldSize: parsed.data.oldSize ?? null,
     };
   } else {
     const gate = submitLineMarkerGates(c, parsed.data.lines);
@@ -3440,6 +3533,36 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
       p_old_line_ids: res.removedIds,
       p_lines: res.out.pLines,
       p_addons_replace: res.out.pAddonsReplace,
+      p_source: "change_request",
+      p_change_request_id: reqId,
+    });
+    const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
+    if (errRes) return errRes;
+    return c.json(await fetchAndShapeOrder(sb, id));
+  }
+
+  // 0258 — an edit_addon request applies through edit_order_addon (the RPC
+  // owns row/qty/size law re-checks under the order lock).
+  if (request.kind === "edit_addon") {
+    const payloadParsed = submitOrderChangeRequestInputSchema.safeParse({
+      ...(request.payload as Record<string, unknown>),
+      kind: "edit_addon",
+    });
+    if (!payloadParsed.success || payloadParsed.data.kind !== "edit_addon") {
+      return c.json(
+        {
+          error: "decide_blocked",
+          code: "invalid_payload",
+          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+        },
+        422,
+      );
+    }
+    const { error: rpcError } = await sb.rpc("edit_order_addon", {
+      p_order_id: id,
+      p_addon_id: payloadParsed.data.targetAddonId,
+      p_qty: payloadParsed.data.qty,
+      p_attrs: payloadParsed.data.attrs ?? null,
       p_source: "change_request",
       p_change_request_id: reqId,
     });

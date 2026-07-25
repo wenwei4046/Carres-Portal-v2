@@ -506,6 +506,19 @@ export const replaceOrderLinesInputSchema = z.object({
 });
 export type ReplaceOrderLinesInput = z.infer<typeof replaceOrderLinesInputSchema>;
 
+/** 0258 — edit a SERVICE add-on row (Loo 2026-07-25 S0-1255: "service sku
+ *  need to be editable as well"). Qty + per-unit sizes only; the row's
+ *  unit_price snapshot never changes, so the up-sell law reduces to
+ *  qty ≥ current (RPC detail `downsell_blocked`). DELIVERY* rows are
+ *  server-owned and never editable. */
+export const editOrderAddonInputSchema = z.object({
+  qty: z.number().int().min(1).max(99),
+  /** 0242 sizes: for a sized addon the route requires attrs.sizes (one per
+   *  unit) + the composed attrs.size summary; size-less addons omit attrs. */
+  attrs: z.record(z.unknown()).nullable().optional(),
+});
+export type EditOrderAddonInput = z.infer<typeof editOrderAddonInputSchema>;
+
 /** 0233 — P3 change-request lifecycle. 0257 widens `kind`: 'replace_lines'
  *  is the proceed-lane "change an ORIGINAL item" submission (Loo 2026-07-25),
  *  applied at approval through the same replace pipeline as the place-lane
@@ -516,7 +529,7 @@ export const orderChangeRequestStatusSchema = z.enum([
   "rejected",
   "cancelled",
 ]);
-export const orderChangeRequestKindSchema = z.enum(["add_lines", "replace_lines"]);
+export const orderChangeRequestKindSchema = z.enum(["add_lines", "replace_lines", "edit_addon"]);
 export const orderChangeRequestSchema = z.object({
   id: z.string().uuid(),
   orderId: z.string().uuid(),
@@ -530,6 +543,14 @@ export const orderChangeRequestSchema = z.object({
     targetLineIds: z.array(z.string()).optional(),
     targetLines: z.array(z.record(z.unknown())).optional(),
     line: z.record(z.unknown()).optional(),
+    /** 0258 — edit_addon kind: the order_addons row being edited + the new
+     *  qty/attrs (+ display snapshot for the operator's old→new view). */
+    targetAddonId: z.string().optional(),
+    qty: z.number().optional(),
+    attrs: z.record(z.unknown()).nullable().optional(),
+    label: z.string().optional(),
+    oldQty: z.number().optional(),
+    oldSize: z.string().nullable().optional(),
   }),
   status: orderChangeRequestStatusSchema,
   requestedBy: z.string().uuid().nullable(),
@@ -572,8 +593,21 @@ const submitChangeReplaceVariantSchema = z.object({
     .optional(),
   line: orderLineInputItemSchema,
 });
+/** 0258 — proceed-lane service add-on edit: qty/sizes on ONE order_addons
+ *  row, applied at approval via `edit_order_addon`. oldQty/oldSize are the
+ *  display snapshot for the operator's old→new view. */
+const submitChangeEditAddonVariantSchema = z.object({
+  kind: z.literal("edit_addon"),
+  targetAddonId: z.string().uuid(),
+  qty: z.number().int().min(1).max(99),
+  attrs: z.record(z.unknown()).nullable().optional(),
+  label: z.string().max(120).optional(),
+  oldQty: z.number().int().min(1).optional(),
+  oldSize: z.string().max(200).nullable().optional(),
+});
 export const submitOrderChangeRequestInputSchema = z.union([
   submitChangeReplaceVariantSchema,
+  submitChangeEditAddonVariantSchema,
   submitChangeAddVariantSchema,
 ]);
 export type SubmitOrderChangeRequestInput = z.infer<typeof submitOrderChangeRequestInputSchema>;

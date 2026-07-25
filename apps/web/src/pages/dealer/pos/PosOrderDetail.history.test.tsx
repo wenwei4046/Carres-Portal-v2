@@ -26,6 +26,8 @@ vi.mock("@/lib/queries", () => ({
   useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  // 0258 — service add-on edit.
+  useEditOrderAddon: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
 }));
 vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",

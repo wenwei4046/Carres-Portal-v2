@@ -179,4 +179,32 @@ describe("submitOrderChangeRequestInputSchema (0257)", () => {
         .success,
     ).toBe(false);
   });
+
+  // 0258 — service add-on qty/size edit.
+  it("parses the edit_addon variant; rejects a missing target / bad qty", () => {
+    const parsed = submitOrderChangeRequestInputSchema.parse({
+      kind: "edit_addon",
+      targetAddonId: "6a51f4a1-0000-4000-8000-000000000009",
+      qty: 2,
+      attrs: { sizes: ["King", "Queen"], size: "King + Queen" },
+      label: "Dispose old mattress",
+      oldQty: 1,
+      oldSize: "King",
+    });
+    expect(parsed.kind).toBe("edit_addon");
+    if (parsed.kind === "edit_addon") {
+      expect(parsed.qty).toBe(2);
+      expect(parsed.targetAddonId).toBe("6a51f4a1-0000-4000-8000-000000000009");
+    }
+    expect(
+      submitOrderChangeRequestInputSchema.safeParse({ kind: "edit_addon", qty: 1 }).success,
+    ).toBe(false);
+    expect(
+      submitOrderChangeRequestInputSchema.safeParse({
+        kind: "edit_addon",
+        targetAddonId: "6a51f4a1-0000-4000-8000-000000000009",
+        qty: 0,
+      }).success,
+    ).toBe(false);
+  });
 });

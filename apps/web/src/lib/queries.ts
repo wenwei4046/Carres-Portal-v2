@@ -132,6 +132,7 @@ import {
   type SalespersonDto,
   type SalespersonCreateInput,
   type AddOrderLinesInput,
+  type EditOrderAddonInput,
   type SubmitOrderChangeRequestInput,
   type ReplaceOrderLinesInput,
   type OrderChangeRequestDto,
@@ -1135,6 +1136,25 @@ export function useReplaceOrderLines(
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 0258 — qty/size edit on a SERVICE add-on row (place lane direct; the
+ *  proceed lane files an edit_addon change request instead). Up-sell law:
+ *  qty can only stay or increase (`downsell_blocked`). */
+export function useEditOrderAddon(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, { addonId: string; input: EditOrderAddonInput }>({
+    mutationFn: ({ addonId, input }) =>
+      apiFetch<Order>(`/api/orders/${orderId}/addons/${addonId}/edit`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (order) => {
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
     },
   });
 }

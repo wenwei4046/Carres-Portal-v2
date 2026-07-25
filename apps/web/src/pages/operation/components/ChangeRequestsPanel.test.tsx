@@ -88,6 +88,31 @@ describe("ChangeRequestsPanel", () => {
     expect(panel.textContent).toContain("Dispose old mattress");
   });
 
+  // 0258 — edit_addon renders the qty/size change + the apply verb.
+  it("renders an edit_addon request as old → new qty/size", () => {
+    h.requests = [
+      {
+        ...REQ,
+        kind: "edit_addon",
+        payload: {
+          targetAddonId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a1",
+          qty: 2,
+          attrs: { sizes: ["King", "Queen"], size: "King + Queen" },
+          label: "Dispose old mattress",
+          oldQty: 1,
+          oldSize: "King",
+        },
+      },
+    ];
+    render(<ChangeRequestsPanel orderId={REQ.orderId} />);
+    const panel = screen.getByTestId("ops-change-requests");
+    expect(panel.textContent).toContain("Add-on change");
+    const swap = screen.getByTestId("ops-cr-editaddon");
+    expect(swap.textContent).toContain("Dispose old mattress ×1 · King");
+    expect(swap.textContent).toContain("→ ×2 · King + Queen");
+    expect(screen.getByTestId("ops-cr-approve").textContent).toContain("Approve & apply");
+  });
+
   // 0257 — replace_lines renders the old→new swap + the apply verb.
   it("renders a replace_lines request as old → new", () => {
     h.requests = [

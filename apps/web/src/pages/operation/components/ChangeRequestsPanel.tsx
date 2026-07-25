@@ -24,6 +24,8 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
   if (!pending) return null;
 
   const isReplace = pending.kind === "replace_lines";
+  // 0258 — service add-on qty/size edit.
+  const isAddonEdit = pending.kind === "edit_addon";
   const lines = [
     ...((pending.payload.lines ?? []) as Array<{
       sku?: string;
@@ -71,9 +73,32 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
       data-testid="ops-change-requests"
     >
       <p className="t-micro text-base-600 mb-1.5">
-        {isReplace ? "Item change · awaiting approval" : "Product change · awaiting approval"}
+        {isReplace
+          ? "Item change · awaiting approval"
+          : isAddonEdit
+            ? "Add-on change · awaiting approval"
+            : "Product change · awaiting approval"}
       </p>
-      {isReplace ? (
+      {isAddonEdit ? (
+        <div data-testid="ops-cr-editaddon">
+          <div className="flex items-center justify-between t-small text-base-500 line-through">
+            <span>
+              {(pending.payload.label as string | undefined) ?? "Add-on"} ×
+              {pending.payload.oldQty ?? "?"}
+              {pending.payload.oldSize ? ` · ${pending.payload.oldSize}` : ""}
+            </span>
+          </div>
+          <div className="flex items-center justify-between t-small text-base-800">
+            <span>
+              → ×{pending.payload.qty ?? "?"}
+              {typeof (pending.payload.attrs as { size?: unknown } | null | undefined)?.size ===
+              "string"
+                ? ` · ${(pending.payload.attrs as { size: string }).size}`
+                : ""}
+            </span>
+          </div>
+        </div>
+      ) : isReplace ? (
         <div data-testid="ops-cr-replace">
           {targetLines.map((l, i) => (
             <div
@@ -146,7 +171,11 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
           onClick={() => decide(true)}
           data-testid="ops-cr-approve"
         >
-          {decideMut.isPending ? "Working…" : isReplace ? "Approve & apply" : "Approve & add"}
+          {decideMut.isPending
+            ? "Working…"
+            : isReplace || isAddonEdit
+              ? "Approve & apply"
+              : "Approve & add"}
         </button>
       </div>
     </div>
