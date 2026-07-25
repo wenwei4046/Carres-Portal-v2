@@ -157,6 +157,8 @@ describe("OrderStatusPage", () => {
     expect(within(place).getByTestId("os-card-1201")).toBeTruthy();
     expect(within(proceed).getByTestId("os-card-1202")).toBeTruthy();
     expect(within(delivered).getByTestId("os-card-1203")).toBeTruthy();
+    // 2026-07-25 (Loo) — cards carry the official SO number, not a # code.
+    expect(within(place).getByText("SO-1201")).toBeTruthy();
     // cancelled #1204 is nowhere on the board
     expect(screen.queryByTestId("os-card-1204")).toBeNull();
   });
