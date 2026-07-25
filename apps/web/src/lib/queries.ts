@@ -129,6 +129,7 @@ import {
   type SalespersonDto,
   type SalespersonCreateInput,
   type AddOrderLinesInput,
+  type ReplaceOrderLinesInput,
   type OrderChangeRequestDto,
   type SalespersonsListResponse,
   // 0233 — Staff PIN login (tiers + PIN identity on salespersons rows).
@@ -1082,6 +1083,31 @@ export function useAddOrderLines(
   return useMutation<Order, ApiError, AddOrderLinesInput>({
     mutationFn: (input) =>
       apiFetch<Order>(`/api/orders/${orderId}/lines`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 0255 — line EDIT: replace one item (or a whole exploded sofa group) on a
+ *  PLACE-lane order with a re-configured, server-re-priced version. Up-sell
+ *  only (`downsell_blocked` 422 otherwise). */
+export function useReplaceOrderLines(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, ReplaceOrderLinesInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, ReplaceOrderLinesInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/lines/replace`, {
         method: "POST",
         body: JSON.stringify(input),
       }),

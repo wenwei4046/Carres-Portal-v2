@@ -21,6 +21,7 @@ vi.mock("@/lib/queries", () => ({
   useProceedOrder: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useUnproceedOrder: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useAddOrderLines: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  useReplaceOrderLines: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
   useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
