@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import type Stripe from "stripe";
+import { ensureFixedTermSchedule } from "../lib/rental-stripe";
 import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured, webCryptoProvider } from "../lib/stripe";
 import { adminClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -58,6 +59,12 @@ stripeWebhookRouter.post("/webhook", async (c) => {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
+      // 0255 — a SUBSCRIPTION-mode session is a rental signup (card saved +
+      // first month collected): wrap the fixed-term schedule + link the ids,
+      // never the order-balance money RPC.
+      if (session.mode === "subscription") {
+        return recordRentalSession(c, stripe, session);
+      }
       if (session.payment_status !== "paid") break; // async method still pending
       return recordSession(c, stripe, session);
     }
@@ -100,6 +107,62 @@ async function recordSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe
   });
   if (error) {
     // Foreign session (not minted by us) — acknowledge, don't retry forever.
+    if (error.details === "session_not_found" || /Unknown checkout session/.test(error.message ?? "")) {
+      return c.json({ received: true, ignored: "unknown_session" });
+    }
+    return c.json({ error: "record_failed", message: error.message }, 500);
+  }
+  return c.json({ received: true });
+}
+
+/**
+ * 0255 — rental signup completion. Order of operations matters: the
+ * fixed-term schedule wraps FIRST (its failure 500s so Stripe retries and the
+ * subscription can never stay open-ended while marked linked), then the
+ * link_rental_subscription RPC stamps the ids — both idempotent, so this and
+ * the POS poll's live-reconcile can race freely. Recording each month's MONEY
+ * (rental_billings.paid + splits) is segment ②'s invoice.paid engine — not
+ * here.
+ */
+async function recordRentalSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe.Checkout.Session) {
+  const subId =
+    typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
+  if (!subId) return c.json({ received: true, ignored: "no_subscription" });
+
+  const admin = adminClient(c.env);
+  // The agreement's term drives the schedule length. An untracked session
+  // (minted straight from the Stripe dashboard) is acknowledged, not retried.
+  const { data: row } = await admin
+    .from("stripe_checkout_sessions")
+    .select("agreement_id")
+    .eq("session_id", session.id)
+    .maybeSingle();
+  const agreementId = (row as { agreement_id: string | null } | null)?.agreement_id ?? null;
+  if (!agreementId) return c.json({ received: true, ignored: "unknown_session" });
+
+  const { data: ag } = await admin
+    .from("rental_agreements")
+    .select("term_months")
+    .eq("id", agreementId)
+    .maybeSingle();
+  if (ag) {
+    try {
+      await ensureFixedTermSchedule(stripe, subId, Number((ag as { term_months: number }).term_months));
+    } catch (e) {
+      return c.json(
+        { error: "schedule_failed", message: e instanceof Error ? e.message : "schedule wrap failed" },
+        500, // Stripe retries; the POS poll retries too
+      );
+    }
+  }
+
+  const { error } = await admin.rpc("link_rental_subscription", {
+    p_session_id: session.id,
+    p_stripe_subscription_id: subId,
+    p_stripe_customer_id:
+      typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
+  });
+  if (error) {
     if (error.details === "session_not_found" || /Unknown checkout session/.test(error.message ?? "")) {
       return c.json({ received: true, ignored: "unknown_session" });
     }

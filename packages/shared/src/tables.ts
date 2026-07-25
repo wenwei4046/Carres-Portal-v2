@@ -157,6 +157,8 @@ export const SALES_ORDER_GRID_CONFIG = "sales_order_grid_config" as const;
 export const CUSTOMERS            = "customers" as const;
 export const SERVICE_PACKAGES     = "service_packages" as const;
 export const RENTAL_PLANS         = "rental_plans" as const;
+/** 0255 — the stripped store-side VIEW over active rental_plans (no pct cols). */
+export const RENTAL_PLANS_POS     = "rental_plans_pos" as const;
 export const RENTAL_AGREEMENTS    = "rental_agreements" as const;
 export const RENTAL_BILLINGS      = "rental_billings" as const;
 export const RENTAL_STOCK_UNITS   = "rental_stock_units" as const;

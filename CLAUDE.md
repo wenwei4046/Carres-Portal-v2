@@ -398,12 +398,12 @@ Don't burn an hour spinning. Surface and ask.
 
 | | |
 |---|---|
-| Active work | Phase 10 post-launch + parallel initiatives. Latest ships (2026-07-25): **Rental + Service Plan BASE** (PR #268, migrations 0247-0249+0253, all DORMANT — next: POS sell lane + Stripe) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252) · BD dealers-only (#262) · My-orders board cascade (#259). 2990s Products 9-tab parity COMPLETE (P1-P8, PRs #38-#45, 0181-0188, dormant until authored). Sofa compartment engine LIVE (P1-P5; 10 sofa models live 2026-07-24). |
+| Active work | Phase 10 post-launch + parallel initiatives. Latest ships (2026-07-25): **Rental + Service Plan BASE** (PR #268, migrations 0247-0249+0253, all DORMANT) → **segment ① POS Rent-to-Own sell lane + Stripe subscription wiring built** (PR #275, branch `worktree-rental-pos-sell-lane`; **0255 DRAFT — NOT applied**; next after merge/apply = ② billing engine + ①b order-side entitlement attach) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252) · BD dealers-only (#262) · My-orders board cascade (#259). 2990s Products 9-tab parity COMPLETE (P1-P8, PRs #38-#45, 0181-0188, dormant until authored). Sofa compartment engine LIVE (P1-P5; 10 sofa models live 2026-07-24). |
 | Project started | 2026-05-02 |
 | Web URLs | https://carres-portal.pages.dev · POS/ERP domain split (2026-07-18): `pos.carresofficial.com` (dealer/showroom/bd) + `erp.carresofficial.com` (internal); TWO Pages projects (`carres-portal` + `carres-pos`), ONE build |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev (+ api.carresofficial.com) |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **Tail = 0253** (verified on prod at apply 2026-07-25): 0244-0246 HR · 0247-0249+0253 Rental · 0250-0252 BD commission. **Rules that survive**: (1) before numbering ANY migration, `list_migrations` the remote tracker tail first — guardrail #8; collisions renumber at apply (0239/0241 lessons). (2) Migrations apply manually via MCP; tracker keys on timestamp, so dual-numbered FILES (0165/0166/0233/0241…) are cosmetic — never renumber applied files. (3) Full per-migration history → archive doc + worklog. |
+| Latest migration | **Applied tail = 0253** (verified on prod at apply 2026-07-25): 0244-0246 HR · 0247-0249+0253 Rental · 0250-0252 BD commission. **0255_rental_sell_lane is a DRAFT in the sell-lane branch — NOT applied** (apply via MCP after Loo greenlights; re-check tracker tail first). **Rules that survive**: (1) before numbering ANY migration, `list_migrations` the remote tracker tail first — guardrail #8; collisions renumber at apply (0239/0241 lessons). (2) Migrations apply manually via MCP; tracker keys on timestamp, so dual-numbered FILES (0165/0166/0233/0241…) are cosmetic — never renumber applied files. (3) Full per-migration history → archive doc + worklog. |
 | Catalog state | 11 suppliers · 171 product_models · ~1150 product_skus (1013 AutoCount + SVC + minted compartment skus; 123 compartment skus flipped ON 2026-07-24, mostly RM0 pending pricing). Bundles: 1 active (King Bedroom Set RM2500). PWP/free-gift/delivery-fee/rental config tables exist, dormant until authored. |
 | Orders state | ~190 orders (153 AutoCount archive + natives). `dealers.channel` is THE showroom-vs-dealer authority (PR #226). |
 | Test count | Baselines + pre-existing fails → §17.7. Run full suites before merge; ZERO new failures is the bar. |
@@ -455,6 +455,7 @@ Don't burn an hour spinning. Surface and ask.
 - **2026-07-24** · Offer = on sale — compartment first-insert `pos_active=true`, 123 rows flipped, 10 sofa models live (PR #253) · Catalog tabs in sidebar (PR #251, superseded next day)
 - **2026-07-25** · Catalog two-doors split (PR #254) · PIN sign-in outlet switch (PR #256) · **HR role + Commission portal** (0244-0246) · **BD commission** (0250-0252) · Carres outlet-name prefix (PR #258) · My-orders board Store→Outlet→Salesperson cascade (PR #259) · BD sees dealers only (PR #262) · **Rental + Service Plan BASE** (PR #268, 0247-0249+0253; also `docs/rental-service-plan-proposal.md`)
 - **2026-07-25 (late)** · My-orders board speaks SO numbers (`#1256`→`SO-1256` on drawer/card/overlay/Stripe modal + WhatsApp copy) + View sales order button in every drawer-footer lane (PR #273, web-only, deployed same session)
+- **2026-07-25 (later)** · **Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring** (PR #275; 0255 DRAFT unapplied [renumbered from 0254 — the hr line took 0254_hr_team_hierarchy]; sell RPC + stripped POS view + plan→Stripe sync + subscription checkout/schedule/webhook + POS lane UI)
 
 ### 17.4 Business model (locked 2026-05-03)
 
@@ -474,7 +475,10 @@ Don't burn an hour spinning. Surface and ask.
 
 **MEDIUM** (touch the area → read the full entry first):
 - `rental-billing-writes-need-rpc` — billing engine phase MUST gate rental money writes behind a DEFINER RPC + history (blanket `is_internal()` today; fine while dormant).
-- `rental-pos-config-projection` — POS sell lane: widen rental-config read via a stripped projection only (never the % split fields).
+- `rental-first-month-vs-billing-row` — Stripe collects month 1 at checkout but `rental_billings` seq 1 stays `due` until ②'s invoice.paid engine (catch up by stripe_invoice_id).
+- `rental-billing-anchor-drift` — our schedule anchors on start_date, Stripe on checkout completion; ② reconciles by stripe_invoice_id.
+- `rental-agreement-store-read` — store JWTs can't read agreements yet (sell lane holds the RPC payload; checkout = service client + explicit Hono ownership); "My rentals" list needs a dealer-scoped RLS read later.
+- `rental-plan-reprice-policy` — re-price archives the old Stripe Price; unlinked old-fee agreements block checkout (422 plan_repriced); live-agreement re-pricing is a ②+ policy call.
 - `bd-network-board-page-cap` — BD board month cards read ONE orders page; under-counts once the network outgrows it.
 - `orders-channel-filter-outlet-id-proxy` — ops orders `channel=` param is a dead, inverted `outlet_id` proxy; filter on `orders.channel` when wiring it.
 - `principal-dealers-join-unbounded` — outlet roll-up reads unbounded; silently truncates past PostgREST max-rows (1000).
