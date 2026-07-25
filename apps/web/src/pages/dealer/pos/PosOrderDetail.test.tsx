@@ -463,6 +463,41 @@ describe("add product (0231)", () => {
   });
 });
 
+describe("item description (Loo 2026-07-25 — cart parity)", () => {
+  it("renders gap, sku code and the option/special add-on rows like the cart", () => {
+    renderDrawer(
+      order({
+        lines: [
+          {
+            id: "00000000-0000-0000-0000-00000000l001",
+            orderId: "00000000-0000-0000-0000-000000001201",
+            sku: "SKU-1",
+            qty: 1,
+            attrs: {
+              gap: '12"',
+              options: [
+                { kind: "divan_height", value: '8"', surcharge: 0 },
+                { kind: "bedframe_leg_height", value: '2"', surcharge: 0 },
+              ],
+              specials: [{ code: "USB", soDescription: "USB port", surcharge: 50 }],
+            },
+            unitPrice: 1500,
+          },
+        ],
+      }),
+    );
+    // Muted detail = variant · gap (cart's "Super Single · gap 12"" row).
+    expect(screen.getByText('King · gap 12"')).toBeTruthy();
+    // The mono SKU code renders on its own row.
+    expect(screen.getByText("SKU-1")).toBeTruthy();
+    // Options + specials render via the SAME SpecialsSummary the cart uses.
+    const summary = screen.getByTestId("specials-summary");
+    expect(within(summary).getByText('+ Divan 8"')).toBeTruthy();
+    expect(within(summary).getByText('+ Leg 2"')).toBeTruthy();
+    expect(within(summary).getByText("+ USB port · +RM 50")).toBeTruthy();
+  });
+});
+
 describe("structured address (0230)", () => {
   it("seeds the cascading picker from the stored parts", () => {
     renderDrawer(
