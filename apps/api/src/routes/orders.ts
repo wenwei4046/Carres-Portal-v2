@@ -46,6 +46,10 @@ import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free
 import { recomputePwpLines } from "../lib/pwp-recompute";
 import { claimPwpCodesForLines } from "../lib/pwp-codes-claim";
 import { sweepReservedForSubmit } from "../lib/pwp-carry-forward";
+import {
+  checkPromoEntitlementAfterEdit,
+  matchEarnedGiftRows,
+} from "../lib/replace-lines-helpers";
 import type { AppEnv } from "../types";
 
 /**
@@ -2268,12 +2272,13 @@ async function computeAddLinesWriteSet(
   id: string,
   inputLines: AddOrderLinesInput["lines"],
   ord: { customer_phone: string | null },
-  // 0255 (line EDIT) — a REPLACE prices its new line against the cart MINUS
-  // the row(s) being replaced (mutex / PWP context / delivery all see the
-  // post-replace cart), and skips the gift stage: the old line's RM0 gift
-  // rows stay untouched (edits never re-deal gifts — add semantics would
-  // double-grant next to them).
-  opts?: { excludeLineIds?: ReadonlySet<string>; skipGifts?: boolean },
+  // 0255/0256 (line EDIT) — a REPLACE prices its new line against the cart
+  // MINUS the row(s) being replaced (mutex / PWP context / gifts / delivery
+  // all see the post-replace cart). The gift stage runs as on an add: the
+  // replacement earns its own gifts; the OLD line's gift rows ride in the
+  // route's excluded/removed set (wizard semantics — gifts leave with their
+  // line).
+  opts?: { excludeLineIds?: ReadonlySet<string> },
 ): Promise<Response | AddLinesWriteSet> {
   // Marker guards: free markers are minted server-side only; a voucher-CODED
   // pwp claim is wizard-scoped (0187's claim → stamp → sweep lifecycle exists
@@ -2555,15 +2560,11 @@ async function computeAddLinesWriteSet(
   // yields exactly their gifts — existing lines earned theirs at create (no
   // diff, no double-grant). Fail-SOFT on a misconfigured gift (resolver
   // contract); fail-CLOSED on a read error.
-  let giftLines: typeof optionsRecompute.lines = [];
-  if (!opts?.skipGifts) {
-    const giftResult = await resolveDefaultFreeGiftLines(sb, optionsRecompute.lines);
-    if (giftResult.status === "server_error") {
-      throw new HTTPException(500, { message: giftResult.message });
-    }
-    giftLines = giftResult.lines;
+  const giftResult = await resolveDefaultFreeGiftLines(sb, optionsRecompute.lines);
+  if (giftResult.status === "server_error") {
+    throw new HTTPException(500, { message: giftResult.message });
   }
-  const finalNewLines = [...optionsRecompute.lines, ...giftLines];
+  const finalNewLines = [...optionsRecompute.lines, ...giftResult.lines];
 
   // 0184 delivery — an ORDER-level trip fee → recomputed over the MERGED cart.
   // The operator inputs are recovered from the persisted DELIVERY* rows
@@ -2838,11 +2839,69 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   }
   const oldTotal = targets.reduce((s, t) => s + Number(t.unit_price) * t.qty, 0);
 
+  // 0256 — wizard gift semantics: the target's RM0 gift rows leave WITH it.
+  // Re-derive what the OLD configuration earns under TODAY's gift config and
+  // match those emissions against the persisted rows; unmatched rows (config
+  // changed since create) STAY — the customer keeps what was promised.
+  const oldGiftResolve = await resolveDefaultFreeGiftLines(
+    sb,
+    targets.map((t) => ({
+      sku: t.sku,
+      qty: t.qty,
+      attrs: t.attrs,
+      unitPrice: Number(t.unit_price),
+    })),
+  );
+  if (oldGiftResolve.status === "server_error") {
+    throw new HTTPException(500, { message: oldGiftResolve.message });
+  }
+  const giftRowIds = matchEarnedGiftRows(
+    oldGiftResolve.lines,
+    allRows.map((r) => ({
+      id: r.id,
+      sku: r.sku,
+      qty: r.qty,
+      attrs: r.attrs,
+      unitPrice: Number(r.unit_price),
+    })),
+    new Set(targetIds),
+  );
+  const removedIds = [...targetIds, ...giftRowIds];
+  const removedSet = new Set(removedIds);
+
   const out = await computeAddLinesWriteSet(c, sb, id, [parsed.data.line], ord, {
-    excludeLineIds: new Set(targetIds),
-    skipGifts: true,
+    excludeLineIds: removedSet,
   });
   if (out instanceof Response) return out;
+
+  // 0256 — promo-integrity guard: the up-sell gate alone can't stop an edit
+  // from pulling the trigger units out from under this order's PWP rewards /
+  // printed vouchers (2× Queen → 1× King raises the total but halves the
+  // entitlement). Never claw back what the customer holds — BLOCK instead.
+  const postEditLines = [
+    ...allRows
+      .filter((r) => !removedSet.has(r.id))
+      .map((r) => ({ sku: r.sku, qty: r.qty, attrs: r.attrs })),
+    ...out.pLines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: (l.attrs ?? null) as Record<string, unknown> | null,
+    })),
+  ];
+  const promoCheck = await checkPromoEntitlementAfterEdit(sb, id, postEditLines);
+  if (promoCheck.status === "server_error") {
+    throw new HTTPException(500, { message: promoCheck.message });
+  }
+  if (promoCheck.status === "blocked") {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "promo_entitlement_broken",
+        message: promoCheck.message,
+      },
+      422,
+    );
+  }
 
   // Friendly up-sell precheck with the real figures (the RPC re-enforces on
   // the DB rows under the order lock).
@@ -2864,7 +2923,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
 
   const { error: rpcError } = await sb.rpc("replace_order_lines", {
     p_order_id: id,
-    p_old_line_ids: targetIds,
+    p_old_line_ids: removedIds,
     p_lines: out.pLines,
     p_addons_replace: out.pAddonsReplace,
   });

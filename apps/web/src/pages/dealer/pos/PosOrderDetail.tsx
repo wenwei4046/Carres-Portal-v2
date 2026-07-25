@@ -174,6 +174,11 @@ function replaceErrorCopy(e: unknown): string {
   if (code === "wrong_status")
     return "Products can only be edited while the order is in Order placed.";
   if (code === "line_not_editable") return "Free, promo and bundle items can't be edited.";
+  if (code === "promo_entitlement_broken")
+    return (
+      "This item backs a promo or printed voucher on this order — the new configuration " +
+      "would no longer qualify for it. Cancel the promo with HQ first."
+    );
   if (code === "line_not_found")
     return "The item is no longer on this order — refresh and retry.";
   if (code === "partial_sofa_group")
