@@ -216,7 +216,6 @@ function renderPage(over?: {
   pwpClaimGroup?: string;
   customerPhone?: string;
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
-  wizardTopbar?: { contextLabel: string };
 }) {
   const onAdd = vi.fn();
   const onClose = vi.fn(over?.onClose);
@@ -240,23 +239,18 @@ function renderPage(over?: {
       onApplyVoucherCode={over?.onApplyVoucherCode}
       onAdd={onAdd}
       onClose={onClose}
-      wizardTopbar={over?.wizardTopbar}
     />,
   );
   return { onAdd, onClose };
 }
 
-// Loo 2026-07-26 (2990s reference) — the sofa header stays ONE row in the
-// wizard: compact brand (logo + store, NO step pills) beside the ← arrow.
-describe("SofaConfigurePage — wizard brand (compact)", () => {
-  it("renders logo + crumb without step pills; keeps the ← arrow; logo = back", () => {
-    const { onClose } = renderPage({ wizardTopbar: { contextLabel: "Carres Mont Kiara" } });
-    const strip = screen.getByTestId("cfg-topbar-brand");
-    expect(strip.textContent).toContain("POS · Carres Mont Kiara");
-    expect(strip.textContent).not.toContain("Customer"); // no step pills
-    expect(screen.getByTestId("sofa-configure-back")).toBeTruthy(); // arrow stays
-    fireEvent.click(screen.getByTestId("cfg-topbar-logo"));
-    expect(onClose).toHaveBeenCalledTimes(1);
+// Loo 2026-07-26 (after two overlap rounds) — the sofa header keeps the plain
+// ← arrow; the brand strip lives on the bed/mattress page only.
+describe("SofaConfigurePage — header stays arrow-only", () => {
+  it("renders the ← arrow and never the brand strip", () => {
+    renderPage();
+    expect(screen.getByTestId("sofa-configure-back")).toBeTruthy();
+    expect(screen.queryByTestId("cfg-topbar-brand")).toBeNull();
   });
 });
 

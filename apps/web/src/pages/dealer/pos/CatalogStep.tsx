@@ -608,7 +608,6 @@ export default function CatalogStep({
               editLine={editing}
               onAdd={emitLine}
               onClose={closeConfigure}
-              wizardTopbar={topbarContext ? { contextLabel: topbarContext } : undefined}
             />
           );
         }

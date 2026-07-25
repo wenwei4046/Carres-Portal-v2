@@ -1,10 +1,12 @@
 /**
- * ConfigureTopbarBrand — Loo 2026-07-26: inside the WIZARD, a full-page
- * configure surface (PosConfigurePage / SofaConfigurePage) shows the same
- * top-left strip as the POS topbar — CARRES wordmark + `POS · {store}` +
- * the 01/02/03 step crumbs — and the LOGO is the way back to the catalog
- * (replaces the old ← arrow; PR 299 made the real topbar's logo behave the
- * same way).
+ * ConfigureTopbarBrand — Loo 2026-07-26: inside the WIZARD, the bed/mattress
+ * configure page (PosConfigurePage) shows the same top-left strip as the POS
+ * topbar — CARRES wordmark + `POS · {store}` + the 01/02/03 step crumbs — and
+ * the LOGO is the way back to the catalog (replaces the old ← arrow; PR 299
+ * made the real topbar's logo behave the same way). The SOFA page deliberately
+ * does NOT use this: its header row has zero slack (the inline PR-301 and
+ * compact PR-305 attempts both overlapped the PWP bar / mode tabs) — it
+ * keeps the plain arrow.
  *
  * Display-only outside the logo: the step crumbs are static (01 Cart is the
  * active pill — configuring happens inside step 1; the wizard's own topbar
@@ -23,25 +25,13 @@ export interface WizardTopbarCtx {
 export default function ConfigureTopbarBrand({
   ctx,
   onBack,
-  compact = false,
 }: {
   ctx: WizardTopbarCtx;
   onBack: () => void;
-  /** Loo 2026-07-26 (2990s reference) — the SOFA header shares ONE row with
-   *  the size/mode tabs + PWP bar + total, so it takes the logo + crumb ONLY
-   *  (no step pills); the ← arrow stays beside it like the 2990s. */
-  compact?: boolean;
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        minWidth: 0,
-        // Compact rides the packed sofa header row — let the crumb give way.
-        flexShrink: compact ? 1 : 0,
-      }}
+      style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flexShrink: 0 }}
       data-testid="cfg-topbar-brand"
     >
       <button
@@ -61,21 +51,19 @@ export default function ConfigureTopbarBrand({
         POS · {ctx.contextLabel}
       </span>
       {/* Same class as the real topbar's step rail — single-source type. */}
-      {!compact && (
-        <span className="pos-topbar__center" style={{ justifyContent: "flex-start" }}>
-          {STEPS.map((label, i) => (
-            <span
-              key={label}
-              className={`pos-topbar__step ${i === 0 ? "is-active" : ""}`}
-              aria-current={i === 0 ? "step" : undefined}
-              style={{ cursor: "default", whiteSpace: "nowrap" }}
-            >
-              <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
-              {label}
-            </span>
-          ))}
-        </span>
-      )}
+      <span className="pos-topbar__center" style={{ justifyContent: "flex-start" }}>
+        {STEPS.map((label, i) => (
+          <span
+            key={label}
+            className={`pos-topbar__step ${i === 0 ? "is-active" : ""}`}
+            aria-current={i === 0 ? "step" : undefined}
+            style={{ cursor: "default", whiteSpace: "nowrap" }}
+          >
+            <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
+            {label}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }
