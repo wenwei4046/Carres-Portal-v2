@@ -132,6 +132,7 @@ import {
   type SalespersonDto,
   type SalespersonCreateInput,
   type AddOrderLinesInput,
+  type SubmitOrderChangeRequestInput,
   type ReplaceOrderLinesInput,
   type OrderChangeRequestDto,
   type SalespersonsListResponse,
@@ -1007,7 +1008,7 @@ export function useSubmitOrderChangeRequest(orderId: string) {
   return useMutation<
     { request: OrderChangeRequestDto | null },
     ApiError,
-    AddOrderLinesInput
+    SubmitOrderChangeRequestInput
   >({
     mutationFn: (input) =>
       apiFetch(`/api/orders/${orderId}/change-requests`, {
@@ -1041,7 +1042,7 @@ export function useUpdateOrderChangeRequest(orderId: string) {
   return useMutation<
     { request: OrderChangeRequestDto | null },
     ApiError,
-    { requestId: string; input: AddOrderLinesInput }
+    { requestId: string; input: SubmitOrderChangeRequestInput }
   >({
     mutationFn: ({ requestId, input }) =>
       apiFetch(`/api/orders/${orderId}/change-requests/${requestId}/edit`, {

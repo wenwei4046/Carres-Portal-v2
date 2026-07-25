@@ -1941,6 +1941,10 @@ function buildSbForProceed(opts: {
   /** 0233 (P3) — rows returned by a `.order()`-terminated list read (the
    *  change-requests list). */
   orderedRows?: unknown[];
+  /** 0257 — per-table rows for `.in()`-terminated reads (addons config /
+   *  order_supplier_threads), so they stop aliasing the product_skus read.
+   *  Falls back to productSkuCategoryRows when the table isn't listed. */
+  inTables?: Record<string, unknown[]>;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
@@ -1961,7 +1965,13 @@ function buildSbForProceed(opts: {
       }
       return chain;
     },
-    in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
+    in: async () => ({
+      data:
+        (currentTable ? opts.inTables?.[currentTable] : undefined) ??
+        opts.productSkuCategoryRows ??
+        [],
+      error: null,
+    }),
     order: async () => ({ data: opts.orderedRows ?? [], error: null }),
     maybeSingle: async () => ({
       data:
@@ -3137,6 +3147,227 @@ describe("order change requests (P3, 0233)", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe("wrong_status");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// 0257 — proceed-lane item CHANGE (replace_lines requests) + service add-ons.
+// =============================================================================
+
+const ADDON_CFG = {
+  key: "dispose-mattress",
+  name: "Dispose old mattress",
+  price: 80,
+  active: true,
+  size_options: null,
+};
+
+function replaceRequestRow(over: Record<string, unknown> = {}) {
+  return requestRow({
+    kind: "replace_lines",
+    payload: {
+      targetLineIds: [TARGET_LINE_ID],
+      targetLines: [{ sku: "SKU-OLD", qty: 1, unitPrice: 100, label: "Old thing" }],
+      line: { sku: "SKU-ADD-1", qty: 1, attrs: null },
+    },
+    ...over,
+  });
+}
+
+describe("0257 — service add-ons on the add doors", () => {
+  it("direct add: addons-only body prices from the addons config and passes p_addons_append", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      inTables: { addons: [ADDON_CFG] },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // Client price 1 is IGNORED — the config prices RM 80.
+        body: JSON.stringify({
+          addons: [{ addonKey: "dispose-mattress", qty: 2, unitPrice: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("add_order_lines");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_lines).toEqual([]);
+    expect(args.p_addons_append).toEqual([
+      { addon_key: "dispose-mattress", qty: 2, unit_price: 80, attrs: null },
+    ]);
+  });
+
+  it("direct add 422 unknown_or_inactive_addon for an inactive / unknown / DELIVERY key", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      inTables: { addons: [{ ...ADDON_CFG, active: false }] },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ addons: [{ addonKey: "dispose-mattress", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("unknown_or_inactive_addon");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("direct add 422 addon_size_required when a sized addon misses per-unit sizes", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: addOrderRow(),
+      inTables: { addons: [{ ...ADDON_CFG, size_options: ["King", "Queen"] }] },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addLinesUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // qty 2 but only ONE size picked.
+        body: JSON.stringify({
+          addons: [{ addonKey: "dispose-mattress", qty: 2, attrs: { sizes: ["Queen"] } }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("addon_size_required");
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("submit: addons ride the add_lines payload with p_kind", async () => {
+    const sb = buildSbForProceed({
+      tables: { order_change_requests: { single: requestRow() } },
+      inTables: { addons: [ADDON_CFG] },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "add_lines",
+          addons: [{ addonKey: "dispose-mattress", qty: 1, unitPrice: 80, label: "Dispose old mattress" }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("submit_order_change_request");
+    const args = sb._rpcCalls[0].args as {
+      p_kind?: string;
+      p_payload?: { addons?: unknown[]; lines?: unknown[] };
+    };
+    expect(args.p_kind).toBe("add_lines");
+    expect(args.p_payload?.addons).toHaveLength(1);
+    expect(args.p_payload?.lines).toEqual([]);
+  });
+});
+
+describe("0257 — replace_lines change requests", () => {
+  it("submit: passes p_kind=replace_lines with the target + replacement payload", async () => {
+    const sb = buildSbForProceed({
+      tables: { order_change_requests: { single: replaceRequestRow() } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(changeReqUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "replace_lines",
+          targetLineIds: [TARGET_LINE_ID],
+          targetLines: [{ sku: "SKU-OLD", qty: 1, unitPrice: 100, label: "Old thing" }],
+          line: { sku: "SKU-ADD-1", qty: 1, unitPrice: 250, label: "New thing" },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("submit_order_change_request");
+    const args = sb._rpcCalls[0].args as {
+      p_kind?: string;
+      p_payload?: { targetLineIds?: string[]; line?: { sku?: string } };
+    };
+    expect(args.p_kind).toBe("replace_lines");
+    expect(args.p_payload?.targetLineIds).toEqual([TARGET_LINE_ID]);
+    expect(args.p_payload?.line?.sku).toBe("SKU-ADD-1");
+  });
+
+  it("decide APPROVE — replace pipeline runs then replace_order_lines p_source=change_request", async () => {
+    const sb = buildSbForProceed({
+      tables: {
+        order_change_requests: { single: replaceRequestRow() },
+        orders: { single: addOrderRow({ status: "proceed_order" }) },
+      },
+      orderLineRows: [replaceTargetRow()],
+      inTables: {
+        order_supplier_threads: [],
+        product_skus: [addSkuRow()],
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("replace_order_lines");
+    const args = sb._rpcCalls[0].args as Record<string, unknown>;
+    expect(args.p_source).toBe("change_request");
+    expect(args.p_change_request_id).toBe(REQ_ID);
+    expect(args.p_old_line_ids).toEqual([TARGET_LINE_ID]);
+    const lines = args.p_lines as Array<Record<string, unknown>>;
+    expect(lines[0].sku).toBe("SKU-ADD-1");
+    expect(lines[0].unit_price).toBe(250); // fresh catalog price at APPROVAL time
+  });
+
+  it("decide APPROVE 422 line_in_production when the target line already has a thread", async () => {
+    const sb = buildSbForProceed({
+      tables: {
+        order_change_requests: { single: replaceRequestRow() },
+        orders: { single: addOrderRow({ status: "proceed_order" }) },
+      },
+      orderLineRows: [replaceTargetRow()],
+      inTables: {
+        order_supplier_threads: [{ id: "t-1" }],
+        product_skus: [addSkuRow()],
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`${changeReqUrl}/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; error?: string };
+    expect(body.code).toBe("line_in_production");
+    expect(body.error).toBe("decide_blocked");
     expect(sb._rpcCalls).toHaveLength(0);
   });
 });

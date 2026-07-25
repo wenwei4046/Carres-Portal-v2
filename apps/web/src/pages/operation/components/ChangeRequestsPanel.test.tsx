@@ -70,4 +70,43 @@ describe("ChangeRequestsPanel", () => {
       }),
     );
   });
+
+  // 0257 — service add-ons ride the add_lines payload.
+  it("renders payload addons alongside lines", () => {
+    h.requests = [
+      {
+        ...REQ,
+        payload: {
+          lines: [{ sku: "PILLOW-1", qty: 1, unitPrice: 220, label: "Memory Foam Pillow" }],
+          addons: [{ addonKey: "dispose-mattress", qty: 2, unitPrice: 80, label: "Dispose old mattress" }],
+        },
+      },
+    ];
+    render(<ChangeRequestsPanel orderId={REQ.orderId} />);
+    const panel = screen.getByTestId("ops-change-requests");
+    expect(panel.textContent).toContain("Memory Foam Pillow");
+    expect(panel.textContent).toContain("Dispose old mattress");
+  });
+
+  // 0257 — replace_lines renders the old→new swap + the apply verb.
+  it("renders a replace_lines request as old → new", () => {
+    h.requests = [
+      {
+        ...REQ,
+        kind: "replace_lines",
+        payload: {
+          targetLineIds: ["33333333-3333-3333-3333-333333333301"],
+          targetLines: [{ sku: "FENRIR-K", qty: 1, unitPrice: 1999, label: "Fenrir · King" }],
+          line: { sku: "FENRIR-Q", qty: 1, unitPrice: 2499, label: "Fenrir · Queen" },
+        },
+      },
+    ];
+    render(<ChangeRequestsPanel orderId={REQ.orderId} />);
+    const panel = screen.getByTestId("ops-change-requests");
+    expect(panel.textContent).toContain("Item change");
+    const swap = screen.getByTestId("ops-cr-replace");
+    expect(swap.textContent).toContain("Fenrir · King");
+    expect(swap.textContent).toContain("Fenrir · Queen");
+    expect(screen.getByTestId("ops-cr-approve").textContent).toContain("Approve & apply");
+  });
 });

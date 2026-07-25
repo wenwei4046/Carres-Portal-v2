@@ -624,8 +624,15 @@ export interface OrderHistory {
 export interface OrderChangeRequest {
   id: string;
   orderId: string;
-  kind: "add_lines";
-  payload: { lines: Array<Record<string, unknown>> };
+  /** 0257 — 'replace_lines' = proceed-lane "change an original item". */
+  kind: "add_lines" | "replace_lines";
+  payload: {
+    lines?: Array<Record<string, unknown>>;
+    addons?: Array<Record<string, unknown>>;
+    targetLineIds?: string[];
+    targetLines?: Array<Record<string, unknown>>;
+    line?: Record<string, unknown>;
+  };
   status: "pending" | "approved" | "rejected" | "cancelled";
   requestedBy: string | null;
   requestedAt: string;
