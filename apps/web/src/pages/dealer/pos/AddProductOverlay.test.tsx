@@ -37,7 +37,14 @@ const CATALOG = {
     { id: "s3", modelId: M_SOFA_FLAT, sku: "SKU-SF", variant: "2-seater", variantKind: "preset", price: 2000, cost: null, supplierId: null },
   ],
   sofaFabrics: [],
-  addons: [],
+  // 0257 — Services tab: active order add-ons are offerable; DELIVERY* keys
+  // are server-exclusive and must stay hidden.
+  addons: [
+    { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true, sizeOptions: ["King", "Queen"] },
+    { key: "dispose-sofa", name: "Dispose old sofa", price: 50, active: true, sizeOptions: null },
+    { key: "DELIVERY", name: "Delivery fee", price: 0, active: true, sizeOptions: null },
+    { key: "retired", name: "Retired addon", price: 10, active: false, sizeOptions: null },
+  ],
   floorConfig: { id: 1, freeUpToFloor: 3, perFloorPerItem: 20 },
   // MODULARSOFA offers compartments → the visual-builder path (P2: allowed).
   modelSofaCompartments: [{ modelId: M_SOFA_BUILD, compartmentId: "c1", priceOverride: null }],
@@ -54,7 +61,11 @@ function order(lines: Array<{ sku: string }> = []): Order {
   } as unknown as Order;
 }
 
-function renderOverlay(o: Order, error: string | null = null) {
+function renderOverlay(
+  o: Order,
+  error: string | null = null,
+  onPickServices = vi.fn(),
+) {
   render(
     <AddProductOverlay
       order={o}
@@ -62,9 +73,12 @@ function renderOverlay(o: Order, error: string | null = null) {
       busy={false}
       error={error}
       onPick={vi.fn()}
+      onPickServices={onPickServices}
+      serviceCta="Add to order"
       onClose={vi.fn()}
     />,
   );
+  return onPickServices;
 }
 
 describe("AddProductOverlay", () => {
@@ -96,5 +110,43 @@ describe("AddProductOverlay", () => {
   it("shows the error banner when an add failed", () => {
     renderOverlay(order(), "Sofa can't mix with mattress / bed frame in one order.");
     expect(screen.getByTestId("pos-add-error").textContent).toContain("can't mix");
+  });
+
+  // 0257 — Services tab: the wizard's order add-ons become addable post-create.
+  it("services tab lists offerable add-ons only and emits the picks", () => {
+    const onPickServices = renderOverlay(order());
+    fireEvent.click(screen.getByText("Services"));
+    const panel = screen.getByTestId("pos-add-services");
+    // Active, non-server-exclusive only: DELIVERY + inactive stay hidden.
+    expect(panel.textContent).toContain("Dispose old sofa");
+    expect(panel.textContent).toContain("Dispose old mattress");
+    expect(panel.textContent).not.toContain("Delivery fee");
+    expect(panel.textContent).not.toContain("Retired addon");
+
+    // Nothing picked → CTA disabled.
+    const cta = screen.getByTestId("pos-add-services-confirm") as HTMLButtonElement;
+    expect(cta.disabled).toBe(true);
+
+    // Pick the size-less service → CTA enables → emits the DraftAddon.
+    fireEvent.click(screen.getByText("Dispose old sofa"));
+    expect(cta.disabled).toBe(false);
+    fireEvent.click(cta);
+    expect(onPickServices).toHaveBeenCalledTimes(1);
+    const picks = onPickServices.mock.calls[0][0] as Array<{ key: string; qty: number }>;
+    expect(picks).toHaveLength(1);
+    expect(picks[0].key).toBe("dispose-sofa");
+    expect(picks[0].qty).toBe(1);
+  });
+
+  it("a sized service gates the CTA until every unit has a size", () => {
+    renderOverlay(order());
+    fireEvent.click(screen.getByText("Services"));
+    fireEvent.click(screen.getByText("Dispose old mattress"));
+    const cta = screen.getByTestId("pos-add-services-confirm") as HTMLButtonElement;
+    expect(cta.disabled).toBe(true); // size not picked yet
+    fireEvent.change(screen.getByLabelText("Dispose old mattress size"), {
+      target: { value: "Queen" },
+    });
+    expect(cta.disabled).toBe(false);
   });
 });

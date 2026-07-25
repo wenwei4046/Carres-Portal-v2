@@ -467,9 +467,30 @@ const orderLineInputItemSchema = z.object({
   label: z.string().max(120).optional(),
 });
 
-export const addOrderLinesInputSchema = z.object({
-  lines: z.array(orderLineInputItemSchema).min(1).max(10),
+/** 0257 — a SERVICE add-on rides the post-create add doors (Loo 2026-07-25:
+ *  "Dispose old sofa/mattress are SKUs too — same setting as opening a sales
+ *  order"). Server price authority: the route re-prices from the `addons`
+ *  config table (active + not the server-exclusive DELIVERY* keys); the
+ *  client `unitPrice`/`label` are display-only previews for the approval
+ *  view. `attrs` carries the 0242 per-unit size picks. */
+const serviceAddonInputItemSchema = z.object({
+  addonKey: z.string().trim().min(1),
+  qty: z.number().int().min(1).max(99),
+  attrs: z.record(z.unknown()).nullable().optional(),
+  unitPrice: z.number().nonnegative().optional(),
+  label: z.string().max(120).optional(),
 });
+export type ServiceAddonInputItem = z.infer<typeof serviceAddonInputItemSchema>;
+
+export const addOrderLinesInputSchema = z
+  .object({
+    lines: z.array(orderLineInputItemSchema).max(10).optional().default([]),
+    /** 0257 — service add-ons appended alongside (or instead of) lines. */
+    addons: z.array(serviceAddonInputItemSchema).max(10).optional().default([]),
+  })
+  .refine((v) => v.lines.length + v.addons.length >= 1, {
+    message: "at least one line or add-on is required",
+  });
 export type AddOrderLinesInput = z.infer<typeof addOrderLinesInputSchema>;
 
 /** 0255 — Order line EDIT (Loo 2026-07-25): re-configure an existing
@@ -485,19 +506,31 @@ export const replaceOrderLinesInputSchema = z.object({
 });
 export type ReplaceOrderLinesInput = z.infer<typeof replaceOrderLinesInputSchema>;
 
-/** 0233 — P3 change-request lifecycle. */
+/** 0233 — P3 change-request lifecycle. 0257 widens `kind`: 'replace_lines'
+ *  is the proceed-lane "change an ORIGINAL item" submission (Loo 2026-07-25),
+ *  applied at approval through the same replace pipeline as the place-lane
+ *  pencil (0255/0256) — up-sell only, thread-virgin lines only. */
 export const orderChangeRequestStatusSchema = z.enum([
   "pending",
   "approved",
   "rejected",
   "cancelled",
 ]);
+export const orderChangeRequestKindSchema = z.enum(["add_lines", "replace_lines"]);
 export const orderChangeRequestSchema = z.object({
   id: z.string().uuid(),
   orderId: z.string().uuid(),
-  kind: z.literal("add_lines"),
-  /** The submitted lines verbatim (sku/qty/attrs + preview unitPrice/label). */
-  payload: z.object({ lines: z.array(z.record(z.unknown())) }),
+  kind: orderChangeRequestKindSchema,
+  /** The submitted payload verbatim. add_lines → lines/addons (sku/qty/attrs
+   *  + preview unitPrice/label). replace_lines → targetLineIds + targetLines
+   *  (display snapshot of the rows being replaced) + line (the replacement). */
+  payload: z.object({
+    lines: z.array(z.record(z.unknown())).optional(),
+    addons: z.array(z.record(z.unknown())).optional(),
+    targetLineIds: z.array(z.string()).optional(),
+    targetLines: z.array(z.record(z.unknown())).optional(),
+    line: z.record(z.unknown()).optional(),
+  }),
   status: orderChangeRequestStatusSchema,
   requestedBy: z.string().uuid().nullable(),
   requestedAt: z.string(),
@@ -507,6 +540,43 @@ export const orderChangeRequestSchema = z.object({
   appliedAt: z.string().nullable(),
 });
 export type OrderChangeRequestDto = z.infer<typeof orderChangeRequestSchema>;
+
+/** 0257 — POST /:id/change-requests + …/edit body. Backward compatible: a
+ *  body without `kind` (the pre-0257 web) parses as the add variant. The
+ *  replace variant carries the target row ids + a display snapshot of the
+ *  old rows (server-side truth is re-read at approval; the snapshot only
+ *  feeds the operator's old→new view). */
+const submitChangeAddVariantSchema = z
+  .object({
+    kind: z.literal("add_lines").optional(),
+    lines: z.array(orderLineInputItemSchema).max(10).optional().default([]),
+    addons: z.array(serviceAddonInputItemSchema).max(10).optional().default([]),
+  })
+  .refine((v) => v.lines.length + v.addons.length >= 1, {
+    message: "at least one line or add-on is required",
+  });
+const submitChangeReplaceVariantSchema = z.object({
+  kind: z.literal("replace_lines"),
+  targetLineIds: z.array(z.string().uuid()).min(1).max(30),
+  targetLines: z
+    .array(
+      z.object({
+        id: z.string().uuid().optional(),
+        sku: z.string().min(1),
+        qty: z.number().int().min(1),
+        unitPrice: z.number().nonnegative().optional(),
+        label: z.string().max(120).optional(),
+      }),
+    )
+    .max(30)
+    .optional(),
+  line: orderLineInputItemSchema,
+});
+export const submitOrderChangeRequestInputSchema = z.union([
+  submitChangeReplaceVariantSchema,
+  submitChangeAddVariantSchema,
+]);
+export type SubmitOrderChangeRequestInput = z.infer<typeof submitOrderChangeRequestInputSchema>;
 
 /** POST /:id/change-requests/:reqId/decide body. `note` is surfaced to the
  *  dealer on reject (the UI encourages it; the server stays lenient). */

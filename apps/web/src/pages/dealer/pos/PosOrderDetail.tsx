@@ -51,7 +51,7 @@ import {
 import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-display";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { newLocalId } from "../new-order/configurators";
-import type { DraftLine } from "../new-order/draft";
+import type { DraftAddon, DraftLine } from "../new-order/draft";
 import AddProductOverlay from "./AddProductOverlay";
 import { buildCatalogIndex } from "./catalog-index";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
@@ -311,13 +311,17 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   const [addErr, setAddErr] = useState<string | null>(null);
   // 0255 — line EDIT (Loo 2026-07-25): the pencil re-opens the item's
   // configure surface seeded with its stored configuration; Save replaces
-  // the row(s) server-side, up-sell only.
+  // the row(s) server-side, up-sell only. 0257 — the SAME pencil works on
+  // the proceed lane, where Save files a replace_lines change request
+  // (HQ approves) instead of writing directly; `targetLines` is the display
+  // snapshot the operator's old→new approval view renders.
   const replaceMut = useReplaceOrderLines(id);
   const [editing, setEditing] = useState<{
     kind: "bed_mattress" | "sofa_build";
     model: ProductModelDto;
     draft: DraftLine;
     targetIds: string[];
+    targetLines: Array<{ id?: string; sku: string; qty: number; unitPrice?: number; label?: string }>;
     oldTotal: number;
   } | null>(null);
   const editIndex = useMemo(
@@ -361,6 +365,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       // The preview unitPrice + label ride along for the operator's approval
       // view; the approval re-prices everything fresh server-side.
       await submitChangeMut.mutateAsync({
+        kind: "add_lines",
         lines: [
           {
             sku: line.sku,
@@ -370,7 +375,38 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             label: line.label,
           },
         ],
+        addons: [],
       });
+      setAddOpen(false);
+    } catch (e) {
+      setAddErr(addErrorCopy(e));
+    }
+  }
+
+  /** 0257 — service add-ons picked in the overlay's Services tab. Place lane
+   *  applies directly; the proceed lane files (or edits) an add_lines change
+   *  request — same doors as products, same one-pending rule. */
+  async function handleAddServices(addons: DraftAddon[]) {
+    setAddErr(null);
+    const payloadAddons = addons.map((a) => ({
+      addonKey: a.key,
+      qty: a.qty,
+      attrs: a.attrs ?? null,
+      unitPrice: a.unitPrice,
+      label: a.name,
+    }));
+    try {
+      if (scope?.canAddProduct) {
+        await addLinesMut.mutateAsync({ lines: [], addons: payloadAddons });
+      } else if (editingChange && pendingChange) {
+        await updateChangeMut.mutateAsync({
+          requestId: pendingChange.id,
+          input: { kind: "add_lines", lines: [], addons: payloadAddons },
+        });
+        setEditingChange(false);
+      } else {
+        await submitChangeMut.mutateAsync({ kind: "add_lines", lines: [], addons: payloadAddons });
+      }
       setAddOpen(false);
     } catch (e) {
       setAddErr(addErrorCopy(e));
@@ -396,6 +432,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       await updateChangeMut.mutateAsync({
         requestId: pendingChange.id,
         input: {
+          kind: "add_lines",
           lines: [
             {
               sku: line.sku,
@@ -405,6 +442,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               label: line.label,
             },
           ],
+          addons: [],
         },
       });
       setAddOpen(false);
@@ -430,6 +468,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             ...(isBuild ? { unitPrice: line.unitPrice } : {}),
           },
         ],
+        addons: [],
       });
       setAddOpen(false);
     } catch (e) {
@@ -437,7 +476,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     }
   }
 
-  // ── 0255 line EDIT ────────────────────────────────────────────────────────
+  // ── 0255 line EDIT (0257: same pencil on the proceed lane → submission) ───
   function startEditLine(line: OrderLine) {
     if (!catalog || !line.id) return;
     const kind = orderLineEditKind(line, catalog);
@@ -451,6 +490,15 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       model,
       draft: draftFromOrderLine(line),
       targetIds: [line.id],
+      targetLines: [
+        {
+          id: line.id,
+          sku: line.sku,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          label: [model.name, sku?.variant].filter(Boolean).join(" · "),
+        },
+      ],
       oldTotal: line.unitPrice * line.qty,
     });
   }
@@ -468,6 +516,13 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       model,
       draft,
       targetIds: row.lines.map((l) => l.id as string),
+      targetLines: row.lines.map((l) => ({
+        id: l.id as string,
+        sku: l.sku,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        label: `${model.name} · ${row.spec}`,
+      })),
       oldTotal: row.totalPrice,
     });
   }
@@ -487,6 +542,29 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     }
     const isBuild = Boolean((newLine.attrs as Record<string, unknown> | null)?.sofa_build);
     setAddErr(null);
+    // 0257 — proceed lane: the same pencil files a replace_lines change
+    // request (HQ approves → the server applies through the SAME replace
+    // pipeline). The preview unitPrice + label always ride for the operator's
+    // old→new view; on a BUILD they also feed the drift gate at approval.
+    if (scope?.editableProceed) {
+      try {
+        await submitChangeMut.mutateAsync({
+          kind: "replace_lines",
+          targetLineIds: target.targetIds,
+          targetLines: target.targetLines,
+          line: {
+            sku: newLine.sku,
+            qty: newLine.qty,
+            attrs: newLine.attrs ?? null,
+            unitPrice: newLine.unitPrice,
+            label: newLine.label,
+          },
+        });
+      } catch (e) {
+        setAddErr(addErrorCopy(e));
+      }
+      return;
+    }
     try {
       // sku/qty/attrs go up — the client preview price stays local (server
       // catalog authority) EXCEPT on a sofa BUILD, whose preview unitPrice
@@ -860,9 +938,11 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 if (row.kind === "sofa_build") {
                   const { model } = skuMeta(row.lines[0]?.sku ?? "");
                   // 0255 — the pencil shows only when the group can round-trip
-                  // (geometry stamps intact, no promo markers) in the place lane.
+                  // (geometry stamps intact, no promo markers). 0257 — it also
+                  // shows on the proceed lane (files a change request there;
+                  // hidden while one is already pending).
                   const editable =
-                    scope.editablePlaced &&
+                    (scope.editablePlaced || (scope.editableProceed && !pendingChange)) &&
                     !!catalog &&
                     row.lines.every((l) => l.id) &&
                     draftFromSofaGroup(row, catalog) !== null;
@@ -905,10 +985,12 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 const { sku, model } = skuMeta(line.sku);
                 const tag = lineTag(line.attrs);
                 const free = tag === "GWP" || tag === "Free item";
-                // 0255 — pencil on configurator-backed rows (mattress/bedframe)
-                // in the place lane; free/promo/bundle rows stay pencil-less.
+                // 0255 — pencil on configurator-backed rows (mattress/bedframe);
+                // free/promo/bundle rows stay pencil-less. 0257 — the proceed
+                // lane gets the same pencil (change request; hidden while one
+                // is pending).
                 const editable =
-                  scope.editablePlaced &&
+                  (scope.editablePlaced || (scope.editableProceed && !pendingChange)) &&
                   !!catalog &&
                   !!line.id &&
                   orderLineEditKind(line, catalog) !== null;
@@ -1057,8 +1139,12 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 data-testid="pos-od-change-pending"
               >
                 <span className="t-tiny" style={{ color: "var(--fg-muted)" }}>
-                  Product change pending HQ approval ·{" "}
-                  {(pendingChange.payload.lines ?? []).length} item(s)
+                  {pendingChange.kind === "replace_lines"
+                    ? "Item change pending HQ approval"
+                    : `Product change pending HQ approval · ${
+                        (pendingChange.payload.lines ?? []).length +
+                        (pendingChange.payload.addons ?? []).length
+                      } item(s)`}
                 </span>
                 <button
                   type="button"
@@ -1604,6 +1690,8 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                   ? handleEditChange
                   : handleSubmitChange
             }
+            onPickServices={handleAddServices}
+            serviceCta={scope.canAddProduct ? "Add to order" : "Submit for approval"}
             onClose={() => {
               setAddOpen(false);
               setEditingChange(false);
@@ -1622,24 +1710,80 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               className="w-full max-w-[440px] bg-white rounded-md shadow-md p-5"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="kicker mb-1">Product change · pending HQ approval</p>
-              {((pendingChange.payload.lines ?? []) as Array<{
-                sku?: string;
-                qty?: number;
-                unitPrice?: number;
-                label?: string;
-              }>).map((l, i) => (
-                <div key={i} className="flex items-center justify-between t-small text-base-800 py-1">
-                  <span>
-                    {l.label ?? l.sku} ×{l.qty ?? 1}
-                  </span>
-                  {typeof l.unitPrice === "number" && (
-                    <span className="font-mono text-base-600">
-                      ≈ RM {l.unitPrice.toLocaleString()}
-                    </span>
-                  )}
+              <p className="kicker mb-1">
+                {pendingChange.kind === "replace_lines"
+                  ? "Item change · pending HQ approval"
+                  : "Product change · pending HQ approval"}
+              </p>
+              {pendingChange.kind === "replace_lines" ? (
+                <div data-testid="pos-od-change-replace">
+                  {((pendingChange.payload.targetLines ?? []) as Array<{
+                    sku?: string;
+                    qty?: number;
+                    unitPrice?: number;
+                    label?: string;
+                  }>).map((l, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between t-small text-base-500 py-1 line-through"
+                    >
+                      <span>
+                        {l.label ?? l.sku} ×{l.qty ?? 1}
+                      </span>
+                      {typeof l.unitPrice === "number" && (
+                        <span className="font-mono">RM {l.unitPrice.toLocaleString()}</span>
+                      )}
+                    </div>
+                  ))}
+                  {(() => {
+                    const nl = (pendingChange.payload.line ?? {}) as {
+                      sku?: string;
+                      qty?: number;
+                      unitPrice?: number;
+                      label?: string;
+                    };
+                    return (
+                      <div className="flex items-center justify-between t-small text-base-800 py-1">
+                        <span>
+                          → {nl.label ?? nl.sku} ×{nl.qty ?? 1}
+                        </span>
+                        {typeof nl.unitPrice === "number" && (
+                          <span className="font-mono text-base-600">
+                            ≈ RM {nl.unitPrice.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
-              ))}
+              ) : (
+                ([
+                  ...((pendingChange.payload.lines ?? []) as Array<{
+                    sku?: string;
+                    qty?: number;
+                    unitPrice?: number;
+                    label?: string;
+                  }>),
+                  ...((pendingChange.payload.addons ?? []) as Array<{
+                    addonKey?: string;
+                    qty?: number;
+                    unitPrice?: number;
+                    label?: string;
+                  }>),
+                ]).map((l, i) => (
+                  <div key={i} className="flex items-center justify-between t-small text-base-800 py-1">
+                    <span>
+                      {l.label ?? ("sku" in l ? l.sku : (l as { addonKey?: string }).addonKey)} ×
+                      {l.qty ?? 1}
+                    </span>
+                    {typeof l.unitPrice === "number" && (
+                      <span className="font-mono text-base-600">
+                        ≈ RM {l.unitPrice.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
               <p className="t-tiny text-base-500 mt-1">
                 Submitted {new Date(pendingChange.requestedAt).toLocaleString()} · final prices
                 re-derive from the live catalog at approval.
@@ -1660,19 +1804,24 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 >
                   Cancel request
                 </button>
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  onClick={() => {
-                    setViewChangeOpen(false);
-                    setEditingChange(true);
-                    setAddErr(null);
-                    setAddOpen(true);
-                  }}
-                  data-testid="pos-od-change-edit"
-                >
-                  Edit request
-                </button>
+                {/* 0257 — an item-change edits by cancel + re-pencil (the
+                    overlay can't seed a replace); only add requests edit
+                    in place. */}
+                {pendingChange.kind !== "replace_lines" && (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => {
+                      setViewChangeOpen(false);
+                      setEditingChange(true);
+                      setAddErr(null);
+                      setAddOpen(true);
+                    }}
+                    data-testid="pos-od-change-edit"
+                  >
+                    Edit request
+                  </button>
+                )}
               </div>
             </div>
           </div>

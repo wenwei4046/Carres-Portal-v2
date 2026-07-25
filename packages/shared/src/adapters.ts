@@ -792,8 +792,8 @@ export const auditFromRow = (r: DB.AuditLogRow): D.AuditEntry => ({
 export const orderChangeRequestFromRow = (r: DB.OrderChangeRequestRow): D.OrderChangeRequest => ({
   id: r.id,
   orderId: r.order_id,
-  kind: r.kind as "add_lines",
-  payload: (r.payload ?? { lines: [] }) as { lines: Array<Record<string, unknown>> },
+  kind: r.kind as D.OrderChangeRequest["kind"],
+  payload: (r.payload ?? { lines: [] }) as D.OrderChangeRequest["payload"],
   status: r.status as D.OrderChangeRequest["status"],
   requestedBy: r.requested_by,
   requestedAt: r.requested_at,

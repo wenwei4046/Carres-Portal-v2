@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   unproceedMutateAsync: vi.fn(async () => ({})),
   addLinesMutateAsync: vi.fn(async () => ({})),
   replaceMutateAsync: vi.fn(async () => ({})),
+  // 0257 — proceed-lane pencil files a replace_lines change request.
+  submitChangeMutateAsync: vi.fn(async () => ({})),
+  changeRequests: [] as unknown[],
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -31,8 +34,11 @@ vi.mock("@/lib/queries", () => ({
   // 0255 — line EDIT.
   useReplaceOrderLines: () => ({ mutateAsync: h.replaceMutateAsync, isPending: false }),
   // 0233 — add-product P3 (submission flow).
-  useOrderChangeRequests: () => ({ data: { requests: [] }, isLoading: false }),
-  useSubmitOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
+  useOrderChangeRequests: () => ({ data: { requests: h.changeRequests }, isLoading: false }),
+  useSubmitOrderChangeRequest: () => ({
+    mutateAsync: h.submitChangeMutateAsync,
+    isPending: false,
+  }),
   useCancelOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
 }));
@@ -181,6 +187,8 @@ beforeEach(() => {
   h.proceedMutateAsync.mockClear();
   h.unproceedMutateAsync.mockClear();
   h.replaceMutateAsync.mockClear();
+  h.submitChangeMutateAsync.mockClear();
+  h.changeRequests = [];
 });
 
 describe("place lane", () => {
@@ -355,9 +363,47 @@ describe("line edit (0255)", () => {
     expect(screen.getByTestId("stub-configure-page")).toBeTruthy();
   });
 
-  it("proceed + delivered lanes hide the pencil", () => {
+  // 0257 — the proceed lane KEEPS the pencil: Save files a replace_lines
+  // change request (HQ approval) instead of writing directly.
+  it("proceed pencil files a replace_lines change request (no direct write)", async () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
+    fireEvent.click(screen.getByTestId("pos-od-edit-line"));
+    fireEvent.click(screen.getByTestId("stub-emit-up"));
+    await waitFor(() =>
+      expect(h.submitChangeMutateAsync).toHaveBeenCalledWith({
+        kind: "replace_lines",
+        targetLineIds: ["00000000-0000-0000-0000-00000000l001"],
+        targetLines: [
+          {
+            id: "00000000-0000-0000-0000-00000000l001",
+            sku: "SKU-1",
+            qty: 2,
+            unitPrice: 1500,
+            label: "Cloud Mattress · King",
+          },
+        ],
+        line: { sku: "SKU-1", qty: 1, attrs: { gap: "None" }, unitPrice: 5000, label: "up" },
+      }),
+    );
+    expect(h.replaceMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("proceed pencil hides while a change request is pending; delivered hides it too", () => {
+    h.changeRequests = [
+      {
+        id: "cr-1",
+        orderId: "00000000-0000-0000-0000-000000001201",
+        kind: "replace_lines",
+        payload: { targetLineIds: [], targetLines: [], line: {} },
+        status: "pending",
+        requestedAt: "2026-07-25T00:00:00Z",
+        decisionNote: null,
+      },
+    ];
     renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
     expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
+    expect(screen.getByTestId("pos-od-change-pending")).toBeTruthy();
+    h.changeRequests = [];
     renderDrawer(order({ status: "delivered", paid: 3000 }));
     expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
   });

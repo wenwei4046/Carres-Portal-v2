@@ -7,7 +7,10 @@ import {
   addOrderLinesInputSchema,
   replaceOrderLinesInputSchema,
   decideOrderChangeRequestInputSchema,
+  submitOrderChangeRequestInputSchema,
   type AddOrderLinesInput,
+  type ReplaceOrderLinesInput,
+  type ServiceAddonInputItem,
   autocountImportInput,
   autocountImportResponseSchema,
   cancelOrderInputSchema,
@@ -2257,6 +2260,95 @@ interface AddLinesWriteSet {
   }> | null;
 }
 
+/** 0257 — service add-ons on the post-create doors (Loo 2026-07-25: "Dispose
+ *  old sofa / mattress are SKUs too — same setting as opening a sales
+ *  order"). Server price authority: each pick is re-priced from the live
+ *  `addons` config; must be ACTIVE and never one of the server-exclusive
+ *  DELIVERY* keys. An addon whose config carries 0242 size_options must
+ *  arrive with one size PER UNIT (attrs.sizes) — the same gate the wizard's
+ *  AddonsPanel enforces. Returns the RPC `p_addons_append` rows, or a ready
+ *  422 Response. Empty input → null (the RPC skips the append). */
+async function priceServiceAddons(
+  c: Context<AppEnv>,
+  sb: ReturnType<typeof userClient>,
+  addons: ServiceAddonInputItem[],
+  errorTag: string,
+): Promise<
+  | Response
+  | Array<{
+      addon_key: string;
+      qty: number;
+      unit_price: number;
+      attrs: Record<string, unknown> | null;
+    }>
+  | null
+> {
+  if (addons.length === 0) return null;
+  const keys = [...new Set(addons.map((a) => a.addonKey))];
+  const cfgR = await sb
+    .from("addons")
+    .select("key, name, price, active, size_options")
+    .in("key", keys);
+  if (cfgR.error) throw new HTTPException(500, { message: cfgR.error.message });
+  const cfgByKey = new Map(
+    (
+      (cfgR.data ?? []) as Array<{
+        key: string;
+        name: string;
+        price: number | string;
+        active: boolean;
+        size_options: unknown;
+      }>
+    ).map((a) => [a.key, a] as const),
+  );
+  const rows: Array<{
+    addon_key: string;
+    qty: number;
+    unit_price: number;
+    attrs: Record<string, unknown> | null;
+  }> = [];
+  for (const a of addons) {
+    const cfg = cfgByKey.get(a.addonKey);
+    if (!cfg || !cfg.active || ADD_LINES_DELIVERY_KEYS.has(a.addonKey)) {
+      return c.json(
+        {
+          error: errorTag,
+          code: "unknown_or_inactive_addon",
+          message: `Add-on ${a.addonKey} is not available`,
+        },
+        422,
+      );
+    }
+    const sizeOptions = Array.isArray(cfg.size_options)
+      ? (cfg.size_options as unknown[]).filter((s): s is string => typeof s === "string")
+      : [];
+    if (sizeOptions.length > 0) {
+      const sizes = (a.attrs as { sizes?: unknown } | null | undefined)?.sizes;
+      const complete =
+        Array.isArray(sizes) &&
+        sizes.length === a.qty &&
+        sizes.every((s) => typeof s === "string" && sizeOptions.includes(s));
+      if (!complete) {
+        return c.json(
+          {
+            error: errorTag,
+            code: "addon_size_required",
+            message: `${cfg.name} needs a size for each unit`,
+          },
+          422,
+        );
+      }
+    }
+    rows.push({
+      addon_key: a.addonKey,
+      qty: a.qty,
+      unit_price: Number(cfg.price),
+      attrs: (a.attrs ?? null) as Record<string, unknown> | null,
+    });
+  }
+  return rows;
+}
+
 /** The add-lines ENGINE PIPELINE (P2, design 2026-07-18) shared by the direct
  *  add route and the P3 change-request APPROVE — over the MERGED cart
  *  (persisted rows ∪ new lines): marker guards → sku gate + server base
@@ -2717,8 +2809,16 @@ ordersRouter.post("/:id/lines", async (c) => {
     );
   }
 
-  const out = await computeAddLinesWriteSet(c, sb, id, parsed.data.lines, ord);
+  // 0257 — service add-ons don't touch order_lines or the trip fee, so an
+  // addons-only add skips the line pipeline entirely (byte-identical order
+  // lines + delivery rows).
+  const out =
+    parsed.data.lines.length > 0
+      ? await computeAddLinesWriteSet(c, sb, id, parsed.data.lines, ord)
+      : ({ pLines: [], pAddonsReplace: null } satisfies AddLinesWriteSet);
   if (out instanceof Response) return out;
+  const addonsAppend = await priceServiceAddons(c, sb, parsed.data.addons, "add_lines_blocked");
+  if (addonsAppend instanceof Response) return addonsAppend;
 
   const { error: rpcError } = await sb.rpc("add_order_lines", {
     p_order_id: id,
@@ -2726,72 +2826,33 @@ ordersRouter.post("/:id/lines", async (c) => {
     p_source: "direct",
     p_change_request_id: null,
     p_addons_replace: out.pAddonsReplace,
+    p_addons_append: addonsAppend,
   });
   const errRes = addLinesRpcError(c, rpcError, "add_lines_blocked");
   if (errRes) return errRes;
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
-/** POST /api/orders/:id/lines/replace — line EDIT (0255, Loo 2026-07-25):
- *  re-configure ONE existing item on a PLACE-lane order. `targetLineIds`
- *  names the row being replaced (or the FULL exploded sofa group); the
- *  replacement is priced through the SAME pipeline as an add (gift stage
- *  skipped — the old line's RM0 gift rows stay). Up-sell only: a replacement
- *  priced below the replaced rows 422s `downsell_blocked` (friendly here,
- *  authoritative in the RPC). */
-ordersRouter.post("/:id/lines/replace", async (c) => {
-  const auth = c.var.auth;
-  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
-  if (!idCheck.success || !idCheck.data) {
-    throw new HTTPException(404, { message: "Order not found" });
-  }
-  const id: string = idCheck.data;
-  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
-    throw new HTTPException(403, { message: "Role cannot mutate orders" });
-  }
-  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
-    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
-  }
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = replaceOrderLinesInputSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
-    });
-  }
-  const targetIds = parsed.data.targetLineIds;
-
-  const sb = userClient(c.env, auth.jwt);
-  const orderR = await sb
-    .from("orders")
-    .select("id, status, operation_stage, source_system, customer_phone")
-    .eq("id", id)
-    .maybeSingle();
-  if (orderR.error) throw new HTTPException(500, { message: orderR.error.message });
-  const ord = orderR.data as {
-    id: string;
-    status: string;
-    operation_stage: string | null;
-    source_system: string | null;
-    customer_phone: string | null;
-  } | null;
-  if (!ord) throw new HTTPException(404, { message: "Order not found" });
-  // Early friendly gate (the RPC re-checks authoritatively).
-  if (ord.status !== "place" || ord.operation_stage !== null || ord.source_system === "autocount") {
-    return c.json(
-      {
-        error: "replace_blocked",
-        code: "wrong_status",
-        message: "Products can only be edited while the order is in Order placed",
-      },
-      422,
-    );
-  }
+/** The REPLACE pipeline (0255/0256) shared by the direct place-lane edit and
+ *  the 0257 replace_lines change-request APPROVE: target-row guards (must
+ *  exist, free/promo/bundle rows untouchable), wizard gift semantics (the
+ *  old line's RM0 gift rows leave WITH it), the merged-cart re-price with
+ *  the targets excluded, the promo-entitlement integrity guard, and the
+ *  friendly up-sell precheck. Returns a ready 422 Response on any rejection,
+ *  else the `replace_order_lines` write-set. The CALLER owns the order-level
+ *  gates (place lane for direct; pending request + not-delivered + thread
+ *  precheck for approve). */
+async function computeReplaceWriteSet(
+  c: Context<AppEnv>,
+  sb: ReturnType<typeof userClient>,
+  id: string,
+  input: ReplaceOrderLinesInput,
+  ord: { customer_phone: string | null },
+  errorTag: string,
+): Promise<
+  Response | { removedIds: string[]; out: AddLinesWriteSet; oldTotal: number; newTotal: number }
+> {
+  const targetIds = input.targetLineIds;
 
   // Target rows: must all exist on this order; free / promo / bundle / combo
   // rows are never editable (their prices are minted by promo/bundle law).
@@ -2817,7 +2878,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   if (targets.length !== targetIds.length) {
     return c.json(
       {
-        error: "replace_blocked",
+        error: errorTag,
         code: "line_not_found",
         message: "The item is no longer on this order — refresh and retry.",
       },
@@ -2829,7 +2890,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
     if (a.free_gift || a.free_item || a.pwp || a.bundle_group || a.combo_key) {
       return c.json(
         {
-          error: "replace_blocked",
+          error: errorTag,
           code: "line_not_editable",
           message: "Free, promo and bundle items can't be edited.",
         },
@@ -2869,7 +2930,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   const removedIds = [...targetIds, ...giftRowIds];
   const removedSet = new Set(removedIds);
 
-  const out = await computeAddLinesWriteSet(c, sb, id, [parsed.data.line], ord, {
+  const out = await computeAddLinesWriteSet(c, sb, id, [input.line], ord, {
     excludeLineIds: removedSet,
   });
   if (out instanceof Response) return out;
@@ -2895,7 +2956,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   if (promoCheck.status === "blocked") {
     return c.json(
       {
-        error: "replace_blocked",
+        error: errorTag,
         code: "promo_entitlement_broken",
         message: promoCheck.message,
       },
@@ -2909,7 +2970,7 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   if (newTotal < oldTotal) {
     return c.json(
       {
-        error: "replace_blocked",
+        error: errorTag,
         code: "downsell_blocked",
         message:
           `The new configuration totals RM ${newTotal.toFixed(2)}, below the original ` +
@@ -2921,11 +2982,78 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
     );
   }
 
+  return { removedIds, out, oldTotal, newTotal };
+}
+
+/** POST /api/orders/:id/lines/replace — line EDIT (0255, Loo 2026-07-25):
+ *  re-configure ONE existing item on a PLACE-lane order. `targetLineIds`
+ *  names the row being replaced (or the FULL exploded sofa group); the
+ *  replacement is priced through the SAME pipeline as an add (gift stage
+ *  skipped — the old line's RM0 gift rows stay). Up-sell only: a replacement
+ *  priced below the replaced rows 422s `downsell_blocked` (friendly here,
+ *  authoritative in the RPC). */
+ordersRouter.post("/:id/lines/replace", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  if (!idCheck.success || !idCheck.data) {
+    throw new HTTPException(404, { message: "Order not found" });
+  }
+  const id: string = idCheck.data;
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = replaceOrderLinesInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
+    });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const orderR = await sb
+    .from("orders")
+    .select("id, status, operation_stage, source_system, customer_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (orderR.error) throw new HTTPException(500, { message: orderR.error.message });
+  const ord = orderR.data as {
+    id: string;
+    status: string;
+    operation_stage: string | null;
+    source_system: string | null;
+    customer_phone: string | null;
+  } | null;
+  if (!ord) throw new HTTPException(404, { message: "Order not found" });
+  // Early friendly gate (the RPC re-checks authoritatively).
+  if (ord.status !== "place" || ord.operation_stage !== null || ord.source_system === "autocount") {
+    return c.json(
+      {
+        error: "replace_blocked",
+        code: "wrong_status",
+        message: "Products can only be edited while the order is in Order placed",
+      },
+      422,
+    );
+  }
+
+  const res = await computeReplaceWriteSet(c, sb, id, parsed.data, ord, "replace_blocked");
+  if (res instanceof Response) return res;
+
   const { error: rpcError } = await sb.rpc("replace_order_lines", {
     p_order_id: id,
-    p_old_line_ids: removedIds,
-    p_lines: out.pLines,
-    p_addons_replace: out.pAddonsReplace,
+    p_old_line_ids: res.removedIds,
+    p_lines: res.out.pLines,
+    p_addons_replace: res.out.pAddonsReplace,
+    p_source: "direct",
+    p_change_request_id: null,
   });
   const errRes = addLinesRpcError(c, rpcError, "replace_blocked");
   if (errRes) return errRes;
@@ -2957,11 +3085,48 @@ ordersRouter.get("/:id/change-requests", async (c) => {
   });
 });
 
-/** POST /api/orders/:id/change-requests — P3 submission (0233): file an
- *  add-product request on a PROCEED-lane order (a place-lane order takes
- *  direct adds — the RPC rejects with use_direct_add; one pending per order
- *  via pending_exists). Payload = the SAME lines shape as the direct add
- *  (+ display labels); the SAME zod re-validates it at approval. */
+/** Submit-time marker gates shared by the submission + edit doors — mirror
+ *  the pipeline's (fail NOW, not at approval): free markers 400; a
+ *  voucher-coded pwp claim 409; a price-less sofa build 400 (review finding
+ *  #1 — immediate dealer feedback, not a stuck-pending approval). */
+function submitLineMarkerGates(
+  c: Context<AppEnv>,
+  lines: Array<{ attrs?: Record<string, unknown> | null; unitPrice?: number }>,
+): Response | null {
+  for (const line of lines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    if (attrs.free_gift || attrs.free_item) {
+      throw new HTTPException(400, {
+        message: "free markers are not allowed on submitted lines",
+      });
+    }
+    const pwpAttr = attrs.pwp as { code?: unknown } | undefined;
+    if (pwpAttr && typeof pwpAttr === "object" && pwpAttr.code) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "pwp_voucher_add_not_supported",
+          message:
+            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
+        },
+        409,
+      );
+    }
+    if (attrs.sofa_build && typeof line.unitPrice !== "number") {
+      throw new HTTPException(400, {
+        message: "a sofa build line must carry its preview unitPrice for the drift gate",
+      });
+    }
+  }
+  return null;
+}
+
+/** POST /api/orders/:id/change-requests — P3 submission (0233): file a
+ *  product-change request on a PROCEED-lane order (a place-lane order takes
+ *  direct edits — the RPC rejects with use_direct_add; one pending per order
+ *  via pending_exists). 0257 — the body is kind-aware: 'add_lines' (default,
+ *  lines and/or service addons) or 'replace_lines' (targetLineIds + the
+ *  replacement line). The SAME zod re-validates the payload at approval. */
 ordersRouter.post("/:id/change-requests", async (c) => {
   const auth = c.var.auth;
   const idCheck = z.string().uuid().safeParse(c.req.param("id"));
@@ -2981,46 +3146,40 @@ ordersRouter.post("/:id/change-requests", async (c) => {
   } catch {
     throw new HTTPException(400, { message: "Body must be valid JSON" });
   }
-  const parsed = addOrderLinesInputSchema.safeParse(raw);
+  const parsed = submitOrderChangeRequestInputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new HTTPException(400, {
       message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
     });
   }
-  // Submit-time marker gates mirror the pipeline's (fail NOW, not at
-  // approval): free markers 400; a voucher-coded pwp claim 409.
-  for (const line of parsed.data.lines) {
-    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
-    if (attrs.free_gift || attrs.free_item) {
-      throw new HTTPException(400, {
-        message: "free markers are not allowed on submitted lines",
-      });
-    }
-    const pwpAttr = attrs.pwp as { code?: unknown } | undefined;
-    if (pwpAttr && typeof pwpAttr === "object" && pwpAttr.code) {
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "pwp_voucher_add_not_supported",
-          message:
-            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
-        },
-        409,
-      );
-    }
-    // Review finding #1 — mirror the pipeline's build-preview guard HERE so a
-    // price-less build fails at submit (immediate dealer feedback), not as a
-    // stuck-pending 400 at every approval attempt.
-    if (attrs.sofa_build && typeof line.unitPrice !== "number") {
-      throw new HTTPException(400, {
-        message: "a sofa build line must carry its preview unitPrice for the drift gate",
-      });
-    }
-  }
   const sb = userClient(c.env, auth.jwt);
+
+  let pKind: "add_lines" | "replace_lines";
+  let pPayload: Record<string, unknown>;
+  if (parsed.data.kind === "replace_lines") {
+    const gate = submitLineMarkerGates(c, [parsed.data.line]);
+    if (gate) return gate;
+    pKind = "replace_lines";
+    pPayload = {
+      targetLineIds: parsed.data.targetLineIds,
+      targetLines: parsed.data.targetLines ?? [],
+      line: parsed.data.line,
+    };
+  } else {
+    const gate = submitLineMarkerGates(c, parsed.data.lines);
+    if (gate) return gate;
+    // Fail-fast validation of the service picks (key active, sizes complete);
+    // the approval re-prices from the live config anyway.
+    const addonsCheck = await priceServiceAddons(c, sb, parsed.data.addons, "submit_blocked");
+    if (addonsCheck instanceof Response) return addonsCheck;
+    pKind = "add_lines";
+    pPayload = { lines: parsed.data.lines, addons: parsed.data.addons };
+  }
+
   const { data: rpcData, error: rpcError } = await sb.rpc("submit_order_change_request", {
     p_order_id: id,
-    p_payload: { lines: parsed.data.lines },
+    p_payload: pPayload,
+    p_kind: pKind,
   });
   const errRes = addLinesRpcError(c, rpcError, "submit_blocked");
   if (errRes) return errRes;
@@ -3063,7 +3222,8 @@ ordersRouter.get("/change-requests/pending", async (c) => {
 
 /** POST /api/orders/:id/change-requests/:reqId/edit — 0234: replace a PENDING
  *  request's payload in place (View request → Edit). Same zod + marker gates
- *  as submit; the RPC owns dealer-scope + pending-only. */
+ *  as submit; the RPC owns dealer-scope + pending-only + the payload-shape
+ *  vs request-kind match (0257). */
 ordersRouter.post("/:id/change-requests/:reqId/edit", async (c) => {
   const auth = c.var.auth;
   const idCheck = z.string().uuid().safeParse(c.req.param("id"));
@@ -3080,39 +3240,34 @@ ordersRouter.post("/:id/change-requests/:reqId/edit", async (c) => {
   } catch {
     throw new HTTPException(400, { message: "Body must be valid JSON" });
   }
-  const parsed = addOrderLinesInputSchema.safeParse(raw);
+  const parsed = submitOrderChangeRequestInputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new HTTPException(400, {
       message: "Invalid input: " + (parsed.error.issues[0]?.message ?? "unknown"),
     });
   }
-  for (const line of parsed.data.lines) {
-    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
-    if (attrs.free_gift || attrs.free_item) {
-      throw new HTTPException(400, { message: "free markers are not allowed on submitted lines" });
-    }
-    const pwpAttr = attrs.pwp as { code?: unknown } | undefined;
-    if (pwpAttr && typeof pwpAttr === "object" && pwpAttr.code) {
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "pwp_voucher_add_not_supported",
-          message:
-            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
-        },
-        409,
-      );
-    }
-    if (attrs.sofa_build && typeof line.unitPrice !== "number") {
-      throw new HTTPException(400, {
-        message: "a sofa build line must carry its preview unitPrice for the drift gate",
-      });
-    }
-  }
   const sb = userClient(c.env, auth.jwt);
+
+  let pPayload: Record<string, unknown>;
+  if (parsed.data.kind === "replace_lines") {
+    const gate = submitLineMarkerGates(c, [parsed.data.line]);
+    if (gate) return gate;
+    pPayload = {
+      targetLineIds: parsed.data.targetLineIds,
+      targetLines: parsed.data.targetLines ?? [],
+      line: parsed.data.line,
+    };
+  } else {
+    const gate = submitLineMarkerGates(c, parsed.data.lines);
+    if (gate) return gate;
+    const addonsCheck = await priceServiceAddons(c, sb, parsed.data.addons, "edit_blocked");
+    if (addonsCheck instanceof Response) return addonsCheck;
+    pPayload = { lines: parsed.data.lines, addons: parsed.data.addons };
+  }
+
   const { error: rpcError } = await sb.rpc("update_order_change_request", {
     p_request_id: reqCheck.data,
-    p_payload: { lines: parsed.data.lines },
+    p_payload: pPayload,
   });
   const errRes = addLinesRpcError(c, rpcError, "edit_blocked");
   if (errRes) return errRes;
@@ -3234,6 +3389,65 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
       422,
     );
   }
+
+  // 0257 — a replace_lines request applies through the REPLACE pipeline +
+  // replace_order_lines; an add_lines request keeps the append path.
+  if (request.kind === "replace_lines") {
+    const payloadParsed = submitOrderChangeRequestInputSchema.safeParse({
+      ...(request.payload as Record<string, unknown>),
+      kind: "replace_lines",
+    });
+    if (!payloadParsed.success || payloadParsed.data.kind !== "replace_lines") {
+      return c.json(
+        {
+          error: "decide_blocked",
+          code: "invalid_payload",
+          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+        },
+        422,
+      );
+    }
+    // Friendly thread precheck (the RPC re-enforces under the order lock):
+    // a line that entered procurement since submission can't be swapped.
+    const threadR = await sb
+      .from("order_supplier_threads")
+      .select("id")
+      .in("order_line_id", payloadParsed.data.targetLineIds);
+    if (threadR.error) throw new HTTPException(500, { message: threadR.error.message });
+    if ((threadR.data ?? []).length > 0) {
+      return c.json(
+        {
+          error: "decide_blocked",
+          code: "line_in_production",
+          message:
+            "This item already has a live procurement thread — reject the request and handle the change manually.",
+        },
+        422,
+      );
+    }
+    const res = await computeReplaceWriteSet(
+      c,
+      sb,
+      id,
+      { targetLineIds: payloadParsed.data.targetLineIds, line: payloadParsed.data.line },
+      ord,
+      "decide_blocked",
+    );
+    if (res instanceof Response) return res;
+
+    const { error: rpcError } = await sb.rpc("replace_order_lines", {
+      p_order_id: id,
+      p_old_line_ids: res.removedIds,
+      p_lines: res.out.pLines,
+      p_addons_replace: res.out.pAddonsReplace,
+      p_source: "change_request",
+      p_change_request_id: reqId,
+    });
+    const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
+    if (errRes) return errRes;
+    return c.json(await fetchAndShapeOrder(sb, id));
+  }
+
   const payloadParsed = addOrderLinesInputSchema.safeParse(request.payload);
   if (!payloadParsed.success) {
     return c.json(
@@ -3246,8 +3460,13 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
     );
   }
 
-  const out = await computeAddLinesWriteSet(c, sb, id, payloadParsed.data.lines, ord);
+  const out =
+    payloadParsed.data.lines.length > 0
+      ? await computeAddLinesWriteSet(c, sb, id, payloadParsed.data.lines, ord)
+      : ({ pLines: [], pAddonsReplace: null } satisfies AddLinesWriteSet);
   if (out instanceof Response) return out;
+  const addonsAppend = await priceServiceAddons(c, sb, payloadParsed.data.addons, "decide_blocked");
+  if (addonsAppend instanceof Response) return addonsAppend;
 
   const { error: rpcError } = await sb.rpc("add_order_lines", {
     p_order_id: id,
@@ -3255,6 +3474,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
     p_source: "change_request",
     p_change_request_id: reqId,
     p_addons_replace: out.pAddonsReplace,
+    p_addons_append: addonsAppend,
   });
   const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
   if (errRes) return errRes;

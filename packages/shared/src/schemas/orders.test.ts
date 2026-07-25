@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { addOrderLinesInputSchema, replaceOrderLinesInputSchema, updateOrderInputSchema } from "./orders";
+import {
+  addOrderLinesInputSchema,
+  replaceOrderLinesInputSchema,
+  submitOrderChangeRequestInputSchema,
+  updateOrderInputSchema,
+} from "./orders";
 
 // 0220 — POS proceed-lane edits: customer.email joins the editable set.
 describe("updateOrderInputSchema.customer.email (0220)", () => {
@@ -116,6 +121,62 @@ describe("addOrderLinesInputSchema (0231/0232)", () => {
     ).toBe(false);
     expect(
       addOrderLinesInputSchema.safeParse({ lines: [{ sku: "  ", qty: 1 }] }).success,
+    ).toBe(false);
+  });
+
+  // 0257 — service add-ons ride the same body; lines become optional.
+  it("parses an addons-only body; rejects when BOTH lines and addons are empty", () => {
+    const svcOnly = addOrderLinesInputSchema.parse({
+      addons: [{ addonKey: "dispose-mattress", qty: 2, attrs: { sizes: ["Queen", "King"] } }],
+    });
+    expect(svcOnly.lines).toEqual([]);
+    expect(svcOnly.addons[0].addonKey).toBe("dispose-mattress");
+    expect(addOrderLinesInputSchema.safeParse({ lines: [], addons: [] }).success).toBe(false);
+    expect(addOrderLinesInputSchema.safeParse({}).success).toBe(false);
+    expect(
+      addOrderLinesInputSchema.safeParse({ addons: [{ addonKey: "x", qty: 0 }] }).success,
+    ).toBe(false);
+  });
+});
+
+// 0257 — kind-aware change-request submissions.
+describe("submitOrderChangeRequestInputSchema (0257)", () => {
+  it("a body without kind parses as the add variant (pre-0257 web compat)", () => {
+    const parsed = submitOrderChangeRequestInputSchema.parse({
+      lines: [{ sku: "PILLOW-1", qty: 1 }],
+    });
+    expect(parsed.kind === "replace_lines").toBe(false);
+    if (parsed.kind !== "replace_lines") {
+      expect(parsed.lines).toHaveLength(1);
+      expect(parsed.addons).toEqual([]);
+    }
+  });
+
+  it("parses the replace variant (targets + snapshot + replacement line)", () => {
+    const parsed = submitOrderChangeRequestInputSchema.parse({
+      kind: "replace_lines",
+      targetLineIds: ["6a51f4a1-0000-4000-8000-000000000001"],
+      targetLines: [{ sku: "FENRIR-K", qty: 1, unitPrice: 1999, label: "Fenrir · King" }],
+      line: { sku: "FENRIR-Q", qty: 1, unitPrice: 2499, label: "Fenrir · Queen" },
+    });
+    expect(parsed.kind).toBe("replace_lines");
+    if (parsed.kind === "replace_lines") {
+      expect(parsed.targetLineIds).toHaveLength(1);
+      expect(parsed.line.sku).toBe("FENRIR-Q");
+    }
+  });
+
+  it("rejects a replace variant without targets and an add variant with nothing to add", () => {
+    expect(
+      submitOrderChangeRequestInputSchema.safeParse({
+        kind: "replace_lines",
+        targetLineIds: [],
+        line: { sku: "S", qty: 1 },
+      }).success,
+    ).toBe(false);
+    expect(
+      submitOrderChangeRequestInputSchema.safeParse({ kind: "add_lines", lines: [], addons: [] })
+        .success,
     ).toBe(false);
   });
 });

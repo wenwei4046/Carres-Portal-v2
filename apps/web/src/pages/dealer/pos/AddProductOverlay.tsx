@@ -7,8 +7,16 @@ import type {
   ProductModelDto,
 } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
-import type { DraftLine } from "../new-order/draft";
+import { rm } from "@/lib/format-currency";
+import {
+  addonRequiresSize,
+  disposalUnitSizes,
+  type DraftAddon,
+  type DraftLine,
+  type WizardDraft,
+} from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
+import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import { buildCatalogIndex } from "./catalog-index";
 import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
@@ -47,6 +55,8 @@ export default function AddProductOverlay({
   busy,
   error,
   onPick,
+  onPickServices,
+  serviceCta,
   onClose,
 }: {
   order: Order;
@@ -55,6 +65,11 @@ export default function AddProductOverlay({
   error: string | null;
   /** The configured line to append — the parent runs the POST and closes on success. */
   onPick: (line: DraftLine) => void;
+  /** 0257 — the picked SERVICE add-ons (Dispose old sofa/mattress …, the
+   *  wizard's AddonsPanel catalog). The parent runs the POST / submission. */
+  onPickServices: (addons: DraftAddon[]) => void;
+  /** CTA label for the services tab ("Add to order" / "Submit for approval"). */
+  serviceCta: string;
   onClose: () => void;
 }) {
   const index = useMemo(
@@ -62,8 +77,16 @@ export default function AddProductOverlay({
     [catalog],
   );
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState<ProductCategory | "all">("all");
+  const [cat, setCat] = useState<ProductCategory | "all" | "services">("all");
   const [configureModel, setConfigureModel] = useState<ProductModelDto | null>(null);
+  // 0257 — the services tab's local picks (AddonsPanel operates on a draft
+  // whose ONLY consulted field is `addons` — shimmed below).
+  const [svc, setSvc] = useState<DraftAddon[]>([]);
+  const services = useMemo(() => offerableAddons(catalog.addons), [catalog.addons]);
+  const svcTotal = svc.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+  const svcSizesOk = svc.every(
+    (a) => !addonRequiresSize(a) || disposalUnitSizes(a).every((s) => s !== ""),
+  );
 
   // 0089 mutex against the ORDER's existing lines (lockedCategoriesFor only
   // reads `.sku`, so the persisted rows adapt structurally).
@@ -160,6 +183,15 @@ export default function AddProductOverlay({
               onClick={() => setCat(ck)}
             />
           ))}
+          {/* 0257 — order add-ons (Dispose old sofa/mattress …): the same
+              service catalog the wizard's AddonsPanel offers. */}
+          {services.length > 0 && (
+            <CatChip
+              active={cat === "services"}
+              label="Services"
+              onClick={() => setCat("services")}
+            />
+          )}
         </div>
 
         {error && (
@@ -173,7 +205,29 @@ export default function AddProductOverlay({
 
         <div className="flex-1 overflow-auto px-6 pb-8">
           {busy && <div className="t-small text-base-500 mb-2">Adding…</div>}
-          {models.length === 0 ? (
+          {cat === "services" ? (
+            <div data-testid="pos-add-services">
+              <AddonsPanel
+                addons={services}
+                draft={{ addons: svc } as unknown as WizardDraft}
+                onChange={(next) => setSvc(next.addons)}
+              />
+              <div className="flex items-center justify-end gap-3 mt-5">
+                {svc.length > 0 && (
+                  <span className="font-mono t-small text-base-600">{rm(svcTotal)}</span>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={busy || svc.length === 0 || !svcSizesOk}
+                  onClick={() => onPickServices(svc)}
+                  data-testid="pos-add-services-confirm"
+                >
+                  {serviceCta}
+                </button>
+              </div>
+            </div>
+          ) : models.length === 0 ? (
             <div className="t-small text-base-500 py-10 text-center">No products match.</div>
           ) : (
             <div className="cat-grid">
