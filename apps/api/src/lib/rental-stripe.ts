@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import type { DB } from "@carres/shared";
 
 /**
- * Rental ↔ Stripe glue (0254, Loo 2026-07-25 — rental segment ①).
+ * Rental ↔ Stripe glue (0255, Loo 2026-07-25 — rental segment ①).
  *
  * Metadata namespace (LOCKED by the live pilot, 2026-07-25): the CARRESS
  * Stripe account still carries the old carressglobal.com system's products

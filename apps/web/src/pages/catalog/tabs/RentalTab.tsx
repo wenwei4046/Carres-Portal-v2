@@ -551,7 +551,7 @@ function PlanRow({
   const del = useDeleteRentalPlan();
   const sync = useSyncRentalPlanStripe();
 
-  // 0254 — a plan needs its Stripe recurring Price before the POS lane can
+  // 0255 — a plan needs its Stripe recurring Price before the POS lane can
   // collect online. Auto-synced on save; this button is the manual retry.
   function syncStripe() {
     sync.mutate(plan.id, {

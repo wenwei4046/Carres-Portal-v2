@@ -949,7 +949,7 @@ export const rentalPlanFromRow = (r: DB.RentalPlanRow): D.RentalPlan => ({
 });
 
 /**
- * Maps a `rental_plans_pos` VIEW row (0254) — the stripped store-side offer.
+ * Maps a `rental_plans_pos` VIEW row (0255) — the stripped store-side offer.
  * No split columns by design (CF rental-pos-config-projection).
  */
 export const posRentalPlanFromRow = (r: DB.RentalPlanPosRow): D.PosRentalPlan => ({

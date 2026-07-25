@@ -59,7 +59,7 @@ stripeWebhookRouter.post("/webhook", async (c) => {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
-      // 0254 — a SUBSCRIPTION-mode session is a rental signup (card saved +
+      // 0255 — a SUBSCRIPTION-mode session is a rental signup (card saved +
       // first month collected): wrap the fixed-term schedule + link the ids,
       // never the order-balance money RPC.
       if (session.mode === "subscription") {
@@ -116,7 +116,7 @@ async function recordSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe
 }
 
 /**
- * 0254 — rental signup completion. Order of operations matters: the
+ * 0255 — rental signup completion. Order of operations matters: the
  * fixed-term schedule wraps FIRST (its failure 500s so Stripe retries and the
  * subscription can never stay open-ended while marked linked), then the
  * link_rental_subscription RPC stamps the ids — both idempotent, so this and

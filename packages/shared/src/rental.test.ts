@@ -231,7 +231,7 @@ describe("rental plan split cap (0253)", () => {
   });
 });
 
-describe("createRentalAgreementInputSchema (0254 POS sell lane)", () => {
+describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
   const valid = {
     planId: "00000000-0000-0000-0000-0000000b0001",
     customerName: "Tan Mei Ling",

@@ -20,7 +20,7 @@ function request(path: string, init: RequestInit | undefined, e: unknown): Promi
 }
 
 /**
- * 0254 — the POS rental sell lane: /pos-plans, POST /agreements (RPC),
+ * 0255 — the POS rental sell lane: /pos-plans, POST /agreements (RPC),
  * the Stripe subscription checkout pair, the webhook's subscription branch
  * and the plan → Stripe sync wiring. Harness = stripe.test.ts (full app,
  * mocked supabase + stripe factories); the fixed-term schedule wrap and the
@@ -223,7 +223,7 @@ const RENTAL_SESSION = {
   paid_at: null,
 };
 
-describe("GET /api/rental/pos-plans (0254 stripped store projection)", () => {
+describe("GET /api/rental/pos-plans (0255 stripped store projection)", () => {
   it("rejects a supplier (403) — not a seller role", async () => {
     const res = await request(
       "/api/rental/pos-plans",
@@ -274,7 +274,7 @@ describe("GET /api/rental/pos-plans (0254 stripped store projection)", () => {
   });
 });
 
-describe("POST /api/rental/agreements (0254 signup RPC)", () => {
+describe("POST /api/rental/agreements (0255 signup RPC)", () => {
   const payload = {
     planId: PLAN_ID,
     customerName: "Tan Mei Ling",
@@ -409,7 +409,7 @@ describe("POST /api/rental/agreements (0254 signup RPC)", () => {
   });
 });
 
-describe("POST /api/rental/agreements/:id/stripe/checkout (0254 subscription link)", () => {
+describe("POST /api/rental/agreements/:id/stripe/checkout (0255 subscription link)", () => {
   it("503s when Stripe is not configured", async () => {
     const res = await request(
       `/api/rental/agreements/${AG_ID}/stripe/checkout`,
@@ -584,7 +584,7 @@ describe("GET /api/rental/agreements/:id/stripe/checkout/:sid (poll + live recon
   });
 });
 
-describe("POST /stripe/webhook — subscription-mode branch (0254)", () => {
+describe("POST /stripe/webhook — subscription-mode branch (0255)", () => {
   async function fireWebhook(sessionObj: Record<string, unknown>) {
     const stripe = makeStripe();
     stripe.webhooks.constructEventAsync.mockResolvedValue({
@@ -665,7 +665,7 @@ describe("POST /stripe/webhook — subscription-mode branch (0254)", () => {
   });
 });
 
-describe("plan authoring → Stripe sync (0254)", () => {
+describe("plan authoring → Stripe sync (0255)", () => {
   it("POST /plans stores the ensured product/price ids and reports stripeSync", async () => {
     const inserted = {
       id: PLAN_ID,

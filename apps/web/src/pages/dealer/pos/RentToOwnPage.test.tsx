@@ -1,5 +1,5 @@
 /**
- * RentToOwnPage — the POS rental sell lane (0254). Mocked queries (RentalTab
+ * RentToOwnPage — the POS rental sell lane (0255). Mocked queries (RentalTab
  * idiom); the Stripe collect modal is stubbed — its own contract is the poll
  * hooks', not this page's.
  *

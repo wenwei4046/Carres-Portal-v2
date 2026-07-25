@@ -58,7 +58,7 @@ function principalOnly(c: { var: { auth: { role: string } } }) {
   }
 }
 
-// "Everyone can sell" (Loo, 0254) — the POS-transacting set, the API twin of
+// "Everyone can sell" (Loo, 0255) — the POS-transacting set, the API twin of
 // the create_rental_agreement RPC's own gate (mirrors requireOrderRole).
 const SELLER_ROLES = new Set<string>([
   "dealer",
@@ -85,7 +85,7 @@ function requireStripeConfigured(c: { env: AppEnv["Bindings"] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Stripe plan sync (0254) — authoring a plan upserts its Stripe Product +
+// Stripe plan sync (0255) — authoring a plan upserts its Stripe Product +
 // recurring Price (the pilot's metadata namespace). Sync NEVER fails the save:
 // the plan row is the source of truth, Stripe is a projection; a failure comes
 // back as stripeSync.status='error' and the Rental tab offers a manual Sync.
@@ -343,7 +343,7 @@ rentalRouter.post("/plans", async (c) => {
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "rental plan insert returned no row" }, 500);
   }
-  // 0254 — project the fresh plan into Stripe (Product + recurring Price).
+  // 0255 — project the fresh plan into Stripe (Product + recurring Price).
   const synced = await syncPlanStripe(c, sb, data as DB.RentalPlanRow);
   return c.json(
     { plan: Adapters.rentalPlanFromRow(synced.plan), stripeSync: synced.stripeSync },
@@ -400,7 +400,7 @@ rentalRouter.patch("/plans/:id", async (c) => {
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "rental plan not found" }, 404);
   }
-  // 0254 — re-project into Stripe when the sellable face moved (sku/term/fee)
+  // 0255 — re-project into Stripe when the sellable face moved (sku/term/fee)
   // or the plan was never synced. A pure deactivate skips Stripe entirely
   // (the POS view already hides inactive plans).
   const row = data as DB.RentalPlanRow;
@@ -571,7 +571,7 @@ rentalRouter.post("/customers", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// POS sell lane (0254) — the store-facing side: browse offers, sign an
+// POS sell lane (0255) — the store-facing side: browse offers, sign an
 // agreement, collect the first month + card-on-file via Stripe Checkout.
 // ---------------------------------------------------------------------------
 

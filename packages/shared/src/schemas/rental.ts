@@ -90,7 +90,7 @@ export const customerInputSchema = z
   .strict();
 export type CustomerInput = z.infer<typeof customerInputSchema>;
 
-// ── POS rental sell lane (0254) ────────────────────────────────────────────
+// ── POS rental sell lane (0255) ────────────────────────────────────────────
 
 /**
  * Sign a rent-to-own agreement at the POS (create_rental_agreement RPC).

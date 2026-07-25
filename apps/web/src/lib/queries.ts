@@ -242,7 +242,7 @@ export const qk = {
     config: () => ["rental", "config"] as const,
     agreements: () => ["rental", "agreements"] as const,
     units: () => ["rental", "units"] as const,
-    // 0254 — the POS sell lane's stripped offer list + checkout polling.
+    // 0255 — the POS sell lane's stripped offer list + checkout polling.
     posPlans: () => ["rental", "pos-plans"] as const,
     checkoutSession: (agreementId: string, sessionId: string) =>
       ["rental", "checkout", agreementId, sessionId] as const,
@@ -6973,7 +6973,7 @@ export function useDeleteRentalPlan() {
   );
 }
 
-/* ── 0254 · POS rental sell lane ─────────────────────────────────────────────
+/* ── 0255 · POS rental sell lane ─────────────────────────────────────────────
  * Store-side: the stripped offer list (rental_plans_pos — NO split fields),
  * the signup RPC and the Stripe subscription checkout pair. Principal-side:
  * the manual plan → Stripe sync retry. */

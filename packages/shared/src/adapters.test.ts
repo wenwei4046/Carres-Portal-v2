@@ -1292,7 +1292,7 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.stripePriceId).toBeNull();
   });
 
-  it("posRentalPlanFromRow (0254 view) exposes the sellable face only — no split fields", () => {
+  it("posRentalPlanFromRow (0255 view) exposes the sellable face only — no split fields", () => {
     const row: RentalPlanPosRow = {
       id: "00000000-0000-0000-0000-0000000b0002",
       sku: "M-CLOUD-KING",

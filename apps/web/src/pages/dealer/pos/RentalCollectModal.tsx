@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/api";
 import { useCreateRentalCheckout, useRentalCheckoutStatus } from "@/lib/queries";
 
 /**
- * RentalCollectModal (0254) — set up a rent-to-own agreement's Stripe
+ * RentalCollectModal (0255) — set up a rent-to-own agreement's Stripe
  * auto-debit at the counter. The StripeCollectModal idiom minus the amount
  * stage: the amount IS the plan's monthly fee, so the subscription Checkout
  * link mints the moment the modal opens (QR first). Paying it collects month

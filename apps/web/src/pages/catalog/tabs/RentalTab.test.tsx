@@ -243,7 +243,7 @@ describe("RentalTab — service packages", () => {
   });
 });
 
-describe("RentalTab — Stripe sync column (0254)", () => {
+describe("RentalTab — Stripe sync column (0255)", () => {
   it("a synced plan shows the Synced pill; no Sync button", () => {
     setConfig([], [makePlan({ stripeProductId: "prod_X", stripePriceId: "price_X" })]);
     render(<RentalTab isPrincipal={true} />);

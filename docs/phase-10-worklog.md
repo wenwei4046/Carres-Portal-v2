@@ -564,11 +564,11 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Next phases**: ① POS rental sell lane + Stripe product/subscription sync + entitlement minting (incl. P7 free-gift attach), ② billing/dunning engine (Jess line's locked D0/3/7/14/21/30/60 + Credit Bureau), ③ cleaning-partner tab + visit scheduling, ④ customer check surface (staff lookup → OTP page), ⑤ LHDN e-invoice decision.
 
-## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (PR #275, migration 0254 DRAFTED — NOT yet applied/deployed)
+## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (PR #275, migration 0255 DRAFTED — NOT yet applied/deployed)
 
 **Ask (Loo)**: "open a worktree, continue the checkpoint of rental program and service line" — resuming checkpoint `20260725-144857-rental-service-plan-base.md`, whose Remaining-Work #1 is this exact segment: the POS rental sell lane + Stripe product/subscription sync + entitlement minting.
 
-**Migration 0254_rental_sell_lane (DRAFT in branch — apply needs Loo's greenlight; tail verified 0253 via list_migrations at session start)**:
+**Migration 0255_rental_sell_lane (DRAFT in branch — apply needs Loo's greenlight; tail verified 0253 via list_migrations at session start)**:
 - Stripe landing columns: `rental_plans.stripe_product_id/stripe_price_id` + `customers.stripe_customer_id` (one Stripe Customer per canonical phone, reused across agreements).
 - `stripe_checkout_sessions`: `order_id` → nullable, `agreement_id` FK added, `one_target` CHECK (exactly one of order/agreement) — the reuse 0223's comment predicted (`purpose` already CHECKed `'rental_subscription'`).
 - **`rental_plans_pos` VIEW** — the deliberate store-side widening 0253 promised (closes CF `rental-pos-config-projection`): ACTIVE plans only, columns id/sku/term/fee/package name+type+visits + `stripe_ready`; **the split pcts are not in the column list**; definer view (security_invoker off), anon revoked, authenticated SELECT.
@@ -592,4 +592,4 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Scope note**: the checkpoint's "entitlement minting incl. free-gift attach" NORMAL-sale path (service SKU bought / P7-gifted on an ORDER mints an entitlement) is deliberately NOT in this PR — it hooks order create/proceed, a different blast radius; slated as segment ①b alongside ②.
 
-**Ship state**: branch pushed + PR open; **0254 NOT applied to prod** (rental tables all dormant, so the code paths 404/empty harmlessly until apply); apply via MCP after Loo's greenlight (re-verify tracker tail first — guardrail #8), then deploy api+web from the merged main tip per the §17.1 deploy rules.
+**Ship state**: branch pushed + PR open; **0255 NOT applied to prod** (rental tables all dormant, so the code paths 404/empty harmlessly until apply); apply via MCP after Loo's greenlight (re-verify tracker tail first — guardrail #8), then deploy api+web from the merged main tip per the §17.1 deploy rules.

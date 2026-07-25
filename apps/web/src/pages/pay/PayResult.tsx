@@ -12,7 +12,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 export function PaySuccess() {
   const [params] = useSearchParams();
   const so = params.get("so");
-  // 0254 — a rent-to-own signup lands with ?ra=RA-…: month 1 collected AND
+  // 0255 — a rent-to-own signup lands with ?ra=RA-…: month 1 collected AND
   // the card is saved for the monthly auto-debit.
   const ra = params.get("ra");
   return (

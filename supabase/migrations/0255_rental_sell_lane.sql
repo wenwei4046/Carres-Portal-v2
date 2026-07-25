@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0254_rental_sell_lane.sql (Loo 2026-07-25 — rental segment ①: the POS sell lane)
+-- 0255_rental_sell_lane.sql (Loo 2026-07-25 — rental segment ①: the POS sell lane)
 -- =============================================================================
 -- The 0247-0249 base is DORMANT config + registry. This migration wakes the
 -- SELL side: a store (dealer / showroom / bd / internal on-behalf) signs a
@@ -47,13 +47,13 @@ ALTER TABLE public.rental_plans
   ADD COLUMN stripe_price_id   text;
 
 COMMENT ON COLUMN public.rental_plans.stripe_price_id IS
-  'Recurring monthly Stripe Price backing this plan (sync engine, 0254). NULL = not yet synced — the POS lane refuses online collection until the principal re-saves/syncs the plan. Prices are immutable on amount: a fee change mints a NEW price and archives the old one.';
+  'Recurring monthly Stripe Price backing this plan (sync engine, 0255). NULL = not yet synced — the POS lane refuses online collection until the principal re-saves/syncs the plan. Prices are immutable on amount: a fee change mints a NEW price and archives the old one.';
 
 ALTER TABLE public.customers
   ADD COLUMN stripe_customer_id text;
 
 COMMENT ON COLUMN public.customers.stripe_customer_id IS
-  'One Stripe Customer per canonical phone, minted lazily at first rental checkout and reused for later agreements (0254).';
+  'One Stripe Customer per canonical phone, minted lazily at first rental checkout and reused for later agreements (0255).';
 
 -- ── 2) stripe_checkout_sessions — the 0223-anticipated rental reuse ─────────
 
@@ -100,7 +100,7 @@ CREATE VIEW public.rental_plans_pos
   WHERE rp.active;
 
 COMMENT ON VIEW public.rental_plans_pos IS
-  'Store-facing rental offers (0254) — the deliberate stripped widening 0253 promised (CF rental-pos-config-projection). Active plans only; the supplier/commission split columns are intentionally absent. Definer view: bypasses the internal-only RLS for exactly this column list.';
+  'Store-facing rental offers (0255) — the deliberate stripped widening 0253 promised (CF rental-pos-config-projection). Active plans only; the supplier/commission split columns are intentionally absent. Definer view: bypasses the internal-only RLS for exactly this column list.';
 
 -- Supabase default privileges hand new objects to anon+authenticated — a
 -- definer view bypasses RLS, so anon must be cut explicitly.

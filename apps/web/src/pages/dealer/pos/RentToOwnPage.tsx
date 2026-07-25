@@ -16,7 +16,7 @@ import {
 import RentalCollectModal from "./RentalCollectModal";
 
 /**
- * Rent-to-Own — the POS rental sell lane (0254, Loo's rent-to-own initiative
+ * Rent-to-Own — the POS rental sell lane (0255, Loo's rent-to-own initiative
  * segment ①). Its own overlay off the POS top bar — deliberately NOT part of
  * the cart wizard: a rental signs an AGREEMENT (RA-…), not an order.
  *

@@ -171,7 +171,7 @@ export default function DealerPos({
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  // 0254 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
+  // 0255 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
   const [rentalOpen, setRentalOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
@@ -932,7 +932,7 @@ export default function DealerPos({
             <Bookmark size={13} strokeWidth={1.75} />
             <span>Quotes</span>
           </button>
-          {/* 0254 — the rental sell lane: sign RA agreements + Stripe
+          {/* 0255 — the rental sell lane: sign RA agreements + Stripe
               auto-debit. Dormant-friendly (no active plans → empty state). */}
           <button
             type="button"

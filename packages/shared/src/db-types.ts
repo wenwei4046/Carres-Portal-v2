@@ -1049,7 +1049,7 @@ export interface CustomerRow {
   email: string | null;
   address: string | null;
   notes: string | null;
-  /** One Stripe Customer per canonical phone (0254) — minted lazily at first
+  /** One Stripe Customer per canonical phone (0255) — minted lazily at first
    *  rental checkout, reused for later agreements. */
   stripe_customer_id: string | null;
   created_at: string;
@@ -1095,7 +1095,7 @@ export interface RentalPlanRow {
   commission_base_pct: number;
   included_package_id: string | null;
   active: boolean;
-  /** Stripe sync anchors (0254). A fee change mints a NEW price (amounts are
+  /** Stripe sync anchors (0255). A fee change mints a NEW price (amounts are
    *  immutable on Stripe) and archives the old one. NULL = not yet synced —
    *  the POS lane refuses online collection until the plan re-saves/syncs. */
   stripe_product_id: string | null;
@@ -1106,7 +1106,7 @@ export interface RentalPlanRow {
 }
 
 /**
- * `rental_plans_pos` (0254) — the DELIBERATE store-side projection of an
+ * `rental_plans_pos` (0255) — the DELIBERATE store-side projection of an
  * ACTIVE rental plan (CF rental-pos-config-projection): the sellable face
  * only. The supplier/commission split columns are intentionally absent — a
  * dealer must never see the supplier's cut nor vice versa (0253 MAJOR).
