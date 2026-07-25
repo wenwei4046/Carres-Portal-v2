@@ -33,6 +33,7 @@ import {
 import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
 import { fabricDisplayName, type SellingFabric } from "../sofa-build/selling-fabrics";
 import type { ModelMeta } from "./catalog-index";
+import ConfigureTopbarBrand, { type WizardTopbarCtx } from "./ConfigureTopbarBrand";
 import {
   coveringPwpForLine,
   linePwpCode,
@@ -321,6 +322,7 @@ export default function PosConfigurePage({
   editLine,
   onAdd,
   onClose,
+  wizardTopbar,
 }: {
   model: ProductModelDto;
   meta: ModelMeta | undefined;
@@ -356,6 +358,9 @@ export default function PosConfigurePage({
   editLine?: DraftLine;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
+  /** Loo 2026-07-26 — wizard context: render the POS topbar strip (logo =
+   *  back) instead of the ← arrow. Absent outside the wizard. */
+  wizardTopbar?: WizardTopbarCtx;
 }) {
   const isBed = model.category === "bedframe";
   const catLabel = isBed ? "Bed frame" : "Mattress";
@@ -770,17 +775,22 @@ export default function PosConfigurePage({
       aria-label={`Configure ${model.name}`}
       data-testid="pos-configure-page"
     >
-      {/* Header — back · live summary · live total (+ breakdown pop) · CTA */}
+      {/* Header — brand strip (wizard) / back arrow · live summary · live
+          total (+ breakdown pop) · CTA */}
       <div className="cfg-header cfg-header--icon">
-        <button
-          className="cfg-header__back"
-          onClick={onClose}
-          title="Back to catalog"
-          aria-label="Back to catalog"
-          data-testid="cfg-back"
-        >
-          <ArrowLeft size={16} strokeWidth={1.75} />
-        </button>
+        {wizardTopbar ? (
+          <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
+        ) : (
+          <button
+            className="cfg-header__back"
+            onClick={onClose}
+            title="Back to catalog"
+            aria-label="Back to catalog"
+            data-testid="cfg-back"
+          >
+            <ArrowLeft size={16} strokeWidth={1.75} />
+          </button>
+        )}
         <div className="cfg-header__live">
           <div className="cfg-header__summary">
             <div className="cfg-header__eyebrow">
