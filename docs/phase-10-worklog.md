@@ -564,6 +564,19 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 
 **Next phases**: ① POS rental sell lane + Stripe product/subscription sync + entitlement minting (incl. P7 free-gift attach), ② billing/dunning engine (Jess line's locked D0/3/7/14/21/30/60 + Credit Bureau), ③ cleaning-partner tab + visit scheduling, ④ customer check surface (staff lookup → OTP page), ⑤ LHDN e-invoice decision.
 
+## 2026-07-25 (late) · My-orders board speaks SO numbers + View sales order in the drawer (PR #273)
+
+**Ask (Loo, screenshot)**: the My-orders drawer header showed `#1256` — "I want this follow with SO number, not this code"; plus a button at the bottom of the drawer to view the sales order.
+
+**What shipped** (web-only, no API/DB):
+- `#1256` → `SO-1256` — the digits were always `orders.so`; the `#` prefix was a 2990s-prototype leftover. Unified on the official document format (matches the SO PDF + finance/operation/HR surfaces) across the drawer title (`PosOrderDetail`), board card id (`order-board-ui`), AddProductOverlay kicker, Stripe collect modal eyebrow AND the customer-facing WhatsApp payment-link message.
+- **View sales order** button at the bottom of the drawer in ALL four footer lanes (place / proceed / locked / delivered — the two info-strip footers restructured to strip + button). New `pos` variant on the existing `DownloadSalesOrderButton` (same fetch → client react-pdf render → new-tab flow as ThankYou/finance/ops; server role gate unchanged), shelled as a `.pos-proto` ghost pill.
+- Bundle note: react-pdf was already in the graph via ThankYou — zero new weight.
+
+**Evidence**: 7 affected web test files 58/58 (new pins: SO format on card + title; button presence per lane; pos-variant unit test) · full web suite 1451 passed / 16 failed = exactly the §17.7 baseline · build (v4-guard + tsc + vite) + design-standard clean.
+
+**Deploy (same session, main tip `115e0ac`)**: web `index-Cvt09dlF.js` → carres-portal `f79b1f71` + carres-pos `d2ff6223` (`--branch=main`); all 4 canonicals verified serving it on first curl; live bundle downloaded to file — `View sales order` marker present, `SERVICE_ROLE` 0. API untouched.
+
 ## 2026-07-25 · Rental segment ① — POS Rent-to-Own sell lane + Stripe subscription wiring (PR #275, migration 0255 DRAFTED — NOT yet applied/deployed)
 
 **Ask (Loo)**: "open a worktree, continue the checkpoint of rental program and service line" — resuming checkpoint `20260725-144857-rental-service-plan-base.md`, whose Remaining-Work #1 is this exact segment: the POS rental sell lane + Stripe product/subscription sync + entitlement minting.
@@ -593,3 +606,4 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Scope note**: the checkpoint's "entitlement minting incl. free-gift attach" NORMAL-sale path (service SKU bought / P7-gifted on an ORDER mints an entitlement) is deliberately NOT in this PR — it hooks order create/proceed, a different blast radius; slated as segment ①b alongside ②.
 
 **Ship state**: branch pushed + PR open; **0255 NOT applied to prod** (rental tables all dormant, so the code paths 404/empty harmlessly until apply); apply via MCP after Loo's greenlight (re-verify tracker tail first — guardrail #8), then deploy api+web from the merged main tip per the §17.1 deploy rules.
+

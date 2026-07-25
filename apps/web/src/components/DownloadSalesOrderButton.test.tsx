@@ -59,6 +59,15 @@ describe("DownloadSalesOrderButton", () => {
     expect(supplier.container.firstChild).toBeNull();
   });
 
+  it("pos variant renders the .pos-proto ghost pill with the View label", () => {
+    render(
+      <DownloadSalesOrderButton orderId="ord-1" so={1256} role="dealer" variant="pos" />,
+    );
+    const btn = screen.getByTestId("download-sales-order-1256");
+    expect(btn).toHaveClass("btn", "btn--ghost");
+    expect(btn).toHaveTextContent("View sales order");
+  });
+
   it("fetches JSON, renders client-side, opens new tab on click", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(apiFetch).mockResolvedValueOnce({ so_number: "SO-001001" } as any);

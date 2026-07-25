@@ -37,6 +37,12 @@ vi.mock("@/lib/storage", () => ({
   newWizardSessionId: () => "sess-1",
   uploadAttachment: vi.fn(async () => "orders-attachments/d-1/topup-sess-1/receipt-1.jpg"),
 }));
+// Keep @react-pdf/renderer (ridden in by DownloadSalesOrderButton) out of the
+// jsdom graph — the fetch-render-open flow is unit-covered in the button's
+// own test file; here we only pin presence per lane.
+vi.mock("@/lib/pdf/render", () => ({
+  renderSalesOrderPdf: vi.fn(),
+}));
 
 const CATALOG = {
   models: [
@@ -271,6 +277,44 @@ describe("delivered lane", () => {
     expect(screen.queryByTestId("pos-od-payform")).toBeNull();
     expect(screen.queryByTestId("pos-od-checklist")).toBeNull();
     expect(screen.getByTestId("pos-od-foot-delivered")).toBeTruthy();
+  });
+});
+
+describe("SO identity + Sales Order doc (2026-07-25, Loo)", () => {
+  it("titles the drawer with the official SO number, not the # code", () => {
+    renderDrawer(order());
+    expect(screen.getByText("SO-1201")).toBeTruthy();
+  });
+
+  it("place-lane footer ends with View sales order", () => {
+    renderDrawer(order());
+    const btn = within(screen.getByTestId("pos-od-foot-place")).getByTestId(
+      "download-sales-order-1201",
+    );
+    expect(btn.textContent).toContain("View sales order");
+  });
+
+  it("proceed-lane footer carries the button next to Move to Order placed", () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "confirmed" }));
+    expect(
+      within(screen.getByTestId("pos-od-foot-proceed")).getByTestId(
+        "download-sales-order-1201",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("locked strip keeps its copy AND gains the button", () => {
+    renderDrawer(order({ status: "proceed_order", operationStage: "in_production" }));
+    const foot = screen.getByTestId("pos-od-foot-locked");
+    expect(within(foot).getByText("Locked · HQ operation handling")).toBeTruthy();
+    expect(within(foot).getByTestId("download-sales-order-1201")).toBeTruthy();
+  });
+
+  it("delivered strip keeps its copy AND gains the button", () => {
+    renderDrawer(order({ status: "delivered", paid: 3000 }));
+    const foot = screen.getByTestId("pos-od-foot-delivered");
+    expect(within(foot).getByText("Delivered · managed in backend portal.")).toBeTruthy();
+    expect(within(foot).getByTestId("download-sales-order-1201")).toBeTruthy();
   });
 });
 

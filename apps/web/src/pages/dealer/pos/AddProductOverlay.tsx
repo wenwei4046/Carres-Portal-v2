@@ -128,7 +128,7 @@ export default function AddProductOverlay({
       >
         <header className="flex items-center gap-3 px-6 py-4 border-b border-base-200 bg-white">
           <div className="min-w-0 flex-1">
-            <p className="kicker">Order #{order.so}</p>
+            <p className="kicker">Order SO-{order.so}</p>
             <h2 className="t-h3">Add product</h2>
           </div>
           <input

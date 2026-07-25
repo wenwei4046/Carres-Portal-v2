@@ -160,7 +160,7 @@ export default function StripeCollectModal({
   const waHref = useMemo(() => {
     if (!session || !customerPhone) return null;
     const text =
-      `Hi ${customerName || "there"}, here is your secure payment link for Carres order #${so} ` +
+      `Hi ${customerName || "there"}, here is your secure payment link for Carres order SO-${so} ` +
       `(RM ${rm2(session.amount)}): ${session.url}`;
     return `https://wa.me/${waNumber(customerPhone)}?text=${encodeURIComponent(text)}`;
   }, [session, customerName, customerPhone, so]);
@@ -180,7 +180,7 @@ export default function StripeCollectModal({
           <X size={16} strokeWidth={1.75} />
         </button>
 
-        <div className="os-stripe__eyebrow">Collect online · order #{so}</div>
+        <div className="os-stripe__eyebrow">Collect online · SO-{so}</div>
 
         {stage === "amount" && lockAmount && (
           <>
