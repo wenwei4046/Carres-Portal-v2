@@ -694,3 +694,12 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Evidence**: shared 1003/1003 · api 1519/1522 (3 = §17.7 baseline; +5) · web 1484/1500 (16 = §17.7 baseline exactly; PosOrderDetail 34 incl. addon pencil place/sized/proceed-CR + DELIVERY locked; history-suite mock gained the new hook — a NEW hook in PosOrderDetail must be added to BOTH test files' query mocks) · build + design-standard clean.
 
 **Ship**: PR #291 merged (`ec3cafd1`) → 0258 applied via MCP → api Worker `4404af26` (unauth new route → 401 ✓) → web `index-CC9gQUto.js` → carres-portal `06ce0d6e` + carres-pos `52865f29`; 4 canonicals first-curl ✓; full bundle 4,018,678 bytes — `pos-od-addon-modal` marker present, `SERVICE_ROLE` 0.
+
+
+## 2026-07-25 (night ④) · SO PDF description = the drawer's ONE-line formula (PR #293, web-only, deployed)
+
+**Ask (Loo, SO PDF screenshot)**: "sales order description want same formula as well" — the PDF still printed point-form `+ Divan 10" · +RM 125` sub-lines after the drawer went one-line (PR #288).
+
+**Fix**: `lineConfigBits` moved from PosOrderDetail into `special-addons-picker` (ONE shared source — drawer + PDF can never drift); the PDF's `attrsDescription` + `optionSpecialSubs` (multi-line, RM-carrying) deleted in favour of one muted `configLine` — `gap 17" · Divan 10" · Leg 2" · Fabric BF-03 · … · ✎ remark`, no per-item RM. Sofa rows keep `sofa_spec` (fabric/leg live inside; only the remark bit rides). ADD-ON sub drops the `Size:` prefix (bare `King`, drawer parity); follow-up remark now `✎ Follow-up of SO-…`.
+
+**Evidence**: affected suites 140/140 · full web 1484/1500 (16 = §17.7 baseline) · build + design-standard clean. **Ship**: PR #293 (`c3ac251e`) → web `index-BYxwMJyA.js` → carres-portal `d51bc036` + carres-pos `3597bdb5`; 4 canonicals ✓ (carres-pos.pages.dev edge lagged ~1 min); full bundle 4,017,729 bytes — new `✎ Follow-up` marker present, old `Size:` prefix zero, `SERVICE_ROLE` 0. api/DB untouched.
