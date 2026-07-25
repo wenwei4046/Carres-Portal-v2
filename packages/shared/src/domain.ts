@@ -999,6 +999,8 @@ export interface Customer {
   email: string | null;
   address: string | null;
   notes: string | null;
+  /** One Stripe Customer per canonical phone (0254), reused across agreements. */
+  stripeCustomerId: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;
@@ -1038,9 +1040,32 @@ export interface RentalPlan {
   commissionBasePct: number;
   includedPackageId: string | null;
   active: boolean;
+  /** Stripe sync anchors (0254). Null = not yet synced — the POS rental lane
+   *  refuses online collection until the principal re-saves/syncs the plan. */
+  stripeProductId: string | null;
+  stripePriceId: string | null;
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
+}
+
+/**
+ * One `rental_plans_pos` VIEW row (0254) — the store-facing sellable face of
+ * an ACTIVE rental plan. Deliberately WITHOUT the supplier/commission split
+ * (cross-party commercial terms; CF rental-pos-config-projection).
+ * `posRentalPlanFromRow` maps it.
+ */
+export interface PosRentalPlan {
+  id: string;
+  sku: string;
+  termMonths: number;
+  monthlyFee: number;
+  includedPackageId: string | null;
+  packageName: string | null;
+  packageServiceType: ServicePackageType | null;
+  packageVisitsPerYear: number | null;
+  /** False until the plan has a synced Stripe price — the lane greys out. */
+  stripeReady: boolean;
 }
 
 /**

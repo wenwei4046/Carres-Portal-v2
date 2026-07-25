@@ -61,6 +61,9 @@ import {
   type RentalPlanInput,
   type RentalAgreement,
   type RentalStockUnit,
+  type PosRentalPlan,
+  type Customer,
+  type CreateRentalAgreementInput,
   type SofaCompartmentDto,
   type SofaCompartmentCreateInput,
   type SofaCompartmentPatchInput,
@@ -239,6 +242,10 @@ export const qk = {
     config: () => ["rental", "config"] as const,
     agreements: () => ["rental", "agreements"] as const,
     units: () => ["rental", "units"] as const,
+    // 0254 — the POS sell lane's stripped offer list + checkout polling.
+    posPlans: () => ["rental", "pos-plans"] as const,
+    checkoutSession: (agreementId: string, sessionId: string) =>
+      ["rental", "checkout", agreementId, sessionId] as const,
   },
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
@@ -6963,6 +6970,87 @@ export function useDeleteRentalPlan() {
     apiFetch<{ ok: boolean }>(`/api/rental/plans/${id}`, {
       method: "DELETE",
     }),
+  );
+}
+
+/* ── 0254 · POS rental sell lane ─────────────────────────────────────────────
+ * Store-side: the stripped offer list (rental_plans_pos — NO split fields),
+ * the signup RPC and the Stripe subscription checkout pair. Principal-side:
+ * the manual plan → Stripe sync retry. */
+
+export interface RentalStripeSyncOutcome {
+  status: "synced" | "skipped" | "error";
+  message?: string;
+}
+
+export interface CreateRentalAgreementResponse {
+  agreement: RentalAgreement;
+  customer: Customer;
+  unit: RentalStockUnit;
+  entitlementId: string | null;
+  visitsTotal: number;
+}
+
+export function useRentalPosPlans(opts?: Partial<UseQueryOptions<{ plans: PosRentalPlan[] }>>) {
+  return useQuery({
+    queryKey: qk.rental.posPlans(),
+    queryFn: () => apiFetch<{ plans: PosRentalPlan[] }>("/api/rental/pos-plans"),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useCreateRentalAgreement() {
+  const qc = useQueryClient();
+  return useMutation<CreateRentalAgreementResponse, ApiError, CreateRentalAgreementInput>({
+    mutationFn: (input) =>
+      apiFetch<CreateRentalAgreementResponse>("/api/rental/agreements", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
+  });
+}
+
+/** Mint the Stripe SUBSCRIPTION checkout link for an agreement (amount = the
+ *  monthly fee; card saved for auto-debit). 422 codes: plan_not_synced /
+ *  plan_repriced / fee_missing / wrong_status; 409 already_subscribed. */
+export function useCreateRentalCheckout(agreementId: string) {
+  return useMutation<{ session: StripeCheckoutSessionInfo }, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(
+        `/api/rental/agreements/${agreementId}/stripe/checkout`,
+        { method: "POST" },
+      ),
+  });
+}
+
+/** Poll one rental checkout link; while open the SERVER live-reconciles, so a
+ *  counter payment wraps the schedule + links the ids within one poll. */
+export function useRentalCheckoutStatus(
+  agreementId: string,
+  sessionId: string | null,
+  opts?: { enabled?: boolean },
+) {
+  return useQuery<{ session: StripeCheckoutSessionInfo }, ApiError>({
+    queryKey: qk.rental.checkoutSession(agreementId, sessionId ?? ""),
+    queryFn: () =>
+      apiFetch<{ session: StripeCheckoutSessionInfo }>(
+        `/api/rental/agreements/${agreementId}/stripe/checkout/${sessionId}`,
+      ),
+    enabled: !!sessionId && (opts?.enabled ?? true),
+    refetchInterval: 4000,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/** Manual plan → Stripe sync retry (principal; the Rental tab's Sync button). */
+export function useSyncRentalPlanStripe() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ plan: RentalPlan; stripeSync: RentalStripeSyncOutcome }>(
+      `/api/rental/plans/${id}/stripe-sync`,
+      { method: "POST" },
+    ),
   );
 }
 

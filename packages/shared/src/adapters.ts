@@ -902,6 +902,7 @@ export const customerFromRow = (r: DB.CustomerRow): D.Customer => ({
   email: r.email,
   address: r.address,
   notes: r.notes,
+  stripeCustomerId: r.stripe_customer_id ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   createdBy: r.created_by,
@@ -940,9 +941,27 @@ export const rentalPlanFromRow = (r: DB.RentalPlanRow): D.RentalPlan => ({
   commissionBasePct: Number(r.commission_base_pct),
   includedPackageId: r.included_package_id,
   active: r.active,
+  stripeProductId: r.stripe_product_id ?? null,
+  stripePriceId: r.stripe_price_id ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   updatedBy: r.updated_by,
+});
+
+/**
+ * Maps a `rental_plans_pos` VIEW row (0254) — the stripped store-side offer.
+ * No split columns by design (CF rental-pos-config-projection).
+ */
+export const posRentalPlanFromRow = (r: DB.RentalPlanPosRow): D.PosRentalPlan => ({
+  id: r.id,
+  sku: r.sku,
+  termMonths: Number(r.term_months),
+  monthlyFee: Number(r.monthly_fee),
+  includedPackageId: r.included_package_id,
+  packageName: r.package_name,
+  packageServiceType: r.package_service_type,
+  packageVisitsPerYear: r.package_visits_per_year == null ? null : Number(r.package_visits_per_year),
+  stripeReady: !!r.stripe_ready,
 });
 
 /**

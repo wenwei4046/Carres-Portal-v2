@@ -89,3 +89,34 @@ export const customerInputSchema = z
   })
   .strict();
 export type CustomerInput = z.infer<typeof customerInputSchema>;
+
+// ── POS rental sell lane (0254) ────────────────────────────────────────────
+
+/**
+ * Sign a rent-to-own agreement at the POS (create_rental_agreement RPC).
+ * The client names a PLAN — the DB re-reads price/split from the plan row
+ * inside the definer transaction, so no money travels in this payload (the
+ * sofa-P4 trust-gate doctrine). Customer name+phone are MANDATORY (Loo):
+ * the server upserts `customers` by canonical phone key.
+ *
+ * `dealerId` is honored ONLY for JWTs carrying no dealer (principal /
+ * operation / finance / bd on-behalf) — a store JWT's own dealer always wins.
+ * `startDate` is a plain calendar date (YYYY-MM-DD), default today MYT.
+ */
+export const createRentalAgreementInputSchema = z
+  .object({
+    planId: z.string().uuid(),
+    customerName: z.string().trim().min(1).max(120),
+    customerPhone: z.string().trim().min(5).max(32),
+    customerEmail: z.string().trim().email().nullable().optional(),
+    customerAddress: z.string().trim().max(500).nullable().optional(),
+    dealerId: z.string().uuid().nullable().optional(),
+    salespersonId: z.string().uuid().nullable().optional(),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "startDate must be YYYY-MM-DD")
+      .optional(),
+    notes: z.string().trim().max(1000).optional(),
+  })
+  .strict();
+export type CreateRentalAgreementInput = z.infer<typeof createRentalAgreementInputSchema>;

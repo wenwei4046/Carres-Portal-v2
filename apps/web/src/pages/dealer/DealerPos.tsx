@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, Repeat, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -53,6 +53,7 @@ import {
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import StripeCollectModal from "./pos/StripeCollectModal";
+import RentToOwnPage from "./pos/RentToOwnPage";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
 import OrderStatusPage from "./pos/OrderStatusPage";
@@ -170,6 +171,8 @@ export default function DealerPos({
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  // 0254 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
+  const [rentalOpen, setRentalOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
   // manage store staff) behind its own top-bar pill.
@@ -929,6 +932,18 @@ export default function DealerPos({
             <Bookmark size={13} strokeWidth={1.75} />
             <span>Quotes</span>
           </button>
+          {/* 0254 — the rental sell lane: sign RA agreements + Stripe
+              auto-debit. Dormant-friendly (no active plans → empty state). */}
+          <button
+            type="button"
+            onClick={() => setRentalOpen(true)}
+            className="topbar-pill"
+            aria-label="Rent-to-Own"
+            data-testid="pos-topbar-rental"
+          >
+            <Repeat size={13} strokeWidth={1.75} />
+            <span>Rent-to-Own</span>
+          </button>
           {/* Every role gets the in-POS Order Status board (PIN-gated) — the
               principal's board scopes to the dealer they're acting for (all
               dealers until one is picked). The portal Orders trace tab still
@@ -1151,6 +1166,14 @@ export default function DealerPos({
         ))}
 
       {accountsOpen && isBd && <BdAccountsPage onClose={() => setAccountsOpen(false)} />}
+
+      {rentalOpen && (
+        <RentToOwnPage
+          actingDealerId={effectiveActingId}
+          dealerId={effectiveDealerId}
+          onClose={() => setRentalOpen(false)}
+        />
+      )}
 
       {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
 

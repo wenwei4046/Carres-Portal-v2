@@ -18,6 +18,7 @@ import {
   usePatchRentalPlan,
   usePatchServicePackage,
   useRentalConfig,
+  useSyncRentalPlanStripe,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 
@@ -462,7 +463,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
 // ---------------------------------------------------------------------------
 
 const PLAN_GRID =
-  "minmax(120px,1.2fr) 70px 90px 110px 80px 100px minmax(110px,1fr) 70px 120px";
+  "minmax(120px,1.2fr) 70px 90px 110px 80px 100px minmax(110px,1fr) 110px 70px 120px";
 
 function RentalPlansSection({
   plans,
@@ -511,6 +512,7 @@ function RentalPlansSection({
           <div className="label text-right">Supplier</div>
           <div className="label text-right">Commission</div>
           <div className="label">Included package</div>
+          <div className="label">Stripe</div>
           <div className="label">Active</div>
           <div className="label text-right">Manage</div>
         </div>
@@ -547,6 +549,19 @@ function PlanRow({
   const [editing, setEditing] = useState(false);
   const patch = usePatchRentalPlan();
   const del = useDeleteRentalPlan();
+  const sync = useSyncRentalPlanStripe();
+
+  // 0254 — a plan needs its Stripe recurring Price before the POS lane can
+  // collect online. Auto-synced on save; this button is the manual retry.
+  function syncStripe() {
+    sync.mutate(plan.id, {
+      onSuccess: (res: { stripeSync: { status: string; message?: string } }) => {
+        if (res.stripeSync.status === "synced") toast.success("Plan synced to Stripe");
+        else toast.error(res.stripeSync.message ?? "Stripe sync failed");
+      },
+      onError: (e: unknown) => toast.error(errMsg(e, "Stripe sync failed")),
+    });
+  }
 
   function toggleActive() {
     patch.mutate(
@@ -589,6 +604,30 @@ function PlanRow({
       <div className="text-right t-num text-[12px]">{plan.supplierRatePct}%</div>
       <div className="text-right t-num text-[12px]">{plan.commissionBasePct}%</div>
       <div className="t-tiny text-base-500 truncate">{includedName}</div>
+      <div className="flex items-center gap-1.5">
+        {plan.stripePriceId ? (
+          <span className="pill pill-confirmed" data-testid={`plan-stripe-${plan.id}`}>
+            Synced
+          </span>
+        ) : (
+          <>
+            <span className="pill pill-neutral" data-testid={`plan-stripe-${plan.id}`}>
+              Not synced
+            </span>
+            {isPrincipal && (
+              <button
+                type="button"
+                onClick={syncStripe}
+                disabled={sync.isPending}
+                className="btn-ghost text-[11px]"
+                data-testid={`plan-sync-${plan.id}`}
+              >
+                {sync.isPending ? "Syncing…" : "Sync"}
+              </button>
+            )}
+          </>
+        )}
+      </div>
       <div>
         {isPrincipal ? (
           <input

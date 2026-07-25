@@ -21,6 +21,7 @@ import {
   customerFromRow,
   servicePackageFromRow,
   rentalPlanFromRow,
+  posRentalPlanFromRow,
   rentalAgreementFromRow,
   rentalBillingFromRow,
   rentalStockUnitFromRow,
@@ -44,6 +45,7 @@ import type {
   RentalAgreementRow,
   RentalBillingRow,
   RentalPlanRow,
+  RentalPlanPosRow,
   RentalStockUnitRow,
   RentalUnitEventRow,
   SalespersonRow,
@@ -1218,6 +1220,7 @@ describe("rental + service plan adapters (0247-0249)", () => {
       email: null,
       address: "123 Jalan Sample, 50000 KL",
       notes: null,
+      stripe_customer_id: null,
       created_at: "2026-07-25T00:00:00Z",
       updated_at: "2026-07-25T00:00:00Z",
       created_by: null,
@@ -1230,6 +1233,7 @@ describe("rental + service plan adapters (0247-0249)", () => {
       email: null,
       address: "123 Jalan Sample, 50000 KL",
       notes: null,
+      stripeCustomerId: null,
       createdAt: "2026-07-25T00:00:00Z",
       updatedAt: "2026-07-25T00:00:00Z",
       createdBy: null,
@@ -1270,6 +1274,8 @@ describe("rental + service plan adapters (0247-0249)", () => {
       commission_base_pct: 20,
       included_package_id: null,
       active: false,
+      stripe_product_id: null,
+      stripe_price_id: null,
       created_at: "2026-07-25T00:00:00Z",
       updated_at: "2026-07-25T00:00:00Z",
       updated_by: null,
@@ -1282,6 +1288,37 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.commissionBasePct).toBe(20);
     expect(out.includedPackageId).toBeNull();
     expect(out.active).toBe(false);
+    expect(out.stripeProductId).toBeNull();
+    expect(out.stripePriceId).toBeNull();
+  });
+
+  it("posRentalPlanFromRow (0254 view) exposes the sellable face only — no split fields", () => {
+    const row: RentalPlanPosRow = {
+      id: "00000000-0000-0000-0000-0000000b0002",
+      sku: "M-CLOUD-KING",
+      term_months: "84" as unknown as number,
+      monthly_fee: "59.00" as unknown as number,
+      included_package_id: "00000000-0000-0000-0000-0000000a0001",
+      package_name: "Annual Clean",
+      package_service_type: "cleaning",
+      package_visits_per_year: "3" as unknown as number,
+      stripe_ready: true,
+    };
+    const out = posRentalPlanFromRow(row);
+    expect(out).toEqual({
+      id: "00000000-0000-0000-0000-0000000b0002",
+      sku: "M-CLOUD-KING",
+      termMonths: 84,
+      monthlyFee: 59,
+      includedPackageId: "00000000-0000-0000-0000-0000000a0001",
+      packageName: "Annual Clean",
+      packageServiceType: "cleaning",
+      packageVisitsPerYear: 3,
+      stripeReady: true,
+    });
+    // The projection must never grow the split — the whole point of the view.
+    expect("supplierRatePct" in out).toBe(false);
+    expect("commissionBasePct" in out).toBe(false);
   });
 
   it("rentalAgreementFromRow maps the snapshot columns and preserves null buyout_amount", () => {
