@@ -52,6 +52,7 @@ import { groupSofaBuildLines, type SofaBuildGroupRow } from "@/lib/sofa-build-di
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 import { newLocalId } from "../new-order/configurators";
 import type { DraftLine } from "../new-order/draft";
+import { SpecialsSummary } from "../new-order/special-addons-picker";
 import AddProductOverlay from "./AddProductOverlay";
 import { buildCatalogIndex } from "./catalog-index";
 import { getOrderEditScope, todayMYISO } from "./order-edit-scope";
@@ -114,6 +115,18 @@ function lineTag(attrs: OrderLine["attrs"]): "GWP" | "Free item" | "PWP" | null 
   if (attrs.free_item) return "Free item";
   if (attrs.pwp) return "PWP";
   return null;
+}
+
+/** Configuration bits for the muted detail line — cart parity (Loo 2026-07-25:
+ *  the detail must read like the cart's "Super Single · gap 12″"). Bedframe
+ *  colour + gap ride flat attrs; legacy wizard sofa lines carry fabric_name. */
+function lineConfigBits(attrs: OrderLine["attrs"]): string[] {
+  if (!attrs) return [];
+  const bits: string[] = [];
+  if (typeof attrs.color === "string" && attrs.color) bits.push(attrs.color);
+  if (typeof attrs.gap === "string" && attrs.gap) bits.push(`gap ${attrs.gap}`);
+  if (typeof attrs.fabric_name === "string" && attrs.fabric_name) bits.push(attrs.fabric_name);
+  return bits;
 }
 
 function errCode(e: unknown): string | null {
@@ -904,6 +917,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 const line = row.line;
                 const { sku, model } = skuMeta(line.sku);
                 const tag = lineTag(line.attrs);
+                const detail = [sku?.variant, ...lineConfigBits(line.attrs), tag]
+                  .filter(Boolean)
+                  .join(" · ");
                 const free = tag === "GWP" || tag === "Free item";
                 // 0255 — pencil on configurator-backed rows (mattress/bedframe)
                 // in the place lane; free/promo/bundle rows stay pencil-less.
@@ -926,10 +942,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                     </div>
                     <div className="os-item__body">
                       <div className="os-item__name">{model?.name ?? line.sku}</div>
-                      <div className="os-item__detail">
-                        {[sku?.variant, line.sku].filter(Boolean).join(" · ")}
-                        {tag ? ` · ${tag}` : ""}
-                      </div>
+                      {detail && <div className="os-item__detail">{detail}</div>}
+                      <div className="os-item__detail font-mono">{line.sku}</div>
+                      <SpecialsSummary attrs={line.attrs} />
                     </div>
                     <div className="os-item__qty">×{line.qty}</div>
                     <div className="os-item__price">
