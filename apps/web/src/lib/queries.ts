@@ -226,6 +226,13 @@ import {
   type HrRecordExitInput,
   type HrChecklistToggleInput,
   type HrSetAccessInput,
+  // HR-P5 (0272) — commission runs
+  type CommissionRunSummary,
+  type CommissionRunDetail,
+  type CommissionRunState,
+  type ReadinessCheck,
+  type CloseMonthInput,
+  type AddAdjustmentInput,
   type SetTeamPositionInput,
   type SetReportsToInput,
   type SetStaffCodeInput,
@@ -493,8 +500,18 @@ export const qk = {
     team: () => ["hr", "team"] as const,
     // HR-P4 (0269) — the employee master.
     people: () => ["hr", "people"] as const,
+    // HR-P5 (0272) — commission runs
+    runs: () => ["hr", "runs"] as const,
+    run: (runId: string) => ["hr", "runs", runId] as const,
+    runState: (year: number, month: number) =>
+      ["hr", "runs", "state", year, month] as const,
     person: (employeeId: string) => ["hr", "people", employeeId] as const,
   },
+};
+
+/** commission_run_state + the pure pre-flight the API folds in. */
+export type CommissionRunStateWithChecks = CommissionRunState & {
+  checks: ReadinessCheck[];
 };
 
 export interface OrderFilters {
@@ -7749,6 +7766,91 @@ export function useHrSetAccess(employeeId: string) {
   return useMutation<{ ok: true; status: string }, ApiError, HrSetAccessInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true; status: string }>(`/api/hr/people/${employeeId}/access`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR-P5 (0272/0273) — commission runs. Closing a month freezes the engine's output;
+// from then on the statement is READ from those rows and never recomputed. Every
+// mutation invalidates the whole ["hr"] sub-tree because the run, the report and the
+// attribution worklist are all views of the same month.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useCommissionRunState(
+  year: number,
+  month: number,
+  opts?: Partial<UseQueryOptions<CommissionRunStateWithChecks>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.runState(year, month),
+    queryFn: () =>
+      apiFetch<CommissionRunStateWithChecks>(
+        `/api/hr/runs/state?year=${year}&month=${month}`,
+      ),
+    staleTime: 15_000,
+    ...opts,
+  });
+}
+
+export function useCommissionRuns(opts?: Partial<UseQueryOptions<{ runs: CommissionRunSummary[] }>>) {
+  return useQuery({
+    queryKey: qk.hr.runs(),
+    queryFn: () => apiFetch<{ runs: CommissionRunSummary[] }>("/api/hr/runs"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** The FROZEN statement. Enabled only once a run exists. */
+export function useCommissionRun(
+  runId: string | null,
+  opts?: Partial<UseQueryOptions<CommissionRunDetail>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.run(runId ?? "none"),
+    queryFn: () => apiFetch<CommissionRunDetail>(`/api/hr/runs/${runId}`),
+    enabled: runId !== null,
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useCloseCommissionMonth() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; runId: string }, ApiError, CloseMonthInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; runId: string }>("/api/hr/runs/close", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** approve | reopen | discard | paid — one hook, the action is the path. */
+export function useCommissionRunAction(
+  action: "approve" | "reopen" | "discard" | "paid",
+) {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, { runId: string; reason?: string }>({
+    mutationFn: ({ runId, reason }) =>
+      apiFetch<{ ok: true }>(`/api/hr/runs/${runId}/${action}`, {
+        method: "POST",
+        body: JSON.stringify(reason ? { reason } : {}),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAddCommissionAdjustment() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; id: string }, ApiError, AddAdjustmentInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; id: string }>("/api/hr/runs/adjustments", {
         method: "POST",
         body: JSON.stringify(input),
       }),

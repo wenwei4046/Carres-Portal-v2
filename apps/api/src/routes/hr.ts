@@ -2,10 +2,8 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   assignDealerBdInput,
-  computeBdCommission,
   setBdMethodInput,
   setBdPositionInput,
-  computeCommission,
   hrAssignSalespersonInput,
   hrReportQuerySchema,
   setBdRateInput,
@@ -14,17 +12,9 @@ import {
   setModelRateInput,
   setModelTiersInput,
   setStaffRateInput,
-  type BdDealer,
-  type BdDealerLine,
-  type BdRateRow,
-  type BdUser,
-  type CommissionMethod,
-  type CommissionConfig,
-  type CommissionLine,
-  type CommissionStaff,
-  type DealerOrderAgg,
 } from "@carres/shared";
 import { requireHr } from "../lib/auth-guards";
+import { loadCommissionMonth } from "../lib/commission-month";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -40,23 +30,6 @@ import type { AppEnv } from "../types";
  */
 const hrRouter = new Hono<AppEnv>();
 
-interface HrSource {
-  staff: CommissionStaff[];
-  models: { id: string; name: string; category: string }[];
-  lines: CommissionLine[];
-  unattributed: unknown[];
-  /** 0265 — imported archive orders (source_system='autocount') that will
-   *  never have a salesperson. Excluded from `unattributed` so the worklist
-   *  can actually reach zero; surfaced as a count so the UI says so aloud. */
-  legacyUnattributed?: number;
-  // 0250/0251 — BD commission
-  bdUsers?: BdUser[];
-  bdMethod?: CommissionMethod;
-  dealers?: BdDealer[];
-  dealerOrders?: DealerOrderAgg[];
-  dealerLines?: BdDealerLine[];
-  config: CommissionConfig & { bdRates?: BdRateRow[] };
-}
 
 /** GET /api/hr/report?year=2026&month=7 — the computed month report. */
 hrRouter.get("/report", requireHr, async (c) => {
@@ -69,38 +42,14 @@ hrRouter.get("/report", requireHr, async (c) => {
   const { year, month } = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("hr_commission_source", {
-    p_year: year,
-    p_month: month,
-  });
-  if (error) {
-    if (error.code === "42501") throw new HTTPException(403, { message: "forbidden" });
-    throw new HTTPException(500, { message: error.message });
-  }
-
-  const source = data as unknown as HrSource;
-  const report = computeCommission(source.staff, source.lines, source.config);
-
-  // O1 Overview headline. Deliberately NOT report.totalBasis — that is the
-  // PERCENTAGE-method basis only, so a store on the per-model method would
-  // report RM 0 sold, which is the kind of number that quietly teaches an
-  // operator to distrust the page. `lines` is already the showroom-channel,
-  // non-service, non-cancelled slice for the month, attributed or not.
-  const monthSold = {
-    amount: source.lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0),
-    orderCount: new Set(source.lines.map((l) => l.orderId)).size,
-  };
-  const bdReport = computeBdCommission({
-    users: source.bdUsers ?? [],
-    dealers: source.dealers ?? [],
-    orders: source.dealerOrders ?? [],
-    rates: source.config.bdRates ?? [],
-    method: source.bdMethod,
-    dealerLines: source.dealerLines,
-    modelRates: source.config.modelRates,
-    modelTiers: source.config.modelTiers,
-    milestones: source.config.milestones,
-  });
+  // HR-P5: this compute path is SHARED with `POST /api/hr/runs/close`. Closing a
+  // month freezes the engine's output forever, so the figures reviewed here and the
+  // figures frozen there must come from literally the same call.
+  const { source, report, bdReport, monthSold } = await loadCommissionMonth(
+    sb,
+    year,
+    month,
+  );
 
   return c.json({
     year,

@@ -68,6 +68,7 @@ import salespersonsRouter from "./routes/salespersons";
 import hrRouter from "./routes/hr";
 import hrTeamRouter from "./routes/hr-team";
 import hrPeopleRouter from "./routes/hr-people";
+import hrRunsRouter from "./routes/hr-runs";
 // 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
 // 0240 — store-account self-service (dealer-principal email-change requests).
@@ -149,6 +150,7 @@ api.route("/salespersons", salespersonsRouter);
 // sub-apps; explicit paths avoid any /hr/* overlap ambiguity).
 api.route("/hr/team", hrTeamRouter);
 api.route("/hr/people", hrPeopleRouter);
+api.route("/hr/runs", hrRunsRouter);
 api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);
