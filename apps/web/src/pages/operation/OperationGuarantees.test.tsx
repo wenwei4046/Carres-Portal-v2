@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GuaranteeEntitlementDto } from "@carres/shared";
 
@@ -54,9 +55,15 @@ const ROW: GuaranteeEntitlementDto = {
   voidReason: null,
 };
 
-function wrap(node: React.ReactNode) {
+/** `entry` seeds the URL — the desk reads `?q=` / `?status=` since J2, because
+ *  an order's Related-cases row links here filtered to one claimed guarantee. */
+function wrap(node: React.ReactNode, entry = "/operation?tab=guarantees") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => apiFetchMock.mockReset());
@@ -171,5 +178,41 @@ describe("OperationGuarantees — STATUS is the guarantee's own state, in three 
     }
     expect(screen.queryByRole("button", { name: "Not delivered" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Used" })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * J2 — an order's Related-cases row links here for a claimed guarantee. The
+ * card asks the link to open "that module FILTERED to the case", so the desk
+ * has to read the filter off the URL, not just land on the page.
+ */
+describe("OperationGuarantees — arriving from an order's Related cases", () => {
+  it("seeds the search box and the status chip from the URL", async () => {
+    apiFetchMock.mockResolvedValue({ items: [ROW], truncated: false });
+    wrap(
+      <OperationGuarantees />,
+      "/operation?tab=guarantees&q=KQYZ939913&status=claimed",
+    );
+
+    expect(screen.getByDisplayValue("KQYZ939913")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/guarantees?q=KQYZ939913&status=claimed",
+      ),
+    );
+  });
+
+  it("ignores a status word the desk cannot show", async () => {
+    apiFetchMock.mockResolvedValue({ items: [], truncated: false });
+    // A hand-typed or stale link must not leave the desk filtered by something
+    // none of its chips can represent (or un-set).
+    wrap(<OperationGuarantees />, "/operation?tab=guarantees&status=banana");
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/api/guarantees?"));
+  });
+
+  it("opens unfiltered when no link params are present", async () => {
+    apiFetchMock.mockResolvedValue({ items: [ROW], truncated: false });
+    wrap(<OperationGuarantees />);
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/api/guarantees?"));
   });
 });

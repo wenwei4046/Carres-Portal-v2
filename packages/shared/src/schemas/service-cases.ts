@@ -62,6 +62,18 @@ export const serviceCaseSchema = z.object({
   caseTypeLabel:       z.string().nullable(),
   statusLabel:         z.string().nullable(),
   statusIsClosed:      z.boolean(),
+
+  /**
+   * J2 — the linked order's SO number, joined from `orders`. orderId is the
+   * permanent key but it is a uuid: nothing on screen can say WHICH order
+   * without this, so the case→order link had no label to render.
+   *
+   * OPTIONAL, not just nullable, and the two mean different things:
+   *   - absent    → an older Worker that predates J2 (a newer web build must
+   *                 degrade to "no link shown", never crash)
+   *   - null      → the case genuinely has no linked order
+   */
+  so:                  z.number().int().nullable().optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 

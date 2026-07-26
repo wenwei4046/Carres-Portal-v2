@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import type { ServiceCase, ServiceCaseListResponse } from "@carres/shared";
 import ServiceCaseModal from "./components/ServiceCaseModal";
+import CaseOrderLink from "./components/CaseOrderLink";
 
 /**
  * Operation Service Cases — the case (病历) list.
@@ -16,6 +18,21 @@ export default function OperationServiceCases() {
   const [state, setState] = useState<"" | "ongoing" | "closed">("");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  // J2 — `?case=<id>` opens that case straight away, which is what the order
+  // drawer's Related-cases row links to. Consumed once and stripped from the
+  // URL so closing the modal does not immediately reopen it, and a refresh
+  // lands on the plain list.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkCase = searchParams.get("case");
+  useEffect(() => {
+    if (!deepLinkCase) return;
+    setEditId(deepLinkCase);
+    const next = new URLSearchParams(searchParams);
+    next.delete("case");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkCase]);
 
   const listQ = useQuery<ServiceCaseListResponse>({
     queryKey: ["ops", "service-cases", "list", state],
@@ -84,6 +101,9 @@ export default function OperationServiceCases() {
             <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Case No.</th>
+                {/* J2 — the case→order link gets its own column: it is the
+                    answer to "which order is this about", not a footnote. */}
+                <th className="text-left px-3 py-2 font-medium">Sales order</th>
                 <th className="text-left px-3 py-2 font-medium">Type</th>
                 <th className="text-left px-3 py-2 font-medium">Customer / Ref</th>
                 <th className="text-left px-3 py-2 font-medium">What Happened</th>
@@ -101,6 +121,9 @@ export default function OperationServiceCases() {
                 >
                   <td className="px-3 py-2 font-mono text-xs text-base-900 font-semibold whitespace-nowrap">
                     {r.caseNo}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <CaseOrderLink orderId={r.orderId} so={r.so} compact />
                   </td>
                   <td className="px-3 py-2">
                     {r.caseTypeLabel ? (
