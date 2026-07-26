@@ -49,6 +49,11 @@ import {
   isPoDayMYT,
   nextPoDayMYT,
   poUrgentBypass,
+  DELIVERY_QUEUES,
+  deliveryQueueByKey,
+  deliveryStepOverdue,
+  myHolidaySet,
+  type DeliveryQueueKey,
   type OpsTask,
   type OpsTasksListResponse,
   type OpsStaffMember,
@@ -525,12 +530,15 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
  *  sits in exactly the queue its NEXT verb names; the counts match by
  *  construction. State words (Waiting/Ready) live in FILTERS only. The old
  *  "To book" / "Waiting stock" / "No logistic" queue rows are dead words. */
+// T7 (Jess 2026-07-27) — the QUEUE SPLIT: the STOCK verbs stay here, the four
+// DELIVERY verbs moved to their own facet group (DELIVERY_QUEUES in
+// packages/shared), each carrying its own auto-overdue deadline. Assign /
+// Chase logistic used to sit in this list; they are the same NEXT verbs, just
+// rendered in the delivery group now — no row changed queue.
 const NEXT_QUEUE_VERBS = [
   "Order PO",
   "Chase supplier",
   "Call customer (stock delay)",
-  "Assign logistic",
-  "Chase logistic",
 ] as const;
 const NEXT_QUEUE_DESC: Record<string, string> = {
   "Order PO": "Goods not ordered from any supplier yet — raise the PO",
@@ -538,10 +546,30 @@ const NEXT_QUEUE_DESC: Record<string, string> = {
     "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
   "Call customer (stock delay)":
     "Stock ETA lands AFTER the promised date — tell the customer now, before the window (delay radar, T3)",
-  "Assign logistic": "No delivery partner picked yet — assign one",
-  "Chase logistic":
-    "Partner assigned but no delivery booked with the customer — chase the logistic",
 };
+
+/** T7 — the delivery-photo verb. Its queue is the ONLY delivery queue that
+ *  deliberately spans CLOSED orders (same reason as Owing: the proof is still
+ *  outstanding after the order is delivered), so it is named here for the two
+ *  places that must special-case it — the count scope and the facet-active
+ *  completed-drop. */
+const DELIVERY_PHOTO_VERB = deliveryQueueByKey("photo").label;
+/** The step's anchor date for the auto-overdue check — a TBD customer date has
+ *  no anchor, so those rows can never be late (silence over a false alarm). */
+function deliveryStepAnchor(
+  o: operationOrderListRow,
+  step: DeliveryQueueKey,
+): string | null {
+  switch (step) {
+    case "assign":
+    case "chase":
+      return o.delivery_date_tbd ? null : o.delivery_date;
+    case "deliver_today":
+      return ovlOf(o)?.confirmed_date ?? null;
+    case "photo":
+      return o.delivered_at;
+  }
+}
 
 // ─── Next action (C2, 2026-07-08) ────────────────────────────────────────────
 // The single most-urgent NEXT step per order — one lamp per row. PURE: reads
@@ -677,7 +705,20 @@ export function nextActionOf(
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
 ): NextAction {
-  if (controlTabOf(o) === "completed") return { label: "Done", tone: "neutral" };
+  if (controlTabOf(o) === "completed") {
+    // T7 (Jess 2026-07-27): a delivered order whose delivery photo is still
+    // missing has ONE real action left, so it is not "Done" yet — this is the
+    // only action a closed order ever shows. WARNING tone, never danger:
+    // guardrail #2 says a delivered order must not alarm red.
+    // `undefined` = the answer is UNKNOWN (an older Worker that doesn't select
+    // the column, or no overlay row at all) → stay Done rather than flood every
+    // delivered row with a demand we can't substantiate. An explicit [] is the
+    // real "no photo yet".
+    const photos = ovlOf(o)?.delivery_photos;
+    if (Array.isArray(photos) && photos.length === 0)
+      return { label: DELIVERY_PHOTO_VERB, tone: "warning" };
+    return { label: "Done", tone: "neutral" };
+  }
 
   // PAST-DEADLINE ESCALATION (Loo locked, freeze gate 2026-07-12): once the
   // promise date has passed with a partner assigned but no delivery booked, the
@@ -755,6 +796,22 @@ export function nextActionOf(
     storageFee > 0 && !ovl?.storage_collected_at && ovl?.storage_waiver_status !== "approved";
   if (owingBalance || owingStorage)
     return { label: "Confirm", tone: "warning", locked: true };
+
+  // T7 (Jess 2026-07-27): the CUSTOMER's confirmed date is itself a deadline, so
+  // a confirmed booking is not one resting state — it splits by that date.
+  //   today  → "Deliver today" (this is today's run; a real queue of its own)
+  //   passed → the booked run did not happen and nothing recorded a delivery →
+  //            back to "Chase logistic" (the carrier is who to ask). This is the
+  //            auto-overdue: the row leaves the Deliver-today queue by itself.
+  // The money-hold above still wins (PayHold law — you don't chase a delivery
+  // you're not allowed to make), and bookingConfirmedOf() guarantees a date here.
+  const confirmedDate = ovl?.confirmed_date ?? null;
+  if (confirmedDate) {
+    const today = todayIso();
+    if (confirmedDate < today) return { label: "Chase logistic", tone: "danger" };
+    if (confirmedDate === today)
+      return { label: deliveryQueueByKey("deliver_today").label, tone: "info" };
+  }
   return { label: "Confirm", tone: "success" };
 }
 
@@ -1543,6 +1600,34 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => liveScope.filter(isSupplierLate).length,
     [liveScope],
   );
+  // T7 · DELIVERY queues + auto-overdue (Jess 2026-07-27). Each of the four
+  // delivery steps carries its own deadline (shared `delivery-queue.ts`), so a
+  // queue item turns LATE by itself — nobody has to watch it. Counts still come
+  // from the NEXT verb, so queue numbers equal the NEXT column by construction
+  // (C-vocab). The photo queue is the one that spans CLOSED orders, for the same
+  // reason Owing does: the proof is still outstanding after delivery.
+  const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  const deliveryQueueStats = useMemo(() => {
+    const today = todayIso();
+    const stat = new Map<string, { n: number; late: number }>();
+    const bump = (label: string, late: boolean) => {
+      const cur = stat.get(label) ?? { n: 0, late: 0 };
+      cur.n += 1;
+      if (late) cur.late += 1;
+      stat.set(label, cur);
+    };
+    const tally = (o: operationOrderListRow, only?: DeliveryQueueKey) => {
+      const label = nextVerbOf(o);
+      const def = DELIVERY_QUEUES.find((q) => q.label === label);
+      if (!def) return;
+      if (only ? def.key !== only : def.key === "photo") return;
+      bump(label, deliveryStepOverdue(def.key, deliveryStepAnchor(o, def.key), today, holidayOpts));
+    };
+    for (const o of liveScope) tally(o);
+    for (const o of orders) tally(o, "photo");
+    return stat;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveScope, orders, availableBySku, holidayOpts]);
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of liveScope) {
@@ -1752,10 +1837,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // an active facet filter must return exactly those rows — completed
     // orders drop out while any facet (except Owing, which deliberately
     // spans closed orders) is engaged. Delivered history = the Delivered tab.
+    // T7 exception: the "Upload delivery photo" queue holds DELIVERED orders by
+    // definition, so its own filter must not drop them (same exemption Owing
+    // has). Every other facet keeps the open-only rule.
     const facetActive =
       flaggedOnly ||
       escalateOnly ||
-      !!nextFilter ||
+      (!!nextFilter && nextFilter !== DELIVERY_PHOTO_VERB) ||
       supplierLateOnly ||
       dueFilter.size > 0 ||
       regionFilter.size > 0 ||
@@ -2511,20 +2599,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     />
                   ) : null,
                 )}
-                {/* Unassigned (Jess 2026-07-19): every open order with no
-                    delivery partner yet — the broader "needs a carrier" list
-                    (Assign logistic above only fires once stock is Ready).
-                    Filters via logisticFilter holding NO_CARRIER. */}
-                {unassignedCount > 0 && (
-                  <KanbanRow
-                    label="Unassigned"
-                    count={unassignedCount}
-                    active={logisticFilter.has(NO_CARRIER)}
-                    chip={picQueueChip}
-                    title="No delivery partner picked yet — assign a carrier"
-                    onClick={() => setLogisticFilter((p) => toggleInSet(p, NO_CARRIER))}
-                  />
-                )}
                 {/* Supplier-late (storage arc, merged from main): the goods ETA
                     misses the promise — the supplier is the problem. Kept as a
                     QUEUE alongside the C-vocab verbs (it's a data flag, not a
@@ -2561,6 +2635,61 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   />
                 )}
               </KanbanGroup>
+
+              {/* DELIVERY — T7 (Jess 2026-07-27): the delivery lifecycle as FOUR
+                  real queues instead of one blob, each with its OWN deadline so
+                  an item turns late by itself (assign ≥3 working days before the
+                  promised date · confirm ≥1 · deliver ON the confirmed date ·
+                  photo same/next working day). The labels ARE the NEXT verbs, so
+                  the counts match the NEXT column by construction (C-vocab); the
+                  "· N late" tail is the auto-overdue. Zero rows auto-hide, and
+                  the whole group hides when the team has no delivery work. */}
+              {(unassignedCount > 0 ||
+                DELIVERY_QUEUES.some((q) => (deliveryQueueStats.get(q.label)?.n ?? 0) > 0)) && (
+                <KanbanGroup
+                  title="DELIVERY"
+                  testid="filter-delivery"
+                  collapsed={collapsedGroups.has("DELIVERY")}
+                  onToggle={() => toggleGroup("DELIVERY")}
+                >
+                  {/* Unassigned (Jess 2026-07-19): every open order with no
+                      delivery partner yet — the broader "needs a carrier" list
+                      (Assign logistic fires only once stock is Ready). Filters
+                      via logisticFilter holding NO_CARRIER. */}
+                  {unassignedCount > 0 && (
+                    <KanbanRow
+                      label="Unassigned"
+                      count={unassignedCount}
+                      active={logisticFilter.has(NO_CARRIER)}
+                      chip={picQueueChip}
+                      title="No delivery partner picked yet — assign a carrier"
+                      onClick={() => setLogisticFilter((p) => toggleInSet(p, NO_CARRIER))}
+                    />
+                  )}
+                  {DELIVERY_QUEUES.map((q) => {
+                    const s = deliveryQueueStats.get(q.label);
+                    if (!s || s.n === 0) return null;
+                    return (
+                      <KanbanRow
+                        key={q.key}
+                        label={q.label}
+                        count={s.n}
+                        // Numbers up front (COPY-STANDARD rule 3): "5 · 2 late".
+                        valueText={s.late > 0 ? `${s.n} · ${s.late} late` : undefined}
+                        tone={s.late > 0 ? "danger" : undefined}
+                        active={nextFilter === q.label}
+                        chip={picQueueChip}
+                        title={
+                          s.late > 0
+                            ? `${q.description}. ${s.late} of ${s.n} already past that deadline.`
+                            : q.description
+                        }
+                        onClick={() => setNextFilter((f) => (f === q.label ? null : q.label))}
+                      />
+                    );
+                  })}
+                </KanbanGroup>
+              )}
 
               {/* TEAM — 每人手上几张 (B rebuild): pool members + No PIC.
                   ⚙ Team manages membership / MC availability / redistribute.
@@ -4107,9 +4236,12 @@ function OrderRow({
           // already says "Delivered"; a "Done" pill is redundant — and would be
           // wrong if a 2nd delivery were still pending, which keeps the order
           // in-pipeline, not Delivered).
-          if (completed) return null;
+          // T7 exception: a delivered order with NO delivery photo still owes
+          // one real act, so the ladder returns "Upload delivery photo" instead
+          // of "Done" and that pill DOES show. Only "Done" blanks the cell.
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
+          if (completed && na.label === "Done") return null;
           // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
           // is the PRIMARY verb; an outstanding balance is an INDEPENDENT track,
           // shown as a secondary "Collect $" pill (max two pills). Hidden once

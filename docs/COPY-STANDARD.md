@@ -174,6 +174,34 @@ queue verb) is written as:
   - `Call customer (stock delay)` — stock ETA overshoots the promised date
     (delay radar, T3). Reserved now so no chat invents a synonym.
   - `Upload delivery photo` — attach the photo proving delivery (T6).
+  - `Deliver today` — the customer confirmed TODAY as the delivery day (T7).
+
+## The delivery queue words (T7, locked with Jess 2026-07-27)
+
+The delivery lifecycle is FOUR queues, and the queue's label IS the row's NEXT
+verb — one word for one step, so a queue count can never disagree with the NEXT
+column. The list is closed; a new chat does not add a fifth or reword one:
+
+| Step | The word | It holds | It goes late |
+|---|---|---|---|
+| 1 | `Assign logistic` | Stock in, no carrier picked | 3 working days before the promised date |
+| 2 | `Chase logistic` | Carrier assigned, customer has not confirmed | 1 working day before the promised date |
+| 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
+| 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
+
+Every deadline is counted in **working days** (Mon–Sat, Selangor public holidays
+skipped) — the same engine procurement uses. Lateness is written as the count
+tail, numbers up front: `5 · 2 late`.
+
+Two words the card asked for and we deliberately did NOT introduce:
+
+- **`Confirm booking`** — it would be a second word for step 2, which already
+  ships as `Chase logistic` (C-vocab, locked 2026-07-19, also the drawer's
+  Chase Now word). Rule 8 wins: renaming step 2 app-wide is a one-line decision,
+  a synonym is not.
+- **`Issue DO`** — nobody issues a DO. `orders.do_number` is stamped by a DB
+  trigger on the dispatch transition, so a queue for it would never have a
+  human in it.
 
 ## Vocabulary — the canonical words
 

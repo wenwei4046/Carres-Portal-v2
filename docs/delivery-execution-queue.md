@@ -196,11 +196,56 @@ panel. T7-T11 build it OUT into a standalone Delivery capability. Same law: one 
 chat, one PR, one deploy, in this order. Detail for each lives in the LATER entry it
 promotes — the implementing chat reads BOTH this card and its L-entry.
 
-## T7 · Queue split + auto-overdue (promotes L1)
+## T7 · Queue split + auto-overdue (promotes L1) ✅ (PR #386)
 
 Real queues: `Assign logistic / Confirm booking / Deliver today / Upload delivery photo`,
 each with its own deadline relative to the confirmed date so items turn overdue by
 themselves. Needs T1-T6 signals — that is why it waits for them.
+
+**Shipped note (PR #386):** web + one additive API select line, **no migration**.
+The delivery verbs left the QUEUES blob for their own **DELIVERY** facet group; the
+stock verbs (`Order PO` / `Chase supplier` / `Call customer (stock delay)`) stayed
+behind. No row changed queue — the labels ARE the NEXT verbs, so counts still equal
+the NEXT column by construction (C-vocab).
+
+**The working-day engine already existed** — L3 said it "ships INSIDE T9 or T10", but
+`packages/shared/working-days.ts` + `my-holidays.ts` shipped with procurement
+2026-07-21 (Mon–Sat, Selangor holidays, injected calendar). So the deadlines are real
+working days from day one, not calendar days: assign = date − 3 wd · confirm = date −
+1 wd · deliver = the confirmed date itself · photo = delivered + 1 wd. The math lives
+in a new pure `packages/shared/delivery-queue.ts` (18 tests) so T10's calendar and
+T11's module read the SAME rule instead of a second copy.
+
+**Two words the card asked for that were NOT built, deliberately:**
+- `Confirm booking` would be a second word for a step that already ships as
+  `Chase logistic` (C-vocab locked 2026-07-19, and the drawer's Chase Now word).
+  COPY-STANDARD rule 8 wins; renaming step 2 app-wide is a one-line call for Jess,
+  a synonym is not. The queue is there, under the live word.
+- L1's `Issue DO` queue has no human in it — `orders.do_number` is stamped by the
+  0098 trigger on the dispatch transition (found while shipping T5), so a queue for
+  it would hold work nobody does.
+
+**Two ladder rungs were added to make the new queues real NEXT verbs** (a queue the
+NEXT column doesn't speak is a queue nobody looks at):
+- A confirmed booking stopped being one resting state: **today → `Deliver today`**,
+  **date passed with no delivery → `Chase logistic` (red)**. That is the auto-overdue
+  — the row leaves the Deliver-today queue by itself. The money-hold still wins
+  (PayHold: never chase a delivery we may not make), and the pre-D1 past-deadline
+  escalation is untouched (it only ever fired on UNCONFIRMED rows; a confirmed date
+  passing is a case D1 created, which is why it fell through to `Confirm` before).
+- **A delivered order with an empty photo ledger is not `Done`** — it shows
+  `Upload delivery photo`, the only action a closed order ever shows, and the MANAGE
+  cell's blank-when-closed rule now blanks on `Done` only. Tone is amber, never red
+  (guardrail #2: a delivered order must not alarm). Its queue deliberately spans
+  CLOSED orders — the second queue to do so, for the same reason Owing does.
+
+**Degrades instead of lying:** an absent `delivery_photos` (older Worker, or no
+overlay row at all) means UNKNOWN, not "no photo", so the queue stays silent rather
+than demanding proof of every delivered order. A TBD customer date has no anchor and
+can therefore never be late — silence over a false alarm, same rule as T3's radar.
+Also fixed a time bomb found in the existing tests: the `BOOKED` fixture hardcoded
+`2026-08-01`, which would have silently started testing a different rung once that
+day passed; it is relative now.
 
 ## T8 · Delivery groups / partial delivery (promotes L7) — ✅ RULING RECEIVED, unblocked
 
@@ -234,15 +279,18 @@ else is planned past T11 on purpose.
 
 ## LATER (no card number = not planned; listed so no chat reinvents them)
 
-- **L1 Queue split → PROMOTED TO T7** — `Assign logistic / Confirm booking / Issue DO /
+- **L1 Queue split → SHIPPED as T7 (PR #386)** — `Assign logistic / Confirm booking / Issue DO /
   Deliver today / Upload delivery photo` as real queues (needs T1-T3 signals stable first).
   Each step gets its own
   deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
   before · delivery order 1 day before · photo same/next day) so a queue item can turn
   overdue BY ITSELF — no human watching required.
 - **L2 Delivery calendar → PROMOTED TO T10** (reads the same booking fields; never a second store).
-- **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — ships INSIDE T9 or T10,
-  whichever needs it first, as a shared util, NOT an admin page. Not its own card.
+- **L3 Working-day calendar engine** — **already existed** (found in T7):
+  `packages/shared/working-days.ts` + `my-holidays.ts`, shipped with procurement
+  2026-07-21 (Mon–Sat, Selangor holidays, calendar injected). T7's deadlines use it.
+  What is still NOT built is the per-site refinement (condo Sat 0.5d etc.) — that
+  belongs to T9's partner profiles, not to a new engine.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
 - **L5 Delivery module page (3-pane) → PROMOTED TO T11** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
   the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
@@ -277,7 +325,7 @@ else is planned past T11 on purpose.
 | T4 | ✅ shipped 2026-07-26 | #377 |
 | T5 | ✅ shipped 2026-07-26 | #382 |
 | T6 | ✅ shipped 2026-07-26 | #384 |
-| T7 | ⬜ queue split + auto-overdue | — |
+| T7 | ✅ shipped 2026-07-27 | #386 |
 | T8 | ⬜ unblocked — ruling recorded in card | — |
 | T9 | ⬜ partner profiles | — |
 | T10 | ⬜ delivery calendar | — |

@@ -684,6 +684,18 @@ export {
   type DeliveryResponsibility,
 } from "./delivery-reasons";
 
+// T7 · Delivery queues + auto-overdue (each step carries its own deadline)
+export {
+  DELIVERY_QUEUES,
+  DELIVERY_QUEUE_LABELS,
+  deliveryQueueByKey,
+  deliveryStepDueIso,
+  deliveryStepOverdue,
+  type DeliveryQueueDef,
+  type DeliveryQueueKey,
+  type DeliveryQueueAnchor,
+} from "./delivery-queue";
+
 export {
   monthKeyMYT,
   isPoDayMYT,
