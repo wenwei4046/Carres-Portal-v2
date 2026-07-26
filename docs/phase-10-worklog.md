@@ -850,7 +850,19 @@ extended the invoice pdf-data mock for the two new tables and added a guarantee-
 · web 1498/1514 (16 = §17.7 baseline; +7 new strip tests) · typecheck api 0 / web 0 / shared 2
 (pre-existing on clean origin/main) · `check:v4` clean · design-standard clean (caught one new
 grey hover — `hover:bg-hovertint`) · BUILD ran (`index-H9jzDLTX.js`), `SERVICE_ROLE` grep 0.
-Spec: `docs/guarantee-package-spec.md`. **Not deployed** — merge to main first, then deploy from
-the union tip per the permanent rule.
+Spec: `docs/guarantee-package-spec.md`.
+
+**Ship**: PR #314 (merge `bd27e1ad`, union with the HR-P2 line's #312 and the Rental-offers line's
+#315 — CLAUDE.md's migration row + the timeline + a colliding ⑦ worklog heading all conflicted;
+theirs won on the migration row because 0264 already names 0261-0263, mine renumbered to ⑧) →
+api Worker `3da6c7bb` (unauth `/api/guarantees/terms` AND `/api/guarantees` both 401 on
+api.carresofficial.com and the workers.dev host) + web `index-Dy-fo8kJ.js` → carres-portal
+`de170149` + carres-pos `df3b8308`; all 4 canonicals serve it; live bundle downloaded
+4,078,798 bytes, `SERVICE_ROLE` grep 0, guarantee + claim-desk markers ✓. Post-merge union suites:
+shared 1064/1064 · api 1545/1548 (3 = baseline) · web 1507/1523 (16 = baseline) · typecheck
+api 0 / web 0 / shared 2 (pre-existing). **Worker deployed BEFORE the web** so the new UI never
+called a 404. DB live-verified after: 1 active term, `Mattress Guarantee 15 Years · RM150.00 ·
+15y · replace`, `pos_active=true`, 0 entitlements (correct — nothing sold yet, and by design no
+history was backfilled).
 
 **Follow-up same session (Loo)**: "订单入口以后基本只会有 POS system；现在看到的订单都是以前 testimony 的 order，系统转移时还没 start Guarantee Program，不需要管之前的 order." Two consequences. (1) **No historical handling, by design** — no backfill was written and none is wanted; the mint trigger only fires on INSERT, so the legacy orders simply carry zero entitlements, which is correct (nobody was sold one). (2) It re-ranked a hole I had filed as an edge case into the main road: **`AddProductOverlay`** (add a product to an order that already exists — the POS's *second* door) built its category chips from `index.productModels`, so the Guarantee card appeared there and fell through to the generic `ConfigureDrawer`, which would have added it **bare**. Fixed: the overlay routes the guarantee card through the SAME `GuaranteePickerModal`, choosing from the ORDER's existing lines (`context="order"` only changes the empty-state wording — the gate is identical). Both POS doors now force attachment, which downgrades `guarantee-attach-no-ui` to LOW: an unattached entitlement can now only come from hand-written SQL or a future non-POS door, and `guarantee_attach` stays as the repair path. Spec gained §4 recording the POS-only scope. Re-verified: web 1498/1514 (16 = baseline), typecheck 0, design-standard + check:v4 clean.
