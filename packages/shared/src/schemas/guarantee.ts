@@ -135,6 +135,10 @@ export type GuaranteeEntitlementDto = {
   // what was sold
   orderId: string;
   so: number | null;
+  /** The ORDER's status (raw DB word — the UI maps it through orderStatusWord).
+   *  Loo 2026-07-26: the desk's STATUS column shows where the ORDER is
+   *  (placed / delivered / …); the guarantee's own state renders under its ID. */
+  orderStatus: string | null;
   orderLineId: string | null;
   guaranteeSku: string;
   guaranteeLabel: string | null;

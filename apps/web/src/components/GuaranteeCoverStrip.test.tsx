@@ -25,6 +25,7 @@ function ent(over: Partial<GuaranteeEntitlementDto> = {}): GuaranteeEntitlementD
     claimedGuaranteeId: null,
     orderId: "o1",
     so: 1240,
+    orderStatus: "place",
     orderLineId: "l1",
     guaranteeSku: "GRT-MATTRESS-15Y",
     guaranteeLabel: "Mattress Guarantee 15 Years",
