@@ -24,12 +24,12 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1-T6 ✅ · T7 next · ENDS at T11 |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R6 | not started |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |
 
 **State 2026-07-27:** ① T1-T7 ✅ (T8 running) · ② J1-J2 ✅ · ⑤ K0 ✅ — 10 of 31 shipped.
 **Run now in parallel:** T8 (already running) + R1 + S1 + K1, four chats. J3 waits for the
-T-line's drawer work to pause (slot it right after T8). Total = 31 cards.
+T-line's drawer work to pause (slot it right after T8). Total = 32 cards.
 
 ## Sidebar map — where every line lands
 
