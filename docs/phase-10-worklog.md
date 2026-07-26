@@ -1934,3 +1934,124 @@ next** — the documented cache behaviour, not a failed deploy.
 missing `ops_order_control` row is indistinguishable from an old Worker client-side. Harmless
 today (a delivered order essentially always has one for its balance) and the conservative
 direction, but it is a structural false-negative rather than a bug to hunt later.
+
+---
+
+## 2026-07-26 ㉔ · The collection engine — money in Stripe lands in our books (0281, PR #387, deployed)
+
+**Loo: "we do 收钱引擎 first, end the whole pipeline then only come try."** So the walk-one-signup
+advice was overruled and the whole money half got built before any live test. Fair call — but it
+meant the design had to be right on paper, so everything below was measured rather than assumed.
+
+### Reading the locked spec first, and finding half of it dead
+
+`docs/subscription-mattress-proposal.md` (Jess's line, LOCKED 2026-07-22) is the canonical spec for
+the money half. Read in full. Its **entire data model does not exist and never will**: live check
+returned `subscriptions` 0, `subscription_billings` 0, `subscription_services` 0, `service_partners`
+0, `collections_events` 0, `orders.subscription_id` 0. Migrations 0256-0261 — the numbers it
+reserves — were taken months ago by promo parity, change requests, HR departments and guarantees.
+Meanwhile THIS line built the same concepts in 0249 as `rental_agreements` / `rental_billings` /
+`service_entitlements`, and they hold real rows. **Building the spec's tables would have meant two
+ledgers for one debt.** So the business locks were honoured and the data model was not.
+
+Three more conflicts nobody had noticed, all flagged to Loo before a line was written:
+
+1. **The ladder has no mouth.** Day 3 SMS / Day 7 WhatsApp / Day 21 warning — there is **no send
+   channel anywhere in the API**. `whatsapp_group_url` on the partner table is a stored link, not a
+   sender. Those three rungs are unbuildable today.
+2. **Two "locked" documents disagree about delinquency.** Loo's T&C says due on the **7th** with
+   **8%/month** interest and no ladder; Jess's spec has a day-count ladder and **no interest**.
+3. **Our own due dates contradicted Loo's contract.** `rental_billings.due_date` anchored on
+   `start_date`, so RA-1003's 84 instalments all fall on the 26th.
+
+### Loo's calendar, and the law inside it
+
+He answered all four questions. On the calendar, in his own words for a customer signing on the
+30th: *"30 号购买的时候会付一次费 · 紧接着的 7 号会付一次费 · 下个月的 7 号再付一次费 …
+到了最后一个月的时候，他基本上就不用付费了，因为之前已经多付过一次了"* — and the invariant that
+actually governs: **"as long as the sum is correct"**.
+
+So: N payments for an N-month term, the first at the counter and the rest on the 7th, totalling
+exactly `monthly_fee × term_months`. `rental_approve_agreement` now **refuses to write a schedule
+that does not sum to the contract value** — asserted in the function, not trusted.
+
+The **7-day guard** (sign on the 6th → first anchor moves to the following month) turned out to be
+load-bearing rather than polite: it stops a second charge one day later that a customer reads as a
+double charge, **and** Stripe refuses a trial shorter than ~48 hours, and the trial is what carries
+the gap. Payment count never changes, so the sum never changes.
+
+### Stripe cannot express Loo's rule directly — checked, not assumed
+
+The obvious approach is a billing anchor on the 7th. The docs say otherwise:
+`proration_behavior:'none'` **WAIVES the first invoice** (customer pays nothing at signup) and the
+default `create_prorations` bills a **part-month**. Neither is "full fee now, full fee every 7th".
+
+The composition that is: the signup month rides as a **one-time line item** (charged at checkout),
+a **trial** covers the gap to the first 7th, and **trial end becomes the billing anchor** so every
+later invoice lands on the 7th by construction — then the schedule runs **term − 1** iterations.
+1 + 83 = 84 × RM59 = RM4,956. `ensureFixedTermSchedule` was renamed `billingCycles` for exactly
+this reason: passing the full term would collect one month too many across seven years.
+
+### The money finally has a door
+
+`rental_billings` had 84 rows and **zero writers**. `rental_record_payment` is the writer and the
+only one: the supplier/commission split is computed **server-side from the agreement's own snapshot
+rates** (a caller never sends money figures), it is **idempotent by `stripe_invoice_id`** because
+Stripe delivers at-least-once and the POS poll races the webhook, it writes history on every call,
+and it is gated to finance/principal or the webhook's `service_role` JWT — deliberately **not**
+`is_internal()`, which admits `bd`, and a BD sells these. **Closes CF
+`rental-billing-writes-need-rpc`.**
+
+That CF also asked us to decide the CASCADE question. An FK cannot say "cascade the unpaid ones
+only", so the guard is a trigger: **a collected month cannot be deleted by any path**, including
+cascade from the agreement. Unpaid rows stay deletable, which re-anchoring needs.
+
+The webhook records the signup month at checkout completion (**closes CF
+`rental-first-month-vs-billing-row`**) and every later `invoice.paid`, matched **by invoice id, not
+due date** — the only identifier immune to the drift in CF `rental-billing-anchor-drift`. SDK v22
+moved that field: `invoice.subscription` is gone, it now hangs off
+`parent.subscription_details.subscription`, read out of the installed types rather than guessed.
+
+**ONE events table**, written from the first ringgit rather than sitting empty waiting for ②b —
+the dunning steps land in the same table as extra `kind` values. That is deliberately not the empty
+`collections_events` the spec wanted, and it is the HR-P6 lesson applied. The Credit Bureau landing
+strip needed nothing at all: **0268 already put `credit_checked_at` / `credit_reference` on the
+agreement**, checked before building a second one.
+
+**8%/month SIMPLE interest** (Loo confirmed 单利), pro-rata by day rather than "per month or part
+thereof" — both readings exist in Malaysian contracts and this is the one that cannot over-charge.
+Computed and recorded, **never auto-fired**: deciding a payment is late is the ladder's job.
+
+### The dry run failed first, and it was the same blind spot as last time
+
+Round 1 reported `B5 seq2=2026-09-30` — the OLD generator. Cause: **I had omitted
+`rental_approve_agreement` from the dry-run payload**, exactly as I omitted it from 0279's. Twice
+now. Re-run with every changed object, 11 assertions passed: Loo's worked example (30 Aug → 7 Sep →
+7 Oct → … → 7 Jul 2033), the 6th-of-month guard, month clamping (31st → 28 Feb, never rolling into
+March), the sum, the split summing exactly, idempotency under re-delivery, oldest-unpaid
+resolution, undeletable collected months incl. cascade, a showroom refused 42501, and the webhook's
+`service_role` JWT admitted.
+
+**Rule, now recorded: the dry-run payload must contain every object the migration changes — diff
+the CREATE/ALTER list in the file against the payload before sending.**
+
+Guardrail #8 fired again too: tail was 0280 (delivery shipped twice today) so this took 0281.
+
+### Evidence
+
+shared **1262/1262** · api **3** = §17.7 baseline · web **16** = §17.7 baseline — zero new.
+typecheck 0, build + `check:v4` + design-standard clean.
+
+**Ship**: PR #387 (merge `0aa75a88`) → **0281 applied first**, then api Worker `63fca88d`
+(`--env production`, bindings verified) + web `index-C-BnjmmM.js` → carres-portal + carres-pos;
+all 4 canonicals converged (pos lagged one poll); live bundle 4,234,736 bytes
+downloaded-then-grepped, `SERVICE_ROLE` **0**, four markers from mounted components present; unauth
+401 on both new routes. Post-apply reconciliation: `md5(prosrc)` + length against the file for all
+**four** function bodies — file == live, byte for byte.
+
+### What ②b still needs, said plainly
+
+No dunning ladder, no reminders, no Credit Bureau call, and `invoice.payment_failed` is not
+recorded (the events table has no `payment_failed` kind — a one-line CHECK change when it lands).
+All of it waits on a comms channel and the bureau contract, both of which Loo said to stand by
+rather than build.
