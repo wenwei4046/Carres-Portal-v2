@@ -117,6 +117,26 @@ const AG_ID = "00000000-0000-0000-0000-0000000d0001";
 const CUST_ID = "00000000-0000-0000-0000-0000000c0001";
 const PLAN_ID = "00000000-0000-0000-0000-0000000b0001";
 
+/** 0278 — every signup now carries the customer's signature. */
+const SIGNED = {
+  signatureDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
+  signedName: "Tan Mei Ling",
+};
+
+/** 0278 — POST /agreements writes the signature with the SERVICE client before
+ *  it calls the RPC (a store JWT fails the bucket's is_internal() policy), so
+ *  every signup test needs a storage-capable admin stand-in. */
+function stubSignatureStorage() {
+  vi.mocked(adminClient).mockReturnValue({
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ error: null }),
+        remove: () => Promise.resolve({ error: null }),
+      }),
+    },
+  } as never);
+}
+
 const PENDING_ROW = {
   id: AG_ID,
   agreement_no: "RA-1001",
@@ -387,10 +407,12 @@ describe("the sell + checkout lanes under the new gate", () => {
       error: null,
     });
     vi.mocked(userClient).mockReturnValue(sb as never);
+    stubSignatureStorage();
     const res = await post("/api/rental/agreements", "showroom", {
       planId: PLAN_ID,
       customerName: "Tan Mei Ling",
       customerPhone: "0123456789",
+      ...SIGNED,
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
@@ -446,9 +468,10 @@ describe("0275 — a rental mints a Sales Order", () => {
       error: null,
     });
     vi.mocked(userClient).mockReturnValue(sb as never);
+    stubSignatureStorage();
     const res = await post("/api/rental/agreements", "showroom", {
       planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
-      deliveryDate: "2026-08-15",
+      deliveryDate: "2026-08-15", ...SIGNED,
     });
     expect(res.status).toBe(201);
     expect((sb.calls.rpc[0].args as { p_delivery_date: string }).p_delivery_date)
@@ -465,8 +488,9 @@ describe("0275 — a rental mints a Sales Order", () => {
       error: null,
     });
     vi.mocked(userClient).mockReturnValue(sb as never);
+    stubSignatureStorage();
     await post("/api/rental/agreements", "showroom", {
-      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
+      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789", ...SIGNED,
     });
     expect((sb.calls.rpc[0].args as { p_delivery_date: unknown }).p_delivery_date).toBeNull();
   });
@@ -478,8 +502,9 @@ describe("0275 — a rental mints a Sales Order", () => {
     vi.mocked(userClient).mockReturnValue(
       makeSb({ data: null, error: { message: "nope", details: detail } }) as never,
     );
+    stubSignatureStorage();
     const res = await post("/api/rental/agreements", "showroom", {
-      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
+      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789", ...SIGNED,
     });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code: string }).code).toBe(detail);

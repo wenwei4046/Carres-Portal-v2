@@ -1272,6 +1272,18 @@ export interface RentalAgreement {
   rejectionReason: string | null;
   creditCheckedAt: string | null;
   creditReference: string | null;
+  /** 0278 — the signature, captured at the counter. Before this the POS
+   *  demanded a drawing to enable Complete and then discarded it, so an
+   *  approver extended credit against a record that only claimed to exist.
+   *  `templateVersion` is what makes it evidence rather than a picture: it
+   *  names the exact wording the customer agreed to. */
+  signedAt: string | null;
+  signedName: string | null;
+  signedNric: string | null;
+  signaturePath: string | null;
+  signedDocPath: string | null;
+  templateId: string | null;
+  templateVersion: number | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;

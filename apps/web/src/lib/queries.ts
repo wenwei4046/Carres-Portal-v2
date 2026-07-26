@@ -296,6 +296,8 @@ export const qk = {
       ["rental", "checkout", agreementId, sessionId] as const,
     // 0268 — the finance approver's credit queue.
     approvals: () => ["rental", "approvals"] as const,
+    // 0278 — the wording in force, read by the POS before a customer signs.
+    agreementTemplate: () => ["rental", "agreement-template"] as const,
   },
   // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
   // so the desk, the order badge and any open drawer all re-read together.
@@ -7015,9 +7017,12 @@ export interface RentalApproval {
   startDate: string;
   createdAt: string;
   notes: string | null;
-  /** Signing is not built yet (0267 landed the columns, nothing writes them),
-   *  so these are null today and the page says so rather than implying a
-   *  signature exists. CF `rental-approve-without-signature`. */
+  /** 0278 — the signature, captured at the counter and stamped by
+   *  `create_rental_agreement`. Every application created from 0278 onward
+   *  carries one (approve now REFUSES an unsigned row), but these stay nullable:
+   *  a row created before 0278 has none, and the page must be able to say so
+   *  rather than imply a signature exists. `templateVersion` is what makes it
+   *  evidence — it names the exact wording the customer agreed to. */
   signedAt: string | null;
   signedName: string | null;
   signedNric: string | null;
@@ -7348,6 +7353,28 @@ export interface CreateRentalAgreementResponse {
    *  a document and a path into operations. Optional for the same reason. */
   orderId?: string | null;
   so?: number | null;
+}
+
+/**
+ * The rental wording the customer is about to sign (0278).
+ *
+ * `rental_agreement_templates` is RLS internal-only, so a store JWT cannot read
+ * the paper directly — this goes through the same definer function
+ * `create_rental_agreement` uses to stamp `template_version`, which is what
+ * keeps the document on screen and the version on the contract identical.
+ *
+ * `template: null` is a real answer: the principal has not published wording,
+ * so no rental can be signed at all. The confirm step says that in words rather
+ * than leaving the operator with a Complete button that always fails.
+ */
+export function useRentalAgreementTemplate(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: qk.rental.agreementTemplate(),
+    queryFn: () =>
+      apiFetch<{ template: RentalAgreementTemplate | null }>("/api/rental/agreement-template"),
+    staleTime: 60_000,
+    enabled: opts?.enabled ?? true,
+  });
 }
 
 export function useRentalPosPlans(opts?: Partial<UseQueryOptions<{ plans: PosRentalPlan[] }>>) {

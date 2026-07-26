@@ -1347,6 +1347,20 @@ export interface RentalAgreementRow {
   rejection_reason: string | null;
   credit_checked_at: string | null;
   credit_reference: string | null;
+  /** 0267 landed these columns; 0278 gave them a writer. An agreement is BORN
+   *  signed or is not born — `create_rental_agreement` stamps all five in the
+   *  same statement that creates the row, and a CHECK keeps them whole (all
+   *  present or all absent). `template_id` + `template_version` say WHICH
+   *  wording was signed, so a contract can always be re-rendered as agreed.
+   *  `signed_nric` stays optional: not every customer hands one over.
+   *  `signed_doc_path` (the archived filled PDF) still has no writer. */
+  signed_at: string | null;
+  signed_name: string | null;
+  signed_nric: string | null;
+  signature_path: string | null;
+  signed_doc_path: string | null;
+  template_id: string | null;
+  template_version: number | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

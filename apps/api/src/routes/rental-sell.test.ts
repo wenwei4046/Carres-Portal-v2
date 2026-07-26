@@ -128,6 +128,30 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
   return { from, rpc: rpcFn, calls };
 }
 
+/**
+ * 0278 — the signature goes to the private `rental-agreements` bucket with the
+ * SERVICE client, because that bucket's INSERT policy is `is_internal()` and a
+ * store JWT fails it. This stands in for that storage conversation and RECORDS
+ * it, so the tests can assert what was written and what was cleaned up.
+ */
+function makeAdminStorage(uploadResult: { error: unknown } = { error: null }) {
+  const calls = {
+    uploads: [] as Array<{ bucket: string; key: string; opts: Record<string, unknown> }>,
+    removes: [] as Array<{ bucket: string; keys: string[] }>,
+  };
+  const from = vi.fn((bucket: string) => ({
+    upload: vi.fn((key: string, _body: unknown, opts: Record<string, unknown>) => {
+      calls.uploads.push({ bucket, key, opts });
+      return Promise.resolve(uploadResult);
+    }),
+    remove: vi.fn((keys: string[]) => {
+      calls.removes.push({ bucket, keys });
+      return Promise.resolve({ error: null });
+    }),
+  }));
+  return { storage: { from }, calls };
+}
+
 /** Scriptable stand-in for the Stripe SDK client. */
 function makeStripe(overrides: Record<string, unknown> = {}) {
   return {
@@ -275,10 +299,14 @@ describe("GET /api/rental/pos-plans (0255 stripped store projection)", () => {
 });
 
 describe("POST /api/rental/agreements (0255 signup RPC)", () => {
+  // 0278 — a signup without a signature is not a signup.
+  const SIG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
   const payload = {
     planId: PLAN_ID,
     customerName: "Tan Mei Ling",
     customerPhone: "0123456789",
+    signatureDataUrl: SIG,
+    signedName: "Tan Mei Ling",
   };
 
   it("rejects a partner (403) and a phoneless payload (422) before the RPC", async () => {
@@ -350,30 +378,141 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
       },
     );
     vi.mocked(userClient).mockReturnValue(sb as never);
+    const admin = makeAdminStorage();
+    vi.mocked(adminClient).mockReturnValue(admin as never);
     const res = await request(
       "/api/rental/agreements",
       {
         method: "POST",
         headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}`, "content-type": "application/json" },
-        body: JSON.stringify({ ...payload, startDate: "2026-07-25" }),
+        body: JSON.stringify({ ...payload, startDate: "2026-07-25", signedNric: "900101-14-5555" }),
       },
       env,
     );
     expect(res.status).toBe(201);
+    // 0278 — the signature is stored BEFORE the RPC, because the DB needs a
+    // path to stamp and the agreement id does not exist until the RPC returns.
+    expect(admin.calls.uploads).toHaveLength(1);
+    expect(admin.calls.uploads[0]?.bucket).toBe("rental-agreements");
+    // The key is entirely server-generated: no client string reaches the path.
+    expect(admin.calls.uploads[0]?.key).toMatch(/^signatures\/\d{4}\/[0-9a-f-]{36}\.png$/);
+    expect(admin.calls.uploads[0]?.opts).toMatchObject({ contentType: "image/png", upsert: false });
+    expect(admin.calls.removes).toHaveLength(0);
     expect(sb.calls.rpc[0]?.name).toBe("create_rental_agreement");
     expect(sb.calls.rpc[0]?.args).toMatchObject({
       p_plan_id: PLAN_ID,
       p_customer_name: "Tan Mei Ling",
       p_customer_phone: "0123456789",
       p_start_date: "2026-07-25",
+      p_signed_name: "Tan Mei Ling",
+      p_signed_nric: "900101-14-5555",
     });
+    // the path handed to the DB is bucket-prefixed, which is what the RPC's own
+    // `rental-agreements/%` guard checks for
+    expect(
+      (sb.calls.rpc[0]?.args as Record<string, string>).p_signature_path,
+    ).toBe(`rental-agreements/${admin.calls.uploads[0]?.key}`);
+    // and the raw base64 never travels to the database
+    expect(JSON.stringify(sb.calls.rpc[0]?.args)).not.toContain("base64");
     const body = (await res.json()) as Record<string, Record<string, unknown>>;
     expect(body.agreement).toMatchObject({ agreementNo: "RA-1001", termMonths: 84, monthlyFee: 59 });
     expect(body.customer).toMatchObject({ phoneKey: "123456789" });
     expect(body.unit).toMatchObject({ unitCode: "RU-1001", status: "allocated" });
   });
 
+  // ── 0278 — the signature stops being thrown away ─────────────────────────
+
+  it("refuses a signup carrying no signature, and stores nothing", async () => {
+    const sb = makeSb({});
+    const admin = makeAdminStorage();
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const { signatureDataUrl: _omit, ...unsigned } = payload;
+    const res = await request(
+      "/api/rental/agreements",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer", DEALER_ID)}`, "content-type": "application/json" },
+        body: JSON.stringify(unsigned),
+      },
+      env,
+    );
+    expect(res.status).toBe(422);
+    // nothing written, nothing called — the refusal is at the door
+    expect(admin.calls.uploads).toHaveLength(0);
+    expect(sb.calls.rpc).toHaveLength(0);
+  });
+
+  it("deletes the stored signature when the RPC refuses, so a failed signup leaves no orphan", async () => {
+    const sb = makeSb({}, {
+      data: null,
+      error: {
+        message: "No rental agreement wording is published",
+        details: "no_agreement_template",
+      },
+    });
+    const admin = makeAdminStorage();
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await request(
+      "/api/rental/agreements",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}`, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      env,
+    );
+    // the one refusal a store can actually trigger: Loo has not published the
+    // wording. It must arrive NAMED so the POS can say which screen to go to.
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("no_agreement_template");
+    expect(admin.calls.uploads).toHaveLength(1);
+    expect(admin.calls.removes).toHaveLength(1);
+    expect(admin.calls.removes[0]?.keys).toEqual([admin.calls.uploads[0]?.key]);
+  });
+
+  it("surfaces a storage failure instead of creating an unsigned agreement", async () => {
+    const sb = makeSb({});
+    const admin = makeAdminStorage({ error: { message: "bucket unavailable" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await request(
+      "/api/rental/agreements",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer", DEALER_ID)}`, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      env,
+    );
+    expect(res.status).toBe(500);
+    // the critical half: the RPC was never reached, so no contract exists
+    // claiming a signature that was never stored.
+    expect(sb.calls.rpc).toHaveLength(0);
+  });
+
+  it("maps the other 0278 guards to named 422s", async () => {
+    for (const detail of ["signature_required", "invalid_signature_path", "signed_name_required"]) {
+      const sb = makeSb({}, { data: null, error: { message: detail, details: detail } });
+      vi.mocked(userClient).mockReturnValue(sb as never);
+      vi.mocked(adminClient).mockReturnValue(makeAdminStorage() as never);
+      const res = await request(
+        "/api/rental/agreements",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${await makeJwt("dealer", DEALER_ID)}`, "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        env,
+      );
+      expect(res.status).toBe(422);
+      expect(((await res.json()) as { code: string }).code).toBe(detail);
+    }
+  });
+
   it("maps RPC business raises to friendly codes (plan_inactive → 422, forbidden → 403)", async () => {
+    vi.mocked(adminClient).mockReturnValue(makeAdminStorage() as never);
     const inactive = makeSb({}, {
       data: null,
       error: { message: "Rental plan is not active", details: "plan_inactive" },
@@ -406,6 +545,65 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
       env,
     );
     expect(res2.status).toBe(403);
+  });
+});
+
+describe("GET /api/rental/agreement-template (0278 — the paper the store shows)", () => {
+  const TEMPLATE_ROW = {
+    id: "00000000-0000-0000-0000-0000000e0009",
+    doc_key: "rent_to_own",
+    name: "Rental Agreement — T&C (v5)",
+    binds_to: ["mattress", "bedframe", "sofa"],
+    version: 2,
+    body: [{ kind: "h2", text: "Terms and Conditions" }],
+    fields: ["customer.name"],
+    effective_from: "2026-07-06",
+    active: true,
+    created_at: "2026-07-26T00:00:00Z",
+    updated_at: "2026-07-26T00:00:00Z",
+    updated_by: null,
+  };
+
+  it("lets a STORE read the wording it is asking a customer to sign", async () => {
+    // The table itself is RLS internal-only (0267), so without the definer
+    // function a store could not display the contract at all.
+    const sb = makeSb({}, { data: TEMPLATE_ROW, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await request(
+      "/api/rental/agreement-template",
+      { headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc[0]?.name).toBe("rental_current_agreement_template");
+    expect(sb.calls.rpc[0]?.args).toMatchObject({ p_doc_key: "rent_to_own" });
+    const body = (await res.json()) as { template: Record<string, unknown> };
+    expect(body.template).toMatchObject({ version: 2, docKey: "rent_to_own" });
+  });
+
+  it("returns template:null — a real answer — when nothing is published yet", async () => {
+    // This is live truth today: rental_agreement_templates holds ZERO rows.
+    const sb = makeSb({}, { data: null, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await request(
+      "/api/rental/agreement-template",
+      { headers: { Authorization: `Bearer ${await makeJwt("dealer", DEALER_ID)}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { template: unknown }).toEqual({ template: null });
+  });
+
+  it("refuses a non-selling role and an unauthenticated caller", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({}) as never);
+    const asPartner = await request(
+      "/api/rental/agreement-template",
+      { headers: { Authorization: `Bearer ${await makeJwt("partner")}` } },
+      env,
+    );
+    expect(asPartner.status).toBe(403);
+    const anon = await request("/api/rental/agreement-template", {}, env);
+    expect(anon.status).toBe(401);
   });
 });
 

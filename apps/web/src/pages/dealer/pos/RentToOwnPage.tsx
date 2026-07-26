@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, CheckCircle2, Repeat, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 import type { PosRentalPlan } from "@carres/shared";
 import { rentalContractValue } from "@carres/shared";
-import { ApiError } from "@/lib/api";
 import { rm } from "@/lib/format-currency";
 import {
   useCatalog,
@@ -45,7 +43,9 @@ const todayIso = (): string => {
   return `${d.getFullYear()}-${mm}-${dd}`;
 };
 
-export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Props) {
+// `actingDealerId` stays in Props (callers and tests still pass it) but is no
+// longer read: the only consumer was the retired signup call above.
+export default function RentToOwnPage({ dealerId, onClose }: Props) {
   const plansQ = useRentalPosPlans();
   const catalogQ = useCatalog();
   const salespersonsQ = useSalespersons();
@@ -102,33 +102,20 @@ export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Pro
 
   function handleSign() {
     if (!formValid || !selected || createAgreement.isPending) return;
-    setSubmitError(null);
-    createAgreement.mutate(
-      {
-        planId: selected.id,
-        customerName: name.trim(),
-        customerPhone: phone.trim(),
-        ...(email.trim() ? { customerEmail: email.trim() } : {}),
-        ...(address.trim() ? { customerAddress: address.trim() } : {}),
-        ...(actingDealerId ? { dealerId: actingDealerId } : {}),
-        ...(salespersonId ? { salespersonId } : {}),
-        startDate,
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      },
-      {
-        onSuccess: (res) => {
-          setCreated(res);
-          // 0268: an application is not a live contract — don't tell the store
-          // it is "signed" when finance still has to approve the credit.
-          toast.success(
-            res.agreement.status === "pending_approval"
-              ? `${res.agreement.agreementNo} sent for approval`
-              : `${res.agreement.agreementNo} signed`,
-          );
-        },
-        onError: (e: unknown) =>
-          setSubmitError(e instanceof ApiError ? e.message : "Could not sign the agreement"),
-      },
+    // 0278 — THIS PAGE IS RETIRED and it has no signature pad.
+    //
+    // The PR that made Rent-to-Own a POS category retired it; nothing imports it any
+    // more (it survives on disk with its tests, and is tree-shaken out of the
+    // shipped bundle). Since 0278 an agreement is BORN signed or is not born,
+    // so this form structurally cannot create one — the server would refuse it
+    // with `signature_required`.
+    //
+    // It is left saying so rather than firing a request that cannot succeed:
+    // the ⑳ lesson was that leaving an old door OPEN while filing a note about
+    // it looks disciplined and behaves like a trap. This door is now shut from
+    // the inside. The file itself is Loo's call to delete.
+    setSubmitError(
+      "This screen has been replaced by the Rental category in the POS, which captures the customer's signature. A rent-to-own agreement can only be signed there.",
     );
   }
 

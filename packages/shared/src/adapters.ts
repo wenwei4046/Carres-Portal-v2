@@ -1133,6 +1133,17 @@ export const rentalAgreementFromRow = (r: DB.RentalAgreementRow): D.RentalAgreem
   rejectionReason: r.rejection_reason ?? null,
   creditCheckedAt: r.credit_checked_at ?? null,
   creditReference: r.credit_reference ?? null,
+  // 0278 signature. Same `?? null` discipline as the 0268 block above: a
+  // browser on this build may read a row shaped by a pre-0278 Worker, and an
+  // absent signature must degrade to "not signed" rather than undefined —
+  // which is exactly the state the approver screen renders a warning for.
+  signedAt: r.signed_at ?? null,
+  signedName: r.signed_name ?? null,
+  signedNric: r.signed_nric ?? null,
+  signaturePath: r.signature_path ?? null,
+  signedDocPath: r.signed_doc_path ?? null,
+  templateId: r.template_id ?? null,
+  templateVersion: r.template_version ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   createdBy: r.created_by,

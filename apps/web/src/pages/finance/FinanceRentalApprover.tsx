@@ -2,6 +2,55 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRentalApprovals, useDecideRentalAgreement, type RentalApproval } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
+import { supabase } from "@/lib/supabase";
+
+/** The private evidence bucket 0267 created. No delete policy — a signed
+ *  agreement is evidence — and read access is `is_internal()`, which finance
+ *  holds, so the browser can mint its own short-lived URL. */
+const SIGNATURE_BUCKET = "rental-agreements";
+
+/**
+ * Open the signature the customer actually drew (0278).
+ *
+ * The approver is deciding thousands of ringgit of credit off the back of this
+ * drawing; being told one exists is not the same as being able to look at it.
+ * The bucket is private, so this mints a short-lived signed URL rather than
+ * embedding anything — the same idiom the ops drawer uses for payment slips.
+ */
+function SignatureLink({ path }: { path: string }) {
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      // Stored bucket-prefixed (`rental-agreements/signatures/…`); the storage
+      // API wants the key WITHIN the bucket.
+      const key = path.startsWith(`${SIGNATURE_BUCKET}/`)
+        ? path.slice(SIGNATURE_BUCKET.length + 1)
+        : path;
+      const { data, error } = await supabase.storage
+        .from(SIGNATURE_BUCKET)
+        .createSignedUrl(key, 3600);
+      if (error || !data?.signedUrl) {
+        toast.error(`Couldn't open the signature — ${error?.message ?? "no URL"}`);
+        return;
+      }
+      window.open(data.signedUrl, "_blank", "noopener");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={open}
+      disabled={busy}
+      data-testid="view-signature"
+      className="text-[11.5px] font-medium text-primary underline underline-offset-2 disabled:opacity-50"
+    >
+      {busy ? "Opening…" : "View signature"}
+    </button>
+  );
+}
 
 /**
  * Finance → Rental Approver (migration 0268).
@@ -134,20 +183,27 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             <span className="font-mono text-[14px] font-semibold text-foreground">
               {r.agreementNo}
             </span>
-            {/* Signing is not built yet — say so rather than let a blank imply
-                a signed contract exists. */}
+            {/* 0278 — the signature is real now, so the pill states a fact
+                instead of apologising for a missing feature. An unsigned row
+                can no longer reach this queue (approve refuses it), so the
+                amber branch only ever describes a pre-0278 application. */}
             {r.signedAt ? (
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Signed
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                title={`Signed ${new Date(r.signedAt).toLocaleString()}`}
+              >
+                Signed by {r.signedName ?? "customer"}
+                {r.templateVersion != null ? ` · T&C v${r.templateVersion}` : ""}
               </span>
             ) : (
               <span
                 className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-                title="The signing view has not shipped yet — no signature is on file for this application."
+                title="This application predates signature capture — no signature is on file, and approval is now refused without one."
               >
                 Not signed yet
               </span>
             )}
+            {r.signaturePath ? <SignatureLink path={r.signaturePath} /> : null}
           </div>
           <div className="text-[12.5px] text-muted-foreground mt-1">
             {r.customer.name}

@@ -214,6 +214,15 @@ export const agreementBlockSchema = z
   .strict();
 
 /**
+ * The rent-to-own contract's `doc_key` — the one document a rental is signed
+ * against. Mirrored (not imported) by 0278's
+ * `rental_current_agreement_template()` default, the same way the HR-P6 metric
+ * list is a shared constant mirrored by a CHECK: the DB cannot import TypeScript,
+ * so the pair is kept honest by naming the mirror in both places.
+ */
+export const RENTAL_AGREEMENT_DOC_KEY = "rent_to_own" as const;
+
+/**
  * Author a NEW version of an agreement's wording. `version` is server-assigned
  * (max + 1 for the doc_key) — a version is immutable once signed against, so
  * the client never picks one.
@@ -284,6 +293,27 @@ export const createRentalAgreementInputSchema = z
     planId: z.string().uuid(),
     customerName: z.string().trim().min(1).max(120),
     customerPhone: z.string().trim().min(5).max(32),
+    /**
+     * 0278 — the customer's signature, as the POS pad drew it.
+     *
+     * REQUIRED, and that is the whole point of the migration: `step4ValidRental`
+     * already refused to enable Complete without a `data:image/…`, then the
+     * rental submit branch returned before the upload the ordinary order path
+     * runs, so the drawing died in the browser. The API writes this to the
+     * private `rental-agreements` bucket with the SERVICE client — a store JWT
+     * fails that bucket's `is_internal()` INSERT policy, so a client-side upload
+     * is structurally impossible and the browser must hand the bytes over.
+     */
+    signatureDataUrl: z
+      .string()
+      .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/, "signature must be a base64 png/jpeg data URL")
+      .max(2_000_000, "signature image is too large"),
+    /** Who signed. Defaults to the customer on screen but stays editable — the
+     *  signer may be a spouse or guardian, and the contract should say so. */
+    signedName: z.string().trim().min(1).max(120),
+    /** Optional by design: not every customer hands one over, and the T&C blank
+     *  may be completed on paper. Excluded from the DB's all-or-nothing CHECK. */
+    signedNric: z.string().trim().max(40).nullable().optional(),
     customerEmail: z.string().trim().email().nullable().optional(),
     customerAddress: z.string().trim().max(500).nullable().optional(),
     dealerId: z.string().uuid().nullable().optional(),
