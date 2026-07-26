@@ -720,3 +720,42 @@ describe("SkuMasterTab — SIZE column dropped where there is no size axis", () 
     expect(screen.getByLabelText("SVC-DISPOSE-SOFA code")).toBeInTheDocument();
   });
 });
+
+describe("SkuMasterTab — header and rows share ONE grid template", () => {
+  const CAT = () =>
+    makeCatalog([SKU_COST_SET, SKU_SVC, SKU_GRT], [MODEL_MAT, MODEL_SVC, MODEL_GRT]);
+
+  /** The header strip is the grid whose first child is the select-all box. */
+  function headerCols(container: HTMLElement): string {
+    const el = container.querySelector<HTMLElement>(
+      'input[aria-label="Select all visible SKUs"]',
+    )!.parentElement!;
+    return el.style.gridTemplateColumns;
+  }
+
+  it("rows line up with the header when the SIZE column is present", () => {
+    const { container } = render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    const row = screen.getByTestId("sku-row-CLOUD-KING");
+    expect(row.style.gridTemplateColumns).toBe(headerCols(container));
+  });
+
+  it("rows line up with the header when the SIZE column is dropped", () => {
+    // The regression Loo caught: the header switched to the no-size template
+    // while the row kept the 9-track one, so every column after Description
+    // drifted left inside the row.
+    const { container } = render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Service" }));
+    const row = screen.getByTestId("sku-row-SVC-DISPOSE-SOFA");
+    expect(row.style.gridTemplateColumns).toBe(headerCols(container));
+    // …and that template really is the one WITHOUT the 100px size track.
+    expect(row.style.gridTemplateColumns).not.toContain("100px");
+  });
+
+  it("rows line up with the header on the Guarantee filter too", () => {
+    const { container } = render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Guarantee" }));
+    const row = screen.getByTestId("sku-row-GRT-MATTRESS-15Y");
+    expect(row.style.gridTemplateColumns).toBe(headerCols(container));
+  });
+});
