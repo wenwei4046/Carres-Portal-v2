@@ -29,6 +29,10 @@ type AgreementListRow = RentalAgreement & {
 
 /** DB agreement status → display word + v4 pill tone. Never leak raw words. */
 const AGREEMENT_STATUS: Record<string, { label: string; pill: string }> = {
+  // 0268 — the credit gate. An application is not a contract: it bills nothing
+  // and holds no unit until finance decides on the Rental Approver page.
+  pending_approval: { label: "Awaiting approval", pill: "pill-draft" },
+  rejected: { label: "Rejected", pill: "pill-overdue" },
   active: { label: "Active", pill: "pill-confirmed" },
   buyout_pending: { label: "Buyout", pill: "pill-warning" },
   completed: { label: "Completed", pill: "pill-sent" },

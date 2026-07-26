@@ -82,7 +82,7 @@ describe("GuaranteeCoverStrip", () => {
     state.error = false;
     render(<GuaranteeCoverStrip orderId="o1" />);
     expect(screen.getByText("ZZZZ000111")).toBeInTheDocument();
-    expect(screen.getByText("Used")).toBeInTheDocument();
+    expect(screen.getByText("Claimed")).toBeInTheDocument();
   });
 
   it("names the covered item and the end date", () => {
@@ -92,7 +92,7 @@ describe("GuaranteeCoverStrip", () => {
     expect(screen.getByText("Guarantee")).toBeInTheDocument();
     expect(screen.getByText(/B1201S King/)).toBeInTheDocument();
     expect(screen.getByText(/15y to 2041-08-01/)).toBeInTheDocument();
-    expect(screen.getByText("Covered")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
   it("shows the DERIVED status word, so an out-of-window guarantee reads Expired", () => {
@@ -102,11 +102,12 @@ describe("GuaranteeCoverStrip", () => {
     expect(screen.getByText("Expired")).toBeInTheDocument();
   });
 
-  it("says the cover starts on delivery before the order is delivered", () => {
+  it("reads Active before delivery too — 'pending' folds into Active (Loo 2026-07-26)", () => {
     state.items = [ent({ status: "pending", effectiveStatus: "pending", expiresOn: null })];
     state.error = false;
     render(<GuaranteeCoverStrip orderId="o1" />);
-    expect(screen.getByText("Starts on delivery")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.queryByText("Starts on delivery")).not.toBeInTheDocument();
   });
 
   it("hides a voided guarantee — a cancelled order's promise is not a promise", () => {

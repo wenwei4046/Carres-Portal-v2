@@ -1353,6 +1353,12 @@ describe("rental + service plan adapters (0247-0249)", () => {
       gifts: [],
       one_off_total: 0,
       notes: null,
+      included_package_id: null,
+      decided_by: null,
+      decided_at: null,
+      rejection_reason: null,
+      credit_checked_at: null,
+      credit_reference: null,
       created_at: "2026-07-25T00:00:00Z",
       updated_at: "2026-07-25T00:00:00Z",
       created_by: null,
@@ -1365,6 +1371,77 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.status).toBe("active");
     expect(out.buyoutAmount).toBeNull();
     expect(out.startDate).toBe("2026-08-01");
+  });
+
+  it("rentalAgreementFromRow carries the 0268 credit decision", () => {
+    const base = {
+      id: "00000000-0000-0000-0000-0000000d0002",
+      agreement_no: "RA-1002",
+      customer_id: "00000000-0000-0000-0000-0000000c0002",
+      dealer_id: null,
+      salesperson_id: null,
+      order_id: null,
+      plan_id: null,
+      sku: "M-CLOUD-QUEEN",
+      term_months: 60,
+      monthly_fee: 75,
+      supplier_rate_pct: 49,
+      commission_base_pct: 20,
+      start_date: "2026-08-01",
+      buyout_at: null,
+      buyout_amount: null,
+      ownership_transfer_at: null,
+      ownership_doc_url: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      offer_id: null,
+      selected_options: {},
+      gifts: [],
+      one_off_total: 0,
+      notes: null,
+      created_at: "2026-07-26T00:00:00Z",
+      updated_at: "2026-07-26T00:00:00Z",
+      created_by: null,
+    };
+
+    // born pending: undecided, and nothing promised has been decided on
+    const pending = rentalAgreementFromRow({
+      ...base,
+      status: "pending_approval",
+      included_package_id: "00000000-0000-0000-0000-0000000e0001",
+      decided_by: null,
+      decided_at: null,
+      rejection_reason: null,
+      credit_checked_at: null,
+      credit_reference: null,
+    } as RentalAgreementRow);
+    expect(pending.status).toBe("pending_approval");
+    expect(pending.decidedAt).toBeNull();
+    expect(pending.includedPackageId).toBe("00000000-0000-0000-0000-0000000e0001");
+
+    // rejected: the reason travels so the store can tell the customer
+    const rejected = rentalAgreementFromRow({
+      ...base,
+      status: "rejected",
+      included_package_id: null,
+      decided_by: "00000000-0000-0000-0000-0000000f0001",
+      decided_at: "2026-07-26T02:00:00Z",
+      rejection_reason: "CBM: adverse record",
+      credit_checked_at: null,
+      credit_reference: null,
+    } as RentalAgreementRow);
+    expect(rejected.status).toBe("rejected");
+    expect(rejected.rejectionReason).toBe("CBM: adverse record");
+    expect(rejected.decidedBy).toBe("00000000-0000-0000-0000-0000000f0001");
+
+    // a pre-0268 Worker's row: the decision keys are absent, not undefined
+    const legacy = rentalAgreementFromRow({
+      ...base,
+      status: "active",
+    } as unknown as RentalAgreementRow);
+    expect(legacy.decidedBy).toBeNull();
+    expect(legacy.rejectionReason).toBeNull();
+    expect(legacy.includedPackageId).toBeNull();
   });
 
   it("rentalBillingFromRow coerces amount_due and null-preserves the split shares", () => {

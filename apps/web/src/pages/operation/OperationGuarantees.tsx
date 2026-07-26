@@ -9,10 +9,11 @@ import { toast } from "sonner";
 import {
   displayGuaranteeId,
   guaranteeCoverageLine,
+  guaranteeDeskStatus,
   isGuaranteeClaimable,
+  type GuaranteeDeskStatus,
   type GuaranteeEntitlementDto,
   type GuaranteeListResponse,
-  type GuaranteeStatus,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -27,25 +28,31 @@ import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
  * alive, and has it already been used? One box searches all three handles Loo
  * named: Sales Order · customer name · customer id / phone.
  *
- * State vocabulary law: no DB word reaches the screen — every status renders
- * through STATUS_DISPLAY, and it's the DERIVED status (effectiveStatus) that
- * shows, so an out-of-window guarantee reads "Expired" even though the row
- * still says 'active'.
+ * STATUS is the guarantee's own state in THREE words (Loo 2026-07-26):
+ * **Active** until it is **Claimed** or **Expired** — that is the whole
+ * decision an operator makes at the counter. 'pending' (sold, not yet
+ * delivered) folds into Active; the "cover hasn't started" nuance lives in the
+ * Cover-ends column ("on delivery"). 'void' keeps its own word so a cancelled
+ * order's guarantee is never mistaken for a live one. The mapping is
+ * guaranteeDeskStatus() in @carres/shared, so this desk and the order-detail
+ * strip can never drift apart.
+ *
+ * State vocabulary law: no DB word reaches the screen, and the word is DERIVED
+ * — an out-of-window row reads Expired even though the column still says
+ * 'active'.
  */
 
-const STATUS_DISPLAY: Record<GuaranteeStatus, { label: string; pill: string }> = {
-  pending: { label: "Starts on delivery", pill: "pill-sent" },
-  active: { label: "Covered", pill: "pill-confirmed" },
-  claimed: { label: "Used", pill: "pill-collected" },
+const STATUS_DISPLAY: Record<GuaranteeDeskStatus, { label: string; pill: string }> = {
+  active: { label: "Active", pill: "pill-confirmed" },
+  claimed: { label: "Claimed", pill: "pill-collected" },
   expired: { label: "Expired", pill: "pill-neutral" },
   void: { label: "Void", pill: "pill-neutral" },
 };
 
-const FILTERS: Array<{ key: "" | GuaranteeStatus; label: string }> = [
+const FILTERS: Array<{ key: "" | GuaranteeDeskStatus; label: string }> = [
   { key: "", label: "All" },
-  { key: "active", label: "Covered" },
-  { key: "pending", label: "Not delivered" },
-  { key: "claimed", label: "Used" },
+  { key: "active", label: "Active" },
+  { key: "claimed", label: "Claimed" },
   { key: "expired", label: "Expired" },
 ];
 
@@ -53,14 +60,16 @@ export default function OperationGuarantees() {
   const qc = useQueryClient();
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim(), 250);
-  const [status, setStatus] = useState<"" | GuaranteeStatus>("");
+  const [status, setStatus] = useState<"" | GuaranteeDeskStatus>("");
   const [claiming, setClaiming] = useState<GuaranteeEntitlementDto | null>(null);
 
-  // Deliberately NOT enabled on an empty box: this is a lookup desk, and
-  // pulling every guarantee ever sold is neither useful nor cheap.
+  // The page LISTS by default (Loo 2026-07-26: he created an order and found
+  // this tab empty). It first shipped as a search-only desk that rendered
+  // nothing until you typed — which made a guarantee that plainly existed look
+  // missing, and left no way to browse at all. The list is one indexed read
+  // capped at 100 newest-first; the box narrows it.
   const listQ = useQuery<GuaranteeListResponse>({
     queryKey: qk.guarantees.search(search, status),
-    enabled: search.length > 0 || status !== "",
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set("q", search);
@@ -87,7 +96,7 @@ export default function OperationGuarantees() {
   });
 
   const rows = listQ.data?.items ?? [];
-  const idle = search.length === 0 && status === "";
+  const filtered = search.length > 0 || status !== "";
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -95,8 +104,8 @@ export default function OperationGuarantees() {
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
         <h1 className="t-h1 text-base-900">Guarantees</h1>
         <p className="text-sm text-base-600 mt-2">
-          Look a guarantee up by its ID — or by Sales Order, customer name, phone or customer ID —
-          then swap the item and record the claim.
+          Every guarantee sold, newest first. Narrow by ID, Sales Order, customer name, phone or
+          customer ID — then swap the item and record the claim.
         </p>
       </div>
 
@@ -111,7 +120,7 @@ export default function OperationGuarantees() {
             type="search"
             value={rawSearch}
             onChange={(e) => setRawSearch(e.target.value)}
-            placeholder="Guarantee ID (ABCD123456), SO number, customer name, phone…"
+            placeholder="Narrow by guarantee ID (ABCD123456), SO number, customer name, phone…"
             aria-label="Search guarantees"
             className="w-full rounded border border-base-300 bg-white pl-9 pr-3 py-2 t-body focus:border-base-500 outline-none"
           />
@@ -134,27 +143,30 @@ export default function OperationGuarantees() {
         </div>
       </div>
 
-      {idle && (
-        <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
-          <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
-          <p className="t-body text-base-700">Search to pull up a customer's guarantee.</p>
-          <p className="t-small text-base-500 mt-1">
-            The guarantee ID off their Sales Order (<span className="font-mono">ABCD123456</span>) —
-            or the SO number, the customer's name, their phone, or their customer ID.
-          </p>
-        </div>
-      )}
-
-      {!idle && listQ.isPending && <p className="t-body text-base-600">Searching…</p>}
-      {!idle && listQ.isError && (
+      {listQ.isPending && <p className="t-body text-base-600">Loading…</p>}
+      {listQ.isError && (
         <p className="t-body text-danger">Couldn't load guarantees — {listQ.error.message}</p>
       )}
-      {!idle && !listQ.isPending && !listQ.isError && rows.length === 0 && (
-        <div className="rounded border border-base-200 bg-white p-10 text-center">
-          <p className="t-body text-base-700">No guarantee found for that search.</p>
-          <p className="t-small text-base-500 mt-1">
-            The customer may not have bought one — check the Sales Order's items.
-          </p>
+      {!listQ.isPending && !listQ.isError && rows.length === 0 && (
+        <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
+          <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
+          {filtered ? (
+            <>
+              <p className="t-body text-base-700">No guarantee matches that search.</p>
+              <p className="t-small text-base-500 mt-1">
+                Try the guarantee ID off their Sales Order (
+                <span className="font-mono">ABCD123456</span>), the SO number, or the customer's
+                name.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="t-body text-base-700">No guarantees sold yet.</p>
+              <p className="t-small text-base-500 mt-1">
+                One appears here the moment a Sales Order with a guarantee is created.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -178,7 +190,7 @@ export default function OperationGuarantees() {
             </thead>
             <tbody>
               {rows.map((g) => {
-                const d = STATUS_DISPLAY[g.effectiveStatus];
+                const d = STATUS_DISPLAY[guaranteeDeskStatus(g.effectiveStatus)];
                 return (
                   <tr key={g.id} className="border-b border-base-100 last:border-0 align-top">
                     {/* The handle everything is tracked by. A claimed row shows

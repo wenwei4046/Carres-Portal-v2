@@ -931,3 +931,83 @@ Three tests lock header ≡ row (size present / size dropped / Guarantee); **ver
 **Shared**: `agreementTokens` · `fillAgreement` (an unfilled blank stays VISIBLE and is reported — a silent gap on a contract is worse than an ugly one) · `blocksFromText` (paste from Word). **API**: POST assigns the next version server-side + caches tokens; PATCH touches binding/name/date/active but NEVER the wording. **Web**: the Rental tab's Agreements section — load the supplied wording, read it, save as version 1; preview any version; only the newest offers "New version".
 
 **Evidence**: shared 1075/1075 · api 1551/1554 (3 = §17.7 baseline; rental route 46/46) · web 1525/1541 (16 = baseline; RentalSettingPage 29/29) · design-standard clean. **Ship**: PR #329 (merge `5cf6c092`, union with #326/#328) → api Worker `8ed1f1b6` (unauth /api/rental/config 401 ✓) + web `index-K-sQWa48.js` → carres-portal `614b51bc` + carres-pos `8e81b245`; 4 canonicals ✓; live bundle 4,107,142 bytes, `SERVICE_ROLE` grep 0, wording marker present.
+
+
+## 2026-07-26 ⑫ · Guarantees desk lists on arrival (PR #333, web-only, deployed)
+
+**Loo**: created an order with a guarantee, opened Operation → Guarantees, saw nothing.
+
+**Not a data bug** — the order carried `KQYZ939913` and the order-detail strip rendered it. **The page was wrong.** I had shipped it as a search-ONLY desk (`enabled: search.length > 0 || status !== ""`), and since the default "All" filter is the empty string, arriving with an empty box never called the endpoint at all. A guarantee that plainly existed looked missing, and there was no way to browse.
+
+**The wrong call for this data's shape**: guarantees are countable, not a million-row log. It now LISTS newest-first on arrival (one indexed read, capped at 100 with the existing truncation notice) and the box NARROWS. The empty state also splits — "No guarantees sold yet" (register genuinely empty) vs "No guarantee matches that search" (a filter is on); before, both read as a prompt to go searching.
+
+**Durable lesson: a "search-first" surface is only right when listing is genuinely expensive or meaningless. For a register an operator opens expecting to see its contents, defaulting to blank reads as a BUG, not as a design.**
+
+Five tests, led by "LISTS on arrival — no typing required" (asserts the endpoint is called with no q and no status); **verified all five go red with the old gate restored**.
+
+**Ship**: PR #333 (merge `f8438c5f`) → web `index-JV59p66j.js` → carres-portal `fcfa1341` + carres-pos `7091ac42`; downloaded 4,107,031 bytes, `SERVICE_ROLE` 0, new empty-state marker ✓. Tests: web 1532/1548 (16 = §17.7 baseline), typecheck 0, design-standard + check:v4 clean. api/DB untouched.
+
+**Edge-lag note (second time today)**: right after deploying, two canonicals still served `index-K-sQWa48.js`. That was the parallel line's OLDER bundle still cached — `wrangler pages deployment list` showed MY deployment (from the main tip) newest on both projects. The two Pages projects lag INDEPENDENTLY and can take several minutes; poll each until it flips rather than redeploying.
+
+
+## 2026-07-26 ⑬ · Guarantees desk — STATUS is the ORDER's status (PR #335, deployed)
+
+**Loo**: make that column the status of the order — placed, delivered, and so on.
+
+It was showing the guarantee's own lifecycle word ("Starts on delivery"), which answers a question the operator hasn't asked yet. What they want at the counter is where the ORDER is — and the guarantee's clock hangs off exactly that (cover starts on delivery), so the order status is genuinely the more useful column.
+
+**Kept rather than replaced**: the guarantee's own state now rides as a small pill directly UNDER the guarantee ID. "Used" and "Expired" are what decide whether a claim can be honoured, so a straight swap would have hidden the one fact this desk exists to surface — same information, no extra column width. **Whenever a request would replace a signal, check whether that signal is the load-bearing one before deleting it; moving usually satisfies the ask without the loss.**
+
+New `orderStatusWord()` lives in `apps/web/src/lib/status-pill.ts` — the file that already declares itself the single status→pill source — so the vocabulary matches the POS board LANES and the order drawer (one order can never read "Order placed" here and "place" there). Unmapped values degrade to de-underscored Title Case instead of leaking a DB word; the pill colour reuses `orderStatusPill`, so this column obeys the same colour law as every other status.
+
+The route ships the RAW status (`orders!inner(so, status)`) and the UI maps it — the mapping stays in one place rather than in the API.
+
+**Ship**: PR #335 (merge `de0c01c9`) → api Worker `f4565b8b` (unauth 401 ✓) + web `index-gSSCw-kl.js` → carres-portal `2b86b202` + carres-pos `2bf8f803`; all 4 canonicals ✓; downloaded 4,107,409 bytes, `SERVICE_ROLE` 0. Tests: shared 1080/1080 · api 3 = §17.7 baseline (guarantees 9/9) · web 16 = baseline (+4 new, incl. one asserting the claimed row still shows "Used" and its retired ID) · typecheck 0 · design-standard + check:v4 clean.
+
+---
+
+
+## 2026-07-26 ⑭ · The Approver gate — the credit-assessment clause, implemented (0268, worktree `rental-modular-sku`)
+
+**Loo asked to continue the rental initiative.** The checkpoint was `e0ac3f86` ("lock the Rental offer-tab design to the approved mock"). I read `docs/rental-service-plan-proposal.md` in full, graded the §5 offer-tab lock, and argued for doing **§4 the Approver page first** instead — Loo agreed.
+
+**Why §4 beat §5.** The §5 offer tab is ~85% built already (PR #315 shipped the price matrix, the option overlay with its "Over the term" column, the fabric series→colour drill with whole-series pricing and All on/All off, surcharges, service plans, revenue split); its real remaining gaps are five cosmetic ones (term-total column, Stripe sync pill, per-part on/off tick, offers-list summary line, "Change model"). §4 was **not built at all, and the database had no room for it**: `rental_agreements_status_check` allowed only `active | buyout_pending | completed | ownership_transferred | defaulted | repossessed | cancelled`, and `create_rental_agreement` stamped `'active'` as a literal. Loo's own T&C says participation is "subject to credit assessment" — the system did not honour its own contract. A signature at a store counter was the only thing between a stranger and RM 4,956 of Carres credit.
+
+**The finding that shaped the design.** The old sell RPC did not just mark an agreement live — in the same breath it wrote the **full 84-row `rental_billings` schedule**, allocated a **`rental_stock_units` asset**, and minted the included package's **`service_entitlements` + `service_visits`**. Gating only the status word would have made the gate cosmetic: a REJECTED application would still have left phantom receivables in finance, a unit ops believes is spoken for, and service visits the customer never earned. **So all of it moved into the approve path.** An application now costs nothing until a human says yes.
+
+**0268** (applied): status machine gains `pending_approval` (the new birth state, via column default AND the RPC literal, so neither door can mint a live contract) + `rejected`; `included_package_id` becomes a real column so the contract survives a plan re-price between signing and approval (the schedule materialises from the AGREEMENT's snapshot, never a re-read of `rental_plans`); `decided_by` / `decided_at` / `rejection_reason` + a CHECK that a rejection must carry a reason and a pending row must not claim a decider; `credit_checked_at` / `credit_reference` as the CBM hook's landing strip (planned, not built — per the spec). Four functions: `rental_can_approve()` (finance + principal — **deliberately narrower than `is_internal()`, which admits `bd`, and a BD sells these**), `rental_approve_agreement`, `rental_reject_agreement`, `rental_pending_approvals()`.
+
+**Free win from the existing code**: the Stripe checkout route already refused any agreement whose status is not `active`. Because an agreement is now born pending, **no card can be charged before finance approves — with zero API changes.** The route now names which of the two it is, so a store sees "waiting for finance" instead of a dead button.
+
+**Two deliberate omissions, both filed as carry-forwards rather than hidden:**
+1. **No `signed_at` guard on approve** (`rental-approve-without-signature`). Loo's flow is signature-then-approval, but signing **is not built** — 0267 landed the columns and the bucket, and nothing anywhere writes one of them. A guard would have jammed the queue shut on day one. The guard is written verbatim into 0268's body as a comment, ready to uncomment; meanwhile every application card shows a **"Not signed yet"** pill so the approver is never misled into thinking a signature exists.
+2. **Reject does not cancel an order** (`rental-reject-does-not-cancel-the-order`). Moot today — the rental lane never mints an order (`rental_agreements.order_id` has no writer anywhere; a rental produces an `RA-` and never an `SO-`). Reaching into order state from a rental RPC would touch live cascades, so the note records the firm fix for when the lane does create orders: a blocker inside `proceed_order` alongside its six existing `P0001` + detail-code guards.
+
+**Verified before applying, not after.** The whole migration ran against live prod inside a transaction that was then rolled back, with **21 assertions** driven through `set_config('request.jwt.claims', …)` impersonation: born pending with 0 billings / 0 units / 0 entitlements · the package snapshot lands · a **showroom is refused (42501)** · finance approves → active + exactly 84 billing rows priced from the agreement + 1 unit + 21 visits (`floor(84×3/12)`) · `decided_by` stamped · **double-approval refused** · blank rejection reason refused · a rejected application leaves **0 billing rows and 0 reserved assets**. Rollback confirmed clean (back to 0 rows, old default intact) before the real apply. Post-apply: default = `pending_approval`, 6 new columns, 4 new functions, `anon` EXECUTE **false** on all of them, and `create_rental_agreement` still has **exactly 1 copy** — no ghost overload (the 0153/0154 trap).
+
+**One measured security correction**: `REVOKE ALL … FROM public` did **not** remove `anon`'s EXECUTE — Supabase grants it through its own default privileges. Measured it, then revoked `anon` explicitly (the 0255 precedent). The functions were fail-closed by logic either way; this is the fence behind the wall.
+
+**Surfaces**: new **Finance → Rental Approver** tab (9th finance tab; one card per application showing the customer, the store, the salesperson, the signature state, and — the number the decision is actually about — **the full credit over the term**, not the monthly fee). Reject demands a typed reason before the button enables. The POS success screen stops saying "signed" for a pending application, drops the collect button, and says "Sent to finance for approval — no payment is collected yet"; the ops Rental list learns the two new status words.
+
+**Tests**: api **+28** (`rental-approver.test.ts` — who may open the queue incl. `bd`/`operation` refused, which RPC each decision calls with which arg name, every detail-code → status mapping, and the two checkout-refusal shapes); web **+10** (`FinanceRentalApprover.test.tsx` — empty state is a real answer, full credit shown not the fee, "Not signed yet" is explicit, reject blocked without a reason, no raw underscored DB word reaches the DOM); shared **+1** (adapter carries the decision, and a pre-0268 row degrades to nulls). Suites at baseline: shared 1081/1081 · api 3 pre-existing (partner/pickups ×1 + supplier/pos ×2) · web 16 pre-existing. typecheck 0, build clean, `check:v4` clean, design-standard clean, `SERVICE_ROLE` grep 0 on a downloaded 4,115,802-byte bundle.
+
+**Ship**: PR #337 (merge `15e82946`) → **0268 applied first, then code** (a Worker that mints `pending_approval` would have violated the old CHECK constraint if deployed before the migration) → api Worker `facd766f` (unauth `/api/rental/approvals` 401 ✓, unauth `POST …/decide` 401 ✓, `/api/rental/config` 401 on api.carresofficial.com ✓) + web `index-gvaodBF9.js` → carres-portal `bd4a3696` + carres-pos `acefd9b3`; **all 4 canonicals verified serving it on the first poll** (no edge lag this time); downloaded 4,116,180 bytes, `SERVICE_ROLE` 0, "Rental Approver" + "Sent to finance for approval" markers present. Post-deploy DB re-check: birth status `pending_approval`, `anon` EXECUTE false on the queue fn, `create_rental_agreement` still exactly 1 copy.
+
+**Still zero rows across the whole rental module** (0 offers / 0 plans / 0 service packages / 0 agreements) — the gate is live but has never carried a real application. **The next thing worth doing is not more code**: author one pilot offer in Rental → Setting and walk a single RM59 signup end-to-end (POS sign → the application appears in Finance → Rental Approver → approve → confirm 84 billing rows + 1 RU + the entitlement appear → then collect month 1 by card). Six rental PRs have now shipped on top of a lane no human has ever walked.
+
+
+## 2026-07-26 ⑭ · Guarantee desk status = Active / Claimed / Expired (PR #338, deployed)
+
+**Loo**, after seeing ⑬ live: put the status back to the guarantee's own, and make it three words — claimed → Claimed, not claimed yet → Active, expired → Expired.
+
+So ⑬'s order-status column is **fully reverted** (the `orderStatusWord()` helper, the DTO field and the route embed all removed rather than left dangling), and the five-word ladder it had replaced is collapsed too: "Starts on delivery" / "Covered" / "Used" → **Active / Claimed / Expired**.
+
+**`pending` folds into Active**, per his rule. Nothing is lost — the "cover hasn't started" fact still reads in the Cover-ends column as "on delivery" instead of a date.
+
+**`void` deliberately keeps its own word** even though it wasn't among the three: a voided guarantee is one whose order was cancelled or whose line was pulled, and showing that as Active would invite an operator to honour a guarantee that was never really sold. A test says exactly that, so nobody "simplifies" it later.
+
+**The bug the tests caught while writing it**: the first cut had the CLIENT re-derive expiry from the date. The server already derives it — two clocks, and a browser in another timezone can disagree by a day about whether a guarantee is still claimable. `guaranteeDeskStatus()` is now a **pure fold** of the already-derived status and never reads a date. **Durable rule: a derived state should be computed ONCE, on the server; UI helpers fold its output, they do not recompute it.**
+
+Same three words on the order-detail strip, from the same function, so a state can't read "Covered" on one screen and "Active" on another. Desk filters follow (All / Active / Claimed / Expired) and the API status filter was taught the desk vocabulary — `active` selects pending+active rows, `expired` sieves on the derived word.
+
+**Ship**: PR #338 (merge `c8bcfadd`) → api Worker `61ea3770` (unauth `?status=active` 401 ✓) + web `index-CHi3ocQU.js` → carres-portal `530a1fe3` + carres-pos `8be44e72`; all 4 canonicals ✓; downloaded 4,115,819 bytes, `SERVICE_ROLE` 0, and the retired vocabulary greps 0 in the live bundle. Tests: shared 1084/1084 (+4) · api 1553/1556 (3 = §17.7 baseline) · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean.

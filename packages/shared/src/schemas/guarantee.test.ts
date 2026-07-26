@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   GUARANTEE_ID_REGEX,
+  guaranteeDeskStatus,
   displayGuaranteeId,
   effectiveGuaranteeStatus,
   isGuaranteeId,
@@ -191,5 +192,32 @@ describe("guarantee ID (0267) — 4 letters + 6 digits", () => {
       "ZZZZ000111",
     );
     expect(displayGuaranteeId({ guaranteeId: null, claimedGuaranteeId: null })).toBeNull();
+  });
+});
+
+describe("guaranteeDeskStatus — the three words the desk shows (Loo 2026-07-26)", () => {
+  it("folds pending into Active — not claimed yet means active", () => {
+    expect(guaranteeDeskStatus("pending")).toBe("active");
+    expect(guaranteeDeskStatus("active")).toBe("active");
+  });
+
+  it("keeps claimed and expired as their own words", () => {
+    expect(guaranteeDeskStatus("claimed")).toBe("claimed");
+    expect(guaranteeDeskStatus("expired")).toBe("expired");
+  });
+
+  it("does NOT fold void into active — a cancelled order's guarantee is not live", () => {
+    // Not one of Loo's three on purpose: calling this Active would invite an
+    // operator to honour a guarantee whose order was cancelled.
+    expect(guaranteeDeskStatus("void")).toBe("void");
+  });
+
+  it("is a pure fold of the DERIVED status, so expiry is decided by one clock", () => {
+    // It takes effectiveGuaranteeStatus's output — it must not re-read a date,
+    // or a browser in another timezone could disagree about claimability.
+    const eff = effectiveGuaranteeStatus("active", "2020-01-01", "2026-07-26");
+    expect(guaranteeDeskStatus(eff)).toBe("expired");
+    const live = effectiveGuaranteeStatus("active", "2041-08-01", "2026-07-26");
+    expect(guaranteeDeskStatus(live)).toBe("active");
   });
 });

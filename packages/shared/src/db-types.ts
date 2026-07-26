@@ -1287,10 +1287,15 @@ export interface RentalPlanPosRow {
 /**
  * `rental_agreements` (migration 0249) — one signed rent-to-own agreement
  * (`agreement_no` 'RA-1001…'). sku/term/fee/split are SNAPSHOTS at signup (a
- * later plan re-price never rewrites a live agreement). Lifecycle: active →
- * completed → ownership_transferred; early exit = buyout_pending (settle the
+ * later plan re-price never rewrites a live agreement). Lifecycle since 0268:
+ * **pending_approval** → active → completed → ownership_transferred, or
+ * pending_approval → rejected. Early exit = buyout_pending (settle the
  * remaining months in one payment); default → defaulted/repossessed while the
- * residual settles. Stripe columns are wired when the Stripe sell lane ships.
+ * residual settles.
+ *
+ * 0268: an agreement is BORN `pending_approval` and materialises nothing — the
+ * billing schedule, the RU asset and the included entitlement only exist once
+ * finance approves (the T&C's credit-assessment clause).
  */
 export interface RentalAgreementRow {
   id: string;
@@ -1307,6 +1312,8 @@ export interface RentalAgreementRow {
   commission_base_pct: number;
   start_date: string;
   status:
+    | "pending_approval"
+    | "rejected"
     | "active"
     | "buyout_pending"
     | "completed"
@@ -1329,6 +1336,17 @@ export interface RentalAgreementRow {
   gifts: RentalGiftJson[];
   one_off_total: number;
   notes: string | null;
+  /** 0268 — the credit decision. `decided_by`/`decided_at` carry BOTH outcomes;
+   *  the status says which way it went. `included_package_id` is the service
+   *  package promised at signing, snapshotted so a plan re-price between
+   *  signing and approval cannot change what the customer was sold.
+   *  `credit_*` are the CBM hook's landing strip — nothing writes them yet. */
+  included_package_id: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  rejection_reason: string | null;
+  credit_checked_at: string | null;
+  credit_reference: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

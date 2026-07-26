@@ -203,6 +203,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/refunds",
       },
       {
+        // 0268 — the rent-to-own credit gate. Sits next to the money tabs
+        // because approving one is a credit decision, not an ops step: it
+        // writes the whole billing schedule and unlocks the card charge.
+        key: "rental-approver",
+        label: "Rental Approver",
+        icon: UserCheck,
+        financePath: "/finance/rental-approver",
+      },
+      {
         key: "recon",
         label: "Reconciliation",
         icon: Scale,
