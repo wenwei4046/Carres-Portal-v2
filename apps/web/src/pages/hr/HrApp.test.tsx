@@ -82,6 +82,8 @@ const REPORT = {
       amount: 4500,
     },
   ],
+  legacyUnattributed: 37,
+  monthSold: { amount: 80817, orderCount: 18 },
   staff: STAFF,
   models: [],
   // 0250/0251 — BD commission (paid by what their assigned dealers sell);
@@ -164,13 +166,16 @@ const REPORT = {
 };
 
 describe("HrApp", () => {
-  it("renders the commission tab table from the mocked month report", async () => {
+  // O1 moved the no-tab default to Overview, so the commission table is now
+  // reached by its deep link. Asserting it here is what pins the promise that
+  // existing /hr?tab=... bookmarks kept working.
+  it("renders the commission tab table on ?tab=commission", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.startsWith("/api/hr/report")) return REPORT;
       throw new Error(`unexpected fetch ${url}`);
     });
 
-    render(wrap(<HrApp />));
+    render(wrap(<HrApp />, "/hr?tab=commission"));
 
     // summary cards
     await waitFor(() => {
@@ -202,6 +207,73 @@ describe("HrApp", () => {
     // 0251 — the method shows under the section title + the CBO position pill
     expect(screen.getByText("% of dealer sales")).toBeInTheDocument();
     expect(screen.getByText("CBO")).toBeInTheDocument();
+  });
+
+  it("lands on the Overview digest when no tab is given", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) return REPORT;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />));
+
+    await waitFor(() => {
+      expect(screen.getByText("Needs a human")).toBeInTheDocument();
+    });
+    // headline tiles read the month, not the commission basis
+    expect(screen.getByText("RM 80,817.00")).toBeInTheDocument();
+    expect(screen.getByText("18 orders")).toBeInTheDocument();
+    // the one real unattributed order IS a todo…
+    expect(
+      screen.getByText("1 order without a salesperson"),
+    ).toBeInTheDocument();
+    // …while imported archive is counted out loud, never as a todo
+    expect(
+      screen.getByText(/37 imported archive orders are not counted here/),
+    ).toBeInTheDocument();
+  });
+
+  it("Overview says nothing needs you when the worklist is genuinely clear", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) {
+        return {
+          ...REPORT,
+          unattributed: [],
+          config: { ...REPORT.config, rates: [{ salespersonId: STAFF[0].id, pct: 2, effectiveFrom: "2026-01-01" }] },
+        };
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />));
+
+    await waitFor(() => {
+      expect(screen.getByText("Nothing needs you today.")).toBeInTheDocument();
+    });
+    // the archive footnote survives the empty state — it is context, not an alert
+    expect(
+      screen.getByText(/37 imported archive orders are not counted here/),
+    ).toBeInTheDocument();
+  });
+
+  it("Overview survives a Worker that predates 0265 (no monthSold key)", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) {
+        const { monthSold: _m, legacyUnattributed: _l, ...old } = REPORT;
+        return old;
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />));
+
+    await waitFor(() => {
+      expect(screen.getByText("Needs a human")).toBeInTheDocument();
+    });
+    // falls back to the report's own basis rather than rendering RM 0
+    expect(screen.getByText("RM 12,000.00")).toBeInTheDocument();
+    // and no archive footnote, because that count is unknown — not zero
+    expect(screen.queryByText(/imported archive/)).not.toBeInTheDocument();
   });
 
   it("renders the attribution worklist on ?tab=attribution", async () => {

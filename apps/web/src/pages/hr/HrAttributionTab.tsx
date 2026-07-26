@@ -40,15 +40,34 @@ export default function HrAttributionTab({
   }
 
   const { unattributed, staff } = data;
+  // `?? 0` = "a pre-0265 Worker didn't tell us", which correctly renders no
+  // note at all rather than claiming zero archive orders exist.
+  const legacyUnattributed = data.legacyUnattributed ?? 0;
+
+  // 0265: imported archive orders are excluded upstream — an archive row was
+  // never sold by anyone here, so there is no salesperson to assign. Said out
+  // loud rather than silently filtered, so the number still reconciles for
+  // anyone comparing this screen against the orders list.
+  const archiveNote =
+    legacyUnattributed > 0 ? (
+      <p className="t-tiny text-base-500 mt-3 text-center">
+        {legacyUnattributed} imported archive order
+        {legacyUnattributed === 1 ? "" : "s"} from the old system {legacyUnattributed === 1 ? "is" : "are"}{" "}
+        not listed — they never had a salesperson, so there is nothing to assign.
+      </p>
+    ) : null;
 
   if (unattributed.length === 0) {
     return (
-      <div className="bg-white border border-base-200 rounded-[12px] px-6 py-12 flex flex-col items-center gap-2 text-center">
-        <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
-        <div className="text-[13px] text-base-700">
-          Every order this month has a salesperson. Commission is complete.
+      <>
+        <div className="bg-white border border-base-200 rounded-[12px] px-6 py-12 flex flex-col items-center gap-2 text-center">
+          <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
+          <div className="text-[13px] text-base-700">
+            Every order this month has a salesperson. Commission is complete.
+          </div>
         </div>
-      </div>
+        {archiveNote}
+      </>
     );
   }
 

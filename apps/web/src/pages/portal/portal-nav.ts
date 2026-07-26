@@ -223,8 +223,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     label: "HR",
     base: "/hr",
     roles: ["hr", "principal"],
-    defaultTab: "commission",
+    // O1 (2026-07-26): HR lands on Overview — "what needs me today" — rather
+    // than opening straight into the commission table.
+    defaultTab: "overview",
     items: [
+      { key: "overview", label: "Overview", icon: LayoutDashboard },
       { key: "commission", label: "Commission", icon: HandCoins },
       { key: "attribution", label: "Attribution", icon: UserCheck },
       { key: "setup", label: "Commission Setup", icon: SlidersHorizontal },
