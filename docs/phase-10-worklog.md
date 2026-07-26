@@ -1733,3 +1733,15 @@ contained their earlier deploy — cache, not a clobber. Polled until all four f
 No `hr`-role user exists to smoke the non-principal path (CF `hr-role-nobody-holds-it`).
 `staff_comp` is at 0 rows, so the page shows RM 0 until Loo records salaries. The 6-month
 trend strip renders one month because one month exists — it fills in by itself.
+
+---
+
+## 2026-07-27 · Stock K0 — one Stock door (On hand · In & out)
+
+**Ship**: PR #376 (merge `9ad44686`) → web `index-BDR0dVav.js` (carres-portal `cc6a901e` + carres-pos `556e1400`; 4 canonicals converged, `pos.carresofficial.com` lagged one poll as usual; bundle downloaded 4,210,141 bytes, SERVICE_ROLE 0, `stock-tabs` + "In & out" present, retired "Stock · Movements" label greps 0). Web-only — no migration, no API change. Worktree `delivery-module-analysis` (the execution-queue planning session; K0 done inline at Jess's "can we amend this now first").
+
+**Card**: K0 of `docs/ready-stock-execution-queue.md`. Jess: "stock on hand, movement, inventory, ready stock, all seem so confusing" — four words for ONE warehouse. Fix = the proven Purchasing-merge pattern verbatim: the two sidebar stock items become ONE `Stock` entry (`tab: stock-onhand`, `activeFor` both tabs — old tab keys stay live so every existing link keeps working), and a shared `StockTabs` bar (copied from `PurchasingTabs`) tops both pages: **On hand** (what's here now) · **In & out** (when things moved — the Movements page's own h1 already said "Stock in & out history"; only the menu still spoke ERP). **Ready stock** joins as the middle tab when K2 ships. Word law added to COPY-STANDARD: user-facing word is `Stock`; `Inventory`/`Movements` are banned UI words (POD treatment).
+
+**Tests**: both pages' test `wrap()` gains `MemoryRouter` (the OperationReceiving precedent for tab-bar pages — StockTabs uses `useLocation`/`Link`). Affected files 39/39; full web suite 16 fails = the §17.7 baseline exactly. Typecheck 0 · check:v4 clean · design lint clean.
+
+**Not done, said out loud**: no visual smoke (login wall; Jess smokes per habit). The union tip carried PR #374's HR-P7 web code — deployed together per the union-tip rule.
