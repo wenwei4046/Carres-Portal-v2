@@ -1378,7 +1378,31 @@ Tests: the two asserting the retired button now assert the new truth; the old "c
 **Ship**: PR #356 (merge `e26fd1ae`) → web `index-Boz1uDzu.js` → carres-portal `b13303d0` + carres-pos `2fbecd1a`; downloaded 4,170,195 bytes, `SERVICE_ROLE` 0, the new notice present AND the retired button's string grepping **0** in the shipped bundle — a removal is worth verifying in the artifact, not just in the diff. `pos.carresofficial.com` lagged ~20s (third deploy in a row where one of four did). api/DB untouched. Web suite at baseline (16 pre-existing).
 
 **Still open, said out loud rather than buried**: the DATA half. The legacy `Mattress Care` row and its one `rental_offer_services` link still live in `service_packages`, and `rental_approve_agreement` still mints `service_entitlements` instead of the 0274 visit-counting `guarantee_entitlements`. Small in data terms (1 package · 1 offer link · 0 entitlements · 0 plans referencing one) but it re-points a credit-gated money path deployed the same day, so it gets its own pass. **This ship stopped the wrong door being used; it did not move what already came through it.**
-## 2026-07-26 ㉑ · HR-P6 — targets + the scoreboard (0276, branch `feat/hr-p6-kpi`, NOT yet deployed)
+
+---
+
+## 2026-07-26 ㉑ · Delivery Module D1 — two-stage booking (Provisional → Confirmed)
+
+**Ship**: PR #360 (merge `099a6577`) → migration **0277 applied** → Worker `daf36839` + web `index-B9ZL9k9A.js` (carres-portal `a8946931` + carres-pos `387cc0f4`; 4 canonicals converged, `pos.carresofficial.com` lagged one poll as usual; bundle downloaded 4,175,048 bytes, SERVICE_ROLE 0, "Record confirmation" + "carrier said" present). Worktree `carres-delivery-d1-analysis`.
+
+**Frozen source**: `Carres_Delivery_Module_Build_Prompt.md` §7 (Two-Stage Booking) + `DELIVERY_IMPLEMENTATION.md` D1 — Loo's Delivery Module docs, D1 only; D2 (DO engine) → D6 (Claim) deliberately untouched.
+
+**The problem D1 fixes**: `logistic_eta` 一填 chip 就显示绿色 "Scheduled" — 但物流讲的日期 ≠ 客户确认的日期 (the 68% stuck-order root per Loo's doc). The system treated a carrier's word as the customer's yes.
+
+**Three approved calls (Loo 2026-07-26)**: (1) booking columns live on `ops_order_control`, NOT `orders` — the implementation doc said `orders` but 0159 keeps core orders untouched and the three nearest relatives (logistic_eta/delivery_time_slot/customer_confirmed) already live on the overlay ("你对，我的文档写错了"); (2) `logistic_eta` upgraded IN PLACE to Stage-1 provisional — no duplicate `preferred_date`, zero data migration; (3) `customer_confirmed` (0220, dormant since rev25) kept but comment-marked DEPRECATED.
+
+**DB (0277)**: 5 columns + `booking_stage` CHECK + the invariant-#1 CHECK (`confirmed` requires date AND slot — a date with no slot is still Provisional). Provisional derives from `logistic_eta` via BEFORE trigger so EVERY writer is covered by construction (the 0274 put-the-rule-on-the-table lesson); a confirmed booking never silently downgrades. Backfill = no-op today (0 of 55 control rows carry a logistic_eta — matches the drawer's documented 1.6% fill rate). 0211 activity trigger extended FROM LIVE `pg_get_functiondef` (never retyped) with booking_stage/confirmed_date/confirmed_time_slot capture. Whole migration dry-run on live prod in a rolled-back transaction first: confirmed-without-slot refused (check_violation), happy path accepted, derivation up AND down verified, confirmed survives an eta clear. Tracker tail checked first — parallel lines had taken 0275+0276 the same day (guardrail #8 earning its keep again).
+
+**API**: `POST /api/operation/orders/:id/booking/confirm` is the ONE door to Confirmed (generic PUT /control strictly rejects booking fields). Server-side gates: goods ready (every goods line reserved-to-THIS-SO — acc auto-pass, service lines skipped) + balance ready (Σ order_lines+order_addons unit_price×qty, else keyed balance; minus payment|deposit ledger; total-not-set doesn't block) + no Sunday. 422s name the offending skus / RM figure in plain English. Re-confirm allowed (re-stamps evidence); no un-confirm — a typo is fixed by confirming again.
+
+**No second engine (HR-P5 lesson, applied)**: `line-category.ts` + `line-readiness.ts` MOVED to packages/shared; web files became re-export shims (zero import churn, existing web tests prove the move). The API gate (`bookingConfirmGate`) composes the same `lineReadiness` the drawer badge renders — they structurally cannot drift. Reserved counting = max(line_received, ops_stock_items reserved_ref='SO-n' summed per stockMatchKey), same as the drawer.
+
+**Web**: BOOKING rows under Chase logistic (per the implementation doc's placement); provisional row = "carrier said 24 Aug 26" + amber `not confirmed` pill + `Confirm with customer` → date + DELIVERY_TIME_SLOTS select + `Record confirmation`; confirmed row = green ✓ + date + slot + recorded-at stamp + Re-confirm. Gate hints warn BEFORE the server refuses (newbie-guided), but the server is the enforcement. Header chip + card caption re-worded to facts (Loo's exact strings): provisional NEVER green.
+
+**Tests**: +8 shared (`booking-gate.test.ts`) · +9 api (`booking-confirm.test.ts` — 401/403/missing-slot 422/Sunday 422/goods-gate 422 naming the sku/balance-gate 422 naming RM/reserved-ledger satisfies/happy path payload/PUT rejects booking_stage). Suites at baseline: shared 1174/1174 · api 3 pre-existing · web 16 pre-existing. tsc(app) 0 · build ✓ · check:v4 ✓ · design lint ✓ (2 hex literals swapped for `text-success`/`text-warning` tokens after the lint caught them). Known pre-existing: `packages/shared` standalone `tsc --noEmit` fails in `schemas/orders.test.ts` (0258 edit_addon union) — reproduced with my changes stashed.
+
+**Not done, said out loud**: (a) no visual smoke — the login wall requires typing a password, which the agent doesn't do; Loo smokes per habit; (b) the orders LIST/queues still key on the old signals — D1 scoped the drawer + API + chip only, per the implementation doc's "其余不动"; (c) service-only orders pass the goods gate vacuously (the drawer's `allReceived` reads false there — that flag feeds the pipeline word, not this gate; blocking a pure-service booking forever would be the real bug).
+## 2026-07-26 ㉒ · HR-P6 — targets + the scoreboard (0276, branch `feat/hr-p6-kpi`, NOT yet deployed)
 
 Worktree `hr-hierarchy`, re-homed off the parked `feat/hr-p4-employee-master` onto `origin/main`
 `e456c87a` first. Design mock approved by Loo before any code (his standing law):

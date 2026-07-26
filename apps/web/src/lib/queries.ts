@@ -177,6 +177,7 @@ import {
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
   type OpsOrderControl,
+  type ConfirmBookingInput,
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
   type OpsStaffListResponse,
@@ -3704,6 +3705,32 @@ export function useSaveOrderControl(
       apiFetch<{ control: OpsOrderControl }>(
         `/api/operation/orders/${orderId}/control`,
         { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** D1 booking confirm (migration 0277) — record the CUSTOMER's confirmed date
+ *  + time slot. The server enforces the gates (goods ready + balance ready +
+ *  no Sunday + date/slot both); a 422 carries the plain-English reason to show.
+ *  Invalidates the overlay + orders tree, same as the control PUT. */
+export function useConfirmBooking(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ control: OpsOrderControl }, ApiError, ConfirmBookingInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, ConfirmBookingInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/booking/confirm`,
+        { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {

@@ -151,10 +151,23 @@ export const opsOrderControlSchema = z.object({
    *  /receive-line endpoint, never the generic control PUT (migration 0208). */
   line_received: z.record(z.string(), z.number()).nullable().default(null),
   called_customer: z.boolean().default(false),
-  /** Customer confirmed the delivery (migration 0220) — the drawer Next-banner
-   *  marker. Distinct from called_customer (= ops made the call): this records
-   *  the customer's own yes. Plain field — no alert-engine wiring. */
+  /** DEPRECATED (0277) — use booking_stage. 0220 drawer marker, UI removed
+   *  rev25; kept only so history reads. No writer, no reader. */
   customer_confirmed: z.boolean().default(false),
+  /** D1 two-stage booking (migration 0277). `none` → `provisional` follows
+   *  logistic_eta by DB trigger (a carrier date = Stage 1, never the customer's
+   *  yes); `confirmed` is written ONLY by the booking-confirm endpoint after the
+   *  goods-ready + balance-ready gates. Defaults keep an old-Worker response
+   *  parseable (HR-O1 degrade lesson). */
+  booking_stage: z.enum(["none", "provisional", "confirmed"]).default("none"),
+  /** Stage 2 — the CUSTOMER-confirmed date + time slot (invariant #1: both or
+   *  neither; DB CHECK + confirm endpoint enforce). READ-only on the overlay —
+   *  written only by the confirm endpoint, never the generic control PUT. */
+  confirmed_date: isoDate.nullable().default(null),
+  confirmed_time_slot: z.string().nullable().default(null),
+  /** Confirmation evidence stamp — when recorded + who recorded it. */
+  customer_confirmed_at: z.string().nullable().default(null),
+  customer_confirmed_by: z.string().uuid().nullable().default(null),
   /** When ops last chased the logistic/supplier (migration 0221) — stamped by
    *  the drawer's WhatsApp copy-template button. No alert-engine wiring. */
   last_chased_at: z.string().nullable().default(null),
@@ -372,6 +385,10 @@ export const updateOpsOrderControlInput = z
     // unassigned. assigned_by / assigned_at are SERVER-stamped when this key
     // is present (never client-supplied).
     assigned_staff: z.string().uuid().nullable(),
+    // D1 booking (0277): booking_stage / confirmed_date / confirmed_time_slot /
+    // customer_confirmed_* are DELIBERATELY absent — `.strict()` rejects them
+    // here. Provisional derives from logistic_eta (DB trigger); Confirmed goes
+    // only through POST /:id/booking/confirm, which enforces the gates.
   })
   .partial()
   .strict();
@@ -387,6 +404,20 @@ export const opsOrderControlResponseSchema = z.object({
 export type OpsOrderControlResponse = z.infer<
   typeof opsOrderControlResponseSchema
 >;
+
+// ── D1 booking confirm (migration 0277) ─────────────────────────────────────
+/** POST /:id/booking/confirm — record the CUSTOMER's yes. Date + slot both
+ *  required (invariant #1); the endpoint additionally enforces goods ready +
+ *  balance ready + the Sunday rule. Re-calling on a confirmed booking updates
+ *  the date/slot and re-stamps the evidence (the customer re-confirmed). */
+export const confirmBookingInput = z
+  .object({
+    confirmedDate: isoDate,
+    /** Free text ≤100 (DELIVERY_TIME_SLOTS are the suggested set). */
+    confirmedTimeSlot: z.string().trim().min(1).max(100),
+  })
+  .strict();
+export type ConfirmBookingInput = z.infer<typeof confirmBookingInput>;
 
 // ── GRN per-line receive (migration 0208) ────────────────────────────────────
 /** Book n units of ONE order line into ops_stock_items, reserved to the SO. The
