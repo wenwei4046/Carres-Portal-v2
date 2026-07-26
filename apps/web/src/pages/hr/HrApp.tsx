@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 // Unified Internal Portal — shared role-aware rail (no props, self-owned state).
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PageHeader from "@/components/PageHeader";
+import HrOverviewTab from "./HrOverviewTab";
 import HrCommissionTab from "./HrCommissionTab";
 import HrAttributionTab from "./HrAttributionTab";
 import HrSetupTab from "./HrSetupTab";
@@ -81,10 +82,16 @@ function MonthStepper({
 export default function HrApp() {
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
+  // O1: Overview is the LANDING tab — HR should open onto "what needs me
+  // today", not straight into the commission table. Existing `?tab=` deep
+  // links keep working unchanged; only the no-tab default moved.
   const tab =
-    rawTab === "attribution" || rawTab === "setup" || rawTab === "team"
+    rawTab === "attribution" ||
+    rawTab === "setup" ||
+    rawTab === "team" ||
+    rawTab === "commission"
       ? rawTab
-      : "commission";
+      : "overview";
 
   const [ym, setYm] = useState<YearMonth>(() => {
     const now = new Date();
@@ -98,7 +105,9 @@ export default function HrApp() {
         ? "Commission Setup"
         : tab === "attribution"
           ? `Attribution · ${monthLabel(ym)}`
-          : `Commission · ${monthLabel(ym)}`;
+          : tab === "overview"
+            ? `Overview · ${monthLabel(ym)}`
+            : `Commission · ${monthLabel(ym)}`;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -117,6 +126,9 @@ export default function HrApp() {
               ) : undefined
             }
           />
+          {tab === "overview" && (
+            <HrOverviewTab year={ym.year} month={ym.month} />
+          )}
           {tab === "commission" && (
             <HrCommissionTab year={ym.year} month={ym.month} />
           )}

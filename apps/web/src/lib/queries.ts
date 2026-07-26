@@ -6944,6 +6944,19 @@ export interface HrReportResponse {
   /** 0251 — the ONE global BD calculation method (absent config = percentage). */
   bdMethod: CommissionMethod;
   unattributed: HrUnattributedOrder[];
+  /** 0265 — imported archive orders excluded from `unattributed`. An archive
+   *  row was never sold by anyone here, so no salesperson is the right
+   *  answer; counting them would make the worklist permanently non-zero.
+   *  Shown as a footnote so the exclusion is visible, not silent. */
+  /** OPTIONAL on purpose: web and api deploy separately, so a browser can be
+   *  running this build against a Worker that predates 0265. Typed optional
+   *  forces every reader to say what it does in that window instead of
+   *  crashing on `undefined`. */
+  legacyUnattributed?: number;
+  /** 0265 / O1 — the month's showroom item revenue (all orders, attributed or
+   *  not; services and cancellations excluded). NOT report.totalBasis, which
+   *  only covers percentage-method stores. Optional for the same reason. */
+  monthSold?: { amount: number; orderCount: number };
   staff: CommissionStaff[];
   models: HrModelOption[];
   /** BD accounts (app_users role='bd') — the setup rate rows + owner selects. */

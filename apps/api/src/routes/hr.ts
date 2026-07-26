@@ -45,6 +45,10 @@ interface HrSource {
   models: { id: string; name: string; category: string }[];
   lines: CommissionLine[];
   unattributed: unknown[];
+  /** 0265 — imported archive orders (source_system='autocount') that will
+   *  never have a salesperson. Excluded from `unattributed` so the worklist
+   *  can actually reach zero; surfaced as a count so the UI says so aloud. */
+  legacyUnattributed?: number;
   // 0250/0251 — BD commission
   bdUsers?: BdUser[];
   bdMethod?: CommissionMethod;
@@ -76,6 +80,16 @@ hrRouter.get("/report", requireHr, async (c) => {
 
   const source = data as unknown as HrSource;
   const report = computeCommission(source.staff, source.lines, source.config);
+
+  // O1 Overview headline. Deliberately NOT report.totalBasis — that is the
+  // PERCENTAGE-method basis only, so a store on the per-model method would
+  // report RM 0 sold, which is the kind of number that quietly teaches an
+  // operator to distrust the page. `lines` is already the showroom-channel,
+  // non-service, non-cancelled slice for the month, attributed or not.
+  const monthSold = {
+    amount: source.lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0),
+    orderCount: new Set(source.lines.map((l) => l.orderId)).size,
+  };
   const bdReport = computeBdCommission({
     users: source.bdUsers ?? [],
     dealers: source.dealers ?? [],
@@ -95,6 +109,9 @@ hrRouter.get("/report", requireHr, async (c) => {
     bdReport,
     bdMethod: source.bdMethod ?? "percentage",
     unattributed: source.unattributed,
+    // Pre-0265 Worker/DB → key absent → 0, i.e. "nothing was excluded".
+    legacyUnattributed: source.legacyUnattributed ?? 0,
+    monthSold,
     staff: source.staff,
     models: source.models,
     bdUsers: source.bdUsers ?? [],
