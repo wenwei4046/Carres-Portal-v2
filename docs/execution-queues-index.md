@@ -8,8 +8,9 @@
 > - WITHIN a line: strictly one card at a time, in order (R1 before R2, never together).
 > - ACROSS lines: parallel chats are FINE when the lines live on different pages —
 >   **R + S + K is a safe trio** (Purchasing · Service Cases · Stock never share files).
-> - **① Delivery (T) and ② Journey (J) may NEVER run at the same time** — both edit the
->   Orders drawer. Either of them CAN run alongside R/S/K.
+> - **① Delivery (T), ② Journey (J) and ⑥ Core C1-C3 may NEVER run at the same time** —
+>   all edit the Orders list/drawer. Any ONE of them can run alongside R/S/K.
+>   ⑥ C4 shares ④'s pages — not alongside an R-chat.
 > - Migration-bearing cards: check the remote tracker tail immediately before apply
 >   (guardrail #8). Two lines may take dual numbers the same day — cosmetic, the tracker
 >   keys on timestamp; never renumber applied files.
@@ -26,10 +27,11 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C4 | Jess rulings 2026-07-27: Dynamic Checklist + Chase banned |
 
 **State 2026-07-27:** ① T1-T7 ✅ (T8 running) · ② J1-J2 ✅ · ⑤ K0 ✅ — 10 of 31 shipped.
 **Run now in parallel:** T8 (already running) + R1 + S1 + K1, four chats. J3 waits for the
-T-line's drawer work to pause (slot it right after T8). Total = 32 cards.
+T-line's drawer work to pause (slot it right after T8). Total = 36 cards.
 
 ## Sidebar map — where every line lands
 
