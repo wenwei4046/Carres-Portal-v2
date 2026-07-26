@@ -43,6 +43,7 @@ import {
   seenTodayMYT,
   countsAsInToday,
   isOpsManager,
+  isOpsManagerRow,
   isOpsGenericAccount,
   canRaisePo,
   isPoDayMYT,
@@ -1257,7 +1258,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // may manually assign / manage the pool / run the sweep; staff read-only.
   const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
-  const isManager = isOpsManager(authRole, authEmail);
+  // HR-P2 (0260): "management" is the `ops_manager` duty on the caller's
+  // position, not an email list. The duties ride the staff payload this page
+  // already fetches, so the query moved UP here — `isManager` is derived from
+  // it and every consumer below reads the same answer.
+  const staffQ = useOperationStaff();
+  const myDuties = staffQ.data?.myDuties;
+  const isManager = isOpsManager(authRole, authEmail, myDuties);
   // PO duty (0236, Jess 人分单货合买): this month's PO controller — gates the
   // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
   // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
@@ -1270,7 +1277,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
     authUserId,
     authRole,
     authEmail,
-    isOpsManager,
+    // Close over the caller's duties — canRaisePo takes the manager test as a
+    // function precisely so the duty source can vary by surface.
+    (r, e) => isOpsManager(r, e, myDuties),
   );
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
@@ -1295,7 +1304,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
     isManager &&
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("poday");
-  const staffQ = useOperationStaff();
   const staffList = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
   const staffById = useMemo(
     () => new Map(staffList.map((s) => [s.user_id, s])),
@@ -1311,7 +1319,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
       staffList.filter(
         (s) =>
           !s.pooled &&
-          !isOpsManager("operation", s.email) &&
+          // Per-ROW: the listed person's own duties decide, never the viewer's.
+          !isOpsManagerRow(s.email, s.duties) &&
           !isOpsGenericAccount(s.email),
       ),
     [staffList],

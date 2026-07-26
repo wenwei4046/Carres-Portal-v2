@@ -1,14 +1,14 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsStaffSettingInput,
-  isOpsManager,
   isOpsGenericAccount,
   distributeOrders,
   countsAsInToday,
   type OpsStaffMember,
 } from "@carres/shared";
+import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -66,6 +66,12 @@ staffRouter.get("/", async (c) => {
   const byId = new Map(
     (settings.data ?? []).map((s) => [s.user_id as string, s]),
   );
+  // HR-P2 (0260): duties ride this payload so the pool filter can ask "is this
+  // OTHER person a manager?" — a per-row question `my_org_duties()` is
+  // self-only and cannot answer. Both reads fail soft to empty, which hands
+  // the decision back to the legacy email list during the transition.
+  const [holders, mine] = await Promise.all([dutyHolders(c), myDuties(c)]);
+
   const staff: OpsStaffMember[] = (users.data ?? [])
     // Disabled accounts drop out of the pool automatically (resign = disable).
     .filter((u) => (u.status ?? "active") === "active")
@@ -79,24 +85,29 @@ staffRouter.get("/", async (c) => {
         available: !!s && s.available !== false,
         note: (s?.note as string | null) ?? null,
         last_seen_at: (u.last_seen_at as string | null) ?? null,
+        duties: [...(holders[u.id as string] ?? [])],
       };
     });
 
-  return c.json({ staff });
+  return c.json({ staff, myDuties: [...mine] });
 });
 
 /** AUTO-ENROLL (Jess round-4, 2026-07-18: "i already created account — once
  *  she log in - system only detect?"): a plain-staff operation account joins
  *  the assignment pool automatically on its FIRST login — creating the
- *  account is the only admin step. Managers (jess@/operation@/principal)
- *  never auto-join. Row-exists = enrolled; the away toggle handles temporary
- *  outs; offboarding = disable the account. */
+ *  account is the only admin step. Managers never auto-join. Row-exists =
+ *  enrolled; the away toggle handles temporary outs; offboarding = disable
+ *  the account.
+ *  HR-P2 (0260): "manager" = the `ops_manager` duty on the caller's position,
+ *  which is why this now takes the request context — the check is a DB read,
+ *  not a string compare. */
 async function autoEnroll(
+  c: Context<AppEnv>,
   sb: ReturnType<typeof userClient>,
-  auth: { id: string; role: string; email: string },
 ) {
+  const auth = c.var.auth;
   if (auth.role !== "operation") return;
-  if (isOpsManager(auth.role, auth.email)) return;
+  if (await hasDuty(c, "ops_manager")) return;
   // Generic (non-person) accounts never auto-join — a login on logistics@
   // must not start swallowing orders (round-4 intent made explicit).
   if (isOpsGenericAccount(auth.email)) return;
@@ -123,7 +134,7 @@ staffRouter.post("/heartbeat", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  await autoEnroll(sb, auth);
+  await autoEnroll(c, sb);
   return c.json({ ok: true });
 });
 
@@ -146,7 +157,7 @@ staffRouter.post("/auto-assign", async (c) => {
   //    staff enrolls right here, so her very first page load already deals
   //    her a share (no race with the heartbeat).
   await sb.rpc("touch_last_seen");
-  await autoEnroll(sb, auth);
+  await autoEnroll(c, sb);
 
   // 2) Pool members not marked away, with the CUTOFF rule (Jess round-3 —
   //    fully automatic MC handling, zero clicks):
@@ -260,11 +271,9 @@ staffRouter.post("/auto-assign", async (c) => {
 staffRouter.put("/:userId", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
-  if (!isOpsManager(auth.role, auth.email)) {
-    throw new HTTPException(403, {
-      message: "Only management can manage the assignment pool",
-    });
-  }
+  // HR-P2 (0260): "management" is now the `ops_manager` duty key on the
+  // caller's position, not an email list.
+  await requireDuty(c, "ops_manager", "Only management can manage the assignment pool");
 
   const idCheck = USER_ID.safeParse(c.req.param("userId"));
   if (!idCheck.success) throw new HTTPException(404, { message: "User not found" });

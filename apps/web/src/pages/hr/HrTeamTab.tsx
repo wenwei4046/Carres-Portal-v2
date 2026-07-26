@@ -12,6 +12,7 @@ import {
   type HrCreateTeamAccountInput,
   type OrgDepartment,
   type OrgPosition,
+  type OrgDuty,
   type PositionBand,
   type TeamAccount,
   type TeamShowroomStaff,
@@ -29,6 +30,7 @@ import {
   useHrTeam,
   useHrUpsertDepartment,
   useHrUpsertPosition,
+  useHrSetPositionDuty,
 } from "@/lib/queries";
 
 /**
@@ -818,6 +820,127 @@ function DepartmentsCard({ departments }: { departments: OrgDepartment[] }) {
 }
 
 // ----------------------------------------------------------------------------
+// d0. Permissions matrix — HR-P2 (0260)
+// ----------------------------------------------------------------------------
+
+/** Column headers. The DB `name` ("PO duty roster editor") is right for a
+ *  tooltip but far too long for a column, so each key gets a 1-2 word label
+ *  and the full name rides the `title`. */
+const DUTY_SHORT: Record<string, string> = {
+  ops_manager: "Ops manager",
+  po_duty_editor: "PO roster",
+  account_creator: "Accounts",
+  finance_approver: "Finance",
+  roster_editor: "Shift roster",
+};
+
+/**
+ * WHO CAN DO WHAT — permissions hang off the POSITION, so promoting someone
+ * moves their access with them (no code change, no redeploy).
+ *
+ * Rendered as a matrix rather than checkboxes inside each Positions row: the
+ * useful question is usually read down a COLUMN ("who can create accounts?"),
+ * and a matrix makes the empty seats visible, which a per-row control hides.
+ */
+function DutiesCard({
+  positions,
+  duties,
+  grants,
+}: {
+  positions: OrgPosition[];
+  duties: OrgDuty[];
+  grants: { positionId: string; dutyKey: string }[];
+}) {
+  const setDuty = useHrSetPositionDuty();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const held = useMemo(
+    () => new Set(grants.map((g) => `${g.positionId}::${g.dutyKey}`)),
+    [grants],
+  );
+  const rows = useMemo(() => positions.filter((p) => p.active), [positions]);
+
+  // Pre-0260 server → no catalogue → the card simply isn't there (every gate
+  // keeps running on the legacy email fallback).
+  if (duties.length === 0) return null;
+
+  return (
+    <SectionCard>
+      <SectionBand
+        title="Permissions"
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((v) => !v)}
+        total={held.size}
+      />
+      {!collapsed && (
+        <div className="p-2">
+          <p className="t-tiny text-base-500 px-1 mb-2">
+            Access follows the position, not the person — promote someone and
+            their access moves with them. The Chairman passes every check by
+            role, which is why that row stays empty.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="t-micro text-base-500 text-left font-medium px-1 pb-1.5">
+                    Position
+                  </th>
+                  {duties.map((d) => (
+                    <th
+                      key={d.key}
+                      title={`${d.name} — ${d.description}`}
+                      className="t-micro text-base-500 font-medium px-1 pb-1.5 w-[92px] text-center"
+                    >
+                      {DUTY_SHORT[d.key] ?? d.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.id} className="hover:bg-hovertint">
+                    <td className="text-[13px] text-base-900 px-1 h-8 truncate max-w-[200px]">
+                      {p.name}
+                    </td>
+                    {duties.map((d) => {
+                      const on = held.has(`${p.id}::${d.key}`);
+                      return (
+                        <td key={d.key} className="text-center h-8">
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={setDuty.isPending}
+                            aria-label={`${d.name} for ${p.name}`}
+                            onChange={() =>
+                              setDuty.mutate(
+                                { positionId: p.id, dutyKey: d.key, granted: !on },
+                                {
+                                  onSuccess: () =>
+                                    toast.success(
+                                      `${d.name} ${on ? "revoked from" : "granted to"} ${p.name}`,
+                                    ),
+                                  onError: (e) => toast.error(e.message || "Save failed"),
+                                },
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-primary cursor-pointer disabled:cursor-wait"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // d. Positions registry editor
 // ----------------------------------------------------------------------------
 
@@ -1160,6 +1283,11 @@ export default function HrTeamTab() {
       {/* d. Departments + Positions registries + change history */}
       <DepartmentsCard departments={data.departments ?? []} />
       <PositionsCard positions={data.positions} departments={data.departments ?? []} />
+      <DutiesCard
+        positions={data.positions}
+        duties={data.duties ?? []}
+        grants={data.positionDuties ?? []}
+      />
 
       <SectionCard>
         <SectionBand

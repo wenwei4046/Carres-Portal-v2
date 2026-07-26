@@ -37,6 +37,24 @@ export const STAFF_TIER_RANK: Record<string, number> = {
   salesperson: 2,
 };
 
+/**
+ * Display label for a showroom STAFF TIER (`salespersons.staff_role`).
+ * De-duplicated out of HrSetupTab + HrCommissionTab, which held byte-identical
+ * copies (HR-P2, 2026-07-26).
+ *
+ * DO NOT merge this with the app-ROLE label map in HrTeamTab. They are two
+ * different taxonomies that happen to share two words: `principal` here means
+ * the store owner, there it means the Chairman; `salesperson` here is a floor
+ * tier, there it is a login role. Folding them together would silently
+ * mislabel both — the exact "dual taxonomy" trap HR-P2 set out to make
+ * explicit rather than paper over.
+ */
+export const STAFF_TIER_LABEL: Record<string, string> = {
+  principal: "Principal",
+  manager: "Manager",
+  salesperson: "Salesperson",
+};
+
 /** Header carrying the staff session token on every authed API call. */
 export const STAFF_TOKEN_HEADER = "X-Staff-Token";
 

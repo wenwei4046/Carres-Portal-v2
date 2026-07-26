@@ -547,11 +547,20 @@ export const opsStaffMemberSchema = z.object({
   /** Presence stamp (0235) — set by touch_last_seen when they open the
    *  portal; null = never seen. Drives the seen-today auto-availability. */
   last_seen_at: z.string().nullable().default(null),
+  /** HR-P2 (0260) — THIS person's duty keys, from `org_duty_holders()`.
+   *  Present so list surfaces can answer "which of these are managers?"
+   *  (the pool filter) without a per-row request. Defaults to [] on a Worker
+   *  that predates 0260, which keeps the legacy email path in charge. */
+  duties: z.array(z.string()).default([]),
 });
 export type OpsStaffMember = z.infer<typeof opsStaffMemberSchema>;
 
 export const opsStaffListResponseSchema = z.object({
   staff: z.array(opsStaffMemberSchema),
+  /** The CALLER's own duty keys (`my_org_duties()`). Rides this payload
+   *  because every surface that asks "may I?" already fetches the staff list —
+   *  no second round-trip, and no duty read on pages that never gate. */
+  myDuties: z.array(z.string()).default([]),
 });
 export type OpsStaffListResponse = z.infer<typeof opsStaffListResponseSchema>;
 
@@ -606,34 +615,29 @@ export function distributeOrders(
   return plan;
 }
 
-/** Who may MANUALLY assign / reassign / redistribute PIC and manage the pool
- *  (Jess 2026-07-18: "operation@carres.com — should only me and others
- *  management only"). Everyone else sees assignments read-only. One rule,
- *  two consumers: the web hides the controls, the API enforces. */
-/** jess@carres.com pre-listed (2026-07-18): Jess should run on her OWN login
- *  — the shared operation@ account can't tell the audit trail who acted. */
-export const OPS_MANAGER_EMAILS = [
-  "operation@carres.com",
-  "jess@carres.com",
-] as const;
+/** HR-P2 (0260): "who may manage the pool" moved to duty keys — the grant now
+ *  hangs off the POSITION (`org_position_duties`), not an email list, so a
+ *  promotion in the Team tab is the whole change. `isOpsManager` lives in
+ *  `./org-duties` and is re-exported here so existing importers keep working;
+ *  the old `OPS_MANAGER_EMAILS` constant survives as
+ *  `LEGACY_OPS_MANAGER_EMAILS` inside the transition fallback and comes out
+ *  one release later. */
+export { isOpsManager } from "./org-duties";
 
 /** GENERIC (non-person) operation accounts — never auto-join the assignment
  *  pool and never appear as a person in the TEAM rail. Round-4's "generic
  *  accounts never auto-join" intent, made explicit: auto-enroll previously
  *  only excluded managers, so a login on logistics@ would have silently
- *  enrolled it and started swallowing orders. */
+ *  enrolled it and started swallowing orders.
+ *  NOTE (2026-07-26 live check): logistics@carres.com no longer exists as an
+ *  app_user, so this list is currently inert — kept because the guard must
+ *  survive the account being recreated, not because it fires today. This is
+ *  NOT a duty: "is this a robot account" is a property of the account, not a
+ *  permission that a position can grant. */
 export const OPS_GENERIC_EMAILS = ["logistics@carres.com"] as const;
 export function isOpsGenericAccount(email: string | null | undefined): boolean {
   if (!email) return false;
   return (OPS_GENERIC_EMAILS as readonly string[]).includes(email.toLowerCase());
-}
-export function isOpsManager(
-  role: string | null | undefined,
-  email: string | null | undefined,
-): boolean {
-  if (role === "principal") return true;
-  if (!email) return false;
-  return (OPS_MANAGER_EMAILS as readonly string[]).includes(email.toLowerCase());
 }
 
 /** Working-day cutoff (MYT hour): BEFORE it, a not-yet-logged-in pool member

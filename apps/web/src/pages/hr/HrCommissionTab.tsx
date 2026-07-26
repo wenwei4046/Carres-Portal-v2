@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
-import type { BdCommissionResult, StaffCommissionResult } from "@carres/shared";
+import { STAFF_TIER_LABEL, type BdCommissionResult, type StaffCommissionResult } from "@carres/shared";
 import { useHrReport } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
 
@@ -14,12 +14,6 @@ import { rm } from "@/lib/format-currency";
  * 0250 adds the BD commission section below — BD staff earn a % of what
  * their assigned dealers sell; a chevron expands the dealer portfolio.
  */
-
-const ROLE_LABEL: Record<string, string> = {
-  principal: "Principal",
-  manager: "Manager",
-  salesperson: "Salesperson",
-};
 
 function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
   const hasAnything =
@@ -389,7 +383,7 @@ export default function HrCommissionTab({
                           {row.staff.name}
                         </span>
                         <span className="pill pill-neutral shrink-0">
-                          {ROLE_LABEL[row.staff.staffRole] ?? row.staff.staffRole}
+                          {STAFF_TIER_LABEL[row.staff.staffRole] ?? row.staff.staffRole}
                         </span>
                       </div>
                       <div className="text-[11px] text-base-500 truncate">
