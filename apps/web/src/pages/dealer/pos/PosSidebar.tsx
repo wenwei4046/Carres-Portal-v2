@@ -11,6 +11,7 @@ import {
   Lock,
   Package,
   Plus,
+  Repeat,
   RotateCcw,
   ShieldCheck,
   Sofa,
@@ -27,6 +28,10 @@ export type RailKey =
   | "sofa"
   | "accessory"
   | "guarantee"
+  // Loo 2026-07-26 — rent-to-own stops hiding behind a top-bar button and
+  // becomes a category like any other. Same cards, same configure surface; the
+  // only difference is that the right rail also asks HOW LONG.
+  | "rental"
   | "bundles"
   | "addons";
 
@@ -47,6 +52,7 @@ const RAIL_ICON: Record<RailKey, LucideIcon> = {
   bedframe: Bed,
   accessory: Lamp,
   guarantee: ShieldCheck,
+  rental: Repeat,
   bundles: Package,
   addons: Lamp,
 };

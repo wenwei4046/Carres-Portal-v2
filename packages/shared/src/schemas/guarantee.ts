@@ -81,8 +81,14 @@ export const guaranteeProductInputSchema = z
       !d.coversVariants ||
       d.coversVariants.length === 0 ||
       d.coversCategory === "mattress" ||
-      d.coversCategory === "bedframe",
-    { message: "variants only apply to mattress / bedframe", path: ["coversVariants"] },
+      d.coversCategory === "bedframe" ||
+      d.coversCategory === "sofa",
+    {
+      // Accessories carry no variant axis at all (Loo). Sofa's axis is the seat
+      // height, from its own Maintenance pool (0271).
+      message: "variants only apply to mattress / bedframe / sofa",
+      path: ["coversVariants"],
+    },
   );
 export type GuaranteeProductInput = z.infer<typeof guaranteeProductInputSchema>;
 
@@ -135,7 +141,8 @@ export const guaranteeTermSchema = z.object({
   // the pre-0270 term (every field null) covering the whole category as before.
   /** null = any model in the category. */
   coversModelId: z.string().uuid().nullable().default(null),
-  /** null / empty = any variant. Mattress + bedframe only. */
+  /** null / empty = any. mattress+bedframe = the SIZE; sofa = the SEAT HEIGHT
+   *  (0271). Every list is that category's own Maintenance pool. */
   coversVariants: z.array(z.string()).nullable().default(null),
   /** Sofa only — a built sofa matches when the combo's slots can be covered. */
   coversComboId: z.string().uuid().nullable().default(null),
@@ -160,6 +167,9 @@ export type GuaranteeCandidate = {
   modelId: string | null;
   /** The SKU's variant label ("King"). */
   variant?: string | null;
+  /** A built sofa's SEAT HEIGHT (`attrs.sofa_build.height`) — that is what a
+   *  sofa's Maintenance pool offers, so it is what a sofa variant matches. */
+  sofaHeight?: string | null;
   /** For a compartment-minted sofa SKU. */
   compartmentId?: string | null;
   /** Module codes of a sofa BUILD line (`attrs.sofa_build.cells`). */
@@ -190,20 +200,27 @@ export function guaranteeCovers(
   if (!item.category || item.category !== scope.coversCategory) return false;
   if (scope.coversModelId && item.modelId !== scope.coversModelId) return false;
 
-  if (scope.coversCompartmentId) {
-    return item.compartmentId === scope.coversCompartmentId;
+  if (scope.coversCompartmentId && item.compartmentId !== scope.coversCompartmentId) {
+    return false;
   }
 
   if (scope.coversComboId) {
-    if (!comboSlots || !matchCombo) return true; // model already matched above
-    const cells = item.builtModuleCodes ?? [];
-    if (cells.length === 0) return false;
-    return matchCombo(cells, comboSlots) !== null;
+    if (comboSlots && matchCombo) {
+      const cells = item.builtModuleCodes ?? [];
+      if (cells.length === 0) return false;
+      if (matchCombo(cells, comboSlots) === null) return false;
+    }
+    // else: the model already matched above — the safe direction, never wider.
+    // FALL THROUGH to the height check: "the L-shape combo, at 32 inch".
   }
 
   const wanted = (scope.coversVariants ?? []).map(normalizeVariant).filter(Boolean);
   if (wanted.length === 0) return true;
-  return wanted.includes(normalizeVariant(item.variant ?? ""));
+  // A sofa's variant axis is its SEAT HEIGHT, not the SKU's variant (which is a
+  // compartment code) — the pool the scope was authored from decides this.
+  const mine =
+    scope.coversCategory === "sofa" ? (item.sofaHeight ?? "") : (item.variant ?? "");
+  return wanted.includes(normalizeVariant(mine));
 }
 
 /**
@@ -227,14 +244,18 @@ export function guaranteeScopeLabel(
 ): string {
   const cat = scope.coversCategory;
   if (scope.coversCompartmentId) {
-    return `${names.compartment ?? "one compartment"} (${cat})`;
+    const vs = (scope.coversVariants ?? []).filter(Boolean);
+    return `${names.compartment ?? "one compartment"} (${cat})${
+      vs.length > 0 ? ` · ${vs.join(" / ")}` : ""
+    }`;
   }
+  const variants = (scope.coversVariants ?? []).filter(Boolean);
+  const suffix = variants.length > 0 ? ` · ${variants.join(" / ")}` : "";
   if (scope.coversComboId) {
-    return `${names.combo ?? "one combo"}${names.model ? ` · ${names.model}` : ""}`;
+    return `${names.combo ?? "one combo"}${names.model ? ` · ${names.model}` : ""}${suffix}`;
   }
   const who = scope.coversModelId ? (names.model ?? "one model") : `any ${cat}`;
-  const variants = (scope.coversVariants ?? []).filter(Boolean);
-  return variants.length > 0 ? `${who} · ${variants.join(" / ")}` : who;
+  return `${who}${suffix}`;
 }
 
 // ── the line stamp ─────────────────────────────────────────────────────────

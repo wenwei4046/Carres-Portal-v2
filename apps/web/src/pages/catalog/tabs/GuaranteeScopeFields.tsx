@@ -127,7 +127,16 @@ export default function GuaranteeScopeFields({
     });
   }
 
-  const hasVariantAxis = cat === "mattress" || cat === "bedframe";
+  // The variant axis is ALWAYS that category's own Maintenance pool (Loo
+  // 2026-07-26): mattress/bedframe -> the size pool; sofa -> the SEAT-HEIGHT
+  // pool; accessory -> none at all.
+  const sofaHeightPool = useMemo(
+    () =>
+      optionPools
+        .filter((p) => p.pool === "sofa_size" && p.active)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value)),
+    [optionPools],
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -160,6 +169,8 @@ export default function GuaranteeScopeFields({
                   ...EMPTY_GUARANTEE_SCOPE,
                   coversCategory: "sofa",
                   sofaKind: e.target.value as SofaScopeKind,
+                  // heights are orthogonal to shape — keep them across a swap
+                  coversVariants: value.coversVariants,
                 })
               }
               className={INPUT_CLS}
@@ -206,6 +217,21 @@ export default function GuaranteeScopeFields({
             </label>
           )}
 
+          {/* Seat height — the sofa's OWN Maintenance pool (0271). Orthogonal
+              to shape, so it stacks on any of the four scopes above:
+              "the L-shape combo, at 32 inch". */}
+          {sofaHeightPool.length > 0 && (
+            <VariantChips
+              title="Seat heights covered"
+              anyLabel="Any height"
+              noneHint="None ticked = every seat height is covered."
+              options={sofaHeightPool.map((p) => ({ id: p.id, value: p.value }))}
+              picked={value.coversVariants}
+              onToggle={toggleVariant}
+              onAny={() => set({ coversVariants: [] })}
+            />
+          )}
+
           {value.sofaKind === "compartment" && (
             <label className="block">
               <span className="label">Compartment</span>
@@ -235,51 +261,18 @@ export default function GuaranteeScopeFields({
             anyLabel={`Any ${CATEGORY_LABEL[cat].toLowerCase()}`}
           />
 
-          {/* Variants — mattress / bed frame only. Loo: accessories carry none. */}
-          {hasVariantAxis && sizePool.length > 0 && (
-            <div>
-              <span className="label">Sizes covered</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                <button
-                  type="button"
-                  onClick={() => set({ coversVariants: [] })}
-                  aria-pressed={value.coversVariants.length === 0}
-                  className={`t-tiny px-2.5 py-1 rounded-full border transition-colors ${
-                    value.coversVariants.length === 0
-                      ? "bg-base-900 text-white border-base-900"
-                      : "bg-white text-base-700 border-base-300 hover:border-base-500"
-                  }`}
-                >
-                  Any size
-                </button>
-                {sizePool.map((p) => {
-                  // The pool stores a CODE ("K") + a marketing label ("6FT"),
-                  // but a SKU's variant is the full name ("King"). Show and
-                  // STORE the canonical name — the same thing the size chips on
-                  // the product side show — or the term matches nothing.
-                  const sizeName = canonicalSize(p.value).name;
-                  const on = value.coversVariants.includes(sizeName);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => toggleVariant(sizeName)}
-                      aria-pressed={on}
-                      className={`t-tiny px-2.5 py-1 rounded-full border transition-colors ${
-                        on
-                          ? "bg-base-900 text-white border-base-900"
-                          : "bg-white text-base-700 border-base-300 hover:border-base-500"
-                      }`}
-                    >
-                      {sizeName}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="t-tiny text-base-500 mt-1">
-                None ticked = every size is covered.
-              </p>
-            </div>
+          {/* Sizes — from THIS category's own Maintenance pool. Accessories
+              have no variant axis at all, so nothing renders for them. */}
+          {sizePool.length > 0 && (
+            <VariantChips
+              title="Sizes covered"
+              anyLabel="Any size"
+              noneHint="None ticked = every size is covered."
+              options={sizePool.map((p) => ({ id: p.id, value: canonicalSize(p.value).name }))}
+              picked={value.coversVariants}
+              onToggle={toggleVariant}
+              onAny={() => set({ coversVariants: [] })}
+            />
           )}
         </>
       )}
@@ -320,5 +313,59 @@ function ModelPicker({
         <p className="t-tiny text-base-500 mt-1">Pick the model this guarantee covers.</p>
       )}
     </label>
+  );
+}
+
+/** One chip row for a variant axis. Shared so a sofa's seat heights and a
+ *  mattress's sizes can never drift into two different affordances. */
+function VariantChips({
+  title,
+  anyLabel,
+  noneHint,
+  options,
+  picked,
+  onToggle,
+  onAny,
+}: {
+  title: string;
+  anyLabel: string;
+  noneHint: string;
+  options: { id: string; value: string }[];
+  picked: string[];
+  onToggle: (v: string) => void;
+  onAny: () => void;
+}) {
+  const chip = (on: boolean) =>
+    `t-tiny px-2.5 py-1 rounded-full border transition-colors ${
+      on
+        ? "bg-base-900 text-white border-base-900"
+        : "bg-white text-base-700 border-base-300 hover:border-base-500"
+    }`;
+  return (
+    <div>
+      <span className="label">{title}</span>
+      <div className="flex flex-wrap gap-1.5 mt-1">
+        <button
+          type="button"
+          onClick={onAny}
+          aria-pressed={picked.length === 0}
+          className={chip(picked.length === 0)}
+        >
+          {anyLabel}
+        </button>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onToggle(o.value)}
+            aria-pressed={picked.includes(o.value)}
+            className={chip(picked.includes(o.value))}
+          >
+            {o.value}
+          </button>
+        ))}
+      </div>
+      <p className="t-tiny text-base-500 mt-1">{noneHint}</p>
+    </div>
   );
 }
