@@ -86,7 +86,6 @@ export function isRentalSectionKey(value: string | null): value is RentalSection
 export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolean }) {
   const configQ = useRentalConfig();
   const catalogQ = useCatalog();
-  const [pkgOpen, setPkgOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
   // `?section=` keeps the family on refresh / deep link (the P&M contract).
@@ -170,14 +169,14 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
         </p>
         {isPrincipal && (
           <div className="flex flex-wrap justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setPkgOpen(true)}
-              className="btn-ghost text-[12px]"
-              data-testid="package-add"
-            >
-              + New service package
-            </button>
+            {/* "+ New service package" is GONE (Loo 2026-07-26). A care plan is
+                authored in SKU Master → + New SKU → Guarantee & Service Package
+                → Recurring, which is the ONE door since 0274. Leaving a second
+                door here is what put Loo's own "Mattress Care" in the wrong
+                registry with the wrong category, so that it never appeared under
+                the filter he was looking at. The section below still LISTS the
+                legacy package (its rental offer references it) — it just cannot
+                mint another one. */}
             {isOfferSection && (
               <button
                 type="button"
@@ -232,20 +231,36 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
       )}
 
       {section === "service" && (
-        <ServicePackagesSection
-          packages={servicePackages}
-          isPrincipal={isPrincipal}
-          addOpen={pkgOpen}
-          onCloseAdd={() => setPkgOpen(false)}
-        />
+        <>
+          {/* Say plainly where care plans live now, and why anything listed here
+              is not where the next one goes. */}
+          <div
+            className="rounded-md border border-border bg-muted/30 px-4 py-3 mb-3.5"
+            data-testid="service-legacy-notice"
+          >
+            <div className="text-[13px] font-semibold text-foreground">
+              Care plans are authored in SKU Master now
+            </div>
+            <div className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
+              Product &amp; Maintenance → SKU Master → <b>+ New SKU</b> → category{" "}
+              <b>Guarantee &amp; Service Package</b> → <b>Recurring</b>. One place for both a
+              guarantee and a care plan, because they are the same thing with a different number
+              of visits. Anything below was authored here before that and still powers the rental
+              offer it is attached to — but no new plan should be added here.
+            </div>
+          </div>
+          {/* addOpen is hard false: the only thing that used to open it was the
+              retired "+ New service package" button (Loo 2026-07-26). */}
+          <ServicePackagesSection
+            packages={servicePackages}
+            isPrincipal={isPrincipal}
+            addOpen={false}
+            onCloseAdd={() => {}}
+          />
+        </>
       )}
       {section === "agreements" && (
         <AgreementsSection templates={agreementTemplates} isPrincipal={isPrincipal} />
-      )}
-      {section !== "service" && pkgOpen && isPrincipal && (
-        <Modal title="Create service package" onClose={() => setPkgOpen(false)}>
-          <PackageForm onDone={() => setPkgOpen(false)} />
-        </Modal>
       )}
     </div>
   );

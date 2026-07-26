@@ -352,10 +352,23 @@ describe("RentalSettingPage — sections + empty states", () => {
 // Gating
 // ---------------------------------------------------------------------------
 describe("RentalSettingPage — gating", () => {
-  it("principal: shows + New offer and + New service package", () => {
+  it("principal: shows + New offer, but NO second door for care plans", () => {
     renderPage({ isPrincipal: true });
-    expect(screen.getByTestId("package-add")).toBeInTheDocument();
     expect(screen.getByTestId("offer-add")).toBeInTheDocument();
+    // Removed 2026-07-26: a care plan is authored in SKU Master (0274). Two
+    // doors is what put Loo's own "Mattress Care" in the wrong registry with
+    // the wrong category, so it never showed under the filter he was using.
+    expect(screen.queryByTestId("package-add")).not.toBeInTheDocument();
+  });
+
+  it("the service section says where care plans are authored now", () => {
+    renderPage({ isPrincipal: true }, "service");
+    const notice = screen.getByTestId("service-legacy-notice");
+    expect(notice).toBeInTheDocument();
+    // it must name the destination, not just say "moved"
+    expect(notice.textContent).toMatch(/SKU Master/);
+    expect(notice.textContent).toMatch(/Guarantee & Service Package/);
+    expect(notice.textContent).toMatch(/Recurring/);
   });
 
   it("non-principal: no add buttons, offer row read-only (View, no delete/toggle)", () => {
@@ -462,27 +475,16 @@ describe("RentalSettingPage — model picker", () => {
 // Service packages — the plan IS a SKU
 // ---------------------------------------------------------------------------
 describe("RentalSettingPage — service packages", () => {
-  it("previews the auto SKU and sends the category in the create payload", () => {
+  // The old "create a package HERE" test is gone with the door it drove: this
+  // page can no longer mint a care plan, and asserting a payload nothing can
+  // send would be testing dead code. What replaces it is the guarantee route's
+  // own coverage (packages/shared guarantee-kind.test.ts) plus the two
+  // assertions above: the door is absent, and the page names its replacement.
+  it("cannot mint a care plan from this page any more", () => {
     renderPage({ isPrincipal: true }, "service");
-    fireEvent.click(screen.getByTestId("package-add"));
-    fireEvent.change(screen.getByTestId("pkg-name"), { target: { value: "Sofa Care — 3 years" } });
-    fireEvent.click(screen.getByTestId("pkg-category-sofa"));
-    fireEvent.click(screen.getByTestId("pkg-duration-36"));
-    fireEvent.change(screen.getByTestId("pkg-visits"), { target: { value: "3" } });
-    fireEvent.change(screen.getByTestId("pkg-price"), { target: { value: "499" } });
-
-    expect(screen.getByTestId("pkg-sku-preview")).toHaveTextContent("SVC-SOFA-CLEAN-3Y3");
-
-    fireEvent.click(screen.getByText("Create package"));
-    expect(mockCreatePkg.mock.calls[0][0]).toMatchObject({
-      name: "Sofa Care — 3 years",
-      category: "sofa",
-      serviceType: "cleaning",
-      durationMonths: 36,
-      visitsPerYear: 3,
-      price: 499,
-      active: true,
-    });
+    expect(screen.queryByTestId("package-add")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pkg-name")).not.toBeInTheDocument();
+    expect(mockCreatePkg).not.toHaveBeenCalled();
   });
 
   it("the row shows the family it serves and its minted SKU", () => {
