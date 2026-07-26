@@ -21,6 +21,7 @@ import {
   phoneKeyMy,
   customerInputSchema,
   createRentalAgreementInputSchema,
+  recordRentalPaymentInputSchema,
   RENTAL_AGREEMENT_DOC_KEY,
   CUSTOMERS,
   SERVICE_PACKAGES,
@@ -1077,6 +1078,138 @@ rentalRouter.get("/approvals", async (c) => {
   return c.json({ approvals: (data ?? []) as unknown[] });
 });
 
+// GET /agreements/:id/collections — 0281. What has actually been collected.
+//
+// Until now this answer only existed in the Stripe dashboard: `rental_billings`
+// had 84 rows and no writer, so finance had two systems and one of them lied.
+// This is the schedule, the money against it, and the running total versus the
+// contract value — the arithmetic Loo's law is stated in.
+rentalRouter.get("/agreements/:id/collections", async (c) => {
+  internalOnly(c);
+  const idCheck = AGREEMENT_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Agreement not found" });
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const [agR, billR, evR] = await Promise.all([
+    sb.from(RENTAL_AGREEMENTS)
+      .select("id, agreement_no, sku, term_months, monthly_fee, start_date, status, supplier_rate_pct, commission_base_pct")
+      .eq("id", idCheck.data)
+      .maybeSingle(),
+    sb.from("rental_billings")
+      .select("id, seq, due_date, amount_due, status, paid_at, paid_amount, method, reference, supplier_share, commission_share, stripe_invoice_id, late_interest")
+      .eq("agreement_id", idCheck.data)
+      .order("seq"),
+    sb.from("rental_billing_events")
+      .select("id, seq, kind, amount, method, reference, stripe_invoice_id, note, actor_text, occurred_at")
+      .eq("agreement_id", idCheck.data)
+      .order("occurred_at", { ascending: false })
+      .limit(200),
+  ]);
+  if (agR.error) throw new HTTPException(500, { message: agR.error.message });
+  if (billR.error) throw new HTTPException(500, { message: billR.error.message });
+  if (evR.error) throw new HTTPException(500, { message: evR.error.message });
+  const ag = agR.data as Record<string, unknown> | null;
+  if (!ag) throw new HTTPException(404, { message: "Agreement not found" });
+
+  const rows = (billR.data ?? []) as Array<Record<string, unknown>>;
+  const num = (v: unknown): number => Number(v ?? 0);
+  const collected = rows
+    .filter((r) => r.status === "paid")
+    .reduce((a, r) => a + num(r.paid_amount), 0);
+  const contract = Math.round(num(ag.monthly_fee) * num(ag.term_months) * 100) / 100;
+  const today = new Date().toISOString().slice(0, 10);
+
+  return c.json({
+    agreement: {
+      id: ag.id,
+      agreementNo: ag.agreement_no,
+      sku: ag.sku,
+      termMonths: num(ag.term_months),
+      monthlyFee: num(ag.monthly_fee),
+      startDate: ag.start_date,
+      status: ag.status,
+      supplierRatePct: num(ag.supplier_rate_pct),
+      commissionBasePct: num(ag.commission_base_pct),
+    },
+    totals: {
+      contractValue: contract,
+      collected: Math.round(collected * 100) / 100,
+      // What is still to come, which is the number a credit decision is about.
+      outstanding: Math.round((contract - collected) * 100) / 100,
+      paidCount: rows.filter((r) => r.status === "paid").length,
+      // "Late" is derived here rather than stored, so it is never stale: an
+      // instalment is late when its day has passed and no money arrived. The
+      // dunning ladder that ACTS on this is segment 2b.
+      lateCount: rows.filter((r) => r.status !== "paid" && String(r.due_date) < today).length,
+      supplierShare: Math.round(rows.reduce((a, r) => a + num(r.supplier_share), 0) * 100) / 100,
+      commissionShare: Math.round(rows.reduce((a, r) => a + num(r.commission_share), 0) * 100) / 100,
+    },
+    billings: rows.map((r) => ({
+      id: r.id,
+      seq: num(r.seq),
+      dueDate: r.due_date,
+      amountDue: num(r.amount_due),
+      status: r.status,
+      paidAt: r.paid_at ?? null,
+      paidAmount: r.paid_amount == null ? null : num(r.paid_amount),
+      method: r.method ?? null,
+      reference: r.reference ?? null,
+      supplierShare: r.supplier_share == null ? null : num(r.supplier_share),
+      commissionShare: r.commission_share == null ? null : num(r.commission_share),
+      stripeInvoiceId: r.stripe_invoice_id ?? null,
+      lateInterest: r.late_interest == null ? null : num(r.late_interest),
+      late: r.status !== "paid" && String(r.due_date) < today,
+    })),
+    events: (evR.data ?? []) as unknown[],
+  });
+});
+
+// POST /agreements/:id/collections/:seq/record — 0281. The manual door, for the
+// money Stripe never sees (a bank transfer, cash at the counter).
+//
+// It goes through the SAME RPC the webhook uses, so there is exactly one way to
+// mark money received and exactly one place the split is computed — which is
+// what CF `rental-billing-writes-need-rpc` asked for. A second, "simpler" path
+// here is how two systems start disagreeing again.
+rentalRouter.post("/agreements/:id/collections/:seq/record", async (c) => {
+  approverOnly(c);
+  const idCheck = AGREEMENT_ID.safeParse(c.req.param("id"));
+  const seq = Number(c.req.param("seq"));
+  if (!idCheck.success || !Number.isInteger(seq) || seq < 1) {
+    throw new HTTPException(404, { message: "Instalment not found" });
+  }
+  const parsed = await parseJsonBody(c, recordRentalPaymentInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_record_payment", {
+    p_agreement_id: idCheck.data,
+    p_seq: seq,
+    // Explicitly null: this money did not come from Stripe, and saying so is
+    // clearer than letting the default carry it. Amount stays optional so the
+    // common case (paid exactly what was due) needs no figure at all.
+    p_stripe_invoice_id: null,
+    p_amount: d.amount ?? null,
+    p_paid_at: d.paidAt ?? null,
+    p_method: d.method,
+    p_reference: d.reference ?? null,
+    p_note: d.note ?? null,
+  });
+  if (error) {
+    const detail = (error as { details?: string | null }).details ?? "";
+    if (detail === "forbidden") {
+      return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
+    }
+    if (detail === "billing_not_found") {
+      return c.json({ error: "not_found", code: detail, message: error.message }, 404);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ recorded: data });
+});
+
 // POST /agreements/:id/decide — Approve puts the contract live and materialises
 // its money; Reject fails the application and leaves nothing behind. Both are
 // one atomic SECURITY DEFINER RPC on the USER's JWT — never service_role.
@@ -1593,11 +1726,60 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
 
   const webBase = (c.env.PUBLIC_WEB_URL ?? "https://carres-portal.pages.dev").replace(/\/$/, "");
   const expiresAt = Math.floor(Date.now() / 1000) + RENTAL_SESSION_TTL_SECONDS;
+
+  // 0281 — Loo's calendar, expressed in the only shape Stripe actually offers.
+  //
+  // What he wants: the FULL fee at the counter, then the FULL fee on the 7th of
+  // every month. Stripe cannot say that with a billing anchor alone —
+  // `proration_behavior:'none'` WAIVES the first invoice (customer pays nothing
+  // today) and the default `create_prorations` bills a PART-month. Checked
+  // against the docs, not assumed.
+  //
+  // So: the signup month rides as a ONE-TIME line item (charged at checkout),
+  // and a trial covers the gap to the first 7th. Trial end then BECOMES the
+  // billing anchor, so every later invoice lands on the 7th by construction.
+  // 1 one-time + (term - 1) subscription invoices = term x fee. The law holds.
+  //
+  // The anchor is read from the SCHEDULE WE ALREADY WROTE (seq >= 2, still
+  // owing, still in the future) rather than recomputed — one calendar, not two.
+  const { data: nextDue } = await admin
+    .from("rental_billings")
+    .select("due_date")
+    .eq("agreement_id", ag.id)
+    .neq("status", "paid")
+    .gte("seq", 2)
+    .gt("due_date", new Date().toISOString().slice(0, 10))
+    .order("seq")
+    .limit(1)
+    .maybeSingle();
+  const anchorIso = (nextDue as { due_date: string } | null)?.due_date ?? null;
+  // Midday UTC on the anchor date — comfortably inside the MYT day either way,
+  // so a timezone edge can never land the charge on the 6th or the 8th.
+  const trialEnd = anchorIso ? Math.floor(Date.parse(`${anchorIso}T12:00:00Z`) / 1000) : null;
+  // A trial must be in the future; if the schedule has run dry or drifted into
+  // the past, fall back to Stripe's natural cycle rather than sending a value
+  // Stripe will reject. The ledger still reconciles by invoice id.
+  const useTrial = trialEnd !== null && trialEnd > Math.floor(Date.now() / 1000) + 3600;
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: stripeCustomerId,
-    line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
+    line_items: [
+      { price: plan.stripe_price_id, quantity: 1 },
+      // the signup month, collected now
+      {
+        price_data: {
+          currency: "myr",
+          unit_amount: Math.round(Number(ag.monthly_fee) * 100),
+          product_data: {
+            name: `Rental ${ag.agreement_no} — first month`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
     subscription_data: {
+      ...(useTrial ? { trial_end: trialEnd! } : {}),
       metadata: {
         carres_source: CARRES_SOURCE,
         carres_kind: "rental_agreement",
@@ -1684,7 +1866,9 @@ rentalRouter.get("/agreements/:id/stripe/checkout/:sid", async (c) => {
       // Schedule wrap BEFORE link: a failure here 500s the poll (and the
       // webhook retries), so a subscription can never stay open-ended with
       // the agreement already marked linked.
-      await ensureFixedTermSchedule(stripe, subId, Number(ag.term_months));
+      // 0281 — term - 1: the signup month was collected as a one-time line
+      // item at checkout, so the subscription carries the REMAINING months.
+      await ensureFixedTermSchedule(stripe, subId, Number(ag.term_months) - 1);
       const { error: rpcErr } = await admin.rpc("link_rental_subscription", {
         p_session_id: current.session_id,
         p_stripe_subscription_id: subId,

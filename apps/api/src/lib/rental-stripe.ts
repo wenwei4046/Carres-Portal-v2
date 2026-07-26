@@ -105,15 +105,22 @@ export async function ensureRentalPlanStripeObjects(
 
 /**
  * Wrap a just-created Checkout subscription into the FIXED-TERM schedule:
- * `termMonths` monthly iterations from the subscription's own start, then
- * end_behavior=cancel (month 85 never bills — the rent-to-own completion
- * flow takes over). Idempotent: a subscription already under a schedule is
- * left alone, so the webhook and the POS poll can race freely.
+ * `billingCycles` monthly iterations from the subscription's own start, then
+ * end_behavior=cancel (the month after never bills — the rent-to-own
+ * completion flow takes over). Idempotent: a subscription already under a
+ * schedule is left alone, so the webhook and the POS poll can race freely.
+ *
+ * @param billingCycles how many invoices the SUBSCRIPTION itself will raise —
+ *   which since 0281 is `term_months - 1`, NOT the term. Loo's calendar
+ *   collects the signup month as a one-time line item at the counter and lets
+ *   the subscription carry the remaining N-1 months on the 7th. Passing the
+ *   full term here would bill one month too many and break the law the whole
+ *   segment is built around ("as long as the sum is correct").
  */
 export async function ensureFixedTermSchedule(
   stripe: Stripe,
   subscriptionId: string,
-  termMonths: number,
+  billingCycles: number,
 ): Promise<void> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   if (sub.schedule) return; // already wrapped (webhook/poll race)
@@ -128,8 +135,8 @@ export async function ensureFixedTermSchedule(
   });
   // from_subscription mints a schedule mirroring the live phase; the update
   // re-states that phase with a hard duration (SDK v22 vocabulary for the
-  // classic "84 iterations"): `termMonths` months from the phase start, on a
-  // monthly price = exactly termMonths billing cycles. start_date must echo
+  // classic "N iterations"): `billingCycles` months from the phase start, on a
+  // monthly price = exactly that many billing cycles. start_date must echo
   // the schedule's own current phase start or Stripe rejects the edit.
   await stripe.subscriptionSchedules.update(schedule.id, {
     end_behavior: "cancel",
@@ -137,7 +144,7 @@ export async function ensureFixedTermSchedule(
       {
         items: [{ price: priceId, quantity: 1 }],
         start_date: schedule.phases[0]!.start_date,
-        duration: { interval: "month", interval_count: termMonths },
+        duration: { interval: "month", interval_count: billingCycles },
       },
     ],
   });

@@ -21,6 +21,9 @@ import type { AppEnv } from "../types";
  *                                        lands via async_payment_succeeded)
  *   checkout.session.async_payment_succeeded → record
  *   checkout.session.expired           → mark the tracker row expired
+ *   invoice.paid                       → 0281: record the rental instalment
+ *                                        (the collection ledger's only entry
+ *                                        point from Stripe)
  *   everything else                    → 200 ignored
  *
  * Recording goes through the 0223 RPC — idempotent (row lock + status guard),
@@ -67,6 +70,10 @@ stripeWebhookRouter.post("/webhook", async (c) => {
       }
       if (session.payment_status !== "paid") break; // async method still pending
       return recordSession(c, stripe, session);
+    }
+    case "invoice.paid": {
+      // 0281 — segment 2a. Every month after signup arrives here.
+      return recordRentalInvoice(c, event.data.object);
     }
     case "checkout.session.expired": {
       const session = event.data.object;
@@ -120,9 +127,13 @@ async function recordSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe
  * fixed-term schedule wraps FIRST (its failure 500s so Stripe retries and the
  * subscription can never stay open-ended while marked linked), then the
  * link_rental_subscription RPC stamps the ids — both idempotent, so this and
- * the POS poll's live-reconcile can race freely. Recording each month's MONEY
- * (rental_billings.paid + splits) is segment ②'s invoice.paid engine — not
- * here.
+ * the POS poll's live-reconcile can race freely.
+ *
+ * 0281 — and THEN the signup month is recorded. The one-time line item on this
+ * session IS instalment seq 1 of Loo's calendar, collected at the counter; the
+ * subscription carries the rest on the 7th. Recording it here closes CF
+ * `rental-first-month-vs-billing-row`, which existed precisely because this
+ * money landed in Stripe and never in our books.
  */
 async function recordRentalSession(c: Context<AppEnv>, stripe: Stripe, session: Stripe.Checkout.Session) {
   const subId =
@@ -147,7 +158,12 @@ async function recordRentalSession(c: Context<AppEnv>, stripe: Stripe, session: 
     .maybeSingle();
   if (ag) {
     try {
-      await ensureFixedTermSchedule(stripe, subId, Number((ag as { term_months: number }).term_months));
+      // 0281 — term - 1 (the signup month rode the checkout as a one-time line)
+      await ensureFixedTermSchedule(
+        stripe,
+        subId,
+        Number((ag as { term_months: number }).term_months) - 1,
+      );
     } catch (e) {
       return c.json(
         { error: "schedule_failed", message: e instanceof Error ? e.message : "schedule wrap failed" },
@@ -168,7 +184,83 @@ async function recordRentalSession(c: Context<AppEnv>, stripe: Stripe, session: 
     }
     return c.json({ error: "record_failed", message: error.message }, 500);
   }
+
+  // 0281 — the signup month. Keyed on the SESSION id (this money arrived as a
+  // one-time line item, not an invoice), so a re-delivered session is a no-op
+  // through the RPC's own idempotency rather than a second collection.
+  const { error: payErr } = await admin.rpc("rental_record_payment", {
+    p_agreement_id: agreementId,
+    p_seq: 1,
+    p_stripe_invoice_id: `cs:${session.id}`,
+    p_method: "stripe",
+    p_reference: session.id,
+    p_note: "First month, collected at signup",
+  });
+  if (payErr) {
+    // The subscription IS linked at this point, so failing hard would make
+    // Stripe retry the whole handler and re-do work that already succeeded
+    // (all idempotent, but noisy). The instalment is recoverable by hand from
+    // the finance screen, so say so loudly and acknowledge.
+    console.error("rental first-month record failed:", payErr.message);
+    return c.json({ received: true, warning: "first_month_not_recorded" });
+  }
   return c.json({ received: true });
+}
+
+/**
+ * 0281 — an invoice was paid. This is the collection ledger's only entry point
+ * from Stripe for months 2..N.
+ *
+ * Matching is by `stripe_invoice_id` and NOT by due date, deliberately: our
+ * calendar anchors on the 7th while Stripe's anchors on the trial end, and a
+ * link paid days late drifts them further (CF `rental-billing-anchor-drift`).
+ * The invoice id is the only identifier that survives both the drift and
+ * Stripe's at-least-once delivery. When the id is new, the RPC takes the
+ * OLDEST still-owing instalment, which is what "paying your rent" means.
+ */
+async function recordRentalInvoice(c: Context<AppEnv>, invoice: Stripe.Invoice) {
+  // SDK v22 moved this: `invoice.subscription` is gone, the link now hangs off
+  // `parent.subscription_details.subscription`. Read out of the installed
+  // types rather than assumed — the same lesson 0255 learned when v22 swapped
+  // a schedule's `iterations` for `duration`.
+  const sub = invoice.parent?.subscription_details?.subscription ?? null;
+  const subId = typeof sub === "string" ? sub : sub?.id ?? null;
+  // No subscription = not a rental instalment (a one-off invoice, say). Ignore
+  // rather than guess, and acknowledge so Stripe stops retrying.
+  if (!subId) return c.json({ received: true, ignored: "not_a_subscription_invoice" });
+  if (!invoice.id) return c.json({ received: true, ignored: "no_invoice_id" });
+
+  const admin = adminClient(c.env);
+  const { data: ag } = await admin
+    .from("rental_agreements")
+    .select("id")
+    .eq("stripe_subscription_id", subId)
+    .maybeSingle();
+  const agreementId = (ag as { id: string } | null)?.id ?? null;
+  // A subscription we do not own (the CARRESS account still carries the old
+  // carressglobal system's objects) — acknowledge, never retry.
+  if (!agreementId) return c.json({ received: true, ignored: "unknown_subscription" });
+
+  const { data, error } = await admin.rpc("rental_record_payment", {
+    p_agreement_id: agreementId,
+    p_stripe_invoice_id: invoice.id,
+    // Stripe reports sen; the ledger keeps ringgit. `amount_paid` is what was
+    // ACTUALLY collected, which is the only figure worth recording.
+    p_amount: (invoice.amount_paid ?? 0) / 100,
+    p_paid_at: new Date((invoice.status_transitions?.paid_at ?? invoice.created) * 1000).toISOString(),
+    p_method: "stripe",
+    p_reference: invoice.number ?? invoice.id,
+  });
+  if (error) {
+    // Every instalment already collected (a trailing invoice, or a manual one
+    // raised in the dashboard) — nothing to record, and retrying will not help.
+    if (error.details === "billing_not_found") {
+      return c.json({ received: true, ignored: "no_open_instalment" });
+    }
+    return c.json({ error: "record_failed", message: error.message }, 500);
+  }
+  const out = data as { already?: boolean; seq?: number } | null;
+  return c.json({ received: true, seq: out?.seq ?? null, already: out?.already ?? false });
 }
 
 export default stripeWebhookRouter;

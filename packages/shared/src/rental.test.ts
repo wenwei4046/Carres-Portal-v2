@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RentalOptionGroup, RentalSurcharge } from "./domain";
 import {
+  RENTAL_LATE_INTEREST_PCT_PER_MONTH,
+  rentalDueDates,
+  rentalLateInterest,
+  rentalScheduleSum,
   agreementTokens,
   blocksFromText,
   compartmentBuildMonthly,
@@ -27,6 +31,9 @@ import {
   servicePackageInputSchema,
   servicePackagePatchSchema,
 } from "./schemas/rental";
+
+/** Local 2dp helper so the tests do not import the module's private one. */
+const round2Local = (n: number): number => Math.round(n * 100) / 100;
 
 describe("serviceVisitsTotal", () => {
   it("accrues visits at visitsPerYear across the duration (floored)", () => {
@@ -242,6 +249,104 @@ describe("rental plan split cap (0253)", () => {
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "not-an-email" }).success).toBe(false);
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: "a@b.co" }).success).toBe(true);
     expect(customerInputSchema.safeParse({ name: "A", phone: "0123456", email: null }).success).toBe(true);
+  });
+});
+
+describe("rentalDueDates — Loo's 7th-of-the-month rule (2026-07-26)", () => {
+  it("walks Loo's own example: sign on the 30th, then every 7th", () => {
+    const d = rentalDueDates("2026-08-30", 84);
+    expect(d).toHaveLength(84);
+    expect(d[0]).toEqual({ seq: 1, dueDate: "2026-08-30" }); // paid at the counter
+    expect(d[1]).toEqual({ seq: 2, dueDate: "2026-09-07" }); // "紧接着的 7 号"
+    expect(d[2]).toEqual({ seq: 3, dueDate: "2026-10-07" }); // "下个月的 7 号"
+    // ...and the last one lands BEFORE the term ends, which is exactly Loo's
+    // "最后一个月基本上就不用付了" — the signup payment was the extra one.
+    expect(d[83]).toEqual({ seq: 84, dueDate: "2033-07-07" });
+  });
+
+  it("THE LAW: N payments, and N x fee equals the contract value exactly", () => {
+    for (const [term, fee] of [[84, 59], [60, 79], [36, 129.9], [12, 49]] as const) {
+      const d = rentalDueDates("2026-08-30", term);
+      expect(d).toHaveLength(term);
+      expect(rentalScheduleSum(fee, term)).toBe(round2Local(fee * term));
+    }
+    // the number Loo quotes out loud
+    expect(rentalScheduleSum(59, 84)).toBe(4956);
+  });
+
+  it("signing ON the 7th rolls to the next 7th — today is already paid", () => {
+    const d = rentalDueDates("2026-09-07", 12);
+    expect(d[0]!.dueDate).toBe("2026-09-07");
+    expect(d[1]!.dueDate).toBe("2026-10-07");
+  });
+
+  it("signing on the 6th does NOT charge again tomorrow (the guard)", () => {
+    // Without the guard this would be 2026-09-07 — a second charge one day
+    // later, which a customer reads as a double charge and Stripe rejects as a
+    // sub-48h trial. Count is unchanged, so the sum is unchanged.
+    const d = rentalDueDates("2026-09-06", 84);
+    expect(d[0]!.dueDate).toBe("2026-09-06");
+    expect(d[1]!.dueDate).toBe("2026-10-07");
+    expect(d).toHaveLength(84);
+  });
+
+  it("keeps the anchor when the gap is comfortable", () => {
+    const d = rentalDueDates("2026-08-31", 12); // 7 days to 7 Sep — exactly at the limit
+    expect(d[1]!.dueDate).toBe("2026-09-07");
+  });
+
+  it("never rolls a short month into the next one (clamping)", () => {
+    // Anchor 31 is not our rule, but the clamp must be right if it ever is.
+    const d = rentalDueDates("2027-01-01", 4, { anchorDay: 31, minGapDays: 0 });
+    expect(d.map((x) => x.dueDate)).toEqual([
+      "2027-01-01",
+      "2027-01-31",
+      "2027-02-28", // not 3 Mar
+      "2027-03-31",
+    ]);
+  });
+
+  it("handles a leap February", () => {
+    const d = rentalDueDates("2028-01-01", 3, { anchorDay: 29, minGapDays: 0 });
+    expect(d[2]!.dueDate).toBe("2028-02-29");
+  });
+
+  it("refuses a malformed date or a nonsense term", () => {
+    expect(() => rentalDueDates("30-08-2026", 84)).toThrow();
+    expect(() => rentalDueDates("2026-08-30", 0)).toThrow();
+    expect(() => rentalDueDates("2026-08-30", 1.5)).toThrow();
+  });
+
+  it("a one-month term is just the signup payment", () => {
+    expect(rentalDueDates("2026-08-30", 1)).toEqual([{ seq: 1, dueDate: "2026-08-30" }]);
+  });
+});
+
+describe("rentalLateInterest — 8% per month, SIMPLE (Loo 2026-07-26)", () => {
+  it("accrues pro-rata by day, not in whole-month jumps", () => {
+    // RM59 late 30 days = 8% of 59 = RM4.72
+    expect(rentalLateInterest(59, 30)).toBe(4.72);
+    expect(rentalLateInterest(59, 15)).toBe(2.36);
+    expect(rentalLateInterest(59, 60)).toBe(9.44);
+  });
+
+  it("is SIMPLE — two months is exactly twice one month, never compounded", () => {
+    const one = rentalLateInterest(100, 30);
+    const two = rentalLateInterest(100, 60);
+    expect(two).toBe(round2Local(one * 2));
+    // compounding would give 100*1.08^2-100 = 16.64
+    expect(two).toBe(16);
+  });
+
+  it("is zero when nothing is late and nothing is owed", () => {
+    expect(rentalLateInterest(59, 0)).toBe(0);
+    expect(rentalLateInterest(59, -3)).toBe(0);
+    expect(rentalLateInterest(0, 90)).toBe(0);
+  });
+
+  it("honours an override rate without touching the default", () => {
+    expect(rentalLateInterest(100, 30, 1)).toBe(1);
+    expect(RENTAL_LATE_INTEREST_PCT_PER_MONTH).toBe(8);
   });
 });
 
