@@ -1330,3 +1330,29 @@ than retyping it — file-equals-live by construction.
 **Nobody has a commission rate.** The screen correctly shows the red blocked state until
 Loo authors percentages in HR → Commission Setup for CR008 and CR009. That is data entry,
 not code.
+
+---
+
+## 2026-07-26 ⑲ · Guarantee & Service Package — one category, two kinds of cover (0274, PR #352, deployed)
+
+**Loo**: "for 那个 cleaning service 呢，直接变成在 guarantee 的 category 里面再多一个项目… 你把名字改成 guarantee and service 吧… 会分为两种类型: One-time（一次性）… Recurring / Retractable Package: 这种 service package 系统还会去检查它还剩几次，因为它是按年（一年一年）来售卖的."
+
+**He spotted a real unification, not a rename.** A guarantee and a care plan are the SAME object: both attach to a purchased item, both have a clock, both get used up. The only thing that differs is HOW MANY TIMES — a guarantee is a care plan with exactly one visit. So `guarantee_terms` learned a `kind` and the entitlement ledger learned to count, instead of a second parallel engine being built beside the first.
+
+**The decision worth keeping: the five-door mint trigger was NOT touched.** `guarantee_mint_from_line` is the single AFTER INSERT trigger that closes all five order-line doors, and it is the most load-bearing function in the feature. Rewriting it to carry two more snapshot columns would have risked the entire mint path for no behavioural gain. Instead a small BEFORE INSERT trigger on `guarantee_entitlements` fills `kind` / `visits_total` from the terms row when they are left at their defaults — the snapshot happens for EVERY door, including ones that do not exist yet, and the mint function is provably untouched (verified post-apply: still exactly one copy). **Durable lesson: when a change needs a value on every row a hot function writes, a BEFORE INSERT trigger on the TARGET is usually cheaper and safer than editing the writer — especially when the writer's whole value is that it is the only one.**
+
+**The ID rule, extended the only correct way.** Spec §2b retires the guarantee ID on claim. Retiring it on visit 1 of 6 would strand the remaining five with no handle to quote, so it is retired when the LAST visit is spent — which for a one-time cover IS the first visit, making a guarantee byte-identical to before. That equivalence is asserted, not assumed.
+
+**Two crossings made impossible at three layers** (zod refine → DB CHECK → the form's own switch), because one is genuinely dangerous: a recurring plan may not promise a `replace` (an unbounded number of free mattresses), and a one-time cover may not carry a visit schedule.
+
+**The DB caught a real gap mid-dry-run.** `remedy` allowed only `replace | repair` — both things you do to a BROKEN item, which is all this table used to describe. A care plan's remedy is neither: nothing is wrong, someone turns up and cleans it. Widened to add `service`, then paired to `kind` by a second CHECK. This is exactly what a CHECK is for, and it is why the dry-run happens before the apply and not after.
+
+**Naming:** the category LABEL reads "Guarantee & Service Package" (short form "Guarantee & Service" on filter chips, which have no room). The DB value stays `guarantee` — renaming a category enum would ripple through the POS, the catalog, the invoice and five RPCs for zero behavioural gain. Two `SkuMasterTab` assertions were updated as a real consequence of the rename, not masked.
+
+**+ New SKU** under that category asks TYPE **first** — it changes what "years" means (15 years of one swap promise vs 3 years of scheduled visits) — then years, then visits-a-year, with the TOTAL spelled out so nobody multiplies at the counter. Codes split: `SVC-…-3Y-6V` vs `GRT-…-3Y`, so a plan and a guarantee over the same product can never collide.
+
+**Verified BEFORE applying**: 20 assertions on live prod in a rolled-back transaction — derived count (3y × 2/yr = 6) · one-time spends on the first claim and retires its ID · recurring survives five visits with its ID intact and spends on the sixth · a seventh refused · both history sentences correct · both bad config shapes refused. Rollback confirmed clean first.
+
+**Ship**: PR #352 (merge `dd867214`) → api Worker `ce089f7b` (deployed AFTER 0274; unauth 401 on three routes via the custom domain) + web `index-BuTmS3FM.js` → carres-portal `f550ec7a` + carres-pos `ce25d0d8`; downloaded 4,169,655 bytes, `SERVICE_ROLE` 0, all three markers present. **Two of four canonicals first served PR #351's `index-A7uOnzQ8.js`** — `wrangler pages deployment list` showed MINE newest and `git merge-base --is-ancestor e657f28 dd86721` proved my tip contains theirs, so it was edge lag, not a clobber; both flipped inside ~20s of polling. Tests +14; suites shared 1141/1141 · api 3 · web 16 (baseline).
+
+**Two carry-forwards recorded, not hidden**: `guarantee-service-two-registries` (the rental-INCLUDED package still comes from `service_packages` — one concept, two registries; folding it in would touch a just-shipped credit-gated money path, so the firm fix is written down instead) and `guarantee-recurring-no-visit-schedule` (0274 counts visits REMAINING but not when they are DUE, so nothing can yet say "this customer is owed a clean this month").
