@@ -300,7 +300,7 @@ export const qk = {
       ["rental", "checkout", agreementId, sessionId] as const,
     // 0268 — the finance approver's credit queue.
     approvals: () => ["rental", "approvals"] as const,
-    // 0278 — the wording in force, read by the POS before a customer signs.
+    // 0279 — the wording in force, read by the POS before a customer signs.
     agreementTemplate: () => ["rental", "agreement-template"] as const,
   },
   // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
@@ -7023,10 +7023,10 @@ export interface RentalApproval {
   startDate: string;
   createdAt: string;
   notes: string | null;
-  /** 0278 — the signature, captured at the counter and stamped by
-   *  `create_rental_agreement`. Every application created from 0278 onward
+  /** 0279 — the signature, captured at the counter and stamped by
+   *  `create_rental_agreement`. Every application created from 0279 onward
    *  carries one (approve now REFUSES an unsigned row), but these stay nullable:
-   *  a row created before 0278 has none, and the page must be able to say so
+   *  a row created before 0279 has none, and the page must be able to say so
    *  rather than imply a signature exists. `templateVersion` is what makes it
    *  evidence — it names the exact wording the customer agreed to. */
   signedAt: string | null;
@@ -7362,7 +7362,7 @@ export interface CreateRentalAgreementResponse {
 }
 
 /**
- * The rental wording the customer is about to sign (0278).
+ * The rental wording the customer is about to sign (0279).
  *
  * `rental_agreement_templates` is RLS internal-only, so a store JWT cannot read
  * the paper directly — this goes through the same definer function

@@ -492,7 +492,7 @@ export default function DealerPos({
   // disabled with no visible reason). Signature + terms still do: they ARE the
   // rental agreement.
   const isRentalCart = cartModeOf(draft.lines) === "rental";
-  // 0278 — a rental cannot be signed against wording that does not exist. The
+  // 0279 — a rental cannot be signed against wording that does not exist. The
   // server refuses it (`no_agreement_template`), so the button must too, with
   // the reason on screen: RentalAgreementBlock renders it right above. Only
   // fetched for a rental cart — an ordinary sale never asks.
@@ -558,7 +558,7 @@ export default function DealerPos({
           planId: rental.planId,
           customerName: draft.customer.name.trim(),
           customerPhone: draft.customer.phone.trim(),
-          // 0278 — THE FIX. `step4ValidRental` has always refused to enable
+          // 0279 — THE FIX. `step4ValidRental` has always refused to enable
           // Complete without a real `data:image/…` on the pad; this branch then
           // returned before the ordinary path's upload, so the drawing the
           // customer made was discarded in the browser and the contract was
@@ -589,7 +589,7 @@ export default function DealerPos({
       clearDraft();
       setRentalDone(done);
     } catch (err) {
-      // 0278 — one refusal is not the store's fault and must not read like a
+      // 0279 — one refusal is not the store's fault and must not read like a
       // bug: the principal has not published the agreement wording, so there is
       // no paper to sign. Name the screen instead of echoing a DB sentence.
       const code = (err as { body?: { code?: string } } | null)?.body?.code;
@@ -1308,7 +1308,7 @@ export default function DealerPos({
                     ? "Let the customer read the agreement, then capture their signature to submit the application."
                     : "Record payment, then capture the customer signature to complete the order."}
                 </p>
-                {/* 0278 — the paper goes ABOVE the pad, because you sign after
+                {/* 0279 — the paper goes ABOVE the pad, because you sign after
                     reading, not before. */}
                 {isRentalCart ? <RentalAgreementBlock /> : null}
                 <Step3SignaturePayment

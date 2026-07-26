@@ -117,13 +117,13 @@ const AG_ID = "00000000-0000-0000-0000-0000000d0001";
 const CUST_ID = "00000000-0000-0000-0000-0000000c0001";
 const PLAN_ID = "00000000-0000-0000-0000-0000000b0001";
 
-/** 0278 — every signup now carries the customer's signature. */
+/** 0279 — every signup now carries the customer's signature. */
 const SIGNED = {
   signatureDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
   signedName: "Tan Mei Ling",
 };
 
-/** 0278 — POST /agreements writes the signature with the SERVICE client before
+/** 0279 — POST /agreements writes the signature with the SERVICE client before
  *  it calls the RPC (a store JWT fails the bucket's is_internal() policy), so
  *  every signup test needs a storage-capable admin stand-in. */
 function stubSignatureStorage() {

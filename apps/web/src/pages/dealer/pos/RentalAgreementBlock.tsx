@@ -2,7 +2,7 @@ import { useRentalAgreementTemplate } from "@/lib/queries";
 import { AgreementBody } from "@/pages/rental/AgreementsSection";
 
 /**
- * The paper, on the confirm step, before the customer signs (0278).
+ * The paper, on the confirm step, before the customer signs (0279).
  *
  * Until now the rental lane asked for a signature with nothing on screen to
  * sign — the T&C existed as a `rental_agreement_templates` row the store JWT

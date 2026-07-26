@@ -215,7 +215,7 @@ export const agreementBlockSchema = z
 
 /**
  * The rent-to-own contract's `doc_key` — the one document a rental is signed
- * against. Mirrored (not imported) by 0278's
+ * against. Mirrored (not imported) by 0279's
  * `rental_current_agreement_template()` default, the same way the HR-P6 metric
  * list is a shared constant mirrored by a CHECK: the DB cannot import TypeScript,
  * so the pair is kept honest by naming the mirror in both places.
@@ -294,7 +294,7 @@ export const createRentalAgreementInputSchema = z
     customerName: z.string().trim().min(1).max(120),
     customerPhone: z.string().trim().min(5).max(32),
     /**
-     * 0278 — the customer's signature, as the POS pad drew it.
+     * 0279 — the customer's signature, as the POS pad drew it.
      *
      * REQUIRED, and that is the whole point of the migration: `step4ValidRental`
      * already refused to enable Complete without a `data:image/…`, then the

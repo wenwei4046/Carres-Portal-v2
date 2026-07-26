@@ -60,7 +60,7 @@ const PLAN = {
   stripeReady: true,
 };
 
-// The CREATED fixture went with the signup tests: since 0278 this page cannot
+// The CREATED fixture went with the signup tests: since 0279 this page cannot
 // create an agreement at all, so there is no success payload to stand in for.
 
 function setPlans(plans: unknown[]) {
@@ -94,9 +94,9 @@ describe("RentToOwnPage — offers", () => {
   });
 });
 
-describe("RentToOwnPage — sign (RETIRED since 0278)", () => {
+describe("RentToOwnPage — sign (RETIRED since 0279)", () => {
   // This page was replaced by the Rental CATEGORY in the POS (PR #347) and has
-  // no signature pad. Since 0278 an agreement is born signed or is not born, so
+  // no signature pad. Since 0279 an agreement is born signed or is not born, so
   // this form structurally cannot create one — the server would refuse it with
   // `signature_required`. The button now says that instead of firing a request
   // that cannot succeed. These tests pin the door SHUT.

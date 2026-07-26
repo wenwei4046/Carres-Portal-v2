@@ -129,7 +129,7 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
 }
 
 /**
- * 0278 — the signature goes to the private `rental-agreements` bucket with the
+ * 0279 — the signature goes to the private `rental-agreements` bucket with the
  * SERVICE client, because that bucket's INSERT policy is `is_internal()` and a
  * store JWT fails it. This stands in for that storage conversation and RECORDS
  * it, so the tests can assert what was written and what was cleaned up.
@@ -299,7 +299,7 @@ describe("GET /api/rental/pos-plans (0255 stripped store projection)", () => {
 });
 
 describe("POST /api/rental/agreements (0255 signup RPC)", () => {
-  // 0278 — a signup without a signature is not a signup.
+  // 0279 — a signup without a signature is not a signup.
   const SIG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
   const payload = {
     planId: PLAN_ID,
@@ -390,7 +390,7 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
       env,
     );
     expect(res.status).toBe(201);
-    // 0278 — the signature is stored BEFORE the RPC, because the DB needs a
+    // 0279 — the signature is stored BEFORE the RPC, because the DB needs a
     // path to stamp and the agreement id does not exist until the RPC returns.
     expect(admin.calls.uploads).toHaveLength(1);
     expect(admin.calls.uploads[0]?.bucket).toBe("rental-agreements");
@@ -420,7 +420,7 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
     expect(body.unit).toMatchObject({ unitCode: "RU-1001", status: "allocated" });
   });
 
-  // ── 0278 — the signature stops being thrown away ─────────────────────────
+  // ── 0279 — the signature stops being thrown away ─────────────────────────
 
   it("refuses a signup carrying no signature, and stores nothing", async () => {
     const sb = makeSb({});
@@ -492,7 +492,7 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
     expect(sb.calls.rpc).toHaveLength(0);
   });
 
-  it("maps the other 0278 guards to named 422s", async () => {
+  it("maps the other 0279 guards to named 422s", async () => {
     for (const detail of ["signature_required", "invalid_signature_path", "signed_name_required"]) {
       const sb = makeSb({}, { data: null, error: { message: detail, details: detail } });
       vi.mocked(userClient).mockReturnValue(sb as never);
@@ -548,7 +548,7 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
   });
 });
 
-describe("GET /api/rental/agreement-template (0278 — the paper the store shows)", () => {
+describe("GET /api/rental/agreement-template (0279 — the paper the store shows)", () => {
   const TEMPLATE_ROW = {
     id: "00000000-0000-0000-0000-0000000e0009",
     doc_key: "rent_to_own",

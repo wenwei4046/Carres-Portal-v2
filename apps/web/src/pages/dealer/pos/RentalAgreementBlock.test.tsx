@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import RentalAgreementBlock from "./RentalAgreementBlock";
 
 /**
- * RentalAgreementBlock (0278) — the paper, on the confirm step, before the pad.
+ * RentalAgreementBlock (0279) — the paper, on the confirm step, before the pad.
  *
  * The behaviour worth pinning is the UNPUBLISHED case. `rental_agreement_
  * templates` holds ZERO rows on live prod, so this is not a theoretical branch:

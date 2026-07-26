@@ -1378,7 +1378,7 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.status).toBe("active");
     expect(out.buyoutAmount).toBeNull();
     expect(out.startDate).toBe("2026-08-01");
-    // 0278 — the signature travels, and WHICH wording was signed travels with
+    // 0279 — the signature travels, and WHICH wording was signed travels with
     // it. A path without a version is a picture, not evidence.
     expect(out.signedAt).toBe("2026-07-25T09:30:00Z");
     expect(out.signedName).toBe("Tan Ah Kow");
@@ -1391,8 +1391,8 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.signedDocPath).toBeNull();
   });
 
-  it("rentalAgreementFromRow degrades a pre-0278 row to 'not signed', never undefined", () => {
-    // A browser on THIS build can be talking to a Worker deployed before 0278.
+  it("rentalAgreementFromRow degrades a pre-0279 row to 'not signed', never undefined", () => {
+    // A browser on THIS build can be talking to a Worker deployed before 0279.
     // The approver screen renders a warning off `signedAt == null`, so an
     // undefined here would silently show "Signed" for an unsigned contract.
     const legacy = rentalAgreementFromRow({

@@ -1347,7 +1347,7 @@ export interface RentalAgreementRow {
   rejection_reason: string | null;
   credit_checked_at: string | null;
   credit_reference: string | null;
-  /** 0267 landed these columns; 0278 gave them a writer. An agreement is BORN
+  /** 0267 landed these columns; 0279 gave them a writer. An agreement is BORN
    *  signed or is not born — `create_rental_agreement` stamps all five in the
    *  same statement that creates the row, and a CHECK keeps them whole (all
    *  present or all absent). `template_id` + `template_version` say WHICH
