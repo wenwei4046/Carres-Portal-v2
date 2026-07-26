@@ -394,7 +394,7 @@ describe("POST /:id/storage/extend", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: true }),
+        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reasonKey: "customer_renovation", acknowledged: true }),
       }),
       env,
     );
@@ -407,11 +407,30 @@ describe("POST /:id/storage/extend", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: false }),
+        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reasonKey: "customer_renovation", acknowledged: false }),
       }),
       env,
     );
     expect(res.status).toBe(422);
+  });
+
+  it("422 without a structured reason — free text / legacy words rejected (T4)", async () => {
+    const jwt = await makeJwt("operation");
+    for (const body of [
+      { newDeliveryDate: "2026-08-01", acknowledged: true },
+      { newDeliveryDate: "2026-08-01", reasonKey: "Renovation", acknowledged: true },
+      { newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: true },
+    ]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+    }
   });
 
   it("201 — first extension snapshots the original delivery date + sets count 1", async () => {
@@ -432,7 +451,7 @@ describe("POST /:id/storage/extend", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newDeliveryDate: "2026-08-20", reason: "Traveling", acknowledged: true }),
+        body: JSON.stringify({ newDeliveryDate: "2026-08-20", reasonKey: "customer_reschedule", note: "wants a weekend", acknowledged: true }),
       }),
       env,
     );
@@ -441,11 +460,20 @@ describe("POST /:id/storage/extend", () => {
       order_id: ORDER_ID,
       extension_original_date: "2026-07-15",
       extension_new_date: "2026-08-20",
-      extension_reason: "Traveling",
+      // T4: the structured KEY is what gets stored
+      extension_reason: "customer_reschedule",
       extension_count: 1,
       extended_by: "u1",
     });
     expect((sb.calls.upserts[0] as { extension_acknowledged_at?: string }).extension_acknowledged_at).toBeTruthy();
+    // T4 done-when: the reason lands in activity history (annotation door)
+    expect(sb.calls.rpc).toHaveLength(1);
+    const ann = sb.calls.rpc[0] as { name: string; args: { p_order_id: string; p_content: string } };
+    expect(ann.name).toBe("operation_add_annotation");
+    expect(ann.args.p_order_id).toBe(ORDER_ID);
+    expect(ann.args.p_content).toContain("Delivery postponed");
+    expect(ann.args.p_content).toContain("Customer requested reschedule");
+    expect(ann.args.p_content).toContain("wants a weekend");
   });
 
   it("403 extension_used — operation cannot record a 2nd extension", async () => {
@@ -463,7 +491,7 @@ describe("POST /:id/storage/extend", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newDeliveryDate: "2026-09-01", reason: "Others", note: "again", acknowledged: true }),
+        body: JSON.stringify({ newDeliveryDate: "2026-09-01", reasonKey: "customer_hold", note: "again", acknowledged: true }),
       }),
       env,
     );
@@ -471,6 +499,7 @@ describe("POST /:id/storage/extend", () => {
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("extension_used");
     expect(sb.calls.upserts).toHaveLength(0);
+    expect(sb.calls.rpc).toHaveLength(0); // no activity row for a refused save
   });
 
   it("201 — a principal CAN record a 2nd extension (keeps the original date)", async () => {
@@ -491,7 +520,7 @@ describe("POST /:id/storage/extend", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ newDeliveryDate: "2026-09-15", reason: "Others", note: "second delay", acknowledged: true }),
+        body: JSON.stringify({ newDeliveryDate: "2026-09-15", reasonKey: "stock_not_ready", note: "second delay", acknowledged: true }),
       }),
       env,
     );

@@ -642,7 +642,6 @@ export {
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
-  STORAGE_EXTENSION_REASONS,
   recordStorageExtensionInput,
   confirmBookingInput,
   type ConfirmBookingInput,
@@ -658,9 +657,21 @@ export {
   type StorageCategory,
   type RequestStorageWaiverInput,
   type DecideStorageWaiverInput,
-  type StorageExtensionReason,
   type RecordStorageExtensionInput,
 } from "./schemas/ops-order-control";
+
+// T4 · Delivery Reason Library v1 (structured reasons, hidden responsibility)
+export {
+  DELIVERY_REASONS,
+  DELIVERY_REASON_KEYS,
+  DELIVERY_REASON_CATEGORY_LABEL,
+  deliveryReasonByKey,
+  deliveryReasonLabel,
+  type DeliveryReason,
+  type DeliveryReasonKey,
+  type DeliveryReasonCategory,
+  type DeliveryResponsibility,
+} from "./delivery-reasons";
 
 export {
   monthKeyMYT,

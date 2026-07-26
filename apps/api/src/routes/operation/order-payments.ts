@@ -7,6 +7,7 @@ import {
   requestStorageWaiverInput,
   decideStorageWaiverInput,
   recordStorageExtensionInput,
+  deliveryReasonLabel,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -357,7 +358,10 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
         order_id: orderId,
         extension_original_date: originalDate,
         extension_new_date: parsed.data.newDeliveryDate,
-        extension_reason: parsed.data.reason,
+        // T4 Reason Library v1: the stored value is the structured KEY
+        // (rides the existing 0196 text column — legacy rows keep their
+        // old words and display as-is via deliveryReasonLabel).
+        extension_reason: parsed.data.reasonKey,
         extension_note: parsed.data.note ?? null,
         extension_acknowledged_at: now,
         extended_at: now,
@@ -373,6 +377,24 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+
+  // T4 done-when: the reason lands in activity history. The 0211 trigger does
+  // not watch the extension columns, so append the fact through the existing
+  // SECURITY DEFINER annotation door (the same feed the drawer's Activity tab
+  // and the global feed merge). FAIL-SOFT — audit must never undo a recorded
+  // extension, so an annotation error is swallowed.
+  const newDateText = new Date(`${parsed.data.newDeliveryDate}T00:00:00`).toLocaleDateString(
+    "en-GB",
+    { day: "numeric", month: "short", year: "2-digit" },
+  );
+  const reasonText = deliveryReasonLabel(parsed.data.reasonKey);
+  const noteText = parsed.data.note?.trim() ? ` — ${parsed.data.note.trim()}` : "";
+  await sb.rpc("operation_add_annotation", {
+    p_order_id: orderId,
+    p_content: `Delivery postponed → ${newDateText} · ${reasonText}${noteText}`,
+    p_tag: null,
+  });
+
   return c.json({ control: data }, 201);
 });
 
