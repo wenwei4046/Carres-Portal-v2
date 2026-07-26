@@ -56,6 +56,10 @@ import {
   STOCK_LOCATIONS,
   DELIVERY_TIME_SLOTS,
   isSundayIso,
+  deliveryGroupOf,
+  deliveryGroupLabel,
+  orderDeliveryGroups,
+  type DeliveryGroupKey,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -1407,6 +1411,27 @@ function DrawerBody({
   // Every goods line is reserved to this SO. Empty goods list (service-only) is
   // NOT "all received". Feeds the pipeline status + delivered gating.
   const allReceived = goodsLines.length > 0 && readyN === goodsLines.length;
+
+  // T8 delivery groups — per-group readiness for the split flow. Deliberately
+  // NOT `readinessOf`: that one also counts free shelf stock and the operator's
+  // Master-sheet override, which the booking gate (correctly) ignores. Offering
+  // a split the server would then refuse is worse than offering none, so this
+  // hint feeds the gate the SAME inputs the API does — reserved-to-this-SO only.
+  const bookingGroupStates = orderDeliveryGroups(goodsLines).map((key) => ({
+    key,
+    ready: goodsLines
+      .filter((l) => deliveryGroupOf(l.sku) === key)
+      .every(
+        (l) =>
+          lineReadiness({
+            sku: l.sku,
+            qty: l.qty,
+            reservedCount: reservedCountOf(l.sku, lineReceivedOf(l.sku)),
+            freeCount: 0,
+            hasPo: false,
+          }) === "reserved",
+      ),
+  }));
 
   // Header pipeline status (BUG 2) — derived from the order's real work signals,
   // each criterion reading ONE clear source (Loo 2026-07-09: annotate every one).
@@ -3869,6 +3894,7 @@ function DrawerBody({
                           goodsReadyHint={allReceived}
                           balanceOwingHint={balanceOwing}
                           outstandingHint={moneyOutstanding}
+                          groupStates={bookingGroupStates}
                         />
                       )}
                       {/* T6 (0280) — the artifact: once delivered, the proof
@@ -4696,12 +4722,16 @@ function BookingBlock({
   goodsReadyHint,
   balanceOwingHint,
   outstandingHint,
+  groupStates,
 }: {
   orderId: string;
   control: OpsOrderControl | null;
   goodsReadyHint: boolean;
   balanceOwingHint: boolean;
   outstandingHint: number;
+  /** T8 — every delivery group on this order with its own readiness, computed
+   *  from the SAME reserved-to-this-SO rule the server gate uses. */
+  groupStates: { key: DeliveryGroupKey; ready: boolean }[];
 }) {
   const stage = control?.booking_stage ?? "none";
   const eta = control?.logistic_eta ?? null;
@@ -4709,10 +4739,25 @@ function BookingBlock({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [slot, setSlot] = useState("");
+  // T8 — which groups THIS trip carries. null = the whole order, and it is the
+  // default on purpose: the operator has to actively choose a split, because
+  // splitting requires having asked the customer (Jess: never auto-split).
+  const [tripGroups, setTripGroups] = useState<DeliveryGroupKey[] | null>(null);
+  const readyGroups = groupStates.filter((g) => g.ready).map((g) => g.key);
+  const waitingGroups = groupStates.filter((g) => !g.ready).map((g) => g.key);
+  const splitAvailable = readyGroups.length > 0 && waitingGroups.length > 0;
+  // The scope of the booking already on file (null column = the whole order).
+  const bookedGroups = (control?.booking_groups ?? null) as
+    | DeliveryGroupKey[]
+    | null;
+  const owedGroups = bookedGroups
+    ? groupStates.map((g) => g.key).filter((k) => !bookedGroups.includes(k))
+    : [];
   const confirm = useConfirmBooking(orderId, {
     onSuccess: () => {
       toast.success("Booking confirmed — the customer's date + slot are recorded");
       setOpen(false);
+      setTripGroups(null);
     },
     onError: (e) =>
       toast.error(
@@ -4720,8 +4765,19 @@ function BookingBlock({
       ),
   });
   const sunday = !!date && isSundayIso(date);
+  // The trip being booked right now: an explicit split, or everything.
+  const tripScope = tripGroups ?? groupStates.map((g) => g.key);
+  const tripReady =
+    tripScope.length === 0 ||
+    tripScope.every((k) => readyGroups.includes(k));
   const gateHints: string[] = [];
-  if (!goodsReadyHint) gateHints.push("goods not all reserved");
+  if (!tripReady)
+    gateHints.push(
+      tripGroups
+        ? `${tripScope.map(deliveryGroupLabel).join(" + ")} not all reserved`
+        : "goods not all reserved",
+    );
+  else if (!goodsReadyHint && !tripGroups) gateHints.push("goods not all reserved");
   if (balanceOwingHint)
     gateHints.push(`RM ${outstandingHint.toFixed(2)} outstanding`);
   const FIELD =
@@ -4742,12 +4798,18 @@ function BookingBlock({
                 {control.confirmed_time_slot}
               </span>
             )}
+            {bookedGroups && (
+              <MiniBadge tone="muted">
+                {bookedGroups.map(deliveryGroupLabel).join(" + ")} only
+              </MiniBadge>
+            )}
             <Btn
               variant="ghost"
               size="sm"
               onClick={() => {
                 setDate(control.confirmed_date ?? "");
                 setSlot(control.confirmed_time_slot ?? "");
+                setTripGroups(bookedGroups);
                 setOpen((v) => !v);
               }}
             >
@@ -4783,8 +4845,68 @@ function BookingBlock({
           </span>
         )}
       </DRow>
+      {/* T8 — the second trip. A split order still owes the customer a group;
+          this row is the ONLY place that says so, and it stays until that
+          group is booked. The button re-opens the same confirm panel scoped to
+          what is owed, so the follow-up trip goes through the same door (and
+          the same gates) as the first one. */}
+      {confirmed && owedGroups.length > 0 && (
+        <DRow k="Second trip">
+          <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+            <span className="text-[12px] text-base-600 whitespace-nowrap">
+              {owedGroups.map(deliveryGroupLabel).join(" + ")} still to deliver
+            </span>
+            {owedGroups.every((k) => readyGroups.includes(k)) ? (
+              <Btn
+                variant="box"
+                size="sm"
+                onClick={() => {
+                  setDate("");
+                  setSlot("");
+                  setTripGroups(owedGroups);
+                  setOpen(true);
+                }}
+              >
+                Book second trip
+              </Btn>
+            ) : (
+              <MiniBadge tone="waiting">stock not in yet</MiniBadge>
+            )}
+          </span>
+        </DRow>
+      )}
       {open && (
         <DRow k="Customer confirmed" block>
+          {/* T8 — the wait-vs-split conversation. It appears ONLY when part of
+              the order is ready and part is not, and it opens on "wait": the
+              operator has to pick the split after asking the customer, which
+              is exactly what "never auto-split" means on screen. */}
+          {splitAvailable && !bookedGroups && (
+            <div className="py-1 space-y-1 text-right">
+              <div className="text-[12px] text-base-600">
+                {waitingGroups.map(deliveryGroupLabel).join(" + ")} not ready
+                yet. Ask the customer:
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <Btn
+                  variant={tripGroups === null ? "box" : "ghost"}
+                  size="sm"
+                  onClick={() => setTripGroups(null)}
+                  title="Nothing is delivered until every item is in — one trip"
+                >
+                  Wait for everything
+                </Btn>
+                <Btn
+                  variant={tripGroups !== null ? "box" : "ghost"}
+                  size="sm"
+                  onClick={() => setTripGroups(readyGroups)}
+                  title={`Deliver ${readyGroups.map(deliveryGroupLabel).join(" + ")} now; the rest goes on a second trip`}
+                >
+                  Deliver {readyGroups.map(deliveryGroupLabel).join(" + ")} now
+                </Btn>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 flex-wrap justify-end py-0.5">
             <input
               type="date"
@@ -4809,17 +4931,29 @@ function BookingBlock({
             <Btn
               variant="box"
               size="sm"
-              disabled={!date || !slot || sunday || confirm.isPending}
+              disabled={!date || !slot || sunday || !tripReady || confirm.isPending}
               title={
                 !date || !slot
                   ? "Date AND time slot both needed — a date alone is not a confirmation"
-                  : undefined
+                  : !tripReady
+                    ? "Not everything on this trip is reserved yet — pick a split, or wait for the stock"
+                    : undefined
               }
               onClick={() =>
-                confirm.mutate({ confirmedDate: date, confirmedTimeSlot: slot })
+                confirm.mutate({
+                  confirmedDate: date,
+                  confirmedTimeSlot: slot,
+                  // Omitted for a normal delivery — the server reads "absent"
+                  // as the whole order, so a split can only ever be explicit.
+                  ...(tripGroups ? { deliverGroups: tripGroups } : {}),
+                })
               }
             >
-              {confirm.isPending ? "Recording…" : "Record confirmation"}
+              {confirm.isPending
+                ? "Recording…"
+                : tripGroups
+                  ? `Record ${tripGroups.map(deliveryGroupLabel).join(" + ")} delivery`
+                  : "Record confirmation"}
             </Btn>
           </div>
           {sunday && (

@@ -203,6 +203,32 @@ Two words the card asked for and we deliberately did NOT introduce:
   trigger on the dispatch transition, so a queue for it would never have a
   human in it.
 
+## The delivery group words (T8, locked with Jess 2026-07-27)
+
+What may travel apart, and what may never. There are exactly TWO groups, and a
+group is one atom — the words below name groups, never individual items:
+
+| Group | The word | What it holds | May it go alone? |
+|---|---|---|---|
+| bed | **Bed set** | Mattress + bed frame | Yes — but never one without the other |
+| sofa | **Sofa** | Sofa lines | Yes, on a second trip, ONLY if the customer agreed |
+
+Accessories (pillow, mattress protector) belong to no group and are never
+named in a trip: they never block a delivery, they are back-ordered.
+
+Fixed phrasings — reuse these, do not invent variants:
+
+- Split offer (only when part is ready and part is not):
+  `Sofa not ready yet. Ask the customer:` + `Wait for everything` /
+  `Deliver Bed set now`
+- Confirmed partial trip: `Bed set only` (pill) ·
+  `Bed set only — Sofa follows on a second trip` (activity line)
+- What is still owed: row `Second trip` → `Sofa still to deliver` +
+  `Book second trip`, or `stock not in yet` when it cannot be booked.
+
+**Never** write "partial delivery", "split shipment", "back-order" or
+"consignment" on screen — say what goes and what follows, in furniture words.
+
 ## Vocabulary — the canonical words
 
 Use these words EVERYWHERE. Never a synonym in a different page. When in
@@ -221,6 +247,8 @@ doubt, grep the codebase and match what already ships.
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
 | The Purchase panel's three stages | **Send · Chase · Receive** | Place · Follow up · Book in |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
+| Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
+| A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
 | Call to fix delivery date + slot | **Call customer (book delivery)** | Schedule delivery · Book delivery · Confirm delivery date |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |

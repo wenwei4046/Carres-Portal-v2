@@ -656,6 +656,10 @@ export {
   type SignDeliveryPhotoUploadInput,
   type AttachDeliveryPhotoInput,
   type DeliveryPhotoListResponse,
+  // T8 delivery groups (migration 0282)
+  deliveryGroupKeySchema,
+  deliveryTripSchema,
+  type DeliveryTrip,
   type OpsOrderControl,
   type UpdateOpsOrderControlInput,
   type OpsOrderControlResponse,
@@ -695,6 +699,19 @@ export {
   type DeliveryQueueKey,
   type DeliveryQueueAnchor,
 } from "./delivery-queue";
+
+// T8 · Delivery groups — bed set never splits; the sofa may take a second trip
+export {
+  DELIVERY_GROUPS,
+  DELIVERY_GROUP_KEYS,
+  deliveryGroupDef,
+  deliveryGroupLabel,
+  deliveryGroupOf,
+  orderDeliveryGroups,
+  deliveryScopeSentence,
+  type DeliveryGroupDef,
+  type DeliveryGroupKey,
+} from "./delivery-groups";
 
 export {
   monthKeyMYT,
@@ -1187,6 +1204,7 @@ export {
   isSundayIso,
   type BookingGateInput,
   type BookingGateResult,
+  type BookingGroupState,
 } from "./booking-gate";
 export {
   isWorkingDay,
