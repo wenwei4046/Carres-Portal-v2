@@ -126,7 +126,7 @@ const ROW = {
   claim_notes: null,
   replacement_sku: null,
   void_reason: null,
-  orders: { so: 1240, status: "place" },
+  orders: { so: 1240 },
   service_cases: null,
 };
 
@@ -151,9 +151,6 @@ describe("GET /api/guarantees/order/:orderId", () => {
     expect(body.items[0]).toMatchObject({
       guaranteeId: "ABCD123456",
       so: 1240,
-      // The desk's STATUS column is the ORDER's status (Loo 2026-07-26); the
-      // route ships the raw DB word and the UI maps it to the operator word.
-      orderStatus: "place",
       coversLabel: "B1201S King",
       guaranteeLabel: "Mattress Guarantee 15 Years",
       status: "active",

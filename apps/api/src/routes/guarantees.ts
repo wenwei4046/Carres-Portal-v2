@@ -6,6 +6,7 @@ import {
   effectiveGuaranteeStatus,
   guaranteeAttachInputSchema,
   guaranteeClaimInputSchema,
+  guaranteeDeskStatus,
   guaranteeListQuerySchema,
   isGuaranteeId,
   normalizeGuaranteeId,
@@ -56,7 +57,7 @@ const ENT_SELECT = `
   customer_id, customer_name, customer_phone, phone_key,
   coverage_years, remedy, starts_on, expires_on, status,
   claimed_at, claim_case_id, claim_notes, replacement_sku, void_reason,
-  orders!inner(so, status),
+  orders!inner(so),
   service_cases(case_no)
 `;
 
@@ -70,7 +71,6 @@ function toDto(row: any, labelBySku: Record<string, string>): GuaranteeEntitleme
     claimedGuaranteeId: row.claimed_guarantee_id ? String(row.claimed_guarantee_id) : null,
     orderId: String(row.order_id),
     so: row.orders?.so != null ? Number(row.orders.so) : null,
-    orderStatus: row.orders?.status ? String(row.orders.status) : null,
     orderLineId: row.order_line_id ? String(row.order_line_id) : null,
     guaranteeSku: String(row.guarantee_sku),
     guaranteeLabel: labelBySku[String(row.guarantee_sku)] ?? null,
@@ -158,10 +158,15 @@ guaranteesRouter.get("/", async (c) => {
 
   if (orderId) query = query.eq("order_id", orderId);
   if (customerId) query = query.eq("customer_id", customerId);
-  // 'expired' is derived, so it can't be a DB filter — narrow to 'active' and
-  // sieve below. Every other status maps 1:1 to the column.
-  if (status && status !== "expired") query = query.eq("status", status);
-  if (status === "expired") query = query.eq("status", "active");
+  // The filter speaks the DESK vocabulary (active | claimed | expired | void).
+  // 'active' covers BOTH 'pending' and 'active' rows and 'expired' is derived
+  // from the date, so neither maps 1:1 to the column — narrow to the candidate
+  // rows here and sieve on the derived word below.
+  if (status === "claimed" || status === "void" || status === "pending") {
+    query = query.eq("status", status);
+  } else if (status === "active" || status === "expired") {
+    query = query.in("status", ["pending", "active"]);
+  }
 
   if (q) {
     // Axis 0 — the guarantee ID itself (0267). This is THE handle a claim is
@@ -210,8 +215,11 @@ guaranteesRouter.get("/", async (c) => {
       .from(GUARANTEE_ENTITLEMENTS)
       .select(ENT_SELECT)
       .eq("orders.so", soCandidate);
-    if (status && status !== "expired") soQuery = soQuery.eq("status", status);
-    if (status === "expired") soQuery = soQuery.eq("status", "active");
+    if (status === "claimed" || status === "void" || status === "pending") {
+      soQuery = soQuery.eq("status", status);
+    } else if (status === "active" || status === "expired") {
+      soQuery = soQuery.in("status", ["pending", "active"]);
+    }
     const { data: soRows } = await soQuery.limit(cap + 1);
     const seen = new Set(rows.map((r) => String(r.id)));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -222,7 +230,7 @@ guaranteesRouter.get("/", async (c) => {
 
   const labels = await termLabels(sb);
   let items = rows.map((r) => toDto(r, labels));
-  if (status) items = items.filter((g) => g.effectiveStatus === status);
+  if (status) items = items.filter((g) => guaranteeDeskStatus(g.effectiveStatus) === status);
 
   const truncated = items.length > cap;
   return c.json<GuaranteeListResponse>({
