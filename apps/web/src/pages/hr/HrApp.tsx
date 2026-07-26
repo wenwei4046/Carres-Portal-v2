@@ -11,6 +11,7 @@ import HrSetupTab from "./HrSetupTab";
 import HrTeamTab from "./HrTeamTab";
 import HrPeopleTab from "./HrPeopleTab";
 import HrPerformanceTab from "./HrPerformanceTab";
+import HrPeopleCostTab from "./HrPeopleCostTab";
 
 /**
  * HR (HQ Internal) shell — sidebar + `?tab=` switched content
@@ -93,6 +94,7 @@ export default function HrApp() {
     rawTab === "team" ||
     rawTab === "people" ||
     rawTab === "performance" ||
+    rawTab === "people-cost" ||
     rawTab === "commission"
       ? rawTab
       : "overview";
@@ -109,6 +111,8 @@ export default function HrApp() {
         ? "People"
       : tab === "performance"
         ? `Performance · ${monthLabel(ym)}`
+      : tab === "people-cost"
+        ? `People cost · ${monthLabel(ym)}`
       : tab === "setup"
         ? "Commission Setup"
         : tab === "attribution"
@@ -148,6 +152,9 @@ export default function HrApp() {
           {tab === "people" && <HrPeopleTab />}
           {tab === "performance" && (
             <HrPerformanceTab year={ym.year} month={ym.month} />
+          )}
+          {tab === "people-cost" && (
+            <HrPeopleCostTab year={ym.year} month={ym.month} />
           )}
         </div>
       </main>

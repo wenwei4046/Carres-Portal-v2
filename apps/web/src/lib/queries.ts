@@ -228,6 +228,10 @@ import {
   type Scorecards,
   type SetKpiTargetInput,
   type SetStoreManagerInput,
+  // HR-P7 (0278) — people cost
+  type PeopleCost,
+  type StaffCompSource,
+  type SetStaffCompInput,
   type HrEmployeeDetail,
   type HrEmployeePatchInput,
   type HrRecordExitInput,
@@ -517,6 +521,8 @@ export const qk = {
     // metric changes every number on the page, so it is a different query.
     kpi: (year: number, month: number, kpiKey: string) =>
       ["hr", "kpi", year, month, kpiKey] as const,
+    // HR-P7 (0278) — people cost.
+    comp: (year: number, month: number) => ["hr", "comp", year, month] as const,
   },
 };
 
@@ -7464,6 +7470,50 @@ export function useHrDeleteKpiTarget() {
   return useMutation<{ ok: true }, ApiError, string>({
     mutationFn: (id) =>
       apiFetch<{ ok: true }>(`/api/hr/kpi/target/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── HR-P7 (0278) — people cost ──────────────────────────────────────────────
+
+export interface HrCompResponse {
+  source: StaffCompSource;
+  /** fixedCost and commissionCost are SEPARATE by ruling — there is deliberately
+   *  no combined field. Do not add one here either. */
+  cost: PeopleCost;
+}
+
+export function useHrComp(
+  year: number,
+  month: number,
+  opts?: Partial<UseQueryOptions<HrCompResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.comp(year, month),
+    queryFn: () => apiFetch<HrCompResponse>(`/api/hr/comp?year=${year}&month=${month}`),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    ...opts,
+  });
+}
+
+/** Record or correct one dated salary row. Same date = correction, new = history. */
+export function useHrSetStaffComp() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; id: string }, ApiError, SetStaffCompInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; id: string }>("/api/hr/comp", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrDeleteStaffComp() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, string>({
+    mutationFn: (id) => apiFetch<{ ok: true }>(`/api/hr/comp/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 }

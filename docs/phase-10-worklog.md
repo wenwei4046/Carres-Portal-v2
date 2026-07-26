@@ -1594,3 +1594,142 @@ A missing delivery date must NOT undo a credit decision, so the auto-proceed is 
 **Ship**: PR #358 (merge `fe60f204`) → api Worker `b8c0159d` (unauth 401 on three routes) + web `index-DGMmYLHd.js` → carres-portal `31c22186` + carres-pos `f98a22fa`; 4,193,674 bytes downloaded-then-grepped, `SERVICE_ROLE` 0. `erp.carresofficial.com` served PR #363's bundle for ~40s; `deployment list` showed mine newest and `merge-base --is-ancestor 474e67b fe60f204` proved containment, so it was lag not a clobber. **Also learned while verifying: "Sent to finance for approval" grepped 0 because it lives in the RETIRED `RentToOwnPage`, correctly tree-shaken — pick markers from MOUNTED components or a clean deploy reads as a failure.** Suites at baseline (shared 1158 · api 3 · web 16); typecheck 0, check:v4 + design-standard clean.
 
 **Remaining in the program Loo asked for (not started / half done)**: signing writes nothing to `rental_agreements.signed_*` yet (the confirm gate is in, the capture is not, and 0268's `not_signed` guard stays disabled); the billing engine is untouched (0 of 84 months read as paid — finance can only see the truth in Stripe); buyout / ownership transfer / repossession have status values but no flows.
+
+---
+
+## 2026-07-26 ㉓ · HR-P7 — people cost (PR #374 merge `c1f8b0d9`, 0278, Worker `dc730db8` + web `index-B3tXaG7G.js` — DEPLOYED)
+
+Design mock approved before any code (Loo's standing law):
+https://claude.ai/code/artifact/567cd7ec-6487-42fa-9fe3-3c29ff58ddcc — then
+"separate, don't merge — go".
+
+### Loo's ruling, and why it is structural rather than visual
+
+The ratified spec's formula was `loaded cost = (base+allowance)×(1+burden) + run totals`.
+Loo's call: **commission is never merged into the people-cost figure.** The reasoning that
+matters is that commission is a VARIABLE cost tracking revenue, so folding it into fixed
+salary makes "average cost per person" meaningless and makes a good sales month read as
+cost inflation.
+
+Implemented as a shape, not a habit: `PeopleCost` carries `fixedCost` and `commissionCost`
+as two fields and **has no field that sums them**. A test asserts no key matches
+`/total.*cost|combined|.../` and that no numeric field equals `fixedCost + commissionCost`.
+That test failed on its own first draft — with `fixedCost` at 0, `commissionCost` trivially
+equalled the sum, so the check passed vacuously. Both parts now have to be non-zero and
+unequal for the assertion to mean anything. Same technique as `rental-cart.ts` holding the
+"rent and outright cannot share an order" law in one module.
+
+### The finding that shaped the screen
+
+Every order in the database sits in **2026-07-21 .. 2026-07-26 — six days of a 31-day
+month.** A full month of salary divided by six days of sales prints a ratio saying a
+profitable store is collapsing. That is not "imprecise", it is directionally wrong, and the
+Chairman is the person who would read it first.
+
+So the ratio is **withheld while the month is in progress** (`monthInProgress`, pure,
+`today` injected so it stays testable), and `coverage` reports the days on file so the
+operator can judge. Both resolve with time — the percentage appears on its own, nothing to
+switch on later. The gate is deliberately "is the month still running" rather than "does
+coverage look thin": a finished slow month legitimately has a bad ratio and should say so.
+
+### What else was measured before designing
+
+| Live fact | Consequence |
+|---|---|
+| 9 employees, 7 HQ + 2 floor; **4 have no department** (Chairman + COO are department-less by design, two more have no position) | a per-department cost view would drop 44% of headcount — including the two dearest people — into "unassigned", so `Management` is a named, truthful bucket |
+| `commission_runs` 0, `staff_commission_rates` 0 | the spec's "+ run totals" term is structurally 0 today; another reason not to bake it into the salary number |
+| `join_date` **0 of 9** | no pro-rating by employment days is possible; not attempted |
+| 0 dealers with `bd_owner_user_id`, 0 `bd_profiles`, 0 bd rates | BD revenue is genuinely unknowable → `not_enrolled`, not a RM 0 that reads as failure |
+| Orders span **1 month** | the spec's 6-month trend would be one bar and five gaps |
+
+### Laws carried from P6, now a pair
+
+1. **Never divide a number to make a screen look complete.** P6 refused to split a store
+   target across heads; P7 refuses to allocate HQ salary across stores. There is no
+   allocation function in `hr-comp.ts` — the absence is the guarantee.
+2. **A number that cannot be computed honestly is not printed; the reason is printed
+   instead, and it fixes itself.** P6's manager view ships Off with the gap named; P7's
+   ratio waits for the month to end.
+
+### Revenue comes from ONE place, by construction
+
+`comp-month.ts` obtains per-store revenue by calling `computeScorecards` — the Performance
+tab's own engine — and reading `stores[].sold`. It does not write a third query. So "the
+Performance tab, O1's SOLD tile and People cost cannot disagree" is structural. The kpi
+metric is pinned to `sales_basis` there on purpose: a units target must not change what a
+cost ratio divides by. A route test asserts only `staff_comp_source` +
+`hr_commission_source` are called — no third revenue read.
+
+### Prod verification — 18/18 in ONE rolled-back transaction
+
+No second pass was needed, because 0276's two lessons went in up front: the grant pair
+`from public, anon` plus an explicit `grant … to authenticated`, and reading audit rows back
+by `ref` rather than `occurred_at`. The assertion worth keeping:
+
+* **a direct `insert into staff_comp` as `authenticated` was refused 42501** — so "the RPC
+  is the only write door" is measured, not claimed. This is the inverse of
+  `staff_commission_rates`, whose `for all` policy is exactly why 0272's back-dated-rate
+  guard had to be a trigger.
+* `SELF - Salary - principal - base 20000.00 + allowance 2000.00 + burden 13.70% from
+  2026-07-01` for the caller's own employee row; no marker for another person's.
+* Guards: negative base, burden 101%, unknown employee, missing row on delete — all refused.
+* `coverage` for 2026-07 returned `{orderCount 19, daysWithOrders 6, daysInMonth 31}`.
+
+### PDPA — a deliberate difference from 0269
+
+IC and bank account are masked and released one value at a time with an audit row written in
+the same transaction. **Salary is not masked**, on purpose: the only two roles that can read
+it (hr, principal) are the two that administer it (D3), the screen's whole job is comparing
+figures side by side, and a reveal-per-row register would be unusable. The control here is
+the WRITE trail — and unlike an IC, the figures DO go into `audit_log`, because "who changed
+pay, from what, to what" is exactly what such an audit has to answer.
+
+### A design error the lint caught
+
+The first pass of the composition bar used purple/blue/grey. `check-design-standard` flagged
+5 hard-coded hex literals — and it was right for a second reason the rule does not state:
+UI-KIT rule 2 reserves colour for action · selection · status · alert, and "which slice is
+allowance" is none of those. The bar is three shades of the neutral ramp now, which is both
+compliant and better. The approved mock still shows the coloured version; the shipped code
+follows the design law instead, which is the correct precedence.
+
+### A number I had reported wrongly, corrected
+
+Earlier in the session I told Loo July had "52 native orders". That was a `count(*)` across a
+LEFT JOIN to `order_lines`, so it counted order×line pairs. **July has 19 native orders.**
+The P6 figures (RM 52,081 over 13 attributed showroom orders) came from a correctly grouped
+query and are unaffected.
+
+### Surfaces
+
+`packages/shared/src/schemas/hr-comp.ts` (`loadedCost` · `resolveStaffComp` ·
+`monthInProgress` · `compGroupOf` · `computePeopleCost` · `REVENUE_ABSENCE_LABEL`) ·
+`apps/api/src/lib/comp-month.ts` · `apps/api/src/routes/hr-comp.ts` (GET · PUT · DELETE) ·
+`HrPeopleCostTab.tsx` + nav entry (`?tab=people-cost`, named People cost because O1 already
+owns `?tab=overview` — the spec called this an "Overview tab", which would have collided) +
+`qk.hr.comp`.
+
+### Verification
+
+Tests **+73** (shared 34 · api 24 · web 15). Suites at §17.7 baseline, zero new: shared
+**1236/1236** · api **3** pre-existing · web **16** pre-existing. api typecheck clean; web
+BUILD clean (v4-guard + `tsconfig.app.json` tsc + vite); design-standard lint clean after the
+greyscale fix; `SERVICE_ROLE` grep 0 in `dist`; `hr/comp` marker present.
+
+### Deploy
+
+Worker `dc730db8`; web `index-B3tXaG7G.js` (carres-portal `03908e0a` + carres-pos
+`3b7e7932`). All 4 canonicals converged; live bundle downloaded to a file before grepping —
+4,208,930 bytes, `SERVICE_ROLE` 0, `hr/comp` + "People cost" + `hr/kpi` all present. Unauth
+401 on `/api/hr/comp`, `/api/hr/kpi`, `/api/hr/runs`.
+
+Three of the four canonicals served the parallel line's older `index-DGezupH6.js` for about a
+minute. Followed the rule rather than re-deploying: the deployment list showed `3b7e7932` from
+source `c1f8b0d` as newest, and `git merge-base --is-ancestor 9d5b379 HEAD` proved my tip
+contained their earlier deploy — cache, not a clobber. Polled until all four flipped.
+
+### Not done
+
+No `hr`-role user exists to smoke the non-principal path (CF `hr-role-nobody-holds-it`).
+`staff_comp` is at 0 rows, so the page shows RM 0 until Loo records salaries. The 6-month
+trend strip renders one month because one month exists — it fills in by itself.

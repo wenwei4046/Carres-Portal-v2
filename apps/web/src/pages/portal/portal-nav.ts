@@ -251,6 +251,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // HR-P6 (0276, 2026-07-26) — targets + the scoreboard. Sits after People
       // because a target is set ON a person: you need the file to exist first.
       { key: "performance", label: "Performance", icon: Target },
+      // HR-P7 (0278) — the Chairman's cost question. Last in the HR group: it is
+      // the only screen carrying salary, and it reads the other tabs' figures.
+      { key: "people-cost", label: "People cost", icon: Wallet },
     ],
   },
   {

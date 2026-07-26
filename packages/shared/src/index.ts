@@ -840,6 +840,40 @@ export {
   type SetStoreManagerInput,
 } from "./schemas/hr-kpi";
 
+// HR-P7 (0278) — what the team costs. Loo's ruling "separate, don't merge" is
+// STRUCTURAL here: PeopleCost carries fixedCost and commissionCost as two fields
+// and deliberately has NO field that sums them (a shared test asserts that).
+// Revenue is an INPUT obtained from computeScorecards, so the Performance tab,
+// O1's SOLD tile and this page cannot quote three different numbers.
+export {
+  staffCompRowSchema,
+  compPersonSchema,
+  compStoreSchema,
+  compCoverageSchema,
+  staffCompSourceSchema,
+  loadedCost,
+  resolveStaffComp,
+  monthInProgress,
+  compGroupOf,
+  computePeopleCost,
+  setStaffCompInput,
+  MANAGEMENT_GROUP,
+  SHOWROOMS_GROUP,
+  REVENUE_ABSENCE_LABEL,
+  type StaffCompRow,
+  type CompPerson,
+  type CompStore,
+  type CompCoverage,
+  type StaffCompSource,
+  type RevenueAbsence,
+  type CompGroupRow,
+  type CompStoreCostRow,
+  type CompRegisterRow,
+  type PeopleCost,
+  type PeopleCostInput,
+  type SetStaffCompInput,
+} from "./schemas/hr-comp";
+
 export {
   LOAN_SOURCES,
   LOAN_OUT_ROUTES,
