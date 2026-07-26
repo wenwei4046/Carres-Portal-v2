@@ -15,6 +15,7 @@ import {
   type GuaranteeStatus,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import { orderStatusPill, orderStatusWord } from "@/lib/status-pill";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { qk } from "@/lib/queries";
 import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
@@ -27,10 +28,17 @@ import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
  * alive, and has it already been used? One box searches all three handles Loo
  * named: Sales Order · customer name · customer id / phone.
  *
- * State vocabulary law: no DB word reaches the screen — every status renders
- * through STATUS_DISPLAY, and it's the DERIVED status (effectiveStatus) that
- * shows, so an out-of-window guarantee reads "Expired" even though the row
- * still says 'active'.
+ * The STATUS column shows where the ORDER is (Loo 2026-07-26) — placed /
+ * delivered / … — because that is the operational question at the counter, and
+ * the guarantee's own clock is downstream of it (cover starts on delivery).
+ * The guarantee's OWN state stays on screen under its ID: "Used" and "Expired"
+ * are what decide whether a claim can be honoured, so they must never be a
+ * click away.
+ *
+ * State vocabulary law: no DB word reaches the screen — the guarantee state
+ * renders through STATUS_DISPLAY (and it's the DERIVED status, so an
+ * out-of-window row reads "Expired" even though the column still says
+ * 'active'), and the order status through orderStatusWord.
  */
 
 const STATUS_DISPLAY: Record<GuaranteeStatus, { label: string; pill: string }> = {
@@ -191,16 +199,23 @@ export default function OperationGuarantees() {
                         still carries that string, so it has to be recognisable
                         here even though it is no longer a live guarantee. */}
                     <td className="px-4 py-3">
-                      <span
+                      <div
                         className={`font-mono text-[12px] ${
                           g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                         }`}
                       >
                         {displayGuaranteeId(g) ?? "—"}
-                      </span>
+                      </div>
+                      {/* The guarantee's OWN state rides under its ID — "Used" /
+                          "Expired" decide whether a claim can be honoured, so
+                          they stay visible even though STATUS now belongs to
+                          the order. */}
+                      <span className={`pill ${d.pill} mt-1`}>{d.label}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`pill ${d.pill}`}>{d.label}</span>
+                      <span className={`pill ${orderStatusPill(orderStatusWord(g.orderStatus))}`}>
+                        {orderStatusWord(g.orderStatus)}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-900">{g.customerName || "—"}</div>
