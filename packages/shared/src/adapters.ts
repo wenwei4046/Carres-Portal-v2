@@ -1025,6 +1025,26 @@ export const rentalOfferFromRow = (r: DB.RentalOfferRow): D.RentalOffer => ({
   updatedBy: r.updated_by,
 });
 
+/** Maps a `rental_agreement_templates` row (0267) — the signed wording. */
+export const rentalAgreementTemplateFromRow = (
+  r: DB.RentalAgreementTemplateRow,
+): D.RentalAgreementTemplate => ({
+  id: r.id,
+  docKey: r.doc_key,
+  name: r.name,
+  bindsTo: r.binds_to ?? [],
+  version: Number(r.version),
+  body: Array.isArray(r.body)
+    ? r.body.filter((b): b is DB.AgreementBlockJson => !!b && typeof b.text === "string")
+    : [],
+  fields: r.fields ?? [],
+  effectiveFrom: r.effective_from,
+  active: r.active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
 /** Maps a `rental_buy_prices` row (0264). `price` null = use the list price. */
 export const rentalBuyPriceFromRow = (r: DB.RentalBuyPriceRow): D.RentalBuyPrice => ({
   id: r.id,

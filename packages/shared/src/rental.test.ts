@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RentalOptionGroup, RentalSurcharge } from "./domain";
 import {
+  agreementTokens,
+  blocksFromText,
   compartmentBuildMonthly,
+  fillAgreement,
   mergeRentalGifts,
   quoteRental,
   rentalContractValue,
@@ -16,6 +19,8 @@ import {
   customerInputSchema,
   rentalOfferInputSchema,
   rentalOfferPatchSchema,
+  agreementTemplateInputSchema,
+  agreementTemplatePatchSchema,
   rentalOfferServiceInputSchema,
   rentalPlanInputSchema,
   rentalPlanPatchSchema,
@@ -596,5 +601,131 @@ describe("rentalOfferServiceInputSchema (0264)", () => {
   it("rejects an unknown lane and a negative price", () => {
     expect(rentalOfferServiceInputSchema.safeParse({ packageId: pkg, freeLane: "gift" }).success).toBe(false);
     expect(rentalOfferServiceInputSchema.safeParse({ packageId: pkg, monthlyPrice: -1 }).success).toBe(false);
+  });
+});
+
+
+// ── 0267 — the agreement wording ───────────────────────────────────────────
+
+/** Newline for the pasted-wording fixtures. */
+const NL = String.fromCharCode(10);
+
+const WORDING = [
+  { kind: "title" as const, text: "RENTAL AGREEMENT" },
+  { kind: "p" as const, text: "Between Carress Sdn. Bhd. and {{customer.name}}, NRIC {{customer.nric}}." },
+  { kind: "p" as const, text: "The Customer rents {{product.name}} for {{term.months}} months at {{money.monthly}} per month." },
+  { kind: "p" as const, text: "A second mention of {{customer.name}} must not be listed twice." },
+];
+
+describe("agreementTokens", () => {
+  it("lists every {{token}} once, in order of first appearance", () => {
+    expect(agreementTokens(WORDING)).toEqual([
+      "customer.name",
+      "customer.nric",
+      "product.name",
+      "term.months",
+      "money.monthly",
+    ]);
+  });
+
+  it("returns nothing for wording with no blanks", () => {
+    expect(agreementTokens([{ kind: "p", text: "This paragraph has no fields." }])).toEqual([]);
+  });
+});
+
+describe("fillAgreement", () => {
+  it("fills every occurrence and keeps the block order", () => {
+    const out = fillAgreement(WORDING, {
+      "customer.name": "Tan Mei Ling",
+      "customer.nric": "900312-14-5566",
+      "product.name": "Cloud Mattress · Queen",
+      "term.months": 84,
+      "money.monthly": "RM 83.00",
+    });
+    expect(out.missing).toEqual([]);
+    expect(out.blocks[1]!.text).toBe("Between Carress Sdn. Bhd. and Tan Mei Ling, NRIC 900312-14-5566.");
+    expect(out.blocks[3]!.text).toContain("Tan Mei Ling");
+    expect(out.blocks.map((b) => b.kind)).toEqual(["title", "p", "p", "p"]);
+  });
+
+  it("leaves an unfilled blank VISIBLE and reports it — never a silent gap on a contract", () => {
+    const out = fillAgreement(WORDING, { "customer.name": "Tan Mei Ling" });
+    expect(out.blocks[1]!.text).toContain("{{customer.nric}}");
+    expect(out.missing).toContain("customer.nric");
+  });
+
+  it("treats an empty string as missing", () => {
+    const out = fillAgreement([{ kind: "p", text: "Name: {{customer.name}}" }], { "customer.name": "" });
+    expect(out.missing).toEqual(["customer.name"]);
+  });
+});
+
+describe("blocksFromText", () => {
+  it("reads pasted wording: first line is the title, short lines head sections, ; lines list", () => {
+    const blocks = blocksFromText(
+      [
+        "RENTAL AGREEMENT",
+        "",
+        "Payment Terms",
+        "",
+        "The Customer shall pay the Monthly Rental on the Commencement Date.",
+        "",
+        "the Customer fails to make rental payments for six (6) consecutive months;",
+      ].join(NL),
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["title", "h2", "p", "li"]);
+    expect(blocks[2]!.text).toContain("Monthly Rental");
+  });
+
+  it("keeps the words exactly as pasted (nothing is added or reworded)", () => {
+    const line = "The rental of the Product(s) shall exclude any routine maintenance.";
+    expect(blocksFromText(["RENTAL AGREEMENT", "", line].join(NL))[1]!.text).toBe(line);
+  });
+
+  it("drops blank lines and bullet markers", () => {
+    const blocks = blocksFromText(["TITLE", "", "- first point", "", "- second point"].join(NL));
+    expect(blocks.slice(1).map((b) => b.text)).toEqual(["first point", "second point"]);
+    expect(blocks.slice(1).every((b) => b.kind === "li")).toBe(true);
+  });
+});
+
+describe("agreementTemplateInputSchema (0267)", () => {
+  it("takes a document with wording and optional bindings", () => {
+    expect(
+      agreementTemplateInputSchema.safeParse({
+        docKey: "rent_to_own",
+        name: "Rental Agreement",
+        bindsTo: ["mattress", "sofa"],
+        body: [{ kind: "p", text: "hello" }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("refuses empty wording, an unknown block kind and a client-picked version", () => {
+    expect(
+      agreementTemplateInputSchema.safeParse({ docKey: "x", name: "X", body: [] }).success,
+    ).toBe(false);
+    expect(
+      agreementTemplateInputSchema.safeParse({
+        docKey: "x",
+        name: "X",
+        body: [{ kind: "footer", text: "hi" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      agreementTemplateInputSchema.safeParse({
+        docKey: "x",
+        name: "X",
+        body: [{ kind: "p", text: "hi" }],
+        version: 2,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("the patch never carries wording — new wording is a new version", () => {
+    expect(agreementTemplatePatchSchema.safeParse({ active: false }).success).toBe(true);
+    expect(
+      agreementTemplatePatchSchema.safeParse({ body: [{ kind: "p", text: "sneaky" }] }).success,
+    ).toBe(false);
   });
 });

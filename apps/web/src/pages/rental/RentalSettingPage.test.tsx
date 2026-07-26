@@ -38,6 +38,7 @@ interface ConfigData {
   rentalOffers: unknown[];
   buyPrices: unknown[];
   offerServices: unknown[];
+  agreementTemplates: unknown[];
 }
 interface ConfigState {
   data: ConfigData | undefined;
@@ -63,6 +64,8 @@ const mockDeleteBuy = vi.fn();
 const mockCreateSvc = vi.fn();
 const mockPatchSvc = vi.fn();
 const mockDeleteSvc = vi.fn();
+const mockCreateTemplate = vi.fn();
+const mockPatchTemplate = vi.fn();
 
 vi.mock("@/lib/queries", () => {
   /** Mutation hook whose mutateAsync records the payload (the editor awaits).
@@ -99,6 +102,19 @@ vi.mock("@/lib/queries", () => {
   useCreateRentalBuyPrice: asyncHook(() => mockCreateBuy),
   usePatchRentalBuyPrice: asyncHook(() => mockPatchBuy),
   useDeleteRentalBuyPrice: asyncHook(() => mockDeleteBuy),
+  useCreateAgreementTemplate: () => ({
+    mutate: (vars: unknown, opts?: { onSuccess?: () => void }) => {
+      mockCreateTemplate(vars);
+      opts?.onSuccess?.();
+    },
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  usePatchAgreementTemplate: () => ({
+    mutate: mockPatchTemplate,
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useCreateRentalOfferService: asyncHook(() => mockCreateSvc),
   usePatchRentalOfferService: asyncHook(() => mockPatchSvc),
   useDeleteRentalOfferService: asyncHook(() => mockDeleteSvc),
@@ -274,6 +290,7 @@ function setConfig(over: Partial<ConfigData> = {}) {
       rentalOffers: [],
       buyPrices: [],
       offerServices: [],
+      agreementTemplates: [],
       ...over,
     },
     isPending: false,
@@ -622,5 +639,88 @@ describe("RentalOfferEditor — via the tab", () => {
     openEditor();
     expect(screen.queryByTestId("offer-service-on-pkg-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("offer-services-empty")).toBeInTheDocument();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Agreements — the wording (0267)
+// ---------------------------------------------------------------------------
+
+function makeTemplate(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: "tpl-1",
+    docKey: "rent_to_own",
+    name: "Rental Agreement — Terms and Conditions (v5)",
+    bindsTo: ["mattress", "bedframe", "sofa"],
+    version: 1,
+    body: [
+      { kind: "title", text: "RENTAL AGREEMENT" },
+      { kind: "p", text: "Between Carress Sdn. Bhd. and {{customer.name}}." },
+    ],
+    fields: ["customer.name"],
+    effectiveFrom: "2026-07-06",
+    active: true,
+    createdAt: "2026-07-26T00:00:00Z",
+    updatedAt: "2026-07-26T00:00:00Z",
+    updatedBy: null,
+    ...over,
+  };
+}
+
+describe("RentalSettingPage — agreements", () => {
+  it("offers to load the supplied wording when nothing is saved yet", () => {
+    renderPage({ isPrincipal: true }, "agreements");
+    expect(screen.getByTestId("agreements-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("agreement-load-supplied")).toBeInTheDocument();
+  });
+
+  it("saving the supplied wording sends it VERBATIM with its bindings", () => {
+    renderPage({ isPrincipal: true }, "agreements");
+    fireEvent.click(screen.getByTestId("agreement-load-supplied"));
+    // The paste box is pre-filled with the customer's own words.
+    const box = screen.getByTestId("agreement-text") as HTMLTextAreaElement;
+    expect(box.value).toContain("RENTAL AGREEMENT");
+    expect(box.value).toContain("Carress Sdn. Bhd.");
+    // …and NOT with anything we invented.
+    expect(box.value).not.toContain("ownership transfers");
+    expect(box.value.toLowerCase()).not.toContain("free service package");
+
+    fireEvent.click(screen.getByText("Save as new version"));
+    expect(mockCreateTemplate).toHaveBeenCalledTimes(1);
+    const sent = mockCreateTemplate.mock.calls[0][0] as {
+      docKey: string;
+      bindsTo: string[];
+      body: Array<{ kind: string; text: string }>;
+    };
+    expect(sent.docKey).toBe("rent_to_own");
+    expect(sent.bindsTo).toEqual(["mattress", "bedframe", "sofa"]);
+    expect(sent.body[0]).toMatchObject({ kind: "title", text: "RENTAL AGREEMENT" });
+    expect(sent.body.length).toBeGreaterThan(30);
+  });
+
+  it("a saved document lists its version and previews the wording", () => {
+    setConfig({ agreementTemplates: [makeTemplate()] });
+    renderPage({ isPrincipal: true }, "agreements");
+    expect(screen.getByTestId("agreement-doc-rent_to_own")).toBeInTheDocument();
+    expect(screen.getByTestId("agreement-version-tpl-1")).toHaveTextContent("v1");
+    fireEvent.click(screen.getByTestId("agreement-preview-tpl-1"));
+    expect(screen.getByTestId("agreement-body")).toHaveTextContent("RENTAL AGREEMENT");
+  });
+
+  it("only the newest version offers a new version, and the load button disappears once saved", () => {
+    setConfig({ agreementTemplates: [makeTemplate(), makeTemplate({ id: "tpl-2", version: 2 })] });
+    renderPage({ isPrincipal: true }, "agreements");
+    expect(screen.getByTestId("agreement-new-version-tpl-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("agreement-new-version-tpl-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agreement-load-supplied")).not.toBeInTheDocument();
+  });
+
+  it("non-principal sees the wording but cannot author it", () => {
+    setConfig({ agreementTemplates: [makeTemplate()] });
+    renderPage({ isPrincipal: false }, "agreements");
+    expect(screen.getByTestId("agreement-preview-tpl-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("agreement-new-version-tpl-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agreement-load-supplied")).not.toBeInTheDocument();
   });
 });

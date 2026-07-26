@@ -68,6 +68,9 @@ import {
   type RentalOfferService,
   type RentalOfferServiceInput,
   type RentalOfferServicePatchInput,
+  type RentalAgreementTemplate,
+  type AgreementTemplateInput,
+  type AgreementTemplatePatchInput,
   type RentalAgreement,
   type RentalStockUnit,
   type GuaranteeListResponse,
@@ -6886,6 +6889,8 @@ export interface RentalConfigResponse {
   rentalOffers?: RentalOffer[];
   buyPrices?: RentalBuyPrice[];
   offerServices?: RentalOfferService[];
+  /** 0267 — the agreement wording, newest version of each document first. */
+  agreementTemplates?: RentalAgreementTemplate[];
 }
 
 /** Agreements list item — the API embeds the customer's name/phone. */
@@ -7135,6 +7140,28 @@ export function usePatchRentalOfferService() {
   return useRentalConfigMutation(
     ({ id, patch }: { id: string; patch: RentalOfferServicePatchInput }) =>
       apiFetch<{ offerService: RentalOfferService }>(`/api/rental/offer-services/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+  );
+}
+
+/** Author a NEW version of an agreement's wording (the version is server-
+ *  assigned; a version already signed against is never edited). */
+export function useCreateAgreementTemplate() {
+  return useRentalConfigMutation((input: AgreementTemplateInput) =>
+    apiFetch<{ template: RentalAgreementTemplate }>("/api/rental/agreement-templates", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/** Patch what a version binds to / whether it is live — never its wording. */
+export function usePatchAgreementTemplate() {
+  return useRentalConfigMutation(
+    ({ id, patch }: { id: string; patch: AgreementTemplatePatchInput }) =>
+      apiFetch<{ template: RentalAgreementTemplate }>(`/api/rental/agreement-templates/${id}`, {
         method: "PATCH",
         body: JSON.stringify(patch),
       }),

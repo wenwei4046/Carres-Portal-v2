@@ -14,6 +14,9 @@ import {
   rentalBuyPricePatchSchema,
   rentalOfferServiceInputSchema,
   rentalOfferServicePatchSchema,
+  agreementTemplateInputSchema,
+  agreementTemplatePatchSchema,
+  agreementTokens,
   serviceSkuCode,
   phoneKeyMy,
   customerInputSchema,
@@ -25,6 +28,7 @@ import {
   RENTAL_OFFERS,
   RENTAL_BUY_PRICES,
   RENTAL_OFFER_SERVICES,
+  RENTAL_AGREEMENT_TEMPLATES,
   RENTAL_AGREEMENTS,
   RENTAL_STOCK_UNITS,
   PRODUCT_MODELS,
@@ -172,18 +176,20 @@ rentalRouter.get("/config", async (c) => {
   // 0264 — the tab now authors OFFERS (one per model) with their rent lines,
   // buy prices and attached service packages. The five reads are independent;
   // a missing table on a stale environment surfaces as a plain 500.
-  const [packagesR, plansR, offersR, buyR, offerSvcR] = await Promise.all([
+  const [packagesR, plansR, offersR, buyR, offerSvcR, templatesR] = await Promise.all([
     sb.from(SERVICE_PACKAGES).select("*"),
     sb.from(RENTAL_PLANS).select("*"),
     sb.from(RENTAL_OFFERS).select("*"),
     sb.from(RENTAL_BUY_PRICES).select("*"),
     sb.from(RENTAL_OFFER_SERVICES).select("*"),
+    sb.from(RENTAL_AGREEMENT_TEMPLATES).select("*"),
   ]);
   if (packagesR.error) throw new HTTPException(500, { message: packagesR.error.message });
   if (plansR.error) throw new HTTPException(500, { message: plansR.error.message });
   if (offersR.error) throw new HTTPException(500, { message: offersR.error.message });
   if (buyR.error) throw new HTTPException(500, { message: buyR.error.message });
   if (offerSvcR.error) throw new HTTPException(500, { message: offerSvcR.error.message });
+  if (templatesR.error) throw new HTTPException(500, { message: templatesR.error.message });
 
   const servicePackages = ((packagesR.data ?? []) as DB.ServicePackageRow[])
     .slice()
@@ -206,7 +212,21 @@ rentalRouter.get("/config", async (c) => {
     .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
     .map((r) => Adapters.rentalOfferServiceFromRow(r));
 
-  return c.json({ servicePackages, rentalPlans, rentalOffers, buyPrices, offerServices });
+  // 0267 — newest version of each document first (the tab lists by doc, and
+  // an older version stays readable because agreements were signed under it).
+  const agreementTemplates = ((templatesR.data ?? []) as DB.RentalAgreementTemplateRow[])
+    .slice()
+    .sort((a, b) => a.doc_key.localeCompare(b.doc_key) || b.version - a.version)
+    .map((r) => Adapters.rentalAgreementTemplateFromRow(r));
+
+  return c.json({
+    servicePackages,
+    rentalPlans,
+    rentalOffers,
+    buyPrices,
+    offerServices,
+    agreementTemplates,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -874,6 +894,105 @@ rentalRouter.delete("/offer-services/:id", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Agreement wording (0267) — the paper a rental signs. The customer's own
+// document, printed VERBATIM; the API only versions it. A version is
+// IMMUTABLE: new wording is POSTed as version max+1, so an agreement signed
+// under v1 can always be re-rendered exactly as it was signed.
+// ---------------------------------------------------------------------------
+
+// POST /agreement-templates — author a new version (principal-only).
+rentalRouter.post("/agreement-templates", async (c) => {
+  principalOnly(c);
+  const parsed = await parseJsonBody(c, agreementTemplateInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Next version for this document (a fresh doc_key starts at 1).
+  const { data: latest, error: readErr } = await sb
+    .from(RENTAL_AGREEMENT_TEMPLATES)
+    .select("version")
+    .eq("doc_key", d.docKey)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readErr) throw new HTTPException(500, { message: readErr.message });
+  const version = ((latest as { version?: number } | null)?.version ?? 0) + 1;
+
+  const { data, error } = await sb
+    .from(RENTAL_AGREEMENT_TEMPLATES)
+    .insert({
+      doc_key: d.docKey,
+      name: d.name,
+      binds_to: d.bindsTo ?? [],
+      version,
+      body: d.body,
+      // Cached from the wording itself — the editor lists what it will fill.
+      fields: agreementTokens(d.body),
+      ...(d.effectiveFrom ? { effective_from: d.effectiveFrom } : {}),
+      active: d.active ?? true,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(
+        { error: "conflict", code: "duplicate_version", message: "that version already exists — reload and try again" },
+        409,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "template insert returned no row" }, 500);
+  }
+  return c.json(
+    { template: Adapters.rentalAgreementTemplateFromRow(data as DB.RentalAgreementTemplateRow) },
+    201,
+  );
+});
+
+// PATCH /agreement-templates/:id — binding / name / effective date / active.
+// The WORDING is never patched: new wording is a new version.
+rentalRouter.patch("/agreement-templates/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, agreementTemplatePatchSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const patch: Record<string, unknown> = {};
+  if (d.name !== undefined) patch.name = d.name;
+  if (d.bindsTo !== undefined) patch.binds_to = d.bindsTo;
+  if (d.effectiveFrom !== undefined) patch.effective_from = d.effectiveFrom;
+  if (d.active !== undefined) patch.active = d.active;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_AGREEMENT_TEMPLATES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "agreement wording not found" }, 404);
+  }
+  return c.json({
+    template: Adapters.rentalAgreementTemplateFromRow(data as DB.RentalAgreementTemplateRow),
+  });
 });
 
 // ---------------------------------------------------------------------------

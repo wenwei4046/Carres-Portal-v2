@@ -1161,6 +1161,34 @@ export interface RentalOfferRow {
   updated_by: string | null;
 }
 
+/** One block of an agreement's wording (0267). `li` renders as a bullet. */
+export interface AgreementBlockJson {
+  kind: "title" | "subtitle" | "h2" | "p" | "li";
+  text: string;
+}
+
+/**
+ * `rental_agreement_templates` (migration 0267) — the paper a rental signs.
+ * The customer's own wording, VERBATIM, as ordered blocks; `fields` caches the
+ * {{tokens}} it uses. A (doc_key, version) pair is immutable: replacing the
+ * wording mints version+1, and a signed agreement keeps the version it was
+ * signed under.
+ */
+export interface RentalAgreementTemplateRow {
+  id: string;
+  doc_key: string;
+  name: string;
+  binds_to: string[];
+  version: number;
+  body: AgreementBlockJson[];
+  fields: string[];
+  effective_from: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 /**
  * `rental_buy_prices` (migration 0264) — the outright lane of an offer, one
  * row per sellable target (a SKU or a sofa combo). `price` NULL = sell at

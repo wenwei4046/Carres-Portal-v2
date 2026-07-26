@@ -1114,3 +1114,121 @@ describe("POST /api/rental/plans (0264 line kinds)", () => {
     expect(res.status).toBe(422);
   });
 });
+
+
+describe("POST /api/rental/agreement-templates (0267)", () => {
+  const TEMPLATE_ROW = {
+    id: "00000000-0000-0000-0000-0000000c0041",
+    doc_key: "rent_to_own",
+    name: "Rental Agreement",
+    binds_to: ["mattress", "sofa"],
+    version: 2,
+    body: [{ kind: "p", text: "hello {{customer.name}}" }],
+    fields: ["customer.name"],
+    effective_from: "2026-07-26",
+    active: true,
+    created_at: "2026-07-26T00:00:00Z",
+    updated_at: "2026-07-26T00:00:00Z",
+    updated_by: null,
+  };
+
+  it("403 for a non-principal internal role", async () => {
+    const res = await authed("/api/rental/agreement-templates", "operation", {
+      method: "POST",
+      body: { docKey: "rent_to_own", name: "X", body: [{ kind: "p", text: "hi" }] },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("201 — the SERVER assigns the next version and caches the tokens the wording uses", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        recorded,
+        // one existing version of THIS doc → the new one must be 2
+        tables: { rental_agreement_templates: [{ doc_key: "rent_to_own", version: 1 }] },
+        writeReturn: TEMPLATE_ROW,
+      }),
+    );
+    const res = await authed("/api/rental/agreement-templates", "principal", {
+      method: "POST",
+      body: {
+        docKey: "rent_to_own",
+        name: "Rental Agreement",
+        bindsTo: ["mattress", "sofa"],
+        body: [
+          { kind: "title", text: "RENTAL AGREEMENT" },
+          { kind: "p", text: "Between Carress and {{customer.name}}, NRIC {{customer.nric}}." },
+        ],
+      },
+    });
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("rental_agreement_templates");
+    expect(ins?.payload).toMatchObject({
+      doc_key: "rent_to_own",
+      version: 2,
+      binds_to: ["mattress", "sofa"],
+      fields: ["customer.name", "customer.nric"],
+    });
+  });
+
+  it("201 — a brand-new document starts at version 1", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ recorded, tables: { rental_agreement_templates: [] }, writeReturn: TEMPLATE_ROW }),
+    );
+    const res = await authed("/api/rental/agreement-templates", "principal", {
+      method: "POST",
+      body: { docKey: "service_package", name: "Service Agreement", body: [{ kind: "p", text: "hi" }] },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.op === "insert")?.payload).toMatchObject({ version: 1 });
+  });
+
+  it("422 — empty wording is refused (a contract with no words is not a contract)", async () => {
+    const res = await authed("/api/rental/agreement-templates", "principal", {
+      method: "POST",
+      body: { docKey: "rent_to_own", name: "X", body: [] },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH changes the binding, never the wording", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: TEMPLATE_ROW }));
+    const ok = await authed(`/api/rental/agreement-templates/${TEMPLATE_ROW.id}`, "principal", {
+      method: "PATCH",
+      body: { bindsTo: ["mattress"], active: false },
+    });
+    expect(ok.status).toBe(200);
+    expect(recorded.find((r) => r.op === "update")?.payload).toMatchObject({
+      binds_to: ["mattress"],
+      active: false,
+    });
+
+    const nope = await authed(`/api/rental/agreement-templates/${TEMPLATE_ROW.id}`, "principal", {
+      method: "PATCH",
+      body: { body: [{ kind: "p", text: "sneaky edit" }] },
+    });
+    expect(nope.status).toBe(422);
+  });
+
+  it("GET /config carries the wording, newest version first", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        tables: {
+          rental_agreement_templates: [
+            { ...TEMPLATE_ROW, id: "v1", version: 1 },
+            { ...TEMPLATE_ROW, id: "v2", version: 2 },
+          ],
+        },
+      }),
+    );
+    const res = await authed("/api/rental/config", "principal");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { agreementTemplates: Array<{ version: number; fields: string[] }> };
+    expect(body.agreementTemplates.map((t) => t.version)).toEqual([2, 1]);
+    expect(body.agreementTemplates[0]!.fields).toEqual(["customer.name"]);
+  });
+});

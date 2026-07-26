@@ -7,6 +7,7 @@
  */
 
 import type {
+  AgreementBlock,
   RentalGift,
   RentalOfferCategory,
   RentalOptionGroup,
@@ -300,4 +301,77 @@ export function mergeRentalGifts(...lists: RentalGift[][]): RentalGift[] {
     }
   }
   return [...bySku.entries()].map(([sku, qty]) => ({ sku, qty }));
+}
+
+
+/* ── 0267 — the agreement wording ────────────────────────────────────────── */
+
+/** `{{token}}` occurrences, in order of first appearance, de-duplicated. */
+export function agreementTokens(blocks: AgreementBlock[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const b of blocks) {
+    for (const m of b.text.matchAll(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g)) {
+      const token = m[1]!;
+      if (!seen.has(token)) {
+        seen.add(token);
+        out.push(token);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Fills the wording for one agreement. Blocks come back in the same order with
+ * every `{{token}}` replaced by its value; a token with NO value is left as
+ * `{{token}}` and reported in `missing` — a blank on a signed contract must be
+ * visible, never silently empty.
+ */
+export function fillAgreement(
+  blocks: AgreementBlock[],
+  values: Record<string, string | number | null | undefined>,
+): { blocks: AgreementBlock[]; missing: string[] } {
+  const missing: string[] = [];
+  const filled = blocks.map((b) => ({
+    ...b,
+    text: b.text.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (whole, token: string) => {
+      const v = values[token];
+      if (v == null || v === "") {
+        if (!missing.includes(token)) missing.push(token);
+        return whole;
+      }
+      return String(v);
+    }),
+  }));
+  return { blocks: filled, missing };
+}
+
+/**
+ * Turns pasted text into ordered blocks — the Agreements tab's paste box.
+ * A line in ALL CAPS or listed in `headings` becomes a heading; a line starting
+ * with a bullet or ending in `;` / `; and` / `; or` becomes a list item; the
+ * rest are paragraphs. Blank lines separate blocks and are dropped.
+ */
+export function blocksFromText(text: string, headings: string[] = []): AgreementBlock[] {
+  const heads = new Set(headings.map((h) => h.trim().toLowerCase()));
+  const out: AgreementBlock[] = [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  for (const [i, line] of lines.entries()) {
+    if (!line) continue;
+    const bullet = /^[-•*]\s+/.test(line);
+    const clean = bullet ? line.replace(/^[-•*]\s+/, "") : line;
+    if (i === 0) {
+      out.push({ kind: "title", text: clean });
+      continue;
+    }
+    const isHead =
+      heads.has(clean.toLowerCase()) ||
+      (clean.length < 70 && clean === clean.toUpperCase() && /[A-Z]/.test(clean)) ||
+      (clean.length < 70 && !clean.endsWith(".") && !clean.endsWith(";") && !bullet && /^[A-Z]/.test(clean));
+    if (isHead) out.push({ kind: "h2", text: clean });
+    else if (bullet || /;( and| or)?$/.test(clean)) out.push({ kind: "li", text: clean });
+    else out.push({ kind: "p", text: clean });
+  }
+  return out;
 }
