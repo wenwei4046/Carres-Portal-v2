@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 const SIGNATURE_BUCKET = "rental-agreements";
 
 /**
- * Open the signature the customer actually drew (0278).
+ * Open the signature the customer actually drew (0279).
  *
  * The approver is deciding thousands of ringgit of credit off the back of this
  * drawing; being told one exists is not the same as being able to look at it.
@@ -183,10 +183,10 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             <span className="font-mono text-[14px] font-semibold text-foreground">
               {r.agreementNo}
             </span>
-            {/* 0278 — the signature is real now, so the pill states a fact
+            {/* 0279 — the signature is real now, so the pill states a fact
                 instead of apologising for a missing feature. An unsigned row
                 can no longer reach this queue (approve refuses it), so the
-                amber branch only ever describes a pre-0278 application. */}
+                amber branch only ever describes a pre-0279 application. */}
             {r.signedAt ? (
               <span
                 className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"

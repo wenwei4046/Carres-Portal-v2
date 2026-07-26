@@ -102,11 +102,11 @@ export default function RentToOwnPage({ dealerId, onClose }: Props) {
 
   function handleSign() {
     if (!formValid || !selected || createAgreement.isPending) return;
-    // 0278 — THIS PAGE IS RETIRED and it has no signature pad.
+    // 0279 — THIS PAGE IS RETIRED and it has no signature pad.
     //
     // The PR that made Rent-to-Own a POS category retired it; nothing imports it any
     // more (it survives on disk with its tests, and is tree-shaken out of the
-    // shipped bundle). Since 0278 an agreement is BORN signed or is not born,
+    // shipped bundle). Since 0279 an agreement is BORN signed or is not born,
     // so this form structurally cannot create one — the server would refuse it
     // with `signature_required`.
     //

@@ -100,7 +100,7 @@ describe("FinanceRentalApprover", () => {
     expect(screen.queryByText(/^Signed$/)).not.toBeInTheDocument();
   });
 
-  it("names WHO signed and WHICH version once a signature exists (0278)", () => {
+  it("names WHO signed and WHICH version once a signature exists (0279)", () => {
     approvalsState = {
       data: {
         approvals: [
@@ -143,7 +143,7 @@ describe("FinanceRentalApprover", () => {
     expect(screen.getByTestId("view-signature")).toBeInTheDocument();
     unmount();
 
-    // a pre-0278 application has no file — no dead link that opens nothing
+    // a pre-0279 application has no file — no dead link that opens nothing
     approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: null };
     render(<FinanceRentalApprover />);
     expect(screen.queryByTestId("view-signature")).not.toBeInTheDocument();

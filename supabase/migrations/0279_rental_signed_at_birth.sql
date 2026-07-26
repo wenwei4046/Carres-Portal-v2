@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0278_rental_signed_at_birth.sql (Loo 2026-07-26 — the signature stops being
+-- 0279_rental_signed_at_birth.sql (Loo 2026-07-26 — the signature stops being
 -- thrown away)
 -- =============================================================================
 -- THE DEFECT THIS CLOSES, stated plainly: the customer already signs. The POS
@@ -109,7 +109,7 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.rental_current_agreement_template(text) IS
-  'The agreement wording in force right now for a doc_key (highest active version whose effective_from has arrived, MYT). NULL when nothing is published. Read by the POS confirm step AND stamped by create_rental_agreement, so the paper shown and the paper signed are one document (0278).';
+  'The agreement wording in force right now for a doc_key (highest active version whose effective_from has arrived, MYT). NULL when nothing is published. Read by the POS confirm step AND stamped by create_rental_agreement, so the paper shown and the paper signed are one document (0279).';
 
 -- ── 2 · the signature facts travel together ──────────────────────────────────
 -- signed_nric is deliberately OUT of the constraint: not every customer hands
@@ -137,7 +137,7 @@ ALTER TABLE public.rental_agreements
   );
 
 COMMENT ON CONSTRAINT rental_agreements_signature_is_whole ON public.rental_agreements IS
-  'A signature is evidence or it is nothing: who signed, the drawing, and WHICH VERSION they signed must all be present or all absent. Backstops the is_internal() PostgREST insert door, which bypasses create_rental_agreement entirely (0278).';
+  'A signature is evidence or it is nothing: who signed, the drawing, and WHICH VERSION they signed must all be present or all absent. Backstops the is_internal() PostgREST insert door, which bypasses create_rental_agreement entirely (0279).';
 
 -- ── 3 · the sell RPC — born signed, or not born ──────────────────────────────
 DROP FUNCTION IF EXISTS public.create_rental_agreement(
@@ -155,7 +155,7 @@ CREATE FUNCTION public.create_rental_agreement(
   p_start_date       date DEFAULT NULL::date,
   p_notes            text DEFAULT NULL::text,
   p_delivery_date    date DEFAULT NULL::date,
-  -- 0278 — the customer's signature. Defaults so a stale caller gets a readable
+  -- 0279 — the customer's signature. Defaults so a stale caller gets a readable
   -- refusal instead of a schema-cache miss (see the header).
   p_signature_path   text DEFAULT NULL::text,
   p_signed_name      text DEFAULT NULL::text,
@@ -179,7 +179,7 @@ DECLARE
   v_order       orders;
   v_channel     text;
   v_contract    numeric(12,2);
-  -- 0278
+  -- 0279
   v_template    jsonb;
   v_sig_path    text := nullif(btrim(coalesce(p_signature_path, '')), '');
   v_sig_name    text := nullif(btrim(coalesce(p_signed_name, '')), '');
@@ -199,7 +199,7 @@ BEGIN
       USING errcode = 'P0001', detail = 'dealer_required';
   END IF;
 
-  -- 0278: the signature, checked BEFORE anything is written. "No signature, no
+  -- 0279: the signature, checked BEFORE anything is written. "No signature, no
   -- order" (Loo, locked) — so there is no half-made application to clean up.
   IF v_sig_path IS NULL THEN
     RAISE EXCEPTION 'The customer must sign before a rental can be submitted'
@@ -217,7 +217,7 @@ BEGIN
       USING errcode = 'P0001', detail = 'signed_name_required';
   END IF;
 
-  -- 0278: WHICH paper was signed. Resolved here so the contract records the
+  -- 0279: WHICH paper was signed. Resolved here so the contract records the
   -- exact version, and refused by name when Loo has not published wording yet —
   -- a rental cannot be signed against a document that does not exist.
   v_template := public.rental_current_agreement_template();
@@ -285,7 +285,7 @@ BEGIN
     customer_id, dealer_id, salesperson_id, plan_id,
     sku, term_months, monthly_fee, supplier_rate_pct, commission_base_pct,
     start_date, status, notes, created_by, included_package_id,
-    -- 0278 — the evidence. `created_by` above is the staff member who witnessed
+    -- 0279 — the evidence. `created_by` above is the staff member who witnessed
     -- it, so the witness needs no column of its own.
     signed_at, signed_name, signed_nric, signature_path,
     template_id, template_version
@@ -317,7 +317,7 @@ BEGIN
     coalesce(nullif(trim(coalesce(p_customer_address, v_customer.address, '')), '') IS NULL, true),
     p_delivery_date, p_delivery_date IS NULL,
     -- Nothing is paid at signing: month 1 is collected by Stripe after approval.
-    -- 0278: terms_accepted is now TRUE and it is the truth — the customer signed
+    -- 0279: terms_accepted is now TRUE and it is the truth — the customer signed
     -- the wording resolved above, in this same transaction.
     0, true, 'rental'
   )
@@ -349,7 +349,7 @@ BEGIN
    WHERE id = v_agreement.id
    RETURNING * INTO v_agreement;
 
-  -- 0278: this line already claimed "signed". Now it names WHO and WHICH paper,
+  -- 0279: this line already claimed "signed". Now it names WHO and WHICH paper,
   -- so the order timeline carries the evidence too.
   INSERT INTO order_history (order_id, text, by_role)
   VALUES (
@@ -379,7 +379,7 @@ $function$;
 
 -- ── 4 · approve refuses an unsigned application ──────────────────────────────
 -- Same signature, so CREATE OR REPLACE keeps the existing grants. The ONLY
--- change from the live 0268 body is the guard block marked 0278 below; the rest
+-- change from the live 0268 body is the guard block marked 0279 below; the rest
 -- was pulled out of pg_get_functiondef rather than retyped, per the standing
 -- rule about reconciling a function body back to live.
 CREATE OR REPLACE FUNCTION public.rental_approve_agreement(
@@ -415,7 +415,7 @@ BEGIN
       USING errcode = 'P0001', detail = 'not_pending';
   END IF;
 
-  -- 0278 — the guard 0268 left commented out, now that signing is built. It
+  -- 0279 — the guard 0268 left commented out, now that signing is built. It
   -- strands nobody: the queue held ZERO pending applications when this was
   -- applied (asserted in the sanity block), and from here every application is
   -- born signed. Because 0275's proceed_order rental branch requires 'active',
@@ -557,7 +557,7 @@ BEGIN
    WHERE p.proname = 'create_rental_agreement'
      AND p.pronamespace = 'public'::regnamespace;
   IF v_copies <> 1 THEN
-    RAISE EXCEPTION '0278: expected exactly 1 create_rental_agreement, found %', v_copies;
+    RAISE EXCEPTION '0279: expected exactly 1 create_rental_agreement, found %', v_copies;
   END IF;
 
   -- the new approve guard must strand nobody who is already in the queue.
@@ -566,7 +566,7 @@ BEGIN
    WHERE status = 'pending_approval' AND signed_at IS NULL;
   IF v_pending > 0 THEN
     RAISE EXCEPTION
-      '0278: % unsigned application(s) are already awaiting approval - the new guard would jam them shut. Decide them first.',
+      '0279: % unsigned application(s) are already awaiting approval - the new guard would jam them shut. Decide them first.',
       v_pending;
   END IF;
 
@@ -582,35 +582,35 @@ BEGIN
       AND template_id IS NOT NULL AND template_version IS NOT NULL)
    );
   IF v_halfsign > 0 THEN
-    RAISE EXCEPTION '0278: % half-signed agreement row(s) exist', v_halfsign;
+    RAISE EXCEPTION '0279: % half-signed agreement row(s) exist', v_halfsign;
   END IF;
 
   -- grants, both directions, on both functions.
   IF has_function_privilege('anon',
        'public.rental_current_agreement_template(text)', 'EXECUTE') THEN
-    RAISE EXCEPTION '0278: anon can execute rental_current_agreement_template';
+    RAISE EXCEPTION '0279: anon can execute rental_current_agreement_template';
   END IF;
   IF has_function_privilege('anon',
        'public.create_rental_agreement(uuid, text, text, text, text, uuid, uuid, date, text, date, text, text, text)',
        'EXECUTE') THEN
-    RAISE EXCEPTION '0278: anon can execute create_rental_agreement';
+    RAISE EXCEPTION '0279: anon can execute create_rental_agreement';
   END IF;
   IF NOT has_function_privilege('authenticated',
        'public.rental_current_agreement_template(text)', 'EXECUTE') THEN
-    RAISE EXCEPTION '0278: authenticated CANNOT execute rental_current_agreement_template';
+    RAISE EXCEPTION '0279: authenticated CANNOT execute rental_current_agreement_template';
   END IF;
   IF NOT has_function_privilege('authenticated',
        'public.create_rental_agreement(uuid, text, text, text, text, uuid, uuid, date, text, date, text, text, text)',
        'EXECUTE') THEN
-    RAISE EXCEPTION '0278: authenticated CANNOT execute create_rental_agreement';
+    RAISE EXCEPTION '0279: authenticated CANNOT execute create_rental_agreement';
   END IF;
   IF NOT has_function_privilege('service_role',
        'public.create_rental_agreement(uuid, text, text, text, text, uuid, uuid, date, text, date, text, text, text)',
        'EXECUTE') THEN
-    RAISE EXCEPTION '0278: service_role CANNOT execute create_rental_agreement';
+    RAISE EXCEPTION '0279: service_role CANNOT execute create_rental_agreement';
   END IF;
 
-  RAISE NOTICE '0278 OK: 1 sell RPC copy, % pending unsigned, grants asserted both ways', v_pending;
+  RAISE NOTICE '0279 OK: 1 sell RPC copy, % pending unsigned, grants asserted both ways', v_pending;
 END $$;
 
 COMMIT;

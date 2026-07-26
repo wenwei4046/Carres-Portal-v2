@@ -251,7 +251,7 @@ describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
     planId: "00000000-0000-0000-0000-0000000b0001",
     customerName: "Tan Mei Ling",
     customerPhone: "012-3456789",
-    // 0278 — a signup without these is not a signup.
+    // 0279 — a signup without these is not a signup.
     signatureDataUrl: SIG,
     signedName: "Tan Mei Ling",
   };
@@ -265,7 +265,7 @@ describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
     expect(out.signedName).toBe("Tan Mei Ling");
   });
 
-  // ── 0278 — the signature is not optional, and it must be a real drawing ────
+  // ── 0279 — the signature is not optional, and it must be a real drawing ────
   it("refuses a signup with NO signature — the defect this closes", () => {
     const { signatureDataUrl: _omit, ...unsigned } = valid;
     expect(createRentalAgreementInputSchema.safeParse(unsigned).success).toBe(false);

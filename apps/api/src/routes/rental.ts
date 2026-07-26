@@ -1243,7 +1243,7 @@ rentalRouter.get("/pos-plans", async (c) => {
   return c.json({ plans });
 });
 
-// GET /agreement-template — the wording the customer is about to sign (0278).
+// GET /agreement-template — the wording the customer is about to sign (0279).
 //
 // `rental_agreement_templates` is RLS internal-only (0267), so a store JWT
 // structurally cannot read the paper it is asking a customer to sign. This
@@ -1317,7 +1317,7 @@ function decodeSignature(dataUrl: string): { bytes: Uint8Array; contentType: str
 // `pending_approval` and NOTHING is materialised until finance approves — no
 // billing schedule, no RU asset, no entitlement. No money in the payload.
 //
-// 0278 — and no unsigned agreement either. The signature is written FIRST (the
+// 0279 — and no unsigned agreement either. The signature is written FIRST (the
 // DB needs a path to stamp), then the RPC runs; if the RPC refuses, the blob is
 // removed again so a rejected signup leaves nothing behind. The alternative
 // order is impossible: the agreement id does not exist until the RPC returns.
@@ -1357,7 +1357,7 @@ rentalRouter.post("/agreements", async (c) => {
     p_notes: d.notes ?? null,
     // 0275 — the Sales Order the rental mints needs this to reach operations.
     p_delivery_date: d.deliveryDate ?? null,
-    // 0278 — the evidence.
+    // 0279 — the evidence.
     p_signature_path: signaturePath,
     p_signed_name: d.signedName,
     p_signed_nric: d.signedNric ?? null,
@@ -1385,7 +1385,7 @@ rentalRouter.post("/agreements", async (c) => {
       // combo plan carries no SKU to deliver (CF rental-combo-agreement-sku-null).
       detail === "dealer_required" ||
       detail === "plan_has_no_sku" ||
-      // 0278 — the signature guards. `no_agreement_template` is the one a store
+      // 0279 — the signature guards. `no_agreement_template` is the one a store
       // can actually hit: it means the principal has not published the wording,
       // and the POS turns it into a named blocker rather than a dead button.
       detail === "signature_required" ||
