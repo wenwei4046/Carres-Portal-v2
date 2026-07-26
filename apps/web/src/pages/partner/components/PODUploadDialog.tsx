@@ -65,7 +65,7 @@ export default function PODUploadDialog({
 
   const attach = useAttachPod({
     onSuccess: () => {
-      toast.success(`POD attached · ${row.po_id ?? row.order_id} marked delivered`);
+      toast.success(`Delivery photo attached · ${row.po_id ?? row.order_id} marked delivered`);
       onClose();
     },
     onError: (err) => setError(err.message),
@@ -204,7 +204,7 @@ export default function PODUploadDialog({
   const titleRef = row.do_number ?? row.po_id ?? `Order ${row.order_id.slice(0, 8)}`;
 
   return (
-    <Modal title={`Proof of Delivery · ${titleRef}`} onClose={onClose}>
+    <Modal title={`Delivery photo · ${titleRef}`} onClose={onClose}>
       <div
         className="text-[12px] text-base-600 mb-3.5 font-body"
         data-testid="pod-upload-dialog"
@@ -251,7 +251,7 @@ export default function PODUploadDialog({
 
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
           <div className="text-[11px] text-base-600 mb-2 font-body">
-            Attach signed POD *{" "}
+            Attach delivery photo *{" "}
             <span className="text-base-400">(JPG/PNG/PDF · ≤10 MB)</span>
           </div>
 
@@ -262,7 +262,7 @@ export default function PODUploadDialog({
               accept="image/jpeg,image/png,application/pdf"
               onChange={handleChange}
               disabled={uploading || attach.isPending}
-              aria-label="POD file"
+              aria-label="Delivery photo file"
               className="block w-full text-[12px]"
               data-testid="pod-file-input"
             />
@@ -271,7 +271,7 @@ export default function PODUploadDialog({
               {isImage ? (
                 <img
                   src={previewUrl}
-                  alt={pickedName ?? "POD preview"}
+                  alt={pickedName ?? "Delivery photo preview"}
                   className="max-h-56 mx-auto rounded-sm object-contain"
                   data-testid="pod-preview-image"
                 />
@@ -313,7 +313,7 @@ export default function PODUploadDialog({
                 accept="image/jpeg,image/png,application/pdf"
                 onChange={handleChange}
                 disabled={uploading || attach.isPending}
-                aria-label="POD file"
+                aria-label="Delivery photo file"
                 className="hidden"
                 data-testid="pod-file-input"
               />

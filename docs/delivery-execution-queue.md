@@ -49,7 +49,7 @@ rides the list API — verify before adding any endpoint.
 **Done when:** no row anywhere renders "Unscheduled"/"Not booked"; a provisional row can never
 render green; queue counts match the drawer's stage.
 
-## T2 · Actions speak human (verb + object + reason)
+## T2 · Actions speak human (verb + object + reason) ✅ (PR #367)
 
 **Concept (Jess):** a new staff must know the next second's action without training. No ERP
 abbreviations — POD is banned.
@@ -66,6 +66,12 @@ abbreviations — POD is banned.
 `docs/COPY-STANDARD.md` (add the naming rule: verb + object + (reason); no abbreviations).
 **No migration. Copy-only.**
 **Done when:** every visible action is a doable act; COPY-STANDARD carries the rule.
+**Shipped note (PR #367):** the ladder's `Call customer` / `Schedule delivery` rungs did not
+exist anymore — the C-vocab rewrite (2026-07-19) had already merged them into
+`Assign logistic / Chase logistic / Confirm`, so the ladder needed zero renames. The live
+`Call customer` string was the drawer follow-up preset (now `Call customer (book delivery)`);
+every visible POD string (partner upload dialog + hints) now says "delivery photo";
+COPY-STANDARD carries the naming law + the reserved labels for T3/T6.
 
 ## T3 · Delay Radar — catch the miss BEFORE the window
 
@@ -154,7 +160,7 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 | Card | Status | PR |
 |---|---|---|
 | T1 | ✅ shipped 2026-07-26 | #363 |
-| T2 | ⬜ | — |
+| T2 | ✅ shipped 2026-07-26 | #367 |
 | T3 | ⬜ | — |
 | T4 | ⬜ | — |
 | T5 | ⬜ | — |
