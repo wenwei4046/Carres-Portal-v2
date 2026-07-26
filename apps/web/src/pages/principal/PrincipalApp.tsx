@@ -16,6 +16,7 @@ import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
 // only PrincipalOrders page was removed 2026-07-16 — order views live in the
 // Operations area (/operation/orders).
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
+import RentalSettingPage from "@/pages/rental/RentalSettingPage";
 import OrderEntryPage from "@/pages/operation/OrderEntryPage";
 
 /**
@@ -75,6 +76,8 @@ export default function PrincipalApp() {
             the Admin "Product & Maintenance" entry (retail / POS prices, all 8
             tabs). Costing lives in Operations as the Operation Catalog. */}
         {tab === "catalog" && <ProductMaintenancePage isPrincipal />}
+        {/* 0264 (Loo 2026-07-26) — Rental setting: its own Admin door. */}
+        {tab === "rental-setting" && <RentalSettingPage isPrincipal />}
         {tab === "accounts" && <PrincipalAccounts />}
         {tab === "audit" && <PrincipalAudit />}
       </main>
