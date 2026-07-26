@@ -110,6 +110,7 @@ import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
+import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
 import DeliveryChain from "./DeliveryChain";
@@ -4439,6 +4440,9 @@ export function OrderCustomerCard({
       {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
           its header ⋮; the redundant inline button is gone). Read-only by default;
           the ⋮ "Edit details" opens the safe Save / Cancel mode. */}
+      {/* 0261-0263 — "did this customer buy a guarantee". Renders nothing when
+          they didn't, so pre-guarantee orders look untouched. */}
+      <GuaranteeCoverStrip orderId={order.id} />
     </div>
   );
 }

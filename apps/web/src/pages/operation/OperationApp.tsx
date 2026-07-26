@@ -49,6 +49,7 @@ import OperationOpsInventory from "./OperationOpsInventory";
 import OperationStockOnHand from "./OperationStockOnHand";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
+import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import OperationRightRail from "./components/OperationRightRail";
 import GlobalTopBar from "./components/GlobalTopBar";
@@ -346,6 +347,8 @@ export default function OperationApp() {
             {tab === "ops-inventory" && <OperationOpsInventory />}
             {/* Migration 0140 — Service Notes / Issue Tracker */}
             {tab === "service-notes" && <OperationServiceCases />}
+            {/* 0261-0263 — the guarantee claim / track-back desk */}
+            {tab === "guarantees" && <OperationGuarantees />}
           </>
         )}
         </div>

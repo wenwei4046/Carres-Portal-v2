@@ -1248,6 +1248,11 @@ export * from "./schemas/staff";
 // Store-account self-service (0240) — dealer-principal password/email change.
 export * from "./schemas/account";
 
+// Guarantee packages (0261-0263) — the 6th SKU category, its terms config and
+// the entitlement ledger ops claims against. Expiry is DERIVED
+// (effectiveGuaranteeStatus), never a stored state.
+export * from "./schemas/guarantee";
+
 // Dealer vs Showroom — the naming rule for our own stores vs external
 // resellers, and for their branches (showroom vs outlet).
 export * from "./store-kind";

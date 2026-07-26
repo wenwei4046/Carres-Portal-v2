@@ -3,13 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
+  GuaranteeTermDto,
   ProductBundleDto,
   ProductCategory,
   ProductModelDto,
+  ProductSkuDto,
   PwpCodeDto,
   PwpDiscoverDto,
 } from "@carres/shared";
-import { explodeBundle } from "@carres/shared";
+import { explodeBundle, guaranteeAttrs } from "@carres/shared";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
@@ -27,8 +29,16 @@ import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
+import GuaranteePickerModal from "./GuaranteePickerModal";
 
-const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory"];
+const CARD_ORDER: ProductCategory[] = [
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+  // 0261 — guarantees sort last: they are bought on top of something else.
+  "guarantee",
+];
 
 /**
  * Step 01 — POS catalog. 2990s-parity layout: sectioned left sidebar
@@ -196,6 +206,12 @@ export default function CatalogStep({
   // 0241 — the bundle currently in the slot walker (null = none open).
   const [configuringBundle, setConfiguringBundle] = useState<ProductBundleDto | null>(null);
 
+  // 0261 — the guarantee waiting for its covered item to be picked (null = none).
+  const [guaranteePick, setGuaranteePick] = useState<{
+    term: GuaranteeTermDto;
+    sku: ProductSkuDto;
+  } | null>(null);
+
   const railEntries: RailEntry[] = [
     { key: "all", label: "All open", count: index.productModels.length },
     {
@@ -222,6 +238,11 @@ export default function CatalogStep({
       label: "Accessories",
       count: countByCat.get("accessory") ?? 0,
     },
+    // 0261 — guarantees. Shown only once the principal has authored a term;
+    // never mutex-locked (a guarantee rides on top of whatever is in the cart).
+    ...((countByCat.get("guarantee") ?? 0) > 0
+      ? [{ key: "guarantee", label: "Guarantees", count: countByCat.get("guarantee") ?? 0 } as RailEntry]
+      : []),
     // 0239 — bundles rail shows only when at least one active bundle exists.
     ...(bundles.length > 0
       ? [{ key: "bundles", label: "Bundles", count: bundles.length } as RailEntry]
@@ -366,6 +387,20 @@ export default function CatalogStep({
   // add to cart", no drawer). Anything with a real choice opens the configurator.
   function handleConfigure(model: ProductModelDto) {
     const modelSkus = index.skusByModel.get(model.id) ?? [];
+
+    // 0261 — a guarantee NEVER direct-adds. It must name the item it covers,
+    // or the claim two years from now has nothing to trace back to.
+    if (model.category === "guarantee") {
+      const s = modelSkus[0];
+      const term = (catalog.guaranteeTerms ?? []).find((t) => t.guaranteeSku === s?.sku);
+      if (s && term) {
+        setGuaranteePick({ term, sku: s });
+      } else {
+        toast.error("This guarantee isn't set up yet — ask the principal to add its terms.");
+      }
+      return;
+    }
+
     const flat = model.category === "accessory" || model.category === "service";
     if (flat && modelSkus.length === 1 && offeredSpecialsFor(model, catalog.specialAddons).length === 0) {
       const s = modelSkus[0]!;
@@ -641,6 +676,30 @@ export default function CatalogStep({
           index={index}
           onComplete={(picks) => completeBundle(configuringBundle, picks)}
           onClose={() => setConfiguringBundle(null)}
+        />
+      )}
+
+      {/* 0261 — a guarantee card asks WHAT it covers before it can be added.
+          The pick is stamped into attrs.guarantee.covers_sku, which is the
+          exact path the 0262 mint trigger reads. */}
+      {guaranteePick && (
+        <GuaranteePickerModal
+          term={guaranteePick.term}
+          sku={guaranteePick.sku}
+          lines={draft.lines}
+          catalog={catalog}
+          onCancel={() => setGuaranteePick(null)}
+          onPick={(coversSku, coversLabel) => {
+            addLine({
+              localId: newLocalId(),
+              sku: guaranteePick.sku.sku,
+              qty: 1,
+              unitPrice: guaranteePick.sku.price,
+              label: `${guaranteePick.term.label} · ${coversLabel}`,
+              attrs: guaranteeAttrs(coversSku, coversLabel),
+            });
+            setGuaranteePick(null);
+          }}
         />
       )}
 

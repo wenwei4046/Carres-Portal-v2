@@ -14,6 +14,7 @@ import {
   type NetRequirementsSupply,
   type NetRequirementsOptions,
 } from "./net-requirements";
+import { productCategorySchema } from "./schemas/product-category";
 import { countWorkingDays, type WorkingDayOptions } from "./working-days";
 
 /** Mirrors `UrgencyBucket` in ./net-requirements (kept in sync by hand). */
@@ -27,13 +28,10 @@ export const purchaseUrgencyBucketSchema = z.enum([
 ]);
 export type PurchaseUrgencyBucket = z.infer<typeof purchaseUrgencyBucketSchema>;
 
-const productCategorySchema = z.enum([
-  "mattress",
-  "bedframe",
-  "sofa",
-  "accessory",
-  "service",
-]);
+// Was a local copy of the 5-category enum, which silently went stale when 0261
+// added 'guarantee'. Now the single source (schemas/product-category, a leaf
+// module — no cycle). Guarantee SKUs never reach procurement (they're
+// SUPPLIERLESS_CATEGORIES), but the TYPE has to admit the value.
 
 /** One SKU line WITHIN a delivery bundle — what to buy + why. */
 export const purchaseBundleItemSchema = z.object({

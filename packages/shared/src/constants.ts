@@ -49,13 +49,16 @@ export function minDeliveryDateISO(leadDays: number, today: Date = new Date()): 
 // 0169-0173 — Product & Maintenance rebuild constants.
 // ---------------------------------------------------------------------------
 
-/** The 5 product categories (0169). Order = the SKU-Master / Modular filter order. */
+/** The 6 product categories (0169 + 0261). Order = the SKU-Master / Modular
+ *  filter order. 'guarantee' sits last: it is sold ON TOP of a covered item,
+ *  never on its own. */
 export const PRODUCT_CATEGORIES = [
   "mattress",
   "bedframe",
   "sofa",
   "accessory",
   "service",
+  "guarantee",
 ] as const;
 
 /** Bare Service-category SKU codes (0172) — also the value stored in
@@ -82,4 +85,4 @@ export const PRODUCT_MODEL_PHOTOS_BUCKET = "product-model-photos";
  * enter a Create-PO line. Mirrors the server set in apps/api/src/routes/catalog.ts;
  * the FE Create-PO guard reads this so the boundary is explicit, not emergent.
  */
-export const SUPPLIERLESS_CATEGORIES = ["service", "accessory"] as const;
+export const SUPPLIERLESS_CATEGORIES = ["service", "accessory", "guarantee"] as const;

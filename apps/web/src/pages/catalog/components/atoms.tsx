@@ -6,13 +6,14 @@ import type { ProductCategory } from "@carres/shared";
  * on v17 tokens — no hand-rolled colours.
  */
 
-/** Display labels for the 5 product categories (sentence case). */
+/** Display labels for the 6 product categories (sentence case). */
 export const CATEGORY_LABEL: Record<ProductCategory, string> = {
   mattress: "Mattress",
   bedframe: "Bedframe",
   sofa: "Sofa",
   accessory: "Accessory",
   service: "Service",
+  guarantee: "Guarantee",
 };
 
 /**

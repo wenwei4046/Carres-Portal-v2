@@ -784,3 +784,85 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 **Web**: the tab is now **Offers + Service packages**. Offers list = one row per model (lanes, fee range, Stripe synced count, On sale). `+ New offer` opens a **model picker** (models with an offer are hidden — UNIQUE model_id). The editor is category-driven: rent price matrix (rows = live SKUs / compartments / combos × term columns) with a GWP cell, buy lane, option tables with one-time + monthly + "over the term", **fabric series → colour drill-down** (All on/off, series price with per-colour override), surcharge slots, service-plan block (filtered by the category token), split preview + On sale. Save = one offer PATCH + create/patch/delete diffs of lines, buy prices and services.
 
 **Evidence**: shared 1030/1030 (+43 new) · api 1519/1522 (3 = §17.7 baseline; rental route 40/40) · web 1500/1516 (16 = §17.7 baseline; RentalTab 22/22) · design-standard clean · `pnpm --filter @carres/web build` ✓. **Shipped**: PR #315 (merge `0ff8f1bc`, union with the HR-P2 line's #312/#313) → api Worker `7fb8505c` (unauth `/api/rental/config` 401 ✓) + web `index-CAb0V6zA.js` → carres-portal `8bd30efe` + carres-pos `efebec76`; all 4 canonicals serve it; live bundle downloaded 4,062,610 bytes, `SERVICE_ROLE` grep 0, offer-picker marker ✓. Post-merge suites: shared 1048/1048 · api 3 = baseline · web 16 = baseline. **Next (segment ①b)**: the POS lane consuming the overlay — render the option/fabric picker, recompute with `quoteRental` server-side, and freeze the picks + one-off money onto the agreement (see the three new CFs, incl. `rental-combo-agreement-sku-null`).
+
+
+## 2026-07-26 ⑧ · Guarantee packages — the 6th SKU category (migrations 0261-0263, PR pending)
+
+**Ask (Loo)**: a new SKU category `guarantee` (he corrected "warranty" → **guarantee**). Sell a
+Mattress Guarantee at RM150: our mattresses carry a 15-year warranty, and if the mattress fails
+inside that window we don't repair — we swap it one-for-one. Invoice + Customer Info must mark
+clearly who bought it, and ops must be able to track back from a claim by **Sales Order /
+customer name / customer ID** to the exact model that was covered.
+
+**Three business rulings taken before any schema was written** (asked, not assumed):
+(1) the 15 years start on **delivery**, not on the order date — the entitlement is born `pending`
+and flips to `active` the moment `orders.delivered_at` lands; (2) **1 guarantee : 1 mattress** —
+a qty-2 line mints 2 entitlement rows, because only 1:1 can answer "which model"; (3) a claim is
+**one-shot** — the swap spends the guarantee.
+
+**Shape**: `0261` widens `product_category` alone (PG forbids USING a new enum value in the
+transaction that adds it — same split as 0169→0172). `0262` adds `guarantee_terms` (config) +
+`guarantee_entitlements` (the ledger, one row per covered unit, with the covered SKU/model/label
+**snapshotted** so a rename 15 years out never orphans a claim) + the mint/void/sync triggers +
+the `guarantee_claim` / `guarantee_attach` DEFINER RPCs. `0263` seeds the RM150 / 15y / replace
+product — **not dormant**, Loo wants it sellable.
+
+**The key design call — a trigger, not RPC edits**: a guarantee line can enter an order through
+FIVE doors (create_order 0089 · add_order_lines 0231/0232 · replace_order_lines 0255/0256 ·
+change-request approve 0233/0257 · AutoCount import 0132/0237). One `AFTER INSERT` trigger on
+`order_lines` closes all five permanently. The same trigger backfills `covers_line_id` because
+create_order inserts in cart order — the guarantee can land BEFORE the mattress it covers.
+Perf: the orders trigger carries a `WHEN` clause (4 columns only); the line trigger costs one PK
+probe on a tiny table + one partial-index probe.
+
+**Expiry is DERIVED, never stored** (`effectiveGuaranteeStatus`) — an 'active' row past its date
+reads Expired whether or not any job ran. Every surface reads the derived value.
+
+**Surfaces**: SKU Master gains a Guarantee chip · POS gains a Guarantees rail whose card CANNOT
+direct-add — it opens a covered-item picker that stamps `attrs.guarantee.covers_sku` (the exact
+path the trigger reads; the contract-sacred submit pipeline is untouched) · the invoice PDF gains
+a bordered **Guarantee cover** block (covers / years / remedy in words / end date) · a
+`GuaranteeCoverStrip` sits in the Customer block of BOTH order-detail surfaces and renders
+NOTHING when there is no guarantee · new **Operation → Guarantees** desk: one box resolving all
+three track-back axes, with the one-shot Claim action (writes `order_history`, can link a
+Service Case).
+
+**Verified on prod inside rolled-back transactions before anything shipped** (the mint trigger
+sits on the order-creation hot path): qty-2 → 2 units with the right covered line + label ·
+delivered → active with expiry 2041-08-01 · guarantee-inserted-BEFORE-the-mattress → backfilled ·
+cancel → void · line deleted → row SURVIVES as void (audit trail kept) · claim refused while
+pending, accepted once delivered, refused on the second attempt, and a claimed row survives its
+line being deleted. `guarantee_entitlements` = 0 rows afterwards, test order untouched.
+
+**Two silent drift bugs found and closed while wiring**: `purchase-report.ts` and
+`apps/api/routes/catalog.ts` each kept their OWN hand-written copy of the 5-category list — the
+catalog one would have demanded a supplier for a guarantee SKU. Both now read the shared
+constant. The category enum moved to `schemas/product-category.ts` so `catalog.ts` and
+`guarantee.ts` can share it without a cycle (catalog re-exports it; no import path changed).
+
+**Test-harness lesson**: a leaf component must NOT call `useQuery` directly — drawer tests fully
+mock `@/lib/queries` and therefore install no `QueryClientProvider`, so a raw query in the leaf
+took 38 tests down. The hook moved into `@/lib/queries` (`useOrderGuarantees`) and the affected
+full mocks stub it.
+
+**Evidence**: shared 1019/1019 (+17 new) · api 1527/1530 (3 = §17.7 baseline; +7 new route tests;
+extended the invoice pdf-data mock for the two new tables and added a guarantee-block assertion)
+· web 1498/1514 (16 = §17.7 baseline; +7 new strip tests) · typecheck api 0 / web 0 / shared 2
+(pre-existing on clean origin/main) · `check:v4` clean · design-standard clean (caught one new
+grey hover — `hover:bg-hovertint`) · BUILD ran (`index-H9jzDLTX.js`), `SERVICE_ROLE` grep 0.
+Spec: `docs/guarantee-package-spec.md`.
+
+**Ship**: PR #314 (merge `bd27e1ad`, union with the HR-P2 line's #312 and the Rental-offers line's
+#315 — CLAUDE.md's migration row + the timeline + a colliding ⑦ worklog heading all conflicted;
+theirs won on the migration row because 0264 already names 0261-0263, mine renumbered to ⑧) →
+api Worker `3da6c7bb` (unauth `/api/guarantees/terms` AND `/api/guarantees` both 401 on
+api.carresofficial.com and the workers.dev host) + web `index-Dy-fo8kJ.js` → carres-portal
+`de170149` + carres-pos `df3b8308`; all 4 canonicals serve it; live bundle downloaded
+4,078,798 bytes, `SERVICE_ROLE` grep 0, guarantee + claim-desk markers ✓. Post-merge union suites:
+shared 1064/1064 · api 1545/1548 (3 = baseline) · web 1507/1523 (16 = baseline) · typecheck
+api 0 / web 0 / shared 2 (pre-existing). **Worker deployed BEFORE the web** so the new UI never
+called a 404. DB live-verified after: 1 active term, `Mattress Guarantee 15 Years · RM150.00 ·
+15y · replace`, `pos_active=true`, 0 entitlements (correct — nothing sold yet, and by design no
+history was backfilled).
+
+**Follow-up same session (Loo)**: "订单入口以后基本只会有 POS system；现在看到的订单都是以前 testimony 的 order，系统转移时还没 start Guarantee Program，不需要管之前的 order." Two consequences. (1) **No historical handling, by design** — no backfill was written and none is wanted; the mint trigger only fires on INSERT, so the legacy orders simply carry zero entitlements, which is correct (nobody was sold one). (2) It re-ranked a hole I had filed as an edge case into the main road: **`AddProductOverlay`** (add a product to an order that already exists — the POS's *second* door) built its category chips from `index.productModels`, so the Guarantee card appeared there and fell through to the generic `ConfigureDrawer`, which would have added it **bare**. Fixed: the overlay routes the guarantee card through the SAME `GuaranteePickerModal`, choosing from the ORDER's existing lines (`context="order"` only changes the empty-state wording — the gate is identical). Both POS doors now force attachment, which downgrades `guarantee-attach-no-ui` to LOW: an unattached entitlement can now only come from hand-written SQL or a future non-POS door, and `guarantee_attach` stays as the repair path. Spec gained §4 recording the POS-only scope. Re-verified: web 1498/1514 (16 = baseline), typecheck 0, design-standard + check:v4 clean.

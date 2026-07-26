@@ -70,6 +70,7 @@ import {
   type RentalOfferServicePatchInput,
   type RentalAgreement,
   type RentalStockUnit,
+  type GuaranteeListResponse,
   type PosRentalPlan,
   type Customer,
   type CreateRentalAgreementInput,
@@ -268,6 +269,12 @@ export const qk = {
     posPlans: () => ["rental", "pos-plans"] as const,
     checkoutSession: (agreementId: string, sessionId: string) =>
       ["rental", "checkout", agreementId, sessionId] as const,
+  },
+  // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
+  // so the desk, the order badge and any open drawer all re-read together.
+  guarantees: {
+    search: (q: string, status: string) => ["guarantees", "search", q, status] as const,
+    byOrder: (orderId: string) => ["guarantees", "by-order", orderId] as const,
   },
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
@@ -7473,5 +7480,35 @@ export function useHrCreateShowroomStaff() {
         body: JSON.stringify(input),
       }),
     onSuccess: invalidate,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Guarantee packages (0261-0263)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every guarantee sold on one order — powers the "Guarantee" strip inside the
+ * Customer block of BOTH order-detail surfaces (ops drawer + POS).
+ *
+ * The hook lives HERE rather than inside the strip on purpose: the strip is a
+ * leaf that mounts inside drawers whose tests fully mock this module and
+ * therefore never install a QueryClientProvider. A raw useQuery in the leaf
+ * takes the whole drawer down in those tests; a hook here is stubbed with the
+ * rest of the module.
+ *
+ * `retry: false` — the strip is silent-when-absent, so a failed read must
+ * degrade to "no guarantee shown", never to a broken customer card.
+ */
+export function useOrderGuarantees(
+  orderId: string,
+  opts?: Partial<UseQueryOptions<GuaranteeListResponse>>,
+) {
+  return useQuery<GuaranteeListResponse>({
+    queryKey: qk.guarantees.byOrder(orderId),
+    queryFn: () => apiFetch<GuaranteeListResponse>(`/api/guarantees/order/${orderId}`),
+    staleTime: 30_000,
+    retry: false,
+    ...opts,
   });
 }
