@@ -36,8 +36,8 @@ Two hard beliefs behind the rules:
 | 5 | Empty states teach | `No results` | `No orders to send today. Check back after 2 PM.` |
 | 6 | Errors give the fix | `Invalid input` | `Master row missing G column. Ask Sales to fill it before Monday.` |
 | 7 | Tooltip = WHY | button `Send` · tip `Click to send` | button `Send` · tip `Sends the PO to Ohana via WhatsApp` |
-| 8 | Same word app-wide | Orders `Chase` · Purchase `Follow up` | Both say `Chase` |
-| 9 | Zero jargon | requisition · expedite · MRP · GRN | order · chase · plan · check in |
+| 8 | Same word app-wide | Orders `Confirm ready date` · Purchase `Follow up` | Both say `Confirm ready date` |
+| 9 | Zero jargon | requisition · expedite · MRP · GRN | order · call · plan · check in |
 | 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Send now.` |
 
 ## The three "who / what / when" questions
@@ -63,7 +63,7 @@ Examples (all pass):
 
     ✔ Send order to Ohana today.               (5 words)
     ✔ Remind Nice Future — PO-86 due Fri.      (7 words)
-    ✔ Chase Ohana — PO-88 late 2 days.         (6 words)
+    ✔ Call Ohana — confirm PO-88 ready date.   (7 words)
     ✔ Check in from Ohana (3 items).           (6 words)
 
 Anti-patterns (all fail):
@@ -113,7 +113,7 @@ it will change · (c) **what** the reader should do meanwhile.
 Examples:
 
     ✔ "No orders to send today. Check back after 2 PM when Master syncs."
-    ✔ "0 chases · everything on track. Nothing to do here."
+    ✔ "0 calls to make · everything on track. Nothing to do here."
     ✔ "No goods arriving today. Ohana's next delivery is Thu 24 Jul."
 
 Anti-patterns:
@@ -155,37 +155,56 @@ If the tooltip would just re-state the label, delete the tooltip.
 
 ---
 
-## Action naming law (delivery T2, locked with Jess 2026-07-26)
+## Action naming law (Jess ruling 2026-07-27 — supersedes the T2 version)
 
-Every visible ACTION label (ladder pill, drawer button, follow-up preset,
-queue verb) is written as:
+Every visible ACTION label (queue name, ladder pill, drawer button, checklist
+row, follow-up preset) is written as:
 
-    [Verb] + [Object] + (reason, only when the same verb+object has two causes)
+    [Verb] + [named party] + [measurable object]
 
-- The reason in brackets exists so a new staff knows WHY they are calling —
-  `Call customer (book delivery)` vs `Call customer (stock delay)` are two
-  different conversations that must never share one label.
+- **Name the party.** Use the actual person/company when the system knows it
+  (`Call Ohana — confirm PO-88 ready date` · `Call NETS — confirm delivery
+  date`); the role word (`customer`, `supplier`) only when no name exists.
+- **The object is measurable.** "Contacted the supplier" completes nothing —
+  the label names the business outcome (a ready date, a delivery slot, an
+  amount collected, a photo uploaded).
 - **No abbreviations, ever.** ERP shorthand a new hire must google is banned.
-  **"POD" is banned** — the word is **delivery photo** everywhere (button,
-  toast, hint, aria-label). "DO" and "PO" survive because the team already
-  speaks them daily (vocabulary table below).
-- Reserved delivery action labels (use EXACTLY these spellings):
-  - `Call customer (book delivery)` — call to fix the delivery date + slot.
-  - `Call customer (stock delay)` — stock ETA overshoots the promised date
-    (delay radar, T3). Reserved now so no chat invents a synonym.
-  - `Upload delivery photo` — attach the photo proving delivery (T6).
-  - `Deliver today` — the customer confirmed TODAY as the delivery day (T7).
+  **"POD" is banned** (→ delivery photo). **"Chase" is banned** (Jess
+  2026-07-27) — it names a mood, not an outcome; every former Chase label
+  becomes a Call with a named party and a measurable object. "DO" and "PO"
+  survive because the team already speaks them daily.
+- Reserved delivery action labels (use EXACTLY these shapes):
+  - `Call {customer} — book delivery date` — fix the date + slot.
+  - `Call {customer} — stock delay` — stock ready date overshoots the promise
+    (delay radar). The call informs BEFORE the promise breaks.
+  - `Call {carrier} — confirm delivery date` — carrier assigned, customer's
+    date not confirmed yet.
+  - `Upload delivery photo` — attach the photo proving delivery.
+  - `Deliver today` — the customer confirmed TODAY as the delivery day.
 
-## The delivery queue words (T7, locked with Jess 2026-07-27)
+## The Dynamic Checklist law (Jess ruling 2026-07-27)
 
-The delivery lifecycle is FOUR queues, and the queue's label IS the row's NEXT
-verb — one word for one step, so a queue count can never disagree with the NEXT
-column. The list is closed; a new chat does not add a fifth or reword one:
+An order never shows just one suggested action — it shows **every open action
+at once**, as a checklist:
 
-| Step | The word | It holds | It goes late |
+- **Drawer**: a `Dynamic Checklist` block lists ALL currently-firing actions
+  (each row = verb + named party + measurable object), derived from the same
+  signals that exist today. An item ticks itself when its signal clears —
+  staff never manually add, reorder, or tick items.
+- **List row**: the NEXT column shows the TOP item plus a `+N` count when more
+  are open (`Call Ohana — confirm ready date  +2`), so scanning stays fast and
+  nothing is hidden.
+- Priority order of items is the existing ladder order — money first.
+
+## The delivery queue words (re-ruled by Jess 2026-07-27 — this is the only version)
+
+The delivery lifecycle is FOUR queues; the queue's label IS the row's top
+checklist item. The list is closed; a new chat does not add a fifth:
+
+| Step | The label | It holds | It goes late |
 |---|---|---|---|
 | 1 | `Assign logistic` | Stock in, no carrier picked | 3 working days before the promised date |
-| 2 | `Chase logistic` | Carrier assigned, customer has not confirmed | 1 working day before the promised date |
+| 2 | `Confirm delivery date` | Carrier assigned, customer has not confirmed (row line: `Call {carrier or customer} — confirm delivery date`) | 1 working day before the promised date |
 | 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
 | 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
 
@@ -193,15 +212,9 @@ Every deadline is counted in **working days** (Mon–Sat, Selangor public holida
 skipped) — the same engine procurement uses. Lateness is written as the count
 tail, numbers up front: `5 · 2 late`.
 
-Two words the card asked for and we deliberately did NOT introduce:
-
-- **`Confirm booking`** — it would be a second word for step 2, which already
-  ships as `Chase logistic` (C-vocab, locked 2026-07-19, also the drawer's
-  Chase Now word). Rule 8 wins: renaming step 2 app-wide is a one-line decision,
-  a synonym is not.
-- **`Issue DO`** — nobody issues a DO. `orders.do_number` is stamped by a DB
-  trigger on the dispatch transition, so a queue for it would never have a
-  human in it.
+One word we deliberately did NOT introduce: **`Issue DO`** — nobody issues a
+DO. `orders.do_number` is stamped by a DB trigger on the dispatch transition,
+so a queue for it would never have a human in it.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -238,18 +251,18 @@ doubt, grep the codebase and match what already ships.
 |---------|---------------|------------|
 | Raise a purchase order to a factory | **Send** (order / PO) | Place · Raise · Push · Submit · Create |
 | Pre-due polite follow-up on an open PO | **Remind** | Notify · Ping · Alert · Nudge |
-| Post-due firm follow-up on an open PO | **Chase** | Expedite · Follow up · Push · Escalate |
+| Post-due firm follow-up on an open PO | **Call {supplier} — confirm ready date** | Chase · Expedite · Follow up · Push · Escalate |
 | Log goods arrival | **Check in** | Receive (as a verb) · Book in · GRN · Goods receipt |
 | Customer confirmed ETA — ready for PO | **Proceed** | Confirmed · Approved · Green-lit |
 | Customer ordered but no ETA yet | **Placed** | New · Draft · Pending · Open |
 | Cancel an order | **Cancel** | Void · Abandon · Kill |
 | Purchase order (the document) | **PO** | Purchase order · P/O · Order (ambiguous with customer order) |
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
-| The Purchase panel's three stages | **Send · Chase · Receive** | Place · Follow up · Book in |
+| The Purchase panel's three stages | **Send · Confirm ready date · Receive** | Chase · Place · Follow up · Book in |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
-| Call to fix delivery date + slot | **Call customer (book delivery)** | Schedule delivery · Book delivery · Confirm delivery date |
+| Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
 

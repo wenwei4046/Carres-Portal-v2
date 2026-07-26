@@ -49,8 +49,9 @@ Wrong spec / Wrong colour / Colour uneven; mattress gets Wrong SKU / Damaged).
 **Goal:** the case carries what WE ask (`Replace · Deliver missing parts · Deliver correct
 item · Repair · Return for inspection`) and what the SUPPLIER answered
 (`Replacement · Deliver remaining · Repair · Return & replace · Reject · Other agreement`)
-— two separate fields, so "what we wanted vs what we got" is analysable. Chase via the
-supplier's WhatsApp GROUP link (memory: suppliers recognise the CR/TCF ref, not PO#).
+— two separate fields, so "what we wanted vs what we got" is analysable. Follow up via
+the supplier's WhatsApp GROUP link (memory: suppliers recognise the CR/TCF ref, not PO#);
+labels follow the 2026-07-27 word law (`Call {supplier} — confirm …`, never Chase).
 **Done when:** every open claim shows who owes the next move; closed claims keep both sides.
 
 ## R4 · Problem stock is quarantined (On hold / Returned to supplier)

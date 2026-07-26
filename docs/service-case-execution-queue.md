@@ -55,7 +55,7 @@ uploader role in the case view.
 **Goal:** on submit, the system creates the next steps instead of the staff remembering:
 
 - issue needs the supplier → a **supplier claim** stub (links to R-series when it ships;
-  until then, a task row on the case: `Chase SUPPLIER — replacement/parts/repair`)
+  until then, a task row on the case: `Call {supplier} — confirm replacement/parts/repair date`)
 - item must come back → logistic collect task; repaired/replaced → redeliver task
 - each party sees only its own task; the case shows the whole chain as a timeline
   (`Complaint → Collected → At supplier → Repaired → Redelivered → Closed`)
