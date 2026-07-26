@@ -331,9 +331,14 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   }
 
   // Linked POs (own so OR within so_refs[]).
+  // 2026-07-27 (J1 Documents panel) — do_file_path added: the `delivery-orders`
+  // object holding the supplier's signed DO (column since 0030). The drawer's
+  // Documents list is derived at read time, so it needs the path to hand the
+  // browser a signed view url; storage RLS (delivery_orders_read) already
+  // admits operation + principal, so no new endpoint carries the file.
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
-    .select("id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date")
+    .select("id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, do_file_path")
     .or(`so.eq.${order.so},so_refs.cs.{${order.so}}`);
   if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
