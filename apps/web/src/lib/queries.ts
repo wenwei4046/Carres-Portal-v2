@@ -222,6 +222,12 @@ import {
   type HrTeamSource,
   // HR-P4 (0269) — employee master
   type HrPeopleSource,
+  // HR-P6 (0276) — targets + scoreboard
+  type KpiKey,
+  type KpiSource,
+  type Scorecards,
+  type SetKpiTargetInput,
+  type SetStoreManagerInput,
   type HrEmployeeDetail,
   type HrEmployeePatchInput,
   type HrRecordExitInput,
@@ -507,6 +513,10 @@ export const qk = {
     runState: (year: number, month: number) =>
       ["hr", "runs", "state", year, month] as const,
     person: (employeeId: string) => ["hr", "people", employeeId] as const,
+    // HR-P6 (0276) — targets + the scoreboard. Keyed on the metric too: switching
+    // metric changes every number on the page, so it is a different query.
+    kpi: (year: number, month: number, kpiKey: string) =>
+      ["hr", "kpi", year, month, kpiKey] as const,
   },
 };
 
@@ -7395,6 +7405,69 @@ export function useSyncRentalPlanStripe() {
 function useHrInvalidate() {
   const qc = useQueryClient();
   return () => void qc.invalidateQueries({ queryKey: ["hr"] });
+}
+
+// ── HR-P6 (0276) — targets + scoreboard ─────────────────────────────────────
+
+export interface HrKpiResponse {
+  source: KpiSource;
+  scorecards: Scorecards;
+  /** The commission run for this month is approved — the money is settled. */
+  monthLocked: boolean;
+  runStatus: string | null;
+}
+
+export function useHrKpi(
+  year: number,
+  month: number,
+  kpiKey: KpiKey,
+  opts?: Partial<UseQueryOptions<HrKpiResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.kpi(year, month, kpiKey),
+    queryFn: () =>
+      apiFetch<HrKpiResponse>(
+        `/api/hr/kpi?year=${year}&month=${month}&kpi=${kpiKey}`,
+      ),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    ...opts,
+  });
+}
+
+/** Set or correct one dated target. Same date = correction, new date = history. */
+export function useHrSetKpiTarget() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; id: string }, ApiError, SetKpiTargetInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; id: string }>("/api/hr/kpi/target", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrDeleteKpiTarget() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, string>({
+    mutationFn: (id) =>
+      apiFetch<{ ok: true }>(`/api/hr/kpi/target/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Who owns a store's number — the switch that turns the manager view on. */
+export function useHrSetStoreManager() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetStoreManagerInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/kpi/store-manager", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
 }
 
 /** Set the commission method for a store (outletId null) / one outlet. */

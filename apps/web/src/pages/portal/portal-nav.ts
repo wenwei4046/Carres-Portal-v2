@@ -19,6 +19,7 @@ import {
   BadgeCheck,
   LayoutGrid,
   IdCard,
+  Target,
   Users,
   Store,
   Network,
@@ -247,6 +248,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // HR-P4 (2026-07-26) — the employee master. Sits next to Team because
       // that is where a person is created; People is where their file lives.
       { key: "people", label: "People", icon: IdCard },
+      // HR-P6 (0276, 2026-07-26) — targets + the scoreboard. Sits after People
+      // because a target is set ON a person: you need the file to exist first.
+      { key: "performance", label: "Performance", icon: Target },
     ],
   },
   {

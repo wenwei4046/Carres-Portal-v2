@@ -780,6 +780,55 @@ export {
   type AddAdjustmentInput,
 } from "./schemas/commission-runs";
 
+// HR-P6 (0276) — targets + the scoreboard. Sold is computed from the month's
+// attributed lines here, NOT read from commission_run_lines.basis: `basis` is
+// percentage-method only, so a per-model store freezes it at 0 (the trap O1 hit
+// with report.totalBasis). P6 shows no commission, so it cannot contradict a
+// frozen statement.
+export {
+  kpiKeySchema,
+  KPI_METRICS,
+  DEFAULT_KPI,
+  kpiMetric,
+  kpiKeysForMigration,
+  kpiScopeKindSchema,
+  kpiTargetRowSchema,
+  kpiPersonSchema,
+  kpiStoreSchema,
+  kpiManualActualSchema,
+  kpiManagerCoverageSchema,
+  kpiManagerCandidateSchema,
+  kpiSourceSchema,
+  monthEndExclusive,
+  resolveKpiTargets,
+  attainment,
+  kpiState,
+  kpiTone,
+  computeScorecards,
+  managerViewReady,
+  setKpiTargetInput,
+  setManualActualInput,
+  setStoreManagerInput,
+  type KpiKey,
+  type KpiMetric,
+  type KpiScopeKind,
+  type KpiTargetRow,
+  type KpiPerson,
+  type KpiStore,
+  type KpiManualActual,
+  type KpiManagerCoverage,
+  type KpiManagerCandidate,
+  type KpiSource,
+  type KpiState,
+  type ScorecardRow,
+  type DepartmentRow,
+  type Scorecards,
+  type ScorecardInput,
+  type SetKpiTargetInput,
+  type SetManualActualInput,
+  type SetStoreManagerInput,
+} from "./schemas/hr-kpi";
+
 export {
   LOAN_SOURCES,
   LOAN_OUT_ROUTES,

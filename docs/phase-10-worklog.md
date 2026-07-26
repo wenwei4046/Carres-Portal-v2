@@ -1402,3 +1402,147 @@ Tests: the two asserting the retired button now assert the new truth; the old "c
 **Tests**: +8 shared (`booking-gate.test.ts`) · +9 api (`booking-confirm.test.ts` — 401/403/missing-slot 422/Sunday 422/goods-gate 422 naming the sku/balance-gate 422 naming RM/reserved-ledger satisfies/happy path payload/PUT rejects booking_stage). Suites at baseline: shared 1174/1174 · api 3 pre-existing · web 16 pre-existing. tsc(app) 0 · build ✓ · check:v4 ✓ · design lint ✓ (2 hex literals swapped for `text-success`/`text-warning` tokens after the lint caught them). Known pre-existing: `packages/shared` standalone `tsc --noEmit` fails in `schemas/orders.test.ts` (0258 edit_addon union) — reproduced with my changes stashed.
 
 **Not done, said out loud**: (a) no visual smoke — the login wall requires typing a password, which the agent doesn't do; Loo smokes per habit; (b) the orders LIST/queues still key on the old signals — D1 scoped the drawer + API + chip only, per the implementation doc's "其余不动"; (c) service-only orders pass the goods gate vacuously (the drawer's `allReceived` reads false there — that flag feeds the pipeline word, not this gate; blocking a pure-service booking forever would be the real bug).
+## 2026-07-26 ㉒ · HR-P6 — targets + the scoreboard (0276, branch `feat/hr-p6-kpi`, NOT yet deployed)
+
+Worktree `hr-hierarchy`, re-homed off the parked `feat/hr-p4-employee-master` onto `origin/main`
+`e456c87a` first. Design mock approved by Loo before any code (his standing law):
+https://claude.ai/code/artifact/e9d96403-ddfa-428e-8c3f-f14c507f0a3c — then "开工, but ignore
+AutoCount Archive (旧账)".
+
+### The habit again: query live, then read the spec
+
+Every material deviation below came from a measurement, not an opinion.
+
+| Measured live | What it changed |
+|---|---|
+| `app_users.reports_to_user_id` holds **1 edge in the whole company** (CR005 Shasha → CR002 Jess), and both sell nothing | the rollup ships OFF |
+| `salespersons` has **no manager column at all**; `hr_set_reports_to(p_user_id …)` only takes app_users | floor staff — the only people with sales — cannot be in an HQ rollup |
+| 5 duty keys exist and **none is `sales_manager`**; `org_position_duties` is `(duty_key, position_id)` with **no store dimension** | the spec's floor-staff rollup route is **not expressible**, not merely thin |
+| 2 sellers, 1 store, 5 departments of which 3 have no revenue | the 5-rung scope ladder becomes 2 rungs |
+| `commission.ts:252-254` — `basis` accumulates **only** in the percentage branch | a closed month must NOT be scored from `commission_run_lines.basis` |
+| `dealers.channel='showroom'` includes **"AutoCount Archive (旧账)"** (0 staff, 37 archive orders) | scoreable stores are DERIVED, not flagged |
+| **no `app_users` row has `role='hr'`** | new CF: the whole HR portal is principal-only today |
+
+### What was cut from the ratified spec, and why
+
+* **4 tables → 2.** `kpi_definitions` as a config table contradicts the spec's own risk #4
+  ("closed metric enum … no formula builder") — a closed enum in a config table invites a row
+  the code cannot compute, so `KPI_METRICS` is a shared constant mirrored by a CHECK, with a
+  shared test (`kpiKeysForMigration`) that fails if the two drift. `kpi_bonus_tiers` not built:
+  a second money path before `staff_commission_rates` has a single row, and the semantics
+  already live in `model_commission_tiers`.
+* **Scope ladder person>store>position>department>band → person|store.** Three rungs cannot
+  resolve at this size and one is actively wrong: a department-scoped SALES target is
+  meaningless for Operation / Finance / HR. Adding a rung later is a CHECK change + one `case`.
+* **Scope is two nullable FKs with a CHECK**, not `(scope_kind, scope_id)`: real referential
+  integrity, and `scope_kind` is DERIVED from which column is filled so it cannot drift.
+
+### The correction I owed Loo mid-build
+
+In review I told him the fix for "a closed month must not be recomputed" was to read the frozen
+`basis`. **That was wrong** and I said so before writing it: `basis` is percentage-method only,
+so a per-model store freezes 0 — the identical trap O1 hit with `report.totalBasis`. The shipped
+design computes sold from the month's attributed lines through ONE shared function for open and
+closed months alike, which makes it method-independent and makes O1's SOLD tile and P6's
+per-person figures the same arithmetic over the same rows. **P6 deliberately displays no
+commission**, so it structurally cannot contradict a frozen statement. CF `kpi-actuals-not-frozen`.
+
+### Writes are RPC-only, by schema design
+
+`kpi_targets` / `kpi_manual_actuals` get a **SELECT-only** RLS policy. This is the direct lesson
+of 0272: `staff_commission_rates` has `for all`, so `/api/hr/config/staff-rate` upserts the table
+directly, which is *why* the back-dated-rate guard had to be a TRIGGER. Making the DEFINER RPC
+the only door means P6's guards can live where they are readable. Do not widen these to `for all`.
+
+### Two defects the prod dry-run caught before apply
+
+28 assertions ran against live prod in two rolled-back transactions (aborted via `raise` so the
+rollback is guaranteed regardless of MCP transaction semantics — a probe confirmed DDL rollback
+works first).
+
+1. **`revoke execute … from anon` did nothing.** Round 1 reported `anon can execute: 5 of 5`. A
+   new function is created with EXECUTE granted to **PUBLIC**, and anon inherits it, so revoking
+   the named role is theatre while the PUBLIC grant stands. 0268 recorded the mirror-image trap
+   ("REVOKE FROM public does not drop anon" — true when anon *also* holds an explicit grant). The
+   working form is `from public, anon` **plus** an explicit `grant … to authenticated, service_role`,
+   or every Hono user-client call dies with permission denied. Re-verified: anon 0/5,
+   authenticated 5/5, and a live `kpi_source()` as `authenticated` still succeeded. The migration
+   now asserts both counts in its own sanity block.
+2. **My audit assertions were reading the wrong row.** `order by occurred_at desc limit 1`
+   returned the *first* row written, because `audit_log.occurred_at` defaults to `now()` = the
+   **transaction start** time, so every audit row written in one txn shares a timestamp. The
+   `SELF - ` marker was therefore unverified, not proven. Re-read by `ref`: confirmed
+   `SELF - KPI target - person principal - sales_basis - 5000.00 from 2026-07-01` for CR001 (the
+   caller's own employee row) and no marker for CR008. **Rule: inside a transaction, read audit
+   rows back by `ref`, never by time.**
+
+### Guardrail #8 paid for itself
+
+Drafted as 0275 against a tail of 0274. The re-check immediately before applying found the
+parallel line had taken **`0275_rental_makes_a_sales_order`** during the verification pass →
+renumbered to **0276** before apply. Post-apply: tracker tail `0276_hr_kpi_targets`, 5 functions
+(no ghost overload), 2 policies, both tables at 0 rows, 1 scoreable store, archive excluded.
+
+### The AutoCount Archive exclusion is derived, not flagged
+
+Loo: "ignore AutoCount Archive". `_kpi_store_is_scoreable()` = showroom channel **AND** at least
+one CR-coded salesperson. The archive holder has 0 staff and its orders are already excluded from
+`hr_commission_source` by 0265, so its scored sales are structurally RM 0 forever. Deriving it
+means zero migration state, no flag to maintain, and a real new showroom appears the moment its
+first coded person is added — the same instinct as O1 deriving "legacy" from `source_system`
+instead of adding a column. Refused at the WRITE too, not just filtered from the read, so a stale
+client cannot create a target no screen would ever show.
+
+### Three design rules on the screen
+
+1. A person with no target of their own reads **"No target"** — the store's RM 60,000 is *not*
+   split across heads. Dividing it by two would be inventing a number and then judging somebody
+   against it.
+2. A department with no revenue shows **"—"**, never 0%. Grey dot = "does not sell", not "failing".
+3. The **Showrooms** department card reads the STORE aggregate, not the sum of its people:
+   the two differ whenever a personal target is missing, and 94% beside the store card's 87%
+   would be two answers to one question.
+
+Plus: percentages are **floored** in the shared engine, so the figure and the pill can never
+disagree (rounding would print "100%" next to "Behind" at 99.6%); and `unscoredSold` surfaces
+sales booked by a showroom salesperson with no CR code, because the store total is computed from
+lines and the people rows would otherwise silently fail to add up.
+
+### Live-safety check on the already-applied column
+
+0276 adds `dealers.manager_user_id` and prod is shared, so the column is live before the code is.
+`GET /api/dealers/me` does `select("*")` — but it parses `Adapters.dealerFromRow(data)` output (an
+explicit field whitelist) with a non-strict `z.object`, and no `.strict()` schema anywhere covers a
+dealer row. An extra column cannot reach the parse. Verified rather than assumed.
+
+### Surfaces
+
+`packages/shared/src/schemas/hr-kpi.ts` (KPI_METRICS · `resolveKpiTargets` · `computeScorecards` ·
+`attainment`/`kpiState`/`kpiTone` · `managerViewReady` · inputs) · `apps/api/src/lib/kpi-actuals.ts`
+(the one place a scoreboard month is assembled; parses the payload rather than casting, and a
+run-state read failure degrades the badge instead of the numbers) · `apps/api/src/routes/hr-kpi.ts`
+(GET + PUT target + DELETE target + PUT manual + PUT store-manager) · `HrPerformanceTab.tsx` +
+nav entry + `qk.hr.kpi` keyed on the metric.
+
+### Verification
+
+Tests **+83** (shared 36 · api 34 · web 13). Suites at §17.7 baseline with zero new failures:
+shared **1194/1194** · api **3** pre-existing (partner/pickups ×1 + supplier/pos ×2) · web **16**
+pre-existing (OperationOrders ×7 + OrderCustomerCard ×4 + OhanaSofaTab ×4 + NiceFutureMattressTab ×1).
+api typecheck clean; web BUILD clean (v4-guard clean + `tsconfig.app.json` tsc + vite —
+the 2026-07-19 "run the build, not just tsc" lesson); design-standard lint clean;
+`SERVICE_ROLE` grep 0 in `dist`. Bundle built locally as `index-CaQrJhr8.js` — **not deployed**.
+`pnpm --filter @carres/shared typecheck` stays RED on 2 pre-existing `orders.test.ts` errors from
+the parallel line's 0257/0258 — not ours, unchanged.
+
+Also fixed here: the **D3 contradiction** in `docs/hr-system-full-spec.md`. Its row said an hr user
+may NOT write their own comp; §4 records Loo overruling that the same day. §4 is the later ruling
+and it explicitly covers "BOTH the P7 comp register and the P6 rates/targets guard" — so leaving
+the stale clause in place would have had P6 built backwards. The retraction is now written into the
+row itself rather than silently deleted.
+
+### Not done
+
+No deploy (needs a merge to origin/main first — Loo's permanent rule). No `hr`-role user exists to
+smoke the non-principal path. P6 is data-empty until Loo sets a target: the tables are at 0 rows,
+so the page will show RM 52,081 sold against "—" until then.
