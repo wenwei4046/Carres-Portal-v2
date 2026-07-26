@@ -1359,6 +1359,13 @@ describe("rental + service plan adapters (0247-0249)", () => {
       rejection_reason: null,
       credit_checked_at: null,
       credit_reference: null,
+      signed_at: "2026-07-25T09:30:00Z",
+      signed_name: "Tan Ah Kow",
+      signed_nric: "900101-14-5555",
+      signature_path: "rental-agreements/2026/sig-1001.png",
+      signed_doc_path: null,
+      template_id: "00000000-0000-0000-0000-0000000e0001",
+      template_version: 3,
       created_at: "2026-07-25T00:00:00Z",
       updated_at: "2026-07-25T00:00:00Z",
       created_by: null,
@@ -1371,6 +1378,60 @@ describe("rental + service plan adapters (0247-0249)", () => {
     expect(out.status).toBe("active");
     expect(out.buyoutAmount).toBeNull();
     expect(out.startDate).toBe("2026-08-01");
+    // 0278 — the signature travels, and WHICH wording was signed travels with
+    // it. A path without a version is a picture, not evidence.
+    expect(out.signedAt).toBe("2026-07-25T09:30:00Z");
+    expect(out.signedName).toBe("Tan Ah Kow");
+    expect(out.signedNric).toBe("900101-14-5555");
+    expect(out.signaturePath).toBe("rental-agreements/2026/sig-1001.png");
+    expect(out.templateId).toBe("00000000-0000-0000-0000-0000000e0001");
+    expect(out.templateVersion).toBe(3);
+    // the archived filled PDF has no writer yet — it must read as absent, not
+    // as an empty string that a link would happily render.
+    expect(out.signedDocPath).toBeNull();
+  });
+
+  it("rentalAgreementFromRow degrades a pre-0278 row to 'not signed', never undefined", () => {
+    // A browser on THIS build can be talking to a Worker deployed before 0278.
+    // The approver screen renders a warning off `signedAt == null`, so an
+    // undefined here would silently show "Signed" for an unsigned contract.
+    const legacy = rentalAgreementFromRow({
+      id: "00000000-0000-0000-0000-0000000d0003",
+      agreement_no: "RA-1003",
+      customer_id: "00000000-0000-0000-0000-0000000c0003",
+      dealer_id: null,
+      salesperson_id: null,
+      order_id: null,
+      plan_id: null,
+      sku: "TEST-RENTAL-K",
+      term_months: 84,
+      monthly_fee: 69,
+      supplier_rate_pct: 49,
+      commission_base_pct: 20,
+      start_date: "2026-07-26",
+      status: "active",
+      buyout_at: null,
+      buyout_amount: null,
+      ownership_transfer_at: null,
+      ownership_doc_url: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      offer_id: null,
+      selected_options: {},
+      gifts: [],
+      one_off_total: 0,
+      notes: null,
+      created_at: "2026-07-26T00:00:00Z",
+      updated_at: "2026-07-26T00:00:00Z",
+      created_by: null,
+    } as unknown as RentalAgreementRow);
+    expect(legacy.signedAt).toBeNull();
+    expect(legacy.signedName).toBeNull();
+    expect(legacy.signedNric).toBeNull();
+    expect(legacy.signaturePath).toBeNull();
+    expect(legacy.signedDocPath).toBeNull();
+    expect(legacy.templateId).toBeNull();
+    expect(legacy.templateVersion).toBeNull();
   });
 
   it("rentalAgreementFromRow carries the 0268 credit decision", () => {
@@ -1399,6 +1460,13 @@ describe("rental + service plan adapters (0247-0249)", () => {
       gifts: [],
       one_off_total: 0,
       notes: null,
+      signed_at: null,
+      signed_name: null,
+      signed_nric: null,
+      signature_path: null,
+      signed_doc_path: null,
+      template_id: null,
+      template_version: null,
       created_at: "2026-07-26T00:00:00Z",
       updated_at: "2026-07-26T00:00:00Z",
       created_by: null,

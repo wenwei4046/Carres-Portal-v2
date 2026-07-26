@@ -32,6 +32,7 @@ import {
   usePwpAvailableForPhone,
   useCreateRentalAgreement,
   useRentalPosPlans,
+  useRentalAgreementTemplate,
   usePwpCodesMine,
   useReservePwpCode,
   useSalespersons,
@@ -64,6 +65,7 @@ import QuotesDrawer from "./pos/QuotesDrawer";
 import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
 import { cartModeOf, rentalOf, type RentalLineAttrs } from "./pos/rental-cart";
+import RentalAgreementBlock from "./pos/RentalAgreementBlock";
 
 /** True when a restored draft has real content worth resuming. */
 function draftHasContent(d: WizardDraft): boolean {
@@ -490,12 +492,18 @@ export default function DealerPos({
   // disabled with no visible reason). Signature + terms still do: they ARE the
   // rental agreement.
   const isRentalCart = cartModeOf(draft.lines) === "rental";
+  // 0278 — a rental cannot be signed against wording that does not exist. The
+  // server refuses it (`no_agreement_template`), so the button must too, with
+  // the reason on screen: RentalAgreementBlock renders it right above. Only
+  // fetched for a rental cart — an ordinary sale never asks.
+  const rentalTemplateQ = useRentalAgreementTemplate({ enabled: isRentalCart });
+  const rentalAgreementReady = !isRentalCart || !!rentalTemplateQ.data?.template;
   const confirmReady = useMemo(
     () =>
       isRentalCart
-        ? step4ValidRental(draft)
+        ? step4ValidRental(draft) && rentalAgreementReady
         : step4Valid(draft, paymentMethods) && asapDepositOk,
-    [draft, asapDepositOk, paymentMethods, isRentalCart],
+    [draft, asapDepositOk, paymentMethods, isRentalCart, rentalAgreementReady],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
@@ -550,6 +558,20 @@ export default function DealerPos({
           planId: rental.planId,
           customerName: draft.customer.name.trim(),
           customerPhone: draft.customer.phone.trim(),
+          // 0278 — THE FIX. `step4ValidRental` has always refused to enable
+          // Complete without a real `data:image/…` on the pad; this branch then
+          // returned before the ordinary path's upload, so the drawing the
+          // customer made was discarded in the browser and the contract was
+          // approved on the strength of a signature nobody kept. The bytes go
+          // to Hono, which writes them to the private evidence bucket with the
+          // service client (a store JWT cannot write there) and hands the DB
+          // the path. `confirmReady` above guarantees this is non-null.
+          signatureDataUrl: draft.signature!,
+          // The signer defaults to the customer on the order, which is who it
+          // is at a counter. The API accepts a different name (a spouse or
+          // guardian) but no field asks for one yet — CF
+          // `rental-signer-name-not-editable`.
+          signedName: draft.customer.name.trim(),
           ...(draft.customer.email?.trim() ? { customerEmail: draft.customer.email.trim() } : {}),
           ...(composedRentalAddress ? { customerAddress: composedRentalAddress } : {}),
           ...(actingDealerId ? { dealerId: actingDealerId } : {}),
@@ -567,7 +589,16 @@ export default function DealerPos({
       clearDraft();
       setRentalDone(done);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not create the rental agreement";
+      // 0278 — one refusal is not the store's fault and must not read like a
+      // bug: the principal has not published the agreement wording, so there is
+      // no paper to sign. Name the screen instead of echoing a DB sentence.
+      const code = (err as { body?: { code?: string } } | null)?.body?.code;
+      const msg =
+        code === "no_agreement_template"
+          ? "The rental agreement wording has not been published yet, so nothing can be signed. Ask the principal to open Admin → Rental → Agreements and save it."
+          : err instanceof Error
+            ? err.message
+            : "Could not create the rental agreement";
       // Say what DID happen — a half-finished run must not look like nothing
       // happened, or the store re-submits and double-signs the customer.
       setSubmitError(
@@ -1273,8 +1304,13 @@ export default function DealerPos({
                   </div>
                 </div>
                 <p className="handover__sub">
-                  Record payment, then capture the customer signature to complete the order.
+                  {isRentalCart
+                    ? "Let the customer read the agreement, then capture their signature to submit the application."
+                    : "Record payment, then capture the customer signature to complete the order."}
                 </p>
+                {/* 0278 — the paper goes ABOVE the pad, because you sign after
+                    reading, not before. */}
+                {isRentalCart ? <RentalAgreementBlock /> : null}
                 <Step3SignaturePayment
                   draft={draft}
                   onChange={setDraft}

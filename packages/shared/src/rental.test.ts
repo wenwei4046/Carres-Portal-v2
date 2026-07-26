@@ -246,17 +246,66 @@ describe("rental plan split cap (0253)", () => {
 });
 
 describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
+  const SIG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
   const valid = {
     planId: "00000000-0000-0000-0000-0000000b0001",
     customerName: "Tan Mei Ling",
     customerPhone: "012-3456789",
+    // 0278 — a signup without these is not a signup.
+    signatureDataUrl: SIG,
+    signedName: "Tan Mei Ling",
   };
 
-  it("accepts the minimal signup (plan + mandatory customer name/phone)", () => {
+  it("accepts the minimal signup (plan + mandatory customer name/phone + signature)", () => {
     const out = createRentalAgreementInputSchema.parse(valid);
     expect(out.planId).toBe(valid.planId);
     expect(out.customerName).toBe("Tan Mei Ling");
     expect(out.startDate).toBeUndefined();
+    expect(out.signatureDataUrl).toBe(SIG);
+    expect(out.signedName).toBe("Tan Mei Ling");
+  });
+
+  // ── 0278 — the signature is not optional, and it must be a real drawing ────
+  it("refuses a signup with NO signature — the defect this closes", () => {
+    const { signatureDataUrl: _omit, ...unsigned } = valid;
+    expect(createRentalAgreementInputSchema.safeParse(unsigned).success).toBe(false);
+  });
+
+  it("refuses a signature that is not a base64 png/jpeg data URL", () => {
+    for (const bad of [
+      "",
+      "not-a-data-url",
+      // a PATH is what the DB stores; the browser must hand over BYTES, because
+      // a store JWT cannot write to the private bucket itself.
+      "rental-agreements/2026/sig.png",
+      // an svg data URL is script-capable — the bucket only allows png/jpeg/pdf
+      "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+      "data:text/html;base64,PGgxPmhpPC9oMT4=",
+    ]) {
+      expect(
+        createRentalAgreementInputSchema.safeParse({ ...valid, signatureDataUrl: bad }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("refuses a signature with nobody's name against it", () => {
+    expect(createRentalAgreementInputSchema.safeParse({ ...valid, signedName: "   " }).success).toBe(false);
+    const { signedName: _omit, ...nameless } = valid;
+    expect(createRentalAgreementInputSchema.safeParse(nameless).success).toBe(false);
+  });
+
+  it("keeps the NRIC optional — not every customer hands one over", () => {
+    expect(createRentalAgreementInputSchema.parse(valid).signedNric).toBeUndefined();
+    expect(
+      createRentalAgreementInputSchema.parse({ ...valid, signedNric: "900101-14-5555" }).signedNric,
+    ).toBe("900101-14-5555");
+    expect(createRentalAgreementInputSchema.parse({ ...valid, signedNric: null }).signedNric).toBeNull();
+  });
+
+  it("lets the signer differ from the customer (a spouse or guardian signs)", () => {
+    const out = createRentalAgreementInputSchema.parse({ ...valid, signedName: "Tan Ah Kow" });
+    expect(out.customerName).toBe("Tan Mei Ling");
+    expect(out.signedName).toBe("Tan Ah Kow");
   });
 
   it("accepts the full payload (dealer on-behalf, salesperson, start date, notes)", () => {

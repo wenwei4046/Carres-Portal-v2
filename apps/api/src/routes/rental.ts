@@ -21,6 +21,7 @@ import {
   phoneKeyMy,
   customerInputSchema,
   createRentalAgreementInputSchema,
+  RENTAL_AGREEMENT_DOC_KEY,
   CUSTOMERS,
   SERVICE_PACKAGES,
   RENTAL_PLANS,
@@ -1242,6 +1243,30 @@ rentalRouter.get("/pos-plans", async (c) => {
   return c.json({ plans });
 });
 
+// GET /agreement-template — the wording the customer is about to sign (0278).
+//
+// `rental_agreement_templates` is RLS internal-only (0267), so a store JWT
+// structurally cannot read the paper it is asking a customer to sign. This
+// definer function is that door, and it is the SAME call
+// `create_rental_agreement` makes to stamp `template_version` — so the document
+// on screen and the version recorded on the contract cannot drift apart.
+//
+// `template: null` is a real answer, not an error: it means the principal has
+// not published wording yet, and the POS says so by name instead of leaving the
+// operator with a button that does nothing.
+rentalRouter.get("/agreement-template", async (c) => {
+  sellerOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_current_agreement_template", {
+    p_doc_key: RENTAL_AGREEMENT_DOC_KEY,
+  });
+  if (error) throw new HTTPException(500, { message: error.message });
+  const row = data as DB.RentalAgreementTemplateRow | null;
+  return c.json({
+    template: row ? Adapters.rentalAgreementTemplateFromRow(row) : null,
+  });
+});
+
 /**
  * The create_rental_agreement RPC's jsonb payload.
  *
@@ -1261,16 +1286,64 @@ type CreateAgreementRpcResult = {
   so?: number | null;
 };
 
+// The private bucket 0267 created for signed-agreement evidence. Its storage
+// policies are `is_internal()` on SELECT/INSERT/UPDATE and there is NO delete
+// policy at all — a signed agreement is evidence. That is exactly why the
+// browser cannot upload here: a store/showroom/salesperson JWT fails
+// `is_internal()`, so the signature bytes must travel through Hono and be
+// written with the service client. Measured, not assumed (pg_policies).
+const SIGNATURE_BUCKET = "rental-agreements";
+
+/**
+ * Turn the POS pad's data URL into bytes. The zod schema already constrained
+ * the shape; this re-derives the content type from the payload itself rather
+ * than trusting a separate field, the same doctrine as the web's
+ * `contentTypeFromFilename` (never `blob.type`).
+ */
+function decodeSignature(dataUrl: string): { bytes: Uint8Array; contentType: string; ext: string } {
+  const m = /^data:(image\/(png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) {
+    throw new HTTPException(422, { message: "signature must be a base64 png/jpeg data URL" });
+  }
+  const binary = atob(m[3]!);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return { bytes, contentType: m[1]!, ext: m[2] === "png" ? "png" : "jpg" };
+}
+
 // POST /agreements — sign a rent-to-own agreement at the POS. ONE atomic
 // SECURITY DEFINER RPC: the client names a plan_id, the DB re-reads
 // price/split and writes customer + agreement. Since 0268 the agreement is born
 // `pending_approval` and NOTHING is materialised until finance approves — no
 // billing schedule, no RU asset, no entitlement. No money in the payload.
+//
+// 0278 — and no unsigned agreement either. The signature is written FIRST (the
+// DB needs a path to stamp), then the RPC runs; if the RPC refuses, the blob is
+// removed again so a rejected signup leaves nothing behind. The alternative
+// order is impossible: the agreement id does not exist until the RPC returns.
 rentalRouter.post("/agreements", async (c) => {
   sellerOnly(c);
   const parsed = await parseJsonBody(c, createRentalAgreementInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const d = parsed.data;
+
+  // The object key is SERVER-generated end to end — no client string reaches
+  // the path. No traversal, no collision, no guessing another store's evidence.
+  // The agreement row is the index into this bucket, not the filename.
+  const { bytes, contentType, ext } = decodeSignature(d.signatureDataUrl);
+  const objectKey = `signatures/${new Date().getUTCFullYear()}/${crypto.randomUUID()}.${ext}`;
+  const admin = adminClient(c.env);
+  const up = await admin.storage.from(SIGNATURE_BUCKET).upload(objectKey, bytes, {
+    contentType,
+    // A signature is written ONCE. Overwriting is how evidence quietly dies,
+    // and the bucket has no delete policy for the same reason.
+    upsert: false,
+  });
+  if (up.error) {
+    throw new HTTPException(500, { message: `Could not store the signature: ${up.error.message}` });
+  }
+  const signaturePath = `${SIGNATURE_BUCKET}/${objectKey}`;
+
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("create_rental_agreement", {
     p_plan_id: d.planId,
@@ -1284,8 +1357,17 @@ rentalRouter.post("/agreements", async (c) => {
     p_notes: d.notes ?? null,
     // 0275 — the Sales Order the rental mints needs this to reach operations.
     p_delivery_date: d.deliveryDate ?? null,
+    // 0278 — the evidence.
+    p_signature_path: signaturePath,
+    p_signed_name: d.signedName,
+    p_signed_nric: d.signedNric ?? null,
   });
   if (error) {
+    // No agreement was created, so this blob indexes nothing. Leaving it would
+    // accumulate orphan customer signatures in a bucket that cannot be cleaned
+    // out through the app. Best-effort: a failed cleanup must not mask the real
+    // error the store needs to read.
+    await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
     const detail = (error as { details?: string | null }).details ?? "";
     if (detail === "forbidden") {
       return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
@@ -1302,7 +1384,14 @@ rentalRouter.post("/agreements", async (c) => {
       // 0275 — a rental now mints a Sales Order, so it needs a store; and a
       // combo plan carries no SKU to deliver (CF rental-combo-agreement-sku-null).
       detail === "dealer_required" ||
-      detail === "plan_has_no_sku"
+      detail === "plan_has_no_sku" ||
+      // 0278 — the signature guards. `no_agreement_template` is the one a store
+      // can actually hit: it means the principal has not published the wording,
+      // and the POS turns it into a named blocker rather than a dead button.
+      detail === "signature_required" ||
+      detail === "invalid_signature_path" ||
+      detail === "signed_name_required" ||
+      detail === "no_agreement_template"
     ) {
       return c.json({ error: "invalid_param", code: detail, message: error.message }, 422);
     }

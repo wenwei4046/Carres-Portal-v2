@@ -60,20 +60,8 @@ const PLAN = {
   stripeReady: true,
 };
 
-const CREATED = {
-  agreement: {
-    id: "00000000-0000-0000-0000-0000000d0001",
-    agreementNo: "RA-1001",
-    sku: "M-CLOUD-K",
-    termMonths: 84,
-    monthlyFee: 59,
-    status: "active",
-  },
-  customer: { id: "c1", name: "Tan Mei Ling", phone: "0123456789" },
-  unit: { id: "u1", unitCode: "RU-1001", status: "allocated" },
-  entitlementId: "e1",
-  visitsTotal: 21,
-};
+// The CREATED fixture went with the signup tests: since 0278 this page cannot
+// create an agreement at all, so there is no success payload to stand in for.
 
 function setPlans(plans: unknown[]) {
   plansState = { data: { plans }, isPending: false, error: null, isSuccess: true };
@@ -106,11 +94,14 @@ describe("RentToOwnPage — offers", () => {
   });
 });
 
-describe("RentToOwnPage — sign", () => {
-  it("gates on plan + name + phone, then signs with planId/startDate (+ salesperson scoped to the dealer)", () => {
-    mockCreate.mockImplementation(
-      (_input: unknown, opts: { onSuccess: (r: typeof CREATED) => void }) => opts.onSuccess(CREATED),
-    );
+describe("RentToOwnPage — sign (RETIRED since 0278)", () => {
+  // This page was replaced by the Rental CATEGORY in the POS (PR #347) and has
+  // no signature pad. Since 0278 an agreement is born signed or is not born, so
+  // this form structurally cannot create one — the server would refuse it with
+  // `signature_required`. The button now says that instead of firing a request
+  // that cannot succeed. These tests pin the door SHUT.
+
+  it("does not call the signup API, even with a complete form", () => {
     render(<RentToOwnPage actingDealerId="d1" dealerId="d1" onClose={() => {}} />);
 
     const sign = screen.getByTestId("rental-sign");
@@ -120,41 +111,26 @@ describe("RentToOwnPage — sign", () => {
     fireEvent.change(screen.getByTestId("rental-name"), { target: { value: "Tan Mei Ling" } });
     fireEvent.change(screen.getByTestId("rental-phone"), { target: { value: "0123456789" } });
 
-    // Salesperson list is scoped to dealer d1 — Ben (d2) must not appear.
+    // Salesperson list is still scoped to dealer d1 — Ben (d2) must not appear.
     const spSelect = screen.getByTestId("rental-salesperson");
     expect(spSelect).toHaveTextContent("Aina");
     expect(spSelect).not.toHaveTextContent("Ben");
-    fireEvent.change(spSelect, { target: { value: "00000000-0000-0000-0000-0000000f0001" } });
 
     expect(sign).not.toBeDisabled();
     fireEvent.click(sign);
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockCreate.mock.calls[0]![0]).toMatchObject({
-      planId: PLAN.id,
-      customerName: "Tan Mei Ling",
-      customerPhone: "0123456789",
-      dealerId: "d1", // acting on behalf → body dealerId travels
-      salespersonId: "00000000-0000-0000-0000-0000000f0001",
-    });
-    expect((mockCreate.mock.calls[0]![0] as { startDate: string }).startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-
-    // Signed screen: RA number + the collect CTA opens the (stubbed) modal.
-    expect(screen.getByTestId("rental-created-no")).toHaveTextContent("RA-1001 signed");
-    expect(screen.getByText(/21 service visits/)).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("rental-collect-open"));
-    expect(screen.getByTestId("collect-modal-stub")).toHaveTextContent("RA-1001");
+    // THE assertion: no unsigned agreement can be created from here.
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it("a store login (no acting dealer) sends NO body dealerId — the JWT wins server-side", () => {
-    mockCreate.mockImplementation(
-      (_input: unknown, opts: { onSuccess: (r: typeof CREATED) => void }) => opts.onSuccess(CREATED),
-    );
+  it("tells the operator where rentals are actually signed now", () => {
     render(<RentToOwnPage dealerId="d1" onClose={() => {}} />);
     fireEvent.click(screen.getByTestId(`rental-term-${PLAN.id}`));
     fireEvent.change(screen.getByTestId("rental-name"), { target: { value: "Tan" } });
     fireEvent.change(screen.getByTestId("rental-phone"), { target: { value: "01234567" } });
     fireEvent.click(screen.getByTestId("rental-sign"));
-    expect("dealerId" in (mockCreate.mock.calls[0]![0] as Record<string, unknown>)).toBe(false);
+    // A dead end that explains itself beats a dead end that just does nothing.
+    expect(screen.getByText(/Rental category in the POS/i)).toBeInTheDocument();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 });

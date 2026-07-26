@@ -100,15 +100,53 @@ describe("FinanceRentalApprover", () => {
     expect(screen.queryByText(/^Signed$/)).not.toBeInTheDocument();
   });
 
-  it("shows Signed once a signature exists", () => {
+  it("names WHO signed and WHICH version once a signature exists (0278)", () => {
     approvalsState = {
-      data: { approvals: [{ ...ROW, signedAt: "2026-07-26T01:00:00Z", signedName: "Tan Mei Ling" }] },
+      data: {
+        approvals: [
+          {
+            ...ROW,
+            signedAt: "2026-07-26T01:00:00Z",
+            signedName: "Tan Mei Ling",
+            templateVersion: 2,
+            signaturePath: "rental-agreements/signatures/2026/abc.png",
+          },
+        ],
+      },
       isLoading: false,
       error: null,
     };
     render(<FinanceRentalApprover />);
-    expect(screen.getByText("Signed")).toBeInTheDocument();
+    // "Signed" alone would be a weaker claim than the data supports: the
+    // approver is extending credit and should see whose hand and which paper.
+    expect(screen.getByText(/Signed by Tan Mei Ling/)).toBeInTheDocument();
+    expect(screen.getByText(/T&C v2/)).toBeInTheDocument();
     expect(screen.queryByText(/Not signed yet/i)).not.toBeInTheDocument();
+  });
+
+  it("offers to open the signature only when one is actually stored", () => {
+    approvalsState = {
+      data: {
+        approvals: [
+          {
+            ...ROW,
+            signedAt: "2026-07-26T01:00:00Z",
+            signedName: "Tan Mei Ling",
+            signaturePath: "rental-agreements/signatures/2026/abc.png",
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    };
+    const { unmount } = render(<FinanceRentalApprover />);
+    expect(screen.getByTestId("view-signature")).toBeInTheDocument();
+    unmount();
+
+    // a pre-0278 application has no file — no dead link that opens nothing
+    approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: null };
+    render(<FinanceRentalApprover />);
+    expect(screen.queryByTestId("view-signature")).not.toBeInTheDocument();
   });
 
   it("approve fires the mutation with approve:true and no note", () => {
