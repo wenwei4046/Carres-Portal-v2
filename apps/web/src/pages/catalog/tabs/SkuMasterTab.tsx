@@ -659,7 +659,12 @@ const SkuRowView = memo(function SkuRowView({
   return (
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: GRID_COLS, opacity: discontinued ? 0.5 : 1 }}
+      // MUST be the same `gridCols` the header uses — this row hardcoded
+      // GRID_COLS while the header switched to the no-size variant, so the row
+      // kept a 9th (100px) track the header had dropped. Same fr tracks, less
+      // free width in the row → every column after Description drifted left
+      // (Loo 2026-07-26: "category 跟价钱偏离这么远"). One template, one source.
+      style={{ gridTemplateColumns: gridCols, opacity: discontinued ? 0.5 : 1 }}
       data-testid={`sku-row-${sku.sku}`}
     >
       <input
