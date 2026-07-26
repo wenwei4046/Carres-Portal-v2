@@ -20,12 +20,16 @@ import { resolveFabricDelta } from "@carres/shared";
  * add-ons list).
  */
 
-/** Categories that render as product cards in the POS grid. */
+/** Categories that render as product cards in the POS grid.
+ *  0261 — 'guarantee' is a card too, but it is NOT self-serve: picking it opens
+ *  the covered-item picker (GuaranteePickerModal) instead of a configurator,
+ *  because a guarantee with nothing attached is untraceable at claim time. */
 export const POS_CARD_CATEGORIES: ProductCategory[] = [
   "mattress",
   "bedframe",
   "sofa",
   "accessory",
+  "guarantee",
 ];
 
 export interface ModelMeta {

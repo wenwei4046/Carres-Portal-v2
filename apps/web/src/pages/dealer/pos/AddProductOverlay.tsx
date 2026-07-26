@@ -2,10 +2,13 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type {
   CatalogResponse,
+  GuaranteeTermDto,
   Order,
   ProductCategory,
   ProductModelDto,
+  ProductSkuDto,
 } from "@carres/shared";
+import { guaranteeAttrs } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { rm } from "@/lib/format-currency";
 import {
@@ -19,6 +22,7 @@ import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import { buildCatalogIndex } from "./catalog-index";
 import ConfigureDrawer from "./ConfigureDrawer";
+import GuaranteePickerModal from "./GuaranteePickerModal";
 import PosConfigurePage from "./PosConfigurePage";
 import ProductCard from "./ProductCard";
 import SofaConfigurePage from "./SofaConfigurePage";
@@ -126,6 +130,27 @@ export default function AddProductOverlay({
     for (const m of index.productModels) present.add(m.category);
     return [...present];
   }, [index]);
+
+  // 0261 — adding a guarantee to an EXISTING order goes through the same gate
+  // as selling one: it must name the item it covers. Without this the generic
+  // ConfigureDrawer below would add it bare, and an unattached guarantee is a
+  // RM150 promise nobody can trace at claim time. Now that the POS is the only
+  // order entry, this overlay is the second (and last) door a guarantee line
+  // can come through.
+  const [guaranteePick, setGuaranteePick] = useState<{
+    term: GuaranteeTermDto;
+    sku: ProductSkuDto;
+  } | null>(null);
+
+  function openModel(m: ProductModelDto) {
+    if (m.category === "guarantee") {
+      const s = (index.skusByModel.get(m.id) ?? [])[0];
+      const term = (catalog.guaranteeTerms ?? []).find((t) => t.guaranteeSku === s?.sku);
+      if (s && term) setGuaranteePick({ term, sku: s });
+      return;
+    }
+    setConfigureModel(m);
+  }
 
   const offeredForConfigure = useMemo(
     () =>
@@ -237,13 +262,35 @@ export default function AddProductOverlay({
                   model={m}
                   meta={index.meta.get(m.id)!}
                   locked={lockedCats.has(m.category)}
-                  onConfigure={() => setConfigureModel(m)}
+                  onConfigure={() => openModel(m)}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {guaranteePick && (
+        <GuaranteePickerModal
+          term={guaranteePick.term}
+          sku={guaranteePick.sku}
+          lines={cartLines}
+          catalog={catalog}
+          context="order"
+          onCancel={() => setGuaranteePick(null)}
+          onPick={(coversSku, coversLabel) => {
+            onPick({
+              localId: newLocalId(),
+              sku: guaranteePick.sku.sku,
+              qty: 1,
+              unitPrice: guaranteePick.sku.price,
+              label: `${guaranteePick.term.label} · ${coversLabel}`,
+              attrs: guaranteeAttrs(coversSku, coversLabel),
+            });
+            setGuaranteePick(null);
+          }}
+        />
+      )}
 
       {configureModel &&
         (() => {

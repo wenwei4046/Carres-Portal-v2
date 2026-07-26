@@ -23,6 +23,7 @@ import {
   Network,
   ScrollText,
   Settings,
+  ShieldCheck,
   HandCoins,
   UserCheck,
   SlidersHorizontal,
@@ -151,6 +152,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: LifeBuoy,
         badge: "service-notes",
       },
+      // Guarantees (0261-0263, Loo 2026-07-26) — the claim desk. Sits right
+      // under Service Cases because that is where a claim ends up: look the
+      // guarantee up here, then swap the item and open the case.
+      { key: "guarantees", label: "Guarantees", icon: ShieldCheck },
     ],
   },
   {

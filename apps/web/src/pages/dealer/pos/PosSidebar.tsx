@@ -12,6 +12,7 @@ import {
   Package,
   Plus,
   RotateCcw,
+  ShieldCheck,
   Sofa,
   Sparkles,
   Utensils,
@@ -19,7 +20,15 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-export type RailKey = "all" | "mattress" | "bedframe" | "sofa" | "accessory" | "bundles" | "addons";
+export type RailKey =
+  | "all"
+  | "mattress"
+  | "bedframe"
+  | "sofa"
+  | "accessory"
+  | "guarantee"
+  | "bundles"
+  | "addons";
 
 export interface RailEntry {
   key: RailKey;
@@ -37,6 +46,7 @@ const RAIL_ICON: Record<RailKey, LucideIcon> = {
   sofa: Sofa,
   bedframe: Bed,
   accessory: Lamp,
+  guarantee: ShieldCheck,
   bundles: Package,
   addons: Lamp,
 };

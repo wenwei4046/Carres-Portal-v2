@@ -90,6 +90,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5EFE6",
   },
   totalsLabel: { fontSize: 9, color: MUTED, textTransform: "uppercase", letterSpacing: 0.6 },
+  // Guarantee block (0261-0263). Deliberately loud: this is the customer's only
+  // written proof of a 15-year promise, so it gets the accent border, not a
+  // footnote. Rendered flat (no wrapper View around the rows) — a wrapper View
+  // cannot break across pages in react-pdf.
+  guaranteeHead: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: ACCENT,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  guaranteeRow: {
+    borderWidth: 1,
+    borderColor: ACCENT,
+    padding: 8,
+    marginBottom: 6,
+  },
+  guaranteeTitle: { fontSize: 10, fontWeight: 700, marginBottom: 2 },
+  guaranteeLine: { fontSize: 9, color: "#3F3A33", marginBottom: 1 },
+  guaranteeTerms: { fontSize: 8, color: MUTED, marginTop: 3 },
   totalsValue: { fontSize: 10, fontWeight: 700 },
   totalsValueGrand: { fontSize: 12, fontWeight: 700, color: ACCENT },
   footer: {
@@ -119,6 +140,7 @@ function formatMoney(value: number, currency: string): string {
 
 export function InvoiceTemplate(data: InvoiceTemplateData) {
   const { doc_title, invoice_no, issue_date, order_code, customer, dealer, lines, subtotal, tax_amount, total, currency } = data;
+  const guarantees = data.guarantees ?? [];
   // A custom doc_title (e.g. "PAYMENT REQUEST" for an imported order's
   // statement) is NOT a tax document — no SST rows, no tax-invoice
   // disclaimer, and the total reads "Total due".
@@ -187,6 +209,26 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
             <Text style={styles.totalsValueGrand}>{formatMoney(total, currency)}</Text>
           </View>
         </View>
+
+        {guarantees.length > 0 && (
+          <Text style={styles.guaranteeHead}>Guarantee cover on this order</Text>
+        )}
+        {guarantees.map((g, idx) => (
+          <View key={`g-${idx}`} style={styles.guaranteeRow}>
+            <Text style={styles.guaranteeTitle}>{g.label}</Text>
+            <Text style={styles.guaranteeLine}>Covers: {g.covers}</Text>
+            <Text style={styles.guaranteeLine}>
+              {g.coverage_years} years ·{" "}
+              {g.remedy === "replace" ? "one-for-one replacement (not repair)" : "repair"}
+            </Text>
+            <Text style={styles.guaranteeLine}>
+              {g.expires_on
+                ? `Valid ${g.starts_on ?? ""} to ${g.expires_on}`
+                : "Cover starts on the delivery date"}
+            </Text>
+            {g.terms_text ? <Text style={styles.guaranteeTerms}>{g.terms_text}</Text> : null}
+          </View>
+        ))}
 
         <View style={styles.footer}>
           <View style={styles.signBlock}>

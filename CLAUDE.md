@@ -437,6 +437,7 @@ Don't burn an hour spinning. Surface and ask.
 | HR Team hierarchy P1 (org registry + CRnnn staff codes + Team = THE account door) | ✅ P1 live | 2026-07-25 | PR #276 · 0254 |
 | **HR-P2 权限跟着职位走** (duty keys retire the 3 email hardcodes; Permissions matrix in Team tab; legacy fallback for ONE release) | ✅ LIVE | 2026-07-26 | PR #312 · 0260 |
 | HR full-system roadmap RATIFIED: **P2 → P4 → P5 → P6 → P7 → P8 + O1 + O4** (P3 cut; D1-D5 all decided; statutory payroll excluded forever) | 📋 spec locked | 2026-07-26 | `docs/hr-system-full-spec.md` · PR #309-#311 |
+| **Guarantee packages** (6th SKU category — RM150 Mattress Guarantee, 15y, one-for-one swap; entitlement ledger + POS covered-item picker + invoice block + claim desk) | ✅ LIVE | 2026-07-26 | PR #314 · 0261-0263 · `docs/guarantee-package-spec.md` |
 
 ### 17.3 Phase 10 work-log
 
@@ -472,6 +473,7 @@ Don't burn an hour spinning. Surface and ask.
 - **2026-07-26 ⑦** · **Rental SETTING closed loop — offers off a Modular model** (PR #315 merge `0ff8f1bc`, migration **0264 applied**, api Worker `7fb8505c` + web `index-CAb0V6zA.js` — **DEPLOYED**) — the "type a SKU code" box is gone: an OFFER is authored per `product_models` row with a rent lane (price matrix: live SKUs / sofa compartments / combos × terms), a BUY lane, an option+fabric price overlay (each value one-time and/or monthly, fabric drills series→colour), manual surcharge slots, GWP gifts as real SKUs, and attached service plans whose SKU is minted as `SVC-{MAT|BF|SOFA|ACC}-{CLEAN|REPAIR|SVCX}-{n}Y{visits}`. `rental_plans` stays the rent money atom (now offer-parented, `line_kind` unit/compartment/combo). 3 new CFs incl. `rental-combo-agreement-sku-null`.
 - **2026-07-25 (night ⑤)** · **HR departments + Department chart** (PR #295, 0259 applied + deployed same session, worktree `hr-hierarchy`) — `org_departments` registry (5 seeded) + position→department link (C-level stays department-less, tops the chart); Team tab gains a Department chart card (Management strip → dept columns → Showrooms → Unassigned), Positions rows with department picker, Departments card. Worker `19a3a6e1` + web `index-D7Ejw5bd.js` (merge `3db49b9f`). Hierarchy-P2 permissions proposal presented, awaiting Loo.
 
+- **2026-07-26 ⑦** · **Guarantee packages — the 6th SKU category** (0261-0263, worktree `feat-guarantee-sku`) — RM150 Mattress Guarantee, 15 years, one-for-one swap. Loo's 3 rulings: clock starts on **delivery**, cover is **1:1** (qty-2 line = 2 entitlements), claim is **one-shot**. Minted by an `order_lines` AFTER INSERT trigger so ALL FIVE line-write doors are covered by construction; expiry is **derived, never stored**. Surfaces: SKU Master chip · POS Guarantees rail whose card can't direct-add (covered-item picker stamps `attrs.guarantee.covers_sku`) · invoice Guarantee-cover block · `GuaranteeCoverStrip` in the Customer block of both order-detail surfaces · **Operation → Guarantees** claim desk (one box = SO / name / customer id / phone). Prod-verified in rolled-back transactions before shipping. Closed 2 silent 5-category drift copies (`purchase-report.ts`, api `catalog.ts`). Spec `docs/guarantee-package-spec.md`.
 ### 17.4 Business model (locked 2026-05-03)
 
 - Dealer just sells. Customer pays HQ direct. No HQ→dealer credit/debt.
@@ -494,6 +496,9 @@ Don't burn an hour spinning. Surface and ask.
 - `rental-billing-anchor-drift` — our schedule anchors on start_date, Stripe on checkout completion; ② reconciles by stripe_invoice_id.
 - `rental-agreement-store-read` — store JWTs can't read agreements yet (sell lane holds the RPC payload; checkout = service client + explicit Hono ownership); "My rentals" list needs a dealer-scoped RLS read later.
 - `rental-plan-reprice-policy` — re-price archives the old Stripe Price; unlinked old-fee agreements block checkout (422 plan_repriced); live-agreement re-pricing is a ②+ policy call.
+- `guarantee-claim-no-stock-movement` — a guarantee claim records the swap but moves no stock and raises no replacement line; ops does it by hand.
+- `guarantee-terms-no-admin-ui` — coverage years / covered category are migration-authored; only the PRICE is UI-editable (they can drift).
+- `guarantee-attach-no-ui` — LOW in practice (both POS doors force the covered-item pick); the attach RPC + route exist as the repair path but no button calls them.
 - `bd-network-board-page-cap` — BD board month cards read ONE orders page; under-counts once the network outgrows it.
 - `orders-channel-filter-outlet-id-proxy` — ops orders `channel=` param is a dead, inverted `outlet_id` proxy; filter on `orders.channel` when wiring it.
 - `principal-dealers-join-unbounded` — outlet roll-up reads unbounded; silently truncates past PostgREST max-rows (1000).

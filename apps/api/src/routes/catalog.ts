@@ -41,6 +41,8 @@ import {
   CATALOG_OPTION_POOLS,
   CATALOG_CONFIG_HISTORY,
   CATALOG_FABRICS,
+  GUARANTEE_TERMS,
+  SUPPLIERLESS_CATEGORIES as SHARED_SUPPLIERLESS_CATEGORIES,
   catalogFabricsBatchSaveInput,
   catalogFabricCostInput,
   deliveryFeeConfigPatchInput,
@@ -77,10 +79,13 @@ const catalogRouter = new Hono<AppEnv>();
 // `@carres/shared` (deriveSkuCode) so the mint + generate-skus + the web
 // read-back can't drift.
 
-// Service/accessory categories carry no supplier (their SKUs are internal:
-// delivery / disposal / labour / pure accessories). The create-SKU supplier
-// requirement is relaxed for them.
-const SUPPLIERLESS_CATEGORIES = new Set(["service", "accessory"]);
+// Service / accessory / guarantee categories carry no supplier (their SKUs are
+// internal: delivery / disposal / labour / pure accessories / a guarantee is a
+// promise, never purchased). The create-SKU supplier requirement is relaxed for
+// them. Built from the SHARED list rather than a second hand-kept literal — the
+// old local copy silently missed 'guarantee' when 0261 widened the enum, which
+// would have demanded a supplier for a guarantee SKU.
+const SUPPLIERLESS_CATEGORIES = new Set<string>(SHARED_SUPPLIERLESS_CATEGORIES);
 
 const ALLOWED_PHOTO_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -215,7 +220,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR, bundlesR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR, bundlesR, guaranteeTermsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -278,6 +283,12 @@ catalogRouter.get("/", async (c) => {
     // inactive rows too); the POS active-only filter is applied client-side
     // below, mirroring the 0181 special-addons branch.
     sb.from(PRODUCT_BUNDLES).select("*"),
+    // 0262 — guarantee terms. The POS needs them in the SAME round-trip as the
+    // models: without a term row it cannot tell a guarantee SKU from an
+    // accessory, nor which cart lines the guarantee may attach to. Fetched
+    // UNFILTERED so the maintenance view sees retired terms; the active-only
+    // filter is applied client-side below (mirrors the special-addons branch).
+    sb.from(GUARANTEE_TERMS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -491,6 +502,23 @@ catalogRouter.get("/", async (c) => {
           ? a.sortOrder - b.sortOrder
           : a.fabricCode.localeCompare(b.fabricCode),
       ),
+    // 0262 — guarantee terms (additive, OPTIONAL). POS sees active only; the
+    // admin view sees retired terms too, so an old guarantee still reads as a
+    // named promise on historic orders instead of a bare SKU code.
+    guaranteeTerms: (guaranteeTermsR.data ?? [])
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      .filter((row: any) => adminMode || row.active === true)
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      .map((row: any) => ({
+        guaranteeSku: String(row.guarantee_sku),
+        label: String(row.label),
+        coversCategory: row.covers_category,
+        coverageYears: Number(row.coverage_years),
+        remedy: row.remedy,
+        termsText: row.terms_text ? String(row.terms_text) : null,
+        active: Boolean(row.active),
+      }))
+      .sort((a, b) => a.guaranteeSku.localeCompare(b.guaranteeSku)),
   });
   // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
   // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height

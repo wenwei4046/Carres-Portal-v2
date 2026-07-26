@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 import { SOFA_HEIGHTS } from "../sofa-constants";
+import { guaranteeTermSchema } from "./guarantee";
 import { orderEntryConfigSchema } from "./order-entry";
+import { productCategorySchema, type ProductCategory } from "./product-category";
 
 /**
  * Catalog bundle — single endpoint that returns everything the wizard's product
@@ -13,17 +15,11 @@ import { orderEntryConfigSchema } from "./order-entry";
  * principal/internal sees all). Used by wizard Step 1 to pick the outlet + SP.
  */
 
-// 0169 (Product & Maintenance rebuild) — widened 3->5. 'accessory' and 'service'
-// carry no variant axis (one SKU per model); 'service' is the bucket for
-// delivery / disposal / labour SKUs (SVC-... codes).
-export const productCategorySchema = z.enum([
-  "mattress",
-  "bedframe",
-  "sofa",
-  "accessory",
-  "service",
-]);
-export type ProductCategory = z.infer<typeof productCategorySchema>;
+// The category enum moved to ./product-category so guarantee.ts can share it
+// without a cycle (this bundle carries guaranteeTerms; a term names a
+// category). Re-exported here — every existing import path still works.
+export { productCategorySchema };
+export type { ProductCategory };
 
 export const variantKindSchema = z.enum(["size", "preset", "part"]);
 export type VariantKind = z.infer<typeof variantKindSchema>;
@@ -998,6 +994,11 @@ export const catalogResponseSchema = z.object({
   // 0202 — global procurement fabric master (additive, OPTIONAL). Pre-0202
   // clients that don't read this are wholly unaffected.
   fabrics: z.array(catalogFabricSchema).optional(),
+  // 0262 — guarantee terms (additive, OPTIONAL). The POS needs these in the
+  // SAME round-trip as the models: without them it cannot tell a guarantee SKU
+  // from an accessory, nor which cart lines a guarantee may attach to.
+  // Pre-0262 clients that don't read this key are wholly unaffected.
+  guaranteeTerms: z.array(guaranteeTermSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

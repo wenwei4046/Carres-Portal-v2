@@ -97,6 +97,22 @@ export type InvoiceTemplateData = {
 
   /** Currency display code, default "MYR". */
   currency: string;
+
+  /** 0261-0263 — guarantee packages bought on this order. Rendered as its own
+   *  block under the totals so the customer's copy states, in writing, exactly
+   *  which item is covered and until when. Absent / empty = no block. */
+  guarantees?: Array<{
+    label: string;
+    /** The covered item, spelled out ("B1201S King"). */
+    covers: string;
+    coverage_years: number;
+    /** 'replace' (one-for-one) | 'repair'. */
+    remedy: string;
+    /** null until the order is delivered — the clock starts on delivery. */
+    starts_on: string | null;
+    expires_on: string | null;
+    terms_text: string | null;
+  }>;
 };
 
 /**

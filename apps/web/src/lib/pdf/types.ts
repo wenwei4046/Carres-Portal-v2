@@ -90,6 +90,18 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   total: number;
   currency: string;
+  /** 0261-0263 — guarantee packages bought on this order. Rendered as its own
+   *  block under the totals so the customer's copy states, in writing, exactly
+   *  which item is covered and until when. Absent / empty = no block. */
+  guarantees?: Array<{
+    label: string;
+    covers: string;
+    coverage_years: number;
+    remedy: string;
+    starts_on: string | null;
+    expires_on: string | null;
+    terms_text: string | null;
+  }>;
 };
 
 export type PoTemplateData = {

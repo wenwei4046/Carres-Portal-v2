@@ -63,6 +63,7 @@ import { draftFromOrderLine, draftFromSofaGroup, orderLineEditKind } from "./ord
 import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
 import StripeCollectModal from "./StripeCollectModal";
+import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
 
 /**
  * PosOrderDetail — the POS-native order detail drawer for the My-orders board
@@ -1335,6 +1336,9 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 />
               </label>
             </div>
+            {/* 0261-0263 — the guarantee this customer bought, if any. Silent
+                when there is none, so an ordinary order is unchanged. */}
+            <GuaranteeCoverStrip orderId={order.id} />
           </section>
 
           {/* Delivery */}
