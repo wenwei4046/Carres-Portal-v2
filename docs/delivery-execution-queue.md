@@ -247,7 +247,7 @@ Also fixed a time bomb found in the existing tests: the `BOOKED` fixture hardcod
 `2026-08-01`, which would have silently started testing a different rung once that
 day passed; it is relative now.
 
-## T8 · Delivery groups / partial delivery (promotes L7) — ✅ RULING RECEIVED, unblocked
+## T8 · Delivery groups / partial delivery (promotes L7) ✅ (PR #391)
 
 **Jess's ruling (2026-07-27, verbatim confirmed):** mattress + bed frame = together (HARD,
 never split) · sofa = prefer together but MAY go as a second trip (SOFT — ASK the customer
@@ -255,6 +255,38 @@ wait-vs-split, never auto-split) · pillow / mattress protector NEVER block a de
 (back-order them). Build: the confirm gate learns delivery groups (accessory lines stop
 blocking); a sofa split creates a second booking on the same SO via the
 "confirm delivery preference with customer" flow.
+
+**Shipped note (PR #391, migration 0282):** shared + api + web, two additive columns.
+
+**The HARD rule is STRUCTURE, not a flag.** Mattress and bed frame are not two groups with
+a "keep together" setting someone can bypass — they are ONE group (`bed`) in the new
+`packages/shared/delivery-groups.ts`. No caller can name them separately, so no code path
+can send a mattress without its frame. The SOFT rule is the only split allowed, and it has
+**no default**: omit `deliverGroups` on the confirm endpoint and the trip carries the whole
+order, byte-identical to the pre-T8 gate. That missing default IS "never auto-split".
+
+**The card's stated first bite was already fixed** — "a missing RM39 pillow blocks a
+RM5,000 bed delivery" is not what the code did: `lineReadiness` has returned `reserved` for
+every accessory since 2026-07-07 (Jess's own Klang-stock rule) and the gate already skipped
+service charges. So accessories never blocked. T8 makes the reason explicit — a non-core
+line carries NO group, i.e. it is outside the question rather than "a group that always
+passes" — and pins it with tests instead of leaving it as an accident two files away.
+
+**"A second booking on the same SO" — the one design call.** It cannot be created at split
+time: the whole reason for splitting is that the other group has no date yet. So the split
+records what THIS trip covers (`booking_groups`, NULL = the whole order ⇒ zero backfill),
+the drawer grows a `Second trip` row naming what is still owed, and the follow-up trip is
+confirmed later through the SAME endpoint and the same gates. There stays ONE live booking
+in the columns T1/T5/T7 already read (and T10's calendar next); `delivery_trips` is an
+ARCHIVE of replaced trips, not a competing store.
+
+**Ships with zero live instances behind it:** no order in the database has both a bed set
+and a sofa (14 orders carry sofa lines; all 14 are sofa-only), which is why the split is
+behind an explicit operator choice and surfaces nowhere by default. The wait-vs-split
+chooser appears ONLY when part is ready and part is not, and opens on `Wait for everything`.
+
+`docs/COPY-STANDARD.md` gains the group words (`Bed set` · `Sofa` · `Second trip`;
+"partial delivery" / "split shipment" / "back-order" banned on screen).
 
 ## T9 · Logistic partner profiles (promotes L6)
 
@@ -300,7 +332,7 @@ else is planned past T11 on purpose.
   operator confirms a date the partner cannot honour). Today partners are bare rows; build the
   fields WITH the first consumer (likely L1's deadlines or L2's calendar), not as an admin page
   up front.
-- **L7 Delivery groups / partial delivery → PROMOTED TO T8 — NEEDS A JESS RULING BEFORE ANY BUILD.**
+- **L7 Delivery groups / partial delivery → SHIPPED as T8 (PR #391, migration 0282).**
   The business rule from Jess's design conversation: mattress + bed frame = ONE delivery
   (hard, never split) · sofa = prefer together but may go as a second trip · accessories
   (pillow/protector) NEVER block a delivery, back-order them. Today's `bookingConfirmGate`
@@ -326,7 +358,7 @@ else is planned past T11 on purpose.
 | T5 | ✅ shipped 2026-07-26 | #382 |
 | T6 | ✅ shipped 2026-07-26 | #384 |
 | T7 | ✅ shipped 2026-07-27 | #386 |
-| T8 | ⬜ unblocked — ruling recorded in card | — |
+| T8 | ✅ shipped 2026-07-27 | #391 |
 | T9 | ⬜ partner profiles | — |
 | T10 | ⬜ delivery calendar | — |
 | T11 | ⬜ delivery module page (FINAL) | — |
