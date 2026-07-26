@@ -684,6 +684,45 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.getAllByTestId("order-row")).toHaveLength(count);
   });
 
+  it("QUEUES gains the T3 delay-radar row — count matches NEXT, click filters, completed never counts", () => {
+    listHookState.data = {
+      orders: [
+        // Open order whose latest stock ETA overshoots the customer date.
+        makeRow({
+          id: "dr1",
+          so: 1301,
+          delivery_date: relISO(10),
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, source_po: "PO/1" }],
+          ops_order_control: {
+            line_stock_status: { "mattress:MAT-1": "waiting" },
+            line_etas: { "mattress:MAT-1": relISO(14) },
+          },
+        }),
+        // Delivered twin with the same overshoot — guardrail #2: never counted.
+        makeRow({
+          id: "dr2",
+          so: 1302,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivery_date: relISO(10),
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, source_po: "PO/1" }],
+          ops_order_control: {
+            line_stock_status: { "mattress:MAT-1": "waiting" },
+            line_etas: { "mattress:MAT-1": relISO(14) },
+          },
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    const row = screen.getByTitle(
+      "Stock ETA lands AFTER the promised date — tell the customer now, before the window (delay radar, T3)",
+    );
+    expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
+    fireEvent.click(row);
+    expect(rowsBySo()).toEqual(["1301"]);
+  });
+
   it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
     wrap(<OperationOrdersControl />);
@@ -927,6 +966,136 @@ describe("nextActionOf (C2)", () => {
     expect(
       nextActionOf(makeRow({ id: "y", so: 2, delivery_date: inDays(3) }), { state: "awaiting" }, SOFA).tone,
     ).toBe("danger");
+  });
+
+  // ── T3 · Delay Radar — catch the miss BEFORE the window ──
+  it("stock ETA overshoots the customer date (date still future) → Call customer (stock delay) (red)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(14) },
+      },
+    });
+    // Without the radar this would be "Chase supplier" (amber) — the radar
+    // outranks it: chasing the supplier can no longer save the date.
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Call customer (stock delay)",
+      tone: "danger",
+    });
+  });
+
+  it("stock ETA still makes the date (even inside the buffer) → stays Chase supplier, radar silent", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(9) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+  });
+
+  it("stock ETA exactly ON the date → not a delay (strict overshoot only)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(10) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+  });
+
+  it("waiting stock with NO ETA → Chase supplier, never stock delay (radar needs a real ETA)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: { line_stock_status: { "mattress:MAT-1": "waiting" } },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+  });
+
+  it("delivered order with an overshooting ETA → Done (guardrail #2 — completed never alarms)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(14) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Done",
+      tone: "neutral",
+    });
+  });
+
+  it("Master says all lines Ready → radar can't fire (goods secured, logistic track)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "ready" },
+        line_etas: { "mattress:MAT-1": inDays(14) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistic");
+  });
+
+  it("No PO + overshooting ETA → Order PO (RUNG 1 not leapfrogged by the radar)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(14) },
+      },
+    });
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Order PO");
+  });
+
+  it("TBD delivery date → radar silent (no date to overshoot)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      delivery_date_tbd: true,
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(14) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+  });
+
+  it("past deadline + partner + waiting stock + overshooting ETA → Chase logistic stays (locked escalation not overridden)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(-2),
+      ops_assigned_logistic: "p1",
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(5) },
+      },
+    });
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Chase logistic",
+      tone: "danger",
+    });
   });
 
   // ── LOGISTIC TRACK — stock in, arrange delivery ──
