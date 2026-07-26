@@ -1,5 +1,5 @@
 /**
- * RentalTab — the rent & buy offer config (0248/0249 + 0264). Mirrors the
+ * RentalSettingPage — the rent & buy offer config (0248/0249 + 0264). Mirrors the
  * PromoTab test style with mocked query/mutation hooks.
  *
  * Covers:
@@ -16,7 +16,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import RentalTab from "./RentalTab";
+import { MemoryRouter } from "react-router-dom";
+import RentalSettingPage from "./RentalSettingPage";
+
+/** The page reads `?section=` — mount it inside a router at the family under test. */
+function renderPage(props: { isPrincipal: boolean }, section = "bedframe") {
+  return render(
+    <MemoryRouter initialEntries={[`/principal?tab=rental-setting&section=${section}`]}>
+      <RentalSettingPage {...props} />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -280,26 +290,43 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Sections + empty states
 // ---------------------------------------------------------------------------
-describe("RentalTab — sections + empty states", () => {
-  it("renders both section headings and the empty states", () => {
-    render(<RentalTab isPrincipal={true} />);
+describe("RentalSettingPage — sections + empty states", () => {
+  it("opens on a product family and shows that family's empty state", () => {
+    renderPage({ isPrincipal: true });
+    expect(screen.getByRole("heading", { name: "Rental" })).toBeInTheDocument();
+    expect(screen.getByText("Bed frame offers")).toBeInTheDocument();
+    expect(screen.getByTestId("offers-empty")).toHaveTextContent("No bed frame offer yet");
+    // The care plans live on their own tab, not underneath the offers.
+    expect(screen.queryByTestId("packages-empty")).not.toBeInTheDocument();
+  });
+
+  it("the service-package tab holds the care plans", () => {
+    setConfig({ servicePackages: [makePackage()] });
+    renderPage({ isPrincipal: true }, "service");
     expect(screen.getByText("Service packages")).toBeInTheDocument();
-    expect(screen.getByText("Offers")).toBeInTheDocument();
-    expect(screen.getByTestId("packages-empty")).toBeInTheDocument();
-    expect(screen.getByTestId("offers-empty")).toHaveTextContent(
-      "No offers yet — pick a model to author the first rent-to-own or outright offer.",
-    );
+    expect(screen.getByTestId("pkg-row-pkg-1")).toBeInTheDocument();
+    // No offer list — and no "+ New offer" (a care plan is not an offer).
+    expect(screen.queryByTestId("offers-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("offer-add")).not.toBeInTheDocument();
+  });
+
+  it("each family tab counts what it holds", () => {
+    setConfig({ rentalOffers: [makeOffer()], servicePackages: [makePackage()] });
+    renderPage({ isPrincipal: true });
+    expect(screen.getByTestId("pm-tab-bedframe")).toHaveTextContent("Bed frame (1)");
+    expect(screen.getByTestId("pm-tab-mattress")).toHaveTextContent("Mattress (0)");
+    expect(screen.getByTestId("pm-tab-service")).toHaveTextContent("Service package (1)");
   });
 
   it("shows the loading state while the config is pending", () => {
     configState = { data: undefined, isPending: true, error: null };
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     expect(screen.getByText(/Loading rental config/)).toBeInTheDocument();
   });
 
   it("shows the error state when the config fails", () => {
     configState = { data: undefined, isPending: false, error: new Error("boom") };
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     expect(screen.getByText(/Failed to load the rental config/)).toBeInTheDocument();
   });
 });
@@ -307,9 +334,9 @@ describe("RentalTab — sections + empty states", () => {
 // ---------------------------------------------------------------------------
 // Gating
 // ---------------------------------------------------------------------------
-describe("RentalTab — gating", () => {
+describe("RentalSettingPage — gating", () => {
   it("principal: shows + New offer and + New service package", () => {
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     expect(screen.getByTestId("package-add")).toBeInTheDocument();
     expect(screen.getByTestId("offer-add")).toBeInTheDocument();
   });
@@ -320,7 +347,7 @@ describe("RentalTab — gating", () => {
       rentalOffers: [makeOffer()],
       rentalPlans: [makePlan()],
     });
-    render(<RentalTab isPrincipal={false} />);
+    renderPage({ isPrincipal: false });
     expect(screen.queryByTestId("package-add")).not.toBeInTheDocument();
     expect(screen.queryByTestId("offer-add")).not.toBeInTheDocument();
     expect(screen.queryByTestId(`offer-delete-${OFFER_ID}`)).not.toBeInTheDocument();
@@ -332,7 +359,7 @@ describe("RentalTab — gating", () => {
 // ---------------------------------------------------------------------------
 // Offer row summary
 // ---------------------------------------------------------------------------
-describe("RentalTab — offer rows", () => {
+describe("RentalSettingPage — offer rows", () => {
   it("summarises the model, the monthly range and the Stripe sync count", () => {
     setConfig({
       rentalOffers: [makeOffer()],
@@ -355,7 +382,7 @@ describe("RentalTab — offer rows", () => {
         },
       ],
     });
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     const row = screen.getByTestId(`offer-row-${OFFER_ID}`);
     expect(row).toHaveTextContent("Kayu Bed Frame");
     expect(row).toHaveTextContent("59");
@@ -366,14 +393,14 @@ describe("RentalTab — offer rows", () => {
 
   it("the On sale toggle patches the offer", () => {
     setConfig({ rentalOffers: [makeOffer()] });
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     fireEvent.click(screen.getByTestId(`offer-active-${OFFER_ID}`));
     expect(mockPatchOffer).toHaveBeenCalledWith({ id: OFFER_ID, patch: { active: false } });
   });
 
   it("the Sync button re-projects every unsynced rent line", () => {
     setConfig({ rentalOffers: [makeOffer()], rentalPlans: [makePlan({ stripePriceId: null })] });
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     fireEvent.click(screen.getByTestId(`offer-sync-${OFFER_ID}`));
     expect(mockSyncPlan).toHaveBeenCalledTimes(1);
     expect(mockSyncPlan.mock.calls[0][0]).toBe("plan-1");
@@ -383,9 +410,9 @@ describe("RentalTab — offer rows", () => {
 // ---------------------------------------------------------------------------
 // Model picker
 // ---------------------------------------------------------------------------
-describe("RentalTab — model picker", () => {
+describe("RentalSettingPage — model picker", () => {
   it("creates the offer off a PICKED model (never a typed SKU code)", () => {
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     fireEvent.click(screen.getByTestId("offer-add"));
     fireEvent.click(screen.getByTestId("offer-model-KAYU"));
     expect(mockCreateOffer).toHaveBeenCalledTimes(1);
@@ -399,7 +426,7 @@ describe("RentalTab — model picker", () => {
 
   it("a model that already has an offer is not offered again (UNIQUE model_id)", () => {
     setConfig({ rentalOffers: [makeOffer()] });
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     fireEvent.click(screen.getByTestId("offer-add"));
     expect(screen.queryByTestId("offer-model-KAYU")).not.toBeInTheDocument();
     expect(screen.getByTestId("offer-model-empty")).toBeInTheDocument();
@@ -407,7 +434,7 @@ describe("RentalTab — model picker", () => {
 
   it("a sofa offer starts in both-modes (compartment build AND combo)", () => {
     catalogState = { data: makeCatalog("sofa"), isPending: false, error: null };
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true }, "sofa");
     fireEvent.click(screen.getByTestId("offer-add"));
     fireEvent.click(screen.getByTestId("offer-model-KAYU"));
     expect(mockCreateOffer.mock.calls[0][0]).toMatchObject({ pricingMode: "both" });
@@ -417,9 +444,9 @@ describe("RentalTab — model picker", () => {
 // ---------------------------------------------------------------------------
 // Service packages — the plan IS a SKU
 // ---------------------------------------------------------------------------
-describe("RentalTab — service packages", () => {
+describe("RentalSettingPage — service packages", () => {
   it("previews the auto SKU and sends the category in the create payload", () => {
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true }, "service");
     fireEvent.click(screen.getByTestId("package-add"));
     fireEvent.change(screen.getByTestId("pkg-name"), { target: { value: "Sofa Care — 3 years" } });
     fireEvent.click(screen.getByTestId("pkg-category-sofa"));
@@ -443,7 +470,7 @@ describe("RentalTab — service packages", () => {
 
   it("the row shows the family it serves and its minted SKU", () => {
     setConfig({ servicePackages: [makePackage()] });
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true }, "service");
     const row = screen.getByTestId("pkg-row-pkg-1");
     expect(row).toHaveTextContent("mattress");
     expect(row).toHaveTextContent("SVC-MAT-CLEAN-2Y2");
@@ -456,7 +483,7 @@ describe("RentalTab — service packages", () => {
 // ---------------------------------------------------------------------------
 describe("RentalOfferEditor — via the tab", () => {
   function openEditor() {
-    render(<RentalTab isPrincipal={true} />);
+    renderPage({ isPrincipal: true });
     fireEvent.click(screen.getByTestId(`offer-edit-${OFFER_ID}`));
   }
 
