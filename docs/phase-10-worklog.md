@@ -1161,3 +1161,33 @@ Also dropped ⑮'s leftovers: the guarantee form was still rendering the generic
 **Durable lesson: whenever a value crosses from CONFIG to a MATCH KEY, check what the other side literally stores.** A pool code, a display label and a SKU variant are three different strings for one size, and only one of them matches.
 
 **Ship**: PR #345 (merge `c4c50479`) → web `index-CPq_A7sa.js` → carres-portal `e06f214f` + carres-pos `c7d1bae1`; all 4 canonicals ✓; downloaded 4,155,658 bytes, `SERVICE_ROLE` 0. Tests: shared 1121/1121 (+5) · api 3 = §17.7 baseline · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean. api/DB untouched (Worker stays `3c543c05`).
+
+---
+
+## 2026-07-26 ⑮ · Rent-to-Own becomes a POS category, and the app stops going blank (PR #347, web-only, deployed)
+
+**Loo, after finding his own rental offer invisible in the POS**: "那个 rent to own，我不要它设在这里，我要它变成在我的 POS system 那一边的左边多加一个 category… 它同样是可以 add to cart 的，就像一模一样的 SKU item。它们唯一的区别只是，在 add to cart 之前，点进去那个 product 会跳进去一个 tab，要选择它要供多久，以及它的 variant 是什么，其他的都一模一样."
+
+**Why he couldn't find it** — and why he was right to move it: renting lived behind a SECOND entrance (a top-bar pill) while every other product family lived in the left rail. Two doors into one catalog is precisely what a low-English operator gets wrong. Worth noting: the ORIGINAL locked spec said the rental lane "creates order (type subscription)" — so his instinct was pulling the design BACK to what was agreed, and the shipped standalone-page version was the drift.
+
+**The blank page, diagnosed first.** Loo also reported the screen going white after filling in a rental. The data was fine — `RA-1003` existed, `pending_approval`, 0 billings, 0 units, exactly as 0268 intends, and Stripe had synced 4/4 once he granted the restricted key `product_write` + `feature_write`. The white screen was a RENDER crash, and the real finding was structural: **there was no ErrorBoundary anywhere in `apps/web`**, so any render error unmounted the tree and left a blank document. At a store counter that is the worst possible failure — "it worked" and "it broke" look identical. Added two levels (root in `main.tsx`, route in `App.tsx` keyed on pathname so navigating away clears it), a readable recovery screen, a Try-again that genuinely re-mounts (keyed subtree — clearing the flag alone re-crashes instantly), and the message kept visible so a screenshot is actionable. **Durable lesson: a crash net is not a nice-to-have on an operator-facing app; without one, every future bug reports itself as "nothing happened".**
+
+**The law Loo locked**: *"rent and outright 不能在同一张单"*. Not a preference — a bought mattress is RM1,999 ONCE and a rented one is RM59 EVERY MONTH for 84 months, so a mixed order has no honest `orders.total`, nothing for the 50%-deposit gate to take a percentage of, no printable invoice figure, and half of it needs finance credit approval (0268) while the other half must ship today. I put the alternative (split one cart into two documents at checkout) to him with a ~3× complexity estimate and he chose exclusivity.
+
+**Design decisions worth keeping:**
+- ONE module (`rental-cart.ts`) decides rent-vs-buy; the rail locks, the add guard, the totals and the submit branch all ask it, so they cannot drift apart.
+- The guard sits in **`addLine`** — the single funnel every door already passes through (card tap, configurator, bundle explode, guarantee pick). One guard, four doors, by construction.
+- Rails reuse the **existing sofa-mutex lock affordance** rather than inventing a second "you can't do that" vocabulary.
+- A rental cart bounces the operator **to** the Rental rail, not to a wall of locked cards under "All open".
+- A cart holding both (only reachable from a pre-rule saved draft) reports **rental** — the SAFE answer, routing to the agreement path where the server re-validates, instead of letting a monthly fee ride into `orders.total` as a one-off price.
+- Rental line qty is fixed at 1 with no stepper: one rented item = one agreement + one Stripe subscription + one tracked asset. Renting two means adding it twice — honest rather than clever.
+- The configure page shows the monthly fee AND the contract total together; "RM59" without "× 84 = RM4,956" is how people mis-buy credit.
+- A mid-way checkout failure NAMES the agreements that were already created — a half-finished run must not look like nothing happened, or the store re-submits and double-signs the customer.
+
+The top-bar button and its dead state are gone. `RentToOwnPage` stays on disk with its tests but is mounted nowhere; delete it once the new lane carries a live pilot signup.
+
+**Tests +27** (rental-cart law 12 incl. every malformed-payload shape and the mixed-cart safe answer · configure page 8 · ErrorBoundary 7). Suites: shared 1117/1117 · api 3 pre-existing · web 16 pre-existing (zero new). typecheck 0, build + check:v4 + design-standard clean.
+
+**Ship**: PR #347 (merge `9dee5f29`) → web `index-CYqtv_4v.js` → carres-portal `5d632cf9` + carres-pos `5bfc034d`; **all 4 canonicals matched on the first poll** (no edge lag); downloaded 4,153,052 bytes, `SERVICE_ROLE` 0, rental-rail + ErrorBoundary + Rental-term markers present. The Worker also went out from the same tip (`f56e7391`) because the union carried parallel lines' undeployed guarantees / hr-people / accounts / catalog changes; unauth 401 verified on four routes + the custom domain.
+
+**NOT done, deliberately — Guarantee & Service Package merge.** Loo's unification is right (a guarantee and a care plan are the same object with a different "how many times": 1 vs N), but it needs a migration on the LIVE entitlement engine — `guarantee_terms` gains a type + visits-per-year and the minting trigger branches one-shot vs decrementing — and there is already 1 live guarantee entitlement. **Premise correction for whoever picks it up: there is NO "Guarantee" tab in Product & Maintenance.** Guarantees are a SKU *category* in SKU Master, where a parallel session already shipped "pick Guarantee → scope fields + Covered for (years)" (`GuaranteeScopeFields.tsx` + the `guaranteeFlow` branch in `NewSkuModal.tsx`). That is where the One-time / Recurring switch belongs, which makes the job smaller than it sounded.
