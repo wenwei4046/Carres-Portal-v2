@@ -2918,6 +2918,10 @@ export interface operationOrderDetailPo {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  /** J1 — the supplier's signed DO object in the `delivery-orders` bucket
+   *  (column since 0030). Optional: a browser on this build talking to a
+   *  pre-J1 Worker simply sees no supplier-DO row instead of crashing. */
+  do_file_path?: string | null;
   lines: operationOrderDetailPoLine[];
 }
 export interface operationOrderDetailResponse {
