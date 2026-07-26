@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { useState } from "react";
 import type {
   CatalogOptionPoolDto,
@@ -84,6 +84,7 @@ const COMBOS: SofaComboDto[] = [
     label: "L-shape 3str",
     effectiveFrom: "2026-01-01",
     active: true,
+    discontinuedAt: null,
   },
 ];
 
