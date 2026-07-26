@@ -8,6 +8,7 @@ import {
   EMAIL_CHANGE_REQUESTS_TABLE,
   type EmailChangeRequestRow,
 } from "@carres/shared";
+import { setAccountStatus } from "../../lib/account-status";
 import { handleCreateAccount } from "../../lib/create-account";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -138,81 +139,30 @@ principalAccountsRouter.post("/:id/status", async (c) => {
     );
   }
   const body = parsed.data;
-  const sb = adminClient(c.env);
-  const principalEmail = c.var.auth.email;
 
-  // Look up target before mutating so we can audit-log the email.
-  const target = await sb
-    .from("app_users")
-    .select("id, email, name, role, dealer_id")
-    .eq("id", id)
-    .maybeSingle();
-  if (!target.data) {
-    return c.json(
-      { error: "not_found", code: "not_found", message: "User not found" },
-      404,
-    );
-  }
-  if (target.data.role === "principal" && body.status === "disabled") {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "cannot_disable_principal",
-        message: "Cannot disable a principal account",
-      },
-      422,
-    );
-  }
+  // The flip + GoTrue sign-out + audit sequence lives in lib/account-status so
+  // this door and HR's People door (HR-P4) cannot drift apart. That sequence IS
+  // the security promise — see the header there.
+  const result = await setAccountStatus(adminClient(c.env), {
+    userId: id,
+    status: body.status,
+    reason: body.reason,
+    actorRole: "principal",
+    actorText: c.var.auth.email,
+  });
 
-  const upd = await sb.from("app_users").update({ status: body.status }).eq("id", id);
-  if (upd.error) {
-    return c.json(
-      {
-        error: "rpc_failed",
-        code: "status_update_failed",
-        message: upd.error.message,
-      },
-      500,
-    );
-  }
-
-  // When disabling, also revoke active sessions so the user is signed out.
-  // Supabase admin API: signOut by user_id immediately invalidates all
-  // refresh tokens. The access token they already have remains valid until
-  // it expires (default 1h).
-  //
-  // Since 0266 this is no longer the ONLY thing standing between a disabled
-  // user and the data: app_role()/is_internal()/is_operation()/is_principal()
-  // all require status='active', so RLS and every hr_* DEFINER function deny
-  // them from the next query onward, token or no token.
-  //
-  // The failure is LOGGED rather than swallowed. It used to be an empty
-  // catch, and that is exactly how samantha@carres.com sat "disabled" with a
-  // live session for two months without anyone knowing (found 2026-07-26).
-  if (body.status === "disabled") {
-    try {
-      await sb.auth.admin.signOut(id);
-    } catch (err) {
-      console.log(
-        JSON.stringify({
-          event: "disable_signout_failed",
-          userId: id,
-          email: target.data.email,
-          message: err instanceof Error ? err.message : String(err),
-          note: "status flip still applied; RLS denies from the next query (0266)",
-        }),
+  if (!result.ok) {
+    if (result.code === "not_found") {
+      return c.json({ error: "not_found", code: result.code, message: result.message }, 404);
+    }
+    if (result.code === "cannot_disable_principal") {
+      return c.json(
+        { error: "invalid_input", code: result.code, message: result.message },
+        422,
       );
     }
+    return c.json({ error: "rpc_failed", code: result.code, message: result.message }, 500);
   }
-
-  const verb = body.status === "disabled" ? "Disabled" : "Re-enabled";
-  await sb.from("audit_log").insert({
-    role: "principal",
-    actor_text: principalEmail,
-    action: `${verb} account · ${target.data.name} (${target.data.email})${body.reason ? ` · ${body.reason}` : ""}`,
-    dealer_id: target.data.dealer_id,
-    ref: id,
-  });
 
   return c.json({ id, status: body.status });
 });

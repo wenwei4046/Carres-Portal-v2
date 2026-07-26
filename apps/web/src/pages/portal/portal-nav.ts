@@ -18,6 +18,7 @@ import {
   BarChart3,
   BadgeCheck,
   LayoutGrid,
+  IdCard,
   Users,
   Store,
   Network,
@@ -234,6 +235,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // Team hierarchy (Loo 2026-07-25) — the org registry + THE account door:
       // every new user except dealers is minted here.
       { key: "team", label: "Team", icon: Users },
+      // HR-P4 (2026-07-26) — the employee master. Sits next to Team because
+      // that is where a person is created; People is where their file lives.
+      { key: "people", label: "People", icon: IdCard },
     ],
   },
   {
