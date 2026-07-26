@@ -69,6 +69,7 @@ import {
   type RentalOfferServiceInput,
   type RentalOfferServicePatchInput,
   type RentalAgreementTemplate,
+  type RecordRentalPaymentInput,
   type AgreementTemplateInput,
   type AgreementTemplatePatchInput,
   type RentalAgreement,
@@ -303,6 +304,8 @@ export const qk = {
     approvals: () => ["rental", "approvals"] as const,
     // 0279 — the wording in force, read by the POS before a customer signs.
     agreementTemplate: () => ["rental", "agreement-template"] as const,
+    // 0281 — what has actually been collected against one agreement.
+    collections: (agreementId: string) => ["rental", "collections", agreementId] as const,
   },
   // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
   // so the desk, the order badge and any open drawer all re-read together.
@@ -7439,6 +7442,83 @@ export function useRentalAgreementTemplate(opts?: { enabled?: boolean }) {
       apiFetch<{ template: RentalAgreementTemplate | null }>("/api/rental/agreement-template"),
     staleTime: 60_000,
     enabled: opts?.enabled ?? true,
+  });
+}
+
+/** One scheduled instalment and whatever money has landed on it (0281). */
+export interface RentalCollectionRow {
+  id: string;
+  seq: number;
+  dueDate: string;
+  amountDue: number;
+  status: string;
+  paidAt: string | null;
+  paidAmount: number | null;
+  method: string | null;
+  reference: string | null;
+  supplierShare: number | null;
+  commissionShare: number | null;
+  stripeInvoiceId: string | null;
+  lateInterest: number | null;
+  /** Derived server-side from the date, never stored — so it cannot go stale. */
+  late: boolean;
+}
+
+export interface RentalCollections {
+  agreement: {
+    id: string;
+    agreementNo: string;
+    sku: string;
+    termMonths: number;
+    monthlyFee: number;
+    startDate: string;
+    status: string;
+    supplierRatePct: number;
+    commissionBasePct: number;
+  };
+  totals: {
+    contractValue: number;
+    collected: number;
+    outstanding: number;
+    paidCount: number;
+    lateCount: number;
+    supplierShare: number;
+    commissionShare: number;
+  };
+  billings: RentalCollectionRow[];
+  events: Array<Record<string, unknown>>;
+}
+
+/**
+ * What has actually been collected on one agreement (0281).
+ *
+ * Before this, `rental_billings` had rows and no writer, so the only true
+ * answer lived in the Stripe dashboard and finance had two systems, one of
+ * which lied. Internal-only.
+ */
+export function useRentalCollections(agreementId: string | null) {
+  return useQuery({
+    queryKey: qk.rental.collections(agreementId ?? ""),
+    queryFn: () => apiFetch<RentalCollections>(`/api/rental/agreements/${agreementId}/collections`),
+    enabled: !!agreementId,
+    staleTime: 15_000,
+  });
+}
+
+/** Record a collection that never touched Stripe (bank transfer, cash). */
+export function useRecordRentalPayment(agreementId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { recorded: unknown },
+    ApiError,
+    { seq: number } & RecordRentalPaymentInput
+  >({
+    mutationFn: ({ seq, ...body }) =>
+      apiFetch<{ recorded: unknown }>(
+        `/api/rental/agreements/${agreementId}/collections/${seq}/record`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
   });
 }
 

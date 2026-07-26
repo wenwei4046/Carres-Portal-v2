@@ -2,8 +2,9 @@
 // units) with stat tiles on one page; not a single filterable list, so the
 // ListPageShell single-list frame doesn't fit (same idiom family as
 // OperationReceiving's sectioned tables).
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRentalAgreements, useRentalUnits } from "@/lib/queries";
+import RentalCollectionsPanel from "./RentalCollectionsPanel";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import type { RentalAgreement, RentalStockUnit } from "@carres/shared/domain";
@@ -68,6 +69,8 @@ function statusDisplay(
 
 export default function OperationRental() {
   const agreementsQ = useRentalAgreements();
+  // 0281 — which agreement's collections are open.
+  const [collectionsFor, setCollectionsFor] = useState<string | null>(null);
   const unitsQ = useRentalUnits();
 
   const agreements = useMemo<AgreementListRow[]>(
@@ -162,13 +165,14 @@ export default function OperationRental() {
                 <Th>Monthly</Th>
                 <Th>Start</Th>
                 <Th>Status</Th>
+                <Th>Money</Th>
               </tr>
             </thead>
             <tbody>
               {agreements.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="p-12 text-center text-[12px] text-base-500"
                   >
                     No rental agreements yet — the POS rental lane ships next.
@@ -208,6 +212,23 @@ export default function OperationRental() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`pill ${st.pill}`}>{st.label}</span>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {/* 0281 — the collection ledger. Only an ACTIVE contract
+                          has a schedule to collect against; a pending or
+                          rejected application has nothing to show. */}
+                      {a.status === "active" ? (
+                        <button
+                          type="button"
+                          onClick={() => setCollectionsFor(a.id)}
+                          data-testid="open-collections"
+                          className="text-[12px] font-medium text-primary underline underline-offset-2"
+                        >
+                          Collections
+                        </button>
+                      ) : (
+                        <span className="text-base-300">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -215,6 +236,13 @@ export default function OperationRental() {
           </table>
         </div>
       </section>
+
+      {collectionsFor && (
+        <RentalCollectionsPanel
+          agreementId={collectionsFor}
+          onClose={() => setCollectionsFor(null)}
+        />
+      )}
 
       {/* UNITS */}
       <section data-testid="rental-units-section">
