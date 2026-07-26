@@ -3,6 +3,10 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsOrderControlInput,
+  confirmBookingInput,
+  bookingConfirmGate,
+  isSundayIso,
+  stockMatchKey,
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
@@ -50,6 +54,11 @@ const orderControlRouter = new Hono<AppEnv>();
 
 const ORDER_ID = z.string().uuid();
 
+/** The full overlay column list — ONE copy for GET / PUT / booking-confirm so
+ *  the three responses can never drift apart. */
+const CONTROL_COLUMNS =
+  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, updated_at, updated_by";
+
 function requireOperationOrPrincipal(
   role: string,
 ): asserts role is "operation" | "principal" {
@@ -71,7 +80,7 @@ orderControlRouter.get("/:id/control", async (c) => {
   const { data, error } = await sb
     .from("ops_order_control")
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, updated_at, updated_by",
+      CONTROL_COLUMNS,
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
@@ -145,8 +154,163 @@ orderControlRouter.put("/:id/control", async (c) => {
       { onConflict: "order_id" },
     )
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, updated_at, updated_by",
+      CONTROL_COLUMNS,
     )
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  return c.json({ control: data });
+});
+
+// POST /:id/booking/confirm — D1 Stage 2 (migration 0277): record the
+// CUSTOMER's confirmed date + time slot. The gates — not the operator's
+// judgement — decide whether a booking may confirm (frozen §7 Two-Stage
+// Booking; the UI's disabled button is assistance, THIS is the enforcement):
+//   * date + slot BOTH present (invariant #1 — zod here, CHECK in the DB)
+//   * no Sunday (invariant #8 / frozen §4.7)
+//   * goods ready + balance ready — server-computed from the same signals the
+//     drawer badge reads, through the same shared bookingConfirmGate (no
+//     second engine).
+// Re-calling on a confirmed booking re-confirms: updates date/slot and
+// re-stamps the evidence (a typo is fixed by confirming again, never by an
+// un-confirm that would erase the customer's yes).
+orderControlRouter.post("/:id/booking/confirm", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = confirmBookingInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid booking-confirm input at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+  const { confirmedDate, confirmedTimeSlot } = parsed.data;
+  if (isSundayIso(confirmedDate)) {
+    return c.json(
+      {
+        error: "booking_sunday",
+        code: "booking_sunday",
+        message: "Sunday is not a delivery working day — pick another date",
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  // The order → SO ref (the reserved-units ledger keys on 'SO-<so>').
+  const { data: order, error: orderErr } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("id", idCheck.data)
+    .maybeSingle();
+  if (orderErr) {
+    const m = mapPgError(orderErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) throw new HTTPException(404, { message: "Order not found" });
+  const soRef = `SO-${order.so}`;
+
+  const [linesRes, addonsRes, controlRes, reservedRes, paymentsRes] =
+    await Promise.all([
+      sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", idCheck.data),
+      sb.from("order_addons").select("qty, unit_price").eq("order_id", idCheck.data),
+      sb
+        .from("ops_order_control")
+        .select("line_received, balance")
+        .eq("order_id", idCheck.data)
+        .maybeSingle(),
+      sb
+        .from("ops_stock_items")
+        .select("sku, qty")
+        .eq("status", "reserved")
+        .eq("reserved_ref", soRef),
+      sb.from("order_payments").select("kind, amount").eq("order_id", idCheck.data),
+    ]);
+  for (const r of [linesRes, addonsRes, controlRes, reservedRes, paymentsRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  const lines = (linesRes.data ?? []) as { sku: string; qty: number; unit_price: number | null }[];
+  // Total: the SAME formula the operation detail route serves (orders.ts) —
+  // Σ lines + addons; AutoCount lines carry no prices, so fall back to the
+  // keyed ops_order_control.balance.
+  const lineSum = [
+    ...lines,
+    ...((addonsRes.data ?? []) as { qty: number; unit_price: number | null }[]),
+  ].reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
+  const orderTotal =
+    lineSum > 0 ? lineSum : Number(controlRes.data?.balance ?? 0);
+  // Collected: goods money only — kind payment|deposit (the drawer's Money rule).
+  const collected = ((paymentsRes.data ?? []) as { kind: string; amount: number }[])
+    .filter((p) => p.kind === "payment" || p.kind === "deposit")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const reservedQtyByKey: Record<string, number> = {};
+  for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
+    const k = stockMatchKey(u.sku);
+    reservedQtyByKey[k] = (reservedQtyByKey[k] ?? 0) + Number(u.qty ?? 1);
+  }
+
+  const gate = bookingConfirmGate({
+    lines: lines.map((l) => ({ sku: l.sku, qty: Number(l.qty || 0) })),
+    lineReceived:
+      (controlRes.data?.line_received as Record<string, number> | null) ?? null,
+    reservedQtyByKey,
+    orderTotal,
+    collected,
+  });
+  if (!gate.ok) {
+    const reasons: string[] = [];
+    if (!gate.goodsReady)
+      reasons.push(`goods not ready — not reserved: ${gate.notReadySkus.join(", ")}`);
+    if (!gate.balanceReady)
+      reasons.push(`balance not ready — RM ${gate.outstanding.toFixed(2)} outstanding`);
+    return c.json(
+      {
+        error: "booking_gate",
+        code: "booking_gate",
+        message: `Cannot confirm the booking: ${reasons.join("; ")}`,
+      },
+      422,
+    );
+  }
+
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: idCheck.data,
+        booking_stage: "confirmed",
+        confirmed_date: confirmedDate,
+        confirmed_time_slot: confirmedTimeSlot,
+        customer_confirmed_at: new Date().toISOString(),
+        customer_confirmed_by: auth.id,
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_COLUMNS)
     .single();
   if (error) {
     const m = mapPgError(error);
