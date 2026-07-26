@@ -581,6 +581,26 @@ export function step3DateFirstIssue(
  * 2026-05-22 (Loo) — renamed from step3Valid when the wizard added a new
  * step 3 for delivery date. Body unchanged.
  */
+/**
+ * The CONFIRM gate for a RENTAL cart (Loo 2026-07-26, 0276).
+ *
+ * `step4Valid` demands a payment slip or a Stripe amount, because an ordinary
+ * order must be part-paid before it is accepted. A rental collects NOTHING at
+ * signing — month 1 is charged by Stripe only after finance approves the credit
+ * — so that gate made the rental lane impossible to finish: the Complete button
+ * stayed disabled with no visible reason. This is the same gate minus the money.
+ *
+ * What it still demands is the part that matters: the SIGNATURE and the accepted
+ * terms. Those are not a formality here — they ARE the rental agreement Loo said
+ * must exist before an order does ("no signature, no order"), and they are what
+ * gets stamped onto `rental_agreements.signed_*`.
+ */
+export function step4ValidRental(d: WizardDraft): boolean {
+  if (!d.signature || !d.signature.startsWith("data:image/")) return false;
+  if (!d.termsAccepted) return false;
+  return true;
+}
+
 export function step4Valid(d: WizardDraft, methods?: PaymentMethodConfig[]): boolean {
   if (!d.signature || !d.signature.startsWith("data:image/")) return false;
   if (!d.termsAccepted) return false;

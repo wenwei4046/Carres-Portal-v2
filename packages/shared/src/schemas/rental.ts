@@ -293,6 +293,14 @@ export const createRentalAgreementInputSchema = z
       .regex(/^\d{4}-\d{2}-\d{2}$/, "startDate must be YYYY-MM-DD")
       .optional(),
     notes: z.string().trim().max(1000).optional(),
+    /** 0275 — the Sales Order the rental now mints needs a delivery date to
+     *  reach operations. Optional: without it the agreement is still approved,
+     *  the order just waits in Place until someone sets one. */
+    deliveryDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "deliveryDate must be YYYY-MM-DD")
+      .nullable()
+      .optional(),
   })
   .strict();
 export type CreateRentalAgreementInput = z.infer<typeof createRentalAgreementInputSchema>;

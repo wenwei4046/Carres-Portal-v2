@@ -51,6 +51,7 @@ import {
   step2Valid,
   step3DateValid,
   step4Valid,
+  step4ValidRental,
 } from "./new-order/draft";
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
@@ -199,9 +200,9 @@ export default function DealerPos({
   const rentalPlansQ = useRentalPosPlans();
   const createRentalAgreement = useCreateRentalAgreement();
   /** Agreements created by the last rental checkout (drives the done screen). */
-  const [rentalDone, setRentalDone] = useState<{ agreementNo: string; label: string }[] | null>(
-    null,
-  );
+  const [rentalDone, setRentalDone] = useState<
+    { agreementNo: string; label: string; so: number | null }[] | null
+  >(null);
 
   // ── 0187 (Phase 8c) — the per-CART claimGroup correlation uuid. ONE per cart
   // submit (§6.3): every coded reward line shares it (the server enforces the
@@ -484,9 +485,17 @@ export default function DealerPos({
       step3DateValid(draft, minLeadDays),
     [draft, minLeadDays, effectiveDealerId, entryFormCfg],
   );
+  // 0276 — a RENTAL cart collects nothing at signing, so the payment half of
+  // step4Valid does not apply to it (it made the Complete button permanently
+  // disabled with no visible reason). Signature + terms still do: they ARE the
+  // rental agreement.
+  const isRentalCart = cartModeOf(draft.lines) === "rental";
   const confirmReady = useMemo(
-    () => step4Valid(draft, paymentMethods) && asapDepositOk,
-    [draft, asapDepositOk, paymentMethods],
+    () =>
+      isRentalCart
+        ? step4ValidRental(draft)
+        : step4Valid(draft, paymentMethods) && asapDepositOk,
+    [draft, asapDepositOk, paymentMethods, isRentalCart],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
@@ -534,7 +543,7 @@ export default function DealerPos({
     if (plans.length === 0) return;
 
     setSubmitError(null);
-    const done: { agreementNo: string; label: string }[] = [];
+    const done: { agreementNo: string; label: string; so: number | null }[] = [];
     try {
       for (const { line, rental } of plans) {
         const res = await createRentalAgreement.mutateAsync({
@@ -545,8 +554,15 @@ export default function DealerPos({
           ...(composedRentalAddress ? { customerAddress: composedRentalAddress } : {}),
           ...(actingDealerId ? { dealerId: actingDealerId } : {}),
           ...(draft.salespersonId ? { salespersonId: draft.salespersonId } : {}),
+          // 0275 — the rental now mints a Sales Order, and an order needs a
+          // delivery date to reach operations. The wizard already collected it.
+          ...(draft.delivery.date ? { deliveryDate: draft.delivery.date } : {}),
         });
-        done.push({ agreementNo: res.agreement.agreementNo, label: line.label });
+        done.push({
+          agreementNo: res.agreement.agreementNo,
+          label: line.label,
+          so: res.so ?? null,
+        });
       }
       clearDraft();
       setRentalDone(done);
@@ -1135,7 +1151,10 @@ export default function DealerPos({
               <div className="flex flex-col gap-1.5">
                 {rentalDone.map((r) => (
                   <div key={r.agreementNo} className="text-[13px] text-muted-foreground">
-                    <span className="font-mono">{r.agreementNo}</span> · {r.label}
+                    <span className="font-mono">{r.agreementNo}</span>
+                    {r.so ? <> · <span className="font-mono">SO-{r.so}</span></> : null}
+                    {" · "}
+                    {r.label}
                   </div>
                 ))}
               </div>

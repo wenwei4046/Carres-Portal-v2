@@ -7344,6 +7344,10 @@ export interface CreateRentalAgreementResponse {
    *  Optional so a browser on this build against a pre-0268 Worker degrades
    *  rather than crashing. */
   pendingApproval?: boolean;
+  /** 0275 — the Sales Order minted with the agreement, so the rented item has
+   *  a document and a path into operations. Optional for the same reason. */
+  orderId?: string | null;
+  so?: number | null;
 }
 
 export function useRentalPosPlans(opts?: Partial<UseQueryOptions<{ plans: PosRentalPlan[] }>>) {
