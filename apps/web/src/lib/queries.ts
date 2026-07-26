@@ -59,6 +59,15 @@ import {
   type ServicePackageInput,
   type RentalPlan,
   type RentalPlanInput,
+  type RentalOffer,
+  type RentalOfferInput,
+  type RentalOfferPatchInput,
+  type RentalBuyPrice,
+  type RentalBuyPriceInput,
+  type RentalBuyPricePatchInput,
+  type RentalOfferService,
+  type RentalOfferServiceInput,
+  type RentalOfferServicePatchInput,
   type RentalAgreement,
   type RentalStockUnit,
   type PosRentalPlan,
@@ -6865,6 +6874,11 @@ export function useAddAnnotation() {
 export interface RentalConfigResponse {
   servicePackages: ServicePackage[];
   rentalPlans: RentalPlan[];
+  /** 0264 — the offer layer: one offer per model, its outright prices and the
+   *  service packages it attaches. Absent on a pre-0264 API (defaults []). */
+  rentalOffers?: RentalOffer[];
+  buyPrices?: RentalBuyPrice[];
+  offerServices?: RentalOfferService[];
 }
 
 /** Agreements list item — the API embeds the customer's name/phone. */
@@ -7028,6 +7042,88 @@ export function useDeleteRentalPlan() {
     apiFetch<{ ok: boolean }>(`/api/rental/plans/${id}`, {
       method: "DELETE",
     }),
+  );
+}
+
+/* ── 0264 · the offer layer (P&M Rental tab) ─────────────────────────────────
+ * One offer per model owns the option/fabric price overlay, the surcharge
+ * slots and the split; its money hangs off it as rent lines (rental_plans,
+ * above) and buy prices, plus the service packages it attaches. Every write
+ * invalidates the whole ["rental"] sub-tree like the rest of the config. */
+
+export function useCreateRentalOffer() {
+  return useRentalConfigMutation((input: RentalOfferInput) =>
+    apiFetch<{ offer: RentalOffer }>("/api/rental/offers", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export function usePatchRentalOffer() {
+  return useRentalConfigMutation(({ id, patch }: { id: string; patch: RentalOfferPatchInput }) =>
+    apiFetch<{ offer: RentalOffer }>(`/api/rental/offers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  );
+}
+
+export function useDeleteRentalOffer() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ ok: boolean }>(`/api/rental/offers/${id}`, { method: "DELETE" }),
+  );
+}
+
+export function useCreateRentalBuyPrice() {
+  return useRentalConfigMutation(
+    ({ offerId, input }: { offerId: string; input: RentalBuyPriceInput }) =>
+      apiFetch<{ buyPrice: RentalBuyPrice }>(`/api/rental/offers/${offerId}/buy-prices`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  );
+}
+
+export function usePatchRentalBuyPrice() {
+  return useRentalConfigMutation(
+    ({ id, patch }: { id: string; patch: RentalBuyPricePatchInput }) =>
+      apiFetch<{ buyPrice: RentalBuyPrice }>(`/api/rental/buy-prices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+  );
+}
+
+export function useDeleteRentalBuyPrice() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ ok: boolean }>(`/api/rental/buy-prices/${id}`, { method: "DELETE" }),
+  );
+}
+
+export function useCreateRentalOfferService() {
+  return useRentalConfigMutation(
+    ({ offerId, input }: { offerId: string; input: RentalOfferServiceInput }) =>
+      apiFetch<{ offerService: RentalOfferService }>(`/api/rental/offers/${offerId}/services`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  );
+}
+
+export function usePatchRentalOfferService() {
+  return useRentalConfigMutation(
+    ({ id, patch }: { id: string; patch: RentalOfferServicePatchInput }) =>
+      apiFetch<{ offerService: RentalOfferService }>(`/api/rental/offer-services/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+  );
+}
+
+export function useDeleteRentalOfferService() {
+  return useRentalConfigMutation((id: string) =>
+    apiFetch<{ ok: boolean }>(`/api/rental/offer-services/${id}`, { method: "DELETE" }),
   );
 }
 

@@ -6,6 +6,15 @@
  * specials/sofa/delivery/bundle honest-pricing pattern).
  */
 
+import type {
+  RentalGift,
+  RentalOfferCategory,
+  RentalOptionGroup,
+  RentalOptionValue,
+  RentalSurcharge,
+  ServicePackageType,
+} from "./domain";
+
 /** 2dp money rounding (same convention as special-addons/option-picks). */
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -67,4 +76,228 @@ export function rentalMonthlySplit(
   // From the ROUNDED shares — Σ-exact; round2 only clears float noise.
   const carresShare = round2(monthlyFee - supplierShare - commissionShare);
   return { supplierShare, commissionShare, carresShare };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 0264 — the OFFER layer: service SKU codes + the pick → money resolver.
+ *
+ * ONE implementation, three consumers: the P&M authoring previews, the POS
+ * rent/buy lanes, and the server-side recompute at signing (the sofa-P4
+ * trust-gate doctrine — a client reports WHAT was picked, never what it
+ * costs). Pure: no DB, no IO.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/** Product-family token in a service SKU (Loo 2026-07-26). */
+const CATEGORY_TOKEN: Record<RentalOfferCategory, string> = {
+  mattress: "MAT",
+  bedframe: "BF",
+  sofa: "SOFA",
+  accessory: "ACC",
+};
+
+/** What-it-does token in a service SKU. */
+const SERVICE_TYPE_TOKEN: Record<ServicePackageType, string> = {
+  cleaning: "CLEAN",
+  repair: "REPAIR",
+  other: "SVCX",
+};
+
+/**
+ * The auto SKU of a service package: `SVC-{CATEGORY}-{TYPE}-{years}Y{visits}`
+ * (Loo 2026-07-26 — "one year × how many visits = one SKU").
+ *
+ *   serviceSkuCode("mattress", "cleaning", 12, 2) → "SVC-MAT-CLEAN-1Y2"
+ *   serviceSkuCode("sofa",     "cleaning", 36, 3) → "SVC-SOFA-CLEAN-3Y3"
+ *   serviceSkuCode("bedframe", "repair",   36, 1) → "SVC-BF-REPAIR-3Y1"
+ *
+ * A duration that isn't whole years keeps its MONTH count with an `M`
+ * (18 months × 2 → `SVC-MAT-CLEAN-18M2`) so a code is never ambiguous.
+ * Changing duration or visits changes the code — two plans can never collide.
+ */
+export function serviceSkuCode(
+  category: RentalOfferCategory,
+  serviceType: ServicePackageType,
+  durationMonths: number,
+  visitsPerYear: number,
+): string {
+  const months = Math.max(1, Math.floor(durationMonths));
+  const visits = Math.max(1, Math.floor(visitsPerYear));
+  const span = months % 12 === 0 ? `${months / 12}Y` : `${months}M`;
+  return `SVC-${CATEGORY_TOKEN[category]}-${SERVICE_TYPE_TOKEN[serviceType]}-${span}${visits}`;
+}
+
+/** One thing the customer picked: an option value, or a fabric colour (which
+ *  travels with its series so the inheritance can be resolved). */
+export interface RentalPick {
+  /** allowed_options group key — "leg_heights", "divan_heights", "gaps",
+   *  "specials" or "fabrics". */
+  group: string;
+  /** The picked value: a pool value, a special code, or a fabric COLOUR code. */
+  value: string;
+  /** Fabric picks only — the series the colour belongs to (e.g. "CG"). */
+  series?: string;
+}
+
+/** The money one pick or surcharge adds. */
+export interface RentalChargeLine {
+  kind: "option" | "surcharge";
+  /** `group:value` for an option, the surcharge code for a surcharge. */
+  key: string;
+  label: string;
+  oneTime: number;
+  monthly: number;
+}
+
+export interface RentalQuote {
+  /** Base + every monthly charge, 2dp. */
+  monthly: number;
+  /** Everything due once at signing (or added to an outright purchase), 2dp. */
+  oneOff: number;
+  /** monthly × term + oneOff — what the whole contract collects. */
+  termTotal: number;
+  lines: RentalChargeLine[];
+  /** Picks the offer does NOT allow (unknown group/value, or switched off) —
+   *  a server recompute must REJECT the signup rather than silently drop them. */
+  invalidPicks: string[];
+}
+
+export interface RentalQuoteInput {
+  /** Variant fee, Σ of the picked compartments, or the combo fee — resolved
+   *  by the caller from the rent lines. */
+  baseMonthly: number;
+  /** Months the agreement runs; 0 on the BUY lane (no monthly at all). */
+  termMonths: number;
+  /** The offer's option/fabric price overlay. */
+  optionPrices: Record<string, RentalOptionGroup>;
+  /** What the customer chose. */
+  picks: RentalPick[];
+  /** The offer's surcharge slots. */
+  surcharges: RentalSurcharge[];
+  /** Codes of the OPTIONAL surcharges the store ticked (required ones always
+   *  apply and need not be listed). */
+  pickedSurcharges?: string[];
+}
+
+/** A fabric colour with no price of its own inherits its series (null =
+ *  "follow the series"; an explicit 0 stays 0). */
+const inheritCharge = (
+  own: RentalOptionValue | undefined,
+  parent: RentalOptionValue | undefined,
+): { oneTime: number; monthly: number } => ({
+  oneTime: own?.oneTime ?? parent?.oneTime ?? 0,
+  monthly: own?.monthly ?? parent?.monthly ?? 0,
+});
+
+/**
+ * Resolves ONE pick against the overlay. Returns null when the offer doesn't
+ * allow it — unknown group, unknown value, or a value/series switched off
+ * (only `on` values ever reach a customer).
+ */
+export function resolveRentalPick(
+  optionPrices: Record<string, RentalOptionGroup>,
+  pick: RentalPick,
+): { oneTime: number; monthly: number } | null {
+  const group = optionPrices[pick.group];
+  if (!group) return null;
+  if (pick.group === "fabrics") {
+    const series = pick.series ? group.series[pick.series] : undefined;
+    if (!series || series.on === false) return null;
+    const colour = series.colors[pick.value];
+    // A series with no per-colour entries offers every colour at series price;
+    // once ANY colour is authored, only the ON ones are on offer.
+    if (Object.keys(series.colors).length > 0 && (!colour || colour.on === false)) return null;
+    return inheritCharge(colour, series);
+  }
+  const value = group.values[pick.value];
+  if (!value || value.on === false) return null;
+  return { oneTime: value.oneTime ?? 0, monthly: value.monthly ?? 0 };
+}
+
+/**
+ * Quotes an agreement: base monthly + every picked option's monthly + the
+ * required and ticked surcharges; one-off money accumulates the same way.
+ *
+ * Rounding happens at the END (never per line) so the parts always sum to the
+ * whole — the Σ-exact convention of explodeBundle / rentalMonthlySplit.
+ */
+export function quoteRental(input: RentalQuoteInput): RentalQuote {
+  const lines: RentalChargeLine[] = [];
+  const invalidPicks: string[] = [];
+  let monthly = input.baseMonthly;
+  let oneOff = 0;
+
+  for (const pick of input.picks) {
+    const charge = resolveRentalPick(input.optionPrices, pick);
+    if (!charge) {
+      invalidPicks.push(`${pick.group}:${pick.value}`);
+      continue;
+    }
+    monthly += charge.monthly;
+    oneOff += charge.oneTime;
+    if (charge.monthly !== 0 || charge.oneTime !== 0) {
+      lines.push({
+        kind: "option",
+        key: `${pick.group}:${pick.value}`,
+        label: pick.value,
+        oneTime: charge.oneTime,
+        monthly: charge.monthly,
+      });
+    }
+  }
+
+  const ticked = new Set(input.pickedSurcharges ?? []);
+  for (const s of input.surcharges) {
+    if (!s.required && !ticked.has(s.code)) continue;
+    monthly += s.monthly;
+    oneOff += s.oneTime;
+    if (s.monthly !== 0 || s.oneTime !== 0) {
+      lines.push({
+        kind: "surcharge",
+        key: s.code,
+        label: s.label,
+        oneTime: s.oneTime,
+        monthly: s.monthly,
+      });
+    }
+  }
+
+  const m = round2(monthly);
+  const o = round2(oneOff);
+  return { monthly: m, oneOff: o, termTotal: round2(m * input.termMonths + o), lines, invalidPicks };
+}
+
+/**
+ * Base monthly of a sofa BUILD: the picked compartment codes summed against
+ * their per-part monthly rates (Loo: "1A 10 + 2A 20 = 30/mo"). A part with no
+ * authored rate is NOT rentable — it comes back in `missing` so the caller
+ * refuses the build instead of quietly renting it for free.
+ */
+export function compartmentBuildMonthly(
+  rates: Record<string, number>,
+  build: string[],
+): { monthly: number; missing: string[] } {
+  let monthly = 0;
+  const missing: string[] = [];
+  for (const code of build) {
+    const rate = rates[code];
+    if (rate == null) missing.push(code);
+    else monthly += rate;
+  }
+  return { monthly: round2(monthly), missing };
+}
+
+/**
+ * Merges gift lists into one SKU → qty list, so two gifts of the same SKU
+ * become one line of qty 2 for stock, delivery and the supplier PO.
+ */
+export function mergeRentalGifts(...lists: RentalGift[][]): RentalGift[] {
+  const bySku = new Map<string, number>();
+  for (const list of lists) {
+    for (const g of list ?? []) {
+      if (!g?.sku) continue;
+      const qty = Math.max(1, Math.floor(Number(g.qty) || 1));
+      bySku.set(g.sku, (bySku.get(g.sku) ?? 0) + qty);
+    }
+  }
+  return [...bySku.entries()].map(([sku, qty]) => ({ sku, qty }));
 }

@@ -1076,6 +1076,124 @@ export interface ServicePackageRow {
   sku: string | null;
   active: boolean;
   sort_order: number;
+  /** 0264 — the product family the plan serves. Drives the
+   *  SVC-{MAT|BF|SOFA|ACC}-… SKU token and filters the offer picker. */
+  category: RentalOfferCategory | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/* ── 0264: the rental OFFER config (the Setting closed loop) ────────────── */
+
+/** Product families a rental offer / service package can belong to (0264). */
+export type RentalOfferCategory = "mattress" | "bedframe" | "sofa" | "accessory";
+
+/** How an offer reaches its base monthly figure (0264). */
+export type RentalPricingMode = "variant" | "compartment" | "combo" | "both";
+
+/** One priced option VALUE inside `rental_offers.option_prices` (0264). A
+ *  fabric colour omits both prices to inherit its series. */
+export interface RentalOptionValueJson {
+  on?: boolean;
+  oneTime?: number | null;
+  monthly?: number | null;
+}
+
+/** One fabric SERIES inside `option_prices.fabrics` — its own price plus the
+ *  per-colour overrides (colour code → value, e.g. "CG-008"). */
+export interface RentalFabricSeriesJson extends RentalOptionValueJson {
+  colors?: Record<string, RentalOptionValueJson>;
+}
+
+/** One option GROUP (leg_heights / divan_heights / gaps / specials) or the
+ *  fabrics group, keyed by the SAME `allowed_options` vocabulary the Modular
+ *  editor writes — a rental overlay can only NARROW what the model allows. */
+export interface RentalOptionGroupJson {
+  /** true = the customer must pick one of the ON values; false = optional add. */
+  required?: boolean;
+  values?: Record<string, RentalOptionValueJson>;
+  series?: Record<string, RentalFabricSeriesJson>;
+}
+
+export type RentalOptionPricesJson = Record<string, RentalOptionGroupJson>;
+
+/** One manual surcharge slot (`rental_offers.surcharges`, 0264). `required`
+ *  = charged on every agreement; otherwise the store may TICK it (never type
+ *  an amount — guardrail #4). */
+export interface RentalSurchargeJson {
+  code: string;
+  label: string;
+  oneTime?: number | null;
+  monthly?: number | null;
+  required?: boolean;
+}
+
+/** One free gift (GWP) — a real SKU + qty so stock / delivery / the supplier
+ *  PO all see it (`rental_plans.gifts`, `rental_buy_prices.gifts`, 0264). */
+export interface RentalGiftJson {
+  sku: string;
+  qty: number;
+}
+
+/**
+ * `rental_offers` (migration 0264) — ONE row per product model: which lanes
+ * are open (rent / buy), how the monthly base is reached (`pricing_mode`),
+ * the option + fabric price overlay, the manual surcharge slots and the
+ * revenue split. The per-variant money lives in `rental_plans` (rent) and
+ * `rental_buy_prices` (buy). Principal-owned; `active` defaults false.
+ */
+export interface RentalOfferRow {
+  id: string;
+  model_id: string;
+  pricing_mode: RentalPricingMode;
+  rent_enabled: boolean;
+  buy_enabled: boolean;
+  terms_months: number[];
+  option_prices: RentalOptionPricesJson;
+  surcharges: RentalSurchargeJson[];
+  supplier_rate_pct: number;
+  commission_base_pct: number;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `rental_buy_prices` (migration 0264) — the outright lane of an offer, one
+ * row per sellable target (a SKU or a sofa combo). `price` NULL = sell at
+ * whatever `product_skus.price` says; a number overrides it for this offer.
+ */
+export interface RentalBuyPriceRow {
+  id: string;
+  offer_id: string;
+  sku: string | null;
+  combo_id: string | null;
+  price: number | null;
+  gifts: RentalGiftJson[];
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `rental_offer_services` (migration 0264) — a service package attached to an
+ * offer: FREE on the rent lane / buy lane / both (with how many visits are on
+ * us), and/or sold at a monthly and/or one-off price.
+ */
+export interface RentalOfferServiceRow {
+  id: string;
+  offer_id: string;
+  package_id: string;
+  free_lane: "rent" | "buy" | "both" | null;
+  free_visits: number | null;
+  monthly_price: number | null;
+  outright_price: number | null;
+  active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -1091,7 +1209,9 @@ export interface ServicePackageRow {
  */
 export interface RentalPlanRow {
   id: string;
-  sku: string;
+  /** 0264 — NULL on a `combo` line (a combo is a shape, not a sellable code);
+   *  always set on `unit` / `compartment` lines. */
+  sku: string | null;
   term_months: number;
   monthly_fee: number;
   supplier_rate_pct: number;
@@ -1103,6 +1223,15 @@ export interface RentalPlanRow {
    *  the POS lane refuses online collection until the plan re-saves/syncs. */
   stripe_product_id: string | null;
   stripe_price_id: string | null;
+  /** 0264 — the parent offer (NULL only on a pre-0264 hand-authored plan). */
+  offer_id: string | null;
+  /** 0264 — a sofa combo target; mutually exclusive with `sku`. */
+  combo_id: string | null;
+  /** 0264 — unit = a whole SKU · compartment = a sofa part's rate (the build
+   *  adds up) · combo = one fixed monthly for a combo shape. */
+  line_kind: "unit" | "compartment" | "combo";
+  /** 0264 — free gifts riding this rent line (real SKU + qty). */
+  gifts: RentalGiftJson[];
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -1163,6 +1292,14 @@ export interface RentalAgreementRow {
   ownership_doc_url: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  /** 0264 — the offer signed from, and the FROZEN snapshot of what the
+   *  customer picked that day (options / fabric colour / surcharges / sofa
+   *  build), the gifts that rode along and the money due once at signing.
+   *  A later re-price of the offer never rewrites these. */
+  offer_id: string | null;
+  selected_options: Record<string, unknown>;
+  gifts: RentalGiftJson[];
+  one_off_total: number;
   notes: string | null;
   created_at: string;
   updated_at: string;

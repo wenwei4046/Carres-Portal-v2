@@ -1,55 +1,67 @@
-import { useState } from "react";
-import { Repeat, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Repeat, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import type { RentalPlan, ServicePackage } from "@carres/shared";
+import type {
+  CatalogResponse,
+  ProductModelDto,
+  RentalBuyPrice,
+  RentalOffer,
+  RentalOfferCategory,
+  RentalOfferService,
+  RentalPlan,
+  ServicePackage,
+} from "@carres/shared";
 import {
   rentalContractValue,
-  rentalMonthlySplit,
+  serviceSkuCode,
   serviceVisitIntervalMonths,
   serviceVisitsTotal,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { rm } from "@/lib/format-currency";
 import {
-  useCreateRentalPlan,
+  useCatalog,
+  useCreateRentalOffer,
   useCreateServicePackage,
-  useDeleteRentalPlan,
+  useDeleteRentalOffer,
   useDeleteServicePackage,
-  usePatchRentalPlan,
+  usePatchRentalOffer,
   usePatchServicePackage,
   useRentalConfig,
   useSyncRentalPlanStripe,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
+import RentalOfferEditor from "../rental/RentalOfferEditor";
 
 /**
- * Rental — the Rental + Service Plan config tab (migrations 0248/0249; Loo
- * 2026-07-25). Two principal-owned, principal-gated subsystems, both DORMANT
- * until authored (empty tables → the POS rental lane, agreements, billings and
- * entitlements all stay asleep):
+ * Rental — the rent & buy config tab (migrations 0248/0249 + 0264; Loo
+ * 2026-07-25 / 2026-07-26). Two principal-owned, principal-gated subsystems,
+ * both DORMANT until authored:
  *
- *   (a) Service packages — a cleaning/repair care plan: duration (months) ×
- *       visits-per-year (Loo: configurable — some plans 2/3/4 visits a year),
- *       optionally linked to a sellable `service`-category SKU and priced for
- *       standalone sale. Selling / attaching one later mints a
- *       service_entitlements schedule.
+ *   (a) Offers — ONE per Modular model. The offer says which variants (or
+ *       sofa compartments / combos) are on offer, prices them monthly (rent)
+ *       and once (buy), prices the options the customer may choose (once or
+ *       every month of the term), narrows the fabric to the exact colours,
+ *       attaches the service plans and records the revenue split. A model is
+ *       PICKED, never typed — the 0248 "type a SKU code" box is gone.
  *
- *   (b) Rental plans (rent-to-own) — a subscription offer on ONE sellable SKU:
- *       term × monthly fee (e.g. RM 59 × 84 months), plus the per-collection
- *       revenue split recorded in finance (supplier rate % + flat base
- *       commission % — the full commission hierarchy lives in the HR line, not
- *       here). A plan can bundle a service package for free.
+ *   (b) Service packages — a care plan (duration × visits-a-year) that IS a
+ *       SKU: `SVC-{MAT|BF|SOFA|ACC}-{CLEAN|REPAIR|SVCX}-{n}Y{visits}` is
+ *       minted on save, so a plan can be sold, gifted and invoiced like any
+ *       other product.
  *
- * Data rides `useRentalConfig()` (GET /api/rental/config). Writes are
- * principal-only at RLS (0248 `*_write_principal`); non-principal roles see
- * the same tables read-only — mirrors the PromoTab gating idiom.
+ * Data rides `useRentalConfig()` (GET /api/rental/config) + `useCatalog()`.
+ * Writes are principal-only at RLS (0248/0264 `*_write_principal`);
+ * non-principal internal roles see everything read-only.
  */
 export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
   const configQ = useRentalConfig();
+  const catalogQ = useCatalog();
   const [pkgOpen, setPkgOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
 
-  if (configQ.isPending) {
+  if (configQ.isPending || catalogQ.isPending) {
     return <div className="t-small text-base-500">Loading rental config…</div>;
   }
   if (configQ.error) {
@@ -61,17 +73,24 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
   }
 
   const servicePackages: ServicePackage[] = configQ.data?.servicePackages ?? [];
-  const rentalPlans: RentalPlan[] = configQ.data?.rentalPlans ?? [];
+  const offers: RentalOffer[] = configQ.data?.rentalOffers ?? [];
+  const plans: RentalPlan[] = configQ.data?.rentalPlans ?? [];
+  const buyPrices: RentalBuyPrice[] = configQ.data?.buyPrices ?? [];
+  const offerServices: RentalOfferService[] = configQ.data?.offerServices ?? [];
+  const catalog = catalogQ.data;
+
+  const editing = editingOfferId ? offers.find((o) => o.id === editingOfferId) ?? null : null;
+  const editingModel =
+    editing && catalog ? catalog.models.find((m) => m.id === editing.modelId) ?? null : null;
 
   return (
     <div className="flex flex-col gap-6 max-w-[1120px]">
       <section className="flex items-start justify-between gap-4">
-        <p className="t-tiny text-base-500 max-w-[480px]">
-          A <b>service package</b> is a care plan (cleaning visits over a duration) sold
-          standalone or bundled free with a rental. A <b>rental plan</b> is a rent-to-own
-          offer on one SKU — a monthly fee over a fixed term, with the supplier and
-          commission split recorded per collected month. Both are dormant until authored
-          and flipped Active.
+        <p className="t-tiny text-base-500 max-w-[520px]">
+          An <b>offer</b> says which model is on offer, in which variants, with which options and
+          gifts — then prices it two ways: monthly to rent, or once to own. A <b>service package</b>{" "}
+          is a care plan (visits over a duration) an offer can give away free or sell. Nothing
+          reaches a store until the offer is switched on.
         </p>
         {isPrincipal && (
           <div className="flex flex-wrap justify-end gap-2 shrink-0">
@@ -81,32 +100,61 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
               className="btn-ghost text-[12px]"
               data-testid="package-add"
             >
-              + New package
+              + New service package
             </button>
             <button
               type="button"
-              onClick={() => setPlanOpen(true)}
+              onClick={() => setPickerOpen(true)}
               className="btn-primary text-[12px]"
-              data-testid="plan-add"
+              data-testid="offer-add"
             >
-              + New plan
+              + New offer
             </button>
           </div>
         )}
       </section>
+
+      {editing && editingModel && catalog ? (
+        <RentalOfferEditor
+          key={editing.id}
+          offer={editing}
+          model={editingModel}
+          catalog={catalog}
+          plans={plans.filter((p) => p.offerId === editing.id)}
+          buyPrices={buyPrices.filter((b) => b.offerId === editing.id)}
+          offerServices={offerServices.filter((s) => s.offerId === editing.id)}
+          packages={servicePackages}
+          onClose={() => setEditingOfferId(null)}
+        />
+      ) : (
+        <OffersSection
+          offers={offers}
+          plans={plans}
+          buyPrices={buyPrices}
+          offerServices={offerServices}
+          catalog={catalog}
+          isPrincipal={isPrincipal}
+          onEdit={setEditingOfferId}
+        />
+      )}
+
+      {pickerOpen && catalog && (
+        <ModelPickerModal
+          catalog={catalog}
+          takenModelIds={new Set(offers.map((o) => o.modelId))}
+          onClose={() => setPickerOpen(false)}
+          onCreated={(id) => {
+            setPickerOpen(false);
+            setEditingOfferId(id);
+          }}
+        />
+      )}
 
       <ServicePackagesSection
         packages={servicePackages}
         isPrincipal={isPrincipal}
         addOpen={pkgOpen}
         onCloseAdd={() => setPkgOpen(false)}
-      />
-      <RentalPlansSection
-        plans={rentalPlans}
-        packages={servicePackages}
-        isPrincipal={isPrincipal}
-        addOpen={planOpen}
-        onCloseAdd={() => setPlanOpen(false)}
       />
     </div>
   );
@@ -128,10 +176,337 @@ function intervalLabel(visitsPerYear: number): string {
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 // ---------------------------------------------------------------------------
-// (a) Service packages
+// (a) Offers
 // ---------------------------------------------------------------------------
 
-const PKG_GRID = "minmax(150px,1.5fr) 80px 90px 130px 100px 110px 70px 120px";
+function OffersSection({
+  offers,
+  plans,
+  buyPrices,
+  offerServices,
+  catalog,
+  isPrincipal,
+  onEdit,
+}: {
+  offers: RentalOffer[];
+  plans: RentalPlan[];
+  buyPrices: RentalBuyPrice[];
+  offerServices: RentalOfferService[];
+  catalog: CatalogResponse | undefined;
+  isPrincipal: boolean;
+  onEdit: (id: string) => void;
+}) {
+  return (
+    <section className="card p-5">
+      <div className="t-h4 font-display flex items-center gap-2 mb-1">
+        <Repeat size={16} strokeWidth={1.75} className="text-primary" />
+        Offers
+        <span className="pill pill-neutral">{offers.length}</span>
+      </div>
+      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+        One offer per model. Each offer can open the rent lane, the buy lane, or both.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+
+      {offers.length === 0 && (
+        <div className="t-small text-base-500 py-4" data-testid="offers-empty">
+          No offers yet — pick a model to author the first rent-to-own or outright offer.
+        </div>
+      )}
+
+      <div className="flex flex-col">
+        {offers.map((o) => (
+          <OfferRow
+            key={o.id}
+            offer={o}
+            model={catalog?.models.find((m) => m.id === o.modelId) ?? null}
+            plans={plans.filter((p) => p.offerId === o.id)}
+            buyCount={buyPrices.filter((b) => b.offerId === o.id && b.active).length}
+            serviceCount={offerServices.filter((s) => s.offerId === o.id && s.active).length}
+            isPrincipal={isPrincipal}
+            onEdit={() => onEdit(o.id)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OfferRow({
+  offer,
+  model,
+  plans,
+  buyCount,
+  serviceCount,
+  isPrincipal,
+  onEdit,
+}: {
+  offer: RentalOffer;
+  model: ProductModelDto | null;
+  plans: RentalPlan[];
+  buyCount: number;
+  serviceCount: number;
+  isPrincipal: boolean;
+  onEdit: () => void;
+}) {
+  const patch = usePatchRentalOffer();
+  const del = useDeleteRentalOffer();
+  const sync = useSyncRentalPlanStripe();
+
+  const fees = plans.map((p) => p.monthlyFee).filter((f) => f > 0);
+  const synced = plans.filter((p) => p.stripePriceId).length;
+  const feeLabel =
+    fees.length === 0
+      ? "no monthly price yet"
+      : fees.length === 1 || Math.min(...fees) === Math.max(...fees)
+        ? `${rm(fees[0]!)} / mo`
+        : `${rm(Math.min(...fees))}–${rm(Math.max(...fees))} / mo`;
+
+  function toggleActive() {
+    patch.mutate(
+      { id: offer.id, patch: { active: !offer.active } },
+      {
+        onSuccess: () => toast.success(offer.active ? "Offer switched off" : "Offer is on sale"),
+        onError: (e: unknown) => toast.error(errMsg(e, "Update failed")),
+      },
+    );
+  }
+
+  function remove() {
+    if (!confirm(`Delete the offer on ${model?.name ?? "this model"} and all its prices?`)) return;
+    del.mutate(offer.id, {
+      onSuccess: () => toast.success("Offer deleted"),
+      onError: (e: unknown) => toast.error(errMsg(e, "Delete failed")),
+    });
+  }
+
+  /** Re-project every unsynced rent line into Stripe (the manual retry). */
+  function syncStripe() {
+    const pending = plans.filter((p) => !p.stripePriceId);
+    if (pending.length === 0) return;
+    let done = 0;
+    for (const p of pending) {
+      sync.mutate(p.id, {
+        onSuccess: (res: { stripeSync: { status: string; message?: string } }) => {
+          done += 1;
+          if (res.stripeSync.status !== "synced") {
+            toast.error(res.stripeSync.message ?? "Stripe sync failed");
+          } else if (done === pending.length) {
+            toast.success("Prices synced to Stripe");
+          }
+        },
+        onError: (e: unknown) => toast.error(errMsg(e, "Stripe sync failed")),
+      });
+    }
+  }
+
+  return (
+    <div
+      className={`flex items-center gap-3 py-3 border-b border-base-100 last:border-b-0 flex-wrap ${offer.active ? "" : "opacity-60"}`}
+      data-testid={`offer-row-${offer.id}`}
+    >
+      {model?.photoUrl ? (
+        <img
+          src={model.photoUrl}
+          alt=""
+          className="w-11 h-11 rounded-[8px] object-cover border border-base-200"
+        />
+      ) : (
+        <div className="w-11 h-11 rounded-[8px] border border-dashed border-base-300 grid place-items-center text-base-300">
+          ▦
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-semibold truncate">
+          {model?.name ?? "Unknown model"}
+          <span className="t-tiny text-base-400 ml-2">{model?.modelKey}</span>
+        </div>
+        <div className="t-tiny text-base-500 truncate">
+          {model?.category ?? "—"}
+          {offer.rentEnabled && ` · Rent ${feeLabel}`}
+          {offer.rentEnabled && plans.length > 0 && (
+            <>
+              {" "}
+              · {plans.length} price row{plans.length === 1 ? "" : "s"}
+              {plans[0] && ` · up to ${rm(rentalContractValue(Math.max(...fees, 0), Math.max(...plans.map((p) => p.termMonths))))} per contract`}
+            </>
+          )}
+          {offer.buyEnabled && ` · Buy ${buyCount} target${buyCount === 1 ? "" : "s"}`}
+          {serviceCount > 0 && ` · ${serviceCount} service plan${serviceCount === 1 ? "" : "s"}`}
+        </div>
+      </div>
+      {offer.rentEnabled && plans.length > 0 && (
+        <span
+          className={`pill ${synced === plans.length ? "pill-confirmed" : "pill-neutral"}`}
+          data-testid={`offer-stripe-${offer.id}`}
+        >
+          {synced} of {plans.length} synced
+        </span>
+      )}
+      {isPrincipal && synced < plans.length && (
+        <button
+          type="button"
+          onClick={syncStripe}
+          disabled={sync.isPending}
+          className="btn-ghost text-[11px]"
+          data-testid={`offer-sync-${offer.id}`}
+        >
+          {sync.isPending ? "Syncing…" : "Sync"}
+        </button>
+      )}
+      {isPrincipal ? (
+        <label className="flex items-center gap-1.5 t-tiny text-base-500">
+          <input
+            type="checkbox"
+            checked={offer.active}
+            disabled={patch.isPending}
+            onChange={toggleActive}
+            aria-label={`${model?.name ?? "offer"} on sale`}
+            data-testid={`offer-active-${offer.id}`}
+          />
+          On sale
+        </label>
+      ) : (
+        <span className={`pill ${offer.active ? "pill-confirmed" : "pill-neutral"}`}>
+          {offer.active ? "On sale" : "Draft"}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onEdit}
+        className="btn-secondary text-[11px]"
+        data-testid={`offer-edit-${offer.id}`}
+      >
+        {isPrincipal ? "Edit" : "View"}
+      </button>
+      {isPrincipal && (
+        <button
+          type="button"
+          onClick={remove}
+          disabled={del.isPending}
+          className="btn-danger text-[11px]"
+          data-testid={`offer-delete-${offer.id}`}
+        >
+          Delete
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Pick the model an offer is authored off — the Modular card wall, filtered
+ *  to models that don't already have one (UNIQUE model_id). */
+function ModelPickerModal({
+  catalog,
+  takenModelIds,
+  onClose,
+  onCreated,
+}: {
+  catalog: CatalogResponse;
+  takenModelIds: Set<string>;
+  onClose: () => void;
+  onCreated: (offerId: string) => void;
+}) {
+  const create = useCreateRentalOffer();
+  const [q, setQ] = useState("");
+
+  const models = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return catalog.models
+      .filter((m) => !m.discontinuedAt && !takenModelIds.has(m.id))
+      .filter(
+        (m) =>
+          !needle ||
+          m.name.toLowerCase().includes(needle) ||
+          m.modelKey.toLowerCase().includes(needle),
+      )
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+      .slice(0, 60);
+  }, [catalog.models, q, takenModelIds]);
+
+  function pick(m: ProductModelDto) {
+    create.mutate(
+      {
+        modelId: m.id,
+        // A sofa prices by its parts by default (Loo: the builder adds up);
+        // everything else prices per variant.
+        pricingMode: m.category === "sofa" ? "both" : "variant",
+        rentEnabled: true,
+        buyEnabled: true,
+      },
+      {
+        onSuccess: (res: { offer: RentalOffer }) => {
+          toast.success(`Offer started for ${m.name}`);
+          onCreated(res.offer.id);
+        },
+        onError: (e: unknown) => toast.error(errMsg(e, "Could not start the offer")),
+      },
+    );
+  }
+
+  return (
+    <Modal title="Pick the product" onClose={onClose} size="lg">
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <Search
+            size={14}
+            strokeWidth={1.75}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-400"
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search models…"
+            aria-label="Search models"
+            className={`${INPUT_CLS} pl-8`}
+            data-testid="offer-model-search"
+          />
+        </div>
+        {models.length === 0 && (
+          <p className="t-small text-base-500" data-testid="offer-model-empty">
+            No model matches — every other model already has an offer.
+          </p>
+        )}
+        <div
+          className="grid gap-2 max-h-[420px] overflow-y-auto"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))" }}
+        >
+          {models.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => pick(m)}
+              disabled={create.isPending}
+              className="flex items-start gap-2 p-2.5 border border-base-200 rounded-[6px] bg-base-50/60 hover:border-base-400 text-left disabled:opacity-50"
+              data-testid={`offer-model-${m.modelKey}`}
+            >
+              {m.photoUrl ? (
+                <img src={m.photoUrl} alt="" className="w-10 h-10 rounded-[4px] object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-[4px] border border-dashed border-base-300 grid place-items-center text-base-300">
+                  ▦
+                </div>
+              )}
+              <span className="min-w-0">
+                <span className="block t-small font-semibold truncate">{m.name}</span>
+                <span className="block t-tiny text-base-500 truncate">
+                  {m.category} · {m.modelKey}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (b) Service packages
+// ---------------------------------------------------------------------------
+
+const PKG_GRID = "minmax(150px,1.5fr) 90px 80px 90px 130px 100px minmax(120px,1fr) 70px 120px";
 
 function ServicePackagesSection({
   packages,
@@ -151,24 +526,25 @@ function ServicePackagesSection({
         Service packages
       </div>
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
-        A care plan: N visits a year over the duration (e.g. 2 years × 2 visits/yr = 4
-        visits). Price is the standalone selling price — RM 0 means free-attach only.
-        Link a service-category SKU to sell it at the POS.
+        A care plan: N visits a year over the duration (e.g. 2 years × 2 visits/yr = 4 visits). Each
+        plan is its own SKU — <span className="t-num">SVC-MAT-CLEAN-1Y2</span> — so it can be sold,
+        gifted and invoiced like any other product.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
       {addOpen && isPrincipal && (
-        <Modal title="New service package" onClose={onCloseAdd}>
+        <Modal title="Create service package" onClose={onCloseAdd}>
           <PackageForm onDone={onCloseAdd} />
         </Modal>
       )}
 
-      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
+      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-x-auto">
         <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
+          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200 min-w-[900px]"
           style={{ gridTemplateColumns: PKG_GRID }}
         >
           <div className="label">Package</div>
+          <div className="label">For</div>
           <div className="label">Type</div>
           <div className="label text-right">Duration</div>
           <div className="label text-right">Visits</div>
@@ -179,8 +555,8 @@ function ServicePackagesSection({
         </div>
         {packages.length === 0 && (
           <div className="t-small text-base-500 px-3 py-4" data-testid="packages-empty">
-            No service packages yet — author one to sell cleaning care standalone or
-            bundle it free with a rental plan.
+            No service packages yet — author one to sell cleaning care standalone or bundle it free
+            with an offer.
           </div>
         )}
         {packages.map((p) => (
@@ -224,11 +600,12 @@ function PackageRow({ pkg, isPrincipal }: { pkg: ServicePackage; isPrincipal: bo
 
   return (
     <div
-      className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${pkg.active ? "" : "opacity-60"}`}
+      className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 min-w-[900px] ${pkg.active ? "" : "opacity-60"}`}
       style={{ gridTemplateColumns: PKG_GRID }}
       data-testid={`pkg-row-${pkg.id}`}
     >
       <div className="text-[13px] truncate">{pkg.name}</div>
+      <div className="t-tiny text-base-500 capitalize">{pkg.category ?? "any"}</div>
       <div className="t-tiny text-base-500 capitalize">{pkg.serviceType}</div>
       <div className="text-right t-num text-[12px]">{pkg.durationMonths} mo</div>
       <div className="text-right t-num text-[12px]">
@@ -285,6 +662,13 @@ const DURATION_PRESETS = [
   { label: "3 years", months: 36 },
 ];
 
+const CATEGORY_CHIPS: { value: RentalOfferCategory; label: string; token: string }[] = [
+  { value: "mattress", label: "Mattress", token: "MAT" },
+  { value: "bedframe", label: "Bed frame", token: "BF" },
+  { value: "sofa", label: "Sofa", token: "SOFA" },
+  { value: "accessory", label: "Accessory", token: "ACC" },
+];
+
 /** Create / edit a service package. `pkg` present = patch mode. */
 function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void }) {
   const create = useCreateServicePackage();
@@ -292,13 +676,13 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
   const busy = create.isPending || patch.isPending;
 
   const [name, setName] = useState(pkg?.name ?? "");
+  const [category, setCategory] = useState<RentalOfferCategory>(pkg?.category ?? "mattress");
   const [serviceType, setServiceType] = useState<ServicePackage["serviceType"]>(
     pkg?.serviceType ?? "cleaning",
   );
   const [duration, setDuration] = useState(pkg ? String(pkg.durationMonths) : "24");
   const [visits, setVisits] = useState(pkg ? String(pkg.visitsPerYear) : "2");
   const [price, setPrice] = useState(pkg ? String(pkg.price) : "0");
-  const [sku, setSku] = useState(pkg?.sku ?? "");
   const [active, setActive] = useState(pkg?.active ?? true);
 
   const durationNum = Math.floor(Number(duration));
@@ -311,15 +695,22 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
   const priceValid = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
   const valid = name.trim().length >= 1 && durationValid && visitsValid && priceValid;
 
+  // The SKU the server will mint — shown live so the operator sees the code
+  // before saving (0264: duration × visits × category ARE the code).
+  const previewSku =
+    durationValid && visitsValid
+      ? serviceSkuCode(category, serviceType, durationNum, visitsNum)
+      : null;
+
   function save() {
     if (!valid || busy) return;
     const payload = {
       name: name.trim(),
+      category,
       serviceType,
       durationMonths: durationNum,
       visitsPerYear: visitsNum,
       price: priceNum,
-      sku: sku.trim() === "" ? null : sku.trim(),
       active,
     };
     if (pkg) {
@@ -352,10 +743,26 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
           className={INPUT_CLS}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Mattress Care Plan (2 years)"
+          placeholder="e.g. Mattress Care — 1 year"
           maxLength={120}
           data-testid="pkg-name"
         />
+      </div>
+      <div>
+        <div className="label mb-1">Category</div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_CHIPS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setCategory(c.value)}
+              className={`${category === c.value ? "btn-primary" : "btn-ghost"} text-[11px]`}
+              data-testid={`pkg-category-${c.value}`}
+            >
+              {c.label} <span className="t-num ml-1 opacity-70">{c.token}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -366,9 +773,9 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
             onChange={(e) => setServiceType(e.target.value as ServicePackage["serviceType"])}
             data-testid="pkg-type"
           >
-            <option value="cleaning">Cleaning</option>
-            <option value="repair">Repair</option>
-            <option value="other">Other</option>
+            <option value="cleaning">Cleaning — CLEAN</option>
+            <option value="repair">Repair — REPAIR</option>
+            <option value="other">Other — SVCX</option>
           </select>
         </div>
         <div>
@@ -428,16 +835,21 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
           )}
         </div>
       </div>
-      <div>
-        <div className="label mb-1">Service SKU (optional)</div>
-        <input
-          className={INPUT_CLS}
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-          placeholder="Service-category SKU code sold at the POS"
-          data-testid="pkg-sku"
-        />
-      </div>
+      {previewSku && !pkg && (
+        <div
+          className="t-tiny text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
+          data-testid="pkg-sku-preview"
+        >
+          Service SKU <b className="t-num">{previewSku}</b> — built from category × type × duration ×
+          visits. Change any of them and the code changes with it, so two plans can never collide.
+        </div>
+      )}
+      {pkg?.sku && (
+        <div className="t-tiny text-base-500">
+          SKU <b className="t-num">{pkg.sku}</b> — a minted code is permanent; a different duration
+          or visit count wants a new package.
+        </div>
+      )}
       <label className="flex items-center gap-2 t-small">
         <input
           type="checkbox"
@@ -451,428 +863,6 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
         onCancel={onDone}
         onPrimary={save}
         primary={pkg ? "Save package" : "Create package"}
-        primaryDisabled={!valid}
-        primaryPending={busy}
-      />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// (b) Rental plans (rent-to-own)
-// ---------------------------------------------------------------------------
-
-// 10 columns must fit the 1120px shell minus card padding (Loo 2026-07-25 —
-// the Stripe column pushed MANAGE off the card edge). Mins sum ≈976px incl.
-// the 9 gaps; the row container scrolls horizontally as the backstop.
-const PLAN_GRID =
-  "minmax(110px,1.2fr) 56px 80px 90px 70px 90px minmax(100px,1fr) 110px 52px 110px";
-
-function RentalPlansSection({
-  plans,
-  packages,
-  isPrincipal,
-  addOpen,
-  onCloseAdd,
-}: {
-  plans: RentalPlan[];
-  packages: ServicePackage[];
-  isPrincipal: boolean;
-  addOpen: boolean;
-  onCloseAdd: () => void;
-}) {
-  const pkgName = (id: string | null): string =>
-    id ? (packages.find((p) => p.id === id)?.name ?? "Unknown package") : "—";
-
-  return (
-    <section className="card p-5">
-      <div className="t-h4 font-display flex items-center gap-2 mb-1">
-        <Repeat size={16} strokeWidth={1.75} className="text-primary" />
-        Rental plans (rent-to-own)
-      </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
-        One SKU rented at a monthly fee over a fixed term — the customer owns it at the
-        end. The supplier rate and base commission are recorded against every collected
-        month. A plan can include a service package for free.
-        {!isPrincipal && " Principal only — read-only for your role."}
-      </p>
-
-      {addOpen && isPrincipal && (
-        <Modal title="New rental plan" onClose={onCloseAdd}>
-          <PlanForm packages={packages} onDone={onCloseAdd} />
-        </Modal>
-      )}
-
-      {/* overflow-x-auto (not hidden): a viewport the grid mins outgrow scrolls
-          inside the card instead of clipping the MANAGE column (UI-KIT law). */}
-      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-x-auto">
-        <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-          style={{ gridTemplateColumns: PLAN_GRID }}
-        >
-          <div className="label">SKU</div>
-          <div className="label text-right">Term</div>
-          <div className="label text-right">Monthly</div>
-          <div className="label text-right">Contract</div>
-          <div className="label text-right">Supplier</div>
-          <div className="label text-right">Commission</div>
-          <div className="label">Included package</div>
-          <div className="label">Stripe</div>
-          <div className="label">Active</div>
-          <div className="label text-right">Manage</div>
-        </div>
-        {plans.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4" data-testid="plans-empty">
-            No rental plans yet — author one to prepare the POS rental lane (next phase).
-          </div>
-        )}
-        {plans.map((p) => (
-          <PlanRow
-            key={p.id}
-            plan={p}
-            packages={packages}
-            includedName={pkgName(p.includedPackageId)}
-            isPrincipal={isPrincipal}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function PlanRow({
-  plan,
-  packages,
-  includedName,
-  isPrincipal,
-}: {
-  plan: RentalPlan;
-  packages: ServicePackage[];
-  includedName: string;
-  isPrincipal: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const patch = usePatchRentalPlan();
-  const del = useDeleteRentalPlan();
-  const sync = useSyncRentalPlanStripe();
-
-  // 0255 — a plan needs its Stripe recurring Price before the POS lane can
-  // collect online. Auto-synced on save; this button is the manual retry.
-  function syncStripe() {
-    sync.mutate(plan.id, {
-      onSuccess: (res: { stripeSync: { status: string; message?: string } }) => {
-        if (res.stripeSync.status === "synced") toast.success("Plan synced to Stripe");
-        else toast.error(res.stripeSync.message ?? "Stripe sync failed");
-      },
-      onError: (e: unknown) => toast.error(errMsg(e, "Stripe sync failed")),
-    });
-  }
-
-  function toggleActive() {
-    patch.mutate(
-      { id: plan.id, patch: { active: !plan.active } },
-      {
-        onSuccess: () => toast.success(plan.active ? "Plan deactivated" : "Plan activated"),
-        onError: (e: unknown) => toast.error(errMsg(e, "Update failed")),
-      },
-    );
-  }
-
-  function remove() {
-    if (!confirm(`Delete the rental plan on ${plan.sku} (${plan.termMonths} months)?`)) return;
-    del.mutate(plan.id, {
-      onSuccess: () => toast.success("Plan deleted"),
-      onError: (e: unknown) => toast.error(errMsg(e, "Delete failed")),
-    });
-  }
-
-  if (editing) {
-    return (
-      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-white">
-        <PlanForm plan={plan} packages={packages} onDone={() => setEditing(false)} />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${plan.active ? "" : "opacity-60"}`}
-      style={{ gridTemplateColumns: PLAN_GRID }}
-      data-testid={`plan-row-${plan.id}`}
-    >
-      <div className="text-[13px] truncate">{plan.sku}</div>
-      <div className="text-right t-num text-[12px]">{plan.termMonths} mo</div>
-      <div className="text-right t-num text-[12px]">{rm(plan.monthlyFee)}</div>
-      <div className="text-right t-num text-[12px]">
-        {rm(rentalContractValue(plan.monthlyFee, plan.termMonths))}
-      </div>
-      <div className="text-right t-num text-[12px]">{plan.supplierRatePct}%</div>
-      <div className="text-right t-num text-[12px]">{plan.commissionBasePct}%</div>
-      <div className="t-tiny text-base-500 truncate">{includedName}</div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {plan.stripePriceId ? (
-          <span className="pill pill-confirmed" data-testid={`plan-stripe-${plan.id}`}>
-            Synced
-          </span>
-        ) : (
-          <>
-            <span className="pill pill-neutral" data-testid={`plan-stripe-${plan.id}`}>
-              Not synced
-            </span>
-            {isPrincipal && (
-              <button
-                type="button"
-                onClick={syncStripe}
-                disabled={sync.isPending}
-                className="btn-ghost text-[11px]"
-                data-testid={`plan-sync-${plan.id}`}
-              >
-                {sync.isPending ? "Syncing…" : "Sync"}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-      <div>
-        {isPrincipal ? (
-          <input
-            type="checkbox"
-            checked={plan.active}
-            disabled={patch.isPending}
-            onChange={toggleActive}
-            aria-label={`${plan.sku} ${plan.termMonths}-month plan active`}
-            data-testid={`plan-active-${plan.id}`}
-          />
-        ) : (
-          <span className={`pill ${plan.active ? "pill-confirmed" : "pill-neutral"}`}>
-            {plan.active ? "Active" : "Off"}
-          </span>
-        )}
-      </div>
-      <div className="text-right flex justify-end gap-1.5">
-        {isPrincipal && (
-          <>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="btn-ghost text-[11px]"
-              data-testid={`plan-edit-${plan.id}`}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={remove}
-              disabled={del.isPending}
-              className="btn-danger text-[11px]"
-              data-testid={`plan-delete-${plan.id}`}
-            >
-              Delete
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const TERM_PRESETS = [
-  { label: "5 years", months: 60 },
-  { label: "7 years", months: 84 },
-];
-
-/** Create / edit a rental plan. `plan` present = patch mode. A NEW plan
- *  defaults INACTIVE (Loo: author first, flip live deliberately). */
-function PlanForm({
-  plan,
-  packages,
-  onDone,
-}: {
-  plan?: RentalPlan;
-  packages: ServicePackage[];
-  onDone: () => void;
-}) {
-  const create = useCreateRentalPlan();
-  const patch = usePatchRentalPlan();
-  const busy = create.isPending || patch.isPending;
-
-  const [sku, setSku] = useState(plan?.sku ?? "");
-  const [term, setTerm] = useState(plan ? String(plan.termMonths) : "");
-  const [fee, setFee] = useState(plan ? String(plan.monthlyFee) : "");
-  const [supplierPct, setSupplierPct] = useState(plan ? String(plan.supplierRatePct) : "0");
-  const [commissionPct, setCommissionPct] = useState(
-    plan ? String(plan.commissionBasePct) : "0",
-  );
-  const [includedPackageId, setIncludedPackageId] = useState(plan?.includedPackageId ?? "");
-  const [active, setActive] = useState(plan?.active ?? false);
-
-  const termNum = Math.floor(Number(term));
-  const feeNum = round2(Number(fee));
-  const supplierNum = round2(Number(supplierPct));
-  const commissionNum = round2(Number(commissionPct));
-  const termValid = term.trim() !== "" && Number.isInteger(termNum) && termNum > 0;
-  const feeValid = fee.trim() !== "" && Number.isFinite(feeNum) && feeNum >= 0;
-  const supplierValid =
-    supplierPct.trim() !== "" && Number.isFinite(supplierNum) && supplierNum >= 0 && supplierNum <= 100;
-  const commissionValid =
-    commissionPct.trim() !== "" &&
-    Number.isFinite(commissionNum) &&
-    commissionNum >= 0 &&
-    commissionNum <= 100;
-  const valid =
-    sku.trim().length >= 1 && termValid && feeValid && supplierValid && commissionValid;
-
-  const preview = termValid && feeValid && supplierValid && commissionValid;
-  const split = preview ? rentalMonthlySplit(feeNum, supplierNum, commissionNum) : null;
-
-  function save() {
-    if (!valid || busy) return;
-    const payload = {
-      sku: sku.trim(),
-      termMonths: termNum,
-      monthlyFee: feeNum,
-      supplierRatePct: supplierNum,
-      commissionBasePct: commissionNum,
-      includedPackageId: includedPackageId === "" ? null : includedPackageId,
-      active,
-    };
-    if (plan) {
-      patch.mutate(
-        { id: plan.id, patch: payload },
-        {
-          onSuccess: () => {
-            toast.success("Plan updated");
-            onDone();
-          },
-          onError: (e: unknown) => toast.error(errMsg(e, "Update failed")),
-        },
-      );
-    } else {
-      create.mutate(payload, {
-        onSuccess: () => {
-          toast.success("Plan created");
-          onDone();
-        },
-        onError: (e: unknown) => toast.error(errMsg(e, "Create failed")),
-      });
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <div className="label mb-1">SKU</div>
-        <input
-          className={INPUT_CLS}
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-          placeholder="Product SKU code (e.g. CLOUD-K)"
-          data-testid="plan-sku"
-        />
-      </div>
-      <div>
-        <div className="label mb-1">Term (months)</div>
-        <div className="flex items-center gap-2">
-          {TERM_PRESETS.map((p) => (
-            <button
-              key={p.months}
-              type="button"
-              onClick={() => setTerm(String(p.months))}
-              className={`${termNum === p.months ? "btn-primary" : "btn-ghost"} text-[11px]`}
-              data-testid={`plan-term-${p.months}`}
-            >
-              {p.label}
-            </button>
-          ))}
-          <input
-            className={`${INPUT_CLS} w-24`}
-            type="number"
-            min={1}
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            data-testid="plan-term"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <div className="label mb-1">Monthly fee (RM)</div>
-          <input
-            className={INPUT_CLS}
-            type="number"
-            min={0}
-            step="0.01"
-            value={fee}
-            onChange={(e) => setFee(e.target.value)}
-            data-testid="plan-fee"
-          />
-        </div>
-        <div>
-          <div className="label mb-1">Supplier rate (%)</div>
-          <input
-            className={INPUT_CLS}
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={supplierPct}
-            onChange={(e) => setSupplierPct(e.target.value)}
-            data-testid="plan-supplier"
-          />
-        </div>
-        <div>
-          <div className="label mb-1">Commission base (%)</div>
-          <input
-            className={INPUT_CLS}
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={commissionPct}
-            onChange={(e) => setCommissionPct(e.target.value)}
-            data-testid="plan-commission"
-          />
-        </div>
-      </div>
-      {split && (
-        <div
-          className="t-tiny text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
-          data-testid="plan-preview"
-        >
-          {rm(feeNum)} × {termNum} months = {rm(rentalContractValue(feeNum, termNum))} · supplier{" "}
-          {rm(split.supplierShare)}/mo · commission {rm(split.commissionShare)}/mo · Carres{" "}
-          {rm(split.carresShare)}/mo
-        </div>
-      )}
-      <div>
-        <div className="label mb-1">Included service package</div>
-        <select
-          className={INPUT_CLS}
-          value={includedPackageId}
-          onChange={(e) => setIncludedPackageId(e.target.value)}
-          data-testid="plan-package"
-        >
-          <option value="">None</option>
-          {packages.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="flex items-center gap-2 t-small">
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(e) => setActive(e.target.checked)}
-          data-testid="plan-form-active"
-        />
-        Active (visible to the POS rental lane once it ships)
-      </label>
-      <ModalActions
-        onCancel={onDone}
-        onPrimary={save}
-        primary={plan ? "Save plan" : "Create plan"}
         primaryDisabled={!valid}
         primaryPending={busy}
       />

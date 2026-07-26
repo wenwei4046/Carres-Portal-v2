@@ -12,6 +12,9 @@ import { z } from "zod";
 
 // ── service_packages (0248) ────────────────────────────────────────────────
 
+/** 0264 — product families an offer / service package can belong to. */
+export const rentalCategorySchema = z.enum(["mattress", "bedframe", "sofa", "accessory"]);
+
 const servicePackageFields = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -20,8 +23,11 @@ const servicePackageFields = z
     visitsPerYear: z.number().int().min(1).max(12),
     // Standalone selling price (RM); 0 = not sold standalone (free-attach only).
     price: z.number().nonnegative().default(0),
-    // Optional sellable service-category SKU; null = no SKU link.
+    // Optional sellable service-category SKU; null = no SKU link. 0264: the
+    // create route MINTS this from serviceSkuCode() when omitted.
     sku: z.string().trim().min(1).max(60).nullable().optional(),
+    // 0264 — drives the SVC-{MAT|BF|SOFA|ACC}-… token + the offer filter.
+    category: rentalCategorySchema.nullable().optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })
@@ -37,9 +43,15 @@ export type ServicePackagePatchInput = z.infer<typeof servicePackagePatchSchema>
 
 // ── rental_plans (0248) ────────────────────────────────────────────────────
 
+/** 0264 — one free gift (GWP) riding a price row: a real SKU + a qty. */
+export const rentalGiftSchema = z
+  .object({ sku: z.string().trim().min(1).max(60), qty: z.number().int().min(1).max(99) })
+  .strict();
+
 const rentalPlanFields = z
   .object({
-    sku: z.string().trim().min(1).max(60),
+    // 0264 — NULL only on a `combo` line (a combo has no sellable code).
+    sku: z.string().trim().min(1).max(60).nullable().optional(),
     termMonths: z.number().int().positive(),
     monthlyFee: z.number().nonnegative(),
     // % of every collected month to the supplier / the selling dealer base.
@@ -48,6 +60,11 @@ const rentalPlanFields = z
     // Service package included free with this rental; null = none.
     includedPackageId: z.string().uuid().nullable().optional(),
     active: z.boolean().optional(),
+    // 0264 — the parent offer, the sofa targets and the gifts.
+    offerId: z.string().uuid().nullable().optional(),
+    comboId: z.string().uuid().nullable().optional(),
+    lineKind: z.enum(["unit", "compartment", "combo"]).optional(),
+    gifts: z.array(rentalGiftSchema).max(20).optional(),
   })
   .strict();
 
@@ -62,8 +79,19 @@ const SPLIT_CAP_MSG = {
   path: ["commissionBasePct"],
 };
 
+/** A rent line aims at EXACTLY one target: a SKU (unit / compartment line) or
+ *  a sofa combo — the DDL says the same (rental_plans_one_target, 0264). */
+const oneTarget = (d: { sku?: string | null; comboId?: string | null }) =>
+  (d.sku != null && d.comboId == null) || (d.sku == null && d.comboId != null);
+const ONE_TARGET_MSG = {
+  message: "a plan needs exactly one target: a sku, or a comboId",
+  path: ["sku"],
+};
+
 /** Create a rental plan. Split rates default 0; `active` defaults false server-side. */
-export const rentalPlanInputSchema = rentalPlanFields.refine(splitCap, SPLIT_CAP_MSG);
+export const rentalPlanInputSchema = rentalPlanFields
+  .refine(splitCap, SPLIT_CAP_MSG)
+  .refine(oneTarget, ONE_TARGET_MSG);
 export type RentalPlanInput = z.infer<typeof rentalPlanInputSchema>;
 
 /** Patch a rental plan — every field of create is optional. The split cap is
@@ -71,6 +99,109 @@ export type RentalPlanInput = z.infer<typeof rentalPlanInputSchema>;
  *  the DB CHECK (0253). */
 export const rentalPlanPatchSchema = rentalPlanFields.partial().refine(splitCap, SPLIT_CAP_MSG);
 export type RentalPlanPatchInput = z.infer<typeof rentalPlanPatchSchema>;
+
+// ── rental_offers + buy prices + offer services (0264) ─────────────────────
+
+/** One priced option value in the overlay. `null` price = inherit (a fabric
+ *  colour follows its series); an explicit 0 means "free, deliberately". */
+const optionValueSchema = z
+  .object({
+    on: z.boolean().optional(),
+    oneTime: z.number().min(0).max(1_000_000).nullable().optional(),
+    monthly: z.number().min(0).max(100_000).nullable().optional(),
+  })
+  .strict();
+
+/** A fabric series: its own price + the per-colour overrides. */
+const fabricSeriesSchema = optionValueSchema.extend({
+  colors: z.record(optionValueSchema).optional(),
+});
+
+/** One option group of the overlay — pool values, or fabric series. */
+const optionGroupSchema = z
+  .object({
+    required: z.boolean().optional(),
+    values: z.record(optionValueSchema).optional(),
+    series: z.record(fabricSeriesSchema).optional(),
+  })
+  .strict();
+
+/** A manual surcharge slot (principal-authored; a store may tick an optional
+ *  one but can never type an amount — guardrail #4). */
+export const rentalSurchargeSchema = z
+  .object({
+    code: z.string().trim().min(1).max(40),
+    label: z.string().trim().min(1).max(120),
+    oneTime: z.number().min(0).max(1_000_000).optional(),
+    monthly: z.number().min(0).max(100_000).optional(),
+    required: z.boolean().optional(),
+  })
+  .strict();
+
+const rentalOfferFields = z
+  .object({
+    modelId: z.string().uuid(),
+    pricingMode: z.enum(["variant", "compartment", "combo", "both"]).optional(),
+    rentEnabled: z.boolean().optional(),
+    buyEnabled: z.boolean().optional(),
+    termsMonths: z.array(z.number().int().positive().max(600)).max(6).optional(),
+    optionPrices: z.record(optionGroupSchema).optional(),
+    surcharges: z.array(rentalSurchargeSchema).max(20).optional(),
+    supplierRatePct: z.number().min(0).max(100).optional(),
+    commissionBasePct: z.number().min(0).max(100).optional(),
+    active: z.boolean().optional(),
+    notes: z.string().trim().max(1000).nullable().optional(),
+  })
+  .strict();
+
+/** Create an offer — one per model (UNIQUE model_id → 409 at the route). */
+export const rentalOfferInputSchema = rentalOfferFields.refine(splitCap, SPLIT_CAP_MSG);
+export type RentalOfferInput = z.infer<typeof rentalOfferInputSchema>;
+
+/** Patch an offer. `modelId` is NOT patchable — re-pointing an authored offer
+ *  at another model would silently re-price live agreements' parent. */
+export const rentalOfferPatchSchema = rentalOfferFields
+  .omit({ modelId: true })
+  .partial()
+  .refine(splitCap, SPLIT_CAP_MSG);
+export type RentalOfferPatchInput = z.infer<typeof rentalOfferPatchSchema>;
+
+const rentalBuyPriceFields = z
+  .object({
+    sku: z.string().trim().min(1).max(60).nullable().optional(),
+    comboId: z.string().uuid().nullable().optional(),
+    // null = sell at whatever SKU Master says (no override for this offer).
+    price: z.number().min(0).max(10_000_000).nullable().optional(),
+    gifts: z.array(rentalGiftSchema).max(20).optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
+export const rentalBuyPriceInputSchema = rentalBuyPriceFields.refine(oneTarget, ONE_TARGET_MSG);
+export type RentalBuyPriceInput = z.infer<typeof rentalBuyPriceInputSchema>;
+
+export const rentalBuyPricePatchSchema = rentalBuyPriceFields.partial();
+export type RentalBuyPricePatchInput = z.infer<typeof rentalBuyPricePatchSchema>;
+
+const rentalOfferServiceFields = z
+  .object({
+    packageId: z.string().uuid(),
+    // Which lane gets it free; null = never free (always paid).
+    freeLane: z.enum(["rent", "buy", "both"]).nullable().optional(),
+    // How many visits are on us when free; null = all of the package's visits.
+    freeVisits: z.number().int().min(0).max(120).nullable().optional(),
+    monthlyPrice: z.number().min(0).max(100_000).nullable().optional(),
+    outrightPrice: z.number().min(0).max(1_000_000).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+
+export const rentalOfferServiceInputSchema = rentalOfferServiceFields;
+export type RentalOfferServiceInput = z.infer<typeof rentalOfferServiceInputSchema>;
+
+export const rentalOfferServicePatchSchema = rentalOfferServiceFields.omit({ packageId: true }).partial();
+export type RentalOfferServicePatchInput = z.infer<typeof rentalOfferServicePatchSchema>;
 
 // ── customers (0247) ───────────────────────────────────────────────────────
 

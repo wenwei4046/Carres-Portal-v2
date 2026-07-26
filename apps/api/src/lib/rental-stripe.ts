@@ -44,14 +44,17 @@ export async function ensureRentalPlanStripeObjects(
   plan: DB.RentalPlanRow,
   siblingProductId: string | null,
 ): Promise<RentalPlanStripeIds> {
+  // 0264 — a `combo` line has no SKU (a combo is a shape); its Stripe label
+  // falls back to the combo id so a product/price is never named "null".
+  const label = plan.sku ?? `combo-${plan.combo_id ?? "unknown"}`;
   let productId = plan.stripe_product_id ?? siblingProductId ?? null;
   if (!productId) {
     const product = await stripe.products.create({
-      name: `Rent-to-Own · ${plan.sku}`,
+      name: `Rent-to-Own · ${label}`,
       metadata: {
         carres_source: CARRES_SOURCE,
         carres_kind: "rental_plan",
-        carres_sku: plan.sku,
+        carres_sku: label,
       },
     });
     productId = product.id;
@@ -85,11 +88,11 @@ export async function ensureRentalPlanStripeObjects(
       currency: "myr",
       unit_amount: wantAmount,
       recurring: { interval: "month" },
-      nickname: `${plan.sku} × ${plan.term_months}mo @ RM${Number(plan.monthly_fee).toFixed(2)}/mo`,
+      nickname: `${label} × ${plan.term_months}mo @ RM${Number(plan.monthly_fee).toFixed(2)}/mo`,
       metadata: {
         carres_source: CARRES_SOURCE,
         carres_kind: "rental_plan_price",
-        carres_sku: plan.sku,
+        carres_sku: label,
         carres_term_months: String(plan.term_months),
         carres_monthly_fee: Number(plan.monthly_fee).toFixed(2),
       },
