@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type {
   CatalogResponse,
   GuaranteeTermDto,
+  PosRentalPlan,
   ProductBundleDto,
   ProductCategory,
   ProductModelDto,
@@ -19,6 +20,13 @@ import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, lineEditTarget, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
+import {
+  cartAccepts,
+  cartModeOf,
+  isRentalLine,
+  mixRefusalMessage,
+} from "./rental-cart";
+import RentalConfigurePage, { type RentalOfferCard } from "./RentalConfigurePage";
 import BundleCard from "./BundleCard";
 import BundleConfigurePage from "./BundleConfigurePage";
 import { assembleBundleLines, bundleNeedsConfig, type BundleSlotPick } from "./bundle-flow";
@@ -64,6 +72,7 @@ export default function CatalogStep({
   pwpAvailableVouchers,
   onApplyVoucherCode,
   topbarContext,
+  rentalPlans,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -88,6 +97,10 @@ export default function CatalogStep({
   pwpAvailableVouchers?: PwpDiscoverDto[];
   /** 0188 — manual voucher-code lookup callback (type/scan a number). */
   onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+  /** Loo 2026-07-26 — the rentable plans (GET /api/rental/pos-plans). Absent or
+   *  empty = no Rental rail at all, so a store with nothing on rental offer
+   *  sees exactly the catalog it saw before. */
+  rentalPlans?: PosRentalPlan[];
 }) {
   const index = useMemo(
     () =>
@@ -100,6 +113,8 @@ export default function CatalogStep({
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim().toLowerCase(), 180);
   const [configureModelId, setConfigureModelId] = useState<string | null>(null);
+  /** Loo 2026-07-26 — the rental card being configured (model id), if any. */
+  const [rentalCardId, setRentalCardId] = useState<string | null>(null);
   // Cart-line EDIT (Loo 2026-07-12): the ✎ pencil re-opens the line's
   // configurator prefilled; on save the line is REPLACED in place.
   const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
@@ -110,17 +125,57 @@ export default function CatalogStep({
     [draft.lines, index.skuToCategory],
   );
 
-  // If the active category just got locked by the mutex, bounce to All.
-  useEffect(() => {
-    if (
-      activeRail !== "all" &&
-      activeRail !== "addons" &&
-      activeRail !== "bundles" &&
-      lockedCats.has(activeRail)
-    ) {
-      setActiveRail("all");
+  // ── Rental (Loo 2026-07-26) ────────────────────────────────────────────────
+  // One card per MODEL that has at least one plan on offer. A rental offer is
+  // authored against a product_models row, so the card wall needs no new
+  // catalog concept — the same models, filtered to those with a live plan.
+  const rentalCards = useMemo<RentalOfferCard[]>(() => {
+    const plans = rentalPlans ?? [];
+    if (plans.length === 0) return [];
+    const skuToModel = new Map<string, string>();
+    for (const s of catalog.skus) skuToModel.set(s.sku, s.modelId);
+
+    const byModel = new Map<string, Map<string, PosRentalPlan[]>>();
+    for (const p of plans) {
+      const modelId = skuToModel.get(p.sku);
+      if (!modelId) continue; // a plan whose sku left the catalog: skip, don't crash
+      const perSku = byModel.get(modelId) ?? new Map<string, PosRentalPlan[]>();
+      perSku.set(p.sku, [...(perSku.get(p.sku) ?? []), p]);
+      byModel.set(modelId, perSku);
     }
-  }, [activeRail, lockedCats]);
+
+    return [...byModel.entries()]
+      .map(([modelId, plansBySku]) => {
+        const model = index.productModels.find((m) => m.id === modelId);
+        return model ? { model, plansBySku } : null;
+      })
+      .filter((c): c is RentalOfferCard => c !== null);
+  }, [rentalPlans, catalog.skus, index.productModels]);
+
+  // The cart has committed to one kind or the other; the rails say so before a
+  // tap does. This reuses the sofa-mutex lock affordance already on the rail —
+  // no new UI vocabulary for the operator to learn.
+  const cartMode = cartModeOf(draft.lines);
+  const rentalRailLocked = cartMode === "outright";
+  const outrightRailsLocked = cartMode === "rental";
+
+  // If the active rail just got locked — by the sofa mutex, or by the cart
+  // committing to rent-vs-buy — bounce somewhere the operator can still act.
+  useEffect(() => {
+    if (activeRail === "all" || activeRail === "addons" || activeRail === "bundles") return;
+    if (activeRail === "rental") {
+      // The cart turned into a normal sale: the Rental rail is no longer usable.
+      if (rentalRailLocked) setActiveRail("all");
+      return;
+    }
+    // A rental cart locks every buying rail, so "All open" would be a wall of
+    // locked cards — send them to the one rail that still works.
+    if (outrightRailsLocked) {
+      setActiveRail("rental");
+      return;
+    }
+    if (lockedCats.has(activeRail)) setActiveRail("all");
+  }, [activeRail, lockedCats, rentalRailLocked, outrightRailsLocked]);
 
   const countByCat = useMemo(() => {
     const m = new Map<ProductCategory, number>();
@@ -218,37 +273,75 @@ export default function CatalogStep({
       key: "mattress",
       label: "Mattresses",
       count: countByCat.get("mattress") ?? 0,
-      locked: lockedCats.has("mattress"),
+      locked: lockedCats.has("mattress") || outrightRailsLocked,
     },
     {
       key: "bedframe",
       label: "Bed frames",
       count: countByCat.get("bedframe") ?? 0,
-      locked: lockedCats.has("bedframe"),
+      locked: lockedCats.has("bedframe") || outrightRailsLocked,
     },
     {
       key: "sofa",
       label: "Sofas",
       count: countByCat.get("sofa") ?? 0,
-      locked: lockedCats.has("sofa"),
+      locked: lockedCats.has("sofa") || outrightRailsLocked,
     },
     // Accessories are cards too (2990s parity) — never mutex-locked.
     {
       key: "accessory",
       label: "Accessories",
       count: countByCat.get("accessory") ?? 0,
+      locked: outrightRailsLocked,
     },
     // 0261 — guarantees. Shown only once the principal has authored a term;
-    // never mutex-locked (a guarantee rides on top of whatever is in the cart).
+    // never sofa-mutex-locked (a guarantee rides on top of whatever is in the
+    // cart) — but a RENTAL cart still locks it, because a guarantee is bought.
     ...((countByCat.get("guarantee") ?? 0) > 0
-      ? [{ key: "guarantee", label: "Guarantees", count: countByCat.get("guarantee") ?? 0 } as RailEntry]
+      ? [
+          {
+            key: "guarantee",
+            label: "Guarantees",
+            count: countByCat.get("guarantee") ?? 0,
+            locked: outrightRailsLocked,
+          } as RailEntry,
+        ]
+      : []),
+    // Loo 2026-07-26 — Rent-to-Own is a category now, not a hidden button.
+    // Appears only when something is actually on rental offer.
+    ...(rentalCards.length > 0
+      ? [
+          {
+            key: "rental",
+            label: "Rental",
+            count: rentalCards.length,
+            locked: rentalRailLocked,
+          } as RailEntry,
+        ]
       : []),
     // 0239 — bundles rail shows only when at least one active bundle exists.
     ...(bundles.length > 0
-      ? [{ key: "bundles", label: "Bundles", count: bundles.length } as RailEntry]
+      ? [
+          {
+            key: "bundles",
+            label: "Bundles",
+            count: bundles.length,
+            locked: outrightRailsLocked,
+          } as RailEntry,
+        ]
       : []),
-    { key: "addons", label: "Add-ons", count: activeAddons.length },
+    { key: "addons", label: "Add-ons", count: activeAddons.length, locked: outrightRailsLocked },
   ];
+
+  // Rental cards show ONLY under their own rail — never mixed into "All open",
+  // because the same model can be both bought and rented and two cards for one
+  // product on the same wall is exactly the confusion this redesign removes.
+  const shownRentals =
+    activeRail === "rental"
+      ? rentalCards.filter(
+          (c) => !search || (index.meta.get(c.model.id)?.searchBlob.includes(search) ?? false),
+        )
+      : [];
 
   // Models to render, filtered by rail + search, ordered category-first
   // (mattress → bedframe → sofa) inside the single CARRES series group.
@@ -282,7 +375,18 @@ export default function CatalogStep({
     setActiveRail("all");
   }
 
+  /**
+   * The no-mixing law (Loo 2026-07-26, LOCKED): a cart is either all rental or
+   * all outright. Enforced HERE, at the single funnel every add passes through
+   * — card tap, configurator, bundle explode and guarantee pick all end up in
+   * `addLine`, so one guard covers every door rather than four that can drift.
+   */
   function addLine(line: DraftLine) {
+    const kind = isRentalLine(line) ? "rental" : "outright";
+    if (!cartAccepts(draft.lines, kind)) {
+      toast.error(mixRefusalMessage(kind));
+      return;
+    }
     onChange({ ...draft, lines: mergeLine(draft.lines, line) });
     // The one-shot FAB pulse (class applied by FloatingCartButton when
     // pulse=true; cleared after 220ms) is the ONLY add feedback — no toast,
@@ -535,9 +639,21 @@ export default function CatalogStep({
                   key={model.id}
                   model={model}
                   meta={index.meta.get(model.id)!}
-                  locked={lockedCats.has(model.category)}
+                  locked={lockedCats.has(model.category) || outrightRailsLocked}
                   inCart={modelIdsInCart.has(model.id)}
                   onConfigure={() => handleConfigure(model)}
+                />
+              ))}
+              {/* Rental cards — the SAME ProductCard as everything else, which
+                  is the whole point: renting must not look like another app. */}
+              {shownRentals.map((card) => (
+                <ProductCard
+                  key={`rental-${card.model.id}`}
+                  model={card.model}
+                  meta={index.meta.get(card.model.id)!}
+                  locked={rentalRailLocked}
+                  inCart={modelIdsInCart.has(card.model.id)}
+                  onConfigure={() => setRentalCardId(card.model.id)}
                 />
               ))}
             </div>
@@ -551,6 +667,28 @@ export default function CatalogStep({
         pulse={pulse}
         onClick={() => onCartOpenChange(true)}
       />
+
+      {/* Rent-to-Own configure page — full page, same shape as the bought
+          configurators (Loo 2026-07-26). Checked BEFORE them so a model that is
+          both sold and rented opens the right one. */}
+      {(() => {
+        const card = rentalCardId
+          ? rentalCards.find((c) => c.model.id === rentalCardId) ?? null
+          : null;
+        if (!card) return null;
+        return (
+          <RentalConfigurePage
+            card={card}
+            catalog={catalog}
+            onAdd={(line) => {
+              addLine(line);
+              setRentalCardId(null);
+            }}
+            onClose={() => setRentalCardId(null)}
+            wizardTopbar={topbarContext ? { contextLabel: topbarContext } : undefined}
+          />
+        );
+      })()}
 
       {(() => {
         // POS-parity (Loo 2026-07-04) — a MODULAR sofa (offers compartments)

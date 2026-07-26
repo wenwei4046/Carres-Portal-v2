@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { RequireRole } from "@/lib/require-role";
 import { roleAllowedOnPortal } from "@/lib/portal";
 import WrongPortal from "@/components/WrongPortal";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
@@ -65,12 +66,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 export default function App() {
   const hydrate = useAuth((s) => s.hydrate);
+  const location = useLocation();
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
   return (
     <>
+      {/* Route-level net. Keyed on pathname so navigating AWAY from a page that
+          crashed clears the error — otherwise the operator would be stuck on
+          the failure screen until a full reload. The root boundary in main.tsx
+          still backs this up. */}
+      <ErrorBoundary key={location.pathname} area="Carres Portal" variant="route">
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/me" element={<RequireAuth><Me /></RequireAuth>} />
@@ -187,6 +194,7 @@ export default function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
+      </ErrorBoundary>
       {/* Global toast surface — top-right per dealer-portal convention.
        *  rich-colors uses sonner's theme classes so success / error / warning
        *  pick up our --success / --warning / --destructive tokens via the

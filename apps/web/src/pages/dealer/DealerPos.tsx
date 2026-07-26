@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, Repeat, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -30,6 +30,8 @@ import {
   usePrincipalDealers,
   useProceedOrder,
   usePwpAvailableForPhone,
+  useCreateRentalAgreement,
+  useRentalPosPlans,
   usePwpCodesMine,
   useReservePwpCode,
   useSalespersons,
@@ -53,7 +55,6 @@ import {
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import StripeCollectModal from "./pos/StripeCollectModal";
-import RentToOwnPage from "./pos/RentToOwnPage";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
 import OrderStatusPage from "./pos/OrderStatusPage";
@@ -61,6 +62,7 @@ import OrderSummaryRail from "./pos/OrderSummaryRail";
 import QuotesDrawer from "./pos/QuotesDrawer";
 import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
+import { cartModeOf, rentalOf, type RentalLineAttrs } from "./pos/rental-cart";
 
 /** True when a restored draft has real content worth resuming. */
 function draftHasContent(d: WizardDraft): boolean {
@@ -172,7 +174,6 @@ export default function DealerPos({
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   // 0255 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
-  const [rentalOpen, setRentalOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
   // manage store staff) behind its own top-bar pill.
@@ -192,6 +193,15 @@ export default function DealerPos({
   const clearStaffToken = useStaffSession((s) => s.clearToken);
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
+  // Loo 2026-07-26 — rent-to-own is a catalog CATEGORY now. Empty result = the
+  // Rental rail simply never appears, so a store with nothing on offer sees the
+  // catalog exactly as before.
+  const rentalPlansQ = useRentalPosPlans();
+  const createRentalAgreement = useCreateRentalAgreement();
+  /** Agreements created by the last rental checkout (drives the done screen). */
+  const [rentalDone, setRentalDone] = useState<{ agreementNo: string; label: string }[] | null>(
+    null,
+  );
 
   // ── 0187 (Phase 8c) — the per-CART claimGroup correlation uuid. ONE per cart
   // submit (§6.3): every coded reward line shares it (the server enforces the
@@ -497,9 +507,68 @@ export default function DealerPos({
    *   2. POST /api/orders with the composed CreateOrderInput
    *   3. clearDraft + render ThankYou; auto-proceed if ASAP
    */
+  /**
+   * A RENTAL cart never becomes an order (Loo 2026-07-26, LOCKED: "rent and
+   * outright 不能在同一张单"). Each rental line is its own contract — its own
+   * agreement number, its own Stripe subscription, its own tracked asset — so
+   * N lines create N agreements, sequentially so a mid-way failure reports
+   * exactly which ones already exist rather than leaving a silent partial.
+   *
+   * Nothing is charged here: 0268 makes every agreement `pending_approval`
+   * until finance clears the credit.
+   */
+  async function submitRentalCart() {
+    // Same MY cascade the order path composes; the agreement stores one string.
+    const composedRentalAddress = composeAddress({
+      line1: draft.customer.addressLine1,
+      line2: draft.customer.addressLine2,
+      state: draft.customer.addressState,
+      city: draft.customer.addressCity,
+      postcode: draft.customer.addressPostcode,
+    });
+    const plans = draft.lines
+      .map((l) => ({ line: l, rental: rentalOf(l) }))
+      .filter((x): x is { line: (typeof draft.lines)[number]; rental: RentalLineAttrs } =>
+        x.rental !== null,
+      );
+    if (plans.length === 0) return;
+
+    setSubmitError(null);
+    const done: { agreementNo: string; label: string }[] = [];
+    try {
+      for (const { line, rental } of plans) {
+        const res = await createRentalAgreement.mutateAsync({
+          planId: rental.planId,
+          customerName: draft.customer.name.trim(),
+          customerPhone: draft.customer.phone.trim(),
+          ...(draft.customer.email?.trim() ? { customerEmail: draft.customer.email.trim() } : {}),
+          ...(composedRentalAddress ? { customerAddress: composedRentalAddress } : {}),
+          ...(actingDealerId ? { dealerId: actingDealerId } : {}),
+          ...(draft.salespersonId ? { salespersonId: draft.salespersonId } : {}),
+        });
+        done.push({ agreementNo: res.agreement.agreementNo, label: line.label });
+      }
+      clearDraft();
+      setRentalDone(done);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not create the rental agreement";
+      // Say what DID happen — a half-finished run must not look like nothing
+      // happened, or the store re-submits and double-signs the customer.
+      setSubmitError(
+        done.length > 0
+          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart — check Admin → Rental first.`
+          : msg,
+      );
+    }
+  }
+
   async function handleSubmit() {
     if (!confirmReady || !step3DateValid(draft, minLeadDays) || !effectiveDealerId || !draft.wizardSessionId)
       return;
+    if (cartModeOf(draft.lines) === "rental") {
+      await submitRentalCart();
+      return;
+    }
     setSubmitError(null);
     try {
       setUploading(true);
@@ -948,18 +1017,14 @@ export default function DealerPos({
             <Bookmark size={13} strokeWidth={1.75} />
             <span>Quotes</span>
           </button>
-          {/* 0255 — the rental sell lane: sign RA agreements + Stripe
-              auto-debit. Dormant-friendly (no active plans → empty state). */}
-          <button
-            type="button"
-            onClick={() => setRentalOpen(true)}
-            className="topbar-pill"
-            aria-label="Rent-to-Own"
-            data-testid="pos-topbar-rental"
-          >
-            <Repeat size={13} strokeWidth={1.75} />
-            <span>Rent-to-Own</span>
-          </button>
+          {/* The Rent-to-Own top-bar button is GONE (Loo 2026-07-26). It was a
+              second, hidden entrance to the catalog — Loo could not find his own
+              rental offer through it — which is the whole reason renting is now
+              a CATEGORY in the left rail like every other product family.
+              `RentToOwnPage` is left on disk with its tests but is no longer
+              mounted anywhere; it is superseded by the Rental rail + the
+              RentalConfigurePage and should be deleted once the new lane has
+              carried a live pilot signup. */}
           {/* Every role gets the in-POS Order Status board (PIN-gated) — the
               principal's board scopes to the dealer they're acting for (all
               dealers until one is picked). The portal Orders trace tab still
@@ -1059,7 +1124,45 @@ export default function DealerPos({
 
       {/* Body */}
       <main className="flex-1 min-h-0 overflow-hidden">
-        {submitted ? (
+        {rentalDone ? (
+          <div className="page-shell h-full overflow-auto">
+            <div className="max-w-[560px] mx-auto py-12 text-center flex flex-col gap-4">
+              <h2 className="text-[22px] font-semibold text-foreground">
+                {rentalDone.length === 1
+                  ? `${rentalDone[0].agreementNo} sent for approval`
+                  : `${rentalDone.length} rental agreements sent for approval`}
+              </h2>
+              <div className="flex flex-col gap-1.5">
+                {rentalDone.map((r) => (
+                  <div key={r.agreementNo} className="text-[13px] text-muted-foreground">
+                    <span className="font-mono">{r.agreementNo}</span> · {r.label}
+                  </div>
+                ))}
+              </div>
+              {/* The one thing the store must not get wrong: no money moved. */}
+              <p className="text-[13px] font-semibold text-foreground">
+                No payment has been collected.
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                Finance reviews the customer's details first. Once approved, the first month can
+                be collected and the monthly auto-debit switches on.
+              </p>
+              <div className="flex justify-center gap-2 mt-2">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => {
+                    setRentalDone(null);
+                    startAnotherOrder();
+                  }}
+                  data-testid="rental-done-new"
+                >
+                  New order
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : submitted ? (
           <div className="page-shell h-full overflow-hidden">
             <ThankYou
               order={submitted}
@@ -1096,6 +1199,7 @@ export default function DealerPos({
               customerPhone={pwpActive ? customerPhone : undefined}
               pwpAvailableVouchers={pwpAvailableQ.data?.vouchers ?? []}
               onApplyVoucherCode={pwpActive ? lookupVoucherCode : undefined}
+              rentalPlans={rentalPlansQ.data?.plans ?? []}
             />
           </div>
         ) : step === 2 ? (
@@ -1183,14 +1287,6 @@ export default function DealerPos({
         ))}
 
       {accountsOpen && isBd && <BdAccountsPage onClose={() => setAccountsOpen(false)} />}
-
-      {rentalOpen && (
-        <RentToOwnPage
-          actingDealerId={effectiveActingId}
-          dealerId={effectiveDealerId}
-          onClose={() => setRentalOpen(false)}
-        />
-      )}
 
       {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
 
