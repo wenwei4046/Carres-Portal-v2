@@ -1,0 +1,175 @@
+/**
+ * Order-line classification — the single client-side source of truth for what
+ * an order line *is* (Mattress / Bedframe / Sofa core good vs accessory vs
+ * service charge), its size, and its default stock location.
+ *
+ * The keyword classifier mirrors the server's `resolve_demand_category`
+ * (migration 0148) VERBATIM so the MS/BF/SOF it yields speaks the exact
+ * vocabulary the supplier forecast uses. Add new model families to BOTH places.
+ *
+ * Extracted here (2026-06-22) so the Orders control grid (OperationOrdersControl)
+ * and the order drawer (OrderDetailDrawer) share ONE copy instead of drifting —
+ * past category bugs came from exactly that drift. Importing from this lib also
+ * breaks the would-be circular import (the grid renders the drawer).
+ *
+ * MOVED to packages/shared (D1, 2026-07-26) so the booking-confirm gate on the
+ * API can ask the SAME goods-ready question the drawer badge shows — no second
+ * engine (the HR-P5 lesson). apps/web/src/lib/line-category.ts re-exports from
+ * here, so every existing web import path still works.
+ */
+import { normalizeSkuKey } from "./sku-code";
+
+export type CoreCat = "mattress" | "bedframe" | "sofa";
+
+/** Core goods (Mattress / Bedframe / Sofa) need POs + stock; everything else is
+ *  accessory ("acc"). Native SKUs carry a `mattress:` / `bedframe:` / `sofa:`
+ *  prefix; AutoCount free-text SKUs use model keywords + `MS## / BF## / SF##`
+ *  item codes. */
+export function lineCategory(sku: string): CoreCat | "acc" {
+  const s = sku.trim();
+  // Native canonical SKUs carry a `mattress:` / `bedframe:` / `sofa:` prefix.
+  // Match ONLY that exact head — an AutoCount SKU often embeds a `COL:` colour
+  // code (".../COL:KN390-15"); the old `includes(":")` shoved every coloured
+  // SKU into "acc", so sofas/bedframes leaked into the row as raw model names.
+  const head = s.split(":")[0].trim().toLowerCase();
+  if (head === "mattress" || head === "bedframe" || head === "sofa")
+    return head as CoreCat;
+
+  // Accessory / service keywords are tested FIRST so "Mattress Protector" stays
+  // an accessory, not a mattress.
+  const n = s.toLowerCase();
+  if (/disposal|transport fee|no lift|per floor|memory pillow|protector|microfiber/.test(n))
+    return "acc";
+  if (/jager|cody|trion|hilton|fenrir|ricardo|regal|divan|\/fab[0-9]/.test(n)) return "bedframe";
+  if (/hk55|dsl90|dsl80|am90|th50|th51|glano|muro|nuvio|lunor|modulo|seater|incliner|eleganz/.test(n))
+    return "sofa";
+  if (/firmcare|softcloud|breeze|lumi|forte|sonic|haven|solace|meridian|b120|l120|h140|m140|s160/.test(n))
+    return "mattress";
+  if (/^ms[0-9]/.test(n)) return "mattress";
+  if (/^bf[0-9]/.test(n)) return "bedframe";
+  if (/^sf[0-9]/.test(n)) return "sofa";
+  return "acc";
+}
+
+/** King / Queen / Single from a SKU, or null. */
+export function lineSize(sku: string): string | null {
+  const s = sku.toLowerCase();
+  // Bedframes/mattresses write the size as a WORD mid-SKU ("Fab3-King",
+  // "Fab2-Queen") as well as the canonical `-K/-Q/-S` suffix. Queen is tested
+  // before King so "super king" still reads K, not a false Q.
+  if (/\bqueen\b/.test(s)) return "Q";
+  if (/\bking\b/.test(s)) return "K";
+  if (/\b(?:super\s*)?single\b/.test(s)) return "S";
+  const m = sku.match(/-([kqs])(?=$|[/\s)])/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/**
+ * The stock MATCH key for a line/unit — the single rule that links an order line
+ * to warehouse free stock (Jess 2026-07-01 locked spec: "same MODEL + same SIZE,
+ * -Q = Queen count as the same size"). Built on `normalizeSkuKey` (case +
+ * punctuation drift) but with the size token CANONICALIZED via `lineSize`, so a
+ * line written "…-Q" and a unit written "…Queen" resolve to ONE key instead of
+ * two — fixing the split that `normalizeSkuKey` alone leaves. Fabric / ref codes
+ * stay in the key (a sofa in fabric A ≠ fabric B); cross-fabric fulfilment is the
+ * "Loan any sofa" escape hatch, not a silent match.
+ *
+ * Used by BOTH the readiness badge (OrderDetailDrawer) and the Warehouse-stock
+ * panel filter (StockPickerGrid) so the count they show can never disagree.
+ */
+export function stockMatchKey(sku: string): string {
+  const s = sku.toLowerCase();
+  // Detect the size in any written form (tolerant on purpose — the whole point
+  // is to survive drift): the words Queen / King / (Super) Single, OR a
+  // standalone K/Q/S delimited by a hyphen OR space ("-Q", "- Q", " Q").
+  let size = "";
+  if (/\bqueen\b/.test(s)) size = "Q";
+  else if (/\bking\b/.test(s)) size = "K";
+  else if (/\b(?:super\s*)?single\b/.test(s)) size = "S";
+  else {
+    const m = s.match(/[-\s]([kqs])(?=$|[/\s)])/);
+    if (m) size = m[1].toUpperCase();
+  }
+  // Strip whichever size form appears so it can't fragment the model key.
+  const withoutSize = s
+    .replace(/\b(?:super\s*)?single\b/g, " ")
+    .replace(/\bqueen\b/g, " ")
+    .replace(/\bking\b/g, " ")
+    .replace(/[-\s]([kqs])(?=$|[/\s)])/g, " ");
+  return normalizeSkuKey(withoutSize) + (size ? `|${size}` : "");
+}
+
+/** Short proper TYPE name for a non-core line — the list shows these instead of
+ *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
+ *  drawer shows the full original name; this is the short form. */
+export function accShort(sku: string): string {
+  const s = sku.toLowerCase();
+  if (/pillow/.test(s)) return "Pillow";
+  if (/protector|protect|\bm\.?p\b/.test(s)) return "M.P";
+  if (/disposal|dispose/.test(s)) return "Disposal";
+  if (/floor|lift|stair|transport|delivery|charge|install/.test(s)) return "Service";
+  if (/topper/.test(s)) return "Topper";
+  // "Carress Footrest-K/-Q" is a sofa footrest add-on — the TYPE is Footrest;
+  // the bare first-word fallback would grab the brand ("Carress") instead.
+  if (/footrest|foot rest|ottoman/.test(s)) return "Footrest";
+  const w = sku.trim().split(/[\s/]+/)[0] ?? sku;
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+
+export type ItemKind = "core" | "acc" | "service";
+
+/** core furniture · accessory goods · service charge (Disposal / floor charge —
+ *  not a physical unit, carries no stock location). */
+export function lineKind(sku: string): ItemKind {
+  if (lineCategory(sku) !== "acc") return "core";
+  const name = accShort(sku);
+  return name === "Disposal" || name === "Service" ? "service" : "acc";
+}
+
+/**
+ * Display sequence rank for an order line (Jess 2026-06-22): always list in the
+ * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
+ * sorts first; ties keep their original order (Array.sort is stable). Use as
+ * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
+ */
+export function lineSortRank(sku: string): number {
+  const cat = lineCategory(sku);
+  if (cat === "mattress") return 0;
+  if (cat === "bedframe") return 1;
+  if (cat === "sofa") return 2;
+  const name = accShort(sku);
+  if (name === "Pillow") return 3;
+  if (name === "M.P") return 4;
+  if (name === "Disposal" || name === "Service") return 6; // service last
+  return 5; // other accessories (Topper / Footrest / …) before service
+}
+
+/**
+ * Suggested default stock location for a line (Jess 2026-06-22):
+ *   • core furniture (Mattress / Bedframe / Sofa) → its SUPPLIER name — it's made
+ *     to order and sits at the supplier until received. Current core suppliers:
+ *     mattress = Nice Future, bedframe + sofa = Ohana ([[supplier-core-mapping]]).
+ *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — kept
+ *     as ready warehouse stock.
+ *   • service charges (No Lift / Disposal / floor) → null — no physical location.
+ * It's only a DEFAULT — the drawer dropdown lets the operator override per line.
+ *
+ * The default is the FINAL consolidation point (Jess 2026-07-07), driven by the
+ * order's assigned LOGISTIC — NOT the supplier: HOUZS → Houzs Balakong · AL → AL ·
+ * everything else (incl. NETS + not-yet-assigned) → the own Carres Klang
+ * warehouse. Received stock is booked in at where it's consolidated for delivery,
+ * so a mattress lands at the Klang warehouse by default, not at its supplier.
+ */
+export function defaultLineLocation(
+  sku: string,
+  logisticName?: string | null,
+): string | null {
+  if (lineKind(sku) === "service") return null; // no physical location
+  const l = (logisticName ?? "").trim().toLowerCase();
+  if (l.includes("houzs")) return "Houzs Balakong";
+  if (l === "al") return "AL";
+  return "Carres Klang"; // own warehouse — the default consolidation point
+}
+
+// NOTE: STOCK_LOCATIONS is NOT re-exported here — it already leaves the shared
+// barrel via schemas/ops-order-control; a second export would collide.

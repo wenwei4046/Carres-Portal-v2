@@ -53,8 +53,11 @@ import {
   docNumber,
   normalizeSkuKey,
   STOCK_LOCATIONS,
+  DELIVERY_TIME_SLOTS,
+  isSundayIso,
   updateOrderInputSchema,
   type OpsStockListResponse,
+  type OpsOrderControl,
   type OrderPaymentMethod,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -76,13 +79,14 @@ import {
   useRecordPayment,
   useVoidPayment,
   useSaveOrderControl,
+  useConfirmBooking,
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
   type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
@@ -683,6 +687,14 @@ function PanelMenu({
 
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
+/** "23 Aug" — the chip's day-month form (Loo's D1 chip spec: no year, no
+ *  weekday; the full "24 Aug 26" date-law form stays on the card rows). */
+const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+
+/** Chip form of a time slot: "Afternoon (12pm–3pm)" → "12pm–3pm"; free text
+ *  passes through unchanged. */
+const shortSlot = (slot: string) => /\(([^)]+)\)/.exec(slot)?.[1] ?? slot;
+
 function MiniBadge({
   tone,
   children,
@@ -3462,11 +3474,27 @@ function DrawerBody({
                         overdue {-daysToDelivery}d
                       </span>
                     );
+                  // D1 (0277, Loo): the chip states FACTS. Green is reserved
+                  // for the CUSTOMER's confirmation; a carrier date alone must
+                  // never read as done — that mislabel is the 68% stuck-order
+                  // root the two-stage booking exists to fix.
+                  if (
+                    form.control?.booking_stage === "confirmed" &&
+                    form.control.confirmed_date
+                  )
+                    return (
+                      <MiniBadge tone="ready">
+                        confirmed {dayMon(form.control.confirmed_date)}
+                        {form.control.confirmed_time_slot
+                          ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
+                          : ""}
+                      </MiniBadge>
+                    );
                   const eta = form.control?.logistic_eta ?? null;
                   if (eta)
                     return (
-                      <MiniBadge tone="ready">
-                        Scheduled {fmtDate(eta).split(", ")[0]}
+                      <MiniBadge tone="waiting">
+                        not confirmed · carrier said {dayMon(eta)}
                       </MiniBadge>
                     );
                   if (order.ops_assigned_logistic)
@@ -3490,20 +3518,27 @@ function DrawerBody({
                 const late = daysToDelivery !== null && daysToDelivery < 0;
                 const hasStockStep = goodsN > 0;
                 const onHold = balanceGate === "hold" || storageGate === "hold";
-                // The delivery status word (Jess 2026-07-19): Scheduled = a
-                // logistic ETA is set · Unscheduled = carrier assigned, no ETA
-                // (the 89% normal state) · Delivered = done (grey, never alarms).
+                // The delivery status word (D1 0277, supersedes the 2026-07-19
+                // "Scheduled" wording): Confirmed = the CUSTOMER confirmed date
+                // + slot · Not confirmed = only a carrier date (logistic_eta)
+                // exists · Unscheduled = carrier assigned, no date (the normal
+                // state) · Delivered = done (grey, never alarms).
+                const bookingConfirmed =
+                  form.control?.booking_stage === "confirmed" &&
+                  !!form.control.confirmed_date;
                 const statusWord = deliveredDone
                   ? "Delivered"
                   : onHold
                     ? "On hold"
                     : late
                       ? `Overdue ${-(daysToDelivery ?? 0)}d`
-                      : eta
-                        ? "Scheduled"
-                        : order.ops_assigned_logistic
-                          ? "Unscheduled"
-                          : "No carrier";
+                      : bookingConfirmed
+                        ? "Confirmed"
+                        : eta
+                          ? "Not confirmed"
+                          : order.ops_assigned_logistic
+                            ? "Unscheduled"
+                            : "No carrier";
                 return (
                   <div className="max-w-[700px]">
                     {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
@@ -3676,6 +3711,19 @@ function DrawerBody({
                             </Btn>
                           </span>
                         </DRow>
+                      )}
+                      {/* D1 BOOKING (0277) — the two-stage truth under Chase
+                          logistic: what the carrier said (provisional) vs what
+                          the CUSTOMER confirmed (date + slot, evidence-stamped).
+                          The server enforces the gates; hints here assist. */}
+                      {!deliveredDone && (
+                        <BookingBlock
+                          orderId={order.id}
+                          control={form.control}
+                          goodsReadyHint={allReceived}
+                          balanceOwingHint={balanceOwing}
+                          outstandingHint={moneyOutstanding}
+                        />
                       )}
                       {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
                           tucked behind a fold, opened only when needed (Jess
@@ -4480,6 +4528,169 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
+/** D1 two-stage booking (0277) — the BOOKING rows under Chase logistic.
+ *  Stage 1 (provisional) = the carrier's date; it already lives in
+ *  logistic_eta (editable in the Booking ETA fold). This block records
+ *  Stage 2: the CUSTOMER's yes — date + time slot, both required (invariant
+ *  #1). The confirm endpoint enforces goods ready + balance ready + no
+ *  Sunday; the hint line here is assistance so nobody is surprised by a
+ *  refusal, never the enforcement. Re-confirm updates the date/slot and
+ *  re-stamps the evidence (no un-confirm — a typo is fixed by confirming
+ *  again). */
+function BookingBlock({
+  orderId,
+  control,
+  goodsReadyHint,
+  balanceOwingHint,
+  outstandingHint,
+}: {
+  orderId: string;
+  control: OpsOrderControl | null;
+  goodsReadyHint: boolean;
+  balanceOwingHint: boolean;
+  outstandingHint: number;
+}) {
+  const stage = control?.booking_stage ?? "none";
+  const eta = control?.logistic_eta ?? null;
+  const confirmed = stage === "confirmed" && !!control?.confirmed_date;
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState("");
+  const [slot, setSlot] = useState("");
+  const confirm = useConfirmBooking(orderId, {
+    onSuccess: () => {
+      toast.success("Booking confirmed — the customer's date + slot are recorded");
+      setOpen(false);
+    },
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : "Couldn't confirm the booking",
+      ),
+  });
+  const sunday = !!date && isSundayIso(date);
+  const gateHints: string[] = [];
+  if (!goodsReadyHint) gateHints.push("goods not all reserved");
+  if (balanceOwingHint)
+    gateHints.push(`RM ${outstandingHint.toFixed(2)} outstanding`);
+  const FIELD =
+    "rounded border border-base-300 bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary";
+  return (
+    <>
+      <DRow k="Booking">
+        {confirmed && control ? (
+          <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+            <span className="text-[12px] font-semibold text-success whitespace-nowrap">
+              ✓ Customer confirmed
+            </span>
+            <span className="font-mono text-[13px] font-semibold text-base-900 whitespace-nowrap">
+              {fmtDate(control.confirmed_date).split(",")[0]}
+            </span>
+            {control.confirmed_time_slot && (
+              <span className="text-[12px] text-base-600 whitespace-nowrap">
+                {control.confirmed_time_slot}
+              </span>
+            )}
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDate(control.confirmed_date ?? "");
+                setSlot(control.confirmed_time_slot ?? "");
+                setOpen((v) => !v);
+              }}
+            >
+              Re-confirm
+            </Btn>
+          </span>
+        ) : (
+          <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+            {eta ? (
+              <>
+                <span className="text-[12px] text-base-600 whitespace-nowrap">
+                  carrier said
+                </span>
+                <span className="font-mono text-[13px] font-semibold text-base-900 whitespace-nowrap">
+                  {fmtDate(eta).split(",")[0]}
+                </span>
+                <MiniBadge tone="waiting">not confirmed</MiniBadge>
+              </>
+            ) : (
+              <span className="text-[12px] text-base-400">no date yet</span>
+            )}
+            <Btn
+              variant="box"
+              size="sm"
+              onClick={() => {
+                setDate(eta ?? "");
+                setSlot("");
+                setOpen((v) => !v);
+              }}
+            >
+              Confirm with customer
+            </Btn>
+          </span>
+        )}
+      </DRow>
+      {open && (
+        <DRow k="Customer confirmed" block>
+          <div className="flex items-center gap-1.5 flex-wrap justify-end py-0.5">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              aria-label="Customer-confirmed delivery date"
+              className={`${FIELD} w-[150px]`}
+            />
+            <select
+              value={slot}
+              onChange={(e) => setSlot(e.target.value)}
+              aria-label="Customer-confirmed time slot"
+              className={`${FIELD} w-[190px]`}
+            >
+              <option value="">— time slot —</option>
+              {DELIVERY_TIME_SLOTS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <Btn
+              variant="box"
+              size="sm"
+              disabled={!date || !slot || sunday || confirm.isPending}
+              title={
+                !date || !slot
+                  ? "Date AND time slot both needed — a date alone is not a confirmation"
+                  : undefined
+              }
+              onClick={() =>
+                confirm.mutate({ confirmedDate: date, confirmedTimeSlot: slot })
+              }
+            >
+              {confirm.isPending ? "Recording…" : "Record confirmation"}
+            </Btn>
+          </div>
+          {sunday && (
+            <div className="text-right text-[12px] text-danger py-0.5">
+              Sunday is not a delivery working day — pick another date
+            </div>
+          )}
+          {gateHints.length > 0 && (
+            <div className="text-right text-[12px] text-warning py-0.5">
+              Not ready yet: {gateHints.join(" · ")} — the system refuses to
+              confirm until these are cleared
+            </div>
+          )}
+        </DRow>
+      )}
+      {confirmed && control?.customer_confirmed_at && (
+        <div className="px-3 pb-1.5 text-right text-[11px] text-base-400">
+          recorded {fmtDate(control.customer_confirmed_at, { time: true })}
+        </div>
+      )}
+    </>
+  );
+}
+
 function DRow({
   k,
   children,

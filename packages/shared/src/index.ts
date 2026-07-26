@@ -644,6 +644,8 @@ export {
   decideStorageWaiverInput,
   STORAGE_EXTENSION_REASONS,
   recordStorageExtensionInput,
+  confirmBookingInput,
+  type ConfirmBookingInput,
   type OpsOrderControl,
   type UpdateOpsOrderControlInput,
   type OpsOrderControlResponse,
@@ -1043,6 +1045,32 @@ export {
 // `normalizeSkuKey` matches order_lines.sku ↔ ops_stock_items.sku across the
 // cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
 export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
+
+// Order-line classification + readiness (D1, 2026-07-26) — moved from
+// apps/web/src/lib so the API booking gate and the drawer badge read ONE rule.
+export {
+  lineCategory,
+  lineSize,
+  stockMatchKey,
+  accShort,
+  lineKind,
+  lineSortRank,
+  defaultLineLocation,
+  type CoreCat,
+  type ItemKind,
+} from "./line-category";
+export {
+  lineReadiness,
+  readinessCounts,
+  type LineReadiness,
+  type LineReadinessInput,
+} from "./line-readiness";
+export {
+  bookingConfirmGate,
+  isSundayIso,
+  type BookingGateInput,
+  type BookingGateResult,
+} from "./booking-gate";
 export {
   isWorkingDay,
   addWorkingDays,
