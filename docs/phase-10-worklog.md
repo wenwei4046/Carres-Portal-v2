@@ -1208,3 +1208,125 @@ The top-bar button and its dead state are gone. `RentToOwnPage` stays on disk wi
 **Ship**: PR #347 (merge `9dee5f29`) → web `index-CYqtv_4v.js` → carres-portal `5d632cf9` + carres-pos `5bfc034d`; **all 4 canonicals matched on the first poll** (no edge lag); downloaded 4,153,052 bytes, `SERVICE_ROLE` 0, rental-rail + ErrorBoundary + Rental-term markers present. The Worker also went out from the same tip (`f56e7391`) because the union carried parallel lines' undeployed guarantees / hr-people / accounts / catalog changes; unauth 401 verified on four routes + the custom domain.
 
 **NOT done, deliberately — Guarantee & Service Package merge.** Loo's unification is right (a guarantee and a care plan are the same object with a different "how many times": 1 vs N), but it needs a migration on the LIVE entitlement engine — `guarantee_terms` gains a type + visits-per-year and the minting trigger branches one-shot vs decrementing — and there is already 1 live guarantee entitlement. **Premise correction for whoever picks it up: there is NO "Guarantee" tab in Product & Maintenance.** Guarantees are a SKU *category* in SKU Master, where a parallel session already shipped "pick Guarantee → scope fields + Covered for (years)" (`GuaranteeScopeFields.tsx` + the `guaranteeFlow` branch in `NewSkuModal.tsx`). That is where the One-time / Recurring switch belongs, which makes the job smaller than it sounded.
+
+---
+
+## 2026-07-26 ⑪ · HR-P5 commission runs — the close is a pre-flight, not a button
+
+**PR #351** (merge `e657f282`) · migrations **0272_commission_runs** + **0273_commission_close_resolves_staff_code**
+applied · api Worker `2cf891df` + web `index-A7uOnzQ8.js` (carres-portal `ffea9a3b` +
+carres-pos `2f21ee5c`) — **DEPLOYED**, all 4 canonicals converged. Design mock approved by
+Loo before any code: https://claude.ai/code/artifact/8ae26a6b-4f54-4fe4-bf39-76df0b2dccc2
+
+Close a month → the figures stop moving → each person gets a statement that still reads the
+same in three years → one CSV goes to whoever pays people.
+
+### The finding that reshaped the phase
+
+Queried live BEFORE writing anything: July 2026 has **19 native orders, all attributed,
+RM 52,081** sold by two showroom staff (Mayson CR008 RM 30,480 · kaan CR009 RM 21,601;
+the two dealer-channel sellers are excluded by the dealer law). And
+`staff_commission_rates`, `model_commission_rates`, `model_commission_tiers`,
+`commission_milestones` and `bd_profiles` are **ALL EMPTY** — zero rows each.
+
+The spec describes one button: *"Early each month HR clicks Close month"*. Pressing it
+today would have frozen **"you earned RM 0"** into a permanent statement for both of them,
+and then locked the month against fixing it. A month-lock pointed the wrong way.
+
+The Setup tab has authored rates since 0245/0246 — six write routes, all live. So this is
+**unauthored data, not a missing feature**. That is exactly why a guard was the right fix
+rather than more UI.
+
+### So the close became a pre-flight
+
+Four checks gate the button: everyone who sold computes to a figure · every sale has a
+salesperson · **the month is over (a WARNING — closing early is allowed)** · no run exists.
+
+`commissionReadiness` is a **pure function** in `@carres/shared`; the API folds the same
+function over the same inputs; `commission_close_month` enforces the same rules again in
+SQL. **A disabled button is a courtesy, never the guarantee.**
+
+### No second engine, made structural
+
+The spec says close must "re-run the SAME pure engines". `/api/hr/report` already ran
+`computeCommission` server-side, so both paths now go through one new helper,
+`apps/api/src/lib/commission-month.ts`. The figures reviewed and the figures frozen come
+from literally the same call — not two copies of three lines that drift the first time
+someone edits one. **Durable rule: when two surfaces must agree on a number, make them
+share the call, not the algorithm.**
+
+### Adjustments key to the OPEN month, not to a run
+
+The spec's `commission_run_adjustments.run_id` would put a September refund onto July's
+frozen statement — mutating the very thing the freeze protects. An adjustment belongs to
+the target (open) month and carries `origin_year`/`origin_month` + `ref_order_id`, so it is
+traceable both ways; it is swept onto a run only when that month closes.
+
+### The lock, and why its coverage is exactly right
+
+Only `staff_commission_rates` is effective-dated — **model rates, tiers, milestones and the
+scheme method are NOT** (verified live). Retro-editing those cannot change a CLOSED month,
+because closing snapshots the computed lines: **the freeze IS the protection**. What it can
+do is make a live preview disagree with the frozen statement, so a closed month is READ
+from the frozen rows and never recomputed. CF `commission-config-not-effective-dated`.
+
+The two things that could still rewrite paid money are guarded:
+* **attribution** — a guard perform'd inside `hr_assign_salesperson`, installed
+  PROGRAMMATICALLY (the 0266 technique: read `pg_get_functiondef`, assert the gate anchor
+  hits exactly once, string-insert, `execute`). Retyping a live function body by hand is
+  how a gate gets broken.
+* **back-dated staff rates** — a TRIGGER, not a route check. `/api/hr/config/staff-rate`
+  upserts the table directly through RLS, so a route guard would be bypassed by the next
+  writer who forgets it. Same reasoning as the guarantee `order_lines` trigger.
+
+Draft deliberately stays fluid (risk register #1: the lock must not fight a workflow where
+corrections happen when noticed); the month locks at **approved** (principal-only). Reopen
+is principal-only, needs a reason, and **disappears once PAID** — after money has left, the
+only honest correction is an adjustment on the next open month.
+
+### Verified against prod in one rolled-back transaction — 12 steps
+
+| # | step | result |
+|---|---|---|
+| 1 | close when a seller would get RM 0 | refused `zero_rate_sellers` |
+| 2 | close with real figures | draft created |
+| 3 | lines frozen | 2 lines, **RM 1,454.43** |
+| 4 | second close, same month | refused `run_already_exists` |
+| 5 | locked while DRAFT? | **still open** (correct) |
+| 6 | after approve | `approved` / locked=true |
+| 7 | re-attribute an order in a locked month | refused `commission_month_locked` |
+| 8 | back-date a rate into a locked month | refused `commission_month_locked` |
+| 9 | adjustment onto the locked month | refused |
+| 10 | same adjustment onto the OPEN month | accepted, points back to July |
+| 11 | reopen | `draft` / locked=false |
+| 12 | re-attribute after reopen | allowed again |
+
+Prod left with 0 runs, 0 lines, 0 adjustments, rates untouched. **RM 1,454.43 matches the
+approved mock's frame 2 exactly.**
+
+### 0273, and the file-equals-live habit paying off again
+
+0272 took `staff_code` from the caller's payload — but `CommissionStaff`, the engine's
+staff type, **carries no staff code**, so Hono had nothing to send and every CSV row would
+have exported a blank join key. 0273 makes the RPC resolve it from `salespersons` /
+`app_users`, where it actually lives. Caught by TypeScript before it ever ran.
+
+For the repo file I pulled the APPLIED definition back out of `pg_get_functiondef` rather
+than retyping it — file-equals-live by construction.
+
+### Also
+
+* **BD is deliberately not enabled** — `bd_profiles` is empty, so a BD run would be an
+  empty ceremony. The route 422s `bd_program_not_enabled`.
+* `check:v4` + design-standard lint clean; suites at baseline (shared **1138/1138**, api 3
+  pre-existing, web 16 pre-existing, **zero new**); live bundle 4,167,316 bytes,
+  `SERVICE_ROLE` grep **0**.
+* **Deviation to note**: this phase was built in the PRIMARY worktree, not the HR line's
+  `hr-hierarchy` worktree (guardrail #9). No conflict resulted — no other session was in
+  that checkout — but the HR line's home is still `hr-hierarchy`.
+
+### What has to happen before it does anything
+
+**Nobody has a commission rate.** The screen correctly shows the red blocked state until
+Loo authors percentages in HR → Commission Setup for CR008 and CR009. That is data entry,
+not code.
