@@ -274,7 +274,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
   // the invoice must never promise cover that no longer exists.
   const { data: guaranteeRows } = await sb
     .from(GUARANTEE_ENTITLEMENTS)
-    .select("guarantee_sku, covers_sku, covers_label, coverage_years, remedy, starts_on, expires_on, status")
+    .select("guarantee_sku, guarantee_id, claimed_guarantee_id, covers_sku, covers_label, coverage_years, remedy, starts_on, expires_on, status")
     .eq("order_id", inv.order_id)
     .neq("status", "void")
     .order("unit_no");
@@ -334,6 +334,11 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     currency: "MYR",
     guarantees: gRows.map((g) => ({
       label: termsBySku[String(g.guarantee_sku)]?.label ?? String(g.guarantee_sku),
+      guarantee_id: g.guarantee_id
+        ? String(g.guarantee_id)
+        : g.claimed_guarantee_id
+          ? String(g.claimed_guarantee_id)
+          : null,
       covers:
         (g.covers_label ? String(g.covers_label) : null) ??
         (g.covers_sku ? String(g.covers_sku) : null) ??

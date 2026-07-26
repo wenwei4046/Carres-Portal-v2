@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  GUARANTEE_ID_REGEX,
+  displayGuaranteeId,
   effectiveGuaranteeStatus,
+  isGuaranteeId,
+  normalizeGuaranteeId,
   guaranteeAttrs,
   guaranteeAttachInputSchema,
   guaranteeClaimInputSchema,
@@ -146,5 +150,46 @@ describe("zod contracts", () => {
 
   it("requires a real line id to attach to", () => {
     expect(() => guaranteeAttachInputSchema.parse({ orderLineId: "not-a-uuid" })).toThrow();
+  });
+});
+
+describe("guarantee ID (0267) — 4 letters + 6 digits", () => {
+  it("accepts the exact shape and nothing looser", () => {
+    expect(GUARANTEE_ID_REGEX.test("ABCD123456")).toBe(true);
+    expect(GUARANTEE_ID_REGEX.test("ABC123456")).toBe(false); // 3 letters
+    expect(GUARANTEE_ID_REGEX.test("ABCD12345")).toBe(false); // 5 digits
+    expect(GUARANTEE_ID_REGEX.test("ABCD1234567")).toBe(false); // 7 digits
+    expect(GUARANTEE_ID_REGEX.test("abcd123456")).toBe(false); // stored form is upper
+    expect(GUARANTEE_ID_REGEX.test("AB1D123456")).toBe(false); // digit in the letter block
+  });
+
+  it("forgives how a human types it off a printed Sales Order", () => {
+    expect(normalizeGuaranteeId(" abcd-123 456 ")).toBe("ABCD123456");
+    expect(isGuaranteeId("abcd 123456")).toBe(true);
+    expect(isGuaranteeId("ABCD-123456")).toBe(true);
+  });
+
+  it("does not mistake a SO number or a name for an ID", () => {
+    expect(isGuaranteeId("1258")).toBe(false);
+    expect(isGuaranteeId("May Tan")).toBe(false);
+    expect(isGuaranteeId("")).toBe(false);
+  });
+
+  it("the letter/digit blocks are positional, so O-vs-0 can never be ambiguous", () => {
+    // "O" is only ever in the first four slots; "0" only in the last six.
+    expect(isGuaranteeId("OOOO000000")).toBe(true);
+    expect(isGuaranteeId("0000OOOOOO")).toBe(false);
+  });
+
+  it("displays the live ID, falling back to the retired one after a claim", () => {
+    expect(displayGuaranteeId({ guaranteeId: "ABCD123456", claimedGuaranteeId: null })).toBe(
+      "ABCD123456",
+    );
+    // Claimed: the live column is cleared but the customer's document still
+    // carries the string, so the UI must still recognise it.
+    expect(displayGuaranteeId({ guaranteeId: null, claimedGuaranteeId: "ZZZZ000111" })).toBe(
+      "ZZZZ000111",
+    );
+    expect(displayGuaranteeId({ guaranteeId: null, claimedGuaranteeId: null })).toBeNull();
   });
 });
