@@ -117,6 +117,7 @@ import Btn from "@/components/Btn";
 import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
+import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
 import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
@@ -3592,6 +3593,19 @@ function DrawerBody({
                           </button>
                         </div>
                       </div>
+                      {/* T5 — booking progress spine (read-only): WHERE the
+                          delivery is in 3 seconds. Each tick derives from a
+                          signal this card already reads — the carrier name
+                          above, booking_stage (0277), do_number (auto on
+                          dispatch, 0098), the same delivered signal as the
+                          chip — so ticks and chip can never disagree. Photo
+                          row stays greyed until T6 ships the upload. */}
+                      <BookingSpine
+                        partnerAssigned={!!chasePartnerName}
+                        customerConfirmed={bookingConfirmed}
+                        doIssued={!!order.do_number}
+                        delivered={deliveredDone}
+                      />
                       {/* body */}
                       <div className="border-t border-base-100 px-3 py-2">
                   <FieldGrid>
