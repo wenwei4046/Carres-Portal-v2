@@ -58,7 +58,23 @@ sold ─────────────► pending ──(orders.delivered_
 `expired` is **never written**. It is derived on every read by `effectiveGuaranteeStatus()`
 so nothing depends on a nightly job having run. Any raw-SQL report must apply the same rule.
 
-## 4. Why a trigger, not RPC edits
+## 4. Scope: the POS is the only order entry, and history is out of scope
+
+Loo, 2026-07-26: **every order from here on is entered through the POS** — the orders visible in
+the system today are the legacy testimony orders carried over at migration, and **no Guarantee
+Program existed then**, so there is deliberately **no backfill and no historical handling**. Old
+orders simply have no entitlements, which is correct: nobody was sold one.
+
+That makes exactly **two** doors a guarantee line can come through in practice, and BOTH are
+gated by the covered-item picker:
+
+1. selling one in the POS cart (`CatalogStep`);
+2. adding one to an order that already exists (`AddProductOverlay`).
+
+The trigger below still covers the other three RPC paths — free, and it means a future door
+(bulk import, a script, an API client) cannot mint an unguarded guarantee.
+
+## 5. Why a trigger, not RPC edits
 
 A guarantee line can enter an order through **five doors** today: `create_order` (0089),
 `add_order_lines` (0231/0232), `replace_order_lines` (0255/0256), the change-request approve
@@ -73,18 +89,19 @@ Perf (CLAUDE.md §8): the orders trigger carries a `WHEN` clause (status / deliv
 customer_name / customer_phone only); the order_lines trigger costs one PK probe on a tiny
 config table plus one partial-index probe per inserted line.
 
-## 5. Surfaces
+## 6. Surfaces
 
 | Where | What |
 |---|---|
 | **Catalog → SKU Master** | A `Guarantee` filter chip. Guarantee SKUs have no supplier and can never enter a PO (`SUPPLIERLESS_CATEGORIES`). |
-| **POS** | A `Guarantees` rail. Tapping the card opens the **covered-item picker** — it cannot be added on its own. The pick is stamped into `attrs.guarantee.covers_sku` (the exact path the trigger reads); the submit pipeline is untouched. |
+| **POS — sell** | A `Guarantees` rail. Tapping the card opens the **covered-item picker** — it cannot be added on its own. The pick is stamped into `attrs.guarantee.covers_sku` (the exact path the trigger reads); the submit pipeline is untouched. |
+| **POS — add to an existing order** | `AddProductOverlay` routes the guarantee card through the SAME picker, choosing from the order's existing lines. Without this it would fall through to the generic configure drawer and add bare. |
 | **Invoice PDF** | A bordered **Guarantee cover** block under the totals: what it covers, how long, the remedy in words, and the end date. The customer's only written proof. Voided entitlements are excluded. |
 | **Customer block** (ops drawer + POS order detail) | `GuaranteeCoverStrip` — silent when there is no guarantee, so the ~190 pre-guarantee orders look untouched. |
 | **Operation → Guarantees** | The claim desk. One search box resolving all three axes (SO / name / customer id / phone), a status filter, and the one-shot **Claim** action. |
 | **Service Cases** | A claim can carry `claim_case_id`; the existing `warranty_claim` case type is where the follow-up work lives. |
 
-## 6. Security
+## 7. Security
 
 - Reads are RLS-scoped: internal sees all; a store sees only its own orders' guarantees
   (that is what powers the POS badge).
@@ -95,7 +112,7 @@ config table plus one partial-index probe per inserted line.
 - Every claim writes an `order_history` row (guardrail 4: no silent movement).
 - Terms are principal-write-only.
 
-## 7. Known gaps (carry-forwards)
+## 8. Known gaps (carry-forwards)
 
 See `docs/carry-forwards.md` for the full entries:
 
@@ -103,6 +120,8 @@ See `docs/carry-forwards.md` for the full entries:
   raise a replacement line; ops issues the replacement by hand.
 - `guarantee-terms-no-admin-ui` — coverage years / covered category are seeded by migration;
   only the price is editable in the UI today.
-- `guarantee-attach-no-ui` — the attach RPC + route exist; the desk shows "Not attached to an
+- `guarantee-attach-no-ui` — LOW in practice: both POS doors force attachment, so an unattached
+  entitlement can now only come from hand-written SQL or a future non-POS door. The
+  `guarantee_attach` RPC + route exist as the repair path; the desk shows "Not attached to an
   item" but has no button yet.
 - `guarantee-pos-one-per-add` — the picker adds one unit per tap by design.

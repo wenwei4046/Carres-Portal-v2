@@ -20,14 +20,18 @@ export default function GuaranteePickerModal({
   sku,
   lines,
   catalog,
+  context = "cart",
   onCancel,
   onPick,
 }: {
   term: GuaranteeTermDto;
   sku: ProductSkuDto;
-  /** The current cart lines — the candidates to cover. */
+  /** The candidates to cover — cart lines when selling, the order's existing
+   *  lines when a guarantee is added to an order that already exists. */
   lines: DraftLine[];
   catalog: CatalogResponse;
+  /** Only changes the empty-state wording — the gate itself is identical. */
+  context?: "cart" | "order";
   onCancel: () => void;
   /** Called with the covered line's sku + a human label for the cart row. */
   onPick: (coversSku: string, coversLabel: string) => void;
@@ -84,8 +88,11 @@ export default function GuaranteePickerModal({
         <div className="p-5">
           {unique.length === 0 ? (
             <p className="t-body text-base-700">
-              Add the {term.coversCategory} to the cart first — a guarantee has to be attached to
-              the item it covers, otherwise it cannot be claimed later.
+              {context === "order"
+                ? `There is no ${term.coversCategory} on this order to cover.`
+                : `Add the ${term.coversCategory} to the cart first.`}{" "}
+              A guarantee has to be attached to the item it covers, otherwise it cannot be claimed
+              later.
             </p>
           ) : (
             <>

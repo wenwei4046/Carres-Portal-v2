@@ -494,7 +494,7 @@ Don't burn an hour spinning. Surface and ask.
 - `rental-plan-reprice-policy` — re-price archives the old Stripe Price; unlinked old-fee agreements block checkout (422 plan_repriced); live-agreement re-pricing is a ②+ policy call.
 - `guarantee-claim-no-stock-movement` — a guarantee claim records the swap but moves no stock and raises no replacement line; ops does it by hand.
 - `guarantee-terms-no-admin-ui` — coverage years / covered category are migration-authored; only the PRICE is UI-editable (they can drift).
-- `guarantee-attach-no-ui` — the attach RPC + route exist; an unattached guarantee (ops add-line / import) has no button to point it at a line.
+- `guarantee-attach-no-ui` — LOW in practice (both POS doors force the covered-item pick); the attach RPC + route exist as the repair path but no button calls them.
 - `bd-network-board-page-cap` — BD board month cards read ONE orders page; under-counts once the network outgrows it.
 - `orders-channel-filter-outlet-id-proxy` — ops orders `channel=` param is a dead, inverted `outlet_id` proxy; filter on `orders.channel` when wiring it.
 - `principal-dealers-join-unbounded` — outlet roll-up reads unbounded; silently truncates past PostgREST max-rows (1000).
