@@ -73,8 +73,22 @@ function stockResponse(
 }
 
 vi.mock("./components/OrderDetailDrawer", () => ({
-  default: ({ orderId, onClose }: { orderId: string; onClose: () => void }) => (
-    <div data-testid="drawer-stub" data-order-id={orderId}>
+  default: ({
+    orderId,
+    onClose,
+    journey,
+  }: {
+    orderId: string;
+    onClose: () => void;
+    // J3 — serialised onto the stub so a test can prove the list hands the
+    // drawer the LADDER's own answer rather than a second derivation.
+    journey?: unknown;
+  }) => (
+    <div
+      data-testid="drawer-stub"
+      data-order-id={orderId}
+      data-journey={journey ? JSON.stringify(journey) : ""}
+    >
       <button onClick={onClose}>close</button>
     </div>
   ),
@@ -284,6 +298,64 @@ describe("OperationOrdersControl", () => {
       .find((r) => r.textContent?.includes("SO-1003"))!;
     fireEvent.click(row);
     expect(screen.getByTestId("drawer-stub")).toHaveAttribute("data-order-id", "c");
+  });
+
+  // ── J3 — the journey strip cannot disagree with the row it came from ──
+  // The list computes the ladder ONCE and hands the result down, so these
+  // assertions are the whole "the strip agrees with the ladder/queues for the
+  // same order, always" guarantee: what the drawer receives IS `nextActionOf`.
+  it("hands the drawer the SAME verb the row's MANAGE pill shows", () => {
+    // Asserted against the RENDERED row, not against a re-run of the ladder:
+    // if these two ever diverge the drawer is lying about the row it opened.
+    wrap(<OperationOrdersControl />);
+    // The list UNMOUNTS when the drawer opens (it renders in place), so every
+    // row node must be re-queried after each close — a cached node is detached.
+    const total = screen.getAllByTestId("order-row").length;
+    let checked = 0;
+    for (let i = 0; i < total; i++) {
+      const row = screen.getAllByTestId("order-row")[i];
+      const pill = row.querySelector("[data-next-action]");
+      if (!pill) continue;
+      const rowVerb = pill.getAttribute("data-next-action");
+      fireEvent.click(row);
+      const stub = screen.queryByTestId("drawer-stub");
+      if (!stub) continue; // row click consumed by an in-row control
+      const journey = JSON.parse(stub.getAttribute("data-journey") || "null");
+      expect(journey).not.toBeNull();
+      expect(journey.next.label).toBe(rowVerb);
+      checked += 1;
+      fireEvent.click(screen.getByText("close"));
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it("tells the drawer the photo answer is UNKNOWN rather than 'no photo'", () => {
+    // T7's three-way law travels intact: a row whose overlay does not carry the
+    // ledger must not make the strip accuse anyone of a missing photo.
+    wrap(<OperationOrdersControl />);
+    const row = screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes("SO-1003"))!;
+    fireEvent.click(row);
+    const journey = JSON.parse(
+      screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+    );
+    expect(journey.photoOnFile).toBeNull();
+  });
+
+  it("reports no PayHold amount when no balance is on record", () => {
+    // Live prod shape: ops_order_control.balance is NULL on every order, so the
+    // ladder's 🔒 never fires and the strip must not invent a settled figure.
+    wrap(<OperationOrdersControl />);
+    const row = screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes("SO-1003"))!;
+    fireEvent.click(row);
+    const journey = JSON.parse(
+      screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+    );
+    expect(journey.holdAmount).toBeNull();
+    expect(journey.next.locked).toBeFalsy();
   });
 
   it("preselects a tab from the :stage URL param", () => {

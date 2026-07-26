@@ -22,7 +22,7 @@
 | Line | Doc | Cards | State |
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1-T6 ✅ · T7 next · ENDS at T11 |
-| ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | J1 ✅ #385 · J2 ✅ #389 |
+| ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R6 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |

@@ -111,7 +111,7 @@ unrecognised status word is ignored. 31 new tests. **NOT done: browser verificat
 the drawer needs a portal login and passwords are not entered; covered by unit tests + live
 prod queries instead.
 
-## J3 · Journey header — current stage · current owner · health
+## J3 · Journey header — current stage · current owner · health ✅ (PR #394)
 
 **Goal:** one strip at the top of the drawer answering the three questions in 3 seconds:
 
@@ -125,6 +125,35 @@ HEALTH    ⚠ balance RM 1,200 outstanding · ⚠ delivery photo missing
 - HEALTH = the missing-check (J1) + PayHold + Delay Radar (T3) rolled into ≤3 lines.
 **Done when:** the strip agrees with the ladder/queues for the same order, always;
 zero new writes.
+**Shipped note (PR #394):** ZERO migration, ZERO API change, web-only. **"Agrees
+always" is met structurally, not by care**: the Orders list already computes each
+row's NEXT verb with `nextActionOf`, so `journeySignalsFor()` hands the drawer that
+SAME `NextAction` object plus the ladder's own inputs, and the stage strip + owner
+line are pure functions of it (one `VERB_STAGE` map is the only joint). A test clicks
+every row and asserts the drawer receives the exact string the row's `data-next-action`
+pill renders — a second derivation would have drifted the first time either side
+changed. `OperationOrders.tsx` is unrouted, so `OperationOrdersControl` is the only
+live door; the prop is still optional and an order absent from the loaded list renders
+no strip rather than a guess. **The live finding that shaped it**: prod holds 56 orders
+with 0 delivered · 0 bookings · 0 logistic ETAs · 0 line ETAs · 0 invoices · 0 POs, and
+`ops_order_control.balance` is **NULL on all 56** — while the payment ledger says **18
+orders owe ~RM 50,659**. So the ladder's PayHold 🔒 has never fired in production, and a
+health line that read the ledger and called it a *hold* would contradict every row it
+opened. Resolution: the word **hold** stays the ladder's (only when `next.locked`), the
+ledger figure is stated as a **fact** ("RM 2,800 not collected yet"), and the two are
+mutually exclusive so the block never prints two money lines. The underlying gap is
+carry-forward `payhold-blind-to-the-payment-ledger` — NOT fixed here, because changing
+what PayHold reads changes the list's locks, the queue counts and the delivery gate for
+every order. **Three deliberate non-goals**: (1) not a second timeline — the numbered
+journey spine (定稿 rev25) still owns "what happened, which panel do I open" and shares
+no vocabulary with this strip; (2) not IN the header — that strip is deliberately
+data-free (rev4) and rev15 cleared the right column so "the work surface starts at the
+top", so it lands in the existing full-width band beside the operator's note; (3)
+unknown ≠ missing — an UNKNOWN photo answer leaves a delivered order Done (T7's law)
+and an unrecognised verb falls back to the first unfinished stage. 33 new tests
+(30 + 3), suites at baseline. **NOT done: browser verification** — reaching the drawer
+needs a portal login and passwords are not entered; covered by unit tests + live prod
+queries, same as J2.
 
 ## LATER (no card = not planned)
 
@@ -141,4 +170,8 @@ zero new writes.
 |---|---|---|
 | J1 | ✅ shipped 2026-07-27 | #385 |
 | J2 | ✅ shipped 2026-07-27 | #389 |
-| J3 | ⬜ | — |
+| J3 | ✅ shipped 2026-07-27 | #394 |
+
+**Line complete — all three cards shipped.** Anything further for Order Journey is in
+LATER above (AI summary · dependency check · full-screen relationship map), and none of
+it has a card, so none of it is planned.
