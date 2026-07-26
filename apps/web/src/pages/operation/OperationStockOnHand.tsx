@@ -5,6 +5,7 @@ import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
 import Segmented from "@/components/Segmented";
+import StockTabs from "./StockTabs";
 
 /**
  * OperationStockOnHand — the unified Stock "On Hand" list.
@@ -189,6 +190,8 @@ export default function OperationStockOnHand() {
   }
 
   return (
+    <>
+    <StockTabs />
     <div className="px-9 py-8 pb-14" data-testid="operation-stock-onhand">
       {/* Top bar — title + search (Orders-style) */}
       <div className="mb-5 flex items-start justify-between gap-4">
@@ -398,6 +401,7 @@ export default function OperationStockOnHand() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

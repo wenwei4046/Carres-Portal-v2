@@ -3,7 +3,6 @@ import {
   ClipboardList,
   ClipboardCheck,
   Boxes,
-  ArrowLeftRight,
   Repeat,
   Wallet,
   BookOpen,
@@ -136,8 +135,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "purchase",
         activeFor: ["tab:purchase", "tab:receiving", "path:/operation/procurement"],
       },
-      { key: "stock-onhand", label: "Stock · On Hand", icon: Boxes },
-      { key: "movements", label: "Stock · Movements", icon: ArrowLeftRight },
+      // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
+      // entry, same shape as the Purchasing merge above: one warehouse, three
+      // questions (On hand · Ready stock [joins at K2] · In & out). Click
+      // target = On hand; the shared StockTabs bar at the top of each page
+      // switches between them. Word law (COPY-STANDARD): the user-facing word
+      // is "Stock" — "Inventory"/"Movements" are banned UI words; the old tab
+      // keys stay live so existing links keep working.
+      {
+        key: "stock",
+        label: "Stock",
+        icon: Boxes,
+        tab: "stock-onhand",
+        activeFor: ["tab:stock-onhand", "tab:movements"],
+      },
       { key: "payments", label: "Payments", icon: Wallet },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.

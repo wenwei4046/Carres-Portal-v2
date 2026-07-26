@@ -14,7 +14,7 @@
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | not started |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R6 | not started |
-| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | not started |
+| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |
 
 **Recommended order:** finish ① T3-T6 first (drawer work), then start ② J1 (same drawer,
 so it waits for T6). ③④⑤ are independent of the drawer — any of them can interleave with
