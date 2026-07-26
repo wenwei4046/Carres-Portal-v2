@@ -179,12 +179,29 @@ principalAccountsRouter.post("/:id/status", async (c) => {
   // When disabling, also revoke active sessions so the user is signed out.
   // Supabase admin API: signOut by user_id immediately invalidates all
   // refresh tokens. The access token they already have remains valid until
-  // it expires (default 1h) — acceptable for V1; tighter rotation later.
+  // it expires (default 1h).
+  //
+  // Since 0266 this is no longer the ONLY thing standing between a disabled
+  // user and the data: app_role()/is_internal()/is_operation()/is_principal()
+  // all require status='active', so RLS and every hr_* DEFINER function deny
+  // them from the next query onward, token or no token.
+  //
+  // The failure is LOGGED rather than swallowed. It used to be an empty
+  // catch, and that is exactly how samantha@carres.com sat "disabled" with a
+  // live session for two months without anyone knowing (found 2026-07-26).
   if (body.status === "disabled") {
     try {
       await sb.auth.admin.signOut(id);
-    } catch {
-      // Ignore — status flip is the source of truth; signOut is best-effort.
+    } catch (err) {
+      console.log(
+        JSON.stringify({
+          event: "disable_signout_failed",
+          userId: id,
+          email: target.data.email,
+          message: err instanceof Error ? err.message : String(err),
+          note: "status flip still applied; RLS denies from the next query (0266)",
+        }),
+      );
     }
   }
 
