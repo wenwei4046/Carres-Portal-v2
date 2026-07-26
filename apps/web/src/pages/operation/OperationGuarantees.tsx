@@ -4,7 +4,8 @@
 // telling the wrong story.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   displayGuaranteeId,
@@ -49,6 +50,15 @@ const STATUS_DISPLAY: Record<GuaranteeDeskStatus, { label: string; pill: string 
   void: { label: "Void", pill: "pill-neutral" },
 };
 
+/** Only the four desk words are accepted from the URL — anything else means no
+ *  filter, so a stale or hand-typed link cannot put the desk in a state its own
+ *  chips can't show. */
+function deskStatusParam(raw: string | null): "" | GuaranteeDeskStatus {
+  return raw === "active" || raw === "claimed" || raw === "expired" || raw === "void"
+    ? raw
+    : "";
+}
+
 const FILTERS: Array<{ key: "" | GuaranteeDeskStatus; label: string }> = [
   { key: "", label: "All" },
   { key: "active", label: "Active" },
@@ -58,9 +68,27 @@ const FILTERS: Array<{ key: "" | GuaranteeDeskStatus; label: string }> = [
 
 export default function OperationGuarantees() {
   const qc = useQueryClient();
-  const [rawSearch, setRawSearch] = useState("");
+  // J2 — an order's Related-cases row links here for a claimed guarantee, and
+  // "opens the module filtered to the case" only works if the desk reads the
+  // filter. `?q=` seeds the search box, `?status=` the chip. Seeded into the
+  // initial state so the desk never renders unfiltered first, then dropped from
+  // the URL so the operator can clear the box and browse.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [rawSearch, setRawSearch] = useState(() => searchParams.get("q") ?? "");
   const search = useDebouncedValue(rawSearch.trim(), 250);
-  const [status, setStatus] = useState<"" | GuaranteeDeskStatus>("");
+  const [status, setStatus] = useState<"" | GuaranteeDeskStatus>(
+    () => deskStatusParam(searchParams.get("status")),
+  );
+  useEffect(() => {
+    if (!searchParams.get("q") && !searchParams.get("status")) return;
+    setRawSearch(searchParams.get("q") ?? "");
+    setStatus(deskStatusParam(searchParams.get("status")));
+    const next = new URLSearchParams(searchParams);
+    next.delete("q");
+    next.delete("status");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [claiming, setClaiming] = useState<GuaranteeEntitlementDto | null>(null);
 
   // The page LISTS by default (Loo 2026-07-26: he created an order and found

@@ -27,8 +27,13 @@ import type { AppEnv } from "../../types";
 
 const scRouter = new Hono<AppEnv>();
 
+/**
+ * J2 adds `orders(so)` to the embed: order_id is the permanent link key but it
+ * is a uuid, so nothing could LABEL the link. The join is on an indexed FK and
+ * costs one extra column per row.
+ */
 const CASE_SELECT =
-  "*, service_case_types(label), service_case_statuses(label,is_closed)";
+  "*, service_case_types(label), service_case_statuses(label,is_closed), orders(so)";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /config — config-driven Case Type + Status (active only, sorted)
@@ -124,12 +129,20 @@ scRouter.get("/lookup", requireOperationOrPrincipal, async (c) => {
 scRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb    = userClient(c.env, c.var.auth.jwt);
   const state = c.req.query("state"); // 'ongoing' | 'closed' | undefined
+  // J2 — the order drawer asks "which cases belong to THIS order". Filtered in
+  // the database on the indexed FK rather than by fetching every case and
+  // discarding it in the browser.
+  const orderId = (c.req.query("orderId") ?? "").trim();
 
-  const { data, error } = await sb
+  let q = sb
     .from("service_cases")
     .select(CASE_SELECT)
     .order("opened_at", { ascending: false })
     .order("case_no",   { ascending: false });
+
+  if (orderId) q = q.eq("order_id", orderId);
+
+  const { data, error } = await q;
 
   if (error) throw new HTTPException(500, { message: error.message });
 
@@ -257,6 +270,9 @@ interface RawCase {
   updated_at: string;
   service_case_types:    { label: string } | null;
   service_case_statuses: { label: string; is_closed: boolean } | null;
+  /** J2 — embedded `orders(so)`. A to-one embed, but PostgREST has been seen
+   *  to hand back an array shape, so both are tolerated. */
+  orders: { so: number } | { so: number }[] | null;
 }
 
 function shapeCase(r: RawCase) {
@@ -282,7 +298,16 @@ function shapeCase(r: RawCase) {
     caseTypeLabel:       r.service_case_types?.label ?? null,
     statusLabel:         r.service_case_statuses?.label ?? null,
     statusIsClosed:      r.service_case_statuses?.is_closed ?? false,
+    so:                  embeddedSo(r.orders),
   };
+}
+
+/** Unwrap the `orders(so)` embed to a plain number. Null when the case has no
+ *  linked order — the live state of every case on file today. */
+function embeddedSo(o: RawCase["orders"]): number | null {
+  if (!o) return null;
+  const row = Array.isArray(o) ? o[0] : o;
+  return row?.so ?? null;
 }
 
 async function parseBody<S extends import("zod").ZodTypeAny>(

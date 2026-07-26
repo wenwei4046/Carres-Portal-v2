@@ -36,6 +36,7 @@ import {
   Phone,
   RotateCcw,
   ScrollText,
+  LifeBuoy,
   Sofa,
   Truck,
   Undo2,
@@ -60,6 +61,8 @@ import {
   deliveryGroupLabel,
   orderDeliveryGroups,
   type DeliveryGroupKey,
+  displayGuaranteeId,
+  effectiveGuaranteeStatus,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -98,6 +101,8 @@ import {
   useConfirmBooking,
   useDeliveryPhotos,
   useUploadDeliveryPhoto,
+  useOrderServiceCases,
+  useOrderGuarantees,
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -171,6 +176,12 @@ import OrderDocuments, {
   countDocumentsMissing,
   type OrderDocRow,
 } from "./OrderDocuments";
+import RelatedCases, {
+  deriveRelatedCases,
+  countRelatedCases,
+  countOpenCases,
+  type RelatedCaseRow,
+} from "./RelatedCases";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -841,6 +852,9 @@ type DrawerTab =
   | "storage"
   | "loan"
   | "documents"
+  /** J2 — only reachable when the order actually HAS a case (the tab hides
+   *  itself otherwise), so this state is never entered on an order with none. */
+  | "cases"
   | "activity";
 
 /** Track tone — drives the tab-rail alert dots. */
@@ -1818,6 +1832,52 @@ function DrawerBody({
   });
   const docsOnFile = countDocumentsOnFile(documentRows);
   const docsMissing = countDocumentsMissing(documentRows);
+
+  // ═══ J2 — Related cases: has anything gone wrong on this order? ═══
+  // Both reads are silent-when-absent (retry: false) — a case list that fails
+  // to load must not break a drawer whose real job is the order itself. The
+  // guarantee query shares its key with the Customer block's cover strip, so
+  // React Query serves both from ONE request.
+  const casesQ = useOrderServiceCases(order.id);
+  const orderGuaranteesQ = useOrderGuarantees(order.id);
+  const relatedCaseRows = deriveRelatedCases({
+    serviceCases: (casesQ.data?.items ?? []).map((c) => ({
+      id: c.id,
+      caseNo: c.caseNo,
+      caseTypeLabel: c.caseTypeLabel,
+      statusLabel: c.statusLabel,
+      statusIsClosed: c.statusIsClosed,
+      openedLabel: fmtDateShort(c.openedAt),
+    })),
+    guarantees: (orderGuaranteesQ.data?.items ?? []).map((g) => ({
+      id: g.id,
+      displayId: displayGuaranteeId(g),
+      coversLabel: g.coversLabel,
+      guaranteeLabel: g.guaranteeLabel,
+      claimCaseId: g.claimCaseId,
+      claimedLabel: g.claimedAt ? fmtDateShort(g.claimedAt.slice(0, 10)) : "",
+      // Expiry is a date fact, never the raw column (guarantee.ts law).
+      effectiveStatus: effectiveGuaranteeStatus(g.status, g.expiresOn),
+    })),
+  });
+  const caseCount = countRelatedCases(relatedCaseRows);
+  const openCaseCount = countOpenCases(relatedCaseRows);
+  /** Open one case in the module that OWNS it. This panel states that a case
+   *  exists; reading and working it stays where it already lives, so there is
+   *  no second place to edit a case. */
+  const openRelatedCase = (row: RelatedCaseRow) => {
+    if (row.caseId) {
+      navigate(`/operation?tab=service-notes&case=${encodeURIComponent(row.caseId)}`);
+      return;
+    }
+    // The guarantee desk's one search box takes the guarantee handle. A claimed
+    // guarantee whose handle is somehow absent still lands the operator on the
+    // desk filtered to claims rather than nowhere.
+    navigate(
+      `/operation?tab=guarantees&status=claimed` +
+        (row.guaranteeSearch ? `&q=${encodeURIComponent(row.guaranteeSearch)}` : ""),
+    );
+  };
   /** Open one document. Every path already existed — this is the one place
    *  that routes a row to it, so the panel adds no new way to fetch a file. */
   const openDocument = (row: OrderDocRow) => {
@@ -2411,6 +2471,23 @@ function DrawerBody({
                 w: docsMissing > 0 ? `${docsMissing} missing` : undefined,
                 tone: docsMissing > 0 ? "warning" : undefined,
               },
+              /* J2 — Cases. The ONLY tab that comes and goes: the card's rule
+                 is that an order with no case shows nothing, and a permanent
+                 tab reading "0" on every clean order is exactly the empty box
+                 it forbids. Amber when a case is still open — that is someone's
+                 job today; a closed case is history and stays quiet. */
+              ...(caseCount > 0
+                ? [
+                    {
+                      key: "cases" as const,
+                      label: "Cases",
+                      icon: LifeBuoy,
+                      v: String(caseCount),
+                      w: openCaseCount > 0 ? `${openCaseCount} open` : undefined,
+                      tone: openCaseCount > 0 ? ("warning" as const) : undefined,
+                    },
+                  ]
+                : []),
               { key: "activity", label: "Activity", icon: ScrollText },
             ] as {
               key: DrawerTab;
@@ -3262,6 +3339,29 @@ function DrawerBody({
           </Panel>
           </SectionCard>
           </div>
+
+          {/* J2 (Order Journey) — Related cases. Rendered only when the order
+              HAS one: no case means no tab and no panel, so a clean order is
+              silent rather than reassured. Read-only in both directions — every
+              row hands off to the module that owns the record. */}
+          {caseCount > 0 && (
+          <div className={tab === "cases" ? "min-h-full flex flex-col gap-3" : "hidden"}>
+          <SectionCard className="shrink-0">
+          <Panel
+            title="Related cases"
+            summary={
+              openCaseCount > 0 ? (
+                <MiniBadge tone="waiting">{openCaseCount} open</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">{caseCount} closed</MiniBadge>
+              )
+            }
+          >
+            <RelatedCases rows={relatedCaseRows} onOpen={openRelatedCase} />
+          </Panel>
+          </SectionCard>
+          </div>
+          )}
 
           <div className={tab === "activity" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           <SectionCard className="shrink-0">
