@@ -1011,3 +1011,116 @@ So ⑬'s order-status column is **fully reverted** (the `orderStatusWord()` help
 Same three words on the order-detail strip, from the same function, so a state can't read "Covered" on one screen and "Active" on another. Desk filters follow (All / Active / Claimed / Expired) and the API status filter was taught the desk vocabulary — `active` selects pending+active rows, `expired` sieves on the derived word.
 
 **Ship**: PR #338 (merge `c8bcfadd`) → api Worker `61ea3770` (unauth `?status=active` 401 ✓) + web `index-CHi3ocQU.js` → carres-portal `530a1fe3` + carres-pos `8be44e72`; all 4 canonicals ✓; downloaded 4,115,819 bytes, `SERVICE_ROLE` 0, and the retired vocabulary greps 0 in the live bundle. Tests: shared 1084/1084 (+4) · api 1553/1556 (3 = §17.7 baseline) · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean.
+
+---
+
+## 2026-07-26 ⑩ · HR-P4 employee master — People reads identity, never copies it
+
+**PR #341** (merge `b25fa2bc`) · migration **0269_hr_employee_master** applied · api Worker
+`aa03fe76` + web `index-CgJfvG3c.js` (carres-portal `ab2b36cc` + carres-pos `9b76d8bf`) — **DEPLOYED**.
+Worktree `hr-hierarchy`, branch `feat/hr-p4-employee-master`. Design mock approved by Loo BEFORE
+any code (his standing law for every HR phase): https://claude.ai/code/artifact/394c5157-cd23-4652-b88e-a4fedf5fdf8f
+
+One record per human who has a CRnnn code — **9 today**, backfilled and verified live (CR001-CR007
+are `app_users`, CR008-CR009 showroom `salespersons`).
+
+### The ratified spec's data model was REJECTED in design review, and Loo took the redesign
+
+It asked for `hr_employees.staff_code (sync w/ CRnnn)` plus copies of `full_name` / `phone` /
+`dob` / `gender` / `status`. Two problems — **the second is the one that mattered**:
+
+1. Anything kept in step by a "sync" drifts. Two answers to "what is this person called".
+2. **`status` is now LOAD-BEARING FOR AUTH.** Since 0266/0267 `app_users.status` decides whether
+   `app_role()` returns anything at all. A second, cosmetic `status` on `hr_employees` is how HR
+   marks someone resigned, believes access is gone, and is wrong — a *rebuild of the exact hole
+   closed the day before*, where samantha@carres.com held a live session from May to July.
+
+So `hr_employees` stores **only fields with no home on the identity tables**, everything else is
+read through the join, and the screen answers **two questions in two columns**: *Employment* (HR's
+record, derived from the dates) vs *Access* (the real switch). Live proof — Samantha's row reads
+`access: "disabled"` + `employment: "not_recorded"`. One field could not have said both.
+
+### Other deliberate departures from the spec
+
+- **`dob`/`gender` are NOT stored.** `salespersons` already has `birthday`+`gender` with **FOUR
+  live write sites** (`lib/create-account.ts`, `routes/hr-team.ts`, `routes/staff.ts` create +
+  patch). Copying = the drift the table exists to prevent; repointing all four would have dragged
+  the live POS staff profile into this phase. New CF `hr-hq-staff-no-birthday`.
+- **Backfill filter written from live data.** The spec's "one row per internal user + showroom
+  staff" taken literally would have filed **Nets · Dispatch, Ohana · Sales and the Kelana Jaya
+  store login as employees** — 20 identity rows live, only 9 are people. The CR code IS the filter
+  (dealer-channel salespersons carry none, so the dealer-exclusion law holds for free).
+- **Checklists are a constant in `@carres/shared`**, not `hr_checklist_templates` + instances. A
+  company hiring ~3 people a year does not need a config screen; the DB stores only the ticks.
+  Same instinct that killed O1's one-click button.
+- **`hr_employment_events` is lifecycle-only** — promotions/transfers already live in
+  `org_position_history` (0254). The drawer MERGES both for display rather than writing a third log.
+- **`hr_add_employee` is idempotent and MERGES** a second identity onto the existing row, so the
+  dual-identity fork (spec risk #3) is closed by construction — the "merge RPC designed up-front"
+  the spec asked for turned out to be a one-line update.
+
+### PDPA
+
+IC and bank account **never enter a list or detail payload** (booleans only).
+`hr_reveal_employee_field` hands the value over and writes the audit row **in the same
+transaction**, so there is no ordering in which a number escapes untracked. Verified live in a
+rolled-back transaction: both payloads grep clean for the value, the audit carries field **NAMES**
+only (`Employee profile - Khor Yee - bank_name, ic_number, …`), completeness read 3/8.
+
+### NEW DOOR — HR may disable a login (Loo, this session)
+
+Found while designing offboarding: the only disable route was `POST /api/principal/accounts/:id/status`,
+**principal-only** (`principal/accounts.ts:37`) — so HR ran an offboarding flow that could not
+offboard. Put to Loo as A (HR gets the door) vs B (HR records the exit, principal cuts access);
+he took **A**. Scoped narrowly: its own route, NOT a widened principal Accounts router (that one
+also creates accounts and rotates passwords); the account is resolved from the **employee row**,
+not the client; PIN-only staff are refused (`no_login_to_disable`) because there is nothing to
+disable. The flip + GoTrue sign-out + audit sequence moved into `apps/api/src/lib/account-status.ts`
+so **the two doors cannot drift** — that sequence is the whole security promise.
+
+**Offboarding is TWO shapes, not one** (the spec conflated them): an HQ login has sessions to kill;
+floor staff never had one — `staff_verify_pin` (0233:66-73) **already checks `salespersons.active`**
+and returns `no_pin` for an inactive person. The spec said "verify, don't assume"; verified, holds.
+
+### Bugs caught in my own migration before it touched prod
+
+- `_hr_employment_status` was `IMMUTABLE` while reading `current_date` → **STABLE** (an immutable
+  current_date function lets the planner fold today's answer into a cached plan or an index).
+- The roster UNION emitted a duplicate `staff_code` key AND would have listed a merged
+  dual-identity person **twice** → `where e.app_user_id is null` on the floor branch.
+- Four validators used `x not in (…)` with **no NULL guard** — the same NULL-gate shape as the
+  0266 bug, where `NULL not in (…)` is NULL, the IF never fires, and the body runs unguarded.
+
+### Verification
+
+Every one of the 10 new functions uses the post-0266 fail-closed
+`coalesce((select public.app_role())::text, '') not in (…)` gate. Simulated per-user against prod
+in rolled-back transactions — **principal ALLOWED; operation, finance and the disabled account all
+42501; operation sees 0 rows in all four tables**.
+
+> **Technique note, order matters**: `begin; select set_config('request.jwt.claims', …, true);
+> set local role authenticated; … rollback;` — set the claims BEFORE dropping to `authenticated`.
+> The other way round, the lookup runs under RLS with no identity, returns no rows, and you get a
+> confusing "forbidden" that looks like a real failure.
+
+Suites at baseline: shared **1093/1093** · api **3** pre-existing · web **16** pre-existing —
+**zero new**. Build (not just tsc) + `check:v4` + design-standard lint clean. Live bundle
+downloaded-then-grepped: 4,145,721 bytes, `SERVICE_ROLE` **0**, `hr/people` present.
+
+**Design lint earned its keep**: `hover:bg-base-50` on clickable rows broke the UI-KIT hover law
+(98 vs baseline 94) — clickable rows/nav/chips hover BLUE (`hover:bg-hovertint`).
+
+**File-equals-live**: some `·`/`→` were flattened to `-`/`->` in the apply payload, so the repo
+file no longer matched. Reconciled the FILE to live (cheaper than a punctuation migration) and
+noted it in the header; the comments describing the `SELF - ` prefix were updated too.
+
+### Still open
+
+- Three questions Loo never answered — shipped on the drafted defaults, all cheap to change
+  because the lists are a constant: offboarding checklist (5) · onboarding checklist (6) ·
+  **CR001 is still named "principal"** (Loo's own record showing a system placeholder; renaming a
+  real person's live row is his call).
+- **`docs/hr-system-full-spec.md` contradicts itself**: D3's row says an hr user may not write
+  their own comp; §4 says Loo OVERRULED that (self-writes allowed, `SELF - ` audit marker). §4 is
+  the later ruling — **delete the D3 clause before P7 is built** or it will be implemented backwards.
+- Next: **P5** (commission runs) → P6 → P7 → P8 → O4.
