@@ -1,10 +1,21 @@
 # Execution queues — THE index (Jess's build map, 2026-07-27)
 
 > **The whole balance of work lives in FIVE card-queue docs.** Open a new chat, pick ONE
-> card from ONE line, paste the line's kickoff sentence. **Only one chat runs at a time —
-> across ALL lines** (different lines touch the same files; parallel chats collide).
-> When a card ships, that chat marks ✅ + PR number in its own doc. These docs are the
-> memory; chats are disposable.
+> card from ONE line, paste the line's kickoff sentence. When a card ships, that chat
+> marks ✅ + PR number in its own doc. These docs are the memory; chats are disposable.
+>
+> **Parallel law (upgraded 2026-07-27, after the serial version proved too cautious):**
+> - WITHIN a line: strictly one card at a time, in order (R1 before R2, never together).
+> - ACROSS lines: parallel chats are FINE when the lines live on different pages —
+>   **R + S + K is a safe trio** (Purchasing · Service Cases · Stock never share files).
+> - **① Delivery (T) and ② Journey (J) may NEVER run at the same time** — both edit the
+>   Orders drawer. Either of them CAN run alongside R/S/K.
+> - Migration-bearing cards: check the remote tracker tail immediately before apply
+>   (guardrail #8). Two lines may take dual numbers the same day — cosmetic, the tracker
+>   keys on timestamp; never renumber applied files.
+> - Deploys will occasionally collide: every chat already follows the union-tip rule
+>   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
+>   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
 
 ## The five lines
 
@@ -16,9 +27,9 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R6 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |
 
-**Recommended order:** finish ① T3-T6 first (drawer work), then start ② J1 (same drawer,
-so it waits for T6). ③④⑤ are independent of the drawer — any of them can interleave with
-① after T6, still one chat at a time. Total = 31 cards.
+**State 2026-07-27:** ① T1-T7 ✅ (T8 running) · ② J1-J2 ✅ · ⑤ K0 ✅ — 10 of 31 shipped.
+**Run now in parallel:** T8 (already running) + R1 + S1 + K1, four chats. J3 waits for the
+T-line's drawer work to pause (slot it right after T8). Total = 31 cards.
 
 ## Sidebar map — where every line lands
 

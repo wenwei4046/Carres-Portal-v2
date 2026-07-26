@@ -12,7 +12,7 @@
 >
 > **Sidebar home: NONE.** Order Journey is a button inside the Orders drawer, not a menu item.
 > **Sequencing:** J-cards touch `OrderDetailDrawer.tsx` — never run a J-chat and a delivery
-> T-chat at the same time. One chat at a time, always.
+> T-chat at the same time. Parallel with R/S/K lines is fine (index parallel law, 2026-07-27).
 
 ## Ground truth (read before ANY card)
 
