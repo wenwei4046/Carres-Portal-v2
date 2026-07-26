@@ -1114,6 +1114,31 @@ export interface RentalOffer {
   updatedBy: string | null;
 }
 
+/** One block of an agreement's wording (0267). */
+export interface AgreementBlock {
+  kind: "title" | "subtitle" | "h2" | "p" | "li";
+  text: string;
+}
+
+/**
+ * One `rental_agreement_templates` row (0267) — the wording a rental signs,
+ * verbatim, as ordered blocks. `rentalAgreementTemplateFromRow` maps it.
+ */
+export interface RentalAgreementTemplate {
+  id: string;
+  docKey: string;
+  name: string;
+  bindsTo: string[];
+  version: number;
+  body: AgreementBlock[];
+  fields: string[];
+  effectiveFrom: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
 /**
  * One `rental_buy_prices` row (0264) — the outright price of one target (SKU
  * or sofa combo). `price` null = fall back to the SKU Master list price.

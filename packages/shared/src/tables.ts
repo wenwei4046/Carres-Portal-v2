@@ -169,6 +169,9 @@ export const RENTAL_STOCK_UNITS   = "rental_stock_units" as const;
 export const RENTAL_OFFERS         = "rental_offers" as const;
 export const RENTAL_BUY_PRICES     = "rental_buy_prices" as const;
 export const RENTAL_OFFER_SERVICES = "rental_offer_services" as const;
+// 0267 — the agreement wording a rental signs (ordered blocks, immutable
+// versions). The customer's own document, printed verbatim.
+export const RENTAL_AGREEMENT_TEMPLATES = "rental_agreement_templates" as const;
 export const SERVICE_ENTITLEMENTS = "service_entitlements" as const;
 export const SERVICE_VISITS       = "service_visits" as const;
 export const RENTAL_UNIT_EVENTS   = "rental_unit_events" as const;

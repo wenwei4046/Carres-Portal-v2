@@ -203,6 +203,51 @@ export type RentalOfferServiceInput = z.infer<typeof rentalOfferServiceInputSche
 export const rentalOfferServicePatchSchema = rentalOfferServiceFields.omit({ packageId: true }).partial();
 export type RentalOfferServicePatchInput = z.infer<typeof rentalOfferServicePatchSchema>;
 
+// ── rental_agreement_templates (0267) ──────────────────────────────────────
+
+/** One block of the wording. `text` may carry `{{tokens}}`. */
+export const agreementBlockSchema = z
+  .object({
+    kind: z.enum(["title", "subtitle", "h2", "p", "li"]),
+    text: z.string().min(1).max(4000),
+  })
+  .strict();
+
+/**
+ * Author a NEW version of an agreement's wording. `version` is server-assigned
+ * (max + 1 for the doc_key) — a version is immutable once signed against, so
+ * the client never picks one.
+ */
+export const agreementTemplateInputSchema = z
+  .object({
+    docKey: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(160),
+    bindsTo: z.array(rentalCategorySchema).max(4).optional(),
+    body: z.array(agreementBlockSchema).min(1).max(400),
+    effectiveFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "effectiveFrom must be YYYY-MM-DD")
+      .optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type AgreementTemplateInput = z.infer<typeof agreementTemplateInputSchema>;
+
+/** Patch what a version BINDS to / whether it is live. The wording itself is
+ *  never patched — new wording is a new version. */
+export const agreementTemplatePatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    bindsTo: z.array(rentalCategorySchema).max(4).optional(),
+    effectiveFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "effectiveFrom must be YYYY-MM-DD")
+      .optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type AgreementTemplatePatchInput = z.infer<typeof agreementTemplatePatchSchema>;
+
 // ── customers (0247) ───────────────────────────────────────────────────────
 
 /**

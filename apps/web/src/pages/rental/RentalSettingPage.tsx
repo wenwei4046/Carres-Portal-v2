@@ -8,6 +8,7 @@ import type {
   RentalBuyPrice,
   RentalOffer,
   RentalOfferCategory,
+  RentalAgreementTemplate,
   RentalOfferService,
   RentalPlan,
   ServicePackage,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/queries";
 import { PillTabs } from "@/pages/catalog/components/PillTabs";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
+import AgreementsSection from "./AgreementsSection";
 import RentalOfferEditor from "./RentalOfferEditor";
 
 /**
@@ -65,7 +67,7 @@ import RentalOfferEditor from "./RentalOfferEditor";
  * non-principal internal roles see everything read-only.
  */
 /** The families an offer can be filed under + the standalone care-plan tab. */
-export type RentalSectionKey = "mattress" | "bedframe" | "sofa" | "service";
+export type RentalSectionKey = "mattress" | "bedframe" | "sofa" | "service" | "agreements";
 
 export const RENTAL_SECTION_PARAM = "section";
 
@@ -74,6 +76,7 @@ export const RENTAL_SECTIONS: readonly { key: RentalSectionKey; label: string }[
   { key: "bedframe", label: "Bed frame" },
   { key: "sofa", label: "Sofa" },
   { key: "service", label: "Service package" },
+  { key: "agreements", label: "Agreements" },
 ];
 
 export function isRentalSectionKey(value: string | null): value is RentalSectionKey {
@@ -113,6 +116,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
   const plans: RentalPlan[] = configQ.data?.rentalPlans ?? [];
   const buyPrices: RentalBuyPrice[] = configQ.data?.buyPrices ?? [];
   const offerServices: RentalOfferService[] = configQ.data?.offerServices ?? [];
+  const agreementTemplates: RentalAgreementTemplate[] = configQ.data?.agreementTemplates ?? [];
   const catalog = catalogQ.data;
 
   const editing = editingOfferId ? offers.find((o) => o.id === editingOfferId) ?? null : null;
@@ -123,13 +127,16 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
   const categoryOf = (offer: RentalOffer): string | null =>
     catalog?.models.find((m) => m.id === offer.modelId)?.category ?? null;
   const offersOf = (cat: RentalSectionKey) => offers.filter((o) => categoryOf(o) === cat);
-  const shownOffers = section === "service" ? [] : offersOf(section);
+  const isOfferSection = section !== "service" && section !== "agreements";
+  const shownOffers = isOfferSection ? offersOf(section) : [];
   const tabs = RENTAL_SECTIONS.map((t) => ({
     key: t.key,
     label:
       t.key === "service"
         ? `${t.label} (${servicePackages.length})`
-        : `${t.label} (${offersOf(t.key).length})`,
+        : t.key === "agreements"
+          ? `${t.label} (${agreementTemplates.length})`
+          : `${t.label} (${offersOf(t.key).length})`,
   }));
 
   return (
@@ -171,7 +178,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
             >
               + New service package
             </button>
-            {section !== "service" && (
+            {isOfferSection && (
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
@@ -185,7 +192,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
         )}
       </section>
 
-      {section !== "service" &&
+      {isOfferSection &&
         (editing && editingModel && catalog ? (
         <RentalOfferEditor
           key={editing.id}
@@ -232,6 +239,9 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
           onCloseAdd={() => setPkgOpen(false)}
         />
       )}
+      {section === "agreements" && (
+        <AgreementsSection templates={agreementTemplates} isPrincipal={isPrincipal} />
+      )}
       {section !== "service" && pkgOpen && isPrincipal && (
         <Modal title="Create service package" onClose={() => setPkgOpen(false)}>
           <PackageForm onDone={() => setPkgOpen(false)} />
@@ -265,6 +275,7 @@ const SECTION_LABEL: Record<RentalSectionKey, string> = {
   bedframe: "Bed frame",
   sofa: "Sofa",
   service: "Service package",
+  agreements: "Agreements",
 };
 
 function OffersSection({
