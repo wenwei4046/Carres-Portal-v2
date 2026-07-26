@@ -51,6 +51,7 @@ import {
   step2Valid,
   step3DateValid,
   step4Valid,
+  step4ValidRental,
 } from "./new-order/draft";
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
@@ -484,9 +485,17 @@ export default function DealerPos({
       step3DateValid(draft, minLeadDays),
     [draft, minLeadDays, effectiveDealerId, entryFormCfg],
   );
+  // 0276 — a RENTAL cart collects nothing at signing, so the payment half of
+  // step4Valid does not apply to it (it made the Complete button permanently
+  // disabled with no visible reason). Signature + terms still do: they ARE the
+  // rental agreement.
+  const isRentalCart = cartModeOf(draft.lines) === "rental";
   const confirmReady = useMemo(
-    () => step4Valid(draft, paymentMethods) && asapDepositOk,
-    [draft, asapDepositOk, paymentMethods],
+    () =>
+      isRentalCart
+        ? step4ValidRental(draft)
+        : step4Valid(draft, paymentMethods) && asapDepositOk,
+    [draft, asapDepositOk, paymentMethods, isRentalCart],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
