@@ -97,6 +97,12 @@ vi.mock("@/lib/queries", () => ({
     mutateAsync: vi.fn().mockResolvedValue({ ok: true, generated: 0, skipped: 0 }),
     isPending: false,
   }),
+  // 0270 — Guarantee authoring; a full mock must stub it (NewSkuModal mounts it).
+  useCreateGuaranteeProduct: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ ok: true, sku: "GRT-X-1Y", label: "x", covers: "x" }),
+    isPending: false,
+  }),
   useImportSkus: () => ({
     mutate: vi.fn(),
     mutateAsync: mockImportMutateAsync,

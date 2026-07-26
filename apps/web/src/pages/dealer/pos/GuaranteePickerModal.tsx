@@ -1,6 +1,7 @@
 import { ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
 import type { CatalogResponse, GuaranteeTermDto, ProductSkuDto } from "@carres/shared";
+import { guaranteeCovers, guaranteeScopeLabel, matchSofaCombo } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 
 /**
@@ -12,8 +13,10 @@ import type { DraftLine } from "../new-order/draft";
  * guarantee is a RM150 liability nobody can trace, so this modal is the gate —
  * pick the item first, then it goes into the cart.
  *
- * Eligibility = the term's `coversCategory` (mattress for v1). If the cart has
- * no eligible line the modal says so instead of offering an empty list.
+ * Eligibility runs through the SHARED `guaranteeCovers` matcher, so what the
+ * seller is offered here is exactly what the term promises — category, then
+ * model, then size / combo / compartment (0270). If nothing in the cart
+ * qualifies the modal says so rather than offering an empty list.
  */
 export default function GuaranteePickerModal({
   term,
@@ -43,11 +46,32 @@ export default function GuaranteePickerModal({
 
   /** Cart lines whose model sits in the covered category. A guarantee already
    *  in the cart is never itself coverable. */
+  const combo = term.coversComboId
+    ? (catalog.sofaCombos ?? []).find((c) => c.id === term.coversComboId)
+    : undefined;
+
   const candidates = lines
     .map((l) => {
       const s = skuByCode.get(l.sku);
       const model = s ? modelById.get(s.modelId) : undefined;
-      if (!model || model.category !== term.coversCategory) return null;
+      if (!model) return null;
+      // A built sofa carries its modules in attrs — that is what a combo-scoped
+      // guarantee is matched against.
+      const attrs = l.attrs as Record<string, unknown> | null;
+      const build = attrs?.sofa_build as { cells?: { moduleCode: string }[] } | undefined;
+      const ok = guaranteeCovers(
+        term,
+        {
+          category: model.category,
+          modelId: model.id,
+          variant: s?.variant ?? null,
+          compartmentId: s?.compartmentId ?? null,
+          builtModuleCodes: build?.cells?.map((c) => c.moduleCode) ?? null,
+        },
+        matchSofaCombo,
+        combo?.slots ?? null,
+      );
+      if (!ok) return null;
       const label = s?.variant?.trim() ? `${model.name} ${s.variant}` : model.name;
       return { line: l, sku: l.sku, label };
     })
@@ -73,6 +97,14 @@ export default function GuaranteePickerModal({
               {term.coverageYears} years ·{" "}
               {term.remedy === "replace" ? "one-for-one replacement" : "repair"} · RM{" "}
               {sku.price.toFixed(2)}
+              <br />
+              <span className="text-base-500">
+                Covers{" "}
+                {guaranteeScopeLabel(term, {
+                  model: modelById.get(term.coversModelId ?? "")?.name ?? null,
+                  combo: combo?.label ?? null,
+                })}
+              </span>
             </p>
           </div>
           <button
@@ -89,8 +121,8 @@ export default function GuaranteePickerModal({
           {unique.length === 0 ? (
             <p className="t-body text-base-700">
               {context === "order"
-                ? `There is no ${term.coversCategory} on this order to cover.`
-                : `Add the ${term.coversCategory} to the cart first.`}{" "}
+                ? `Nothing on this order matches what this guarantee covers.`
+                : `Add the item this guarantee covers to the cart first.`}{" "}
               A guarantee has to be attached to the item it covers, otherwise it cannot be claimed
               later.
             </p>

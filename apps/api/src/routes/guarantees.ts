@@ -8,6 +8,13 @@ import {
   guaranteeClaimInputSchema,
   guaranteeDeskStatus,
   guaranteeListQuerySchema,
+  guaranteeProductInputSchema,
+  guaranteeScopeLabel,
+  deriveGuaranteeSkuCode,
+  PRODUCT_MODELS,
+  PRODUCT_SKUS,
+  SOFA_COMBO_PRICING,
+  SOFA_COMPARTMENTS,
   isGuaranteeId,
   normalizeGuaranteeId,
   type GuaranteeEntitlementDto,
@@ -119,7 +126,7 @@ guaranteesRouter.get("/terms", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from(GUARANTEE_TERMS)
-    .select("guarantee_sku, label, covers_category, coverage_years, remedy, terms_text, active")
+    .select("*")
     .eq("active", true)
     .order("guarantee_sku");
   if (error) {
@@ -135,6 +142,10 @@ guaranteesRouter.get("/terms", async (c) => {
     remedy: String(r.remedy) as GuaranteeRemedy,
     termsText: r.terms_text ? String(r.terms_text) : null,
     active: Boolean(r.active),
+    coversModelId: r.covers_model_id ? String(r.covers_model_id) : null,
+    coversVariants: Array.isArray(r.covers_variants) ? (r.covers_variants as string[]) : null,
+    coversComboId: r.covers_combo_id ? String(r.covers_combo_id) : null,
+    coversCompartmentId: r.covers_compartment_id ? String(r.covers_compartment_id) : null,
   }));
   return c.json({ items });
 });
@@ -307,3 +318,161 @@ guaranteesRouter.post("/:id/attach", async (c) => {
 });
 
 export default guaranteesRouter;
+
+// ---------------------------------------------------------------------------
+// POST /api/guarantees/products — author a guarantee end to end (Loo
+// 2026-07-26, from + New SKU): the product_model, its ONE SKU and the terms
+// row in a single call.
+//
+// Why one endpoint and not three client calls: a SKU without its terms row is
+// a guarantee that sells but covers nothing and mints no entitlement — exactly
+// the untraceable state this whole feature exists to prevent. The write order
+// is model → sku → terms, and each failure UNWINDS what it already created, so
+// a half-authored guarantee never reaches the catalog.
+//
+// The code and label are DERIVED here, never sent, so two people authoring the
+// same cover cannot invent two spellings of it.
+// ---------------------------------------------------------------------------
+guaranteesRouter.post("/products", async (c) => {
+  if (c.var.auth.role !== "principal") {
+    throw new HTTPException(403, {
+      message: "Only the principal (Master Admin) can author a guarantee",
+    });
+  }
+  const parsed = await parseJsonBody(c, guaranteeProductInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Resolve the names the code + label are built from, and prove every scope id
+  // really exists (a dangling scope would silently cover nothing).
+  let modelKey: string | null = null;
+  let modelName: string | null = null;
+  if (d.coversModelId) {
+    const { data: m } = await sb
+      .from(PRODUCT_MODELS)
+      .select("model_key, name, category")
+      .eq("id", d.coversModelId)
+      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = m as any;
+    if (!row) throw new HTTPException(422, { message: "that product no longer exists" });
+    if (row.category !== d.coversCategory) {
+      throw new HTTPException(422, {
+        message: `that product is a ${row.category}, not a ${d.coversCategory}`,
+      });
+    }
+    modelKey = String(row.model_key);
+    modelName = String(row.name);
+  }
+
+  let compartmentCode: string | null = null;
+  if (d.coversCompartmentId) {
+    const { data: cp } = await sb
+      .from(SOFA_COMPARTMENTS)
+      .select("code")
+      .eq("id", d.coversCompartmentId)
+      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!cp) throw new HTTPException(422, { message: "that compartment no longer exists" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    compartmentCode = String((cp as any).code);
+  }
+
+  let comboLabel: string | null = null;
+  if (d.coversComboId) {
+    const { data: cb } = await sb
+      .from(SOFA_COMBO_PRICING)
+      .select("label, model_id")
+      .eq("id", d.coversComboId)
+      .maybeSingle();
+    if (!cb) throw new HTTPException(422, { message: "that combo no longer exists" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    comboLabel = (cb as any).label ? String((cb as any).label) : "combo";
+  }
+
+  const variants = (d.coversVariants ?? []).filter(Boolean);
+  const scopeLabel = guaranteeScopeLabel(
+    {
+      coversCategory: d.coversCategory,
+      coversModelId: d.coversModelId ?? null,
+      coversVariants: variants,
+      coversComboId: d.coversComboId ?? null,
+      coversCompartmentId: d.coversCompartmentId ?? null,
+    },
+    { model: modelName, combo: comboLabel, compartment: compartmentCode },
+  );
+  const label =
+    d.label?.trim() ||
+    `${scopeLabel.charAt(0).toUpperCase()}${scopeLabel.slice(1)} Guarantee ${d.coverageYears} Years`;
+  const sku = deriveGuaranteeSkuCode({
+    coversCategory: d.coversCategory,
+    modelKey,
+    variants,
+    compartmentCode,
+    comboLabel,
+    coverageYears: d.coverageYears,
+  });
+
+  // 1. the guarantee product_model (one per authored guarantee — the SKU
+  //    Master groups by model, so each cover reads as its own product).
+  const modelKeyForGuarantee = sku.toLowerCase();
+  const { data: createdModel, error: modelErr } = await sb
+    .from(PRODUCT_MODELS)
+    .insert({
+      category: "guarantee",
+      model_key: modelKeyForGuarantee,
+      name: label,
+      blurb: d.description ?? null,
+      allowed_options: {},
+    })
+    .select("id")
+    .maybeSingle();
+  if (modelErr) {
+    const m = mapPgError(modelErr);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const modelId = String((createdModel as any).id);
+
+  // 2. its single SKU. `variant` IS the invoice line description (finance reads
+  //    product_skus.variant), so it carries the full sentence, not a size.
+  const { error: skuErr } = await sb.from(PRODUCT_SKUS).insert({
+    model_id: modelId,
+    sku,
+    variant: label,
+    variant_kind: "preset",
+    price: d.price,
+    pos_active: true,
+    supplier_id: null, // a guarantee is never purchased
+    description: d.description ?? null,
+  });
+  if (skuErr) {
+    await sb.from(PRODUCT_MODELS).delete().eq("id", modelId); // unwind
+    const m = mapPgError(skuErr);
+    return c.json(m.body, m.status);
+  }
+
+  // 3. the terms — what it actually promises.
+  const { error: termErr } = await sb.from(GUARANTEE_TERMS).insert({
+    guarantee_sku: sku,
+    label,
+    covers_category: d.coversCategory,
+    coverage_years: d.coverageYears,
+    remedy: d.remedy,
+    terms_text: d.description ?? null,
+    covers_model_id: d.coversModelId ?? null,
+    covers_variants: variants.length > 0 ? variants : null,
+    covers_combo_id: d.coversComboId ?? null,
+    covers_compartment_id: d.coversCompartmentId ?? null,
+  });
+  if (termErr) {
+    await sb.from(PRODUCT_SKUS).delete().eq("sku", sku); // unwind both
+    await sb.from(PRODUCT_MODELS).delete().eq("id", modelId);
+    const m = mapPgError(termErr);
+    return c.json(m.body, m.status);
+  }
+
+  return c.json({ ok: true, sku, label, modelId, covers: scopeLabel }, 201);
+});

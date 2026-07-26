@@ -305,3 +305,58 @@ describe("GET /api/guarantees — the ID is the primary handle (0267)", () => {
     });
   });
 });
+
+describe("POST /api/guarantees/products — authoring (0270)", () => {
+  it("refuses anyone but the principal — a guarantee is a multi-year liability", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({}));
+    for (const role of ["operation", "finance", "dealer"]) {
+      const jwt = await makeJwt(role, role === "dealer" ? "d1" : null);
+      const res = await app.fetch(
+        new Request("http://t/api/guarantees/products", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ coversCategory: "mattress", coverageYears: 15 }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(403);
+    }
+  });
+
+  it("rejects a combo AND a compartment at once before touching the DB", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({}));
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/guarantees/products", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coversCategory: "sofa",
+          coverageYears: 5,
+          coversComboId: "11111111-1111-1111-1111-111111111111",
+          coversCompartmentId: "22222222-2222-2222-2222-222222222222",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects variants on accessories (no size axis)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({}));
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/guarantees/products", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coversCategory: "accessory",
+          coverageYears: 2,
+          coversVariants: ["King"],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});

@@ -74,6 +74,7 @@ import {
   type RentalAgreement,
   type RentalStockUnit,
   type GuaranteeListResponse,
+  type GuaranteeProductInput,
   type PosRentalPlan,
   type Customer,
   type CreateRentalAgreementInput,
@@ -7619,5 +7620,29 @@ export function useOrderGuarantees(
     staleTime: 30_000,
     retry: false,
     ...opts,
+  });
+}
+
+/**
+ * Author a guarantee PRODUCT — model + SKU + terms in one server call (0270).
+ *
+ * A mutation hook rather than a bare apiFetch + useQueryClient inside the modal:
+ * NewSkuModal's tests fully mock this module and install no QueryClientProvider,
+ * so touching the client directly in the component takes the whole modal down.
+ * Same rule as useOrderGuarantees — data access lives here.
+ */
+export function useCreateGuaranteeProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GuaranteeProductInput) =>
+      apiFetch<{ ok: true; sku: string; label: string; covers: string }>(
+        "/api/guarantees/products",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      // The catalog bundle carries models, skus AND guaranteeTerms — one blast.
+      void qc.invalidateQueries({ queryKey: ["catalog"] });
+      void qc.invalidateQueries({ queryKey: ["guarantees"] });
+    },
   });
 }

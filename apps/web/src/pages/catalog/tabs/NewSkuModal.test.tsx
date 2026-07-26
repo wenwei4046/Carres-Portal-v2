@@ -32,6 +32,7 @@ const mockCreateModelMutateAsync = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockOfferMutateAsync = vi.fn();
 const mockGenerateSkusMutateAsync = vi.fn();
+const mockCreateGuaranteeMutateAsync = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useCreateCatalogModel: () => ({
@@ -52,6 +53,13 @@ vi.mock("@/lib/queries", () => ({
   useGenerateSkus: () => ({
     mutate: vi.fn(),
     mutateAsync: mockGenerateSkusMutateAsync,
+    isPending: false,
+  }),
+  // 0270 — the Guarantee authoring path. A full mock of this module must stub
+  // it or the modal mounts a mutation with no QueryClientProvider.
+  useCreateGuaranteeProduct: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockCreateGuaranteeMutateAsync,
     isPending: false,
   }),
 }));
