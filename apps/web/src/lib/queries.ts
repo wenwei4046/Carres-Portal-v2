@@ -2745,6 +2745,13 @@ export interface opsRemarkEmbed {
    *  the list for the owner chip + STAFF facet. Optional so older fixtures
    *  keep typechecking. */
   assigned_staff?: string | null;
+  /** D1 two-stage booking (migration 0277, T1) — the list's Delivery column +
+   *  queues read these to tell the CUSTOMER's confirmed booking apart from the
+   *  carrier's provisional date (logistic_eta). Optional: a browser on this
+   *  build against a pre-T1 Worker degrades to the provisional reading. */
+  booking_stage?: "none" | "provisional" | "confirmed" | null;
+  confirmed_date?: string | null;
+  confirmed_time_slot?: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

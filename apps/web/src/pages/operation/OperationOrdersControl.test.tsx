@@ -959,12 +959,45 @@ describe("nextActionOf (C2)", () => {
   });
 
   // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──
-  it("ready + carrier + ETA + paid → Confirm (green)", () => {
+  // T1 (0277): the gate opens on the CUSTOMER's confirmation, never on the
+  // carrier's provisional logistic_eta alone.
+  const BOOKED = {
+    logistic_eta: "2026-08-01",
+    booking_stage: "confirmed" as const,
+    confirmed_date: "2026-08-01",
+    confirmed_time_slot: "Morning (9–11 AM)",
+  };
+
+  it("ready + carrier + provisional carrier date only → STILL Chase logistic (not Confirm)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
-      ops_order_control: { logistic_eta: "2026-08-01" },
+      ops_order_control: { logistic_eta: "2026-08-01", booking_stage: "provisional" },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
+  });
+
+  it("past deadline + partner + provisional date → Chase logistic (red) — carrier's word doesn't clear the escalation", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(-2),
+      ops_assigned_logistic: "p1",
+      ops_order_control: { logistic_eta: inDays(1), booking_stage: "provisional" },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Chase logistic",
+      tone: "danger",
+    });
+  });
+
+  it("ready + carrier + customer confirmed + paid → Confirm (green)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
       label: "Confirm",
@@ -972,12 +1005,12 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + ETA + owing balance → Confirm, held (🔒)", () => {
+  it("ready + carrier + customer confirmed + owing balance → Confirm, held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
-      ops_order_control: { logistic_eta: "2026-08-01", balance: 2248 },
+      ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
       label: "Confirm",
@@ -985,12 +1018,12 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + ETA + owing storage → Confirm, held", () => {
+  it("ready + carrier + customer confirmed + owing storage → Confirm, held", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
-      ops_order_control: { logistic_eta: "2026-08-01", storage_fee_msbf: 150 },
+      ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
       label: "Confirm",
@@ -998,13 +1031,13 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + ETA + storage waived → Confirm, NOT held", () => {
+  it("ready + carrier + customer confirmed + storage waived → Confirm, NOT held", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: {
-        logistic_eta: "2026-08-01",
+        ...BOOKED,
         storage_fee_msbf: 150,
         storage_waiver_status: "approved",
       },
@@ -1122,7 +1155,7 @@ describe("slackDays (Option B — DEADLINE-primary + bounded stock bump)", () =>
   });
 });
 
-describe("logisticStateOf (LOGISTIC delivery state machine)", () => {
+describe("logisticStateOf (LOGISTIC delivery state machine — T1 booking truth, 0277)", () => {
   const pn = new Map<string, string>();
 
   it("completed → delivered", () => {
@@ -1130,37 +1163,120 @@ describe("logisticStateOf (LOGISTIC delivery state machine)", () => {
     expect(logisticStateOf(o, pn).key).toBe("delivered");
   });
 
-  it("committed delivery date → scheduled (+ the date)", () => {
+  it("customer confirmed (booking_stage + date + slot) → confirmed, with date + slot", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       delivery_partners: { id: "p", name: "NETS" },
-      ops_order_control: { logistic_eta: "2026-08-01" },
+      ops_order_control: {
+        logistic_eta: "2026-07-25",
+        booking_stage: "confirmed",
+        confirmed_date: "2026-07-27",
+        confirmed_time_slot: "Morning (9–11 AM)",
+      },
     });
-    expect(logisticStateOf(o, pn)).toMatchObject({ key: "scheduled", date: "2026-08-01" });
+    expect(logisticStateOf(o, pn)).toMatchObject({
+      key: "confirmed",
+      date: "2026-07-27",
+      slot: "Morning (9–11 AM)",
+    });
+  });
+
+  it("carrier date alone (logistic_eta, no customer confirmation) → provisional, NEVER confirmed", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_partners: { id: "p", name: "NETS" },
+      ops_order_control: { logistic_eta: "2026-08-01", booking_stage: "provisional" },
+    });
+    expect(logisticStateOf(o, pn)).toMatchObject({ key: "provisional", date: "2026-08-01" });
+  });
+
+  it("booking_stage='confirmed' WITHOUT a confirmed_date is not trusted (invariant #1) → provisional", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      delivery_partners: { id: "p", name: "NETS" },
+      ops_order_control: { logistic_eta: "2026-08-01", booking_stage: "confirmed" },
+    });
+    expect(logisticStateOf(o, pn).key).toBe("provisional");
   });
 
   it("no partner → unassigned", () => {
     expect(logisticStateOf(makeRow({ id: "x", so: 1 }), pn).key).toBe("unassigned");
   });
 
-  it("partner + no date + inside the ≤3-day window → call_now", () => {
-    const o = makeRow({
-      id: "x",
-      so: 1,
-      delivery_partners: { id: "p", name: "NETS" },
-      delivery_date: relISO(2),
-    });
-    expect(logisticStateOf(o, pn).key).toBe("call_now");
+  it("partner + no date at all → need_booking (the old call_now/no_date window split is dead)", () => {
+    for (const due of [relISO(2), relISO(10)]) {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        delivery_partners: { id: "p", name: "NETS" },
+        delivery_date: due,
+      });
+      expect(logisticStateOf(o, pn).key).toBe("need_booking");
+    }
+  });
+});
+
+// ── T1 · the Delivery column tells the booking truth (0277) ──────────────────
+describe("Delivery column (T1 booking truth)", () => {
+  const bookingRows: operationOrderListRow[] = [
+    makeRow({
+      id: "conf",
+      so: 2001,
+      status: "proceed_order",
+      operation_stage: "in_production",
+      delivery_partners: { id: "p-nets", name: "NETS" },
+      ops_order_control: {
+        logistic_eta: "2026-07-25",
+        booking_stage: "confirmed",
+        confirmed_date: "2026-07-27",
+        confirmed_time_slot: "Morning (9–11 AM)",
+      },
+    }),
+    makeRow({
+      id: "prov",
+      so: 2002,
+      status: "proceed_order",
+      operation_stage: "in_production",
+      delivery_partners: { id: "p-nets", name: "NETS" },
+      ops_order_control: { logistic_eta: "2026-07-27", booking_stage: "provisional" },
+    }),
+    makeRow({
+      id: "nb",
+      so: 2003,
+      status: "proceed_order",
+      operation_stage: "in_production",
+      delivery_partners: { id: "p-nets", name: "NETS" },
+    }),
+  ];
+
+  beforeEach(() => {
+    listHookState.data = { orders: bookingRows };
   });
 
-  it("partner + no date + still early → no_date", () => {
-    const o = makeRow({
-      id: "x",
-      so: 1,
-      delivery_partners: { id: "p", name: "NETS" },
-      delivery_date: relISO(10),
-    });
-    expect(logisticStateOf(o, pn).key).toBe("no_date");
+  function row(so: number) {
+    return screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes(`SO-${so}`))!;
+  }
+
+  it("confirmed → date · slot; provisional → carrier said; assigned-no-date → need booking; 'Unscheduled'/'Not booked' render NOWHERE", () => {
+    wrap(<OperationOrdersControl />);
+    expect(within(row(2001)).getByText("27 Jul · 9–11 AM")).toBeInTheDocument();
+    expect(within(row(2002)).getByText(/carrier said 27 Jul/)).toBeInTheDocument();
+    expect(within(row(2003)).getByText("need booking")).toBeInTheDocument();
+    expect(screen.queryByText(/unscheduled/i)).toBeNull();
+    expect(screen.queryByText(/not booked/i)).toBeNull();
+  });
+
+  it("a provisional row never paints the green booking text (green is the customer's yes only)", () => {
+    wrap(<OperationOrdersControl />);
+    const prov = within(row(2002)).getByText(/carrier said 27 Jul/);
+    expect(prov).toHaveClass("text-warning"); // amber token, not the green ink
+    expect(prov).not.toHaveStyle({ color: "#3B6D11" });
+    const conf = within(row(2001)).getByText("27 Jul · 9–11 AM");
+    expect(conf).toHaveStyle({ color: "#3B6D11" });
   });
 });
