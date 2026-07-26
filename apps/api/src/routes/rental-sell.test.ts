@@ -83,7 +83,11 @@ interface TableCfg {
   maybeSingle?: { data: unknown; error: unknown } | Array<{ data: unknown; error: unknown }>;
 }
 
-function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error: unknown }) {
+function makeSb(
+  byTable: Record<string, TableCfg>,
+  /** One answer for every rpc, or a QUEUE consumed call-by-call. */
+  rpc?: { data: unknown; error: unknown } | Array<{ data: unknown; error: unknown }>,
+) {
   const calls = {
     inserts: [] as Array<{ table: string; payload: unknown }>,
     updates: [] as Array<{ table: string; payload: unknown }>,
@@ -112,6 +116,12 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
       is: vi.fn(() => builder),
       not: vi.fn(() => builder),
       neq: vi.fn(() => builder),
+      // 0281 — the checkout reads the next unpaid instalment for the trial
+      // anchor, which needs range filters the builder never had.
+      gte: vi.fn(() => builder),
+      gt: vi.fn(() => builder),
+      lte: vi.fn(() => builder),
+      lt: vi.fn(() => builder),
       limit: vi.fn(() => builder),
       order: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
@@ -121,8 +131,10 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
     };
     return builder;
   });
+  const rpcQueue = Array.isArray(rpc) ? [...rpc] : null;
   const rpcFn = vi.fn((name: string, args: unknown) => {
     calls.rpc.push({ name, args });
+    if (rpcQueue) return Promise.resolve(rpcQueue.shift() ?? { data: null, error: null });
     return Promise.resolve(rpc ?? { data: null, error: null });
   });
   return { from, rpc: rpcFn, calls };
@@ -704,7 +716,16 @@ describe("POST /api/rental/agreements/:id/stripe/checkout (0255 subscription lin
     const createArgs = stripe.checkout.sessions.create.mock.calls[0]![0] as Record<string, unknown>;
     expect(createArgs.mode).toBe("subscription");
     expect(createArgs.customer).toBe("cus_test_1");
-    expect(createArgs.line_items).toEqual([{ price: "price_X", quantity: 1 }]);
+    // 0281 — TWO lines now. The recurring price carries months 2..N on the
+    // 7th; the one-time line is the signup month, collected at the counter.
+    // 1 + (term - 1) = term, which is the whole law.
+    expect(createArgs.line_items).toHaveLength(2);
+    expect(createArgs.line_items[0]).toEqual({ price: "price_X", quantity: 1 });
+    expect(createArgs.line_items[1]).toMatchObject({
+      quantity: 1,
+      price_data: { currency: "myr", unit_amount: 5900 },
+    });
+    expect(createArgs.line_items[1].price_data.product_data.name).toMatch(/first month/i);
     expect((createArgs.success_url as string).startsWith("https://pos.test/pay/success?ra=RA-1001")).toBe(true);
 
     const insert = admin.calls.inserts.find((i) => i.table === "stripe_checkout_sessions");
@@ -768,7 +789,8 @@ describe("GET /api/rental/agreements/:id/stripe/checkout/:sid (poll + live recon
       env,
     );
     expect(res.status).toBe(200);
-    expect(ensureFixedTermSchedule).toHaveBeenCalledWith(stripe, "sub_test_1", 84);
+    // 0281 — the subscription carries term - 1; the signup month was a line item.
+    expect(ensureFixedTermSchedule).toHaveBeenCalledWith(stripe, "sub_test_1", 83);
     expect(admin.calls.rpc[0]).toMatchObject({
       name: "link_rental_subscription",
       args: {
@@ -783,6 +805,18 @@ describe("GET /api/rental/agreements/:id/stripe/checkout/:sid (poll + live recon
 });
 
 describe("POST /stripe/webhook — subscription-mode branch (0255)", () => {
+  async function fireEvent(type: string, obj: Record<string, unknown>) {
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({ type, data: { object: obj } });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+    const res = await request(
+      "/stripe/webhook",
+      { method: "POST", headers: { "stripe-signature": "t=1,v1=x" }, body: "{}" },
+      env,
+    );
+    return { res, stripe };
+  }
+
   async function fireWebhook(sessionObj: Record<string, unknown>) {
     const stripe = makeStripe();
     stripe.webhooks.constructEventAsync.mockResolvedValue({
@@ -816,10 +850,44 @@ describe("POST /stripe/webhook — subscription-mode branch (0255)", () => {
       customer: "cus_test_1",
     });
     expect(res.status).toBe(200);
-    expect(ensureFixedTermSchedule).toHaveBeenCalledWith(expect.anything(), "sub_test_1", 84);
+    // 0281 — 83, not 84: the signup month rode the checkout as a one-time line
+    // item, so the SUBSCRIPTION carries the remaining months. Billing the full
+    // term here would collect one month too many over seven years.
+    expect(ensureFixedTermSchedule).toHaveBeenCalledWith(expect.anything(), "sub_test_1", 83);
     expect(admin.calls.rpc[0]).toMatchObject({
       name: "link_rental_subscription",
       args: { p_session_id: "cs_test_ra", p_stripe_subscription_id: "sub_test_1" },
+    });
+    // ...and the first month finally lands in OUR books too (closes CF
+    // rental-first-month-vs-billing-row). Keyed on the session, because this
+    // money arrived as a line item and never had an invoice of its own.
+    expect(admin.calls.rpc[1]).toMatchObject({
+      name: "rental_record_payment",
+      args: { p_agreement_id: AG_ID, p_seq: 1, p_stripe_invoice_id: "cs:cs_test_ra", p_method: "stripe" },
+    });
+  });
+
+  it("acknowledges with a warning when the first month cannot be recorded — the link already happened", async () => {
+    const admin = makeSb(
+      {
+        stripe_checkout_sessions: { maybeSingle: { data: { agreement_id: AG_ID }, error: null } },
+        rental_agreements: { maybeSingle: { data: { term_months: 84 }, error: null } },
+      },
+      [
+        { data: { already: false }, error: null },                            // link_rental_subscription
+        { data: null, error: { message: "boom", details: "billing_not_found" } }, // rental_record_payment
+      ],
+    );
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const { res } = await fireWebhook({
+      id: "cs_test_ra", mode: "subscription", payment_status: "paid",
+      subscription: "sub_test_1", customer: "cus_test_1",
+    });
+    // 500 would make Stripe retry a handler whose expensive half already
+    // succeeded; the instalment is recoverable by hand from the finance screen.
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({
+      warning: "first_month_not_recorded",
     });
   });
 
@@ -862,6 +930,227 @@ describe("POST /stripe/webhook — subscription-mode branch (0255)", () => {
     expect(admin.calls.rpc).toHaveLength(0); // link never ran — retry re-attempts both
   });
 });
+
+describe("POST /stripe/webhook — invoice.paid (0281 collection ledger)", () => {
+  async function fireInvoice(inv: Record<string, unknown>) {
+    const stripe = makeStripe();
+    stripe.webhooks.constructEventAsync.mockResolvedValue({
+      type: "invoice.paid",
+      data: { object: inv },
+    });
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+    return request(
+      "/stripe/webhook",
+      { method: "POST", headers: { "stripe-signature": "t=1,v1=x" }, body: "{}" },
+      env,
+    );
+  }
+
+  const INVOICE = {
+    id: "in_test_9",
+    number: "CARRES-0009",
+    amount_paid: 5900, // sen
+    created: 1_790_000_000,
+    status_transitions: { paid_at: 1_790_000_100 },
+    // SDK v22 shape: the subscription hangs off parent.subscription_details
+    parent: { subscription_details: { subscription: "sub_test_1" } },
+  };
+
+  it("records the instalment against the agreement that owns the subscription", async () => {
+    const admin = makeSb(
+      { rental_agreements: { maybeSingle: { data: { id: AG_ID }, error: null } } },
+      { data: { already: false, seq: 2 }, error: null },
+    );
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+
+    const res = await fireInvoice(INVOICE);
+    expect(res.status).toBe(200);
+    expect(admin.calls.rpc[0]).toMatchObject({
+      name: "rental_record_payment",
+      args: {
+        p_agreement_id: AG_ID,
+        p_stripe_invoice_id: "in_test_9",
+        p_amount: 59, // sen -> ringgit
+        p_method: "stripe",
+        p_reference: "CARRES-0009",
+      },
+    });
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({ seq: 2, already: false });
+  });
+
+  it("is a no-op on Stripe's at-least-once re-delivery", async () => {
+    const admin = makeSb(
+      { rental_agreements: { maybeSingle: { data: { id: AG_ID }, error: null } } },
+      { data: { already: true, seq: 2 }, error: null },
+    );
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await fireInvoice(INVOICE);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({ already: true });
+  });
+
+  it("acknowledges a subscription we do not own — never retries forever", async () => {
+    // The CARRESS Stripe account still carries the old carressglobal system's
+    // objects; their invoices must not 500 our webhook.
+    const admin = makeSb({ rental_agreements: { maybeSingle: { data: null, error: null } } });
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await fireInvoice(INVOICE);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({
+      ignored: "unknown_subscription",
+    });
+    expect(admin.calls.rpc).toHaveLength(0);
+  });
+
+  it("ignores an invoice with no subscription behind it", async () => {
+    const admin = makeSb({});
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await fireInvoice({ ...INVOICE, parent: null });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({
+      ignored: "not_a_subscription_invoice",
+    });
+  });
+
+  it("acknowledges when every instalment is already collected", async () => {
+    const admin = makeSb(
+      { rental_agreements: { maybeSingle: { data: { id: AG_ID }, error: null } } },
+      { data: null, error: { message: "none", details: "billing_not_found" } },
+    );
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await fireInvoice(INVOICE);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Record<string, unknown>).toMatchObject({
+      ignored: "no_open_instalment",
+    });
+  });
+
+  it("500s on a real failure so Stripe retries", async () => {
+    const admin = makeSb(
+      { rental_agreements: { maybeSingle: { data: { id: AG_ID }, error: null } } },
+      { data: null, error: { message: "db exploded", details: "" } },
+    );
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await fireInvoice(INVOICE);
+    expect(res.status).toBe(500);
+  });
+});
+
+describe("rental collections (0281) — the 84 months stop lying", () => {
+  const BILLINGS = [
+    { id: "b1", seq: 1, due_date: "2026-08-30", amount_due: 59, status: "paid",
+      paid_at: "2026-08-30T04:00:00Z", paid_amount: 59, method: "stripe", reference: "cs_x",
+      supplier_share: 28.91, commission_share: 11.8, stripe_invoice_id: "cs:cs_x", late_interest: null },
+    { id: "b2", seq: 2, due_date: "2026-09-07", amount_due: 59, status: "due",
+      paid_at: null, paid_amount: null, method: null, reference: null,
+      supplier_share: null, commission_share: null, stripe_invoice_id: null, late_interest: null },
+    { id: "b3", seq: 3, due_date: "2000-01-07", amount_due: 59, status: "due",
+      paid_at: null, paid_amount: null, method: null, reference: null,
+      supplier_share: null, commission_share: null, stripe_invoice_id: null, late_interest: null },
+  ];
+
+  function collectionsSb() {
+    return makeSb({
+      rental_agreements: {
+        maybeSingle: {
+          data: {
+            id: AG_ID, agreement_no: "RA-1001", sku: "M-CLOUD-K", term_months: 84,
+            monthly_fee: 59, start_date: "2026-08-30", status: "active",
+            supplier_rate_pct: 49, commission_base_pct: 20,
+          },
+          error: null,
+        },
+      },
+      rental_billings: { list: { data: BILLINGS, error: null } },
+      rental_billing_events: { list: { data: [], error: null } },
+    });
+  }
+
+  it("adds up: collected, outstanding, and the contract value it is measured against", async () => {
+    vi.mocked(userClient).mockReturnValue(collectionsSb() as never);
+    const res = await request(
+      `/api/rental/agreements/${AG_ID}/collections`,
+      { headers: { Authorization: `Bearer ${await makeJwt("finance")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      totals: Record<string, number>;
+      billings: Array<Record<string, unknown>>;
+    };
+    expect(body.totals.contractValue).toBe(4956); // 84 x 59, Loo's number
+    expect(body.totals.collected).toBe(59);
+    expect(body.totals.outstanding).toBe(4897);
+    expect(body.totals.paidCount).toBe(1);
+    // LATE is derived from the date, never stored, so it cannot go stale
+    expect(body.totals.lateCount).toBe(1);
+    expect(body.billings.find((b) => b.seq === 3)!.late).toBe(true);
+    expect(body.billings.find((b) => b.seq === 2)!.late).toBe(false);
+  });
+
+  it("is internal-only — a store may not read the money", async () => {
+    vi.mocked(userClient).mockReturnValue(collectionsSb() as never);
+    const res = await request(
+      `/api/rental/agreements/${AG_ID}/collections`,
+      { headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}` } },
+      env,
+    );
+    expect(res.status).toBe(403);
+    const anon = await request(`/api/rental/agreements/${AG_ID}/collections`, {}, env);
+    expect(anon.status).toBe(401);
+  });
+
+  it("the manual door goes through the SAME RPC, and never carries a split", async () => {
+    const sb = makeSb({}, { data: { already: false, seq: 4 }, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await request(
+      `/api/rental/agreements/${AG_ID}/collections/4/record`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "content-type": "application/json" },
+        body: JSON.stringify({ method: "bank_transfer", reference: "MBB-9931" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc[0]).toMatchObject({
+      name: "rental_record_payment",
+      args: { p_agreement_id: AG_ID, p_seq: 4, p_method: "bank_transfer", p_reference: "MBB-9931" },
+    });
+    // no invoice id (this money never touched Stripe) and NO split figures
+    expect((sb.calls.rpc[0]!.args as Record<string, unknown>).p_stripe_invoice_id).toBeNull();
+    expect(JSON.stringify(sb.calls.rpc[0]!.args)).not.toMatch(/supplier|commission|share/i);
+  });
+
+  it("refuses an operator recording money, and a made-up payment method", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({}) as never);
+    const asOps = await request(
+      `/api/rental/agreements/${AG_ID}/collections/4/record`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "content-type": "application/json" },
+        body: JSON.stringify({ method: "cash" }),
+      },
+      env,
+    );
+    expect(asOps.status).toBe(403);
+
+    const sb = makeSb({});
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const bogus = await request(
+      `/api/rental/agreements/${AG_ID}/collections/4/record`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "content-type": "application/json" },
+        body: JSON.stringify({ method: "crypto" }),
+      },
+      env,
+    );
+    expect(bogus.status).toBe(422);
+    expect(sb.calls.rpc).toHaveLength(0);
+  });
+});
+
 
 describe("plan authoring → Stripe sync (0255)", () => {
   it("POST /plans stores the ensured product/price ids and reports stripeSync", async () => {

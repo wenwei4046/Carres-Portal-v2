@@ -220,6 +220,28 @@ export const agreementBlockSchema = z
  * list is a shared constant mirrored by a CHECK: the DB cannot import TypeScript,
  * so the pair is kept honest by naming the mirror in both places.
  */
+/**
+ * Record a rental instalment by hand (0281) — the money Stripe never sees: a
+ * bank transfer, or cash at the counter.
+ *
+ * NOTE what is absent: the split. A caller may say how much arrived and how,
+ * but never who gets what — `rental_record_payment` computes the supplier and
+ * commission shares server-side from the agreement's own snapshot rates. Same
+ * doctrine as the POS not pricing its own sofas, applied to money going out.
+ */
+export const recordRentalPaymentInputSchema = z
+  .object({
+    /** Omit when the customer paid exactly what was due — the common case. */
+    amount: z.number().positive().max(1_000_000).optional(),
+    /** ISO datetime. Omit for "now". */
+    paidAt: z.string().datetime().optional(),
+    method: z.enum(["bank_transfer", "cash", "cheque", "card", "other"]),
+    reference: z.string().trim().max(120).nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+export type RecordRentalPaymentInput = z.infer<typeof recordRentalPaymentInputSchema>;
+
 export const RENTAL_AGREEMENT_DOC_KEY = "rent_to_own" as const;
 
 /**

@@ -80,6 +80,151 @@ export function rentalMonthlySplit(
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * The collection calendar (Loo 2026-07-26) — WHEN the money is due.
+ *
+ * Loo's rule, in his own example: a customer who signs on the 30th pays once
+ * on the 30th, then on the 7th of the next month, then every 7th after that.
+ * The final month needs no payment, because the signup payment was the extra
+ * one. His invariant, stated as the thing that actually matters:
+ *
+ *     "as long as the sum is correct"
+ *
+ * So N payments for an N-month term, and N x monthlyFee must equal the
+ * contract value exactly. Everything else about the calendar is subordinate to
+ * that, and `rentalScheduleSum` exists so the DB, the API and the tests can all
+ * assert it rather than trust it.
+ *
+ * This ALSO has to be expressible in Stripe, which cannot be talked out of its
+ * own opinions: `proration_behavior:'none'` WAIVES the first invoice, and the
+ * default `create_prorations` bills a part-month. Neither is Loo's rule. The
+ * composition that is: a one-time line item for the signup month + a trial
+ * running to the first 7th (which then BECOMES the billing anchor) + a schedule
+ * of N-1 iterations. Hence `MIN_FIRST_GAP_DAYS` below is not politeness.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/** The day of the month money is due, from Loo's T&C ("on or before the 7th"). */
+export const RENTAL_ANCHOR_DAY = 7;
+
+/**
+ * If the first anchor lands sooner than this after signing, skip to the next
+ * month. Two reasons, and the second one is hard:
+ *   1. Signing on the 6th would charge twice in two days, which a customer
+ *      reads as a double charge and a bank reads as a chargeback.
+ *   2. Stripe refuses a trial shorter than ~48 hours, and the trial is what
+ *      carries the gap between signup and the first anchored invoice.
+ * The payment COUNT never changes, so the sum never changes.
+ */
+export const MIN_FIRST_GAP_DAYS = 7;
+
+/** One scheduled collection: which month of the term, and when it is due. */
+export interface RentalDueDate {
+  /** 1-based. seq 1 is the signup payment, collected at the counter. */
+  seq: number;
+  /** ISO `YYYY-MM-DD`. */
+  dueDate: string;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** Parse `YYYY-MM-DD` to a UTC-midnight Date. Deterministic — no local zone. */
+function parseIsoDate(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) throw new Error(`rentalDueDates: startDate must be YYYY-MM-DD, got "${iso}"`);
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+}
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * `base` shifted by N calendar months, clamped to the target month's length.
+ * Day 7 never triggers the clamp, but a future anchor day of 31 would, and a
+ * silent Mar-31 -> May-1 rollover in a payment calendar is the kind of bug that
+ * is only ever found by a customer.
+ */
+function addMonthsClamped(base: Date, months: number): Date {
+  const y = base.getUTCFullYear();
+  const m = base.getUTCMonth();
+  const d = base.getUTCDate();
+  const lastOfTarget = new Date(Date.UTC(y, m + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m + months, Math.min(d, lastOfTarget)));
+}
+
+/**
+ * The full collection calendar for an agreement.
+ *
+ * seq 1 = the signup day itself. seq 2..N = the anchor day of each successive
+ * month, starting at the first anchor strictly after signing (pushed one month
+ * when that gap is under `MIN_FIRST_GAP_DAYS`).
+ */
+export function rentalDueDates(
+  startDate: string,
+  termMonths: number,
+  opts?: { anchorDay?: number; minGapDays?: number },
+): RentalDueDate[] {
+  if (!Number.isInteger(termMonths) || termMonths < 1) {
+    throw new Error(`rentalDueDates: termMonths must be a positive integer, got ${termMonths}`);
+  }
+  const anchorDay = opts?.anchorDay ?? RENTAL_ANCHOR_DAY;
+  const minGapDays = opts?.minGapDays ?? MIN_FIRST_GAP_DAYS;
+  const start = parseIsoDate(startDate);
+
+  // The anchor day within the signing month, clamped to that month's length.
+  const lastOfSignMonth = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  let anchor = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), Math.min(anchorDay, lastOfSignMonth)),
+  );
+  // Must be STRICTLY after signing: signing on the 7th rolls to next month,
+  // because the signup payment already covered today.
+  if (anchor.getTime() <= start.getTime()) anchor = addMonthsClamped(anchor, 1);
+  if ((anchor.getTime() - start.getTime()) / MS_PER_DAY < minGapDays) {
+    anchor = addMonthsClamped(anchor, 1);
+  }
+
+  const out: RentalDueDate[] = [{ seq: 1, dueDate: toIsoDate(start) }];
+  for (let k = 2; k <= termMonths; k += 1) {
+    out.push({ seq: k, dueDate: toIsoDate(addMonthsClamped(anchor, k - 2)) });
+  }
+  return out;
+}
+
+/**
+ * What the calendar must add up to. Loo's law: N payments of the monthly fee,
+ * total identical to the contract value. Kept as its own function so the
+ * migration, the RPC and the tests all assert the SAME arithmetic.
+ */
+export function rentalScheduleSum(monthlyFee: number, termMonths: number): number {
+  return round2(monthlyFee * termMonths);
+}
+
+/**
+ * 8% per month SIMPLE interest on a late instalment (Loo's T&C; he confirmed
+ * "单利" — simple, not compounding — and that it rides onto the next invoice).
+ *
+ * Accrual is PRO-RATA BY DAY, not "per month or part thereof". Both readings of
+ * "8% per month" exist in Malaysian contracts; this is the one that cannot
+ * over-charge, and over-charging a customer is a worse failure than
+ * under-charging. Switching to whole-months is `Math.ceil(days / 30)` here and
+ * nowhere else — that is why this is one function.
+ *
+ * NOTHING calls this automatically yet. Firing it belongs to the dunning ladder
+ * (segment ②b); this is the calculator and the record, not the trigger.
+ */
+export const RENTAL_LATE_INTEREST_PCT_PER_MONTH = 8;
+
+export function rentalLateInterest(
+  amountDue: number,
+  daysLate: number,
+  ratePctPerMonth: number = RENTAL_LATE_INTEREST_PCT_PER_MONTH,
+): number {
+  if (!(daysLate > 0) || !(amountDue > 0)) return 0;
+  return round2((amountDue * ratePctPerMonth * daysLate) / (100 * 30));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * 0264 — the OFFER layer: service SKU codes + the pick → money resolver.
  *
  * ONE implementation, three consumers: the P&M authoring previews, the POS
