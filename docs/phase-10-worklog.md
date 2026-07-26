@@ -1144,3 +1144,20 @@ Before this a guarantee could only say "the mattress category" — authorable, b
 **Parallel-merge note**: PR #341 (HR-P4) landed between my `git fetch` and my merge, so #342 hit a conflict in `queries.ts` (both lines appended hooks at the end, sharing a `});}` tail). Resolved by keeping BOTH; a follow-up fixture fix was needed because the sofa combo DTO gained `discontinuedAt` in that same union. **The pre-merge fetch is not enough on a busy day — re-check right before the merge click.**
 
 **Ship**: PR #342 (merge `09b6933a`) → api Worker `3c543c05` (unauth `POST /api/guarantees/products` 401 ✓) + web `index-DIco4n1v.js` → carres-portal `73806dbe` + carres-pos `8aa0d1d7`; all 4 canonicals ✓; downloaded 4,155,071 bytes, `SERVICE_ROLE` 0, scope-form marker ✓. Tests: shared 1117/1117 (+20) · api 3 = §17.7 baseline (guarantees 12/12) · web 16 = baseline (+9 scope-field tests) · typecheck 0 · design-standard + check:v4 clean.
+
+
+## 2026-07-26 ⑯ · Guarantee size chips are canonical — and the silent no-match behind them (PR #345, deployed)
+
+**Loo, two screenshots**: the Guarantee scope chips read `6FT / 5FT / 3FT / 3.5FT / 200X200CM` while the mattress form beside them reads `King / Queen / Single / Super Single`. Same pool, two vocabularies.
+
+**The display was the visible half. The dangerous half was silent.** The size pool stores a CODE in `value` (`K`) and a marketing string in `label` (`6FT`), while a mattress SKU's `variant` is the full name (`King`). ⑮ rendered the label and was about to STORE the code — so a guarantee authored for King would have compared `"k"` against `"king"` and covered **nothing**. An authored-but-matches-nothing guarantee is precisely the untraceable state this whole feature exists to prevent, **and it looks completely fine on screen**: created, listed, openable — it just can never be sold against anything.
+
+**Fixed at both ends**: the chips resolve through `canonicalSize()` like every other size chip in the app (so they read King/Queen AND store that name), and `guaranteeCovers` normalises both sides through it too, so `K` / `king` / `King` are one size whichever way round they were written. Unknown tokens (a sofa preset, a free-typed variant) still fall back to the loose compare.
+
+**Deliberately NOT taught to `canonicalSize`: the marketing label.** `6FT` / `200X200CM` is per-row display config that can be anything; baking it into the canonical table would be wrong. A test now asserts that — and it is exactly why the chip stores the NAME rather than the label. **Two assertions I had written the other way round were the ones that were wrong, not the code; when a new test fails, decide which side is the promise before "fixing" anything.**
+
+Also dropped ⑮'s leftovers: the guarantee form was still rendering the generic SIZE / VARIANT and COST fields under itself. A guarantee has no variant axis and is never purchased from a supplier, so it now carries only its own Price + Description.
+
+**Durable lesson: whenever a value crosses from CONFIG to a MATCH KEY, check what the other side literally stores.** A pool code, a display label and a SKU variant are three different strings for one size, and only one of them matches.
+
+**Ship**: PR #345 (merge `c4c50479`) → web `index-CPq_A7sa.js` → carres-portal `e06f214f` + carres-pos `c7d1bae1`; all 4 canonicals ✓; downloaded 4,155,658 bytes, `SERVICE_ROLE` 0. Tests: shared 1121/1121 (+5) · api 3 = §17.7 baseline · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean. api/DB untouched (Worker stays `3c543c05`).
