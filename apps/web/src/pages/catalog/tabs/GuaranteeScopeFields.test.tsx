@@ -52,10 +52,13 @@ const pool = (v: string, p: string): CatalogOptionPoolDto => ({
   sortOrder: 1,
 });
 
+// The real pool shape: a CODE as the value, a marketing string as the label.
+// The chips must show — and store — the canonical NAME, or the authored term
+// matches no SKU at all (whose variant is "King").
 const POOLS: CatalogOptionPoolDto[] = [
-  pool("King", "mattress_size"),
-  pool("Queen", "mattress_size"),
-  pool("Single", "bedframe_size"),
+  { ...pool("K", "mattress_size"), label: "6FT" },
+  { ...pool("Q", "mattress_size"), label: "5FT" },
+  { ...pool("SS", "bedframe_size"), label: "3.5FT" },
 ];
 
 const COMPARTMENTS: SofaCompartmentDto[] = [
@@ -134,7 +137,11 @@ describe("GuaranteeScopeFields", () => {
       "aria-pressed",
       "true",
     );
+    // The pool value is "K" and its label is "6FT" — the chip must read King,
+    // the same word every other size chip in the app shows.
+    expect(screen.queryByRole("button", { name: "6FT" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "King" }));
+    // …and STORE the canonical name, because that is what a SKU's variant is.
     expect(seen.at(-1)!.coversVariants).toEqual(["King"]);
     fireEvent.click(screen.getByRole("button", { name: "King" }));
     expect(seen.at(-1)!.coversVariants).toEqual([]); // back to any
@@ -155,7 +162,7 @@ describe("GuaranteeScopeFields", () => {
       target: { value: "bedframe" },
     });
     expect(screen.getByLabelText("Covered product")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Single" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Super Single" })).toBeInTheDocument();
     // …and it uses the BEDFRAME pool, not the mattress one
     expect(screen.queryByRole("button", { name: "King" })).not.toBeInTheDocument();
   });

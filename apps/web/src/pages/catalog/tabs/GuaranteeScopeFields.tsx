@@ -6,6 +6,7 @@ import type {
   SofaComboDto,
   SofaCompartmentDto,
 } from "@carres/shared";
+import { canonicalSize } from "@carres/shared";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL } from "../components/atoms";
 
@@ -252,12 +253,17 @@ export default function GuaranteeScopeFields({
                   Any size
                 </button>
                 {sizePool.map((p) => {
-                  const on = value.coversVariants.includes(p.value);
+                  // The pool stores a CODE ("K") + a marketing label ("6FT"),
+                  // but a SKU's variant is the full name ("King"). Show and
+                  // STORE the canonical name — the same thing the size chips on
+                  // the product side show — or the term matches nothing.
+                  const sizeName = canonicalSize(p.value).name;
+                  const on = value.coversVariants.includes(sizeName);
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => toggleVariant(p.value)}
+                      onClick={() => toggleVariant(sizeName)}
                       aria-pressed={on}
                       className={`t-tiny px-2.5 py-1 rounded-full border transition-colors ${
                         on
@@ -265,7 +271,7 @@ export default function GuaranteeScopeFields({
                           : "bg-white text-base-700 border-base-300 hover:border-base-500"
                       }`}
                     >
-                      {p.label ?? p.value}
+                      {sizeName}
                     </button>
                   );
                 })}
