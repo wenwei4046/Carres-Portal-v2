@@ -4,6 +4,14 @@
 > Loo: **every phase must have its UX/UI design done and shown BEFORE
 > implementation starts.**
 >
+> **HR-P8 DROPPED (Loo, 2026-07-26, after the design was shown)** — his words:
+> *"no need thoese leave function , attendance function all delete , temporary dont
+> need , will add on in future"*. **Parked, not killed** — §5. Zero rework: the mock
+> was shown before any table or line of code existed, so nothing was built and nothing
+> had to be removed. The §HR-P8 section below is KEPT as the design record, including
+> the two findings that would still apply on revival. Build order is now
+> **P2 → O1 → P4 → P5 → P6 → P7**, all shipped; next open item is O4.
+>
 > **HR-P7 + HR-P8 RESTORED (Loo, 2026-07-26, same day)** — cut earlier that day
 > ("no need p7, p8"), reinstated on his call. D3/D4/D5 went live again with them
 > and were **all three decided the same day** — see §7 for the rulings (D3 =
@@ -18,7 +26,7 @@
 > (verified: 18/18 native have salesperson_id; the 37 blanks are ALL AutoCount
 > testimonial imports). The change-with-reason correction door survives as a
 > micro-add inside HR-P5 (the run-lock guard needs it anyway). Remaining build
-> order: **P2 → P4 → P5 → P6 → P7 → P8.**
+> order: **P2 → P4 → P5 → P6 → P7** (P8 dropped later the same day — see the top note).
 >
 > **PROPOSALS — Loo picked O1 + O4 (2026-07-26).**
 > ✅ **O1 Overview** (HR landing digest: month money + needs-a-human rail + one-click
@@ -84,9 +92,11 @@ staffless showrooms unconfigurable in Setup · per-outlet scheme dimension dorma
 
 ## 2. Roadmap at a glance
 
-Build order: **P2 → P4 → P5 → P6 → P7 → P8** (P7 reads P4's comp register + P5's
-run totals, so it cannot precede either; P8's leave ladders key off P4's
-`join_date`).
+Build order: **P2 → P4 → P5 → P6 → P7** — all shipped 2026-07-26. (P7 reads P4's
+comp register + P5's run totals, so it could not precede either.) **P8 dropped** by
+Loo the same day; its leave ladders were the only planned consumer of P4's
+`join_date`, which is why that column still has no reader — it stays useful for the
+employment record itself (probation, tenure) and for the pro-rating CF on P7.
 
 | # | Phase | Module | Size | Migration | Blocking decision |
 |---|---|---|---|---|---|
@@ -96,7 +106,7 @@ run totals, so it cannot precede either; P8's leave ladders key off P4's
 | 3 | **HR-P5** | Commission runs (month lock + adjustments + CSV export) | M-L | 1 | D1 ✅ |
 | 4 | **HR-P6** | KPI targets + scorecards + rollups | M | 1 | — |
 | 5 | **HR-P7** | Chairman overview (cost vs revenue) — needs comp register | M | 1 | D3 ✅ |
-| 6 | **HR-P8** | Roster + presence signal · Leave (HR-entered records, no request flow) | M-L | 1-2 | D4 ✅ D5 ✅ |
+| — | ~~HR-P8~~ | ~~Roster + presence · Leave~~ — **DROPPED (Loo, 2026-07-26)**: "temporary dont need, will add on in future". Never started; nothing to remove. §5 | — | — | D4/D5 moot while dropped |
 | +1 | **O1 Overview** | HR landing digest — slots in right after P2 (reads data that is already live) | S | 0 | — |
 | +2 | **O4 My HR** | Staff self-service — after P5 at the earliest (needs P4 profile + P5 statement to have anything to show) | M | 1 | **login gap, §2a** |
 
@@ -319,7 +329,37 @@ self-edits stay one filter away rather than blocked.
 estimate. This phase never computes EPF/SOCSO/EIS/PCB, never issues a payslip, never
 generates a bank or e-filing file — see §6. Restoring P7 did not reopen that door.
 
-### HR-P8 — Roster + presence · Leave (HR-entered records only, no request flow)
+### ~~HR-P8~~ — Roster + presence · Leave — **DROPPED (Loo, 2026-07-26)**
+
+> **Not built, and nothing was removed.** The mock was shown first (standing law), Loo
+> replied *"no need thoese leave function , attendance function all delete , temporary
+> dont need , will add on in future"*, so the phase ended at design. No table, no RPC,
+> no route, no UI — verified: zero `%leave%` / `%roster%` / `%shift%` / `%presence%`
+> objects in the database and zero references in `apps/` or `packages/`.
+>
+> **Kept below as the design record**, plus the two findings that would still bite on
+> revival:
+>
+> 1. **Do not seed the Employment Act ladders as truth.** §6 refuses to compute
+>    EPF/SOCSO/PCB because "rates change every Budget; real agency liability" — the
+>    statutory LEAVE ladders are the same class of risk and changed in the 2022
+>    amendment (maternity 60→98 days, paternity newly created). Entitlement should be a
+>    number HR types, with the EA figure shown beside it as a labelled suggestion —
+>    the shape Loo already accepted for `employer_burden_pct` in P7.
+> 2. **The ladder is not computable today.** Annual leave 8/12/16 is a function of
+>    years of service and `hr_employees.join_date` is filled for **0 of 9** people.
+>    Derived entitlement would silently fall to the lowest rung and tell a
+>    long-serving employee they have 8 days when the Act owes them 16 — a real harm,
+>    not a cosmetic gap.
+>
+> Also measured while designing: the roster would have covered **2 people at 1 store**
+> (3 of the 5 salespeople are dealer-channel and excluded by the locked dealer law), and
+> no presence concept exists anywhere — `app_users.last_seen_at` is HQ web login only,
+> `salespersons` has nothing, so `staff_verify_pin` was the intended single hook.
+> Design mock: https://claude.ai/code/artifact/e9156a64-d518-40f4-bffb-5aa6afe97fa5
+
+#### Original spec text (unbuilt)
+
 
 **Roster:** `shift_templates` + `roster_entries` (staff × outlet × date) + week grid
 UI; store-side "My week" read-only via existing staff-scoped POS routes.
@@ -379,12 +419,14 @@ exists) · claims module = O3, not picked (pairs naturally with the payroll SaaS
 
 ~~employee self-service~~ — no longer parked: approved as **O4** (2026-07-26).
 
+**HR-P8 roster + presence + leave — PARKED 2026-07-26 by Loo** ("temporary dont need, will add on in future"). Never started, so reviving it costs nothing already spent. Read the two findings in the §HR-P8 block before rebuilding — the statutory-seeding one is a policy question for Loo, not an implementation detail. Consequence to know: **O4 "My HR" shrinks** — a staff self-service page can no longer show leave balance, so it is profile + commission statement only.
+
 ## 6. Never build — and why
 
 | Not building | Why | Instead |
 |---|---|---|
 | **Statutory payroll** (EPF/SOCSO/EIS/PCB/HRDF, payslips, bank files, e-filing) | Rates/tables change every Budget; real agency liability; negative ROI at ≤20 headcount | **Buy**: PayrollPanda (~RM12-15/staff/mo) or Kakitangan; BrioHR/Swingvia if buying leave+claims too. **Talenta ruled out** (Indonesia-first: BPJS/PPh21, not EPF/PCB). Our P5 CSV is the integration contract |
-| Biometric/geofence attendance | Hardware rabbit hole; presence signal + SaaS clock-in covers it | P8 signal |
+| Biometric/geofence attendance | Hardware rabbit hole | Was going to be P8's "seen at POS" signal; **P8 dropped 2026-07-26**, so there is no attendance signal in Carres at all today. The payroll SaaS's clock-in is the answer if it is ever needed. |
 | Recruitment/ATS, LMS, surveys, 360 reviews | Wrong scale at ≤20 staff | Notion/Sheets |
 | Configurable workflow engine | One fixed chain covers a 15-person company | Fixed flows |
 | Dealer-staff HR | Locked law: dealers are independent entities | — |
