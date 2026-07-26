@@ -168,12 +168,14 @@ Real queues: `Assign logistic / Confirm booking / Deliver today / Upload deliver
 each with its own deadline relative to the confirmed date so items turn overdue by
 themselves. Needs T1-T6 signals — that is why it waits for them.
 
-## T8 · Delivery groups / partial delivery (promotes L7) — ⛔ BLOCKED until Jess rules
+## T8 · Delivery groups / partial delivery (promotes L7) — ✅ RULING RECEIVED, unblocked
 
-The pillow question: today the confirm gate blocks a RM5,000 bed on a missing RM39 pillow.
-Jess must rule which categories may lag (proposal in L7: mattress+frame hard-together ·
-sofa may second-trip · accessories never block). No build before the ruling; the ruling is
-one sentence.
+**Jess's ruling (2026-07-27, verbatim confirmed):** mattress + bed frame = together (HARD,
+never split) · sofa = prefer together but MAY go as a second trip (SOFT — ASK the customer
+wait-vs-split, never auto-split) · pillow / mattress protector NEVER block a delivery
+(back-order them). Build: the confirm gate learns delivery groups (accessory lines stop
+blocking); a sofa split creates a second booking on the same SO via the
+"confirm delivery preference with customer" flow.
 
 ## T9 · Logistic partner profiles (promotes L6)
 
@@ -242,7 +244,7 @@ else is planned past T11 on purpose.
 | T5 | ⬜ | — |
 | T6 | ⬜ | — |
 | T7 | ⬜ queue split + auto-overdue | — |
-| T8 | ⛔ blocked on Jess's pillow ruling | — |
+| T8 | ⬜ unblocked — ruling recorded in card | — |
 | T9 | ⬜ partner profiles | — |
 | T10 | ⬜ delivery calendar | — |
 | T11 | ⬜ delivery module page (FINAL) | — |
