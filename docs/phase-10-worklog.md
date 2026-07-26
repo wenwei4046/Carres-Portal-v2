@@ -1597,7 +1597,7 @@ A missing delivery date must NOT undo a credit decision, so the auto-proceed is 
 
 ---
 
-## 2026-07-26 ㉓ · HR-P7 — people cost (0278, branch `feat/hr-p7-people-cost`)
+## 2026-07-26 ㉓ · HR-P7 — people cost (PR #374 merge `c1f8b0d9`, 0278, Worker `dc730db8` + web `index-B3tXaG7G.js` — DEPLOYED)
 
 Design mock approved before any code (Loo's standing law):
 https://claude.ai/code/artifact/567cd7ec-6487-42fa-9fe3-3c29ff58ddcc — then
@@ -1715,6 +1715,18 @@ Tests **+73** (shared 34 · api 24 · web 15). Suites at §17.7 baseline, zero n
 **1236/1236** · api **3** pre-existing · web **16** pre-existing. api typecheck clean; web
 BUILD clean (v4-guard + `tsconfig.app.json` tsc + vite); design-standard lint clean after the
 greyscale fix; `SERVICE_ROLE` grep 0 in `dist`; `hr/comp` marker present.
+
+### Deploy
+
+Worker `dc730db8`; web `index-B3tXaG7G.js` (carres-portal `03908e0a` + carres-pos
+`3b7e7932`). All 4 canonicals converged; live bundle downloaded to a file before grepping —
+4,208,930 bytes, `SERVICE_ROLE` 0, `hr/comp` + "People cost" + `hr/kpi` all present. Unauth
+401 on `/api/hr/comp`, `/api/hr/kpi`, `/api/hr/runs`.
+
+Three of the four canonicals served the parallel line's older `index-DGezupH6.js` for about a
+minute. Followed the rule rather than re-deploying: the deployment list showed `3b7e7932` from
+source `c1f8b0d` as newest, and `git merge-base --is-ancestor 9d5b379 HEAD` proved my tip
+contained their earlier deploy — cache, not a clobber. Polled until all four flipped.
 
 ### Not done
 
