@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DELIVERY_REASON_KEYS } from "../delivery-reasons";
 
 /**
  * ops_order_control — the editable "Master Sheet, live" overlay on an order
@@ -534,34 +535,26 @@ export const decideStorageWaiverInput = z.object({
 export type DecideStorageWaiverInput = z.infer<typeof decideStorageWaiverInput>;
 
 // ── Storage delivery-extension input (the two Google Forms, Jess 2026-06-30) ──
-/** Reason for the delivery delay / extension — the dropdown on both forms. */
-export const STORAGE_EXTENSION_REASONS = [
-  "Renovation",
-  "Traveling",
-  "Others",
-] as const;
-export type StorageExtensionReason = (typeof STORAGE_EXTENSION_REASONS)[number];
-
 /**
  * Record a one-time storage delivery-extension. POST /:id/storage/extend.
  * `acknowledged` must be true (the customer-acknowledgement checkbox is
- * mandatory on the form); `note` is required when the reason is "Others" (the
- * free-text detail). The new date must be a valid future-ish delivery date — we
- * only shape-check here (yyyy-mm-dd); the route snapshots the original date.
+ * mandatory on the form). T4 Reason Library v1: `reasonKey` is a required pick
+ * from the shared DELIVERY_REASONS (structured, no free text — the old
+ * Renovation/Traveling/Others dropdown is retired; legacy rows keep their
+ * stored words and display as-is). `note` is an optional detail for any
+ * reason. The new date must be a valid delivery date — we only shape-check
+ * here (yyyy-mm-dd); the route snapshots the original date.
  */
-export const recordStorageExtensionInput = z
-  .object({
-    newDeliveryDate: isoDate,
-    reason: z.enum(STORAGE_EXTENSION_REASONS),
-    note: z.string().trim().max(500).nullish(),
-    acknowledged: z.literal(true, {
-      errorMap: () => ({ message: "customer acknowledgement is required" }),
-    }),
-  })
-  .refine((v) => v.reason !== "Others" || !!v.note?.trim(), {
-    message: "a note is required when the reason is Others",
-    path: ["note"],
-  });
+export const recordStorageExtensionInput = z.object({
+  newDeliveryDate: isoDate,
+  reasonKey: z.enum(DELIVERY_REASON_KEYS, {
+    errorMap: () => ({ message: "a delivery reason is required" }),
+  }),
+  note: z.string().trim().max(500).nullish(),
+  acknowledged: z.literal(true, {
+    errorMap: () => ({ message: "customer acknowledgement is required" }),
+  }),
+});
 export type RecordStorageExtensionInput = z.infer<typeof recordStorageExtensionInput>;
 
 // ── Staff assignment pool (migration 0232, Jess model B 2026-07-18) ──────────

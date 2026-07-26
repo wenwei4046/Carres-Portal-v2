@@ -13,6 +13,7 @@ import {
   seenTodayMYT,
   countsAsInToday,
 } from "./ops-order-control";
+import { DELIVERY_REASON_KEYS } from "../delivery-reasons";
 
 /**
  * Storage-fee rules (Jess 2026-07-13, UI-KIT §7.5 — supersedes the 2026-06-30
@@ -224,26 +225,35 @@ describe("storage waiver inputs", () => {
   });
 });
 
-describe("recordStorageExtensionInput", () => {
-  const base = { newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: true } as const;
+describe("recordStorageExtensionInput (T4 Reason Library v1)", () => {
+  const base = { newDeliveryDate: "2026-08-01", reasonKey: "customer_renovation", acknowledged: true } as const;
 
-  it("accepts a valid extension", () => {
+  it("accepts a valid extension (note optional for every reason)", () => {
     expect(recordStorageExtensionInput.safeParse(base).success).toBe(true);
+    expect(recordStorageExtensionInput.safeParse({ ...base, note: "site not ready" }).success).toBe(true);
   });
 
   it("requires the customer acknowledgement (must be true)", () => {
     expect(recordStorageExtensionInput.safeParse({ ...base, acknowledged: false }).success).toBe(false);
-    expect(recordStorageExtensionInput.safeParse({ newDeliveryDate: "2026-08-01", reason: "Renovation" }).success).toBe(false);
+    expect(recordStorageExtensionInput.safeParse({ newDeliveryDate: "2026-08-01", reasonKey: "customer_renovation" }).success).toBe(false);
   });
 
-  it("rejects an unknown reason + a malformed date", () => {
-    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Holiday" }).success).toBe(false);
+  it("cannot be saved without a structured reason (T4 done-when)", () => {
+    const { reasonKey: _drop, ...noReason } = base;
+    expect(recordStorageExtensionInput.safeParse(noReason).success).toBe(false);
+    // legacy labels and free text are NOT keys
+    expect(recordStorageExtensionInput.safeParse({ ...base, reasonKey: "Renovation" }).success).toBe(false);
+    expect(recordStorageExtensionInput.safeParse({ ...base, reasonKey: "Holiday" }).success).toBe(false);
+  });
+
+  it("rejects a malformed date", () => {
     expect(recordStorageExtensionInput.safeParse({ ...base, newDeliveryDate: "01/08/2026" }).success).toBe(false);
   });
 
-  it("requires a note when the reason is Others", () => {
-    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others" }).success).toBe(false);
-    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others", note: "moving house" }).success).toBe(true);
+  it("accepts every key in the library", () => {
+    for (const key of DELIVERY_REASON_KEYS) {
+      expect(recordStorageExtensionInput.safeParse({ ...base, reasonKey: key }).success).toBe(true);
+    }
   });
 });
 

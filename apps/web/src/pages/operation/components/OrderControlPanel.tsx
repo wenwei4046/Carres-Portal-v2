@@ -16,9 +16,12 @@ import {
   PAYMENT_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_KINDS,
-  STORAGE_EXTENSION_REASONS,
+  DELIVERY_REASONS,
+  DELIVERY_REASON_CATEGORY_LABEL,
+  deliveryReasonLabel,
   summarizePayments,
-  type StorageExtensionReason,
+  type DeliveryReasonCategory,
+  type DeliveryReasonKey,
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type LineStockStatus,
@@ -1239,10 +1242,12 @@ export function StorageExtensionRow({
         policy.push(
           "Storage fees, where applicable, run from the week after the requested delivery date until actual delivery or collection.",
         );
-      const reasonText =
-        control?.extension_reason === "Others" && control?.extension_note
-          ? `Others — ${control.extension_note}`
-          : control?.extension_reason ?? "—";
+      // T4: stored value is a reason KEY (legacy rows hold the old words —
+      // deliveryReasonLabel passes those through as-is).
+      const reasonLabel = deliveryReasonLabel(control?.extension_reason);
+      const reasonText = control?.extension_note
+        ? `${reasonLabel} — ${control.extension_note}`
+        : reasonLabel;
       const blob = await renderExtensionAgreementPdf({
         order_code: meta?.orderCode ?? "—",
         issue_date: (control?.extension_acknowledged_at ?? control?.extended_at ?? "").slice(0, 10),
@@ -1268,7 +1273,9 @@ export function StorageExtensionRow({
 
   const [open, setOpen] = useState(false);
   const [newDate, setNewDate] = useState("");
-  const [reason, setReason] = useState<StorageExtensionReason>("Renovation");
+  // T4 Reason Library: no default — a reschedule cannot be saved without an
+  // explicit reason pick (a silent default would record a wrong fact).
+  const [reasonKey, setReasonKey] = useState<DeliveryReasonKey | "">("");
   const [note, setNote] = useState("");
   const [ack, setAck] = useState(false);
 
@@ -1289,7 +1296,7 @@ export function StorageExtensionRow({
           <div className="font-semibold text-base-900">
             → {fmt(control?.extension_new_date)}
             <span className="ml-1 text-[12px] font-normal text-base-500">
-              · {control?.extension_reason ?? "—"} · free from {fmt(control?.extension_original_date)}
+              · {deliveryReasonLabel(control?.extension_reason)} · free from {fmt(control?.extension_original_date)}
             </span>
           </div>
           <div className="mt-1 flex items-center gap-3">
@@ -1336,8 +1343,18 @@ export function StorageExtensionRow({
     );
   }
 
-  const canSubmit =
-    !!newDate && ack && (reason !== "Others" || !!note.trim()) && !extend.isPending;
+  // T4 done-when: no reason pick → no save.
+  const canSubmit = !!newDate && ack && !!reasonKey && !extend.isPending;
+
+  const reasonGroups = (
+    Object.keys(DELIVERY_REASON_CATEGORY_LABEL) as DeliveryReasonCategory[]
+  )
+    .map((cat) => ({
+      cat,
+      label: DELIVERY_REASON_CATEGORY_LABEL[cat],
+      reasons: DELIVERY_REASONS.filter((r) => r.category === cat),
+    }))
+    .filter((g) => g.reasons.length > 0);
 
   return (
     <FieldRow label="Extension">
@@ -1356,29 +1373,34 @@ export function StorageExtensionRow({
           <label className="text-[12px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
             Reason
             <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value as StorageExtensionReason)}
+              value={reasonKey}
+              onChange={(e) => setReasonKey(e.target.value as DeliveryReasonKey | "")}
               aria-label="Extension reason"
               className={CELL}
             >
-              {STORAGE_EXTENSION_REASONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
+              <option value="" disabled>
+                Select reason…
+              </option>
+              {reasonGroups.map((g) => (
+                <optgroup key={g.cat} label={g.label}>
+                  {g.reasons.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
         </div>
-        {reason === "Others" && (
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Reason detail (required)"
-            aria-label="Extension note"
-            className={CELL + " w-full"}
-          />
-        )}
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Detail (optional)"
+          aria-label="Extension note"
+          className={CELL + " w-full"}
+        />
         <label className="flex items-start gap-1.5 text-[12px] text-base-700">
           <input
             type="checkbox"
@@ -1392,14 +1414,15 @@ export function StorageExtensionRow({
           <button
             type="button"
             disabled={!canSubmit}
-            onClick={() =>
+            onClick={() => {
+              if (!reasonKey) return;
               extend.mutate({
                 newDeliveryDate: newDate,
-                reason,
-                note: reason === "Others" ? note.trim() : note.trim() || null,
+                reasonKey,
+                note: note.trim() || null,
                 acknowledged: true,
-              })
-            }
+              });
+            }}
             className="btn-primary text-[12px] px-2 py-1 disabled:opacity-40"
           >
             {extend.isPending ? "Saving…" : "Record extension"}
