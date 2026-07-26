@@ -400,3 +400,40 @@ describe("guaranteeProductInputSchema — the authoring contract", () => {
     expect(() => guaranteeProductInputSchema.parse({ ...base, coverageYears: 51 })).toThrow();
   });
 });
+
+describe("guaranteeCovers — sizes are compared CANONICALLY (Loo 2026-07-26)", () => {
+  // The bug this locks: the size POOL stores a code ("K") with a marketing
+  // label ("6FT"), while a mattress SKU's variant is the full name ("King").
+  // A raw string compare authored a guarantee that silently covered NOTHING —
+  // the precise failure this feature exists to prevent.
+  const scope = { coversCategory: "mattress" as const, coversVariants: ["King"] };
+  const line = (variant: string) => ({
+    category: "mattress" as const,
+    modelId: "m1",
+    variant,
+  });
+
+  it("matches the SKU's full name against a pool CODE", () => {
+    expect(guaranteeCovers({ ...scope, coversVariants: ["K"] }, line("King"))).toBe(true);
+  });
+
+  it("does NOT treat the pool's marketing label as a size token", () => {
+    // "6FT" is per-row display config, not a size name — canonicalSize knows
+    // codes and names only, and baking arbitrary labels in would be wrong.
+    // This is why the CHIP stores the canonical name, not the label.
+    expect(guaranteeCovers({ ...scope, coversVariants: ["6FT"] }, line("King"))).toBe(false);
+  });
+
+  it("matches whichever way round the two were written", () => {
+    expect(guaranteeCovers(scope, line("K"))).toBe(true);
+    expect(guaranteeCovers(scope, line("king"))).toBe(true);
+    expect(guaranteeCovers(scope, line(" King "))).toBe(true);
+  });
+
+  it("still tells two different sizes apart", () => {
+    expect(guaranteeCovers(scope, line("Queen"))).toBe(false);
+    expect(guaranteeCovers(scope, line("Q"))).toBe(false);
+    expect(guaranteeCovers({ ...scope, coversVariants: ["SS"] }, line("Single"))).toBe(false);
+    expect(guaranteeCovers({ ...scope, coversVariants: ["SS"] }, line("Super Single"))).toBe(true);
+  });
+});

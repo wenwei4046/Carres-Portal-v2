@@ -546,7 +546,21 @@ export default function NewSkuModal({
                     <p className="t-tiny text-danger mt-1">Between 1 and 50 years.</p>
                   )}
                 </label>
-                {!isPrincipal && (
+                {isPrincipal ? (
+                  <label className="block">
+                    <span className="label block mb-1">Price (RM)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="0.00"
+                      data-testid="new-sku-guarantee-price"
+                      className={INPUT_CLS}
+                    />
+                  </label>
+                ) : (
                   <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2">
                     <div className="t-small text-base-600">Principal only</div>
                     <div className="t-tiny text-base-400 mt-0.5">
@@ -555,6 +569,18 @@ export default function NewSkuModal({
                     </div>
                   </div>
                 )}
+                <label className="block">
+                  <span className="label block mb-1">Description (optional)</span>
+                  <input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="What the customer gets if they claim"
+                    data-testid="new-sku-guarantee-description"
+                    className={INPUT_CLS}
+                  />
+                </label>
+                {/* No size and no cost on purpose: a guarantee has no variant
+                    axis, and it is never purchased from a supplier. */}
               </>
             ) : (
             <label className="block">
@@ -810,7 +836,10 @@ export default function NewSkuModal({
             size path (one SKU per ticked size instead). In existing mode a
             chip section OWNS the flow outright (no free-text fallback — the
             additions are picked, not typed). */}
-        {!compFlow && !sizeFlow && !(mode === "existing" && (compSection || sizeSection)) && (
+        {!guaranteeFlow &&
+          !compFlow &&
+          !sizeFlow &&
+          !(mode === "existing" && (compSection || sizeSection)) && (
           <>
             {noVariantAxis ? (
               // Accessory / service: no size/variant axis — nothing to fill.

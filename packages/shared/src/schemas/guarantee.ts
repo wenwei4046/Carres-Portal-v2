@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { canonicalSize } from "../mattress-sizes";
 import { productCategorySchema, type ProductCategory } from "./product-category";
 
 /**
@@ -205,8 +206,17 @@ export function guaranteeCovers(
   return wanted.includes(normalizeVariant(item.variant ?? ""));
 }
 
+/**
+ * One size, however it was written. The size POOL stores codes (`K`) with a
+ * marketing label (`6FT`), while a SKU's variant is the full name (`King`) —
+ * so a raw string compare would author a guarantee that silently covers
+ * NOTHING. Everything goes through canonicalSize first, then a loose compare
+ * for anything it doesn't know (a sofa preset, a free-typed variant).
+ */
 function normalizeVariant(v: string): string {
-  return v.trim().toLowerCase().replace(/\s+/g, " ");
+  const raw = v.trim();
+  if (!raw) return "";
+  return canonicalSize(raw).name.toLowerCase().replace(/\s+/g, " ");
 }
 
 /** One-line human summary of what a term covers — for the SKU list, the
