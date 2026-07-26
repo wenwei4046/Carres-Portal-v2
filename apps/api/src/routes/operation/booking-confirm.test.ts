@@ -63,6 +63,9 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     }),
+    // T8 — the split confirm appends a plain-English activity line through the
+    // existing SECURITY DEFINER annotation door (fail-soft, same as T4/T6).
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
 }
 
@@ -236,6 +239,253 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     expect(typeof payload.customer_confirmed_at).toBe("string");
     const body = (await res.json()) as { control: { booking_stage: string } };
     expect(body.control.booking_stage).toBe("confirmed");
+  });
+
+  // ── T8 · delivery groups (migration 0282) ────────────────────────────────
+  // Jess: bed set never splits · sofa may take a second trip IF the customer
+  // agrees · accessories never block. The endpoint is where that is enforced.
+
+  const BEDFRAME = "bedframe:Jager/Fab3-King";
+  const SOFA = "sofa:Glano-3Seater";
+  const PILLOW = "Memory Pillow";
+
+  /** Bed set reserved, sofa NOT — the case the whole card exists for. */
+  function mixedTables(overrides?: Partial<Record<string, ReturnType<typeof tableMock>>>) {
+    return happyTables({
+      order_lines: tableMock({
+        data: [
+          { sku: MATTRESS, qty: 1, unit_price: 2000 },
+          { sku: BEDFRAME, qty: 1, unit_price: 500 },
+          { sku: SOFA, qty: 1, unit_price: 0 },
+          { sku: PILLOW, qty: 2, unit_price: 0 },
+        ],
+        error: null,
+      }),
+      ops_order_control: tableMock(
+        {
+          data: {
+            line_received: { [MATTRESS]: 1, [BEDFRAME]: 1, [SOFA]: 0 },
+            balance: null,
+          },
+          error: null,
+        },
+        { data: { order_id: ORDER_ID, booking_stage: "confirmed" }, error: null },
+      ),
+      ...overrides,
+    });
+  }
+
+  it("422 without a scope when the sofa is short — the system never splits by itself", async () => {
+    const sb = makeSb(mixedTables());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("booking_gate");
+    expect(body.message).toContain(SOFA);
+  });
+
+  it("200 with deliverGroups:['bed'] — the customer said deliver the bed set now", async () => {
+    const tables = mixedTables();
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["bed"],
+    });
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.booking_groups).toEqual(["bed"]);
+    // The split is on the timeline in words, not only as a column diff.
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "operation_add_annotation",
+      expect.objectContaining({
+        p_content: expect.stringContaining("Sofa follows on a second trip"),
+      }),
+    );
+  });
+
+  it("422 for deliverGroups:['sofa'] when the sofa is the unready half", async () => {
+    const sb = makeSb(mixedTables());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["sofa"],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("booking_gate");
+  });
+
+  it("HARD rule: no scope can send the mattress without its bed frame", async () => {
+    const sb = makeSb(
+      mixedTables({
+        ops_order_control: tableMock(
+          {
+            data: {
+              line_received: { [MATTRESS]: 1, [BEDFRAME]: 0, [SOFA]: 1 },
+              balance: null,
+            },
+            error: null,
+          },
+          { data: null, error: null },
+        ),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["bed"],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toContain(BEDFRAME);
+  });
+
+  it("422 booking_scope when the scope names a group this order does not have", async () => {
+    const sb = makeSb(happyTables()); // mattress only — no sofa
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["sofa"],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("booking_scope");
+  });
+
+  it("422 on an empty deliverGroups — a trip carrying nothing is not a delivery", async () => {
+    const sb = makeSb(mixedTables());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: [],
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("a full-order trip stores NULL, not the group list — no split, nothing to chase", async () => {
+    const tables = happyTables();
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["bed"], // the only group this order has
+    });
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.booking_groups).toBeNull();
+    expect(sb.rpc).not.toHaveBeenCalled(); // nothing owed = not a split
+  });
+
+  it("the follow-up trip archives the first one instead of overwriting it", async () => {
+    const tables = mixedTables({
+      ops_order_control: tableMock(
+        {
+          data: {
+            line_received: { [MATTRESS]: 1, [BEDFRAME]: 1, [SOFA]: 1 },
+            balance: null,
+            // The bed-set trip already on file.
+            booking_stage: "confirmed",
+            booking_groups: ["bed"],
+            confirmed_date: "2026-08-17",
+            confirmed_time_slot: "Morning (9am–12pm)",
+            customer_confirmed_at: "2026-08-10T02:00:00.000Z",
+            customer_confirmed_by: "u1",
+            delivery_trips: [],
+          },
+          error: null,
+        },
+        { data: { order_id: ORDER_ID, booking_stage: "confirmed" }, error: null },
+      ),
+    });
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["sofa"],
+    });
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.booking_groups).toEqual(["sofa"]);
+    expect(payload.delivery_trips).toEqual([
+      {
+        groups: ["bed"],
+        date: "2026-08-17",
+        slot: "Morning (9am–12pm)",
+        at: "2026-08-10T02:00:00.000Z",
+        by: "u1",
+      },
+    ]);
+  });
+
+  it("re-confirming the SAME scope is a typo fix — it does not archive a trip", async () => {
+    const tables = mixedTables({
+      ops_order_control: tableMock(
+        {
+          data: {
+            line_received: { [MATTRESS]: 1, [BEDFRAME]: 1, [SOFA]: 0 },
+            balance: null,
+            booking_stage: "confirmed",
+            booking_groups: ["bed"],
+            confirmed_date: "2026-08-17",
+            confirmed_time_slot: "Morning (9am–12pm)",
+            delivery_trips: [],
+          },
+          error: null,
+        },
+        { data: { order_id: ORDER_ID, booking_stage: "confirmed" }, error: null },
+      ),
+    });
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), {
+      ...OK_BODY,
+      deliverGroups: ["bed"],
+    });
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.delivery_trips).toEqual([]);
+  });
+
+  it("a short pillow never blocks the bed set — accessories are outside the question", async () => {
+    const tables = mixedTables({
+      order_lines: tableMock({
+        data: [
+          { sku: MATTRESS, qty: 1, unit_price: 2000 },
+          { sku: BEDFRAME, qty: 1, unit_price: 500 },
+          { sku: PILLOW, qty: 2, unit_price: 0 }, // nothing received
+        ],
+        error: null,
+      }),
+    });
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    // No scope at all: the order is deliverable in full despite the pillow.
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
   });
 
   it("generic PUT /control refuses booking_stage — the one door is the confirm endpoint", async () => {

@@ -14,9 +14,22 @@
  * balance ready — Outstanding (Total − Collected) is zero. Total-not-set ⇒
  * don't block, mirroring the drawer's Money rule (an AutoCount order with no
  * keyed balance can't owe a number nobody has entered).
+ *
+ * T8 (2026-07-27) — the gate learns DELIVERY GROUPS. Goods-ready stopped being
+ * one all-or-nothing question about the whole order and became one question per
+ * group (`delivery-groups.ts`): the bed set is ONE atom, the sofa is another,
+ * and a trip may carry a subset — but only when the caller passes the
+ * customer's answer in as `deliverGroups`. Omit it and the scope is the whole
+ * order, byte-identical to the pre-T8 rule. That is what "never auto-split"
+ * means in code: the split has no default.
  */
 import { lineKind, stockMatchKey } from "./line-category";
 import { lineReadiness } from "./line-readiness";
+import {
+  deliveryGroupOf,
+  orderDeliveryGroups,
+  type DeliveryGroupKey,
+} from "./delivery-groups";
 
 export interface BookingGateInput {
   /** Order lines (order_lines rows — sku + qty; service charges included, the
@@ -32,16 +45,41 @@ export interface BookingGateInput {
   orderTotal: number;
   /** Σ order_payments of kind 'payment' | 'deposit'. */
   collected: number;
+  /** T8 — the delivery groups THIS trip carries (the customer's wait-vs-split
+   *  answer). Omit / null / undefined = the whole order, the pre-T8 rule. An
+   *  empty array is NOT "everything": it is an invalid scope, refused. */
+  deliverGroups?: DeliveryGroupKey[] | null;
+}
+
+/** One delivery group's own readiness — the bed set passes or fails as a unit. */
+export interface BookingGroupState {
+  key: DeliveryGroupKey;
+  ready: boolean;
+  /** This group's lines that are not reserved to the SO. */
+  notReadySkus: string[];
 }
 
 export interface BookingGateResult {
+  /** Every group IN SCOPE is ready (scope = the whole order unless narrowed). */
   goodsReady: boolean;
-  /** Goods lines still not reserved-to-this-SO (plain skus for the 422 message). */
+  /** In-scope goods lines still not reserved-to-this-SO (for the 422 message). */
   notReadySkus: string[];
   balanceReady: boolean;
   outstanding: number;
   /** Both gates open. */
   ok: boolean;
+  /** T8 — every delivery group ON THE ORDER with its own readiness, in trip
+   *  order. Empty for an accessories-only / service-only order. */
+  groups: BookingGroupState[];
+  /** The groups this trip carries, resolved (all of them when not narrowed). */
+  scope: DeliveryGroupKey[];
+  /** Groups left for a later trip — what the customer is still owed. */
+  waitingGroups: DeliveryGroupKey[];
+  /** A partial trip is POSSIBLE: something is ready and something is not.
+   *  This is the trigger to ASK the customer — never to act. */
+  splitAvailable: boolean;
+  /** The requested scope is empty, or names a group this order does not have. */
+  scopeValid: boolean;
 }
 
 export function bookingConfirmGate({
@@ -50,10 +88,17 @@ export function bookingConfirmGate({
   reservedQtyByKey,
   orderTotal,
   collected,
+  deliverGroups,
 }: BookingGateInput): BookingGateResult {
-  const notReadySkus: string[] = [];
+  const allGroups = orderDeliveryGroups(lines);
+  const notReadyByGroup = new Map<DeliveryGroupKey, string[]>();
+  for (const g of allGroups) notReadyByGroup.set(g, []);
+  // Lines with no group (accessory / service charge) are not "a group that
+  // always passes" — they never enter the question. 配件永不挡送货.
   for (const l of lines) {
-    if (lineKind(l.sku) === "service") continue; // 配件永不挡送货 applies to service charges; acc auto-passes below
+    if (lineKind(l.sku) === "service") continue;
+    const group = deliveryGroupOf(l.sku);
+    if (!group) continue; // accessory — back-ordered, never blocks a trip
     const reservedCount = Math.max(
       Number(lineReceived?.[l.sku] ?? 0),
       reservedQtyByKey[stockMatchKey(l.sku)] ?? 0,
@@ -67,17 +112,52 @@ export function bookingConfirmGate({
       freeCount: 0,
       hasPo: false,
     });
-    if (state !== "reserved") notReadySkus.push(l.sku);
+    if (state !== "reserved") notReadyByGroup.get(group)?.push(l.sku);
   }
-  // A goods-free order (pure service visit) has nothing to reserve — vacuously
-  // ready. (The drawer's allReceived reads false there, but that flag feeds the
+  const groups: BookingGroupState[] = allGroups.map((key) => {
+    const bad = notReadyByGroup.get(key) ?? [];
+    return { key, ready: bad.length === 0, notReadySkus: bad };
+  });
+
+  // Scope. Omitted ⇒ the whole order (pre-T8 behaviour). A requested scope must
+  // be non-empty and may only name groups the order actually has — asking to
+  // deliver a sofa an order does not contain is a bug, not a narrower trip.
+  const requested = deliverGroups ?? null;
+  const scopeValid =
+    requested === null ||
+    (requested.length > 0 && requested.every((g) => allGroups.includes(g)));
+  const scope: DeliveryGroupKey[] = scopeValid && requested
+    ? allGroups.filter((g) => requested.includes(g))
+    : allGroups;
+  const waitingGroups = allGroups.filter((g) => !scope.includes(g));
+
+  const inScope = groups.filter((g) => scope.includes(g.key));
+  const notReadySkus = inScope.flatMap((g) => g.notReadySkus);
+  // A goods-free order (pure service visit) has no groups — vacuously ready.
+  // (The drawer's allReceived reads false there, but that flag feeds the
   // "completed" pipeline word, not this gate; blocking a service-only booking
   // forever would be the real bug.)
-  const goodsReady = notReadySkus.length === 0;
+  const goodsReady = scopeValid && notReadySkus.length === 0;
+  const splitAvailable =
+    groups.length > 1 &&
+    groups.some((g) => g.ready) &&
+    groups.some((g) => !g.ready);
+
   const totalSet = orderTotal > 0;
   const outstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
   const balanceReady = !totalSet || outstanding <= 0;
-  return { goodsReady, notReadySkus, balanceReady, outstanding, ok: goodsReady && balanceReady };
+  return {
+    goodsReady,
+    notReadySkus,
+    balanceReady,
+    outstanding,
+    ok: goodsReady && balanceReady,
+    groups,
+    scope,
+    waitingGroups,
+    splitAvailable,
+    scopeValid,
+  };
 }
 
 /** Sunday is not a Delivery Working Day (frozen §4.7 / invariant #8) — the

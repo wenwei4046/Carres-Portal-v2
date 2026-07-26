@@ -102,6 +102,26 @@ export const deliveryPhotoSchema = z.object({
 });
 export type DeliveryPhoto = z.infer<typeof deliveryPhotoSchema>;
 
+// ── T8 delivery groups (migration 0282) ─────────────────────────────────────
+/** The two things that can travel on their own trip. Mirrors
+ *  `DELIVERY_GROUP_KEYS` in delivery-groups.ts — mattress + bed frame are ONE
+ *  group ("bed"), which is how the never-split rule survives contact with any
+ *  future caller. */
+export const deliveryGroupKeySchema = z.enum(["bed", "sofa"]);
+
+/** One archived trip in ops_order_control.delivery_trips — a confirmation that
+ *  a later confirmation replaced. SERVER-built; nothing here is client input. */
+export const deliveryTripSchema = z.object({
+  /** Groups that trip carried; null = the whole order. */
+  groups: z.array(deliveryGroupKeySchema).nullable().default(null),
+  date: z.string().nullable().default(null),
+  slot: z.string().nullable().default(null),
+  /** When the replaced trip was confirmed. */
+  at: z.string().nullable().default(null),
+  by: z.string().uuid().nullable().default(null),
+});
+export type DeliveryTrip = z.infer<typeof deliveryTripSchema>;
+
 /** Allowed upload types — photos only (the partner POD flow additionally
  *  takes PDF; a delivery photo is a photo). */
 export const DELIVERY_PHOTO_MIMES = [
@@ -281,6 +301,18 @@ export const opsOrderControlSchema = z.object({
    *  control PUT. Default keeps a pre-0280 Worker response parseable (the
    *  HR-O1 degrade lesson). */
   delivery_photos: z.array(deliveryPhotoSchema).default([]),
+  /** T8 delivery groups (migration 0282) — which groups the CONFIRMED trip
+   *  carries. `null` = the whole order, which is what every pre-T8 confirmation
+   *  means, so the default is also the honest reading of an old row. A partial
+   *  scope exists only when the customer chose to split (bed set now, sofa
+   *  later, or the reverse). READ-only on the overlay — written only by the
+   *  booking-confirm endpoint, never the generic control PUT. */
+  booking_groups: z.array(deliveryGroupKeySchema).nullable().default(null),
+  /** T8 (0282) — trips a later confirmation replaced. NOT a second booking
+   *  store: the live booking stays in booking_stage / confirmed_date /
+   *  confirmed_time_slot. Default keeps a pre-0282 Worker response parseable
+   *  (the HR-O1 degrade lesson). */
+  delivery_trips: z.array(deliveryTripSchema).default([]),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -456,6 +488,9 @@ export const updateOpsOrderControlInput = z
     // customer_confirmed_* are DELIBERATELY absent — `.strict()` rejects them
     // here. Provisional derives from logistic_eta (DB trigger); Confirmed goes
     // only through POST /:id/booking/confirm, which enforces the gates.
+    // T8 (0282): booking_groups / delivery_trips are absent for the same
+    // reason — a trip's scope is part of the confirmation, not a field an
+    // operator may edit afterwards (a DB CHECK backstops it either way).
   })
   .partial()
   .strict();
@@ -482,6 +517,13 @@ export const confirmBookingInput = z
     confirmedDate: isoDate,
     /** Free text ≤100 (DELIVERY_TIME_SLOTS are the suggested set). */
     confirmedTimeSlot: z.string().trim().min(1).max(100),
+    /** T8 (0282) — the delivery groups THIS trip carries, i.e. the customer's
+     *  wait-vs-split answer. OMIT for a normal delivery: absent = the whole
+     *  order, which is the pre-T8 behaviour and the reason nothing splits by
+     *  itself. `[]` is rejected on purpose — a trip carrying nothing is not a
+     *  delivery, and an accidental empty array must never read as "everything".
+     *  The server still gates every named group on goods-ready + balance. */
+    deliverGroups: z.array(deliveryGroupKeySchema).min(1).max(2).optional(),
   })
   .strict();
 export type ConfirmBookingInput = z.infer<typeof confirmBookingInput>;

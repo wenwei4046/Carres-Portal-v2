@@ -9,6 +9,9 @@ import {
   type DeliveryPhoto,
   bookingConfirmGate,
   isSundayIso,
+  deliveryGroupLabel,
+  deliveryScopeSentence,
+  type DeliveryGroupKey,
   stockMatchKey,
   stockEtaImportInput,
   matchStockRows,
@@ -60,7 +63,7 @@ const ORDER_ID = z.string().uuid();
 /** The full overlay column list — ONE copy for GET / PUT / booking-confirm so
  *  the three responses can never drift apart. */
 const CONTROL_COLUMNS =
-  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, updated_at, updated_by";
+  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, booking_groups, delivery_trips, updated_at, updated_by";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -180,6 +183,14 @@ orderControlRouter.put("/:id/control", async (c) => {
 // Re-calling on a confirmed booking re-confirms: updates date/slot and
 // re-stamps the evidence (a typo is fixed by confirming again, never by an
 // un-confirm that would erase the customer's yes).
+//
+// T8 (2026-07-27, migration 0282) — an optional `deliverGroups` narrows the
+// trip to the delivery groups the CUSTOMER agreed to take now. Omit it and the
+// trip carries the whole order, exactly as before; that missing default is what
+// "never auto-split" means here. The mattress + bed frame are ONE group, so no
+// value of this field can send a mattress without its frame. When a split
+// order books its follow-up trip through this same door, the previous trip is
+// archived into delivery_trips instead of being overwritten away.
 orderControlRouter.post("/:id/booking/confirm", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -206,7 +217,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
       422,
     );
   }
-  const { confirmedDate, confirmedTimeSlot } = parsed.data;
+  const { confirmedDate, confirmedTimeSlot, deliverGroups } = parsed.data;
   if (isSundayIso(confirmedDate)) {
     return c.json(
       {
@@ -238,7 +249,9 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
       sb.from("order_addons").select("qty, unit_price").eq("order_id", idCheck.data),
       sb
         .from("ops_order_control")
-        .select("line_received, balance")
+        .select(
+          "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips",
+        )
         .eq("order_id", idCheck.data)
         .maybeSingle(),
       sb
@@ -282,7 +295,24 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     reservedQtyByKey,
     orderTotal,
     collected,
+    deliverGroups,
   });
+  // A scope naming a group this order does not have is a caller bug, not a
+  // narrower trip — answer it separately so the message names the real problem
+  // instead of reporting phantom unready goods.
+  if (!gate.scopeValid) {
+    return c.json(
+      {
+        error: "booking_scope",
+        code: "booking_scope",
+        message:
+          `Cannot confirm the booking: this order has ` +
+          `${gate.groups.length > 0 ? gate.groups.map((g) => deliveryGroupLabel(g.key)).join(" + ") : "no goods to deliver"}` +
+          ` — it cannot be delivered as ${(deliverGroups ?? []).map(deliveryGroupLabel).join(" + ") || "nothing"}`,
+      },
+      422,
+    );
+  }
   if (!gate.ok) {
     const reasons: string[] = [];
     if (!gate.goodsReady)
@@ -299,6 +329,44 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     );
   }
 
+  // The trip's scope. NULL means "the whole order" — so a trip that happens to
+  // carry every group is stored as NULL, keeping the common case identical to
+  // pre-T8 rows and out of the split UI.
+  const prev = controlRes.data as {
+    booking_stage?: string | null;
+    booking_groups?: string[] | null;
+    confirmed_date?: string | null;
+    confirmed_time_slot?: string | null;
+    customer_confirmed_at?: string | null;
+    customer_confirmed_by?: string | null;
+    delivery_trips?: unknown;
+  } | null;
+  const scope: DeliveryGroupKey[] | null =
+    gate.waitingGroups.length > 0 ? gate.scope : null;
+
+  // Archive the trip this confirmation REPLACES — but only when it is a
+  // genuinely different trip. Re-confirming the same scope is the typo fix
+  // 0277 designed for; archiving it would fill the ledger with noise.
+  const prevScope = prev?.booking_groups ?? null;
+  const scopeChanged =
+    JSON.stringify(prevScope ?? null) !== JSON.stringify(scope ?? null);
+  const hadTrip =
+    prev?.booking_stage === "confirmed" && !!prev?.confirmed_date;
+  const archive = Array.isArray(prev?.delivery_trips) ? prev.delivery_trips : [];
+  const deliveryTrips =
+    hadTrip && scopeChanged
+      ? [
+          ...archive,
+          {
+            groups: prevScope,
+            date: prev?.confirmed_date ?? null,
+            slot: prev?.confirmed_time_slot ?? null,
+            at: prev?.customer_confirmed_at ?? null,
+            by: prev?.customer_confirmed_by ?? null,
+          },
+        ]
+      : archive;
+
   const { data, error } = await sb
     .from("ops_order_control")
     .upsert(
@@ -309,6 +377,8 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         confirmed_time_slot: confirmedTimeSlot,
         customer_confirmed_at: new Date().toISOString(),
         customer_confirmed_by: auth.id,
+        booking_groups: scope,
+        delivery_trips: deliveryTrips,
         updated_by: auth.id,
       },
       { onConflict: "order_id" },
@@ -318,6 +388,22 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
+  }
+
+  // T8 — a split is the fact an operator must be able to find later ("why did
+  // only the bed set go?"). The 0282 trigger logs the scope CHANGE; this adds
+  // the human sentence naming what is still owed. FAIL-SOFT (same door and
+  // same rule as T4/T6): an audit hiccup must never undo a recorded booking.
+  const sentence = deliveryScopeSentence(
+    gate.scope,
+    gate.groups.map((g) => g.key),
+  );
+  if (sentence) {
+    await sb.rpc("operation_add_annotation", {
+      p_order_id: idCheck.data,
+      p_content: `Delivery split — ${sentence}`,
+      p_tag: null,
+    });
   }
 
   return c.json({ control: data });
