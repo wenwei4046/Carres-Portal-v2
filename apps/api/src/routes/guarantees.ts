@@ -56,7 +56,7 @@ const ENT_SELECT = `
   customer_id, customer_name, customer_phone, phone_key,
   coverage_years, remedy, starts_on, expires_on, status,
   claimed_at, claim_case_id, claim_notes, replacement_sku, void_reason,
-  orders!inner(so),
+  orders!inner(so, status),
   service_cases(case_no)
 `;
 
@@ -70,6 +70,7 @@ function toDto(row: any, labelBySku: Record<string, string>): GuaranteeEntitleme
     claimedGuaranteeId: row.claimed_guarantee_id ? String(row.claimed_guarantee_id) : null,
     orderId: String(row.order_id),
     so: row.orders?.so != null ? Number(row.orders.so) : null,
+    orderStatus: row.orders?.status ? String(row.orders.status) : null,
     orderLineId: row.order_line_id ? String(row.order_line_id) : null,
     guaranteeSku: String(row.guarantee_sku),
     guaranteeLabel: labelBySku[String(row.guarantee_sku)] ?? null,

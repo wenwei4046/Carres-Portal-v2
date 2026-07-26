@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GuaranteeEntitlementDto } from "@carres/shared";
@@ -28,6 +28,7 @@ const ROW: GuaranteeEntitlementDto = {
   claimedGuaranteeId: null,
   orderId: "o1",
   so: 1258,
+  orderStatus: "place",
   orderLineId: "l1",
   guaranteeSku: "GRT-MATTRESS-15Y",
   guaranteeLabel: "Mattress Guarantee 15 Years",
@@ -104,5 +105,58 @@ describe("OperationGuarantees", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Claim" })).toBeInTheDocument(),
     );
+  });
+});
+
+describe("OperationGuarantees — STATUS is the ORDER's status (Loo 2026-07-26)", () => {
+  it("shows where the ORDER is, in the operators' vocabulary — never the DB word", async () => {
+    apiFetchMock.mockResolvedValue({ items: [ROW], truncated: false });
+    wrap(<OperationGuarantees />);
+    expect(await screen.findByText("Order placed")).toBeInTheDocument();
+    expect(screen.queryByText("place")).not.toBeInTheDocument();
+  });
+
+  it("maps a delivered order to Delivered", async () => {
+    apiFetchMock.mockResolvedValue({
+      items: [{ ...ROW, orderStatus: "delivered", status: "active", effectiveStatus: "active" }],
+      truncated: false,
+    });
+    wrap(<OperationGuarantees />);
+    expect(await screen.findByText("Delivered")).toBeInTheDocument();
+  });
+
+  it("never leaks the underscored DB word for proceed_order", async () => {
+    apiFetchMock.mockResolvedValue({
+      items: [{ ...ROW, orderStatus: "proceed_order" }],
+      truncated: false,
+    });
+    wrap(<OperationGuarantees />);
+    expect(await screen.findByText("Proceed")).toBeInTheDocument();
+    expect(screen.queryByText("proceed_order")).not.toBeInTheDocument();
+  });
+
+  it("KEEPS the guarantee's own state on screen — Used is what blocks a claim", async () => {
+    // The reason STATUS could be handed to the order at all: this stays visible.
+    apiFetchMock.mockResolvedValue({
+      items: [
+        {
+          ...ROW,
+          orderStatus: "delivered",
+          guaranteeId: null,
+          claimedGuaranteeId: "ZZZZ000111",
+          status: "claimed",
+          effectiveStatus: "claimed",
+          claimedAt: "2026-08-02T09:00:00Z",
+        },
+      ],
+      truncated: false,
+    });
+    wrap(<OperationGuarantees />);
+    expect(await screen.findByText("Delivered")).toBeInTheDocument();
+    // Scoped to the table — "Used" is also a filter button label.
+    const row = within(screen.getByRole("table"));
+    expect(row.getByText("Used")).toBeInTheDocument(); // the guarantee-state pill
+    expect(row.getByText("ZZZZ000111")).toBeInTheDocument(); // its retired ID
+    expect(row.getByText(/Used 2026-08-02/)).toBeInTheDocument(); // the action cell
   });
 });
