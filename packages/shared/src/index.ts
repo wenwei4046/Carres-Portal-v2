@@ -700,6 +700,46 @@ export {
   type DutyGrantVia,
 } from "./schemas/org-duties";
 
+// HR-P4 (0269) — the employee master. `hr_employees` is an HR-private satellite
+// of app_users / salespersons, NOT a second roster: identity is read through the
+// join. `employment` (HR's record) and `access` (the real login switch) are kept
+// as two separate concepts on purpose — see the module header.
+export {
+  employmentStatusSchema,
+  EMPLOYMENT_STATUS_LABEL,
+  employeeAccessSchema,
+  EMPLOYEE_ACCESS_LABEL,
+  ONBOARDING_CHECKLIST,
+  OFFBOARDING_CHECKLIST,
+  checklistKindSchema,
+  checklistFor,
+  hrPersonRowSchema,
+  hrPeopleSourceSchema,
+  hrEmployeeDetailSchema,
+  hrEmployeePatchInput,
+  hrRevealFieldInput,
+  hrRecordExitInput,
+  EXIT_REASON_LABEL,
+  hrChecklistToggleInput,
+  hrSetAccessInput,
+  employmentTone,
+  accessTone,
+  needsExitRecorded,
+  revocationShape,
+  type EmploymentStatus,
+  type EmployeeAccess,
+  type ChecklistItem,
+  type ChecklistKind,
+  type HrPersonRow,
+  type HrPeopleSource,
+  type HrEmployeeDetail,
+  type HrEmployeePatchInput,
+  type HrRevealFieldInput,
+  type HrRecordExitInput,
+  type HrChecklistToggleInput,
+  type HrSetAccessInput,
+} from "./schemas/hr-people";
+
 export {
   LOAN_SOURCES,
   LOAN_OUT_ROUTES,
