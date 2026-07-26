@@ -13,12 +13,12 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1 ✅ T2 ✅ · T3 running · ENDS at T11 |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | not started |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R5 | not started |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R6 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | not started |
 
 **Recommended order:** finish ① T3-T6 first (drawer work), then start ② J1 (same drawer,
 so it waits for T6). ③④⑤ are independent of the drawer — any of them can interleave with
-① after T6, still one chat at a time. Total = 30 cards.
+① after T6, still one chat at a time. Total = 31 cards.
 
 ## Sidebar map — where every line lands
 
@@ -36,6 +36,8 @@ Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tab
 Payments            ← unchanged (reminder schedule stays parked here)
 Operation Catalog   ← unchanged
 Suppliers           ← ④ R5 supplier scorecard lands here
+                       (④ R6 warehouse LOGIN = a new external ROLE like supplier/partner
+                        portals — a portal shell, not a sidebar item here)
 Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note stay)
 ```
 
