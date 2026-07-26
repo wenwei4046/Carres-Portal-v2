@@ -147,26 +147,68 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 
 ---
 
-## LATER (do not start; listed so no chat reinvents them)
+## Road ahead — T7-T11 (locked with Jess 2026-07-27; the queue ENDS at T11)
 
-- **L1 Queue split** — `Assign logistic / Confirm booking / Issue DO / Deliver today / Upload
-  delivery photo` as real queues (needs T1-T3 signals stable first). Each step gets its own
+The T-series is ELEVEN cards total. T1-T6 finish the delivery lifecycle INSIDE the order
+panel. T7-T11 build it OUT into a standalone Delivery capability. Same law: one card, one
+chat, one PR, one deploy, in this order. Detail for each lives in the LATER entry it
+promotes — the implementing chat reads BOTH this card and its L-entry.
+
+## T7 · Queue split + auto-overdue (promotes L1)
+
+Real queues: `Assign logistic / Confirm booking / Deliver today / Upload delivery photo`,
+each with its own deadline relative to the confirmed date so items turn overdue by
+themselves. Needs T1-T6 signals — that is why it waits for them.
+
+## T8 · Delivery groups / partial delivery (promotes L7) — ⛔ BLOCKED until Jess rules
+
+The pillow question: today the confirm gate blocks a RM5,000 bed on a missing RM39 pillow.
+Jess must rule which categories may lag (proposal in L7: mattress+frame hard-together ·
+sofa may second-trip · accessories never block). No build before the ruling; the ruling is
+one sentence.
+
+## T9 · Logistic partner profiles (promotes L6)
+
+Working days · blackout dates · daily capacity · booking lead time — and the confirm flow
+warns when an operator books a date the partner cannot honour. First real consumer of
+partner rules; the working-day util (L3) ships inside this card or T10, whichever needs it
+first.
+
+## T10 · Delivery calendar as single source (promotes L2)
+
+Today / Tomorrow / This week views reading the SAME booking fields — never a second store.
+Partner capacity from T9 shows on the day.
+
+## T11 · Delivery module page (promotes L5) — the LAST card
+
+The 3-pane standalone module per `docs/delivery-module-proposal.md` (LOCKED 2026-07-22
+with Jess). By T11 every signal, queue, reason and profile already exists — this card is
+ASSEMBLY, not invention. After T11: two weeks of live usage writes the fix list; nothing
+else is planned past T11 on purpose.
+
+---
+
+## LATER (no card number = not planned; listed so no chat reinvents them)
+
+- **L1 Queue split → PROMOTED TO T7** — `Assign logistic / Confirm booking / Issue DO /
+  Deliver today / Upload delivery photo` as real queues (needs T1-T3 signals stable first).
+  Each step gets its own
   deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
   before · delivery order 1 day before · photo same/next day) so a queue item can turn
   overdue BY ITSELF — no human watching required.
-- **L2 Delivery calendar as single source** (reads the same booking fields; never a second store).
-- **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — build when storage countdown or
-  booking lead-time first needs it, as a shared util, NOT an admin page.
+- **L2 Delivery calendar → PROMOTED TO T10** (reads the same booking fields; never a second store).
+- **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — ships INSIDE T9 or T10,
+  whichever needs it first, as a shared util, NOT an admin page. Not its own card.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
-- **L5 Delivery module page (3-pane)** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
+- **L5 Delivery module page (3-pane) → PROMOTED TO T11** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
   the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
-- **L6 Logistic partner profiles** — per-partner rules the booking flow will eventually read:
+- **L6 Logistic partner profiles → PROMOTED TO T9** — per-partner rules the booking flow will eventually read:
   working days (Sat half/full), blackout dates ("truck maintenance 15-18 Feb"), daily capacity
   ("NETS max N drops/day"), booking lead time ("needs 2 working days notice" → warn when an
   operator confirms a date the partner cannot honour). Today partners are bare rows; build the
   fields WITH the first consumer (likely L1's deadlines or L2's calendar), not as an admin page
   up front.
-- **L7 Delivery groups / partial delivery — NEEDS A JESS RULING BEFORE ANY BUILD.**
+- **L7 Delivery groups / partial delivery → PROMOTED TO T8 — NEEDS A JESS RULING BEFORE ANY BUILD.**
   The business rule from Jess's design conversation: mattress + bed frame = ONE delivery
   (hard, never split) · sofa = prefer together but may go as a second trip · accessories
   (pillow/protector) NEVER block a delivery, back-order them. Today's `bookingConfirmGate`
@@ -191,3 +233,8 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 | T4 | ⬜ | — |
 | T5 | ⬜ | — |
 | T6 | ⬜ | — |
+| T7 | ⬜ queue split + auto-overdue | — |
+| T8 | ⛔ blocked on Jess's pillow ruling | — |
+| T9 | ⬜ partner profiles | — |
+| T10 | ⬜ delivery calendar | — |
+| T11 | ⬜ delivery module page (FINAL) | — |
