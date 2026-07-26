@@ -1124,3 +1124,23 @@ noted it in the header; the comments describing the `SELF - ` prefix were update
   their own comp; §4 says Loo OVERRULED that (self-writes allowed, `SELF - ` audit marker). §4 is
   the later ruling — **delete the D3 clause before P7 is built** or it will be implemented backwards.
 - Next: **P5** (commission runs) → P6 → P7 → P8 → O4.
+
+---
+
+## 2026-07-26 ⑮ · Guarantee scope — author WHAT it covers (0270, PR #342, deployed)
+
+**Loo**: picking category Guarantee in + New SKU should ask what it covers — a category, then a specific model or any model in it; sofa scoped by combo / compartment / any model; bed frame like mattress with King/Queen/Single/Super Single; accessories with no size. Then years, description, price.
+
+Before this a guarantee could only say "the mattress category" — authorable, but not sellable with intent.
+
+**Four scope columns, not one scope jsonb.** They are real FOREIGN KEYS, so deleting a model / combo / compartment takes its narrowed terms with it instead of leaving a term pointing at a ghost that matches nothing — or worse, at a re-used id. **NULL at any level = ANY at that level**, which is what makes it additive: the live `GRT-MATTRESS-15Y` keeps every column null and keeps covering every mattress. Two CHECKs keep the shape honest (combo/compartment sofa-only + mutually exclusive; variants only where a size axis exists).
+
+**ONE matcher for every surface** — `guaranteeCovers()` in `@carres/shared` — so the POS picker and the server can never disagree about what a guarantee covers. Combo scope matches properly via `matchSofaCombo`, **injected** so shared stays free of the pricing engine; without it a combo term falls back to requiring the same MODEL, which is the safe direction — it never widens coverage.
+
+**Authoring is ONE endpoint, not three client calls.** A SKU without its terms row is a guarantee that sells, covers nothing and mints no entitlement — the exact untraceable state this feature exists to prevent — so `POST /api/guarantees/products` writes model → sku → terms and **unwinds what it created** on any failure. The code and label are DERIVED server-side (`GRT-LUMI-FIRMCARE-KING-10Y`), never typed, so two people authoring the same cover cannot invent two spellings. Principal-only: a guarantee is a multi-year liability.
+
+**Repeat of a lesson already in this worklog** (⑧): the modal reached for `useQueryClient` directly and took its OWN tests down (they fully mock `@/lib/queries` and install no provider). It is a `useCreateGuaranteeProduct` mutation hook now. **Data access lives in queries.ts — components never touch the query client.** Two occurrences in one day; treat it as a rule, not a gotcha.
+
+**Parallel-merge note**: PR #341 (HR-P4) landed between my `git fetch` and my merge, so #342 hit a conflict in `queries.ts` (both lines appended hooks at the end, sharing a `});}` tail). Resolved by keeping BOTH; a follow-up fixture fix was needed because the sofa combo DTO gained `discontinuedAt` in that same union. **The pre-merge fetch is not enough on a busy day — re-check right before the merge click.**
+
+**Ship**: PR #342 (merge `09b6933a`) → api Worker `3c543c05` (unauth `POST /api/guarantees/products` 401 ✓) + web `index-DIco4n1v.js` → carres-portal `73806dbe` + carres-pos `8aa0d1d7`; all 4 canonicals ✓; downloaded 4,155,071 bytes, `SERVICE_ROLE` 0, scope-form marker ✓. Tests: shared 1117/1117 (+20) · api 3 = §17.7 baseline (guarantees 12/12) · web 16 = baseline (+9 scope-field tests) · typecheck 0 · design-standard + check:v4 clean.
