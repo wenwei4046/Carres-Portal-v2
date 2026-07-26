@@ -1871,3 +1871,66 @@ byte for byte**.
 and every rental signup will refuse with `no_agreement_template`. The POS says so by name and points
 at the screen. **Press Save version 1 in Admin → Rental → Agreements** — the wording is already
 loaded there behind a button, and nobody has pressed it since PR #329 shipped it.
+
+## 2026-07-27 · Delivery T7 — queue split + auto-overdue (PR #386 merge `984d9d0b`, Worker `f96b3e19` + web `index-ChJLxdiq.js` — DEPLOYED)
+
+Card T7 of `docs/delivery-execution-queue.md`. The delivery lifecycle stops being one blob of
+"delivery work" and becomes **four real queues** in their own DELIVERY facet group, each carrying
+**its own deadline** so a queue item turns late by itself: `Assign logistic` (promised date − 3
+working days) · `Chase logistic` (− 1 wd) · `Deliver today` (the confirmed date) · `Upload delivery
+photo` (delivered + 1 wd). Lateness reads as the count tail, numbers up front — `5 · 2 late`.
+No migration; the API change is one additive select line (`delivery_photos` on the list payload).
+
+**L3 was already built.** The card's deadlines are in WORKING days and L3 said the working-day
+engine "ships INSIDE T9 or T10" — but `packages/shared/working-days.ts` + `my-holidays.ts` shipped
+with procurement on 2026-07-21 (Mon–Sat, Selangor holidays, calendar injected). So T7 needed a
+consumer, not an engine, and the deadlines are real working days from day one instead of the
+calendar-day placeholder the card would have accepted. The math went into a new pure
+`packages/shared/delivery-queue.ts` (18 tests) so T10's calendar and T11's module read ONE rule
+rather than a second copy — the same reason `line-category`/`line-readiness` moved to shared in D1.
+
+**Two ladder rungs, because a queue the NEXT column doesn't speak is a queue nobody looks at.**
+(1) A confirmed booking stopped being one resting state — it splits by its own date: today →
+`Deliver today`, **date passed with no delivery recorded → `Chase logistic` (red)**. That IS the
+auto-overdue: the row leaves the Deliver-today queue with no human involved. The money-hold still
+wins (PayHold — never chase a delivery we may not make), and the Loo-frozen past-deadline
+escalation (freeze gate 2026-07-12) is untouched: it only ever fired on UNCONFIRMED rows, which is
+precisely why a passed confirmed date used to fall through to `Confirm`. That hole was created by
+D1, not by the freeze. (2) **A delivered order with an empty photo ledger is not `Done`** — it
+shows `Upload delivery photo`, the only action a closed order ever shows, and MANAGE's
+blank-when-closed rule now blanks on `Done` only. Amber, never red (guardrail #2: a delivered
+order must not alarm). Its queue deliberately spans CLOSED orders — the second queue to do so,
+for the same structural reason Owing does.
+
+**Two of the card's own words were NOT built, deliberately.** `Confirm booking` would be a second
+word for a step that already ships as `Chase logistic` (C-vocab locked 2026-07-19, and the
+drawer's Chase Now word) — COPY-STANDARD rule 8 wins, and renaming step 2 app-wide is a one-line
+call for Jess while a synonym is a permanent drift. L1's `Issue DO` queue has no human in it:
+`orders.do_number` is stamped by the 0098 trigger on the dispatch transition (found while
+shipping T5), so it would hold work nobody does. Both recorded in COPY-STANDARD next to the now
+closed four-word queue list, so no future chat re-derives them.
+
+**Degrades instead of lying.** An absent `delivery_photos` means UNKNOWN, not "no photo", so a
+browser on this build against an older Worker (or an order with no overlay row) stays silent
+rather than demanding proof of every delivered order; only an explicit `[]` is the real "no photo
+yet". A TBD customer date has no anchor and can therefore never be late — silence over a false
+alarm, the same rule T3's radar follows. Also de-fused a time bomb in the existing tests: the
+`BOOKED` fixture hardcoded `2026-08-01`, so once that day passed it would have silently started
+exercising the new `Chase logistic` rung while still claiming to test `Confirm`.
+
+**Verification.** shared 1267/1267 (18 new) · api 3 pre-existing · web 16 pre-existing — zero new
+failures, checked again on the union tip after merging the parallel line's PR #385 (J1 Documents),
+whose additive edit to the SAME list-select line merged cleanly with both survivals asserted. Five
+new render tests mount the real page (group holds the four queues with counts matching NEXT · a
+step past its own deadline reads `2 · 1 late` · a TBD date never says late · the photo queue keeps
+DELIVERED rows when clicked · the group hides when there is no delivery work). Build + v4 guard +
+design-standard lint clean; `SERVICE_ROLE` 0 in the built AND the downloaded live bundle
+(4,228,707 bytes). Worker deployed with `--env production` (bindings receipt read back:
+`PUBLIC_WEB_URL=pos.carresofficial.com` + `api.carresofficial.com` route); unauth 401 on both
+hostnames. **The POS pair served the J1 line's older bundle on the first poll and converged on the
+next** — the documented cache behaviour, not a failed deploy.
+
+**Deferred, named:** the photo queue can only see orders that HAVE an overlay row, since a
+missing `ops_order_control` row is indistinguishable from an old Worker client-side. Harmless
+today (a delivered order essentially always has one for its balance) and the conservative
+direction, but it is a structural false-negative rather than a bug to hunt later.
