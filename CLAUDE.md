@@ -507,6 +507,8 @@ Don't burn an hour spinning. Surface and ask.
 - `rental-first-month-vs-billing-row` — Stripe collects month 1 at checkout but `rental_billings` seq 1 stays `due` until ②'s invoice.paid engine (catch up by stripe_invoice_id).
 - `rental-billing-anchor-drift` — our schedule anchors on start_date, Stripe on checkout completion; ② reconciles by stripe_invoice_id.
 - `rental-agreement-store-read` — store JWTs can't read agreements yet (sell lane holds the RPC payload; checkout = service client + explicit Hono ownership); "My rentals" list needs a dealer-scoped RLS read later.
+- `guarantee-service-two-registries` — a sellable care plan is a `guarantee_terms` row (0274) but the RENTAL-included package still lives in `service_packages`; two registries for one concept. Firm fix + interim rule in the doc.
+- `guarantee-recurring-no-visit-schedule` — 0274 counts visits REMAINING but not when they are DUE; nothing can say "this customer is owed a clean this month". Fine for authoring/pilot; needs a due date before volume.
 - `rental-approve-without-signature` — 0268 approve deliberately does NOT require `signed_at`: signing is unbuilt (0267 landed the columns, nothing writes them) so a guard would jam the queue shut. The guard sits ready as a comment in 0268; the page shows "Not signed yet" meanwhile.
 - `rental-reject-does-not-cancel-the-order` — 0268 reject fails the AGREEMENT only. Moot today (the rental lane mints no order); when it does, add the blocker inside `proceed_order`.
 - `rental-plan-reprice-policy` — re-price archives the old Stripe Price; unlinked old-fee agreements block checkout (422 plan_repriced); live-agreement re-pricing is a ②+ policy call.

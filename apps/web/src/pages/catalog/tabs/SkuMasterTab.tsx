@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
-import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
+import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
@@ -239,7 +239,9 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           </CategoryChip>
           {PRODUCT_CATEGORIES.map((c) => (
             <CategoryChip key={c} active={category === c} onClick={() => pickCategory(c)}>
-              {CATEGORY_LABEL[c]}
+              {/* short form: a filter chip has no room for the full
+                  "Guarantee & Service Package" (0274). */}
+              {CATEGORY_LABEL_SHORT[c]}
             </CategoryChip>
           ))}
         </div>
@@ -319,7 +321,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         >
           <span className="t-micro text-base-400 mr-1">Model</span>
           <CategoryChip active={modelFilter === "all"} onClick={() => setModelFilter("all")}>
-            All {CATEGORY_LABEL[category]}
+            All {CATEGORY_LABEL_SHORT[category]}
           </CategoryChip>
           {categoryModels.map((m) => (
             <CategoryChip
