@@ -99,7 +99,7 @@ Strict overshoot only (ETA > date; ETA ON the date is not a delay); TBD dates / 
 ETAs stay silent. The verb also joined the QUEUES rows (C-vocab: counts match the NEXT
 column by construction), danger tone, PIC chip.
 
-## T4 · Reason Library v1 (structured, no free text)
+## T4 · Reason Library v1 (structured, no free text) ✅ (PR #377)
 
 **Concept (Jess):** staff pick facts, never write essays. Every reason has a hidden category
 so the dashboard can later say "42% of delays are customer-side".
@@ -125,6 +125,17 @@ pass. Costs one field now, saves a re-tag of history later.
 (ride an existing attrs/jsonb column if one fits; a migration ONLY if nothing fits — and then
 one nullable column, nothing more) + drawer dropdown replaces/augments free text.
 **Done when:** a reschedule cannot be saved without a reason; reasons land in activity history.
+**Shipped note (PR #377):** ZERO migration — `reason_key` rides the existing
+`ops_order_control.extension_reason` text column (0196, no CHECK on it); legacy
+Renovation/Traveling/Others rows display as-is via `deliveryReasonLabel` passthrough.
+The card left the payment category's responsibility unmapped → assigned **customer**
+(waiting for the customer's money starts the storage clock). Activity: the 0211 trigger
+doesn't watch extension columns, so the extend route appends
+"Delivery postponed → 20 Aug 26 · {reason}" through the existing
+`operation_add_annotation` SECURITY DEFINER door, fail-soft. Dropdown has NO default
+(a silent default would record a wrong fact); note became an optional detail for ANY
+reason — the required-if-Others rule died with Others. `DELIVERY_REASONS` lives in
+`packages/shared/src/delivery-reasons.ts`, ready for T7's queues + the future dashboard.
 
 ## T5 · Booking progress spine in the drawer (read-only)
 
@@ -240,7 +251,7 @@ else is planned past T11 on purpose.
 | T1 | ✅ shipped 2026-07-26 | #363 |
 | T2 | ✅ shipped 2026-07-26 | #367 |
 | T3 | ✅ shipped 2026-07-26 | #370 |
-| T4 | ⬜ | — |
+| T4 | ✅ shipped 2026-07-26 | #377 |
 | T5 | ⬜ | — |
 | T6 | ⬜ | — |
 | T7 | ⬜ queue split + auto-overdue | — |
