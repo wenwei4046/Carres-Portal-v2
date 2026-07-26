@@ -416,6 +416,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           skus={catalog.skus}
           sofaCompartments={catalog.sofaCompartments ?? []}
           optionPools={catalog.optionPools ?? []}
+          sofaCombos={catalog.sofaCombos ?? []}
           onClose={() => setNewOpen(false)}
         />
       )}

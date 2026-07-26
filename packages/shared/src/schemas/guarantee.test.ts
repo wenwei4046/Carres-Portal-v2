@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { matchSofaCombo } from "../sofa-pricing";
 import {
   GUARANTEE_ID_REGEX,
+  deriveGuaranteeSkuCode,
+  guaranteeCovers,
+  guaranteeProductInputSchema,
+  guaranteeScopeLabel,
   guaranteeDeskStatus,
   displayGuaranteeId,
   effectiveGuaranteeStatus,
@@ -219,5 +224,179 @@ describe("guaranteeDeskStatus — the three words the desk shows (Loo 2026-07-26
     expect(guaranteeDeskStatus(eff)).toBe("expired");
     const live = effectiveGuaranteeStatus("active", "2041-08-01", "2026-07-26");
     expect(guaranteeDeskStatus(live)).toBe("active");
+  });
+});
+
+describe("guaranteeCovers — what a guarantee actually covers (0270)", () => {
+  const MATTRESS = { category: "mattress" as const, modelId: "m1", variant: "King" };
+
+  it("an unset level is a wildcard, so a category-only term covers everything in it", () => {
+    // This is what keeps the pre-0270 term working untouched.
+    expect(guaranteeCovers({ coversCategory: "mattress" }, MATTRESS)).toBe(true);
+    expect(
+      guaranteeCovers({ coversCategory: "mattress" }, { ...MATTRESS, modelId: "other" }),
+    ).toBe(true);
+  });
+
+  it("never covers a different category", () => {
+    expect(guaranteeCovers({ coversCategory: "sofa" }, MATTRESS)).toBe(false);
+    expect(guaranteeCovers({ coversCategory: "mattress" }, { ...MATTRESS, category: null })).toBe(
+      false,
+    );
+  });
+
+  it("narrows to one model when a model is pinned", () => {
+    const scope = { coversCategory: "mattress" as const, coversModelId: "m1" };
+    expect(guaranteeCovers(scope, MATTRESS)).toBe(true);
+    expect(guaranteeCovers(scope, { ...MATTRESS, modelId: "m2" })).toBe(false);
+  });
+
+  it("narrows to the ticked sizes, and compares them forgivingly", () => {
+    const scope = {
+      coversCategory: "mattress" as const,
+      coversModelId: "m1",
+      coversVariants: ["King", "Queen"],
+    };
+    expect(guaranteeCovers(scope, MATTRESS)).toBe(true);
+    // authored "King", SKU says "king " — same size, different hands typed it
+    expect(guaranteeCovers(scope, { ...MATTRESS, variant: "king " })).toBe(true);
+    expect(guaranteeCovers(scope, { ...MATTRESS, variant: "Single" })).toBe(false);
+  });
+
+  it("an EMPTY variant list still means any size (not 'no size')", () => {
+    const scope = { coversCategory: "mattress" as const, coversVariants: [] };
+    expect(guaranteeCovers(scope, { ...MATTRESS, variant: "Anything" })).toBe(true);
+  });
+
+  it("a compartment-scoped guarantee matches only that compartment's sku", () => {
+    const scope = { coversCategory: "sofa" as const, coversCompartmentId: "c1" };
+    const line = { category: "sofa" as const, modelId: "s1", compartmentId: "c1" };
+    expect(guaranteeCovers(scope, line)).toBe(true);
+    expect(guaranteeCovers(scope, { ...line, compartmentId: "c2" })).toBe(false);
+    expect(guaranteeCovers(scope, { ...line, compartmentId: null })).toBe(false);
+  });
+
+  it("a combo-scoped guarantee matches a BUILD whose modules satisfy the combo", () => {
+    const scope = { coversCategory: "sofa" as const, coversComboId: "cb1" };
+    const slots = [["1A"], ["2A"], ["CNR"]];
+    const covers = (codes: string[]) =>
+      guaranteeCovers(
+        scope,
+        { category: "sofa", modelId: "s1", builtModuleCodes: codes },
+        matchSofaCombo,
+        slots,
+      );
+    expect(covers(["1A", "2A", "CNR"])).toBe(true);
+    expect(covers(["1A", "2A", "CNR", "CONSOLE"])).toBe(true); // extras are fine
+    expect(covers(["1A", "2A"])).toBe(false); // a slot can't be filled
+    expect(covers([])).toBe(false); // not a build at all
+  });
+
+  it("without a matcher a combo scope falls back to the MODEL — it never widens", () => {
+    const scope = { coversCategory: "sofa" as const, coversComboId: "cb1", coversModelId: "s1" };
+    expect(guaranteeCovers(scope, { category: "sofa", modelId: "s1" })).toBe(true);
+    expect(guaranteeCovers(scope, { category: "sofa", modelId: "s2" })).toBe(false);
+  });
+});
+
+describe("guaranteeScopeLabel", () => {
+  it("says 'any <category>' when nothing is pinned", () => {
+    expect(guaranteeScopeLabel({ coversCategory: "mattress" })).toBe("any mattress");
+  });
+  it("names the model and the sizes when they are", () => {
+    expect(
+      guaranteeScopeLabel(
+        { coversCategory: "mattress", coversModelId: "m1", coversVariants: ["King", "Queen"] },
+        { model: "Lumi FirmCare" },
+      ),
+    ).toBe("Lumi FirmCare · King / Queen");
+  });
+  it("names the compartment / combo for a sofa", () => {
+    expect(
+      guaranteeScopeLabel({ coversCategory: "sofa", coversCompartmentId: "c1" }, { compartment: "1A" }),
+    ).toBe("1A (sofa)");
+  });
+});
+
+describe("deriveGuaranteeSkuCode", () => {
+  it("builds a clean join key from the scope + the years", () => {
+    expect(deriveGuaranteeSkuCode({ coversCategory: "mattress", coverageYears: 15 })).toBe(
+      "GRT-MATTRESS-15Y",
+    );
+    expect(
+      deriveGuaranteeSkuCode({
+        coversCategory: "mattress",
+        modelKey: "lumi firmcare",
+        variants: ["King"],
+        coverageYears: 10,
+      }),
+    ).toBe("GRT-LUMI-FIRMCARE-KING-10Y");
+  });
+
+  it("collapses several sizes rather than growing an unbounded code", () => {
+    expect(
+      deriveGuaranteeSkuCode({
+        coversCategory: "mattress",
+        modelKey: "lumi",
+        variants: ["King", "Queen", "Single"],
+        coverageYears: 5,
+      }),
+    ).toBe("GRT-LUMI-3SIZES-5Y");
+  });
+
+  it("prefers the compartment / combo over the model when one is pinned", () => {
+    expect(
+      deriveGuaranteeSkuCode({
+        coversCategory: "sofa",
+        modelKey: "booqit",
+        compartmentCode: "1A(LHF)",
+        coverageYears: 3,
+      }),
+    ).toBe("GRT-1A-LHF-3Y");
+  });
+});
+
+describe("guaranteeProductInputSchema — the authoring contract", () => {
+  const base = { coversCategory: "mattress" as const, coverageYears: 15 };
+
+  it("takes the simple case and defaults the remedy + price", () => {
+    const p = guaranteeProductInputSchema.parse(base);
+    expect(p.remedy).toBe("replace");
+    expect(p.price).toBe(0);
+  });
+
+  it("refuses a combo AND a compartment at once — they are different things", () => {
+    expect(() =>
+      guaranteeProductInputSchema.parse({
+        coversCategory: "sofa",
+        coverageYears: 5,
+        coversComboId: "11111111-1111-1111-1111-111111111111",
+        coversCompartmentId: "22222222-2222-2222-2222-222222222222",
+      }),
+    ).toThrow();
+  });
+
+  it("refuses combo / compartment scope outside sofa", () => {
+    expect(() =>
+      guaranteeProductInputSchema.parse({
+        ...base,
+        coversComboId: "11111111-1111-1111-1111-111111111111",
+      }),
+    ).toThrow();
+  });
+
+  it("refuses variants on a category that has no size axis (Loo: accessories)", () => {
+    expect(() =>
+      guaranteeProductInputSchema.parse({
+        coversCategory: "accessory",
+        coverageYears: 2,
+        coversVariants: ["King"],
+      }),
+    ).toThrow();
+  });
+
+  it("keeps the DDL bounds so zod never passes a doomed payload", () => {
+    expect(() => guaranteeProductInputSchema.parse({ ...base, coverageYears: 0 })).toThrow();
+    expect(() => guaranteeProductInputSchema.parse({ ...base, coverageYears: 51 })).toThrow();
   });
 });

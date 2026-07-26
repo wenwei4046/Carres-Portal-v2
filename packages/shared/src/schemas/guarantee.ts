@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { productCategorySchema } from "./product-category";
+import { productCategorySchema, type ProductCategory } from "./product-category";
 
 /**
  * Guarantee packages (migrations 0261-0263) — the SKU category Carres sells ON
@@ -38,6 +38,82 @@ const guaranteeTermFields = z
   .strict();
 
 export const guaranteeTermInputSchema = guaranteeTermFields;
+
+/**
+ * Authoring a whole guarantee PRODUCT in one call (Loo 2026-07-26, from the
+ * + New SKU form): the product_model, its single SKU and the terms row are one
+ * indivisible thing — a half-created guarantee (a SKU with no terms) would be
+ * sellable and untraceable, which is the exact failure this feature exists to
+ * prevent. So the server does all three or none.
+ *
+ * The SKU CODE and the display label are DERIVED server-side from the scope +
+ * years, so two people authoring the same cover can't invent two spellings.
+ */
+export const guaranteeProductInputSchema = z
+  .object({
+    /** What it covers. */
+    coversCategory: productCategorySchema,
+    coversModelId: z.string().uuid().nullable().optional(),
+    coversVariants: z.array(z.string().trim().min(1)).max(20).nullable().optional(),
+    coversComboId: z.string().uuid().nullable().optional(),
+    coversCompartmentId: z.string().uuid().nullable().optional(),
+    /** How long. */
+    coverageYears: z.number().int().min(1).max(50),
+    remedy: guaranteeRemedySchema.default("replace"),
+    /** Money + copy. */
+    price: z.number().nonnegative().default(0),
+    description: z.string().trim().max(600).nullable().optional(),
+    /** Optional override of the derived name. */
+    label: z.string().trim().min(1).max(120).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (d) => !(d.coversComboId && d.coversCompartmentId),
+    { message: "pick a combo OR a compartment, not both", path: ["coversComboId"] },
+  )
+  .refine(
+    (d) => !((d.coversComboId || d.coversCompartmentId) && d.coversCategory !== "sofa"),
+    { message: "combo / compartment scope is sofa-only", path: ["coversCategory"] },
+  )
+  .refine(
+    (d) =>
+      !d.coversVariants ||
+      d.coversVariants.length === 0 ||
+      d.coversCategory === "mattress" ||
+      d.coversCategory === "bedframe",
+    { message: "variants only apply to mattress / bedframe", path: ["coversVariants"] },
+  );
+export type GuaranteeProductInput = z.infer<typeof guaranteeProductInputSchema>;
+
+/**
+ * The SKU code for an authored guarantee: `GRT-<SCOPE>-<YEARS>Y`, uppercased
+ * and punctuation-stripped so it stays a clean join key like every other code.
+ * Derived, never typed — see guaranteeProductInputSchema.
+ */
+export function deriveGuaranteeSkuCode(parts: {
+  coversCategory: string;
+  modelKey?: string | null;
+  variants?: string[] | null;
+  compartmentCode?: string | null;
+  comboLabel?: string | null;
+  coverageYears: number;
+}): string {
+  const chunk = (v: string) =>
+    v
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  const bits = ["GRT"];
+  if (parts.compartmentCode) bits.push(chunk(parts.compartmentCode));
+  else if (parts.comboLabel) bits.push(chunk(parts.comboLabel));
+  else if (parts.modelKey) bits.push(chunk(parts.modelKey));
+  else bits.push(chunk(parts.coversCategory));
+  const vs = (parts.variants ?? []).filter(Boolean);
+  if (vs.length === 1) bits.push(chunk(vs[0]!));
+  else if (vs.length > 1) bits.push(`${vs.length}SIZES`);
+  bits.push(`${parts.coverageYears}Y`);
+  return bits.filter(Boolean).join("-");
+}
 export type GuaranteeTermInput = z.infer<typeof guaranteeTermInputSchema>;
 
 export const guaranteeTermPatchSchema = guaranteeTermFields.partial();
@@ -54,8 +130,102 @@ export const guaranteeTermSchema = z.object({
   remedy: guaranteeRemedySchema,
   termsText: z.string().nullable(),
   active: z.boolean(),
+  // 0270 scope — NULL at any level means ANY at that level, which is what keeps
+  // the pre-0270 term (every field null) covering the whole category as before.
+  /** null = any model in the category. */
+  coversModelId: z.string().uuid().nullable().default(null),
+  /** null / empty = any variant. Mattress + bedframe only. */
+  coversVariants: z.array(z.string()).nullable().default(null),
+  /** Sofa only — a built sofa matches when the combo's slots can be covered. */
+  coversComboId: z.string().uuid().nullable().default(null),
+  /** Sofa only — matches a line minted from that compartment. */
+  coversCompartmentId: z.string().uuid().nullable().default(null),
 });
 export type GuaranteeTermDto = z.infer<typeof guaranteeTermSchema>;
+
+/** The narrowing a guarantee applies, independent of its DTO shape — so the
+ *  matcher can be fed either a term or an in-progress authoring form. */
+export type GuaranteeScope = {
+  coversCategory: ProductCategory;
+  coversModelId?: string | null;
+  coversVariants?: string[] | null;
+  coversComboId?: string | null;
+  coversCompartmentId?: string | null;
+};
+
+/** What we know about a candidate line, resolved from the catalog by the caller. */
+export type GuaranteeCandidate = {
+  category: ProductCategory | null;
+  modelId: string | null;
+  /** The SKU's variant label ("King"). */
+  variant?: string | null;
+  /** For a compartment-minted sofa SKU. */
+  compartmentId?: string | null;
+  /** Module codes of a sofa BUILD line (`attrs.sofa_build.cells`). */
+  builtModuleCodes?: readonly string[] | null;
+};
+
+/**
+ * Does this guarantee cover that item? ONE matcher, so the POS picker, the
+ * server and any report can never disagree about what a guarantee covers.
+ *
+ * Every level is an AND, and an unset level is a wildcard:
+ *   category → model → (variants | combo | compartment)
+ *
+ * Variant comparison is case/space-insensitive because the pool value ("King")
+ * and a SKU variant ("king") are authored by different hands.
+ *
+ * `matchCombo` is injected rather than imported so this module stays free of
+ * the sofa-pricing engine (callers pass `matchSofaCombo`); without it a
+ * combo-scoped term simply falls back to requiring the same MODEL, which is
+ * the safe direction — it never widens coverage.
+ */
+export function guaranteeCovers(
+  scope: GuaranteeScope,
+  item: GuaranteeCandidate,
+  matchCombo?: (builtCodes: readonly string[], slots: readonly (readonly string[])[]) => unknown,
+  comboSlots?: readonly (readonly string[])[] | null,
+): boolean {
+  if (!item.category || item.category !== scope.coversCategory) return false;
+  if (scope.coversModelId && item.modelId !== scope.coversModelId) return false;
+
+  if (scope.coversCompartmentId) {
+    return item.compartmentId === scope.coversCompartmentId;
+  }
+
+  if (scope.coversComboId) {
+    if (!comboSlots || !matchCombo) return true; // model already matched above
+    const cells = item.builtModuleCodes ?? [];
+    if (cells.length === 0) return false;
+    return matchCombo(cells, comboSlots) !== null;
+  }
+
+  const wanted = (scope.coversVariants ?? []).map(normalizeVariant).filter(Boolean);
+  if (wanted.length === 0) return true;
+  return wanted.includes(normalizeVariant(item.variant ?? ""));
+}
+
+function normalizeVariant(v: string): string {
+  return v.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** One-line human summary of what a term covers — for the SKU list, the
+ *  authoring preview and the POS picker header. */
+export function guaranteeScopeLabel(
+  scope: GuaranteeScope,
+  names: { model?: string | null; combo?: string | null; compartment?: string | null } = {},
+): string {
+  const cat = scope.coversCategory;
+  if (scope.coversCompartmentId) {
+    return `${names.compartment ?? "one compartment"} (${cat})`;
+  }
+  if (scope.coversComboId) {
+    return `${names.combo ?? "one combo"}${names.model ? ` · ${names.model}` : ""}`;
+  }
+  const who = scope.coversModelId ? (names.model ?? "one model") : `any ${cat}`;
+  const variants = (scope.coversVariants ?? []).filter(Boolean);
+  return variants.length > 0 ? `${who} · ${variants.join(" / ")}` : who;
+}
 
 // ── the line stamp ─────────────────────────────────────────────────────────
 

@@ -8,17 +8,23 @@ import type {
   SofaCompartmentDto,
   VariantKind,
 } from "@carres/shared";
+import type { SofaComboDto } from "@carres/shared";
 import { PRODUCT_CATEGORIES, autoBedSkuDescription, canonicalSize } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
   useCreateCatalogSku,
+  useCreateGuaranteeProduct,
   useGenerateSkus,
   useOfferModelCompartments,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
+import GuaranteeScopeFields, {
+  EMPTY_GUARANTEE_SCOPE,
+  type GuaranteeScopeValue,
+} from "./GuaranteeScopeFields";
 
 /**
  * + New SKU -- two modes:
@@ -77,6 +83,7 @@ export default function NewSkuModal({
   skus = [],
   sofaCompartments = [],
   optionPools = [],
+  sofaCombos = [],
   onClose,
 }: {
   models: ProductModelDto[];
@@ -89,6 +96,9 @@ export default function NewSkuModal({
   /** Maintenance option pools (catalog bundle) — the mattress/bedframe SIZE
    *  chips read `mattress_size` / `bedframe_size` from here. */
   optionPools?: CatalogOptionPoolDto[];
+  /** Sofa combos (catalog bundle) — the Guarantee scope picker offers them as
+   *  a coverage target. Optional so non-catalog callers stay valid. */
+  sofaCombos?: SofaComboDto[];
   onClose: () => void;
 }) {
   // Phase 2 (0175): price + cost are principal-only ("Master Admin"). A
@@ -98,6 +108,7 @@ export default function NewSkuModal({
   const isPrincipal = useAuth((s) => s.role) === "principal";
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
+  const createGuarantee = useCreateGuaranteeProduct();
   const offerCompartments = useOfferModelCompartments();
   const generateSkus = useGenerateSkus();
   const [mode, setMode] = useState<Mode>("new");
@@ -112,6 +123,11 @@ export default function NewSkuModal({
   const [name, setName] = useState("");
   // existing-model field
   const [modelId, setModelId] = useState("");
+  // GUARANTEE authoring (Loo 2026-07-26) — picking category Guarantee swaps the
+  // whole form: WHAT it covers + for how long, instead of a name + a size.
+  const [gScope, setGScope] = useState<GuaranteeScopeValue>(EMPTY_GUARANTEE_SCOPE);
+  const [gYears, setGYears] = useState("15");
+  const [gBusy, setGBusy] = useState(false);
 
   const sortedModels = useMemo(
     () =>
@@ -239,6 +255,19 @@ export default function NewSkuModal({
       ? `${modelKey.toUpperCase()}-${codeSuffix}`
       : "";
 
+  // GUARANTEE flow — a wholly separate authoring path (server mints the code,
+  // the label and the terms row atomically).
+  const guaranteeFlow = mode === "new" && category === "guarantee";
+  const gYearsNum = Number(gYears);
+  const gYearsOk = Number.isInteger(gYearsNum) && gYearsNum >= 1 && gYearsNum <= 50;
+  const gScopeOk =
+    gScope.coversCategory === "sofa"
+      ? gScope.sofaKind === "any" ||
+        (gScope.sofaKind === "model" && !!gScope.coversModelId) ||
+        (gScope.sofaKind === "combo" && !!gScope.coversComboId) ||
+        (gScope.sofaKind === "compartment" && !!gScope.coversCompartmentId)
+      : true; // non-sofa: "any model" is a legitimate scope
+
   const priceNum = price.trim() === "" ? 0 : Number(price);
   const priceOk = Number.isFinite(priceNum) && priceNum >= 0;
 
@@ -276,7 +305,9 @@ export default function NewSkuModal({
   // picked model. Both need ≥1 tick.
   const chipTargetOk =
     mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel;
-  const valid = compFlow
+  const valid = guaranteeFlow
+    ? gYearsOk && gScopeOk && isPrincipal && priceOk
+    : compFlow
     ? chipTargetOk && selectedComps.size > 0
     : sizeFlow
       ? chipTargetOk && selectedSizes.size > 0 && (!isPrincipal || priceOk)
@@ -287,6 +318,7 @@ export default function NewSkuModal({
         (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
   const pending =
+    gBusy ||
     createModel.isPending ||
     createSku.isPending ||
     offerCompartments.isPending ||
@@ -294,6 +326,32 @@ export default function NewSkuModal({
 
   async function submit() {
     if (!valid) return;
+    // GUARANTEE — one call: the server creates the model, the SKU and the terms
+    // row together, or none of them. A SKU without terms would sell a
+    // guarantee that covers nothing and mints no entitlement.
+    if (guaranteeFlow) {
+      setGBusy(true);
+      try {
+        const res = await createGuarantee.mutateAsync({
+          coversCategory: gScope.coversCategory,
+          coversModelId: gScope.coversModelId,
+          coversVariants: gScope.coversVariants.length > 0 ? gScope.coversVariants : null,
+          coversComboId: gScope.coversComboId,
+          coversCompartmentId: gScope.coversCompartmentId,
+          coverageYears: gYearsNum,
+          remedy: "replace",
+          price: priceNum,
+          description: description.trim() || null,
+        });
+        toast.success(`${res.sku} created — covers ${res.covers}`);
+        onClose();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Could not create the guarantee");
+      } finally {
+        setGBusy(false);
+      }
+      return;
+    }
     try {
       // Sofa compartment path — create the model (sofa_mode 'custom') unless
       // adding to an existing one, then offer every ticked compartment; each
@@ -458,6 +516,47 @@ export default function NewSkuModal({
                 ))}
               </select>
             </label>
+            {guaranteeFlow ? (
+              <>
+                {/* WHAT it covers — the whole point of a guarantee (Loo
+                    2026-07-26). Name, size and code are all DERIVED from this
+                    plus the years, so two people can't spell the same cover
+                    two ways. */}
+                <GuaranteeScopeFields
+                  value={gScope}
+                  onChange={setGScope}
+                  models={models}
+                  optionPools={optionPools}
+                  sofaCompartments={sofaCompartments}
+                  sofaCombos={sofaCombos}
+                />
+                <label className="block">
+                  <span className="label block mb-1">Covered for (years)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={gYears}
+                    onChange={(e) => setGYears(e.target.value)}
+                    data-testid="new-sku-guarantee-years"
+                    className={INPUT_CLS}
+                  />
+                  {!gYearsOk && gYears.trim() !== "" && (
+                    <p className="t-tiny text-danger mt-1">Between 1 and 50 years.</p>
+                  )}
+                </label>
+                {!isPrincipal && (
+                  <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2">
+                    <div className="t-small text-base-600">Principal only</div>
+                    <div className="t-tiny text-base-400 mt-0.5">
+                      A guarantee carries a multi-year liability, so only the Master Admin
+                      can author one.
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
             <label className="block">
               <span className="label block mb-1">Product name</span>
               <input
@@ -474,6 +573,7 @@ export default function NewSkuModal({
                 </div>
               )}
             </label>
+            )}
           </>
         ) : (
           <label className="block">

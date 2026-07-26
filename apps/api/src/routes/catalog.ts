@@ -517,6 +517,15 @@ catalogRouter.get("/", async (c) => {
         remedy: row.remedy,
         termsText: row.terms_text ? String(row.terms_text) : null,
         active: Boolean(row.active),
+        // 0270 scope — null at any level = ANY at that level.
+        coversModelId: row.covers_model_id ? String(row.covers_model_id) : null,
+        coversVariants: Array.isArray(row.covers_variants)
+          ? (row.covers_variants as string[])
+          : null,
+        coversComboId: row.covers_combo_id ? String(row.covers_combo_id) : null,
+        coversCompartmentId: row.covers_compartment_id
+          ? String(row.covers_compartment_id)
+          : null,
       }))
       .sort((a, b) => a.guaranteeSku.localeCompare(b.guaranteeSku)),
   });
