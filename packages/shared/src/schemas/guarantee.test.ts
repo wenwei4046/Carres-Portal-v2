@@ -437,3 +437,78 @@ describe("guaranteeCovers — sizes are compared CANONICALLY (Loo 2026-07-26)", 
     expect(guaranteeCovers({ ...scope, coversVariants: ["SS"] }, line("Super Single"))).toBe(true);
   });
 });
+
+describe("guaranteeCovers — a sofa's variant axis is its SEAT HEIGHT (0271)", () => {
+  // Loo: the variants come from that category's own Maintenance pool. For a
+  // sofa that pool is `sofa_size` (24 / 32 / Flat …), NOT a bed size — and it
+  // is matched against the BUILD's height, not the SKU variant (which is a
+  // compartment code).
+  const line = (over: Record<string, unknown> = {}) => ({
+    category: "sofa" as const,
+    modelId: "s1",
+    variant: "1A(LHF)",
+    sofaHeight: "32",
+    ...over,
+  });
+
+  it("matches the built height, ignoring the compartment-code variant", () => {
+    const scope = { coversCategory: "sofa" as const, coversVariants: ["32"] };
+    expect(guaranteeCovers(scope, line())).toBe(true);
+    expect(guaranteeCovers(scope, line({ sofaHeight: "24" }))).toBe(false);
+  });
+
+  it("does not accidentally match the compartment code as a height", () => {
+    const scope = { coversCategory: "sofa" as const, coversVariants: ["1A(LHF)"] };
+    expect(guaranteeCovers(scope, line())).toBe(false);
+  });
+
+  it("no heights ticked still means every height", () => {
+    expect(guaranteeCovers({ coversCategory: "sofa" }, line({ sofaHeight: "Flat" }))).toBe(true);
+  });
+
+  it("STACKS with a combo — 'the L-shape, at 32 inch'", () => {
+    const slots = [["1A"], ["2A"]];
+    const scope = {
+      coversCategory: "sofa" as const,
+      coversComboId: "cb1",
+      coversVariants: ["32"],
+    };
+    const at = (h: string) =>
+      guaranteeCovers(
+        scope,
+        { category: "sofa", modelId: "s1", builtModuleCodes: ["1A", "2A"], sofaHeight: h },
+        matchSofaCombo,
+        slots,
+      );
+    expect(at("32")).toBe(true);
+    expect(at("24")).toBe(false); // right shape, wrong height
+  });
+
+  it("STACKS with a compartment — that piece, at that height", () => {
+    const scope = {
+      coversCategory: "sofa" as const,
+      coversCompartmentId: "c1",
+      coversVariants: ["32"],
+    };
+    expect(guaranteeCovers(scope, line({ compartmentId: "c1" }))).toBe(true);
+    expect(guaranteeCovers(scope, line({ compartmentId: "c1", sofaHeight: "24" }))).toBe(false);
+    expect(guaranteeCovers(scope, line({ compartmentId: "c2" }))).toBe(false);
+  });
+
+  it("the authoring contract now admits sofa variants, still never accessories", () => {
+    expect(() =>
+      guaranteeProductInputSchema.parse({
+        coversCategory: "sofa",
+        coverageYears: 5,
+        coversVariants: ["32"],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      guaranteeProductInputSchema.parse({
+        coversCategory: "accessory",
+        coverageYears: 5,
+        coversVariants: ["32"],
+      }),
+    ).toThrow();
+  });
+});

@@ -59,6 +59,9 @@ const POOLS: CatalogOptionPoolDto[] = [
   { ...pool("K", "mattress_size"), label: "6FT" },
   { ...pool("Q", "mattress_size"), label: "5FT" },
   { ...pool("SS", "bedframe_size"), label: "3.5FT" },
+  // A sofa's Maintenance pool is its SEAT HEIGHT (0271).
+  { ...pool("32", "sofa_size"), label: "32" },
+  { ...pool("Flat", "sofa_size"), label: "Flat" },
 ];
 
 const COMPARTMENTS: SofaCompartmentDto[] = [
@@ -210,5 +213,39 @@ describe("GuaranteeScopeFields", () => {
     fireEvent.change(screen.getByLabelText("Covered category"), { target: { value: "sofa" } });
     expect(seen.at(-1)!.coversVariants).toEqual([]);
     expect(seen.at(-1)!.coversModelId).toBeNull();
+  });
+});
+
+describe("GuaranteeScopeFields — a sofa's variants are its seat heights (0271)", () => {
+  it("offers the seat-height pool, not bed sizes", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Covered category"), { target: { value: "sofa" } });
+    expect(screen.getByRole("button", { name: "Any height" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "32" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Flat" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "King" })).not.toBeInTheDocument();
+  });
+
+  it("heights stack on every sofa scope — they narrow the shape, not replace it", () => {
+    const seen: GuaranteeScopeValue[] = [];
+    render(<Harness onValue={(v) => seen.push(v)} />);
+    fireEvent.change(screen.getByLabelText("Covered category"), { target: { value: "sofa" } });
+    fireEvent.click(screen.getByRole("button", { name: "32" }));
+    expect(seen.at(-1)!.coversVariants).toEqual(["32"]);
+    // switching Any -> Combo must NOT throw the height away
+    fireEvent.change(screen.getByLabelText("Sofa scope"), { target: { value: "combo" } });
+    expect(seen.at(-1)!.coversVariants).toEqual(["32"]);
+    fireEvent.change(screen.getByLabelText("Covered combo"), { target: { value: "cb1" } });
+    expect(seen.at(-1)!.coversComboId).toBe("cb1");
+    expect(seen.at(-1)!.coversVariants).toEqual(["32"]);
+  });
+
+  it("accessories still get no variant row at all", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Covered category"), {
+      target: { value: "accessory" },
+    });
+    expect(screen.queryByRole("button", { name: "Any size" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Any height" })).not.toBeInTheDocument();
   });
 });

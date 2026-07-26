@@ -58,7 +58,9 @@ export default function GuaranteePickerModal({
       // A built sofa carries its modules in attrs — that is what a combo-scoped
       // guarantee is matched against.
       const attrs = l.attrs as Record<string, unknown> | null;
-      const build = attrs?.sofa_build as { cells?: { moduleCode: string }[] } | undefined;
+      const build = attrs?.sofa_build as
+        | { cells?: { moduleCode: string }[]; height?: string }
+        | undefined;
       const ok = guaranteeCovers(
         term,
         {
@@ -67,6 +69,7 @@ export default function GuaranteePickerModal({
           variant: s?.variant ?? null,
           compartmentId: s?.compartmentId ?? null,
           builtModuleCodes: build?.cells?.map((c) => c.moduleCode) ?? null,
+          sofaHeight: build?.height ?? null,
         },
         matchSofaCombo,
         combo?.slots ?? null,
