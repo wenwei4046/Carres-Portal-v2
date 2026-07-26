@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  GUARANTEE_ENTITLEMENTS,
+  GUARANTEE_TERMS,
   financeInvoiceIssueInput,
   financeInvoiceVoidInput,
   invoicesListQuery,
@@ -267,6 +269,31 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     }
   }
 
+  // 0261-0263 — guarantee cover printed on the customer's copy. A voided
+  // entitlement (cancelled order / removed line) is deliberately excluded:
+  // the invoice must never promise cover that no longer exists.
+  const { data: guaranteeRows } = await sb
+    .from(GUARANTEE_ENTITLEMENTS)
+    .select("guarantee_sku, covers_sku, covers_label, coverage_years, remedy, starts_on, expires_on, status")
+    .eq("order_id", inv.order_id)
+    .neq("status", "void")
+    .order("unit_no");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gRows = (guaranteeRows ?? []) as any[];
+  const termsBySku: Record<string, { label: string; terms_text: string | null }> = {};
+  if (gRows.length > 0) {
+    const { data: termRows } = await sb
+      .from(GUARANTEE_TERMS)
+      .select("guarantee_sku, label, terms_text");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const t of (termRows ?? []) as any[]) {
+      termsBySku[String(t.guarantee_sku)] = {
+        label: String(t.label),
+        terms_text: t.terms_text ? String(t.terms_text) : null,
+      };
+    }
+  }
+
   const taxAmount = Number(inv.tax_amount ?? 0);
   const total = invoiceAmt;
   const subtotal = +(total - taxAmount).toFixed(2);
@@ -305,6 +332,18 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    guarantees: gRows.map((g) => ({
+      label: termsBySku[String(g.guarantee_sku)]?.label ?? String(g.guarantee_sku),
+      covers:
+        (g.covers_label ? String(g.covers_label) : null) ??
+        (g.covers_sku ? String(g.covers_sku) : null) ??
+        "the mattress on this order",
+      coverage_years: Number(g.coverage_years),
+      remedy: String(g.remedy),
+      starts_on: g.starts_on ? String(g.starts_on) : null,
+      expires_on: g.expires_on ? String(g.expires_on) : null,
+      terms_text: termsBySku[String(g.guarantee_sku)]?.terms_text ?? null,
+    })),
   };
 
   return c.json(templateData);

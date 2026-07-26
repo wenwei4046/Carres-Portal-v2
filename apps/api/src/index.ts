@@ -71,6 +71,7 @@ import hrTeamRouter from "./routes/hr-team";
 import staffRouter from "./routes/staff";
 // 0240 — store-account self-service (dealer-principal email-change requests).
 import accountRouter from "./routes/account";
+import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
@@ -149,6 +150,8 @@ api.route("/hr/team", hrTeamRouter);
 api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);
+// Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
+api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/movements", operationMovementsRouter);

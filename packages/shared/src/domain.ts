@@ -69,7 +69,7 @@ export interface Salesperson {
 
 export interface ProductModel {
   id: string;
-  category: "mattress" | "bedframe" | "sofa" | "accessory" | "service"; // 0169
+  category: "mattress" | "bedframe" | "sofa" | "accessory" | "service" | "guarantee"; // 0169 + 0261
   modelKey: string;
   name: string;
   blurb: string | null;

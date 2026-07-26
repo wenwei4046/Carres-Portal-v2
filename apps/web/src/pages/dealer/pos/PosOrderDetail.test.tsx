@@ -45,6 +45,10 @@ vi.mock("@/lib/queries", () => ({
   useUpdateOrderChangeRequest: () => ({ mutateAsync: vi.fn(async () => ({})), isPending: false }),
   // 0258 — service add-on edit.
   useEditOrderAddon: () => ({ mutateAsync: h.editAddonMutateAsync, isPending: false }),
+  // 0262 — the Customer block renders <GuaranteeCoverStrip/>, which reads this
+  // hook. A full mock of this module must stub it, or the strip mounts a query
+  // with no QueryClientProvider and takes the whole surface down.
+  useOrderGuarantees: () => ({ data: undefined }),
 }));
 // 0255 — the edit surface mounts the real configure pages; stub them so the
 // drawer tests stay light. The bed stub can emit an UP-priced or DOWN-priced

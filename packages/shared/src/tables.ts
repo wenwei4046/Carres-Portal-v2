@@ -165,3 +165,14 @@ export const RENTAL_STOCK_UNITS   = "rental_stock_units" as const;
 export const SERVICE_ENTITLEMENTS = "service_entitlements" as const;
 export const SERVICE_VISITS       = "service_visits" as const;
 export const RENTAL_UNIT_EVENTS   = "rental_unit_events" as const;
+
+// ---------------------------------------------------------------------------
+// Guarantee packages (migrations 0261-0263)
+// ---------------------------------------------------------------------------
+// 0262 — guarantee_terms is the principal-owned config (what a guarantee SKU
+// promises: covered category × coverage years × remedy). guarantee_entitlements
+// is the ledger: ONE row per covered unit, minted by a trigger on order_lines
+// so every write door (create_order / add_order_lines / replace_order_lines /
+// change-request approve / AutoCount import) is covered by construction.
+export const GUARANTEE_TERMS        = "guarantee_terms" as const;
+export const GUARANTEE_ENTITLEMENTS = "guarantee_entitlements" as const;

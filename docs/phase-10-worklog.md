@@ -765,3 +765,71 @@ So saving Products genuinely worked (offered rows + skus all minted — Annsa ha
 ## 2026-07-26 ⑥ · Sofa header revert to arrow-only (PR #307, web-only, deployed)
 
 **Loo**: still overlapping — revert the sofa tab to the first version. **Final state of the configure-page header saga (PR 301→303→305→307)**: bed/mattress page = own `cfg-wizardbar` row (CARRES logo + `POS · store` + 01/02/03, logo = back, no arrow); **sofa page = the ORIGINAL arrow-only header** — that row (crumb + heights + Quick pick/Customize + PWP bar + total) has ZERO slack; both the inline (PR-301) and compact (PR-305) brand attempts overlapped it. Documented in-code (ConfigureTopbarBrand + SofaConfigurePage headers) so no third attempt; a test locks the sofa header as arrow-only. **Ship**: PR #307 (`4bb9dc64`) → `index--fYb_hd5.js` → carres-portal `4a927d12` + carres-pos `0a9bb1ed`; 4 canonicals ✓; bundle 4,025,751 bytes SERVICE_ROLE 0. Tests 63/63 touched + full web 16 = baseline. (Design-standard hex rule caught `#301/#305` in comments AGAIN — write `PR-NNN` in web-app comments, never `#NNN`.)
+
+
+## 2026-07-26 ⑦ · Guarantee packages — the 6th SKU category (migrations 0261-0263, PR pending)
+
+**Ask (Loo)**: a new SKU category `guarantee` (he corrected "warranty" → **guarantee**). Sell a
+Mattress Guarantee at RM150: our mattresses carry a 15-year warranty, and if the mattress fails
+inside that window we don't repair — we swap it one-for-one. Invoice + Customer Info must mark
+clearly who bought it, and ops must be able to track back from a claim by **Sales Order /
+customer name / customer ID** to the exact model that was covered.
+
+**Three business rulings taken before any schema was written** (asked, not assumed):
+(1) the 15 years start on **delivery**, not on the order date — the entitlement is born `pending`
+and flips to `active` the moment `orders.delivered_at` lands; (2) **1 guarantee : 1 mattress** —
+a qty-2 line mints 2 entitlement rows, because only 1:1 can answer "which model"; (3) a claim is
+**one-shot** — the swap spends the guarantee.
+
+**Shape**: `0261` widens `product_category` alone (PG forbids USING a new enum value in the
+transaction that adds it — same split as 0169→0172). `0262` adds `guarantee_terms` (config) +
+`guarantee_entitlements` (the ledger, one row per covered unit, with the covered SKU/model/label
+**snapshotted** so a rename 15 years out never orphans a claim) + the mint/void/sync triggers +
+the `guarantee_claim` / `guarantee_attach` DEFINER RPCs. `0263` seeds the RM150 / 15y / replace
+product — **not dormant**, Loo wants it sellable.
+
+**The key design call — a trigger, not RPC edits**: a guarantee line can enter an order through
+FIVE doors (create_order 0089 · add_order_lines 0231/0232 · replace_order_lines 0255/0256 ·
+change-request approve 0233/0257 · AutoCount import 0132/0237). One `AFTER INSERT` trigger on
+`order_lines` closes all five permanently. The same trigger backfills `covers_line_id` because
+create_order inserts in cart order — the guarantee can land BEFORE the mattress it covers.
+Perf: the orders trigger carries a `WHEN` clause (4 columns only); the line trigger costs one PK
+probe on a tiny table + one partial-index probe.
+
+**Expiry is DERIVED, never stored** (`effectiveGuaranteeStatus`) — an 'active' row past its date
+reads Expired whether or not any job ran. Every surface reads the derived value.
+
+**Surfaces**: SKU Master gains a Guarantee chip · POS gains a Guarantees rail whose card CANNOT
+direct-add — it opens a covered-item picker that stamps `attrs.guarantee.covers_sku` (the exact
+path the trigger reads; the contract-sacred submit pipeline is untouched) · the invoice PDF gains
+a bordered **Guarantee cover** block (covers / years / remedy in words / end date) · a
+`GuaranteeCoverStrip` sits in the Customer block of BOTH order-detail surfaces and renders
+NOTHING when there is no guarantee · new **Operation → Guarantees** desk: one box resolving all
+three track-back axes, with the one-shot Claim action (writes `order_history`, can link a
+Service Case).
+
+**Verified on prod inside rolled-back transactions before anything shipped** (the mint trigger
+sits on the order-creation hot path): qty-2 → 2 units with the right covered line + label ·
+delivered → active with expiry 2041-08-01 · guarantee-inserted-BEFORE-the-mattress → backfilled ·
+cancel → void · line deleted → row SURVIVES as void (audit trail kept) · claim refused while
+pending, accepted once delivered, refused on the second attempt, and a claimed row survives its
+line being deleted. `guarantee_entitlements` = 0 rows afterwards, test order untouched.
+
+**Two silent drift bugs found and closed while wiring**: `purchase-report.ts` and
+`apps/api/routes/catalog.ts` each kept their OWN hand-written copy of the 5-category list — the
+catalog one would have demanded a supplier for a guarantee SKU. Both now read the shared
+constant. The category enum moved to `schemas/product-category.ts` so `catalog.ts` and
+`guarantee.ts` can share it without a cycle (catalog re-exports it; no import path changed).
+
+**Test-harness lesson**: a leaf component must NOT call `useQuery` directly — drawer tests fully
+mock `@/lib/queries` and therefore install no `QueryClientProvider`, so a raw query in the leaf
+took 38 tests down. The hook moved into `@/lib/queries` (`useOrderGuarantees`) and the affected
+full mocks stub it.
+
+**Evidence**: shared 1019/1019 (+17 new) · api 1527/1530 (3 = §17.7 baseline; +7 new route tests;
+extended the invoice pdf-data mock for the two new tables and added a guarantee-block assertion)
+· web 1498/1514 (16 = §17.7 baseline; +7 new strip tests) · typecheck api 0 / web 0 / shared 2
+(pre-existing on clean origin/main) · `check:v4` clean · design-standard clean (caught one new
+grey hover — `hover:bg-hovertint`) · BUILD ran (`index-H9jzDLTX.js`), `SERVICE_ROLE` grep 0.
+Spec: `docs/guarantee-package-spec.md`. **Not deployed** — merge to main first, then deploy from
+the union tip per the permanent rule.

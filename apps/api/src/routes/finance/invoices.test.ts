@@ -325,9 +325,17 @@ describe("POST /api/finance/invoices/:id/void", () => {
 });
 
 describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
-  // Mocks both the invoice / order / lines / sku selects.
+  // Mocks the invoice / order / lines / sku selects, plus the 0262 guarantee
+  // reads (entitlements on the order + the terms labels for their names).
   type Row = Record<string, unknown>;
-  function mockChain(invoice: Row | null, order: Row | null, lines: Row[] | null = [], skuRows: Row[] | null = []) {
+  function mockChain(
+    invoice: Row | null,
+    order: Row | null,
+    lines: Row[] | null = [],
+    skuRows: Row[] | null = [],
+    guaranteeRows: Row[] | null = [],
+    guaranteeTerms: Row[] | null = [],
+  ) {
     return {
       from: vi.fn().mockImplementation((table: string) => {
         if (table === "invoices") {
@@ -362,6 +370,23 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
             }),
           };
         }
+        // 0262 — .select().eq().neq().order()
+        if (table === "guarantee_entitlements") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: guaranteeRows, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "guarantee_terms") {
+          return {
+            select: vi.fn().mockResolvedValue({ data: guaranteeTerms, error: null }),
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -392,6 +417,54 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
     expect(body.lines).toHaveLength(1);
+    // No guarantee sold on this order → the block is empty, not absent-and-broken.
+    expect(body.guarantees).toEqual([]);
+  });
+
+  it("prints the guarantee block, naming the covered item and the end date", async () => {
+    // The customer's only written proof of a 15-year promise — if this stops
+    // rendering, the invoice silently drops a liability we've been paid for.
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1241", order_id: ORDER_ID, amount: 6120, tax_amount: 453, issued_at: "2026-08-01", voided_at: null },
+      { id: ORDER_ID, so: 1241, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "10 Lorong KL", dealer_id: "d1", paid: 6120, dealers: { name: "KL Showroom", contact: "Aisha" } },
+      [{ sku: "SKU-A", qty: 1, unit_price: 5970 }, { sku: "GRT-MATTRESS-15Y", qty: 1, unit_price: 150 }],
+      [{ sku: "SKU-A", variant: "Mattress · Queen" }],
+      [
+        {
+          guarantee_sku: "GRT-MATTRESS-15Y",
+          covers_sku: "SKU-A",
+          covers_label: "B1201S King",
+          coverage_years: 15,
+          remedy: "replace",
+          starts_on: "2026-08-01",
+          expires_on: "2041-08-01",
+          status: "active",
+        },
+      ],
+      [{ guarantee_sku: "GRT-MATTRESS-15Y", label: "Mattress Guarantee 15 Years", terms_text: "One-for-one." }],
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.guarantees).toHaveLength(1);
+    expect(body.guarantees[0]).toMatchObject({
+      label: "Mattress Guarantee 15 Years",
+      covers: "B1201S King",
+      coverage_years: 15,
+      remedy: "replace",
+      expires_on: "2041-08-01",
+      terms_text: "One-for-one.",
+    });
   });
 
   it("returns 404 when invoice not found", async () => {

@@ -1,0 +1,25 @@
+-- =============================================================================
+-- 0261_guarantee_category.sql  (Loo 2026-07-26)
+-- =============================================================================
+-- A 6th product_category: 'guarantee'.
+--
+-- Business: Carres sells a *guarantee package* on top of the manufacturer
+-- warranty. v1 = "Mattress Guarantee" RM150 — if the mattress fails inside the
+-- 15-year window we do NOT repair, we swap one-for-one for a new mattress.
+--
+-- Why its own category rather than an 'accessory' or 'service' SKU:
+--   - it is not goods (no PO, no supplier, no stock, no delivery leg) and not
+--     labour either — it is a liability we carry for 15 years;
+--   - ops must be able to answer "who bought a guarantee, on which model, is it
+--     still alive" from the SKU category alone;
+--   - the POS must gate it: a guarantee only sells attached to a covered item.
+--
+-- SPLIT ON PURPOSE: Postgres forbids USING a new enum value in the same
+-- transaction that adds it. 0262 (tables + triggers) and 0263 (seed) reference
+-- 'guarantee'::product_category, so the ADD VALUE must commit alone first.
+-- Same pattern as 0169 (accessory / service) → 0172 (service SKU rows).
+--
+-- Authorized in conversation 2026-07-26 per CLAUDE.md §7.
+-- =============================================================================
+
+ALTER TYPE product_category ADD VALUE IF NOT EXISTS 'guarantee';
