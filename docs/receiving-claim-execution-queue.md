@@ -70,11 +70,34 @@ Feeds Purchase's promise-setting (short-delivery strategy already prices promise
 real supplier performance).
 **Done when:** next supplier negotiation opens with numbers, not memory.
 
+## R6 · Warehouse login — the warehouse updates itself
+
+**Concept (Jess, 2026-07-27):** the third-party warehouse stops reporting by WhatsApp;
+they log in and file receiving themselves. **The pattern ALREADY EXISTS twice** — the
+supplier portal (marks delivered + uploads DO photos) and the partner portal — warehouse
+is the THIRD external role, built the same way (own role in auth, RLS-scoped, narrow shell).
+
+What a warehouse login sees (and nothing else):
+- POs bound for THEIR warehouse (incoming list)
+- the R1 receive form (qty + photos; Pending delivery / Damaged / Wrong item)
+- their own open issues (R2 cases they reported)
+
+What it can NEVER do: prices · stock adjustments · settings · deletes · other warehouses.
+Ops reviews/approves before stock actually updates (the GRN write stays behind the
+existing RPC — warehouse submissions land as PENDING, ops confirm flips them).
+
+**Sequencing law: R6 comes AFTER R1-R2** — the inspection form must exist and be proven
+by ops first; giving outsiders a login before the structure exists recreates the
+Service-Note free-text problem. Needs a migration (role + RLS) — guardrail #8, drafts to
+Jess first.
+**Done when:** a Klang receiving lands in the system with zero ops typing — ops only
+reviews.
+
 ## LATER
 
-- Purchase Return flow (2990s has it — port, don't invent) · supplier-side portal upload ·
-  third-party warehouse login doing GRN directly (今天 ops 代录) · claim → service-case
-  cross-link view (J2 covers the order side).
+- Purchase Return flow (2990s has it — port, don't invent) · claim → service-case
+  cross-link view (J2 covers the order side) · multi-warehouse On-hand filtering (the
+  P4 note in OperationReceiving) · partner-warehouse (SSY/EU) logins after Klang proves R6.
 
 ## Status
 
@@ -85,3 +108,4 @@ real supplier performance).
 | R3 | ⬜ | — |
 | R4 | ⬜ | — |
 | R5 | ⬜ | — |
+| R6 | ⬜ after R1-R2 · warehouse login | — |
