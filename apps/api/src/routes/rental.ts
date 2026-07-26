@@ -8,15 +8,27 @@ import {
   servicePackagePatchSchema,
   rentalPlanInputSchema,
   rentalPlanPatchSchema,
+  rentalOfferInputSchema,
+  rentalOfferPatchSchema,
+  rentalBuyPriceInputSchema,
+  rentalBuyPricePatchSchema,
+  rentalOfferServiceInputSchema,
+  rentalOfferServicePatchSchema,
+  serviceSkuCode,
+  phoneKeyMy,
   customerInputSchema,
   createRentalAgreementInputSchema,
-  phoneKeyMy,
   CUSTOMERS,
   SERVICE_PACKAGES,
   RENTAL_PLANS,
   RENTAL_PLANS_POS,
+  RENTAL_OFFERS,
+  RENTAL_BUY_PRICES,
+  RENTAL_OFFER_SERVICES,
   RENTAL_AGREEMENTS,
   RENTAL_STOCK_UNITS,
+  PRODUCT_MODELS,
+  PRODUCT_SKUS,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
@@ -106,12 +118,17 @@ async function syncPlanStripe(
   try {
     // Same-SKU sibling plan's Product (deterministic DB lookup — never Stripe
     // search) so two terms on one mattress share one Product.
-    const { data: sibling } = await sb
+    // 0264 — a combo line has no sku; its siblings share the combo instead.
+    const siblingQ = sb
       .from(RENTAL_PLANS)
       .select("stripe_product_id")
-      .eq("sku", planRow.sku)
       .not("stripe_product_id", "is", null)
-      .neq("id", planRow.id)
+      .neq("id", planRow.id);
+    const { data: sibling } = await (
+      planRow.sku != null
+        ? siblingQ.eq("sku", planRow.sku)
+        : siblingQ.eq("combo_id", planRow.combo_id ?? "")
+    )
       .limit(1)
       .maybeSingle();
     const ids = await ensureRentalPlanStripeObjects(
@@ -152,12 +169,21 @@ async function syncPlanStripe(
 rentalRouter.get("/config", async (c) => {
   internalOnly(c);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [packagesR, plansR] = await Promise.all([
+  // 0264 — the tab now authors OFFERS (one per model) with their rent lines,
+  // buy prices and attached service packages. The five reads are independent;
+  // a missing table on a stale environment surfaces as a plain 500.
+  const [packagesR, plansR, offersR, buyR, offerSvcR] = await Promise.all([
     sb.from(SERVICE_PACKAGES).select("*"),
     sb.from(RENTAL_PLANS).select("*"),
+    sb.from(RENTAL_OFFERS).select("*"),
+    sb.from(RENTAL_BUY_PRICES).select("*"),
+    sb.from(RENTAL_OFFER_SERVICES).select("*"),
   ]);
   if (packagesR.error) throw new HTTPException(500, { message: packagesR.error.message });
   if (plansR.error) throw new HTTPException(500, { message: plansR.error.message });
+  if (offersR.error) throw new HTTPException(500, { message: offersR.error.message });
+  if (buyR.error) throw new HTTPException(500, { message: buyR.error.message });
+  if (offerSvcR.error) throw new HTTPException(500, { message: offerSvcR.error.message });
 
   const servicePackages = ((packagesR.data ?? []) as DB.ServicePackageRow[])
     .slice()
@@ -167,13 +193,71 @@ rentalRouter.get("/config", async (c) => {
     .slice()
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .map((r) => Adapters.rentalPlanFromRow(r));
+  const rentalOffers = ((offersR.data ?? []) as DB.RentalOfferRow[])
+    .slice()
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((r) => Adapters.rentalOfferFromRow(r));
+  const buyPrices = ((buyR.data ?? []) as DB.RentalBuyPriceRow[])
+    .slice()
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((r) => Adapters.rentalBuyPriceFromRow(r));
+  const offerServices = ((offerSvcR.data ?? []) as DB.RentalOfferServiceRow[])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+    .map((r) => Adapters.rentalOfferServiceFromRow(r));
 
-  return c.json({ servicePackages, rentalPlans });
+  return c.json({ servicePackages, rentalPlans, rentalOffers, buyPrices, offerServices });
 });
 
 // ---------------------------------------------------------------------------
 // Service packages — principal-only CRUD (RLS service_packages_write_principal).
 // ---------------------------------------------------------------------------
+
+// 0264 — a service plan IS a SKU: "one year × how many visits = one SKU"
+// (Loo 2026-07-26). Creating a package with a category and no explicit sku
+// mints `SVC-{CAT}-{TYPE}-{n}Y{visits}` under the catalog's service model, so
+// the plan can be sold, gifted and invoiced like any other product. Idempotent:
+// an existing code is reused (a package deleted and re-authored keeps its SKU).
+async function ensureServiceSku(
+  sb: ReturnType<typeof userClient>,
+  code: string,
+  name: string,
+  price: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: existing, error: readErr } = await sb
+    .from(PRODUCT_SKUS)
+    .select("sku")
+    .eq("sku", code)
+    .maybeSingle();
+  if (readErr) return { ok: false, message: readErr.message };
+  if (existing) return { ok: true };
+
+  const { data: model, error: modelErr } = await sb
+    .from(PRODUCT_MODELS)
+    .select("id")
+    .eq("category", "service")
+    .is("discontinued_at", null)
+    .limit(1)
+    .maybeSingle();
+  if (modelErr) return { ok: false, message: modelErr.message };
+  if (!model) {
+    return {
+      ok: false,
+      message: "no service-category model in the catalog — create one in Modular before authoring service plans",
+    };
+  }
+  const { error: insErr } = await sb.from(PRODUCT_SKUS).insert({
+    model_id: (model as { id: string }).id,
+    sku: code,
+    variant: code,
+    variant_kind: "preset",
+    price,
+    pos_active: true,
+    description: name,
+  });
+  if (insErr) return { ok: false, message: insErr.message };
+  return { ok: true };
+}
 
 // POST /service-packages — create (principal-only). Duplicate sku (the
 // UNIQUE service_packages.sku link) → friendly 409; unknown sku FK → 422.
@@ -183,6 +267,18 @@ rentalRouter.post("/service-packages", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const d = parsed.data;
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Auto-SKU: only when the caller named a category and gave no sku of its own.
+  let sku = d.sku ?? null;
+  if (!sku && d.category) {
+    const code = serviceSkuCode(d.category, d.serviceType, d.durationMonths, d.visitsPerYear);
+    const minted = await ensureServiceSku(sb, code, d.name, d.price);
+    if (!minted.ok) {
+      return c.json({ error: "invalid_param", code: "service_sku_mint_failed", message: minted.message }, 422);
+    }
+    sku = code;
+  }
+
   const { data, error } = await sb
     .from(SERVICE_PACKAGES)
     .insert({
@@ -191,7 +287,8 @@ rentalRouter.post("/service-packages", async (c) => {
       duration_months: d.durationMonths,
       visits_per_year: d.visitsPerYear,
       price: d.price,
-      sku: d.sku ?? null,
+      sku,
+      category: d.category ?? null,
       active: d.active ?? true,
       sort_order: d.sortOrder ?? 0,
       updated_at: new Date().toISOString(),
@@ -235,6 +332,10 @@ rentalRouter.patch("/service-packages/:id", async (c) => {
   if (d.visitsPerYear !== undefined) patch.visits_per_year = d.visitsPerYear;
   if (d.price !== undefined) patch.price = d.price;
   if (d.sku !== undefined) patch.sku = d.sku;
+  // 0264 — category is patchable, but the SKU is NOT re-minted: a code that
+  // already exists in the catalog (and possibly on an invoice) is permanent.
+  // A different duration/visits/category wants a NEW package.
+  if (d.category !== undefined) patch.category = d.category;
   if (d.active !== undefined) patch.active = d.active;
   if (d.sortOrder !== undefined) patch.sort_order = d.sortOrder;
   if (Object.keys(patch).length === 0) {
@@ -307,13 +408,18 @@ rentalRouter.post("/plans", async (c) => {
   const { data, error } = await sb
     .from(RENTAL_PLANS)
     .insert({
-      sku: d.sku,
+      sku: d.sku ?? null,
       term_months: d.termMonths,
       monthly_fee: d.monthlyFee,
       supplier_rate_pct: d.supplierRatePct,
       commission_base_pct: d.commissionBasePct,
       included_package_id: d.includedPackageId ?? null,
       active: d.active ?? false,
+      // 0264 — the parent offer + sofa targets + gifts.
+      offer_id: d.offerId ?? null,
+      combo_id: d.comboId ?? null,
+      line_kind: d.lineKind ?? (d.comboId ? "combo" : "unit"),
+      gifts: d.gifts ?? [],
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
     })
@@ -366,6 +472,10 @@ rentalRouter.patch("/plans/:id", async (c) => {
   if (d.commissionBasePct !== undefined) patch.commission_base_pct = d.commissionBasePct;
   if (d.includedPackageId !== undefined) patch.included_package_id = d.includedPackageId;
   if (d.active !== undefined) patch.active = d.active;
+  if (d.offerId !== undefined) patch.offer_id = d.offerId;
+  if (d.comboId !== undefined) patch.combo_id = d.comboId;
+  if (d.lineKind !== undefined) patch.line_kind = d.lineKind;
+  if (d.gifts !== undefined) patch.gifts = d.gifts;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -443,6 +553,323 @@ rentalRouter.delete("/plans/:id", async (c) => {
         409,
       );
     }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Rental OFFERS (0264) — the model-level config the P&M Rental tab authors:
+// which lanes are open, how the monthly base is reached, the option/fabric
+// price overlay, the surcharge slots and the split. Principal-only writes
+// (RLS rental_offers_write_principal); the per-variant money hangs off it as
+// rental_plans (rent) and rental_buy_prices (buy).
+// ---------------------------------------------------------------------------
+
+// POST /offers — create. One offer per model (UNIQUE model_id) → 409.
+rentalRouter.post("/offers", async (c) => {
+  principalOnly(c);
+  const parsed = await parseJsonBody(c, rentalOfferInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_OFFERS)
+    .insert({
+      model_id: d.modelId,
+      pricing_mode: d.pricingMode ?? "variant",
+      rent_enabled: d.rentEnabled ?? true,
+      buy_enabled: d.buyEnabled ?? false,
+      ...(d.termsMonths ? { terms_months: d.termsMonths } : {}),
+      option_prices: d.optionPrices ?? {},
+      surcharges: d.surcharges ?? [],
+      supplier_rate_pct: d.supplierRatePct ?? 0,
+      commission_base_pct: d.commissionBasePct ?? 0,
+      active: d.active ?? false,
+      notes: d.notes ?? null,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(
+        { error: "conflict", code: "duplicate_offer", message: "this model already has an offer — edit that one" },
+        409,
+      );
+    }
+    if (error.code === "23503") {
+      return c.json(
+        { error: "invalid_param", code: "invalid_model", message: "unknown model (no matching product_models row)" },
+        422,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer insert returned no row" }, 500);
+  }
+  return c.json({ offer: Adapters.rentalOfferFromRow(data as DB.RentalOfferRow) }, 201);
+});
+
+// PATCH /offers/:id — partial update; `modelId` is deliberately unpatchable
+// (zod omits it — re-pointing an authored offer would re-parent live money).
+rentalRouter.patch("/offers/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, rentalOfferPatchSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const patch: Record<string, unknown> = {};
+  if (d.pricingMode !== undefined) patch.pricing_mode = d.pricingMode;
+  if (d.rentEnabled !== undefined) patch.rent_enabled = d.rentEnabled;
+  if (d.buyEnabled !== undefined) patch.buy_enabled = d.buyEnabled;
+  if (d.termsMonths !== undefined) patch.terms_months = d.termsMonths;
+  if (d.optionPrices !== undefined) patch.option_prices = d.optionPrices;
+  if (d.surcharges !== undefined) patch.surcharges = d.surcharges;
+  if (d.supplierRatePct !== undefined) patch.supplier_rate_pct = d.supplierRatePct;
+  if (d.commissionBasePct !== undefined) patch.commission_base_pct = d.commissionBasePct;
+  if (d.active !== undefined) patch.active = d.active;
+  if (d.notes !== undefined) patch.notes = d.notes;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_OFFERS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "offer not found" }, 404);
+  }
+  return c.json({ offer: Adapters.rentalOfferFromRow(data as DB.RentalOfferRow) });
+});
+
+// DELETE /offers/:id — cascades its rent lines, buy prices and attached
+// services (all ON DELETE CASCADE). A rent line with a signed agreement blocks
+// (rental_agreements.plan_id has no cascade) → friendly 409; the soft path is
+// PATCH active=false.
+rentalRouter.delete("/offers/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(RENTAL_OFFERS).delete().eq("id", id);
+  if (error) {
+    if (error.code === "23503") {
+      return c.json(
+        {
+          error: "conflict",
+          code: "offer_in_use",
+          message: "this offer has agreements signed against it — switch it off instead",
+        },
+        409,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Buy prices (0264) — the outright lane of an offer. `price` null = sell at
+// whatever SKU Master says.
+// ---------------------------------------------------------------------------
+
+rentalRouter.post("/offers/:offerId/buy-prices", async (c) => {
+  principalOnly(c);
+  const offerId = c.req.param("offerId");
+  const parsed = await parseJsonBody(c, rentalBuyPriceInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_BUY_PRICES)
+    .insert({
+      offer_id: offerId,
+      sku: d.sku ?? null,
+      combo_id: d.comboId ?? null,
+      price: d.price ?? null,
+      gifts: d.gifts ?? [],
+      active: d.active ?? true,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(
+        { error: "conflict", code: "duplicate_buy_price", message: "that target already has a buy price on this offer" },
+        409,
+      );
+    }
+    if (error.code === "23503") {
+      return c.json(
+        { error: "invalid_param", code: "invalid_target", message: "unknown offer, sku or combo" },
+        422,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "buy price insert returned no row" }, 500);
+  }
+  return c.json({ buyPrice: Adapters.rentalBuyPriceFromRow(data as DB.RentalBuyPriceRow) }, 201);
+});
+
+rentalRouter.patch("/buy-prices/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, rentalBuyPricePatchSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const patch: Record<string, unknown> = {};
+  if (d.sku !== undefined) patch.sku = d.sku;
+  if (d.comboId !== undefined) patch.combo_id = d.comboId;
+  if (d.price !== undefined) patch.price = d.price;
+  if (d.gifts !== undefined) patch.gifts = d.gifts;
+  if (d.active !== undefined) patch.active = d.active;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_BUY_PRICES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "buy price not found" }, 404);
+  }
+  return c.json({ buyPrice: Adapters.rentalBuyPriceFromRow(data as DB.RentalBuyPriceRow) });
+});
+
+rentalRouter.delete("/buy-prices/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(RENTAL_BUY_PRICES).delete().eq("id", id);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Offer services (0264) — which service packages an offer attaches, free on
+// which lane (and for how many visits), or at what monthly / one-off price.
+// ---------------------------------------------------------------------------
+
+rentalRouter.post("/offers/:offerId/services", async (c) => {
+  principalOnly(c);
+  const offerId = c.req.param("offerId");
+  const parsed = await parseJsonBody(c, rentalOfferServiceInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_OFFER_SERVICES)
+    .insert({
+      offer_id: offerId,
+      package_id: d.packageId,
+      free_lane: d.freeLane ?? null,
+      free_visits: d.freeVisits ?? null,
+      monthly_price: d.monthlyPrice ?? null,
+      outright_price: d.outrightPrice ?? null,
+      active: d.active ?? true,
+      sort_order: d.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(
+        { error: "conflict", code: "duplicate_offer_service", message: "that package is already attached to this offer" },
+        409,
+      );
+    }
+    if (error.code === "23503") {
+      return c.json(
+        { error: "invalid_param", code: "invalid_target", message: "unknown offer or service package" },
+        422,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer service insert returned no row" }, 500);
+  }
+  return c.json(
+    { offerService: Adapters.rentalOfferServiceFromRow(data as DB.RentalOfferServiceRow) },
+    201,
+  );
+});
+
+rentalRouter.patch("/offer-services/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, rentalOfferServicePatchSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const patch: Record<string, unknown> = {};
+  if (d.freeLane !== undefined) patch.free_lane = d.freeLane;
+  if (d.freeVisits !== undefined) patch.free_visits = d.freeVisits;
+  if (d.monthlyPrice !== undefined) patch.monthly_price = d.monthlyPrice;
+  if (d.outrightPrice !== undefined) patch.outright_price = d.outrightPrice;
+  if (d.active !== undefined) patch.active = d.active;
+  if (d.sortOrder !== undefined) patch.sort_order = d.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(RENTAL_OFFER_SERVICES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "offer service not found" }, 404);
+  }
+  return c.json({ offerService: Adapters.rentalOfferServiceFromRow(data as DB.RentalOfferServiceRow) });
+});
+
+rentalRouter.delete("/offer-services/:id", async (c) => {
+  principalOnly(c);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(RENTAL_OFFER_SERVICES).delete().eq("id", id);
+  if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }

@@ -1,33 +1,41 @@
 /**
- * RentalTab — Rental + Service Plan config (migrations 0248/0249). Mirrors the
- * PromoTab test style with mocked mutation hooks.
+ * RentalTab — the rent & buy offer config (0248/0249 + 0264). Mirrors the
+ * PromoTab test style with mocked query/mutation hooks.
  *
  * Covers:
  *  - Both sections render with their dormancy-explaining empty states.
- *  - Principal vs non-principal gating ("+ New plan" / "+ New package" present
- *    or absent; rows read-only for non-principal).
- *  - Populated tables render the derived columns (serviceVisitsTotal /
- *    rentalContractValue).
- *  - Creating a plan fires useCreateRentalPlan with the camelCase payload
- *    { sku, termMonths: 84, monthlyFee: 59, supplierRatePct: 49,
- *      commissionBasePct: 20, ... } and the live preview math line renders
- *    ("4,956" contract value + "28.91" supplier share).
- *  - The package Active toggle fires usePatchServicePackage({ id, patch }).
+ *  - Principal vs non-principal gating (+ New offer / + New package present or
+ *    absent; offer rows read-only for non-principal).
+ *  - An offer row summarises its lanes, fee range and Stripe sync count.
+ *  - The model picker creates the offer (one per model — taken models hidden).
+ *  - A service package previews its auto SKU (SVC-{CAT}-{TYPE}-{n}Y{visits})
+ *    and sends `category` in the create payload.
+ *  - The editor: the rent matrix rows come from the model's live SKUs, a typed
+ *    fee creates the rent line with the offer id + line kind, an option price
+ *    lands in the overlay PATCH, and a fabric colour can be ticked one by one.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import RentalTab from "./RentalTab";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 // --- queries hooks -----------------------------------------------------------
 
+interface ConfigData {
+  servicePackages: unknown[];
+  rentalPlans: unknown[];
+  rentalOffers: unknown[];
+  buyPrices: unknown[];
+  offerServices: unknown[];
+}
 interface ConfigState {
-  data: { servicePackages: unknown[]; rentalPlans: unknown[] } | undefined;
+  data: ConfigData | undefined;
   isPending: boolean;
   error: unknown;
 }
 let configState: ConfigState;
+let catalogState: { data: unknown; isPending: boolean; error: unknown };
 
 const mockCreatePkg = vi.fn();
 const mockPatchPkg = vi.fn();
@@ -36,19 +44,61 @@ const mockCreatePlan = vi.fn();
 const mockPatchPlan = vi.fn();
 const mockDeletePlan = vi.fn();
 const mockSyncPlan = vi.fn();
+const mockCreateOffer = vi.fn();
+const mockPatchOffer = vi.fn();
+const mockDeleteOffer = vi.fn();
+const mockCreateBuy = vi.fn();
+const mockPatchBuy = vi.fn();
+const mockDeleteBuy = vi.fn();
+const mockCreateSvc = vi.fn();
+const mockPatchSvc = vi.fn();
+const mockDeleteSvc = vi.fn();
 
-vi.mock("@/lib/queries", () => ({
+vi.mock("@/lib/queries", () => {
+  /** Mutation hook whose mutateAsync records the payload (the editor awaits).
+   *  The spy is read at HOOK-CALL time — vi.mock is hoisted above the `const`
+   *  spy declarations, so touching them in the factory body would throw. */
+  const asyncHook = (spy: () => ReturnType<typeof vi.fn>) => () => ({
+    mutate: (vars: unknown) => spy()(vars),
+    mutateAsync: async (vars: unknown) => {
+      spy()(vars);
+      return { ok: true };
+    },
+    isPending: false,
+  });
+  return {
   useRentalConfig: () => configState,
+  useCatalog: () => catalogState,
   useCreateServicePackage: () => ({ mutate: mockCreatePkg, mutateAsync: vi.fn(), isPending: false }),
   usePatchServicePackage: () => ({ mutate: mockPatchPkg, mutateAsync: vi.fn(), isPending: false }),
   useDeleteServicePackage: () => ({ mutate: mockDeletePkg, mutateAsync: vi.fn(), isPending: false }),
-  useCreateRentalPlan: () => ({ mutate: mockCreatePlan, mutateAsync: vi.fn(), isPending: false }),
-  usePatchRentalPlan: () => ({ mutate: mockPatchPlan, mutateAsync: vi.fn(), isPending: false }),
-  useDeleteRentalPlan: () => ({ mutate: mockDeletePlan, mutateAsync: vi.fn(), isPending: false }),
+  useCreateRentalPlan: asyncHook(() => mockCreatePlan),
+  usePatchRentalPlan: asyncHook(() => mockPatchPlan),
+  useDeleteRentalPlan: asyncHook(() => mockDeletePlan),
   useSyncRentalPlanStripe: () => ({ mutate: mockSyncPlan, mutateAsync: vi.fn(), isPending: false }),
-}));
+  useCreateRentalOffer: () => ({
+    mutate: (vars: unknown, opts?: { onSuccess?: (r: unknown) => void }) => {
+      mockCreateOffer(vars);
+      opts?.onSuccess?.({ offer: { id: "offer-1" } });
+    },
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  usePatchRentalOffer: asyncHook(() => mockPatchOffer),
+  useDeleteRentalOffer: asyncHook(() => mockDeleteOffer),
+  useCreateRentalBuyPrice: asyncHook(() => mockCreateBuy),
+  usePatchRentalBuyPrice: asyncHook(() => mockPatchBuy),
+  useDeleteRentalBuyPrice: asyncHook(() => mockDeleteBuy),
+  useCreateRentalOfferService: asyncHook(() => mockCreateSvc),
+  usePatchRentalOfferService: asyncHook(() => mockPatchSvc),
+  useDeleteRentalOfferService: asyncHook(() => mockDeleteSvc),
+  };
+});
 
 // --- fixtures ---------------------------------------------------------------
+
+const MODEL_ID = "model-1";
+const OFFER_ID = "offer-1";
 
 function makePackage(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -58,11 +108,33 @@ function makePackage(over: Partial<Record<string, unknown>> = {}) {
     durationMonths: 24,
     visitsPerYear: 2,
     price: 399,
-    sku: "SVC-CLEAN-2Y",
+    sku: "SVC-MAT-CLEAN-2Y2",
     active: true,
     sortOrder: 0,
-    createdAt: "2026-07-25T00:00:00Z",
-    updatedAt: "2026-07-25T00:00:00Z",
+    category: "mattress",
+    createdAt: "2026-07-26T00:00:00Z",
+    updatedAt: "2026-07-26T00:00:00Z",
+    updatedBy: null,
+    ...over,
+  };
+}
+
+function makeOffer(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: OFFER_ID,
+    modelId: MODEL_ID,
+    pricingMode: "variant",
+    rentEnabled: true,
+    buyEnabled: true,
+    termsMonths: [60, 84],
+    optionPrices: {},
+    surcharges: [],
+    supplierRatePct: 49,
+    commissionBasePct: 20,
+    active: true,
+    notes: null,
+    createdAt: "2026-07-26T00:00:00Z",
+    updatedAt: "2026-07-26T00:00:00Z",
     updatedBy: null,
     ...over,
   };
@@ -76,35 +148,146 @@ function makePlan(over: Partial<Record<string, unknown>> = {}) {
     monthlyFee: 59,
     supplierRatePct: 49,
     commissionBasePct: 20,
-    includedPackageId: "pkg-1",
+    includedPackageId: null,
     active: true,
-    createdAt: "2026-07-25T00:00:00Z",
-    updatedAt: "2026-07-25T00:00:00Z",
+    stripeProductId: "prod_X",
+    stripePriceId: "price_X",
+    offerId: OFFER_ID,
+    comboId: null,
+    lineKind: "unit",
+    gifts: [],
+    createdAt: "2026-07-26T00:00:00Z",
+    updatedAt: "2026-07-26T00:00:00Z",
     updatedBy: null,
     ...over,
   };
 }
 
-function setConfig(servicePackages: unknown[] = [], rentalPlans: unknown[] = []) {
-  configState = { data: { servicePackages, rentalPlans }, isPending: false, error: null };
+/** Bed frame model: one size SKU, a leg pool, one fabric series (the colour
+ *  axis lives INSIDE the fabric — a frame has no separate colour choice). */
+function makeCatalog(category = "bedframe") {
+  return {
+    models: [
+      {
+        id: MODEL_ID,
+        category,
+        modelKey: "KAYU",
+        name: "Kayu Bed Frame",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofaMode: null,
+        discontinuedAt: null,
+        photoUrl: null,
+        allowedOptions: {},
+      },
+    ],
+    skus: [
+      {
+        id: "sku-q",
+        modelId: MODEL_ID,
+        sku: "KAYU-Q",
+        variant: "Queen",
+        variantKind: "size",
+        price: 1890,
+        supplierId: null,
+        cost: null,
+        discontinuedAt: null,
+        posActive: true,
+        description: null,
+        compartmentId: null,
+        pwpPrice: null,
+        pricesBySize: null,
+      },
+    ],
+    sofaFabrics: [],
+    addons: [],
+    floorConfig: {},
+    optionPools: [
+      {
+        id: "p1",
+        pool: "bedframe_leg_height",
+        value: '2"',
+        label: null,
+        dimensions: null,
+        surcharge: 0,
+        active: true,
+        sortOrder: 1,
+      },
+      {
+        id: "p2",
+        pool: "bedframe_leg_height",
+        value: '5"',
+        label: null,
+        dimensions: null,
+        surcharge: 120,
+        active: true,
+        sortOrder: 2,
+      },
+    ],
+    fabrics: [
+      {
+        id: "f1",
+        fabricCode: "CG-001",
+        series: "CG",
+        description: "CG-001 Pearl",
+        supplierCode: null,
+        sofaTier: "PRICE_1",
+        bedframeTier: "PRICE_1",
+        active: true,
+        sortOrder: 1,
+      },
+      {
+        id: "f2",
+        fabricCode: "CG-008",
+        series: "CG",
+        description: "CG-008 Charcoal",
+        supplierCode: null,
+        sofaTier: "PRICE_1",
+        bedframeTier: "PRICE_1",
+        active: true,
+        sortOrder: 2,
+      },
+    ],
+    specialAddons: [],
+    sofaCombos: [],
+    sofaCompartments: [],
+    modelSofaCompartments: [],
+  };
+}
+
+function setConfig(over: Partial<ConfigData> = {}) {
+  configState = {
+    data: {
+      servicePackages: [],
+      rentalPlans: [],
+      rentalOffers: [],
+      buyPrices: [],
+      offerServices: [],
+      ...over,
+    },
+    isPending: false,
+    error: null,
+  };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   setConfig();
+  catalogState = { data: makeCatalog(), isPending: false, error: null };
 });
 
 // ---------------------------------------------------------------------------
 // Sections + empty states
 // ---------------------------------------------------------------------------
 describe("RentalTab — sections + empty states", () => {
-  it("renders both section headings and the dormancy-explaining empty states", () => {
+  it("renders both section headings and the empty states", () => {
     render(<RentalTab isPrincipal={true} />);
     expect(screen.getByText("Service packages")).toBeInTheDocument();
-    expect(screen.getByText("Rental plans (rent-to-own)")).toBeInTheDocument();
+    expect(screen.getByText("Offers")).toBeInTheDocument();
     expect(screen.getByTestId("packages-empty")).toBeInTheDocument();
-    expect(screen.getByTestId("plans-empty")).toHaveTextContent(
-      "No rental plans yet — author one to prepare the POS rental lane (next phase).",
+    expect(screen.getByTestId("offers-empty")).toHaveTextContent(
+      "No offers yet — pick a model to author the first rent-to-own or outright offer.",
     );
   });
 
@@ -112,7 +295,6 @@ describe("RentalTab — sections + empty states", () => {
     configState = { data: undefined, isPending: true, error: null };
     render(<RentalTab isPrincipal={true} />);
     expect(screen.getByText(/Loading rental config/)).toBeInTheDocument();
-    expect(screen.queryByText("Service packages")).not.toBeInTheDocument();
   });
 
   it("shows the error state when the config fails", () => {
@@ -123,147 +305,295 @@ describe("RentalTab — sections + empty states", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Principal gating
+// Gating
 // ---------------------------------------------------------------------------
 describe("RentalTab — gating", () => {
-  it("principal: shows + New package and + New plan", () => {
+  it("principal: shows + New offer and + New service package", () => {
     render(<RentalTab isPrincipal={true} />);
     expect(screen.getByTestId("package-add")).toBeInTheDocument();
-    expect(screen.getByTestId("plan-add")).toBeInTheDocument();
+    expect(screen.getByTestId("offer-add")).toBeInTheDocument();
   });
 
-  it("non-principal: no add buttons, rows read-only (no Edit/Delete, pill not checkbox)", () => {
-    setConfig([makePackage()], [makePlan()]);
+  it("non-principal: no add buttons, offer row read-only (View, no delete/toggle)", () => {
+    setConfig({
+      servicePackages: [makePackage()],
+      rentalOffers: [makeOffer()],
+      rentalPlans: [makePlan()],
+    });
     render(<RentalTab isPrincipal={false} />);
     expect(screen.queryByTestId("package-add")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plan-add")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("pkg-edit-pkg-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plan-edit-plan-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("pkg-active-pkg-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plan-active-plan-1")).not.toBeInTheDocument();
-    // read-only status pills instead
-    expect(screen.getAllByText("Active").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByTestId("offer-add")).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`offer-delete-${OFFER_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`offer-active-${OFFER_ID}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId(`offer-edit-${OFFER_ID}`)).toHaveTextContent("View");
   });
 });
 
 // ---------------------------------------------------------------------------
-// Derived columns
+// Offer row summary
 // ---------------------------------------------------------------------------
-describe("RentalTab — derived table columns", () => {
-  it("package row shows total visits via serviceVisitsTotal; plan row shows contract value + included package name", () => {
-    setConfig([makePackage()], [makePlan()]);
+describe("RentalTab — offer rows", () => {
+  it("summarises the model, the monthly range and the Stripe sync count", () => {
+    setConfig({
+      rentalOffers: [makeOffer()],
+      rentalPlans: [
+        makePlan(),
+        makePlan({ id: "plan-2", termMonths: 60, monthlyFee: 69, stripePriceId: null }),
+      ],
+      buyPrices: [
+        {
+          id: "b1",
+          offerId: OFFER_ID,
+          sku: "KAYU-Q",
+          comboId: null,
+          price: 1690,
+          gifts: [],
+          active: true,
+          createdAt: "",
+          updatedAt: "",
+          updatedBy: null,
+        },
+      ],
+    });
     render(<RentalTab isPrincipal={true} />);
-    // 24 months × 2 visits/yr = 4 total
-    expect(screen.getByTestId("pkg-row-pkg-1")).toHaveTextContent("2 / yr · 4 total");
-    // RM 59 × 84 months = RM 4,956.00
-    expect(screen.getByTestId("plan-row-plan-1")).toHaveTextContent("4,956");
-    // included package resolved by id → name
-    expect(screen.getByTestId("plan-row-plan-1")).toHaveTextContent("Mattress Care Plan");
+    const row = screen.getByTestId(`offer-row-${OFFER_ID}`);
+    expect(row).toHaveTextContent("Kayu Bed Frame");
+    expect(row).toHaveTextContent("59");
+    expect(row).toHaveTextContent("69");
+    expect(row).toHaveTextContent("Buy 1 target");
+    expect(screen.getByTestId(`offer-stripe-${OFFER_ID}`)).toHaveTextContent("1 of 2 synced");
+  });
+
+  it("the On sale toggle patches the offer", () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    render(<RentalTab isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId(`offer-active-${OFFER_ID}`));
+    expect(mockPatchOffer).toHaveBeenCalledWith({ id: OFFER_ID, patch: { active: false } });
+  });
+
+  it("the Sync button re-projects every unsynced rent line", () => {
+    setConfig({ rentalOffers: [makeOffer()], rentalPlans: [makePlan({ stripePriceId: null })] });
+    render(<RentalTab isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId(`offer-sync-${OFFER_ID}`));
+    expect(mockSyncPlan).toHaveBeenCalledTimes(1);
+    expect(mockSyncPlan.mock.calls[0][0]).toBe("plan-1");
   });
 });
 
 // ---------------------------------------------------------------------------
-// Plan create + live preview
+// Model picker
 // ---------------------------------------------------------------------------
-describe("RentalTab — new plan", () => {
-  it("renders the live split preview and fires useCreateRentalPlan with the camelCase payload", () => {
+describe("RentalTab — model picker", () => {
+  it("creates the offer off a PICKED model (never a typed SKU code)", () => {
     render(<RentalTab isPrincipal={true} />);
-    fireEvent.click(screen.getByTestId("plan-add"));
-
-    fireEvent.change(screen.getByTestId("plan-sku"), { target: { value: "CLOUD-K" } });
-    // "7 years" preset pill → 84 months
-    fireEvent.click(screen.getByTestId("plan-term-84"));
-    fireEvent.change(screen.getByTestId("plan-fee"), { target: { value: "59" } });
-    fireEvent.change(screen.getByTestId("plan-supplier"), { target: { value: "49" } });
-    fireEvent.change(screen.getByTestId("plan-commission"), { target: { value: "20" } });
-
-    // live preview: RM 59.00 × 84 months = RM 4,956.00 · supplier RM 28.91/mo ·
-    // commission RM 11.80/mo · Carres RM 18.29/mo
-    const preview = screen.getByTestId("plan-preview");
-    expect(preview).toHaveTextContent("4,956");
-    expect(preview).toHaveTextContent("28.91");
-    expect(preview).toHaveTextContent("11.80");
-    expect(preview).toHaveTextContent("18.29");
-
-    fireEvent.click(screen.getByText("Create plan"));
-    expect(mockCreatePlan).toHaveBeenCalledTimes(1);
-    expect(mockCreatePlan.mock.calls[0][0]).toMatchObject({
-      sku: "CLOUD-K",
-      termMonths: 84,
-      monthlyFee: 59,
-      supplierRatePct: 49,
-      commissionBasePct: 20,
-      includedPackageId: null,
-      active: false, // a NEW plan defaults inactive
+    fireEvent.click(screen.getByTestId("offer-add"));
+    fireEvent.click(screen.getByTestId("offer-model-KAYU"));
+    expect(mockCreateOffer).toHaveBeenCalledTimes(1);
+    expect(mockCreateOffer.mock.calls[0][0]).toMatchObject({
+      modelId: MODEL_ID,
+      pricingMode: "variant",
+      rentEnabled: true,
+      buyEnabled: true,
     });
   });
 
-  it("free numeric term input overrides the presets", () => {
+  it("a model that already has an offer is not offered again (UNIQUE model_id)", () => {
+    setConfig({ rentalOffers: [makeOffer()] });
     render(<RentalTab isPrincipal={true} />);
-    fireEvent.click(screen.getByTestId("plan-add"));
-    fireEvent.change(screen.getByTestId("plan-sku"), { target: { value: "CLOUD-K" } });
-    fireEvent.change(screen.getByTestId("plan-term"), { target: { value: "36" } });
-    fireEvent.change(screen.getByTestId("plan-fee"), { target: { value: "99" } });
-    fireEvent.click(screen.getByText("Create plan"));
-    expect(mockCreatePlan.mock.calls[0][0]).toMatchObject({ termMonths: 36, monthlyFee: 99 });
+    fireEvent.click(screen.getByTestId("offer-add"));
+    expect(screen.queryByTestId("offer-model-KAYU")).not.toBeInTheDocument();
+    expect(screen.getByTestId("offer-model-empty")).toBeInTheDocument();
+  });
+
+  it("a sofa offer starts in both-modes (compartment build AND combo)", () => {
+    catalogState = { data: makeCatalog("sofa"), isPending: false, error: null };
+    render(<RentalTab isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId("offer-add"));
+    fireEvent.click(screen.getByTestId("offer-model-KAYU"));
+    expect(mockCreateOffer.mock.calls[0][0]).toMatchObject({ pricingMode: "both" });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Package create + active toggle
+// Service packages — the plan IS a SKU
 // ---------------------------------------------------------------------------
 describe("RentalTab — service packages", () => {
-  it("creating a package fires useCreateServicePackage with the camelCase payload (duration preset pill)", () => {
+  it("previews the auto SKU and sends the category in the create payload", () => {
     render(<RentalTab isPrincipal={true} />);
     fireEvent.click(screen.getByTestId("package-add"));
-    fireEvent.change(screen.getByTestId("pkg-name"), { target: { value: "Sofa Care" } });
-    fireEvent.change(screen.getByTestId("pkg-type"), { target: { value: "cleaning" } });
-    fireEvent.click(screen.getByTestId("pkg-duration-36")); // "3 years" preset
+    fireEvent.change(screen.getByTestId("pkg-name"), { target: { value: "Sofa Care — 3 years" } });
+    fireEvent.click(screen.getByTestId("pkg-category-sofa"));
+    fireEvent.click(screen.getByTestId("pkg-duration-36"));
     fireEvent.change(screen.getByTestId("pkg-visits"), { target: { value: "3" } });
     fireEvent.change(screen.getByTestId("pkg-price"), { target: { value: "499" } });
+
+    expect(screen.getByTestId("pkg-sku-preview")).toHaveTextContent("SVC-SOFA-CLEAN-3Y3");
+
     fireEvent.click(screen.getByText("Create package"));
-    expect(mockCreatePkg).toHaveBeenCalledTimes(1);
     expect(mockCreatePkg.mock.calls[0][0]).toMatchObject({
-      name: "Sofa Care",
+      name: "Sofa Care — 3 years",
+      category: "sofa",
       serviceType: "cleaning",
       durationMonths: 36,
       visitsPerYear: 3,
       price: 499,
-      sku: null,
       active: true,
     });
   });
 
-  it("the row Active toggle fires usePatchServicePackage({ id, patch })", () => {
-    setConfig([makePackage()], []);
+  it("the row shows the family it serves and its minted SKU", () => {
+    setConfig({ servicePackages: [makePackage()] });
     render(<RentalTab isPrincipal={true} />);
-    fireEvent.click(screen.getByTestId("pkg-active-pkg-1"));
-    expect(mockPatchPkg).toHaveBeenCalledTimes(1);
-    expect(mockPatchPkg.mock.calls[0][0]).toEqual({ id: "pkg-1", patch: { active: false } });
+    const row = screen.getByTestId("pkg-row-pkg-1");
+    expect(row).toHaveTextContent("mattress");
+    expect(row).toHaveTextContent("SVC-MAT-CLEAN-2Y2");
+    expect(row).toHaveTextContent("2 / yr · 4 total");
   });
 });
 
-describe("RentalTab — Stripe sync column (0255)", () => {
-  it("a synced plan shows the Synced pill; no Sync button", () => {
-    setConfig([], [makePlan({ stripeProductId: "prod_X", stripePriceId: "price_X" })]);
+// ---------------------------------------------------------------------------
+// The editor
+// ---------------------------------------------------------------------------
+describe("RentalOfferEditor — via the tab", () => {
+  function openEditor() {
     render(<RentalTab isPrincipal={true} />);
-    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Synced");
-    expect(screen.queryByTestId("plan-sync-plan-1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(`offer-edit-${OFFER_ID}`));
+  }
+
+  it("the rent matrix rows come from the model's live SKUs, one column per term", () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    expect(screen.getByTestId("rent-row-sku:KAYU-Q")).toHaveTextContent("Queen");
+    expect(screen.getByTestId("rent-fee-sku:KAYU-Q-60")).toBeInTheDocument();
+    expect(screen.getByTestId("rent-fee-sku:KAYU-Q-84")).toBeInTheDocument();
   });
 
-  it("an unsynced plan shows Not synced + the principal Sync retry fires the mutation", () => {
-    setConfig([], [makePlan({ stripeProductId: null, stripePriceId: null })]);
-    render(<RentalTab isPrincipal={true} />);
-    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Not synced");
-    fireEvent.click(screen.getByTestId("plan-sync-plan-1"));
-    expect(mockSyncPlan).toHaveBeenCalledTimes(1);
-    expect(mockSyncPlan.mock.calls[0][0]).toBe("plan-1");
+  it("a typed fee creates the rent line with the offer id, target and line kind", async () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.change(screen.getByTestId("rent-fee-sku:KAYU-Q-84"), { target: { value: "45" } });
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockCreatePlan).toHaveBeenCalled());
+    expect(mockCreatePlan.mock.calls[0][0]).toMatchObject({
+      sku: "KAYU-Q",
+      lineKind: "unit",
+      termMonths: 84,
+      monthlyFee: 45,
+      offerId: OFFER_ID,
+    });
   });
 
-  it("non-principal sees the status pill but no Sync button", () => {
-    setConfig([], [makePlan({ stripePriceId: null })]);
-    render(<RentalTab isPrincipal={false} />);
-    expect(screen.getByTestId("plan-stripe-plan-1")).toHaveTextContent("Not synced");
-    expect(screen.queryByTestId("plan-sync-plan-1")).not.toBeInTheDocument();
+  it("an option price lands in the overlay PATCH (once vs every month)", async () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.click(screen.getByTestId('option-on-leg_heights-5"'));
+    fireEvent.change(screen.getByTestId('option-monthly-leg_heights-5"'), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockPatchOffer).toHaveBeenCalled());
+    const call = mockPatchOffer.mock.calls[0][0] as {
+      patch: {
+        optionPrices: Record<
+          string,
+          { values: Record<string, { on: boolean; monthly: number | null }> }
+        >;
+      };
+    };
+    expect(call.patch.optionPrices.leg_heights!.values['5"']).toMatchObject({
+      on: true,
+      monthly: 5,
+    });
+  });
+
+  it("fabric drills down to individual colours — a tick per colour", async () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.click(screen.getByTestId("fabric-toggle-CG"));
+    fireEvent.click(screen.getByTestId("fabric-color-on-CG-008"));
+    fireEvent.change(screen.getByTestId("fabric-color-monthly-CG-008"), { target: { value: "4" } });
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockPatchOffer).toHaveBeenCalled());
+    const call = mockPatchOffer.mock.calls[0][0] as {
+      patch: {
+        optionPrices: {
+          fabrics?: {
+            series: Record<string, { colors: Record<string, { on: boolean; monthly: number | null }> }>;
+          };
+        };
+      };
+    };
+    expect(call.patch.optionPrices.fabrics!.series.CG!.colors["CG-008"]).toMatchObject({
+      on: true,
+      monthly: 4,
+    });
+  });
+
+  it("a surcharge slot is added by hand and saved with the offer", async () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.click(screen.getByTestId("surcharge-add"));
+    fireEvent.change(screen.getByTestId("surcharge-label-0"), { target: { value: "Delivery" } });
+    fireEvent.change(screen.getByTestId("surcharge-once-0"), { target: { value: "150" } });
+    fireEvent.click(screen.getByTestId("surcharge-required-0"));
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockPatchOffer).toHaveBeenCalled());
+    const call = mockPatchOffer.mock.calls[0][0] as {
+      patch: { surcharges: Array<{ label: string; oneTime: number; required: boolean }> };
+    };
+    expect(call.patch.surcharges[0]).toMatchObject({
+      label: "Delivery",
+      oneTime: 150,
+      required: true,
+    });
+  });
+
+  it("refuses a split that pays out more than it collects", () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.change(screen.getByTestId("offer-supplier-pct"), { target: { value: "70" } });
+    fireEvent.change(screen.getByTestId("offer-commission-pct"), { target: { value: "40" } });
+    expect(screen.getByTestId("offer-split-error")).toBeInTheDocument();
+    expect(screen.getByTestId("offer-save")).toBeDisabled();
+  });
+
+  it("a ticked buy target creates its outright price row", async () => {
+    setConfig({ rentalOffers: [makeOffer()] });
+    openEditor();
+    fireEvent.click(screen.getByTestId("buy-on-sku:KAYU-Q"));
+    fireEvent.change(screen.getByTestId("buy-price-sku:KAYU-Q"), { target: { value: "1690" } });
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockCreateBuy).toHaveBeenCalled());
+    expect(mockCreateBuy.mock.calls[0][0]).toMatchObject({
+      offerId: OFFER_ID,
+      input: { sku: "KAYU-Q", price: 1690 },
+    });
+  });
+
+  it("attaching a service package free on the rent lane sends the visit count", async () => {
+    setConfig({
+      rentalOffers: [makeOffer()],
+      servicePackages: [makePackage({ category: "bedframe" })],
+    });
+    openEditor();
+    fireEvent.click(screen.getByTestId("offer-service-on-pkg-1"));
+    fireEvent.change(screen.getByTestId("offer-service-lane-pkg-1"), { target: { value: "rent" } });
+    fireEvent.change(screen.getByTestId("offer-service-visits-pkg-1"), { target: { value: "2" } });
+    fireEvent.click(screen.getByTestId("offer-save"));
+    await waitFor(() => expect(mockCreateSvc).toHaveBeenCalled());
+    expect(mockCreateSvc.mock.calls[0][0]).toMatchObject({
+      offerId: OFFER_ID,
+      input: { packageId: "pkg-1", freeLane: "rent", freeVisits: 2 },
+    });
+  });
+
+  it("a mattress plan never shows on a bed-frame offer (the category token filters)", () => {
+    setConfig({
+      rentalOffers: [makeOffer()],
+      servicePackages: [makePackage({ category: "mattress" })],
+    });
+    openEditor();
+    expect(screen.queryByTestId("offer-service-on-pkg-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("offer-services-empty")).toBeInTheDocument();
   });
 });

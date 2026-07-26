@@ -1037,6 +1037,115 @@ export interface ServicePackage {
   sku: string | null;
   active: boolean;
   sortOrder: number;
+  /** 0264 — product family (drives the SVC-{MAT|BF|SOFA|ACC}-… SKU token). */
+  category: RentalOfferCategory | null;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/* ── 0264: the rental OFFER config ─────────────────────────────────────── */
+
+/** Product families an offer / service package can belong to (0264). */
+export type RentalOfferCategory = "mattress" | "bedframe" | "sofa" | "accessory";
+
+/** How an offer reaches its base monthly figure (0264). */
+export type RentalPricingMode = "variant" | "compartment" | "combo" | "both";
+
+/** Which lane gets an attached service package for free (0264). */
+export type RentalServiceFreeLane = "rent" | "buy" | "both";
+
+/** A priced option value inside the overlay — omit both prices on a fabric
+ *  colour to inherit its series. */
+export interface RentalOptionValue {
+  on: boolean;
+  oneTime: number | null;
+  monthly: number | null;
+}
+
+/** A fabric series + its per-colour overrides (colour code → value). */
+export interface RentalFabricSeries extends RentalOptionValue {
+  colors: Record<string, RentalOptionValue>;
+}
+
+/** One option group (leg_heights / divan_heights / gaps / specials) or the
+ *  fabrics group of the overlay. */
+export interface RentalOptionGroup {
+  required: boolean;
+  values: Record<string, RentalOptionValue>;
+  series: Record<string, RentalFabricSeries>;
+}
+
+/** A manual surcharge slot: charged always, or a tick the store may add. */
+export interface RentalSurcharge {
+  code: string;
+  label: string;
+  oneTime: number;
+  monthly: number;
+  required: boolean;
+}
+
+/** A free gift (GWP): a real SKU + qty. */
+export interface RentalGift {
+  sku: string;
+  qty: number;
+}
+
+/**
+ * One `rental_offers` row (migration 0264) — the model-level rent/buy offer:
+ * lanes, pricing mode, option + fabric price overlay, surcharge slots and the
+ * revenue split. `rentalOfferFromRow` maps it.
+ */
+export interface RentalOffer {
+  id: string;
+  modelId: string;
+  pricingMode: RentalPricingMode;
+  rentEnabled: boolean;
+  buyEnabled: boolean;
+  termsMonths: number[];
+  optionPrices: Record<string, RentalOptionGroup>;
+  surcharges: RentalSurcharge[];
+  supplierRatePct: number;
+  commissionBasePct: number;
+  active: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/**
+ * One `rental_buy_prices` row (0264) — the outright price of one target (SKU
+ * or sofa combo). `price` null = fall back to the SKU Master list price.
+ */
+export interface RentalBuyPrice {
+  id: string;
+  offerId: string;
+  sku: string | null;
+  comboId: string | null;
+  price: number | null;
+  gifts: RentalGift[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/**
+ * One `rental_offer_services` row (0264) — a service package attached to an
+ * offer: free on a lane (with how many visits are on us) and/or sold monthly
+ * / once.
+ */
+export interface RentalOfferService {
+  id: string;
+  offerId: string;
+  packageId: string;
+  freeLane: RentalServiceFreeLane | null;
+  freeVisits: number | null;
+  monthlyPrice: number | null;
+  outrightPrice: number | null;
+  active: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
@@ -1049,7 +1158,8 @@ export interface ServicePackage {
  */
 export interface RentalPlan {
   id: string;
-  sku: string;
+  /** Null on a `combo` line (0264) — a combo is a shape, not a sellable code. */
+  sku: string | null;
   termMonths: number;
   monthlyFee: number;
   supplierRatePct: number;
@@ -1060,6 +1170,11 @@ export interface RentalPlan {
    *  refuses online collection until the principal re-saves/syncs the plan. */
   stripeProductId: string | null;
   stripePriceId: string | null;
+  /** 0264 — parent offer · sofa combo target · line kind · free gifts. */
+  offerId: string | null;
+  comboId: string | null;
+  lineKind: "unit" | "compartment" | "combo";
+  gifts: RentalGift[];
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
@@ -1111,6 +1226,13 @@ export interface RentalAgreement {
   ownershipDocUrl: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  /** 0264 — the offer signed from + the FROZEN pick snapshot (options /
+   *  fabric colour / surcharges / sofa build), the gifts that rode along and
+   *  the money due once at signing. Re-pricing the offer never rewrites them. */
+  offerId: string | null;
+  selectedOptions: Record<string, unknown>;
+  gifts: RentalGift[];
+  oneOffTotal: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;

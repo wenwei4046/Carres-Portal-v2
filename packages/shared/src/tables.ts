@@ -162,6 +162,13 @@ export const RENTAL_PLANS_POS     = "rental_plans_pos" as const;
 export const RENTAL_AGREEMENTS    = "rental_agreements" as const;
 export const RENTAL_BILLINGS      = "rental_billings" as const;
 export const RENTAL_STOCK_UNITS   = "rental_stock_units" as const;
+// 0264 — the SETTING closed loop: an offer is authored off a Modular model
+// (option/fabric price overlay + surcharge slots + revenue split) and prices
+// two lanes — rent (rental_plans rows, one Stripe price each) and buy
+// (rental_buy_prices) — plus the service packages it attaches.
+export const RENTAL_OFFERS         = "rental_offers" as const;
+export const RENTAL_BUY_PRICES     = "rental_buy_prices" as const;
+export const RENTAL_OFFER_SERVICES = "rental_offer_services" as const;
 export const SERVICE_ENTITLEMENTS = "service_entitlements" as const;
 export const SERVICE_VISITS       = "service_visits" as const;
 export const RENTAL_UNIT_EVENTS   = "rental_unit_events" as const;

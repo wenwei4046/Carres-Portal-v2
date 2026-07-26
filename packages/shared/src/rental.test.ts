@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
+import type { RentalOptionGroup, RentalSurcharge } from "./domain";
 import {
+  compartmentBuildMonthly,
+  mergeRentalGifts,
+  quoteRental,
   rentalContractValue,
   rentalMonthlySplit,
+  resolveRentalPick,
+  serviceSkuCode,
   serviceVisitIntervalMonths,
   serviceVisitsTotal,
 } from "./rental";
 import {
   createRentalAgreementInputSchema,
   customerInputSchema,
+  rentalOfferInputSchema,
+  rentalOfferPatchSchema,
+  rentalOfferServiceInputSchema,
   rentalPlanInputSchema,
   rentalPlanPatchSchema,
   servicePackageInputSchema,
@@ -270,5 +279,322 @@ describe("createRentalAgreementInputSchema (0255 POS sell lane)", () => {
     expect(
       createRentalAgreementInputSchema.safeParse({ ...valid, supplierRatePct: 0 }).success,
     ).toBe(false);
+  });
+});
+
+// ── 0264 — the offer layer ─────────────────────────────────────────────────
+
+describe("serviceSkuCode", () => {
+  it("builds SVC-{CATEGORY}-{TYPE}-{years}Y{visits} (Loo 2026-07-26)", () => {
+    expect(serviceSkuCode("mattress", "cleaning", 12, 2)).toBe("SVC-MAT-CLEAN-1Y2");
+    expect(serviceSkuCode("sofa", "cleaning", 36, 3)).toBe("SVC-SOFA-CLEAN-3Y3");
+    expect(serviceSkuCode("bedframe", "repair", 36, 1)).toBe("SVC-BF-REPAIR-3Y1");
+    expect(serviceSkuCode("accessory", "other", 24, 4)).toBe("SVC-ACC-SVCX-2Y4");
+  });
+
+  it("keeps months when the duration is not whole years, so a code is never ambiguous", () => {
+    expect(serviceSkuCode("mattress", "cleaning", 18, 2)).toBe("SVC-MAT-CLEAN-18M2");
+  });
+
+  it("changing duration or visits changes the code — two plans cannot collide", () => {
+    expect(serviceSkuCode("mattress", "cleaning", 12, 2)).not.toBe(
+      serviceSkuCode("mattress", "cleaning", 12, 3),
+    );
+    expect(serviceSkuCode("mattress", "cleaning", 12, 2)).not.toBe(
+      serviceSkuCode("mattress", "cleaning", 24, 2),
+    );
+  });
+});
+
+/** Overlay fixture: legs 2"/3" free, 4" RM80 once, 5" RM5/mo, 10" off;
+ *  fabrics CG series free with only 2 colours authored (CG-008 at RM4/mo). */
+const OVERLAY: Record<string, RentalOptionGroup> = {
+  leg_heights: {
+    required: true,
+    series: {},
+    values: {
+      '2"': { on: true, oneTime: 0, monthly: 0 },
+      '3"': { on: true, oneTime: null, monthly: null },
+      '4"': { on: true, oneTime: 80, monthly: 0 },
+      '5"': { on: true, oneTime: 0, monthly: 5 },
+      '10"': { on: false, oneTime: 0, monthly: 0 },
+    },
+  },
+  fabrics: {
+    required: true,
+    values: {},
+    series: {
+      CG: {
+        on: true,
+        oneTime: 0,
+        monthly: 0,
+        colors: {
+          "CG-001": { on: true, oneTime: null, monthly: null },
+          "CG-008": { on: true, oneTime: null, monthly: 4 },
+          "CG-010": { on: false, oneTime: null, monthly: null },
+        },
+      },
+      EZ: { on: false, oneTime: null, monthly: null, colors: {} },
+      D: { on: true, oneTime: 0, monthly: 6, colors: {} },
+    },
+  },
+};
+
+const SURCHARGES: RentalSurcharge[] = [
+  { code: "delivery", label: "Delivery & installation", oneTime: 150, monthly: 0, required: true },
+  { code: "fabric-care", label: "Premium fabric care", oneTime: 0, monthly: 15, required: false },
+];
+
+describe("resolveRentalPick", () => {
+  it("charges an ON value and reads null as free", () => {
+    expect(resolveRentalPick(OVERLAY, { group: "leg_heights", value: '5"' })).toEqual({
+      oneTime: 0,
+      monthly: 5,
+    });
+    expect(resolveRentalPick(OVERLAY, { group: "leg_heights", value: '3"' })).toEqual({
+      oneTime: 0,
+      monthly: 0,
+    });
+  });
+
+  it("rejects an unknown group, an unknown value and a switched-off value", () => {
+    expect(resolveRentalPick(OVERLAY, { group: "divan_heights", value: '6"' })).toBeNull();
+    expect(resolveRentalPick(OVERLAY, { group: "leg_heights", value: '7"' })).toBeNull();
+    expect(resolveRentalPick(OVERLAY, { group: "leg_heights", value: '10"' })).toBeNull();
+  });
+
+  it("a fabric colour inherits its series and can override it", () => {
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "CG-001", series: "CG" })).toEqual({
+      oneTime: 0,
+      monthly: 0,
+    });
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "CG-008", series: "CG" })).toEqual({
+      oneTime: 0,
+      monthly: 4,
+    });
+  });
+
+  it("rejects an off colour, an off series, and a colour whose series was never named", () => {
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "CG-010", series: "CG" })).toBeNull();
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "EZ-001", series: "EZ" })).toBeNull();
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "CG-001" })).toBeNull();
+  });
+
+  it("a series with NO authored colours offers every colour at the series price", () => {
+    expect(resolveRentalPick(OVERLAY, { group: "fabrics", value: "D-004", series: "D" })).toEqual({
+      oneTime: 0,
+      monthly: 6,
+    });
+  });
+});
+
+describe("quoteRental", () => {
+  it("adds the picked options and the REQUIRED surcharge to the base (Loo's bed-frame example)", () => {
+    const q = quoteRental({
+      baseMonthly: 45,
+      termMonths: 84,
+      optionPrices: OVERLAY,
+      picks: [
+        { group: "leg_heights", value: '5"' },
+        { group: "fabrics", value: "CG-008", series: "CG" },
+      ],
+      surcharges: SURCHARGES,
+    });
+    expect(q.monthly).toBe(54); // 45 + 5 legs + 4 fabric
+    expect(q.oneOff).toBe(150); // delivery is required
+    expect(q.termTotal).toBe(54 * 84 + 150);
+    expect(q.invalidPicks).toEqual([]);
+  });
+
+  it("counts an optional surcharge only when the store ticked it", () => {
+    const base = {
+      baseMonthly: 40,
+      termMonths: 60,
+      optionPrices: OVERLAY,
+      picks: [],
+      surcharges: SURCHARGES,
+    };
+    expect(quoteRental(base).monthly).toBe(40);
+    expect(quoteRental({ ...base, pickedSurcharges: ["fabric-care"] }).monthly).toBe(55);
+  });
+
+  it("a one-time option is charged once, never monthly", () => {
+    const q = quoteRental({
+      baseMonthly: 45,
+      termMonths: 84,
+      optionPrices: OVERLAY,
+      picks: [{ group: "leg_heights", value: '4"' }],
+      surcharges: [],
+    });
+    expect(q.monthly).toBe(45);
+    expect(q.oneOff).toBe(80);
+    expect(q.termTotal).toBe(45 * 84 + 80);
+  });
+
+  it("reports a disallowed pick instead of silently dropping it (the signing gate)", () => {
+    const q = quoteRental({
+      baseMonthly: 45,
+      termMonths: 84,
+      optionPrices: OVERLAY,
+      picks: [{ group: "leg_heights", value: '10"' }],
+      surcharges: [],
+    });
+    expect(q.invalidPicks).toEqual(['leg_heights:10"']);
+    expect(q.monthly).toBe(45);
+  });
+
+  it("lists every charge but skips the free picks", () => {
+    const q = quoteRental({
+      baseMonthly: 45,
+      termMonths: 84,
+      optionPrices: OVERLAY,
+      picks: [
+        { group: "leg_heights", value: '2"' },
+        { group: "leg_heights", value: '5"' },
+      ],
+      surcharges: SURCHARGES,
+    });
+    expect(q.lines.map((l) => l.key)).toEqual(['leg_heights:5"', "delivery"]);
+  });
+
+  it("rounds only at the end, so the parts sum to the whole (Σ-exact)", () => {
+    const q = quoteRental({
+      baseMonthly: 10.005,
+      termMonths: 12,
+      optionPrices: {},
+      picks: [],
+      surcharges: [{ code: "x", label: "X", oneTime: 0.004, monthly: 0.004, required: true }],
+    });
+    expect(q.monthly).toBe(10.01);
+    expect(q.oneOff).toBe(0);
+  });
+
+  it("a BUY-lane quote (term 0) collects only the one-off money", () => {
+    const q = quoteRental({
+      baseMonthly: 0,
+      termMonths: 0,
+      optionPrices: OVERLAY,
+      picks: [{ group: "leg_heights", value: '4"' }],
+      surcharges: SURCHARGES,
+    });
+    expect(q.monthly).toBe(0);
+    expect(q.termTotal).toBe(230); // 80 legs + 150 delivery
+  });
+});
+
+describe("compartmentBuildMonthly", () => {
+  it("sums the picked parts (Loo: 1A 10 + 1S 20 + 2A 10 = 40/mo)", () => {
+    const out = compartmentBuildMonthly({ "1A": 10, "2A": 10, "1S": 20 }, ["1A", "1S", "2A"]);
+    expect(out.monthly).toBe(40);
+    expect(out.missing).toEqual([]);
+  });
+
+  it("counts a repeated part every time it appears", () => {
+    expect(compartmentBuildMonthly({ "1S": 20 }, ["1S", "1S"]).monthly).toBe(40);
+  });
+
+  it("reports a part with no authored rate instead of renting it free", () => {
+    const out = compartmentBuildMonthly({ "1A": 10 }, ["1A", "1L"]);
+    expect(out.monthly).toBe(10);
+    expect(out.missing).toEqual(["1L"]);
+  });
+});
+
+describe("mergeRentalGifts", () => {
+  it("merges duplicate SKUs into one line for stock and the supplier PO", () => {
+    expect(
+      mergeRentalGifts([{ sku: "PILLOW-STD", qty: 2 }], [{ sku: "PILLOW-STD", qty: 1 }, { sku: "PROTECTOR", qty: 1 }]),
+    ).toEqual([
+      { sku: "PILLOW-STD", qty: 3 },
+      { sku: "PROTECTOR", qty: 1 },
+    ]);
+  });
+});
+
+describe("rentalOfferInputSchema (0264)", () => {
+  it("accepts a minimal offer and defaults the rest server-side", () => {
+    const out = rentalOfferInputSchema.parse({ modelId: "00000000-0000-0000-0000-00000000ab01" });
+    expect(out.modelId).toBe("00000000-0000-0000-0000-00000000ab01");
+  });
+
+  it("keeps the split cap — supplier + commission can never exceed the collection", () => {
+    expect(
+      rentalOfferInputSchema.safeParse({
+        modelId: "00000000-0000-0000-0000-00000000ab01",
+        supplierRatePct: 70,
+        commissionBasePct: 40,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an unknown key and a negative option price", () => {
+    expect(
+      rentalOfferInputSchema.safeParse({ modelId: "00000000-0000-0000-0000-00000000ab01", foo: 1 }).success,
+    ).toBe(false);
+    expect(
+      rentalOfferInputSchema.safeParse({
+        modelId: "00000000-0000-0000-0000-00000000ab01",
+        optionPrices: { leg_heights: { values: { '5"': { on: true, monthly: -1 } } } },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("cannot re-point an authored offer at another model (patch omits modelId)", () => {
+    expect(
+      rentalOfferPatchSchema.safeParse({ modelId: "00000000-0000-0000-0000-00000000ab02" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("rentalPlanInputSchema targets (0264)", () => {
+  const base = { termMonths: 84, monthlyFee: 59 };
+
+  it("takes a SKU line or a combo line, never both and never neither", () => {
+    expect(rentalPlanInputSchema.safeParse({ ...base, sku: "CLOUD-K" }).success).toBe(true);
+    expect(
+      rentalPlanInputSchema.safeParse({
+        ...base,
+        comboId: "00000000-0000-0000-0000-00000000cc01",
+        lineKind: "combo",
+      }).success,
+    ).toBe(true);
+    expect(
+      rentalPlanInputSchema.safeParse({
+        ...base,
+        sku: "CLOUD-K",
+        comboId: "00000000-0000-0000-0000-00000000cc01",
+      }).success,
+    ).toBe(false);
+    expect(rentalPlanInputSchema.safeParse(base).success).toBe(false);
+  });
+
+  it("carries gifts as real SKUs with a positive qty", () => {
+    expect(
+      rentalPlanInputSchema.safeParse({ ...base, sku: "CLOUD-K", gifts: [{ sku: "PILLOW-STD", qty: 2 }] })
+        .success,
+    ).toBe(true);
+    expect(
+      rentalPlanInputSchema.safeParse({ ...base, sku: "CLOUD-K", gifts: [{ sku: "PILLOW-STD", qty: 0 }] })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("rentalOfferServiceInputSchema (0264)", () => {
+  const pkg = "00000000-0000-0000-0000-00000000dd01";
+
+  it("attaches a package free on a lane with a visit count, or priced", () => {
+    expect(
+      rentalOfferServiceInputSchema.safeParse({ packageId: pkg, freeLane: "rent", freeVisits: 2 }).success,
+    ).toBe(true);
+    expect(
+      rentalOfferServiceInputSchema.safeParse({ packageId: pkg, monthlyPrice: 19, outrightPrice: 390 })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects an unknown lane and a negative price", () => {
+    expect(rentalOfferServiceInputSchema.safeParse({ packageId: pkg, freeLane: "gift" }).success).toBe(false);
+    expect(rentalOfferServiceInputSchema.safeParse({ packageId: pkg, monthlyPrice: -1 }).success).toBe(false);
   });
 });
