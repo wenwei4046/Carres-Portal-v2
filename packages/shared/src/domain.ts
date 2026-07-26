@@ -970,12 +970,16 @@ export type ThreadReadinessRow = {
 export type ServicePackageType = "cleaning" | "repair" | "other";
 
 /**
- * `rental_agreements.status` lifecycle: active → completed →
- * ownership_transferred; early exit = buyout_pending (settle the remaining
- * months in one payment); default → defaulted/repossessed while the residual
- * settles slowly.
+ * `rental_agreements.status` lifecycle since 0268: **pending_approval** →
+ * active → completed → ownership_transferred, or pending_approval → rejected
+ * (the T&C's credit-assessment clause — finance decides before a contract goes
+ * live and before any card can be charged). Early exit = buyout_pending (settle
+ * the remaining months in one payment); default → defaulted/repossessed while
+ * the residual settles slowly.
  */
 export type RentalAgreementStatus =
+  | "pending_approval"
+  | "rejected"
   | "active"
   | "buyout_pending"
   | "completed"
@@ -1259,6 +1263,15 @@ export interface RentalAgreement {
   gifts: RentalGift[];
   oneOffTotal: number;
   notes: string | null;
+  /** 0268 — the credit decision. One pair for both outcomes; `status` says
+   *  which way. `includedPackageId` is the package promised at signing (a plan
+   *  re-price before approval cannot change it). `credit*` await the CBM hook. */
+  includedPackageId: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  rejectionReason: string | null;
+  creditCheckedAt: string | null;
+  creditReference: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;

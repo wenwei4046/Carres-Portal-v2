@@ -1124,6 +1124,15 @@ export const rentalAgreementFromRow = (r: DB.RentalAgreementRow): D.RentalAgreem
   gifts: giftsFromJson(r.gifts),
   oneOffTotal: Number(r.one_off_total ?? 0),
   notes: r.notes,
+  // 0268 credit gate. `?? null` throughout: a browser on this build may read a
+  // row shaped by a pre-0268 Worker, and a missing decision must degrade to
+  // "not decided yet" rather than undefined.
+  includedPackageId: r.included_package_id ?? null,
+  decidedBy: r.decided_by ?? null,
+  decidedAt: r.decided_at ?? null,
+  rejectionReason: r.rejection_reason ?? null,
+  creditCheckedAt: r.credit_checked_at ?? null,
+  creditReference: r.credit_reference ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   createdBy: r.created_by,
