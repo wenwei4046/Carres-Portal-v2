@@ -6,7 +6,7 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { activeSofaSizes, PRODUCT_CATEGORIES } from "@carres/shared";
+import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
@@ -50,6 +50,10 @@ const VISIBLE_CAP = 300;
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
 const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px";
+// Same tracks minus the 100px SIZE one — used when the active filter is a
+// category with no size axis (Service / Guarantee), where every SIZE cell would
+// either repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
+const GRID_COLS_NO_SIZE = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 90px 90px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -125,9 +129,15 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const sofaSizeMode =
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
+  // Loo 2026-07-26 (SKU Master screenshots): drop the SIZE column outright when
+  // the filter is a category that has none. Under "All" the column stays (other
+  // categories need it) and the sizeless ROWS render "—" instead of the noise.
+  const sizelessMode = category !== "all" && !categoryHasSizeAxis(category);
   const gridCols = sofaSizeMode
     ? `32px 170px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")}`
-    : GRID_COLS;
+    : sizelessMode
+      ? GRID_COLS_NO_SIZE
+      : GRID_COLS;
 
   // Switching category invalidates a model pick from the previous category —
   // reset synchronously in the same handler so there's no stale-filter frame.
@@ -371,7 +381,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label">Description</div>
               <div className="label">Product</div>
               <div className="label">Category</div>
-              <div className="label">Size</div>
+              {!sizelessMode && <div className="label">Size</div>}
               <div className="label text-right">Price</div>
               <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
@@ -395,6 +405,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             inlineEdit={editAll}
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
+            showSize={!sizelessMode}
           />
         ))}
       </div>
@@ -421,6 +432,7 @@ const SkuRowView = memo(function SkuRowView({
   inlineEdit,
   sofaSizes,
   gridCols,
+  showSize,
 }: {
   row: FlatRow;
   /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
@@ -435,6 +447,9 @@ const SkuRowView = memo(function SkuRowView({
    *  pool size for compartment SKUs; flat SKUs span the size tracks). */
   sofaSizes: string[] | null;
   gridCols: string;
+  /** false when the whole SIZE column is dropped (Service / Guarantee filter);
+   *  the row must then omit its SIZE cell or every later cell shifts a track. */
+  showSize: boolean;
 }) {
   const { sku, model, category, productName } = row;
   const priceEdit = inlineEdit && canEditPrices;
@@ -446,6 +461,11 @@ const SkuRowView = memo(function SkuRowView({
   // Accessory / service carry NO size/variant axis (one SKU per model, Loo
   // 2026-07-11): their SIZE may be cleared; other categories keep theirs.
   const noVariantAxis = category === "accessory" || category === "service";
+  // Loo 2026-07-26 — a Service variant IS the code and a Guarantee variant is
+  // the invoice sentence, so neither is a size. Under the "All" filter (where
+  // the column still exists for the others) such a row shows "—" rather than
+  // repeating the code / printing a sentence in the SIZE column.
+  const sizeless = !categoryHasSizeAxis(category);
 
   /** Commit the FULL code — a free, directly-renameable field (Loo 2026-07-11,
    *  AutoCount style: ACC-601). Historical orders/POs keep the OLD code string;
@@ -673,25 +693,26 @@ const SkuRowView = memo(function SkuRowView({
           {category ? CATEGORY_LABEL[category] : "—"}
         </div>
       )}
-      {inlineEdit ? (
-        <input
-          defaultValue={sku.variant}
-          onBlur={(e) => commitSize(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-          placeholder={noVariantAxis ? "no size" : undefined}
-          aria-label={`${sku.sku} size`}
-          title={
-            noVariantAxis
-              ? "Optional — accessories/services carry no size"
-              : "The SIZE label — editing it never changes the code"
-          }
-          className={`${INPUT_CLS} t-small text-[12px] w-full min-w-0`}
-        />
-      ) : (
-        <div className="t-small text-base-700">{sku.variant || "—"}</div>
-      )}
+      {showSize &&
+        (inlineEdit && !sizeless ? (
+          <input
+            defaultValue={sku.variant}
+            onBlur={(e) => commitSize(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            placeholder={noVariantAxis ? "no size" : undefined}
+            aria-label={`${sku.sku} size`}
+            title={
+              noVariantAxis
+                ? "Optional — accessories/services carry no size"
+                : "The SIZE label — editing it never changes the code"
+            }
+            className={`${INPUT_CLS} t-small text-[12px] w-full min-w-0`}
+          />
+        ) : (
+          <div className="t-small text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
+        ))}
 
       {/* Price */}
       <div className="text-right">

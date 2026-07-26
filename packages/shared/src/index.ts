@@ -12,6 +12,8 @@ export {
   CARRES_INTERNAL_SUPPLIER_SLUG,
   PRODUCT_MODEL_PHOTOS_BUCKET,
   SUPPLIERLESS_CATEGORIES,
+  SIZELESS_CATEGORIES,
+  categoryHasSizeAxis,
   type DeliveryLeadCategory,
 } from "./constants";
 

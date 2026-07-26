@@ -86,3 +86,23 @@ export const PRODUCT_MODEL_PHOTOS_BUCKET = "product-model-photos";
  * the FE Create-PO guard reads this so the boundary is explicit, not emergent.
  */
 export const SUPPLIERLESS_CATEGORIES = ["service", "accessory", "guarantee"] as const;
+
+/**
+ * Categories with NO size axis — their `product_skus.variant` is not a size at
+ * all (Loo 2026-07-26, SKU Master screenshots):
+ *   - `service`  — the variant IS the code (`SVC-DISPOSE-SOFA`), a naming
+ *     convention, so a SIZE column just repeats the CODE column;
+ *   - `guarantee` — the variant is the customer-facing invoice sentence
+ *     ("Mattress Guarantee 15 Years"), which is not a size either.
+ * `accessory` is deliberately NOT here: its variant is a legitimate optional
+ * "option" label (POS calls it that) and is merely empty today.
+ *
+ * DISPLAY-only. The column still round-trips through Export / Import SKUs, so
+ * the underlying value stays reachable.
+ */
+export const SIZELESS_CATEGORIES = ["service", "guarantee"] as const;
+
+/** True when a SIZE column carries real meaning for this category. */
+export function categoryHasSizeAxis(category: string | undefined | null): boolean {
+  return !!category && !(SIZELESS_CATEGORIES as readonly string[]).includes(category);
+}

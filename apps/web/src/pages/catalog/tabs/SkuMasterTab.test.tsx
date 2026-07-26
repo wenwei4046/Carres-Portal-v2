@@ -624,3 +624,99 @@ describe("SkuMasterTab — model filter", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// SIZE column — Service / Guarantee have no size axis (Loo 2026-07-26)
+// ---------------------------------------------------------------------------
+const MODEL_SVC: ProductModelDto = {
+  id: "m-svc",
+  category: "service",
+  modelKey: "service-addons",
+  name: "Service & Add-ons",
+  blurb: null,
+  colors: null,
+  gaps: null,
+  sofaMode: null,
+};
+
+const MODEL_GRT: ProductModelDto = {
+  id: "m-grt",
+  category: "guarantee",
+  modelKey: "GUARANTEE-MATTRESS",
+  name: "Mattress Guarantee",
+  blurb: null,
+  colors: null,
+  gaps: null,
+  sofaMode: null,
+};
+
+// A service SKU's variant IS its code — which is exactly why a SIZE column
+// there just repeats the CODE column.
+const SKU_SVC: ProductSkuDto = {
+  id: "s-svc",
+  modelId: "m-svc",
+  sku: "SVC-DISPOSE-SOFA",
+  variant: "SVC-DISPOSE-SOFA",
+  variantKind: "preset",
+  price: 50,
+  cost: null,
+  supplierId: null,
+};
+
+// A guarantee's variant is the customer-facing invoice sentence.
+const SKU_GRT: ProductSkuDto = {
+  id: "s-grt",
+  modelId: "m-grt",
+  sku: "GRT-MATTRESS-15Y",
+  variant: "Mattress Guarantee 15 Years",
+  variantKind: "preset",
+  price: 150,
+  cost: null,
+  supplierId: null,
+};
+
+describe("SkuMasterTab — SIZE column dropped where there is no size axis", () => {
+  const CAT = () =>
+    makeCatalog([SKU_COST_SET, SKU_SVC, SKU_GRT], [MODEL_MAT, MODEL_SVC, MODEL_GRT]);
+
+  it("keeps the Size header for a category that HAS sizes", () => {
+    render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.getByText("Size")).toBeInTheDocument();
+    expect(screen.getByText("King")).toBeInTheDocument();
+  });
+
+  it("drops the Size header under the Service filter", () => {
+    render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Service" }));
+    expect(screen.queryByText("Size")).not.toBeInTheDocument();
+    // The code still shows once (in CODE) — not twice.
+    expect(screen.getAllByText("SVC-DISPOSE-SOFA")).toHaveLength(1);
+  });
+
+  it("drops the Size header under the Guarantee filter", () => {
+    render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Guarantee" }));
+    expect(screen.queryByText("Size")).not.toBeInTheDocument();
+    // The invoice sentence must not be sitting in a SIZE cell.
+    expect(screen.queryByText("Mattress Guarantee 15 Years")).not.toBeInTheDocument();
+  });
+
+  it("under All, keeps the column for the others but shows no size noise", () => {
+    render(wrap(<SkuMasterTab catalog={CAT()} />));
+    // "All" is the default filter.
+    expect(screen.getByText("Size")).toBeInTheDocument();
+    expect(screen.getByText("King")).toBeInTheDocument();
+    expect(screen.getAllByText("SVC-DISPOSE-SOFA")).toHaveLength(1);
+    expect(screen.queryByText("Mattress Guarantee 15 Years")).not.toBeInTheDocument();
+  });
+
+  it("edit-all offers no size input for a sizeless row (the value is not a size)", () => {
+    render(wrap(<SkuMasterTab catalog={CAT()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Service" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.queryByLabelText("SVC-DISPOSE-SOFA size")).not.toBeInTheDocument();
+    // The code stays editable — only the phantom SIZE field is gone.
+    expect(screen.getByLabelText("SVC-DISPOSE-SOFA code")).toBeInTheDocument();
+  });
+});
