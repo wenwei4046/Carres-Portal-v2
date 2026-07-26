@@ -64,8 +64,19 @@ import {
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
-import { renderDoPdf, renderReceiptPdf, renderInvoicePdf } from "@/lib/pdf/render";
-import type { DoTemplateData, InvoiceTemplateData } from "@/lib/pdf/types";
+import {
+  renderDoPdf,
+  renderReceiptPdf,
+  renderInvoicePdf,
+  renderSalesOrderPdf,
+  renderPoPdf,
+} from "@/lib/pdf/render";
+import type {
+  DoTemplateData,
+  InvoiceTemplateData,
+  SalesOrderTemplateData,
+  PoTemplateData,
+} from "@/lib/pdf/types";
 import {
   qk,
   useOperationOrder,
@@ -150,6 +161,12 @@ import FollowUpForm from "./FollowUpForm";
 import ReceivePOModal from "./ReceivePOModal";
 import AnnotationTimeline from "./AnnotationTimeline";
 import ChangeRequestsPanel from "./ChangeRequestsPanel";
+import OrderDocuments, {
+  deriveOrderDocuments,
+  countDocumentsOnFile,
+  countDocumentsMissing,
+  type OrderDocRow,
+} from "./OrderDocuments";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -813,7 +830,14 @@ function DeliveryNotesLog({
 
 /** The drawer's detail tabs (Jess 2026-07-17): Items+Warehouse share ONE tab;
  *  every other panel is its own tab. Contents stay mounted behind `hidden`. */
-type DrawerTab = "items" | "delivery" | "balance" | "storage" | "loan" | "activity";
+type DrawerTab =
+  | "items"
+  | "delivery"
+  | "balance"
+  | "storage"
+  | "loan"
+  | "documents"
+  | "activity";
 
 /** Track tone — drives the tab-rail alert dots. */
 type KpiTone = "success" | "warning" | "danger" | "neutral";
@@ -1735,6 +1759,71 @@ function DrawerBody({
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
 
+  // ═══ J1 — the Documents list, derived at read time ═══
+  // Nothing new is stored or fetched for this: the invoice + delivery-order
+  // numbers ride the order row, receipts are the payment ledger, purchase
+  // orders + their signed supplier DO ride the detail payload, and the photo
+  // ledger is T6's own query (asked for only once the order is delivered,
+  // since that is the only state where a photo can exist).
+  const docPhotosQ = useDeliveryPhotos(order.id, { enabled: deliveredDone });
+  const supplierNameOf = (id: string | null): string | null =>
+    (suppliersData?.suppliers ?? []).find((s) => s.id === id)?.name ?? null;
+  const documentRows = deriveOrderDocuments({
+    so: order.so,
+    invoiceNo: order.invoice_no ?? null,
+    doNumber: order.do_number ?? null,
+    // "Left the warehouse" — the transition that auto-issues BOTH the invoice
+    // and the delivery order number (0098). Past it, either one absent is a gap.
+    dispatched: stage === "dispatched" || stage === "delivered",
+    delivered: deliveredDone,
+    payments: ledger.map((p) => ({
+      id: p.id,
+      receiptNo: p.receipt_no,
+      // Only a fallback: a receipt row that has no number yet is named by the
+      // day it was paid, in the compact date form the drawer uses elsewhere.
+      paidOnLabel: fmtDateShort(p.paid_on),
+    })),
+    pos: pos.map((p) => ({
+      id: p.id,
+      supplierName: supplierNameOf(p.supplier_id),
+      received: p.status === "received",
+      doFilePath: p.do_file_path ?? null,
+    })),
+    photos: docPhotosQ.data?.photos ?? [],
+  });
+  const docsOnFile = countDocumentsOnFile(documentRows);
+  const docsMissing = countDocumentsMissing(documentRows);
+  /** Open one document. Every path already existed — this is the one place
+   *  that routes a row to it, so the panel adds no new way to fetch a file. */
+  const openDocument = (row: OrderDocRow) => {
+    switch (row.kind) {
+      case "sales_order":
+        void openSalesOrderPdf(order.id, order.so);
+        return;
+      case "invoice":
+        void openInvoicePdf(order.id, order.so);
+        return;
+      case "delivery_order":
+        void openDoPdf(order.id);
+        return;
+      case "receipt": {
+        const p = ledger.find((r) => r.id === row.paymentId);
+        if (p) void openReceipt(p, receiptMetaOf());
+        return;
+      }
+      case "purchase_order":
+        if (row.poId) void openPoPdf(row.poId);
+        return;
+      case "supplier_do":
+        if (row.storagePath) void openSupplierDo(row.storagePath);
+        return;
+      case "delivery_photo":
+        if (row.photoUrl) window.open(row.photoUrl, "_blank", "noopener");
+        else toast.error("That photo's link expired — reopen the order");
+        return;
+    }
+  };
+
   // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
   // N/M ready + that category's supplier status + its OWN PO-led chase.
   // Chase targets group by PO: a portal PO resolves its supplier name; an
@@ -2284,6 +2373,18 @@ function DrawerBody({
                 label: "Loan",
                 icon: Undo2,
                 v: liveLoanCount > 0 ? String(liveLoanCount) : undefined,
+              },
+              /* J1 — every paper this order has, in one place. A utility, not
+                 a step: it sits with Loan / Activity, never on the spine. The
+                 count is what is ON FILE; the amber dot means a document the
+                 order should already have is missing. */
+              {
+                key: "documents",
+                label: "Documents",
+                icon: FileText,
+                v: String(docsOnFile),
+                w: docsMissing > 0 ? `${docsMissing} missing` : undefined,
+                tone: docsMissing > 0 ? "warning" : undefined,
               },
               { key: "activity", label: "Activity", icon: ScrollText },
             ] as {
@@ -3110,6 +3211,31 @@ function DrawerBody({
           </Panel>
           </SectionCard>
 
+          </div>
+
+          <div className={tab === "documents" ? "min-h-full flex flex-col gap-3" : "hidden"}>
+          <SectionCard className="shrink-0">
+          {/* J1 (Order Journey) — Documents. Every paper this order has, one
+              row each, and what is missing said out loud. Derived at read
+              time from records already on screen elsewhere: nothing is stored
+              here, nothing is linked by hand. Read-only on purpose — the
+              delivery photo is UPLOADED in the Delivery card, so there is one
+              upload door, not two. */}
+          <Panel
+            title="Documents"
+            summary={
+              docsMissing > 0 ? (
+                <MiniBadge tone="waiting">{docsMissing} missing</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">
+                  {docsOnFile} on file
+                </MiniBadge>
+              )
+            }
+          >
+            <OrderDocuments rows={documentRows} onOpen={openDocument} />
+          </Panel>
+          </SectionCard>
           </div>
 
           <div className={tab === "activity" ? "min-h-full flex flex-col gap-3" : "hidden"}>
@@ -4931,6 +5057,53 @@ async function openDoPdf(orderId: string) {
 
 // Invoice print stays reserved for the ⋮ menu; DO print is wired on the card.
 void openInvoicePdf;
+
+/** J1 — the Sales Order PDF, same fetch-render-open flow DownloadSalesOrderButton
+ *  runs. A function (not the button) because the Documents panel renders a
+ *  uniform Open control on every row. */
+async function openSalesOrderPdf(orderId: string, so: number) {
+  try {
+    const data = await apiFetch<SalesOrderTemplateData>(
+      `/api/orders/${orderId}/sales-order-data`,
+    );
+    const blob = await renderSalesOrderPdf(data);
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+    toast.success(`Sales Order SO-${String(so).padStart(6, "0")} opened`);
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`Open sales order failed — ${msg}`);
+  }
+}
+
+/** J1 — the Purchase Order PDF, the same endpoint + renderer PoDetailModal's
+ *  Print button uses. */
+async function openPoPdf(poId: string) {
+  try {
+    const data = await apiFetch<PoTemplateData>(
+      `/api/operation/pos/${poId}/print-data`,
+    );
+    const blob = await renderPoPdf(data);
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  } catch (e) {
+    const msg = e instanceof ApiError ? e.message : String(e);
+    toast.error(`Open purchase order failed — ${msg}`);
+  }
+}
+
+/** J1 — the supplier's signed DO in the private `delivery-orders` bucket.
+ *  Signed browser-side with the caller's own JWT: the bucket's
+ *  `delivery_orders_read` policy admits operation + principal outright, so
+ *  this needs no Worker route (the same pattern viewSlip uses). */
+async function openSupplierDo(path: string) {
+  const { data, error } = await supabase.storage
+    .from("delivery-orders")
+    .createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) {
+    toast.error(`Couldn't open the supplier DO — ${error?.message ?? "no URL"}`);
+    return;
+  }
+  window.open(data.signedUrl, "_blank", "noopener");
+}
 
 /** Malaysian receiving banks for the Bank-transfer dropdown (free set — the
  *  name rides `reference`, no schema change). */
