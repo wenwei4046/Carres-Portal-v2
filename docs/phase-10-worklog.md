@@ -901,3 +901,22 @@ Three tests lock header ≡ row (size present / size dropped / Guarantee); **ver
 **Decisions locked the same session** (full text in `docs/rental-service-plan-proposal.md`): the agreement doc prints Loo's T&C verbatim and is signed at the sales order (no signature, no order → no draft state) with the **free service package deliberately excluded** (a promotion, not a rental term); five gaps flagged for his lawyer (no ownership-transfer clause, no buyout clause, "rental excludes servicing" vs a free care plan, the 7th-of-month + 8%/month terms, the credit-assessment clause); the **buyout/settlement** lane (finance clears the remaining months, customer-signed supporting document attached); **Stripe** — the 8% penalty is not native so the engine pushes a one-off invoice item, and subscriptions go past-due rather than cancel because termination after six missed months is MANUAL; the new finance **Approver page** (CBM API hook later) that gates an order into operations.
 
 **Evidence**: RentalSettingPage 24/24 · catalog 217/217 · full web 1520/1536 (16 = §17.7 baseline) · design-standard clean · build ok. **Ship**: PR #324 (merge `93a64a7a`, union with the SKU-Master-grid line's #319/#321) → web `index-B4SBrkkQ.js` → carres-portal `92157205` + carres-pos `8b19c4d1`; 4 canonicals ✓ (pos.carresofficial.com took a second curl ~40s later); live bundle 4,083,949 bytes, `SERVICE_ROLE` grep 0. API untouched this round.
+
+
+## 2026-07-26 ⑪ · Guarantee ID — the handle a claim is made against (0267, PR #328, deployed)
+
+**Loo**: every guarantee needs an ID — 4 random letters + 6 random digits, generated when the Sales Order is created, used for all tracking and for the claim, shown in the item's remark, and **deleted once claimed**.
+
+**Why the format is good rather than decorative**: the blocks are POSITIONAL — a letter can only sit in the first four slots, a digit only in the last six — so O-vs-0 and I-vs-1 can never be ambiguous when a customer reads the ID off a printed Sales Order and the counter retypes it.
+
+**Minted inside the existing trigger**, so it arrives through the one door all five write paths already funnel into. `gen_guarantee_id()` retries against BOTH the live and the retired column: a spent ID is never reissued to a different customer, which would make the audit trail ambiguous.
+
+**It lands on the LINE too** — the trigger writes `attrs.guarantee.ids` and appends `Guarantee ID: …` to `attrs.remark`, which `lineConfigBits` already prints as `✎ …` on the drawer and the Sales Order PDF. So the customer's own paperwork carries it **with no template change**; an operator-typed remark is preserved, not clobbered.
+
+**"Deleted on claim" implemented as a MOVE, and Loo was told why**: `guarantee_id` is cleared (the ID leaves the live space, can never be claimed twice — his rule) and the spent string lands in `claimed_guarantee_id`. Without that column a customer presenting an old ID gets "not found", which reads identical to a fake or a typo; with it, ops says "claimed on 3 March". Both columns are searched and a retired ID renders struck-through. Erasing it outright stays a one-line change.
+
+**Prod rollback-test before shipping**: format `^[A-Z]{4}[0-9]{6}$` ✓ · qty-2 mints two distinct IDs ✓ · remark preserved the operator text then appended both ✓ · claim cleared the live column, kept the spent one, left unit 2 live ✓ · order_history names the ID ✓ — all rolled back. **Loo had already placed a live test order (SO-1258, May Tan) minutes before the migration**, so it also backfills the ID *and* the line remark; verified `KQYZ939913` now reads on the line.
+
+**THREE-WAY 0267 collision**: three parallel sessions applied a `0267_*` within two minutes (auth-hook 054334 · guarantee_id 054413 · rental templates 054452). The tracker keys on timestamp so all three are fine; per the standing rule NONE were renumbered.
+
+**Ship**: PR #328 (merge `71be3bcc`) → api Worker `05649c23` (unauth `?q=ABCD123456` 401 ✓) + web `index-Dygf2tsy.js` → carres-portal `062451cd` + carres-pos `18f65b70`; all 4 canonicals ✓; downloaded 4,084,708 bytes, `SERVICE_ROLE` 0, ID marker ✓. Tests: shared 1069/1069 (+6) · api 1547/1550 (3 = §17.7 baseline; guarantees 9/9) · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean.
