@@ -74,6 +74,7 @@ import {
   type RentalAgreement,
   type RentalStockUnit,
   type GuaranteeListResponse,
+  type ServiceCaseListResponse,
   type GuaranteeProductInput,
   type PosRentalPlan,
   type Customer,
@@ -309,6 +310,12 @@ export const qk = {
   guarantees: {
     search: (q: string, status: string) => ["guarantees", "search", q, status] as const,
     byOrder: (orderId: string) => ["guarantees", "by-order", orderId] as const,
+  },
+  serviceCases: {
+    // Shares the ["ops","service-cases"] prefix the list page and modal already
+    // invalidate, so saving a case refreshes the order drawer's Cases tab too.
+    byOrder: (orderId: string) =>
+      ["ops", "service-cases", "by-order", orderId] as const,
   },
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
@@ -7891,6 +7898,33 @@ export function useOrderGuarantees(
   return useQuery<GuaranteeListResponse>({
     queryKey: qk.guarantees.byOrder(orderId),
     queryFn: () => apiFetch<GuaranteeListResponse>(`/api/guarantees/order/${orderId}`),
+    staleTime: 30_000,
+    retry: false,
+    ...opts,
+  });
+}
+
+/**
+ * J2 — every service case that names this order. Powers the order drawer's
+ * Cases tab (the order→case half of the cross-link).
+ *
+ * Filtered server-side by `?orderId=`, not fetched-then-filtered: the case list
+ * is company-wide and would only grow.
+ *
+ * `retry: false` mirrors useOrderGuarantees — the Cases tab is silent-when-
+ * absent, so a failed read must degrade to "no cases shown" rather than
+ * blocking the drawer with an error the operator can do nothing about.
+ */
+export function useOrderServiceCases(
+  orderId: string,
+  opts?: Partial<UseQueryOptions<ServiceCaseListResponse>>,
+) {
+  return useQuery<ServiceCaseListResponse>({
+    queryKey: qk.serviceCases.byOrder(orderId),
+    queryFn: () =>
+      apiFetch<ServiceCaseListResponse>(
+        `/api/ops/service-cases?orderId=${encodeURIComponent(orderId)}`,
+      ),
     staleTime: 30_000,
     retry: false,
     ...opts,

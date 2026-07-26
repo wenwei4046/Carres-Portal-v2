@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   useAllPendingChangeRequests,
   useOperationOrders,
@@ -1242,7 +1242,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => tabFromStageParam(params.stage) ?? "all",
   );
   const [search, setSearch] = useState("");
-  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // J2 — `?order=<id>` opens that order's drawer on arrival, which is how a
+  // Service Case links back to the order it is about. Seeded into the initial
+  // state, so the drawer is the first thing rendered rather than a flash of the
+  // list. The param is stripped once consumed: closing the drawer must return
+  // to the list, not re-open the order.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openOrderId, setOpenOrderId] = useState<string | null>(
+    () => searchParams.get("order"),
+  );
+  useEffect(() => {
+    const deepLink = searchParams.get("order");
+    if (!deepLink) return;
+    // Also SET it, not only strip it: the lazy initializer above covers a fresh
+    // mount, but a link arriving while this page is already mounted would
+    // otherwise clear the param and open nothing.
+    setOpenOrderId(deepLink);
+    const next = new URLSearchParams(searchParams);
+    next.delete("order");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   // Share the open order with the global right rail so its Activity panel shows
   // THIS order's history (Jess 2026-06-30: Activity moved off the page).
   useEffect(() => {

@@ -7,6 +7,7 @@ import type {
   ServiceCaseConfig,
 } from "@carres/shared";
 import { Search, X } from "lucide-react";
+import CaseOrderLink from "./CaseOrderLink";
 
 /**
  * Create / edit a Service Case (病历).
@@ -188,7 +189,16 @@ export default function ServiceCaseModal({
             </Field>
             <Field label="Linked Order">
               <div className="px-2.5 py-1.5 text-sm text-base-600">
-                {matchedSo ?? (orderId ? "linked" : <span className="text-base-400">— none —</span>)}
+                {/* J2 — the case→order link. This field used to render the bare
+                    word "linked" whenever the case was opened for editing:
+                    `matchedSo` is only ever set by the create-mode lookup, so an
+                    existing case could name its order only in the session that
+                    created it. It is a real link now, in both modes. */}
+                {matchedSo ? (
+                  <CaseOrderLink orderId={orderId} so={soFromMatch(matchedSo)} />
+                ) : (
+                  <CaseOrderLink orderId={orderId} so={existingQ.data?.so} />
+                )}
               </div>
             </Field>
           </div>
@@ -288,4 +298,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** The create-mode lookup hands back the SO as a string ("SO-1147"); the link
+ *  wants the number. Anything unparseable falls back to no number, which still
+ *  renders a working link (the deep link travels by order id). */
+function soFromMatch(matched: string): number | undefined {
+  const n = parseInt(matched.replace(/^S[O0]-?/i, ""), 10);
+  return Number.isNaN(n) ? undefined : n;
 }
