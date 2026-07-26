@@ -27,7 +27,7 @@
 - `docs/inventory-module-proposal.md` exists — sibling spec; on conflict, THIS queue +
   Jess's locked shape above win.
 
-## K0 · One Stock door (kills the word confusion)
+## K0 · One Stock door (kills the word confusion) ✅ (PR #376)
 
 **Problem (Jess, 2026-07-27):** On Hand / Movements / Inventory / Ready stock — four words
 for ONE warehouse. **Fix:** merge the two sidebar items into ONE `Stock` entry with tabs:
@@ -99,7 +99,7 @@ SKU rows.
 
 | Card | Status | PR |
 |---|---|---|
-| K0 | ⬜ nav-only, can ship any time | — |
+| K0 | ✅ shipped 2026-07-27 | #376 |
 | K1 | ⬜ | — |
 | K2 | ⬜ | — |
 | K3 | ⬜ | — |
