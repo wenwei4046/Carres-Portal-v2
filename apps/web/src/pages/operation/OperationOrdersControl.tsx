@@ -198,7 +198,10 @@ function controlTabOf(
     // 2026-07-19: "why scheduled no showing?"). Same fix as nextActionOf #5.
     const stockReady =
       stockBucketOf(o, availableBySku) === "Ready" || stockEtaOf(o).state === "ready";
-    const logisticBooked = !!logisticEtaOf(o);
+    // T1 (0277): "a slot booked" = the CUSTOMER confirmed (booking_stage), not
+    // the carrier's provisional logistic_eta — provisional rows stay Pending,
+    // so the tab counts agree with the drawer's booking chip.
+    const logisticBooked = bookingConfirmedOf(o);
     return stockReady && logisticBooked ? "scheduled" : "pending";
   }
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
@@ -501,11 +504,20 @@ function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
 //  openTaskOf / taskUrgency above + the tasksByOrder map in the component.)
 
 /** The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180) —
- *  distinct from the customer `delivery_date` deadline. */
+ *  distinct from the customer `delivery_date` deadline. Since 0277 (D1) this is
+ *  the Stage-1 PROVISIONAL date: the carrier's word, not the customer's yes. */
 function logisticEtaOf(o: operationOrderListRow): string | null {
   const raw = o.ops_order_control;
   const ovl = Array.isArray(raw) ? raw[0] : raw;
   return ovl?.logistic_eta ?? null;
+}
+
+/** D1 two-stage booking (0277, T1) — TRUE only when the CUSTOMER confirmed the
+ *  delivery: booking_stage='confirmed' AND a confirmed_date (invariant #1 —
+ *  the stage word alone is never trusted without its date). */
+function bookingConfirmedOf(o: operationOrderListRow): boolean {
+  const ovl = ovlOf(o);
+  return ovl?.booking_stage === "confirmed" && !!ovl.confirmed_date;
 }
 
 /** C-vocab (Jess 2026-07-19): the QUEUES rows ARE the NEXT verbs — one
@@ -596,20 +608,26 @@ export function rowDotsOf(
   else if (se.state === "overdue" || se.state === "late")
     goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
   else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
-  // 送 — guardrail #2: a delivered order never alarms. Open: booked = green,
-  // not booked = amber NORMAL state (truth ladder §12), red only past deadline.
+  // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
+  // reserved for the CUSTOMER's confirmation; a provisional carrier date stays
+  // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
   if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
-  else if (logi.key === "scheduled")
-    delivery = { color: DOT_HEX.green, title: "Delivery — booked" };
+  else if (logi.key === "confirmed")
+    delivery = { color: DOT_HEX.green, title: "Delivery — customer confirmed" };
   else if (logi.key === "unassigned")
     delivery = { color: DOT_HEX.grey, title: "Delivery — no carrier yet" };
   else {
     const dd = daysToDue(o);
+    const late = dd !== null && dd < 0;
     delivery =
-      dd !== null && dd < 0
-        ? { color: DOT_HEX.red, title: "Delivery — past deadline, not booked" }
-        : { color: DOT_HEX.amber, title: "Delivery — not booked yet" };
+      logi.key === "provisional"
+        ? late
+          ? { color: DOT_HEX.red, title: "Delivery — past deadline, customer not confirmed" }
+          : { color: DOT_HEX.amber, title: "Delivery — carrier date only, customer not confirmed" }
+        : late
+          ? { color: DOT_HEX.red, title: "Delivery — past deadline, no booking" }
+          : { color: DOT_HEX.amber, title: "Delivery — needs a booking" };
   }
   return [money, goods, delivery];
 }
@@ -665,7 +683,9 @@ export function nextActionOf(
   // an empty action).
   const dd = daysToDue(o);
   const hasPartner = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
-  if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !logisticEtaOf(o))
+  // T1 (0277): "no delivery booked" = the customer hasn't confirmed — a
+  // provisional carrier date past the deadline still escalates.
+  if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !bookingConfirmedOf(o))
     return { label: "Chase logistic", tone: "danger" };
 
   // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
@@ -695,10 +715,13 @@ export function nextActionOf(
     return { label: "Chase supplier", tone: overdue ? "danger" : "warning" };
   }
 
-  // LOGISTIC TRACK — stock is in; arrange the delivery.
+  // LOGISTIC TRACK — stock is in; arrange the delivery. T1 (0277): the chase
+  // ends only on the CUSTOMER's confirmation — a provisional carrier date
+  // (logistic_eta alone) keeps the row in the Chase logistic queue, matching
+  // the drawer's "not confirmed" chip.
   if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
     return { label: "Assign logistic", tone: "info" };
-  if (!logisticEtaOf(o)) return { label: "Chase logistic", tone: "info" };
+  if (!bookingConfirmedOf(o)) return { label: "Chase logistic", tone: "info" };
 
   // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate action).
   const ovl = ovlOf(o);
@@ -748,32 +771,54 @@ function logisticOf(
 }
 const NO_CARRIER = "—";
 
-// ─── Logistic delivery state (locked列 spec, 2026-07-12) ──────────────────────
-// The LOGISTIC column = partner tag + delivery date, as a small state machine.
-// The logistic PARTNER queries the slot + calls the customer; ops only chases —
-// so "call now" is a time-window alarm (inside the deadline−1..3d window), NOT a
-// stock signal. Uses the committed delivery date (ops_order_control.logistic_eta).
-type LogisticStateKey = "delivered" | "scheduled" | "call_now" | "no_date" | "unassigned";
+// ─── Logistic delivery state (locked列 spec 2026-07-12 · T1 booking truth
+// 2026-07-26) ─────────────────────────────────────────────────────────────────
+// The LOGISTIC column = partner tag + booking state, as a small state machine.
+// D1 (0277) split "a date exists" into two stages, and the column tells the
+// truth (Jess, T1): "confirmed" = the CUSTOMER's yes (date + slot) — the ONLY
+// green; "provisional" = only the carrier's word (logistic_eta) — amber, never
+// green; "need_booking" = partner assigned, no date at all. The old
+// call_now/no_date time-window split is dead — both rendered the same word.
+type LogisticStateKey =
+  | "delivered"
+  | "confirmed"
+  | "provisional"
+  | "need_booking"
+  | "unassigned";
 interface LogisticState {
   key: LogisticStateKey;
   partner: string | null;
-  /** ISO committed delivery date — only on "scheduled". */
+  /** ISO date — the customer's confirmed date on "confirmed"; the carrier's
+   *  provisional date on "provisional". */
   date: string | null;
+  /** Customer's time slot — only on "confirmed" (null until recorded). */
+  slot: string | null;
 }
+/** "31 Jul 26" → "31 Jul" — the column speaks the drawer chip's exact date
+ *  form (T1: one booking vocabulary across the two surfaces). */
+const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+/** "Afternoon (12pm–3pm)" → "12pm–3pm" — same short-slot read as the drawer. */
+const shortSlot = (slot: string) => /\(([^)]+)\)/.exec(slot)?.[1] ?? slot;
+
 export function logisticStateOf(
   o: operationOrderListRow,
   partnerName: Map<string, string>,
 ): LogisticState {
   const partner = logisticOf(o, partnerName);
-  if (controlTabOf(o) === "completed") return { key: "delivered", partner, date: null };
+  if (controlTabOf(o) === "completed")
+    return { key: "delivered", partner, date: null, slot: null };
+  const ovl = ovlOf(o);
+  if (ovl?.booking_stage === "confirmed" && ovl.confirmed_date)
+    return {
+      key: "confirmed",
+      partner,
+      date: ovl.confirmed_date,
+      slot: ovl.confirmed_time_slot ?? null,
+    };
   const eta = logisticEtaOf(o);
-  if (eta) return { key: "scheduled", partner, date: eta }; // date booked → Deliver <date>
-  if (!partner) return { key: "unassigned", partner: null, date: null };
-  // No date yet: "call now" once inside the arrangement window (≤3 days to the
-  // promise, incl. today/overdue), regardless of stock; else it's still early.
-  const dd = daysToDue(o);
-  if (dd !== null && dd <= 3) return { key: "call_now", partner, date: null };
-  return { key: "no_date", partner, date: null };
+  if (eta) return { key: "provisional", partner, date: eta, slot: null };
+  if (!partner) return { key: "unassigned", partner: null, date: null, slot: null };
+  return { key: "need_booking", partner, date: null, slot: null };
 }
 
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
@@ -3977,10 +4022,11 @@ function OrderRow({
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
       </td>
       )}
-      {/* Delivery — partner + §12 truth-ladder word. "call now" is DEAD (§14:
-          the red time-window alarm painted every row); call_now/no_date both
-          render "not booked" — the NORMAL state, worded grey because the 送
-          dot carries the colour. */}
+      {/* Delivery — partner + the T1 booking truth (0277). The column never
+          says "Unscheduled": green `27 Jul · 12pm–3pm` ONLY on the customer's
+          confirmation; amber `carrier said 27 Jul` while only the carrier's
+          provisional date exists; grey `need booking` when a partner is
+          assigned with no date at all. Same vocabulary as the drawer chip. */}
       {showCol("delivery") && (
       <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
@@ -3992,15 +4038,23 @@ function OrderRow({
               <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
                 Delivered ✓
               </div>
-            ) : logi.key === "scheduled" && logi.date ? (
+            ) : logi.key === "confirmed" && logi.date ? (
               <div
                 className="tabular-nums"
                 style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
               >
-                scheduled {fmtDate(logi.date)}
+                {dayMon(logi.date)}
+                {logi.slot ? ` · ${shortSlot(logi.slot)}` : ""}
+              </div>
+            ) : logi.key === "provisional" && logi.date ? (
+              <div
+                className="tabular-nums text-warning"
+                style={{ fontSize: "11px", fontWeight: 600 }}
+              >
+                carrier said {dayMon(logi.date)}
               </div>
             ) : (
-              <div className="t4-caption">Unscheduled</div>
+              <div className="t4-caption">need booking</div>
             )}
           </div>
         )}
