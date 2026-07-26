@@ -53,7 +53,7 @@ async function authed(path: string, role: string, init?: RequestInit) {
 
 /** Route each rpc name to a canned result so one mock serves a whole flow. */
 function mockRpc(byName: Record<string, { data?: unknown; error?: { code?: string; message: string } }>) {
-  const rpc = vi.fn(async (name: string) => {
+  const rpc = vi.fn(async (name: string, _args?: unknown) => {
     const r = byName[name];
     if (!r) return { data: null, error: null };
     return { data: r.data ?? null, error: r.error ?? null };
@@ -129,7 +129,7 @@ describe("POST /api/hr/runs/close", () => {
     expect(res.status).toBe(200);
 
     const call = rpc.mock.calls.find((c) => c[0] === "commission_close_month")!;
-    const args = call[1] as { p_lines: { subjectId: string; basis: number; total: number }[] };
+    const args = call[1] as unknown as { p_lines: { subjectId: string; basis: number; total: number }[] };
     // the figure was computed here, not supplied by the caller
     expect(args.p_lines).toHaveLength(1);
     expect(args.p_lines[0]!.subjectId).toBe(SP);
@@ -146,7 +146,7 @@ describe("POST /api/hr/runs/close", () => {
       method: "POST",
       body: JSON.stringify({ year: 2026, month: 7, lines: [{ total: 999999 }] }),
     });
-    const args = rpc.mock.calls.find((c) => c[0] === "commission_close_month")![1] as {
+    const args = rpc.mock.calls.find((c) => c[0] === "commission_close_month")![1] as unknown as {
       p_lines: { total: number }[];
     };
     expect(args.p_lines[0]!.total).toBeCloseTo(914.4, 2);
