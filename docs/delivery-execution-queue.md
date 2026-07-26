@@ -73,7 +73,7 @@ exist anymore — the C-vocab rewrite (2026-07-19) had already merged them into
 every visible POD string (partner upload dialog + hints) now says "delivery photo";
 COPY-STANDARD carries the naming law + the reserved labels for T3/T6.
 
-## T3 · Delay Radar — catch the miss BEFORE the window
+## T3 · Delay Radar — catch the miss BEFORE the window ✅ (PR #370)
 
 **Concept (Jess, the Golden Rule):** delivery risk is not "is stock here today"; it is
 "can the LATEST stock ETA still honour the customer's delivery date". If supplier ETA is
@@ -90,6 +90,14 @@ flip to `Call customer (stock delay)` NOW, not show overdue on 16 Aug.
 that is T4's reason write, not a new column here.
 **Done when:** an order whose ETA overshoots its date shows `Call customer (stock delay)`
 while the date is still in the future; delivered/completed orders never show it (guardrail #2).
+**Shipped note (PR #370):** web-only, no migration — ETAs already ride the list payload
+(`ops_order_control.line_etas`). The rung sits INSIDE the stock track: above `Chase supplier`
+(chasing can't save a certain miss) but below `Order PO` (raising the PO stays the real
+unblock) and below the LOCKED past-deadline `Chase logistic` escalation (freeze gate
+2026-07-12 — post-deadline behaviour unchanged; the radar's job is BEFORE the window).
+Strict overshoot only (ETA > date; ETA ON the date is not a delay); TBD dates / missing
+ETAs stay silent. The verb also joined the QUEUES rows (C-vocab: counts match the NEXT
+column by construction), danger tone, PIC chip.
 
 ## T4 · Reason Library v1 (structured, no free text)
 
@@ -229,7 +237,7 @@ else is planned past T11 on purpose.
 |---|---|---|
 | T1 | ✅ shipped 2026-07-26 | #363 |
 | T2 | ✅ shipped 2026-07-26 | #367 |
-| T3 | ⬜ | — |
+| T3 | ✅ shipped 2026-07-26 | #370 |
 | T4 | ⬜ | — |
 | T5 | ⬜ | — |
 | T6 | ⬜ | — |
