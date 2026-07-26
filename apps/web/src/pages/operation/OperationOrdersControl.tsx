@@ -32,6 +32,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
+import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
@@ -1607,6 +1608,60 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
     nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+  /** J3 — the drawer's journey strip, computed HERE and handed down.
+   *
+   *  The card's DONE WHEN is "the strip agrees with the ladder/queues for the
+   *  same order, always". The only way to guarantee that is to never run the
+   *  ladder twice: this page owns `nextActionOf` + every signal it reads, so
+   *  the strip receives the SAME NextAction object the row's MANAGE pill
+   *  renders and the queue counts tally. The drawer adds only what this page
+   *  cannot see (its document check and its payment ledger) and derives
+   *  nothing the ladder already answered.
+   *
+   *  Returns undefined when the order is not in the loaded list (a deep link
+   *  landing straight on a drawer): the strip then renders nothing rather than
+   *  guess — same degradation law as J1/J2. */
+  const journeySignalsFor = (
+    orderId: string,
+  ): OrderJourneySignals | undefined => {
+    const o = orders.find((r) => r.id === orderId);
+    if (!o) return undefined;
+    const stock = stockReadiness(o, availableBySku);
+    const ovl = ovlOf(o);
+    const photos = ovl?.delivery_photos;
+    // The ladder's own 🔒 inputs, read the same way nextActionOf reads them:
+    // an owing balance plus any storage fee that is neither collected nor
+    // waived. `null` when no balance is on record — not "settled".
+    const storageFee =
+      (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
+    const owingStorage =
+      storageFee > 0 &&
+      !ovl?.storage_collected_at &&
+      ovl?.storage_waiver_status !== "approved"
+        ? storageFee
+        : 0;
+    const holdAmount =
+      ovl?.balance == null && owingStorage === 0
+        ? null
+        : Number(ovl?.balance ?? 0) + owingStorage;
+    return {
+      next: nextActionOf(o, stock, o.order_lines ?? []),
+      // The same test the ladder's RUNG 1 makes: goods with no purchase order
+      // anywhere are goods nobody has ordered.
+      hasPo: (o.order_lines ?? []).some((l) => !!l.source_po),
+      // The ladder's own two-signal ready rule (live free stock OR the Master
+      // import's per-line ready flag) — not the drawer's line readiness.
+      goodsReady:
+        stock.state === "ready" ||
+        stock.state === "in_stock" ||
+        stockEtaOf(o).state === "ready",
+      bookingConfirmed: bookingConfirmedOf(o),
+      delivered: controlTabOf(o) === "completed",
+      // T7's three-way answer: [] is "no photo yet", undefined is UNKNOWN.
+      photoOnFile: Array.isArray(photos) ? photos.length > 0 : null,
+      holdAmount,
+    };
+  };
   const nextCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of liveScope) {
@@ -2080,6 +2135,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return (
       <OrderDetailDrawer
         orderId={openOrderId}
+        journey={journeySignalsFor(openOrderId)}
         onClose={() => setOpenOrderId(null)}
         nav={
           navIdx >= 0

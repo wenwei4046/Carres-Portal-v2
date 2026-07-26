@@ -178,6 +178,10 @@ import RelatedCases, {
   countOpenCases,
   type RelatedCaseRow,
 } from "./RelatedCases";
+import OrderJourneyHeader, {
+  deriveOrderJourney,
+  type OrderJourneySignals,
+} from "./OrderJourneyHeader";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -207,6 +211,11 @@ interface Props {
   orderId: string;
   onClose: () => void;
   nav?: DrawerNav;
+  /** J3 — the ladder's OWN answer for this order, computed by the Orders list
+   *  (see `journeySignalsFor`). Optional: absent means the order was not in the
+   *  loaded list, and the journey strip renders nothing rather than run a
+   *  second derivation that could disagree with the row it came from. */
+  journey?: OrderJourneySignals;
 }
 
 /**
@@ -290,7 +299,12 @@ export type DrawerNav = {
   onNext?: () => void;
 };
 
-export default function OrderDetailDrawer({ orderId, onClose, nav }: Props) {
+export default function OrderDetailDrawer({
+  orderId,
+  onClose,
+  nav,
+  journey,
+}: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
   const navigate = useNavigate();
 
@@ -415,6 +429,7 @@ export default function OrderDetailDrawer({ orderId, onClose, nav }: Props) {
             <DrawerBody
               nav={nav}
               data={data}
+              journey={journey}
               onClose={onClose}
               onDispatchClick={() => setShowDispatch(true)}
               onDOClick={() => setShowDO(true)}
@@ -567,6 +582,8 @@ function DrawerError({
 interface DrawerBodyProps {
   nav?: DrawerNav;
   data: NonNullable<ReturnType<typeof useOperationOrder>["data"]>;
+  /** J3 — see Props.journey. */
+  journey?: OrderJourneySignals;
   onClose: () => void;
   onServiceNoteClick: () => void;
   onDispatchClick: () => void;
@@ -1121,6 +1138,7 @@ interface StockCat {
 function DrawerBody({
   nav,
   data,
+  journey,
   onClose,
   onDispatchClick,
   onDOClick,
@@ -1837,6 +1855,35 @@ function DrawerBody({
   });
   const caseCount = countRelatedCases(relatedCaseRows);
   const openCaseCount = countOpenCases(relatedCaseRows);
+
+  // ═══ J3 — the journey strip: where · who · what is wrong ═══
+  // The ladder's answer arrives as a prop (see OperationOrdersControl's
+  // `journeySignalsFor`), so nothing about the stage, the verb or the owner is
+  // recomputed here. This block adds ONLY the two facts the Orders list cannot
+  // see, and neither of them contradicts the ladder:
+  //   · docsMissing — J1's derived list, drawer-only data.
+  //   · moneyOutstanding — the payment LEDGER (order total − collected). The
+  //     ladder's PayHold reads `ops_order_control.balance`, which is NULL on
+  //     every live order, so the list's money dot correctly reads "no balance
+  //     data" while 18 orders genuinely owe. The strip states the ledger fact
+  //     and never calls it a hold: a hold is the ladder's word, and the ladder
+  //     is not holding this order. See carry-forward
+  //     `payhold-blind-to-the-payment-ledger`.
+  const journeyView = journey
+    ? deriveOrderJourney({
+        signals: journey,
+        docsMissing,
+        docsMissingLabels: documentRows.filter((r) => r.missing).map((r) => r.label),
+        ledgerOutstanding: moneyOutstanding,
+        ledgerOutstandingLabel: Math.round(moneyOutstanding).toLocaleString(),
+        // The amount the ladder itself locked on — its own PayHold input, NOT
+        // the ledger's. Empty when the lock is on but no balance is on file.
+        holdAmountLabel:
+          journey.holdAmount && journey.holdAmount > 0
+            ? Math.round(journey.holdAmount).toLocaleString()
+            : "",
+      })
+    : null;
   /** Open one case in the module that OWNS it. This panel states that a case
    *  exists; reading and working it stays where it already lives, so there is
    *  no second place to edit a case. */
@@ -2356,6 +2403,15 @@ function DrawerBody({
         <div className="flex items-center justify-end gap-3 min-w-0 shrink-0 empty:hidden">
           <OrderControlSaveBar form={form} />
         </div>
+        {/* J3 — the journey strip. It sits HERE, in the full-width band under
+            the bare header, and not in the header itself: that strip is
+            deliberately data-free (Jess rev4, "the identity lives in the
+            Customer card"), and not at the top of the right column either
+            (Jess rev15 cleared that column so "the work surface starts at the
+            top"). This band already carries the operator's own note, so a
+            second full-width line of order truth belongs alongside it.
+            Renders nothing when the ladder's answer is absent. */}
+        {journeyView && <OrderJourneyHeader journey={journeyView} />}
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
           <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">

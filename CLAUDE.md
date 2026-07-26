@@ -518,6 +518,7 @@ Don't burn an hour spinning. Surface and ask.
 - `phase-9-rotate-principal-password` — principal@carres.com still at '111'; PDPA exposure up to RM 300k.
 
 **MEDIUM** (touch the area → read the full entry first):
+- `payhold-blind-to-the-payment-ledger` — the ladder's 🔒 reads `ops_order_control.balance`, NULL on all 56 live orders, while the ledger says 18 orders owe ~RM 50,659. The money gate has never fired in prod. J3 states the ledger figure as a fact and reserves "hold" for the ladder; the real fix is a delivery/orders card.
 - `rental-dunning-has-no-send-channel` — segment 2b is BLOCKED: no message-sending integration exists anywhere in apps/api, so the Day 3/7/21 rungs cannot be built. Loo: skip for now.
 - `rental-payment-failed-not-recorded` — 0281 handles invoice.paid only; a bounced card writes nothing and the events table has no payment_failed kind. One CHECK change + a webhook branch when 2b lands.
 - `rental-two-calendar-implementations` — the due-date rule lives twice (shared TS + SQL) because the DB cannot import TS; both assert the same worked example, change one and the other fails.
