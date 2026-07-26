@@ -29,7 +29,7 @@
 - Design law `docs/UI-KIT.md` · copy law `docs/COPY-STANDARD.md` (POD banned → "delivery
   photo"; plain words, no ERP jargon).
 
-## J1 · Documents panel + missing check
+## J1 · Documents panel + missing check ✅ (PR #385)
 
 **Goal:** a `Documents` section (drawer, near the header): every document this order has,
 one row each, clickable to open — and what is MISSING, stated out loud.
@@ -49,6 +49,28 @@ NO manual linking. A doc type that cannot exist yet for this order simply doesn'
 (no noise). **No migration expected.**
 **Done when:** every existing artifact for an order is reachable in ≤2 clicks from the
 drawer; missing rows say "missing", never hide.
+**Shipped note (PR #385):** ZERO migration, and the card's two rules only reconcile as
+THREE states — exists (number + Open) · **cannot exist yet (renders nothing)** · should
+exist by now ("missing"). "By now" always reads a real transition, never a guess: dispatch
+auto-issues BOTH the invoice and the delivery-order number (0098), a delivered order owes a
+delivery photo (0280), a `received` PO owes its supplier DO file. **Live data is why this
+matters**: prod holds 56 orders with ZERO invoices, payments, POs, threads, DO numbers,
+delivered orders and delivery photos, so a two-state rule would open every order onto six
+red "missing" lines; under this rule a raw order shows exactly ONE row, its sales order.
+The list is derived from what the drawer already loads and every Open path already existed
+— the panel routes rows to them rather than adding a second way to fetch a file, and the
+delivery photo is **view-only** here (upload stays in the Delivery card: one upload door).
+ONE api field added to an existing select — `purchase_orders.do_file_path` (column since
+0030) — because the browser signs the view url itself: the `delivery_orders_read` policy
+admits operation + principal outright, so no Worker route carries the file; the web type is
+OPTIONAL so this build against an older Worker degrades instead of crashing.
+**Two deliberate deviations, both inside DONE WHEN:** (1) it is a tab in the drawer's
+utility rail beside Loan / Activity, not a card "near the header" — the 280px left rail
+already stacks three cards over a scrolling nav, and that rail's own contract names the spot
+for "non-flow utilities"; drawer → Documents → Open is still 2 clicks. (2) a **Delivery
+order** row joins the card's six (`orders.do_number` → the DO PDF the drawer could already
+print) because DONE WHEN asks for *every* existing artifact. 13 new tests incl. a
+banned-word guard (POD / Proof of Delivery / Unscheduled grep 0).
 
 ## J2 · Related cases cross-links (both directions)
 
@@ -92,6 +114,6 @@ zero new writes.
 
 | Card | Status | PR |
 |---|---|---|
-| J1 | ⬜ | — |
+| J1 | ✅ shipped 2026-07-27 | #385 |
 | J2 | ⬜ | — |
 | J3 | ⬜ | — |
