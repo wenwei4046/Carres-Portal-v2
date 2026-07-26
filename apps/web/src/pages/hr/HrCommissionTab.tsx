@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { STAFF_TIER_LABEL, type BdCommissionResult, type StaffCommissionResult } from "@carres/shared";
 import { useHrReport } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
+import HrCommissionRunPanel from "./HrCommissionRunPanel";
 import { rm } from "@/lib/format-currency";
 
 /**
@@ -227,6 +229,7 @@ export default function HrCommissionTab({
   month: number;
 }) {
   const { data, isLoading, isError } = useHrReport(year, month);
+  const role = useAuth((st) => st.role);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) =>
@@ -250,8 +253,21 @@ export default function HrCommissionTab({
 
   const { report, bdReport, unattributed } = data;
 
+  // HR-P5: the month close sits above the figures, because whether the month CAN be
+  // closed changes what the figures below mean (a preview vs a frozen statement).
+  const sellers = report.perStaff
+    .filter((s) => s.basis > 0)
+    .map((s) => ({ id: s.staff.id, name: s.staff.name }));
+
   return (
     <div className="space-y-4">
+      <HrCommissionRunPanel
+        year={year}
+        month={month}
+        people={sellers}
+        isPrincipal={role === "principal"}
+      />
+
       {/* Summary row — three independent white KPI cards (UI-KIT §A8). */}
       <div className="grid grid-cols-3 gap-2.5">
         <div className="kpi-box">

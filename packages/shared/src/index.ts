@@ -740,6 +740,44 @@ export {
   type HrSetAccessInput,
 } from "./schemas/hr-people";
 
+// HR-P5 (0272) — commission runs. Closing a month snapshots the engine's output into
+// commission_run_lines; from then on the statement is READ from those rows and never
+// recomputed (only staff_commission_rates is effective-dated, so a later model-rate
+// edit would otherwise change what a closed month appears to say).
+export {
+  commissionRunStatusSchema,
+  COMMISSION_RUN_STATUS_LABEL,
+  isMonthLocked,
+  runStatusTone,
+  adjustmentReasonSchema,
+  ADJUSTMENT_REASON_LABEL,
+  READINESS_KEYS,
+  commissionReadiness,
+  canClose,
+  blockingFailures,
+  commissionRunLineSchema,
+  commissionRunSummarySchema,
+  commissionRunDetailSchema,
+  commissionRunStateSchema,
+  closeMonthInput,
+  runActionInput,
+  addAdjustmentInput,
+  COMMISSION_CSV_COLUMNS,
+  commissionRunCsv,
+  type CommissionRunStatus,
+  type AdjustmentReason,
+  type ReadinessKey,
+  type ReadinessCheck,
+  type ReadinessInput,
+  type CommissionRunLine,
+  type CommissionRunSummary,
+  type CommissionRunDetail,
+  type CommissionRunState,
+  type CloseMonthInput,
+  type RunActionInput,
+  type AddAdjustmentInput,
+} from "./schemas/commission-runs";
+
 export {
   LOAN_SOURCES,
   LOAN_OUT_ROUTES,
