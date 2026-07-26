@@ -28,7 +28,28 @@ Why it is its own SKU category and not an accessory or a service SKU:
 | 2 | **1 guarantee : 1 unit** | The whole feature exists so a claim can be traced to *one* model. Two mattresses = two guarantees; a qty-2 guarantee line mints two entitlement rows. Order-level cover would make a K+S order ambiguous at claim time and uncap the swap cost. |
 | 3 | **A claim is ONE-SHOT** | The swap fulfils the promise. The replacement carries no cover unless the customer buys another guarantee. Keeps the liability bounded and the ledger terminal. |
 
-## 3. Data model (0262)
+## 2b. The guarantee ID (0267, Loo 2026-07-26)
+
+Every guarantee carries a **`ABCD123456`** handle — 4 random letters + 6 random digits — minted
+server-side the moment the Sales Order is created. All tracking is by this ID.
+
+The two blocks are positional, which is what makes it safe to read aloud and retype: a letter can
+only appear in the first four slots and a digit only in the last six, so **O-vs-0 and I-vs-1 are
+never ambiguous** off a printed document.
+
+**It also lands on the order line.** The mint trigger writes it back into
+`order_lines.attrs.guarantee.ids` AND appends `Guarantee ID: …` to `attrs.remark`, which
+`lineConfigBits` already prints as `✎ …` on the order drawer and the Sales Order PDF — so the
+customer's own paperwork carries the ID with no template change. An operator-typed remark is
+preserved, not clobbered.
+
+**A claim retires the ID.** `guarantee_id` is cleared (it leaves the live space and can never be
+claimed twice — Loo's "被 claim 之后这个 ID 就会被删除") and the spent string moves to
+`claimed_guarantee_id`. That column is deliberate: without it a customer presenting an old ID gets
+"not found", which reads identical to a fake or a typo; with it, ops can say "claimed on 3 March".
+Both columns are searched, and a spent ID renders struck-through everywhere it shows.
+
+## 3. Data model (0262 + 0267)
 
 ```
 guarantee_terms          -- config, principal-owned
@@ -36,6 +57,7 @@ guarantee_terms          -- config, principal-owned
 
 guarantee_entitlements   -- the ledger: ONE ROW PER COVERED UNIT
   order_id · order_line_id · guarantee_sku · unit_no
+  guarantee_id · claimed_guarantee_id                               <- 0267, the handle
   covers_line_id · covers_sku · covers_model_id · covers_label      <- snapshot
   customer_id · customer_name · customer_phone · phone_key          <- the 3 track-back axes
   coverage_years · remedy · starts_on · expires_on · status
@@ -98,7 +120,7 @@ config table plus one partial-index probe per inserted line.
 | **POS — add to an existing order** | `AddProductOverlay` routes the guarantee card through the SAME picker, choosing from the order's existing lines. Without this it would fall through to the generic configure drawer and add bare. |
 | **Invoice PDF** | A bordered **Guarantee cover** block under the totals: what it covers, how long, the remedy in words, and the end date. The customer's only written proof. Voided entitlements are excluded. |
 | **Customer block** (ops drawer + POS order detail) | `GuaranteeCoverStrip` — silent when there is no guarantee, so the ~190 pre-guarantee orders look untouched. |
-| **Operation → Guarantees** | The claim desk. One search box resolving all three axes (SO / name / customer id / phone), a status filter, and the one-shot **Claim** action. |
+| **Operation → Guarantees** | The claim desk. A **Guarantee ID** column leads the table; one search box resolves the ID first (live OR retired), then SO / name / customer id / phone. Status filter + the one-shot **Claim** action. |
 | **Service Cases** | A claim can carry `claim_case_id`; the existing `warranty_claim` case type is where the follow-up work lives. |
 
 ## 7. Security

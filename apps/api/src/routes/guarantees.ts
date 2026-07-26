@@ -7,6 +7,8 @@ import {
   guaranteeAttachInputSchema,
   guaranteeClaimInputSchema,
   guaranteeListQuerySchema,
+  isGuaranteeId,
+  normalizeGuaranteeId,
   type GuaranteeEntitlementDto,
   type GuaranteeListResponse,
   type GuaranteeRemedy,
@@ -49,6 +51,7 @@ function claimRoleOnly(c: { var: { auth: { role: string } } }) {
 // same shape. The order embed gives us the SO number (the #1 track-back axis).
 const ENT_SELECT = `
   id, order_id, order_line_id, guarantee_sku, unit_no,
+  guarantee_id, claimed_guarantee_id,
   covers_line_id, covers_sku, covers_model_id, covers_label,
   customer_id, customer_name, customer_phone, phone_key,
   coverage_years, remedy, starts_on, expires_on, status,
@@ -63,6 +66,8 @@ function toDto(row: any, labelBySku: Record<string, string>): GuaranteeEntitleme
   const expiresOn = row.expires_on ? String(row.expires_on) : null;
   return {
     id: String(row.id),
+    guaranteeId: row.guarantee_id ? String(row.guarantee_id) : null,
+    claimedGuaranteeId: row.claimed_guarantee_id ? String(row.claimed_guarantee_id) : null,
     orderId: String(row.order_id),
     so: row.orders?.so != null ? Number(row.orders.so) : null,
     orderLineId: row.order_line_id ? String(row.order_line_id) : null,
@@ -158,16 +163,29 @@ guaranteesRouter.get("/", async (c) => {
   if (status === "expired") query = query.eq("status", "active");
 
   if (q) {
-    // Axis 3a — a UUID typed straight in is a customer id.
+    // Axis 0 — the guarantee ID itself (0267). This is THE handle a claim is
+    // looked up by, so it wins over every other interpretation and matches the
+    // live column OR the retired one: a spent ID must answer "already claimed",
+    // never the indistinguishable "not found".
+    const gid = normalizeGuaranteeId(q);
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q.trim());
-    if (isUuid) {
+    if (isGuaranteeId(q)) {
+      query = query.or(`guarantee_id.eq.${gid},claimed_guarantee_id.eq.${gid}`);
+    } else if (isUuid) {
+      // Axis 3a — a UUID typed straight in is a customer id.
       query = query.eq("customer_id", q.trim());
     } else {
       // Axis 2 (name) + axis 3b (phone) + the covered model code, in one OR.
       // PostgREST cannot OR across an embedded resource, so axis 1 (the SO
       // number) runs as its own read below and the two sets are merged.
       const digits = q.replace(/\D/g, "");
-      const ors = [`customer_name.ilike.%${q}%`, `covers_sku.ilike.%${q}%`];
+      const ors = [
+        `customer_name.ilike.%${q}%`,
+        `covers_sku.ilike.%${q}%`,
+        // a partially-typed ID still narrows, live or retired
+        `guarantee_id.ilike.%${gid}%`,
+        `claimed_guarantee_id.ilike.%${gid}%`,
+      ];
       if (digits.length >= 4) ors.push(`phone_key.ilike.%${digits}%`);
       query = query.or(ors.join(","));
     }
@@ -185,7 +203,7 @@ guaranteesRouter.get("/", async (c) => {
 
   // SO axis — a numeric q is very likely a Sales Order number. Run it as its
   // own filtered read and merge (PostgREST cannot OR across an embed).
-  const soCandidate = q ? Number(q.trim().replace(/^SO-?/i, "")) : NaN;
+  const soCandidate = q && !isGuaranteeId(q) ? Number(q.trim().replace(/^SO-?/i, "")) : NaN;
   if (Number.isInteger(soCandidate) && soCandidate > 0) {
     let soQuery = sb
       .from(GUARANTEE_ENTITLEMENTS)
