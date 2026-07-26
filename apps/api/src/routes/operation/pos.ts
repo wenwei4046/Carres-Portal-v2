@@ -9,13 +9,13 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   receivePoWithDoInput,
-  isOpsManager,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { PoTemplateData } from "../../lib/pdf/types";
 import { requireOperation } from "../../lib/auth-guards";
+import { hasDuty } from "../../lib/duties";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -53,10 +53,19 @@ const operationPosRouter = new Hono<AppEnv>();
  *  block procurement). Read-only PO routes are untouched. */
 async function poDutyGate(c: Context<AppEnv>): Promise<Response | null> {
   const auth = c.var.auth;
-  if (isOpsManager(auth.role, auth.email)) return null;
   const sb = userClient(c.env, auth.jwt);
+
+  // Cheapest question first. HR-P2 (0260) turned the management bypass into a
+  // duty read (a DB round-trip), so asking it up front would bill EVERY PO
+  // create for a permission we usually don't need: when the duty layer is
+  // dormant, or the caller IS this month's holder, management status is
+  // irrelevant to the outcome. Resolve the holder first and only ask about
+  // `ops_manager` in the one case where it can change the answer.
   const duty = await resolveCurrentPoDuty(sb);
   if (!duty || duty.user_id === auth.id) return null;
+
+  // Someone ELSE holds this month — management may still override.
+  if (await hasDuty(c, "ops_manager")) return null;
   const holder = await sb
     .from("app_users")
     .select("name, email")

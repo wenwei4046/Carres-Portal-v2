@@ -10,7 +10,7 @@ import {
   monthKeyMYT,
   nextPoDayMYT,
   isPoDutyEditor,
-  isOpsManager,
+  isOpsManagerRow,
   isOpsGenericAccount,
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
@@ -101,18 +101,29 @@ export default function TeamPanel() {
   const currentMonth = dutyQ.data?.month ?? monthKeyMYT();
   const nextUp = (dutyQ.data?.roster ?? []).filter((r) => r.month > currentMonth);
 
-  // Roster edit = JESS-ONLY (+principal) — STRICTER than isOpsManager: the
-  // shared operation@ login must never rewrite the rotation (Jess 2026-07-19
-  // "can edit roster only me"). Hover ✎ on the hero / click a NEXT UP entry
-  // → candidate select; everyone else never sees it, the API 403s anyway.
+  // Roster edit = the `po_duty_editor` duty (+principal) — STRICTER than
+  // ops_manager: the shared operation@ login must never rewrite the rotation
+  // (Jess 2026-07-19 "can edit roster only me"). Hover ✎ on the hero / click a
+  // NEXT UP entry → candidate select; everyone else never sees it, the API
+  // 403s anyway.
+  //
+  // HR-P2 (0260): the staff query is no longer gated on `isEditor`, because it
+  // is now also where duties come from — gating it on a value derived FROM it
+  // would deadlock (no fetch → no duties → never an editor → no fetch). The
+  // cockpit page fetches the same query key unconditionally, so in practice
+  // this shares a cached response rather than adding a request.
   const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
-  const isEditor = isPoDutyEditor(authRole, authEmail);
-  const staffQ = useOperationStaff({ enabled: isEditor });
+  const staffQ = useOperationStaff();
+  const myDuties = staffQ.data?.myDuties;
+  const isEditor = isPoDutyEditor(authRole, authEmail, myDuties);
   const candidates = useMemo(
     () =>
       (staffQ.data?.staff ?? []).filter(
-        (s) => !isOpsManager("operation", s.email) && !isOpsGenericAccount(s.email),
+        (s) =>
+          // Per-ROW question: is THIS person a manager? Answered from the row's
+          // own duties, never from the viewer's.
+          !isOpsManagerRow(s.email, s.duties) && !isOpsGenericAccount(s.email),
       ),
     [staffQ.data],
   );

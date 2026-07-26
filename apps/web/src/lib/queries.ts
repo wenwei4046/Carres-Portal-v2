@@ -219,6 +219,7 @@ import {
   type SetStaffCodeInput,
   type UpsertOrgDepartmentInput,
   type UpsertOrgPositionInput,
+  type SetPositionDutyInput,
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
 } from "@carres/shared";
@@ -7399,6 +7400,21 @@ export function useHrUpsertPosition() {
   return useMutation<{ ok: true; id: string }, ApiError, UpsertOrgPositionInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true; id: string }>("/api/hr/team/positions", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 0260 (HR-P2) — grant / revoke one duty key on one position. This is the
+ *  whole point of the phase: a promotion in the Team tab moves the permission,
+ *  no code change and no redeploy. */
+export function useHrSetPositionDuty() {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, SetPositionDutyInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>("/api/hr/team/position-duty", {
         method: "POST",
         body: JSON.stringify(input),
       }),
