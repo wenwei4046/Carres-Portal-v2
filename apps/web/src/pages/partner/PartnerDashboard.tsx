@@ -288,7 +288,7 @@ export default function PartnerDashboard() {
         />
         <DeliveryPreviewColumn
           label="Out for delivery"
-          hint="Delivery day · drop off + POD"
+          hint="Delivery day · drop off + delivery photo"
           accent="info"
           count={deliveryBuckets.out_for_delivery.length}
           rows={deliveryBuckets.out_for_delivery.map((r) => ({

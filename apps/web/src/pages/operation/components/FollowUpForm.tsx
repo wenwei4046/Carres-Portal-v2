@@ -17,9 +17,10 @@ import { TASKS_KEY } from "./rail/TasksPanel";
  * sees) + lights this order's flag.
  */
 
-/** Preset follow-ups — UI-only starter list, all English (Jess to edit freely). */
+/** Preset follow-ups — UI-only starter list, all English (Jess to edit freely).
+ *  T2 naming law (docs/COPY-STANDARD.md): verb + object + (reason). */
 const PRESET_FOLLOWUPS = [
-  "Call customer — confirm delivery date",
+  "Call customer (book delivery)",
   "Chase logistic for ETA",
   "Customer wants to change address",
   "Customer wants to postpone",

@@ -155,6 +155,26 @@ If the tooltip would just re-state the label, delete the tooltip.
 
 ---
 
+## Action naming law (delivery T2, locked with Jess 2026-07-26)
+
+Every visible ACTION label (ladder pill, drawer button, follow-up preset,
+queue verb) is written as:
+
+    [Verb] + [Object] + (reason, only when the same verb+object has two causes)
+
+- The reason in brackets exists so a new staff knows WHY they are calling —
+  `Call customer (book delivery)` vs `Call customer (stock delay)` are two
+  different conversations that must never share one label.
+- **No abbreviations, ever.** ERP shorthand a new hire must google is banned.
+  **"POD" is banned** — the word is **delivery photo** everywhere (button,
+  toast, hint, aria-label). "DO" and "PO" survive because the team already
+  speaks them daily (vocabulary table below).
+- Reserved delivery action labels (use EXACTLY these spellings):
+  - `Call customer (book delivery)` — call to fix the delivery date + slot.
+  - `Call customer (stock delay)` — stock ETA overshoots the promised date
+    (delay radar, T3). Reserved now so no chat invents a synonym.
+  - `Upload delivery photo` — attach the photo proving delivery (T6).
+
 ## Vocabulary — the canonical words
 
 Use these words EVERYWHERE. Never a synonym in a different page. When in
@@ -172,6 +192,8 @@ doubt, grep the codebase and match what already ships.
 | Purchase order (the document) | **PO** | Purchase order · P/O · Order (ambiguous with customer order) |
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
 | The Purchase panel's three stages | **Send · Chase · Receive** | Place · Follow up · Book in |
+| Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
+| Call to fix delivery date + slot | **Call customer (book delivery)** | Schedule delivery · Book delivery · Confirm delivery date |
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The

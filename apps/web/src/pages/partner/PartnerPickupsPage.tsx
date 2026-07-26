@@ -183,7 +183,7 @@ export default function PartnerPickupsPage() {
 
             <PipelineColumn
               label="Delivered"
-              hint="POD captured · customer signed (last 30 days)"
+              hint="Delivery photo captured · customer signed (last 30 days)"
               accent="success"
               count={buckets.delivered.length}
             >
