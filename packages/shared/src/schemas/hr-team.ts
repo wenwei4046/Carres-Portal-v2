@@ -60,6 +60,15 @@ export const upsertOrgDepartmentInput = z.object({
 });
 export type UpsertOrgDepartmentInput = z.infer<typeof upsertOrgDepartmentInput>;
 
+/** HR-P2 (0260) — grant/revoke ONE duty key on ONE position. Audited DEFINER
+ *  RPC `hr_set_position_duty`; the checkbox in the Team → Positions card. */
+export const setPositionDutyInput = z.object({
+  positionId: z.string().uuid(),
+  dutyKey: z.string().trim().min(1).max(40),
+  granted: z.boolean(),
+});
+export type SetPositionDutyInput = z.infer<typeof setPositionDutyInput>;
+
 /** hr_set_position — positionId null clears. Audited + history row (职位更替). */
 export const setTeamPositionInput = z.object({
   userId: z.string().uuid(),
@@ -218,6 +227,19 @@ export interface HrTeamSource {
   /** 0259 — departments; absent on a pre-0259 server (render chart w/o columns). */
   departments?: OrgDepartment[];
   history: PositionHistoryEntry[];
+  /** 0260 — the duty catalogue (5 keys) + which positions hold which. Both
+   *  absent on a pre-0260 server, which simply hides the Duties card while
+   *  every gate keeps running on the legacy email fallback. */
+  duties?: OrgDuty[];
+  positionDuties?: { positionId: string; dutyKey: string }[];
+}
+
+/** One grantable duty key (0260). `name` is what HR reads on the checkbox. */
+export interface OrgDuty {
+  key: string;
+  name: string;
+  description: string;
+  sort: number;
 }
 
 /** Roles that are Carres' own team (get hierarchy + codes); rest = external. */

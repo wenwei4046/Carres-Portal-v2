@@ -167,14 +167,11 @@ export function pickNextDutyHolder(
 /** Who may EDIT the duty roster (Jess 2026-07-19: "can edit roster only
  *  me") — STRICTER than isOpsManager: the shared operation@ account is a
  *  manager for daily surfaces, but whoever holds its password must NOT be
- *  able to rewrite the rotation. Jess's own login + principal only. */
-export function isPoDutyEditor(
-  role: string | null | undefined,
-  email: string | null | undefined,
-): boolean {
-  if (role === "principal") return true;
-  return (email ?? "").toLowerCase() === "jess@carres.com";
-}
+ *  able to rewrite the rotation.
+ *  HR-P2 (0260): this is now the `po_duty_editor` duty key, granted to the
+ *  COO seat (Jess's actual position) and to the still-empty Operation Manager
+ *  seat. Re-exported from `./org-duties` so existing importers keep working. */
+export { isPoDutyEditor } from "./org-duties";
 
 /** May this user press Raise PO / create POs right now?
  *  Managers always; the month's holder; and EVERYONE while the duty layer is

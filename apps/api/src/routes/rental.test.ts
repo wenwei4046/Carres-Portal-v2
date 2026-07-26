@@ -146,6 +146,18 @@ function buildSb(opts: {
       rec("or", expr);
       return chain;
     };
+    // 0264 — the service-SKU mint filters on `.is("discontinued_at", null)`.
+    chain.is = (col: string, val: unknown) => {
+      rec("is", col, val);
+      if (mode === "read") {
+        rows = rows.filter((r) => ((r as Record<string, unknown>)[col] ?? null) === val);
+      }
+      return chain;
+    };
+    chain.not = (col: string, op: string, val: unknown) => {
+      rec("not", col, op, val);
+      return chain;
+    };
     chain.ilike = (col: string, pattern: string) => {
       rec("ilike", col, pattern);
       return chain;
@@ -212,6 +224,60 @@ const PLAN_ROW = {
   active: true,
   created_at: "2026-01-02T00:00:00Z",
   updated_at: "2026-01-02T00:00:00Z",
+  updated_by: null,
+};
+
+// 0264 — offer config fixtures.
+const OFFER_ID = "00000000-0000-0000-0000-0000000c0031";
+const MODEL_ID = "00000000-0000-0000-0000-0000000c0032";
+const SERVICE_MODEL_ID = "00000000-0000-0000-0000-0000000c0033";
+const COMBO_ID = "00000000-0000-0000-0000-0000000c0034";
+
+const OFFER_ROW = {
+  id: OFFER_ID,
+  model_id: MODEL_ID,
+  pricing_mode: "variant",
+  rent_enabled: true,
+  buy_enabled: true,
+  terms_months: [60, 84],
+  option_prices: {
+    leg_heights: { required: true, values: { '5"': { on: true, oneTime: 0, monthly: 5 } } },
+  },
+  surcharges: [{ code: "delivery", label: "Delivery", oneTime: 150, monthly: 0, required: true }],
+  supplier_rate_pct: 49,
+  commission_base_pct: 20,
+  active: false,
+  notes: null,
+  created_at: "2026-07-26T00:00:00Z",
+  updated_at: "2026-07-26T00:00:00Z",
+  updated_by: null,
+};
+
+const BUY_PRICE_ROW = {
+  id: "00000000-0000-0000-0000-0000000c0035",
+  offer_id: OFFER_ID,
+  sku: "CLOUD-K",
+  combo_id: null,
+  price: 4590,
+  gifts: [{ sku: "PILLOW-STD", qty: 2 }],
+  active: true,
+  created_at: "2026-07-26T00:00:00Z",
+  updated_at: "2026-07-26T00:00:00Z",
+  updated_by: null,
+};
+
+const OFFER_SERVICE_ROW = {
+  id: "00000000-0000-0000-0000-0000000c0036",
+  offer_id: OFFER_ID,
+  package_id: PKG_ID,
+  free_lane: "rent",
+  free_visits: 2,
+  monthly_price: null,
+  outright_price: null,
+  active: true,
+  sort_order: 0,
+  created_at: "2026-07-26T00:00:00Z",
+  updated_at: "2026-07-26T00:00:00Z",
   updated_by: null,
 };
 
@@ -707,6 +773,344 @@ describe("POST /api/rental/customers", () => {
       }),
       env,
     );
+    expect(res.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0264 — rental OFFERS (the Setting closed loop)
+// ---------------------------------------------------------------------------
+
+const authed = async (
+  path: string,
+  role: string,
+  init?: { method?: string; body?: unknown },
+): Promise<Response> => {
+  const jwt = await makeJwt(role);
+  return app.fetch(
+    new Request(`http://t${path}`, {
+      method: init?.method ?? "GET",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    }),
+    env,
+  );
+};
+
+describe("GET /api/rental/config (0264 offer bundle)", () => {
+  it("returns offers, buy prices and attached services alongside packages + plans", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        tables: {
+          service_packages: [PKG_ROW],
+          rental_plans: [PLAN_ROW],
+          rental_offers: [OFFER_ROW],
+          rental_buy_prices: [BUY_PRICE_ROW],
+          rental_offer_services: [OFFER_SERVICE_ROW],
+        },
+      }),
+    );
+    const res = await authed("/api/rental/config", "principal");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      rentalOffers: Array<{
+        modelId: string;
+        pricingMode: string;
+        termsMonths: number[];
+        optionPrices: Record<string, { required: boolean; values: Record<string, unknown> }>;
+        surcharges: Array<{ code: string; oneTime: number; required: boolean }>;
+      }>;
+      buyPrices: Array<{ sku: string; price: number; gifts: Array<{ sku: string; qty: number }> }>;
+      offerServices: Array<{ packageId: string; freeLane: string; freeVisits: number }>;
+    };
+    expect(body.rentalOffers).toHaveLength(1);
+    expect(body.rentalOffers[0]).toMatchObject({ modelId: MODEL_ID, pricingMode: "variant" });
+    expect(body.rentalOffers[0]!.termsMonths).toEqual([60, 84]);
+    expect(body.rentalOffers[0]!.optionPrices.leg_heights).toMatchObject({ required: true });
+    expect(body.rentalOffers[0]!.surcharges[0]).toMatchObject({ code: "delivery", oneTime: 150, required: true });
+    expect(body.buyPrices[0]).toMatchObject({ sku: "CLOUD-K", price: 4590 });
+    expect(body.buyPrices[0]!.gifts).toEqual([{ sku: "PILLOW-STD", qty: 2 }]);
+    expect(body.offerServices[0]).toMatchObject({ packageId: PKG_ID, freeLane: "rent", freeVisits: 2 });
+  });
+});
+
+describe("POST /api/rental/offers", () => {
+  it("403 for a non-principal internal role", async () => {
+    const res = await authed("/api/rental/offers", "operation", {
+      method: "POST",
+      body: { modelId: MODEL_ID },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("201 — camel→snake payload, defaults applied, offer born inactive", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: OFFER_ROW }));
+    const res = await authed("/api/rental/offers", "principal", {
+      method: "POST",
+      body: {
+        modelId: MODEL_ID,
+        pricingMode: "both",
+        buyEnabled: true,
+        optionPrices: { leg_heights: { required: true, values: { '5"': { on: true, monthly: 5 } } } },
+        surcharges: [{ code: "delivery", label: "Delivery", oneTime: 150, required: true }],
+        supplierRatePct: 49,
+        commissionBasePct: 20,
+      },
+    });
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("rental_offers");
+    expect(ins?.payload).toMatchObject({
+      model_id: MODEL_ID,
+      pricing_mode: "both",
+      buy_enabled: true,
+      supplier_rate_pct: 49,
+      commission_base_pct: 20,
+      active: false,
+    });
+  });
+
+  it("409 — one offer per model (23505 on the UNIQUE model_id)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "rental_offers_model_id_key"' },
+      }),
+    );
+    const res = await authed("/api/rental/offers", "principal", {
+      method: "POST",
+      body: { modelId: MODEL_ID },
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_offer");
+  });
+
+  it("422 — the split can never exceed the collection", async () => {
+    const res = await authed("/api/rental/offers", "principal", {
+      method: "POST",
+      body: { modelId: MODEL_ID, supplierRatePct: 70, commissionBasePct: 40 },
+    });
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("PATCH /api/rental/offers/:id", () => {
+  it("422 — an authored offer can never be re-pointed at another model", async () => {
+    const res = await authed(`/api/rental/offers/${OFFER_ID}`, "principal", {
+      method: "PATCH",
+      body: { modelId: "00000000-0000-0000-0000-0000000c9999" },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("200 — writes the overlay and the surcharge slots", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: OFFER_ROW }));
+    const res = await authed(`/api/rental/offers/${OFFER_ID}`, "principal", {
+      method: "PATCH",
+      body: {
+        optionPrices: { fabrics: { required: true, series: { CG: { on: true, colors: { "CG-008": { on: true, monthly: 4 } } } } } },
+        active: true,
+      },
+    });
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.table).toBe("rental_offers");
+    expect(upd?.payload).toMatchObject({ active: true });
+    expect((upd?.payload as { option_prices: Record<string, unknown> }).option_prices).toHaveProperty("fabrics");
+  });
+});
+
+describe("POST /api/rental/offers/:id/buy-prices", () => {
+  it("201 — outright price with gifts, offer id from the path", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: BUY_PRICE_ROW }));
+    const res = await authed(`/api/rental/offers/${OFFER_ID}/buy-prices`, "principal", {
+      method: "POST",
+      body: { sku: "CLOUD-K", price: 4590, gifts: [{ sku: "PILLOW-STD", qty: 2 }] },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.op === "insert")?.payload).toMatchObject({
+      offer_id: OFFER_ID,
+      sku: "CLOUD-K",
+      price: 4590,
+    });
+  });
+
+  it("422 — a buy price needs exactly one target (never both a sku and a combo)", async () => {
+    const res = await authed(`/api/rental/offers/${OFFER_ID}/buy-prices`, "principal", {
+      method: "POST",
+      body: { sku: "CLOUD-K", comboId: COMBO_ID, price: 4590 },
+    });
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("POST /api/rental/offers/:id/services", () => {
+  it("201 — a package attached free on the rent lane for 2 visits", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: OFFER_SERVICE_ROW }));
+    const res = await authed(`/api/rental/offers/${OFFER_ID}/services`, "principal", {
+      method: "POST",
+      body: { packageId: PKG_ID, freeLane: "rent", freeVisits: 2 },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.op === "insert")?.payload).toMatchObject({
+      offer_id: OFFER_ID,
+      package_id: PKG_ID,
+      free_lane: "rent",
+      free_visits: 2,
+    });
+  });
+
+  it("409 — the same package cannot be attached twice", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ writeError: { code: "23505", message: "duplicate key" } }),
+    );
+    const res = await authed(`/api/rental/offers/${OFFER_ID}/services`, "principal", {
+      method: "POST",
+      body: { packageId: PKG_ID, monthlyPrice: 19 },
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_offer_service");
+  });
+});
+
+describe("POST /api/rental/service-packages (0264 auto SKU)", () => {
+  it("mints SVC-MAT-CLEAN-1Y2 under the service model and links it", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        recorded,
+        tables: {
+          product_skus: [],
+          product_models: [{ id: SERVICE_MODEL_ID, category: "service", discontinued_at: null }],
+        },
+        writeReturn: { ...PKG_ROW, sku: "SVC-MAT-CLEAN-1Y2", category: "mattress" },
+      }),
+    );
+    const res = await authed("/api/rental/service-packages", "principal", {
+      method: "POST",
+      body: {
+        name: "Mattress Care — 1 year",
+        category: "mattress",
+        serviceType: "cleaning",
+        durationMonths: 12,
+        visitsPerYear: 2,
+        price: 190,
+      },
+    });
+    expect(res.status).toBe(201);
+    const skuInsert = recorded.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuInsert?.payload).toMatchObject({
+      model_id: SERVICE_MODEL_ID,
+      sku: "SVC-MAT-CLEAN-1Y2",
+      variant_kind: "preset",
+      price: 190,
+      pos_active: true,
+    });
+    const pkgInsert = recorded.find((r) => r.table === "service_packages" && r.op === "insert");
+    expect(pkgInsert?.payload).toMatchObject({ sku: "SVC-MAT-CLEAN-1Y2", category: "mattress" });
+  });
+
+  it("reuses an existing SKU code instead of inserting it twice", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        recorded,
+        tables: {
+          product_skus: [{ sku: "SVC-SOFA-CLEAN-3Y3" }],
+          product_models: [{ id: SERVICE_MODEL_ID, category: "service", discontinued_at: null }],
+        },
+        writeReturn: { ...PKG_ROW, sku: "SVC-SOFA-CLEAN-3Y3", category: "sofa" },
+      }),
+    );
+    const res = await authed("/api/rental/service-packages", "principal", {
+      method: "POST",
+      body: {
+        name: "Sofa Care — 3 years",
+        category: "sofa",
+        serviceType: "cleaning",
+        durationMonths: 36,
+        visitsPerYear: 3,
+      },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.table === "product_skus" && r.op === "insert")).toBeUndefined();
+  });
+
+  it("422 when the catalog has no service model to hang the SKU on", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ tables: { product_skus: [], product_models: [] }, writeReturn: PKG_ROW }),
+    );
+    const res = await authed("/api/rental/service-packages", "principal", {
+      method: "POST",
+      body: { name: "Orphan plan", category: "mattress", durationMonths: 12, visitsPerYear: 2 },
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("service_sku_mint_failed");
+  });
+
+  it("no category → no mint (the pre-0264 hand-linked path still works)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: PKG_ROW }));
+    const res = await authed("/api/rental/service-packages", "principal", {
+      method: "POST",
+      body: { name: "Legacy plan", durationMonths: 12, visitsPerYear: 2 },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.table === "product_skus")).toBeUndefined();
+  });
+});
+
+describe("POST /api/rental/plans (0264 line kinds)", () => {
+  it("201 — a sofa COMBO line carries no sku and lands line_kind=combo", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ recorded, writeReturn: { ...PLAN_ROW, sku: null, combo_id: COMBO_ID, line_kind: "combo" } }),
+    );
+    const res = await authed("/api/rental/plans", "principal", {
+      method: "POST",
+      body: { comboId: COMBO_ID, lineKind: "combo", termMonths: 84, monthlyFee: 150, offerId: OFFER_ID },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.op === "insert")?.payload).toMatchObject({
+      sku: null,
+      combo_id: COMBO_ID,
+      line_kind: "combo",
+      offer_id: OFFER_ID,
+    });
+  });
+
+  it("201 — a compartment line keeps its sku and carries gifts", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ recorded, writeReturn: { ...PLAN_ROW, line_kind: "compartment" } }),
+    );
+    const res = await authed("/api/rental/plans", "principal", {
+      method: "POST",
+      body: {
+        sku: "BOOQIT-1A",
+        lineKind: "compartment",
+        termMonths: 84,
+        monthlyFee: 10,
+        offerId: OFFER_ID,
+        gifts: [{ sku: "CUSHION", qty: 1 }],
+      },
+    });
+    expect(res.status).toBe(201);
+    expect(recorded.find((r) => r.op === "insert")?.payload).toMatchObject({
+      sku: "BOOQIT-1A",
+      line_kind: "compartment",
+      gifts: [{ sku: "CUSHION", qty: 1 }],
+    });
+  });
+
+  it("422 — a line with neither a sku nor a combo is refused", async () => {
+    const res = await authed("/api/rental/plans", "principal", {
+      method: "POST",
+      body: { termMonths: 84, monthlyFee: 59 },
+    });
     expect(res.status).toBe(422);
   });
 });

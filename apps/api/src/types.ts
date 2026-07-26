@@ -30,6 +30,13 @@ export type AuthContext = {
 
 export type Variables = {
   auth: AuthContext;
+  /**
+   * HR-P2 (0260) — the caller's duty keys from `my_org_duties()`, memoised for
+   * the life of ONE request by `lib/duties.ts`. Deliberately NOT populated by
+   * the auth middleware: duties cost a DB round-trip and only a handful of
+   * routes gate on them, so the read is lazy rather than on every request.
+   */
+  duties?: readonly string[];
 };
 
 export type AppEnv = { Bindings: Bindings; Variables: Variables };

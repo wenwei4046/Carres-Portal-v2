@@ -925,18 +925,29 @@ export const servicePackageFromRow = (r: DB.ServicePackageRow): D.ServicePackage
   sku: r.sku,
   active: r.active,
   sortOrder: Number(r.sort_order),
+  category: r.category ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   updatedBy: r.updated_by,
 });
 
+/** Normalises one `gifts` jsonb entry (0264) — a real SKU + a positive qty.
+ *  Malformed entries are dropped rather than crashing a config read. */
+const giftsFromJson = (raw: unknown): D.RentalGift[] =>
+  Array.isArray(raw)
+    ? raw
+        .filter((g): g is DB.RentalGiftJson => !!g && typeof (g as DB.RentalGiftJson).sku === "string")
+        .map((g) => ({ sku: g.sku, qty: Math.max(1, Math.floor(Number(g.qty) || 1)) }))
+    : [];
+
 /**
- * Maps a `rental_plans` row (0248) to the camelCase domain shape. The money /
- * rate columns are Postgres numeric → `Number()`.
+ * Maps a `rental_plans` row (0248 + 0264) to the camelCase domain shape. The
+ * money / rate columns are Postgres numeric → `Number()`; a pre-0264 row (no
+ * offer_id / line_kind) still maps cleanly through the defaults.
  */
 export const rentalPlanFromRow = (r: DB.RentalPlanRow): D.RentalPlan => ({
   id: r.id,
-  sku: r.sku,
+  sku: r.sku ?? null,
   termMonths: Number(r.term_months),
   monthlyFee: Number(r.monthly_fee),
   supplierRatePct: Number(r.supplier_rate_pct),
@@ -945,6 +956,102 @@ export const rentalPlanFromRow = (r: DB.RentalPlanRow): D.RentalPlan => ({
   active: r.active,
   stripeProductId: r.stripe_product_id ?? null,
   stripePriceId: r.stripe_price_id ?? null,
+  offerId: r.offer_id ?? null,
+  comboId: r.combo_id ?? null,
+  lineKind: r.line_kind ?? "unit",
+  gifts: giftsFromJson(r.gifts),
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/* ── 0264: the offer config adapters ───────────────────────────────────── */
+
+/** Normalises one priced option value; absent prices stay NULL so a fabric
+ *  colour can inherit its series (the resolver in ./rental applies that). */
+const optionValueFromJson = (raw: DB.RentalOptionValueJson | undefined): D.RentalOptionValue => ({
+  on: raw?.on !== false,
+  oneTime: raw?.oneTime == null ? null : Number(raw.oneTime),
+  monthly: raw?.monthly == null ? null : Number(raw.monthly),
+});
+
+const optionPricesFromJson = (
+  raw: DB.RentalOptionPricesJson | null | undefined,
+): Record<string, D.RentalOptionGroup> => {
+  const out: Record<string, D.RentalOptionGroup> = {};
+  for (const [group, g] of Object.entries(raw ?? {})) {
+    const values: Record<string, D.RentalOptionValue> = {};
+    for (const [v, entry] of Object.entries(g?.values ?? {})) values[v] = optionValueFromJson(entry);
+    const series: Record<string, D.RentalFabricSeries> = {};
+    for (const [s, entry] of Object.entries(g?.series ?? {})) {
+      const colors: Record<string, D.RentalOptionValue> = {};
+      for (const [code, cv] of Object.entries(entry?.colors ?? {})) colors[code] = optionValueFromJson(cv);
+      series[s] = { ...optionValueFromJson(entry), colors };
+    }
+    out[group] = { required: g?.required === true, values, series };
+  }
+  return out;
+};
+
+const surchargesFromJson = (raw: DB.RentalSurchargeJson[] | null | undefined): D.RentalSurcharge[] =>
+  Array.isArray(raw)
+    ? raw
+        .filter((s): s is DB.RentalSurchargeJson => !!s && typeof s.code === "string")
+        .map((s) => ({
+          code: s.code,
+          label: s.label ?? s.code,
+          oneTime: Number(s.oneTime ?? 0),
+          monthly: Number(s.monthly ?? 0),
+          required: s.required === true,
+        }))
+    : [];
+
+/** Maps a `rental_offers` row (0264) to the camelCase domain shape. */
+export const rentalOfferFromRow = (r: DB.RentalOfferRow): D.RentalOffer => ({
+  id: r.id,
+  modelId: r.model_id,
+  pricingMode: r.pricing_mode,
+  rentEnabled: r.rent_enabled,
+  buyEnabled: r.buy_enabled,
+  termsMonths: (r.terms_months ?? []).map((t) => Number(t)),
+  optionPrices: optionPricesFromJson(r.option_prices),
+  surcharges: surchargesFromJson(r.surcharges),
+  supplierRatePct: Number(r.supplier_rate_pct),
+  commissionBasePct: Number(r.commission_base_pct),
+  active: r.active,
+  notes: r.notes,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/** Maps a `rental_buy_prices` row (0264). `price` null = use the list price. */
+export const rentalBuyPriceFromRow = (r: DB.RentalBuyPriceRow): D.RentalBuyPrice => ({
+  id: r.id,
+  offerId: r.offer_id,
+  sku: r.sku,
+  comboId: r.combo_id,
+  price: r.price == null ? null : Number(r.price),
+  gifts: giftsFromJson(r.gifts),
+  active: r.active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
+});
+
+/** Maps a `rental_offer_services` row (0264). */
+export const rentalOfferServiceFromRow = (
+  r: DB.RentalOfferServiceRow,
+): D.RentalOfferService => ({
+  id: r.id,
+  offerId: r.offer_id,
+  packageId: r.package_id,
+  freeLane: r.free_lane,
+  freeVisits: r.free_visits == null ? null : Number(r.free_visits),
+  monthlyPrice: r.monthly_price == null ? null : Number(r.monthly_price),
+  outrightPrice: r.outright_price == null ? null : Number(r.outright_price),
+  active: r.active,
+  sortOrder: Number(r.sort_order),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   updatedBy: r.updated_by,
@@ -992,6 +1099,10 @@ export const rentalAgreementFromRow = (r: DB.RentalAgreementRow): D.RentalAgreem
   ownershipDocUrl: r.ownership_doc_url,
   stripeCustomerId: r.stripe_customer_id,
   stripeSubscriptionId: r.stripe_subscription_id,
+  offerId: r.offer_id ?? null,
+  selectedOptions: (r.selected_options ?? {}) as Record<string, unknown>,
+  gifts: giftsFromJson(r.gifts),
+  oneOffTotal: Number(r.one_off_total ?? 0),
   notes: r.notes,
   createdAt: r.created_at,
   updatedAt: r.updated_at,

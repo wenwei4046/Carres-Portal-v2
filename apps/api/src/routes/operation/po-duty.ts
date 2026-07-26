@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
-  isPoDutyEditor,
   monthKeyMYT,
   pickNextDutyHolder,
   updateOpsPoDutyInput,
   type OpsPoDutyResponse,
 } from "@carres/shared";
+import { requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -37,6 +37,20 @@ function requireOperationOrPrincipal(
  *  and the pos.ts create-PO gate. Returns null when dormant (missing table /
  *  empty pool / no row could be created). */
 export async function resolveCurrentPoDuty(
+  sb: ReturnType<typeof userClient>,
+): Promise<{ month: string; user_id: string; assigned_by: string | null } | null> {
+  // The doc above promises "dormant, never block" — so a THROW has to degrade
+  // exactly like an error RESULT does. Without this, an unexpected client
+  // shape turns a dormant OPTIONAL feature into a 500 on the PO create path,
+  // which is the precise opposite of what this gate is for.
+  try {
+    return await resolveCurrentPoDutyImpl(sb);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveCurrentPoDutyImpl(
   sb: ReturnType<typeof userClient>,
 ): Promise<{ month: string; user_id: string; assigned_by: string | null } | null> {
   const month = monthKeyMYT();
@@ -141,13 +155,15 @@ poDutyRouter.get("/", async (c) => {
 poDutyRouter.put("/", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
-  // STRICTER than isOpsManager (Jess 2026-07-19: roster edits are HERS) —
-  // the shared operation@ login must not rewrite the rotation.
-  if (!isPoDutyEditor(auth.role, auth.email)) {
-    throw new HTTPException(403, {
-      message: "Only Jess (or principal) can change the PO duty roster",
-    });
-  }
+  // STRICTER than the ops_manager duty (Jess 2026-07-19: roster edits are
+  // HERS) — the shared operation@ login must not rewrite the rotation.
+  // HR-P2 (0260): the grant now rides the `po_duty_editor` duty key on her
+  // position (COO), with the legacy email list as the one-release fallback.
+  await requireDuty(
+    c,
+    "po_duty_editor",
+    "Only the PO duty roster editor (or principal) can change the roster",
+  );
 
   let body: unknown;
   try {

@@ -635,7 +635,6 @@ export {
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
   isOpsManager,
-  OPS_MANAGER_EMAILS,
   OPS_GENERIC_EMAILS,
   isOpsGenericAccount,
   receiveLineInput,
@@ -680,6 +679,24 @@ export {
   type OpsPoDutyResponse,
   type UpdateOpsPoDutyInput,
 } from "./schemas/ops-po-duty";
+
+// HR-P2 (0260) — permissions that follow the position, not the person.
+// `isOpsManager` / `isPoDutyEditor` are re-exported above from their original
+// modules so no existing importer had to change; everything genuinely new to
+// duty keys is exported here.
+export {
+  DUTY_KEYS,
+  isDutyKey,
+  checkDuty,
+  usedLegacyFallback,
+  isOpsManagerRow,
+  LEGACY_OPS_MANAGER_EMAILS,
+  LEGACY_PO_DUTY_EDITOR_EMAILS,
+  type DutyKey,
+  type DutyHolderMap,
+  type DutyGrant,
+  type DutyGrantVia,
+} from "./schemas/org-duties";
 
 export {
   LOAN_SOURCES,
@@ -1256,11 +1273,25 @@ export {
   rentalContractValue,
   rentalMonthlySplit,
   type RentalMonthlySplit,
+  // 0264 — the offer layer: service SKU codes + the pick → money resolver
+  // (shared by the P&M previews, the POS lanes and the signing recompute).
+  serviceSkuCode,
+  resolveRentalPick,
+  quoteRental,
+  compartmentBuildMonthly,
+  mergeRentalGifts,
+  type RentalPick,
+  type RentalChargeLine,
+  type RentalQuote,
+  type RentalQuoteInput,
 } from "./rental";
 export {
   customerFromRow,
   servicePackageFromRow,
   rentalPlanFromRow,
+  rentalOfferFromRow,
+  rentalBuyPriceFromRow,
+  rentalOfferServiceFromRow,
   posRentalPlanFromRow,
   rentalAgreementFromRow,
   rentalBillingFromRow,
@@ -1273,6 +1304,17 @@ export type {
   Customer,
   ServicePackage,
   RentalPlan,
+  RentalOffer,
+  RentalBuyPrice,
+  RentalOfferService,
+  RentalOfferCategory,
+  RentalPricingMode,
+  RentalServiceFreeLane,
+  RentalOptionValue,
+  RentalFabricSeries,
+  RentalOptionGroup,
+  RentalSurcharge,
+  RentalGift,
   PosRentalPlan,
   RentalAgreement,
   RentalBilling,
