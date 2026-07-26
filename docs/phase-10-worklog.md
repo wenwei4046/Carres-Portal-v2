@@ -1161,3 +1161,18 @@ Also dropped ⑮'s leftovers: the guarantee form was still rendering the generic
 **Durable lesson: whenever a value crosses from CONFIG to a MATCH KEY, check what the other side literally stores.** A pool code, a display label and a SKU variant are three different strings for one size, and only one of them matches.
 
 **Ship**: PR #345 (merge `c4c50479`) → web `index-CPq_A7sa.js` → carres-portal `e06f214f` + carres-pos `c7d1bae1`; all 4 canonicals ✓; downloaded 4,155,658 bytes, `SERVICE_ROLE` 0. Tests: shared 1121/1121 (+5) · api 3 = §17.7 baseline · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean. api/DB untouched (Worker stays `3c543c05`).
+
+
+## 2026-07-26 ⑰ · A sofa guarantee's variants are its SEAT HEIGHTS (0271, PR #348, deployed)
+
+**Loo**: a guarantee's variants come from that category's own Maintenance pool — mattress from the mattress pool, bedframe from the bedframe pool, "and sofa's too".
+
+Mattress and bedframe already read exactly that (`mattress_size` / `bedframe_size` ARE the Maintenance → Sizes pools). **Sofa was the gap**: ⑮ gave it combo / compartment / model and no variant axis at all, so `sofa_size` (the seat heights 24 / 26 / … / Flat) could not narrow anything.
+
+**Seat height is ORTHOGONAL to shape**, so this WIDENS the variants CHECK rather than adding a fifth mutually-exclusive scope: "the L-shape combo, at 32 inch" is one sensible cover, and the form keeps the heights when you swap between Any / Model / Combo / Compartment. `covers_variants` now reads: mattress+bedframe → the SIZE · sofa → the SEAT HEIGHT · accessory → still nothing.
+
+**The subtle part**: a sofa SKU's `variant` is a COMPARTMENT CODE (`1A(LHF)`), not a height — matching a height against it would never fire. For the sofa category the matcher now compares the BUILD's height (`attrs.sofa_build.height`), and a test asserts the compartment code is not accidentally accepted as a height. **When a category's "variant" means a different thing, the matcher has to be told which field carries it — the column name being the same is not evidence.**
+
+**Two bugs the stacking exposed**: the combo branch used to `return true` and the compartment branch to `return`, so either one short-circuited PAST a height narrowing. Both now fall through. The two chip rows collapsed into one shared `VariantChips` so a sofa's heights and a bed's sizes can never drift into different affordances.
+
+**Ship**: PR #348 (merge `24f50a72`) → web `index--HiWvb7v.js` → carres-portal `b388e446` + carres-pos `20298cd0`; all 4 canonicals ✓; downloaded 4,156,276 bytes, `SERVICE_ROLE` 0, seat-height marker ✓. Tests: shared 1127/1127 (+6) · api 3 = §17.7 baseline · web 16 = baseline (+3) · typecheck 0 · design-standard + check:v4 clean. api/DB otherwise untouched (Worker stays `3c543c05`).
