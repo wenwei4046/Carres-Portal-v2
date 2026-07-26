@@ -211,7 +211,7 @@ describe("GET /api/rental/approvals — who may see the credit queue", () => {
     vi.mocked(userClient).mockReturnValue(makeSb({ data: null, error: null }) as never);
     const res = await get("/api/rental/approvals", "finance");
     expect(res.status).toBe(200);
-    expect((await res.json()).approvals).toEqual([]);
+    expect(((await res.json()) as { approvals: unknown[] }).approvals).toEqual([]);
   });
 
   // The whole point of the narrower gate: `bd` and `operation` are internal and
@@ -243,7 +243,7 @@ describe("POST /api/rental/agreements/:id/decide", () => {
     expect(res.status).toBe(200);
     expect(sb.calls.rpc[0].name).toBe("rental_approve_agreement");
     expect(sb.calls.rpc[0].args).toEqual({ p_agreement_id: AG_ID, p_note: "CBM clear" });
-    expect((await res.json()).agreement.status).toBe("active");
+    expect(((await res.json()) as { agreement: { status: string } }).agreement.status).toBe("active");
   });
 
   it("approve without a note is fine (p_note null)", async () => {
@@ -337,7 +337,7 @@ describe("POST /api/rental/agreements/:id/decide", () => {
     );
     const res = await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", { approve: true });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("not_pending");
+    expect(((await res.json()) as { code: string }).code).toBe("not_pending");
   });
 
   it("maps agreement_not_found → 404", async () => {
