@@ -2775,6 +2775,12 @@ export interface opsRemarkEmbed {
   booking_stage?: "none" | "provisional" | "confirmed" | null;
   confirmed_date?: string | null;
   confirmed_time_slot?: string | null;
+  /** T6 delivery-photo ledger (migration 0280) — surfaced into the list for T7's
+   *  "Upload delivery photo" queue. `undefined` means the answer is UNKNOWN (an
+   *  older Worker that doesn't select the column, or no overlay row at all), and
+   *  the queue stays silent; an explicit `[]` is the real "no photo yet". Only
+   *  paths ride the list — a signed view URL is minted per click in the drawer. */
+  delivery_photos?: { path: string; at: string; by: string | null }[] | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

@@ -670,11 +670,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.queryByRole("button", { name: /Waiting stock/ })).toBeNull();
     // Locate queue rows via their unique tooltips (per-row hover actions also
     // carry an "Assign logistic" accessible name — the title disambiguates).
+    // T7 moved the two delivery verbs into their own DELIVERY group (with their
+    // own deadlines) — they are covered by the DELIVERY-queue tests below, so
+    // this list is the STOCK verbs that stayed in QUEUES.
     const verbTitles = [
       "Goods not ordered from any supplier yet — raise the PO",
       "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
-      "No delivery partner picked yet — assign one",
-      "Partner assigned but no delivery booked with the customer — chase the logistic",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
     expect(row).toBeTruthy();
@@ -721,6 +722,175 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
     fireEvent.click(row);
     expect(rowsBySo()).toEqual(["1301"]);
+  });
+
+  // ── T7 · DELIVERY queues + auto-overdue ────────────────────────────────────
+  // The delivery lifecycle is its own facet group, each row carrying its own
+  // deadline so an item turns late by itself.
+  it("DELIVERY group holds the four delivery queues, and each count equals its NEXT verb", () => {
+    listHookState.data = {
+      orders: [
+        // Stock ready, no carrier → Assign logistic. Date 10d out = NOT late.
+        makeRow({
+          id: "q1",
+          so: 1401,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(10),
+        }),
+        // Carrier assigned, customer not confirmed → Chase logistic.
+        makeRow({
+          id: "q2",
+          so: 1402,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+        }),
+        // Customer confirmed for TODAY → Deliver today.
+        makeRow({
+          id: "q3",
+          so: 1403,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(0),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          ops_order_control: {
+            booking_stage: "confirmed",
+            confirmed_date: relISO(0),
+            confirmed_time_slot: "Morning (9–11 AM)",
+          },
+        }),
+        // Delivered with an EMPTY photo ledger → Upload delivery photo.
+        makeRow({
+          id: "q4",
+          so: 1404,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivered_at: relISO(-1),
+          ops_order_control: { delivery_photos: [] },
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*4/ }));
+    const g = within(screen.getByTestId("filter-delivery"));
+    for (const label of [
+      "Assign logistic",
+      "Chase logistic",
+      "Deliver today",
+      "Upload delivery photo",
+    ]) {
+      const row = g.getByRole("button", { name: new RegExp(label) });
+      expect(row.textContent).toMatch(/1$/); // one order each, none late
+    }
+  });
+
+  it("a step past its OWN deadline reads '· N late' without anyone watching", () => {
+    listHookState.data = {
+      orders: [
+        // Stock ready, no carrier, customer date is TOMORROW — assign was due 3
+        // working days ago, so this row is late on its own.
+        makeRow({
+          id: "late1",
+          so: 1411,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(1),
+        }),
+        // Same queue, date far out → not late. Count 2, late 1.
+        makeRow({
+          id: "ok1",
+          so: 1412,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(30),
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    const row = within(screen.getByTestId("filter-delivery")).getByRole("button", {
+      name: /Assign logistic/,
+    });
+    expect(row.textContent).toContain("2 · 1 late");
+    expect(row.getAttribute("title")).toContain("1 of 2 already past that deadline");
+  });
+
+  it("a TBD customer date is never late (silence beats a false alarm)", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "tbd1",
+          so: 1421,
+          status: "proceed_order",
+          operation_stage: "ready_to_dispatch",
+          delivery_date: relISO(1),
+          delivery_date_tbd: true,
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
+    const row = within(screen.getByTestId("filter-delivery")).getByRole("button", {
+      name: /Assign logistic/,
+    });
+    expect(row.textContent).not.toContain("late");
+  });
+
+  it("the photo queue spans DELIVERED orders — clicking it keeps them in the table", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "p1",
+          so: 1431,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivered_at: relISO(-1),
+          ops_order_control: { delivery_photos: [] },
+        }),
+        // Delivered WITH proof — Done, never in the queue.
+        makeRow({
+          id: "p2",
+          so: 1432,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivered_at: relISO(-1),
+          ops_order_control: {
+            delivery_photos: [{ path: "order/p2/a.jpg", at: relISO(-1), by: null }],
+          },
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    const row = within(screen.getByTestId("filter-delivery")).getByRole("button", {
+      name: /Upload delivery photo/,
+    });
+    expect(row.textContent).toMatch(/1$/);
+    fireEvent.click(row);
+    expect(rowsBySo()).toEqual(["1431"]);
+  });
+
+  it("the DELIVERY group hides entirely when there is no delivery work", () => {
+    listHookState.data = {
+      orders: [
+        // No PO raised → the stock track owns this row; nothing delivery-side,
+        // and it has a carrier so it isn't Unassigned either.
+        makeRow({
+          id: "s1",
+          so: 1441,
+          status: "proceed_order",
+          operation_stage: "in_production",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+        }),
+      ],
+    };
+    stockHookState = { data: stockResponse([{ sku: "other", available: 0 }]) };
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("filter-delivery")).toBeNull();
   });
 
   it("gives each status chip a plain-English tooltip (legend)", () => {
@@ -1130,10 +1300,14 @@ describe("nextActionOf (C2)", () => {
   // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──
   // T1 (0277): the gate opens on the CUSTOMER's confirmation, never on the
   // carrier's provisional logistic_eta alone.
+  // Relative, NOT a fixed calendar date: T7 splits a confirmed booking by its
+  // date (today → Deliver today · passed → Chase logistic), so a hardcoded
+  // "2026-08-01" would silently start testing a different rung once that day
+  // passed. inDays(6) keeps this fixture "confirmed for a future day" forever.
   const BOOKED = {
-    logistic_eta: "2026-08-01",
+    logistic_eta: inDays(6),
     booking_stage: "confirmed" as const,
-    confirmed_date: "2026-08-01",
+    confirmed_date: inDays(6),
     confirmed_time_slot: "Morning (9–11 AM)",
   };
 
@@ -1214,6 +1388,98 @@ describe("nextActionOf (C2)", () => {
     const r = nextActionOf(o, { state: "ready" }, []);
     expect(r.label).toBe("Confirm");
     expect(r.locked).toBeFalsy();
+  });
+
+  // ── T7 · the confirmed date is itself a deadline ──
+  it("confirmed for TODAY → Deliver today (its own queue, not the resting Confirm)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, confirmed_date: inDays(0) },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Deliver today",
+      tone: "info",
+    });
+  });
+
+  it("confirmed date PASSED with no delivery recorded → Chase logistic (red) — the queue turns late by itself", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, confirmed_date: inDays(-2) },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Chase logistic",
+      tone: "danger",
+    });
+  });
+
+  it("confirmed for a future day → still Confirm (T7 changes nothing before the day)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, confirmed_date: inDays(3) },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm");
+  });
+
+  it("owing balance beats Deliver today (PayHold: never chase a delivery we may not make)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Confirm",
+      locked: true,
+    });
+  });
+
+  // ── T7 · the delivery photo is the last outstanding act on a closed order ──
+  it("delivered with an EMPTY photo ledger → Upload delivery photo (amber, never red — guardrail #2)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivered_at: inDays(-3),
+      ops_order_control: { delivery_photos: [] },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Upload delivery photo",
+      tone: "warning",
+    });
+  });
+
+  it("delivered WITH a photo → Done", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivered_at: inDays(-3),
+      ops_order_control: {
+        delivery_photos: [{ path: "order/x/a.jpg", at: inDays(-3), by: null }],
+      },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
+  });
+
+  it("delivered with the ledger ABSENT → Done (an old Worker must not flood every row)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivered_at: inDays(-3),
+      ops_order_control: { balance: 0 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
   });
 });
 
