@@ -135,10 +135,6 @@ export type GuaranteeEntitlementDto = {
   // what was sold
   orderId: string;
   so: number | null;
-  /** The ORDER's status (raw DB word — the UI maps it through orderStatusWord).
-   *  Loo 2026-07-26: the desk's STATUS column shows where the ORDER is
-   *  (placed / delivered / …); the guarantee's own state renders under its ID. */
-  orderStatus: string | null;
   orderLineId: string | null;
   guaranteeSku: string;
   guaranteeLabel: string | null;
@@ -183,6 +179,42 @@ export function effectiveGuaranteeStatus(
   if (status !== "active") return status;
   if (expiresOn && expiresOn < today) return "expired";
   return "active";
+}
+
+/**
+ * The DESK vocabulary (Loo 2026-07-26): a guarantee is **Active** until it is
+ * **Claimed** or **Expired**. Three words, because that is the whole decision
+ * an operator makes at the counter.
+ *
+ * `pending` (sold, not yet delivered) folds into Active on purpose — Loo:
+ * "如果还没 claim，就是 active". The "cover hasn't started yet" nuance is not
+ * lost: the Cover-ends column reads "on delivery" instead of a date.
+ *
+ * `void` deliberately KEEPS its own word even though it wasn't in the three.
+ * A voided guarantee is one whose order was cancelled or whose line was
+ * removed — calling that "Active" would invite an operator to honour a
+ * guarantee that was never really sold.
+ */
+export type GuaranteeDeskStatus = "active" | "claimed" | "expired" | "void";
+
+/**
+ * A pure FOLD of the five lifecycle states into the four display words. It
+ * takes the ALREADY-derived status (effectiveGuaranteeStatus) rather than
+ * re-deriving from the date: expiry must be decided by ONE clock — the
+ * server's — or a browser in another timezone can disagree by a day about
+ * whether a guarantee is still claimable.
+ */
+export function guaranteeDeskStatus(effective: GuaranteeStatus): GuaranteeDeskStatus {
+  switch (effective) {
+    case "claimed":
+      return "claimed";
+    case "expired":
+      return "expired";
+    case "void":
+      return "void";
+    default:
+      return "active"; // 'active' AND 'pending'
+  }
 }
 
 /** Only a live, in-window, unclaimed guarantee can be swapped (ruling #3).

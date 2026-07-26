@@ -9,13 +9,13 @@ import { toast } from "sonner";
 import {
   displayGuaranteeId,
   guaranteeCoverageLine,
+  guaranteeDeskStatus,
   isGuaranteeClaimable,
+  type GuaranteeDeskStatus,
   type GuaranteeEntitlementDto,
   type GuaranteeListResponse,
-  type GuaranteeStatus,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
-import { orderStatusPill, orderStatusWord } from "@/lib/status-pill";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { qk } from "@/lib/queries";
 import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
@@ -28,32 +28,31 @@ import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
  * alive, and has it already been used? One box searches all three handles Loo
  * named: Sales Order · customer name · customer id / phone.
  *
- * The STATUS column shows where the ORDER is (Loo 2026-07-26) — placed /
- * delivered / … — because that is the operational question at the counter, and
- * the guarantee's own clock is downstream of it (cover starts on delivery).
- * The guarantee's OWN state stays on screen under its ID: "Used" and "Expired"
- * are what decide whether a claim can be honoured, so they must never be a
- * click away.
+ * STATUS is the guarantee's own state in THREE words (Loo 2026-07-26):
+ * **Active** until it is **Claimed** or **Expired** — that is the whole
+ * decision an operator makes at the counter. 'pending' (sold, not yet
+ * delivered) folds into Active; the "cover hasn't started" nuance lives in the
+ * Cover-ends column ("on delivery"). 'void' keeps its own word so a cancelled
+ * order's guarantee is never mistaken for a live one. The mapping is
+ * guaranteeDeskStatus() in @carres/shared, so this desk and the order-detail
+ * strip can never drift apart.
  *
- * State vocabulary law: no DB word reaches the screen — the guarantee state
- * renders through STATUS_DISPLAY (and it's the DERIVED status, so an
- * out-of-window row reads "Expired" even though the column still says
- * 'active'), and the order status through orderStatusWord.
+ * State vocabulary law: no DB word reaches the screen, and the word is DERIVED
+ * — an out-of-window row reads Expired even though the column still says
+ * 'active'.
  */
 
-const STATUS_DISPLAY: Record<GuaranteeStatus, { label: string; pill: string }> = {
-  pending: { label: "Starts on delivery", pill: "pill-sent" },
-  active: { label: "Covered", pill: "pill-confirmed" },
-  claimed: { label: "Used", pill: "pill-collected" },
+const STATUS_DISPLAY: Record<GuaranteeDeskStatus, { label: string; pill: string }> = {
+  active: { label: "Active", pill: "pill-confirmed" },
+  claimed: { label: "Claimed", pill: "pill-collected" },
   expired: { label: "Expired", pill: "pill-neutral" },
   void: { label: "Void", pill: "pill-neutral" },
 };
 
-const FILTERS: Array<{ key: "" | GuaranteeStatus; label: string }> = [
+const FILTERS: Array<{ key: "" | GuaranteeDeskStatus; label: string }> = [
   { key: "", label: "All" },
-  { key: "active", label: "Covered" },
-  { key: "pending", label: "Not delivered" },
-  { key: "claimed", label: "Used" },
+  { key: "active", label: "Active" },
+  { key: "claimed", label: "Claimed" },
   { key: "expired", label: "Expired" },
 ];
 
@@ -61,7 +60,7 @@ export default function OperationGuarantees() {
   const qc = useQueryClient();
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim(), 250);
-  const [status, setStatus] = useState<"" | GuaranteeStatus>("");
+  const [status, setStatus] = useState<"" | GuaranteeDeskStatus>("");
   const [claiming, setClaiming] = useState<GuaranteeEntitlementDto | null>(null);
 
   // The page LISTS by default (Loo 2026-07-26: he created an order and found
@@ -191,7 +190,7 @@ export default function OperationGuarantees() {
             </thead>
             <tbody>
               {rows.map((g) => {
-                const d = STATUS_DISPLAY[g.effectiveStatus];
+                const d = STATUS_DISPLAY[guaranteeDeskStatus(g.effectiveStatus)];
                 return (
                   <tr key={g.id} className="border-b border-base-100 last:border-0 align-top">
                     {/* The handle everything is tracked by. A claimed row shows
@@ -199,23 +198,16 @@ export default function OperationGuarantees() {
                         still carries that string, so it has to be recognisable
                         here even though it is no longer a live guarantee. */}
                     <td className="px-4 py-3">
-                      <div
+                      <span
                         className={`font-mono text-[12px] ${
                           g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                         }`}
                       >
                         {displayGuaranteeId(g) ?? "—"}
-                      </div>
-                      {/* The guarantee's OWN state rides under its ID — "Used" /
-                          "Expired" decide whether a claim can be honoured, so
-                          they stay visible even though STATUS now belongs to
-                          the order. */}
-                      <span className={`pill ${d.pill} mt-1`}>{d.label}</span>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`pill ${orderStatusPill(orderStatusWord(g.orderStatus))}`}>
-                        {orderStatusWord(g.orderStatus)}
-                      </span>
+                      <span className={`pill ${d.pill}`}>{d.label}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-900">{g.customerName || "—"}</div>

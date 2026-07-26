@@ -1,5 +1,9 @@
 import { ShieldCheck } from "lucide-react";
-import { displayGuaranteeId, type GuaranteeStatus } from "@carres/shared";
+import {
+  displayGuaranteeId,
+  guaranteeDeskStatus,
+  type GuaranteeDeskStatus,
+} from "@carres/shared";
 import { useOrderGuarantees } from "@/lib/queries";
 
 /**
@@ -16,18 +20,18 @@ import { useOrderGuarantees } from "@/lib/queries";
  * not a promise); the Guarantees desk still shows them for audit.
  */
 
-const TONE: Record<GuaranteeStatus, string> = {
-  pending: "pill-sent",
+// The SAME three words the Guarantees desk uses (guaranteeDeskStatus) — a
+// state must never read one way here and another way there.
+const TONE: Record<GuaranteeDeskStatus, string> = {
   active: "pill-confirmed",
   claimed: "pill-collected",
   expired: "pill-neutral",
   void: "pill-neutral",
 };
 
-const WORD: Record<GuaranteeStatus, string> = {
-  pending: "Starts on delivery",
-  active: "Covered",
-  claimed: "Used",
+const WORD: Record<GuaranteeDeskStatus, string> = {
+  active: "Active",
+  claimed: "Claimed",
   expired: "Expired",
   void: "Void",
 };
@@ -37,7 +41,7 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
   // nothing rather than breaking the customer card around it.
   const q = useOrderGuarantees(orderId);
 
-  const items = (q.data?.items ?? []).filter((g) => g.effectiveStatus !== "void");
+  const items = (q.data?.items ?? []).filter((g) => guaranteeDeskStatus(g.effectiveStatus) !== "void");
   if (items.length === 0) return null;
 
   return (
@@ -66,8 +70,8 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
                 · {g.coverageYears}y{g.expiresOn ? ` to ${g.expiresOn}` : ""}
               </span>
             </span>
-            <span className={`pill ${TONE[g.effectiveStatus]} shrink-0`}>
-              {WORD[g.effectiveStatus]}
+            <span className={`pill ${TONE[guaranteeDeskStatus(g.effectiveStatus)]} shrink-0`}>
+              {WORD[guaranteeDeskStatus(g.effectiveStatus)]}
             </span>
           </li>
         ))}
