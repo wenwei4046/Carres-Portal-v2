@@ -94,6 +94,17 @@ operations. SKUs still live in SKU Master.
 - The uploaded T&C is printed **verbatim**; the system only fills the blanks and stamps the
   signature. The customer signs at the sales order — **no signature, no order**, therefore no
   draft state exists.
+- **CORRECTION (2026-07-26, shipped as 0279).** "Signs at the sales order" became literally
+  impossible when 0275 moved the Sales Order behind finance approval: read as written it forces
+  either a draft state (which the line above forbids) or a signature that arrives after the
+  contract. **The signature attaches at agreement BIRTH** — which IS the counter moment the clause
+  means — and the SO the approval mints inherits it. The rule is unchanged in substance and now
+  enforced by construction: `create_rental_agreement` refuses without a signature, and
+  `rental_approve_agreement` refuses to approve an unsigned application, so no signature means no
+  agreement means no order. Two things the spec did not anticipate, both structural: a store JWT
+  cannot READ `rental_agreement_templates` (RLS internal-only) and cannot WRITE to the
+  `rental-agreements` bucket (`is_internal()` INSERT policy) — so the wording is served by a
+  definer function and the signature bytes travel through Hono, written with the service client.
 - **The free service package must NOT appear in the agreement.** It is a promotion, not a term
   of the rental — the document stays a pure rental agreement. (The `service.included` token is
   dropped from the field map.)

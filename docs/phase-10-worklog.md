@@ -1745,3 +1745,129 @@ trend strip renders one month because one month exists — it fills in by itself
 **Tests**: both pages' test `wrap()` gains `MemoryRouter` (the OperationReceiving precedent for tab-bar pages — StockTabs uses `useLocation`/`Link`). Affected files 39/39; full web suite 16 fails = the §17.7 baseline exactly. Typecheck 0 · check:v4 clean · design lint clean.
 
 **Not done, said out loud**: no visual smoke (login wall; Jess smokes per habit). The union tip carried PR #374's HR-P7 web code — deployed together per the union-tip rule.
+
+---
+
+## 2026-07-26 ㉓ · The customer's signature stops being thrown away (0279, PR #378, deployed)
+
+**Loo asked to resume the rental line.** The checkpoint was PR #358 (a rental produces a Sales
+Order), whose own closing note listed what was left: signing writes nothing, the billing engine is
+untouched, and buyout/ownership/repossession have status words but no flows. I picked signing and
+argued it over the billing engine: `RA-1003` carries `stripe_subscription_id = NULL`, so no
+subscription has ever existed and an `invoice.paid` handler could not be tested against a real
+event — while signing is a **legal** gap, not a visibility one.
+
+### The defect, and it was mine
+
+The POS **already asked for a signature**. `step4ValidRental` (draft.ts) refuses to enable Complete
+until `draft.signature` is a real `data:image/…` the customer drew on the pad. Then `handleSubmit`
+(DealerPos.tsx) branches to the rental path and **returns** — before the `uploadDataUrl` the
+ordinary order path runs on the very next lines. The drawing died in the browser.
+
+So the system asked for a signature purely to satisfy a gate and stored nothing.
+`create_rental_agreement` even wrote an order_history line reading "Rental RA-nnnn signed", and
+`rental_approve_agreement` extended up to RM 4,956 of credit on the strength of it. **A false
+record is worse than a missing feature.** PR #347 installed the gate; PR #358 confirmed the gate
+and fixed a different bug in it; neither wired the capture.
+
+Verified before writing a line, not assumed: `signed_at` / `signed_nric` / `signature_path` /
+`signed_doc_path` (0267's columns) had **zero writers** anywhere in `apps/api`, `packages/shared`
+or `supabase/migrations`, and `rental_agreement_templates` held **zero rows** on live prod.
+
+### Three structural blockers the spec never mentions
+
+1. **A store cannot read the paper it asks a customer to sign.** `rental_agreement_templates` is
+   RLS internal-only (0267), so the T&C was unreachable from a store JWT.
+2. **A store cannot write the signature either.** The `rental-agreements` bucket's INSERT policy is
+   `is_internal()` — measured in `pg_policies`, not guessed — so a client-side upload is
+   structurally impossible and the bytes must travel through Hono.
+3. **The spec's §1 is now literally impossible.** It says the customer "signs at the sales order",
+   but 0275 moved the SO behind approval. Read literally that forces either a draft state (which
+   the same spec forbids) or a late signature. The signature attaches at agreement BIRTH instead —
+   the counter moment — and the proposal doc is corrected rather than left to mislead.
+
+### 0279 — born signed, or not born
+
+`rental_current_agreement_template()` is ONE definition of "the wording in force"; the POS read
+route and the sell RPC both call it, so the paper on screen and the version stamped on the contract
+cannot be two documents. `create_rental_agreement` (**DROP + CREATE** — adding a parameter to a
+REPLACE makes a second overload, the 0153/0154 ghost trap) takes the signature, resolves the
+template, and stamps all five columns in the statement that creates the row.
+
+**The guard 0268 left commented out is now live**, and that inheritance is the point: 0275's
+`proceed_order` rental branch requires `active`, `active` requires approval, approval now requires a
+signature — **one line closes the chain from pad to warehouse**. Closes CF
+`rental-approve-without-signature`. A CHECK keeps the signature facts whole (all present or all
+absent) because `rental_agreements` also carries a blanket `is_internal()` policy and can be
+INSERTed straight through PostgREST, bypassing the RPC entirely.
+
+**The new params carry DEFAULTS on purpose.** 0275 DROPped a live signature while the old Worker
+still called it and broke rentals between apply and deploy. Here a stale caller still resolves and
+fails on `signature_required` — a readable refusal instead of "function not found in schema cache".
+
+### The dry run failed first, and that was the point
+
+Round 1 reported A8 FAIL with an empty detail. Two defects, both **in my own harness**: I had
+omitted the approve rewrite entirely (so the live 0268 body ran and happily approved an unsigned
+row), and every assertion block was shaped `BEGIN … RAISE 'AN FAIL' … EXCEPTION WHEN sqlstate
+'P0001'` — which **catches its own RAISE**. Rewritten to a flag-based pattern where the check
+happens outside the handler, then all 13 passed: every refusal by name, a properly signed signup
+stamping all five columns, the approve guard refusing an unsigned application *and writing no
+billings*, the CHECK refusing a half-signed row, RA-1003's survival, one RPC copy, grants both ways,
+and an ordinary order still refusing to proceed. Rollback confirmed clean before the real apply.
+**Rule: an assertion that raises inside its own EXCEPTION handler proves nothing.**
+
+### Guardrail #8 paid for itself, again
+
+Numbered 0278 against a tail of 0277. The re-check immediately before applying found a parallel line
+had taken **`0278_hr_staff_comp`** at 13:06 UTC *and already applied it* → renumbered to **0279**
+(PR #380) before apply. The ~35 code-comment references moved with it; the HR line's own
+`HR-P7 (0278)` references inside the two SHARED files it also touches (`packages/shared/src/index.ts`,
+`apps/web/src/lib/queries.ts`) were deliberately left alone — a blanket replace would have
+relabelled their migration as mine.
+
+### A mistake I made deploying, said out loud
+
+I ran `wrangler deploy` instead of `wrangler deploy --env production`. Both stanzas share
+`name = "carres-portal-v2-api"`, so it overwrote the production Worker with the DEFAULT env: it
+carried `PUBLIC_WEB_URL = "http://localhost:5173"` (which is where Stripe Checkout would have sent
+customers back to) and dropped the `api.carresofficial.com` custom-domain route. Caught it in the
+deploy output — the bindings are printed — and redeployed correctly inside about a minute.
+**Rule: read wrangler's echoed bindings, they are the receipt; and the api deploy is
+`--env production`, never bare.**
+
+### Also, the old door
+
+The retired `RentToOwnPage` (unimported since rental became a POS category) still held a signup form
+with **no signature pad**. Rather than leave it open behind a note — the ⑳ lesson — its submit now
+refuses with a message naming the live lane, and its two signup tests were rewritten to pin the door
+shut. The file itself is Loo's call to delete.
+
+### Evidence
+
+shared **1208/1208** · api **3** = §17.7 baseline (partner/pickups ×1 + supplier/pos ×2) · web
+**16** = §17.7 baseline (OperationOrders ×7 + OrderCustomerCard ×4 + OhanaSofaTab ×4 +
+NiceFutureMattressTab ×1) — **zero new**. typecheck 0 (2 pre-existing shared errors in
+`schemas/orders.test.ts` confirmed on clean HEAD, not from this line), build + `check:v4` +
+design-standard clean.
+
+**Ship**: PR #378 (merge `dc3bbfba`) + PR #380 renumber (merge `f809562d`) → **0279 applied**, then
+api Worker `91e70584` + web `index-CmQv7X-2.js` → carres-portal + carres-pos; **all 4 canonicals
+converged** (one mid-propagation read returned a 1,724-byte 404 for a hash that no longer existed —
+poll, do not panic); live bundle 4,214,968 bytes downloaded-then-grepped, `SERVICE_ROLE` **0**, and
+three markers from **MOUNTED** components present. `Rental category in the POS` greps 0 exactly as
+expected — it lives in the retired page and is correctly tree-shaken.
+
+**Post-apply, verified not assumed**: tracker tail `0279_rental_signed_at_birth` · exactly **1**
+copy of the sell RPC with the 13-arg signature · constraint present · `anon` EXECUTE false and
+`authenticated` true on both new functions · RA-1003 intact · **0** unsigned pending applications ·
+the approve guard present in the live body. And the reconciliation the standing rule asks for:
+`md5(prosrc)` + length compared against the file for all three function bodies — **file == live,
+byte for byte**.
+
+### Still blocked on Loo, and it is one click
+
+`rental_agreement_templates` is still empty, so `rental_current_agreement_template()` returns NULL
+and every rental signup will refuse with `no_agreement_template`. The POS says so by name and points
+at the screen. **Press Save version 1 in Admin → Rental → Agreements** — the wording is already
+loaded there behind a button, and nobody has pressed it since PR #329 shipped it.
