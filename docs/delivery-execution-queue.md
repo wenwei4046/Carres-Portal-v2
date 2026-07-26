@@ -29,7 +29,7 @@
 
 ---
 
-## T1 · Delivery column tells the booking truth 🟢 NEXT
+## T1 · Delivery column tells the booking truth ✅ (PR #363)
 
 **Concept (Jess):** the list column must never say "Unscheduled". It says WHO + WHEN + slot,
 and whether the customer actually confirmed.
@@ -153,7 +153,7 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 
 | Card | Status | PR |
 |---|---|---|
-| T1 | 🟢 next | — |
+| T1 | ✅ shipped 2026-07-26 | #363 |
 | T2 | ⬜ | — |
 | T3 | ⬜ | — |
 | T4 | ⬜ | — |
