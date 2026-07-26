@@ -994,3 +994,20 @@ The route ships the RAW status (`orders!inner(so, status)`) and the UI maps it �
 **Ship**: PR #337 (merge `15e82946`) → **0268 applied first, then code** (a Worker that mints `pending_approval` would have violated the old CHECK constraint if deployed before the migration) → api Worker `facd766f` (unauth `/api/rental/approvals` 401 ✓, unauth `POST …/decide` 401 ✓, `/api/rental/config` 401 on api.carresofficial.com ✓) + web `index-gvaodBF9.js` → carres-portal `bd4a3696` + carres-pos `acefd9b3`; **all 4 canonicals verified serving it on the first poll** (no edge lag this time); downloaded 4,116,180 bytes, `SERVICE_ROLE` 0, "Rental Approver" + "Sent to finance for approval" markers present. Post-deploy DB re-check: birth status `pending_approval`, `anon` EXECUTE false on the queue fn, `create_rental_agreement` still exactly 1 copy.
 
 **Still zero rows across the whole rental module** (0 offers / 0 plans / 0 service packages / 0 agreements) — the gate is live but has never carried a real application. **The next thing worth doing is not more code**: author one pilot offer in Rental → Setting and walk a single RM59 signup end-to-end (POS sign → the application appears in Finance → Rental Approver → approve → confirm 84 billing rows + 1 RU + the entitlement appear → then collect month 1 by card). Six rental PRs have now shipped on top of a lane no human has ever walked.
+
+
+## 2026-07-26 ⑭ · Guarantee desk status = Active / Claimed / Expired (PR #338, deployed)
+
+**Loo**, after seeing ⑬ live: put the status back to the guarantee's own, and make it three words — claimed → Claimed, not claimed yet → Active, expired → Expired.
+
+So ⑬'s order-status column is **fully reverted** (the `orderStatusWord()` helper, the DTO field and the route embed all removed rather than left dangling), and the five-word ladder it had replaced is collapsed too: "Starts on delivery" / "Covered" / "Used" → **Active / Claimed / Expired**.
+
+**`pending` folds into Active**, per his rule. Nothing is lost — the "cover hasn't started" fact still reads in the Cover-ends column as "on delivery" instead of a date.
+
+**`void` deliberately keeps its own word** even though it wasn't among the three: a voided guarantee is one whose order was cancelled or whose line was pulled, and showing that as Active would invite an operator to honour a guarantee that was never really sold. A test says exactly that, so nobody "simplifies" it later.
+
+**The bug the tests caught while writing it**: the first cut had the CLIENT re-derive expiry from the date. The server already derives it — two clocks, and a browser in another timezone can disagree by a day about whether a guarantee is still claimable. `guaranteeDeskStatus()` is now a **pure fold** of the already-derived status and never reads a date. **Durable rule: a derived state should be computed ONCE, on the server; UI helpers fold its output, they do not recompute it.**
+
+Same three words on the order-detail strip, from the same function, so a state can't read "Covered" on one screen and "Active" on another. Desk filters follow (All / Active / Claimed / Expired) and the API status filter was taught the desk vocabulary — `active` selects pending+active rows, `expired` sieves on the derived word.
+
+**Ship**: PR #338 (merge `c8bcfadd`) → api Worker `61ea3770` (unauth `?status=active` 401 ✓) + web `index-CHi3ocQU.js` → carres-portal `530a1fe3` + carres-pos `8be44e72`; all 4 canonicals ✓; downloaded 4,115,819 bytes, `SERVICE_ROLE` 0, and the retired vocabulary greps 0 in the live bundle. Tests: shared 1084/1084 (+4) · api 1553/1556 (3 = §17.7 baseline) · web 16 = baseline · typecheck 0 · design-standard + check:v4 clean.
