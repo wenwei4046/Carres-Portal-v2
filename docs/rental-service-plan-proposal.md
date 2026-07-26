@@ -77,3 +77,59 @@ P0 decisions above → P1 `customers` + entitlement engine (shared foundation) �
 - Web: P&M **Rental** tab (`?section=rental`, config editors) + internal-portal **Rental** page (`?tab=rental`, agreements + units registry, read-only). API: `/api/rental/*` config CRUD (principal) + registry reads (internal).
 
 **Next phases**: ① POS rental sell lane + Stripe product sync/subscription create + entitlement minting (incl. free-gift attach), ② billing/dunning engine (Jess line's locked cadence), ③ cleaning-partner tab + visit scheduling ops, ④ customer check surface (staff lookup → OTP page), ⑤ LHDN e-invoice decision.
+
+---
+
+## LOCKED by Loo (2026-07-26) — the agreement, the settlement lane and the approver gate
+
+**Naming**: the module is **Rental**. Not "Rental On", not "Rental setting".
+
+**Where it lives**: Rental left Product & Maintenance and is its own Admin tab
+(`?tab=rental-setting`), filed by product family (`?section=mattress|bedframe|sofa|service`).
+It is a SETTINGS surface only — collections, service visits and the rented-out fleet stay
+operations. SKUs still live in SKU Master.
+
+### 1. The agreement document (Loo's Word file, v5_260706)
+
+- The uploaded T&C is printed **verbatim**; the system only fills the blanks and stamps the
+  signature. The customer signs at the sales order — **no signature, no order**, therefore no
+  draft state exists.
+- **The free service package must NOT appear in the agreement.** It is a promotion, not a term
+  of the rental — the document stays a pure rental agreement. (The `service.included` token is
+  dropped from the field map.)
+- Gaps found by reading the file (wording is Loo's / his lawyer's call, NOT ours to invent):
+  1. the T&C says the product stays the Company's property with **no ownership transfer** — the
+     business is rent-to-own, so an ownership-transfer clause is missing;
+  2. **no early-buyout clause**, though buyout is a locked business rule (see §2 below);
+  3. clause 1.2 says rental **excludes** maintenance/servicing — an exception is needed if a care
+     plan rides along free;
+  4. payment is due **on or before the 7th** each month with **8% per month** late interest —
+     the billing engine must match that calendar and that rate;
+  5. participation is **subject to credit assessment** — that is the approver gate in §3.
+- Entity on the paper: **Carress Sdn. Bhd. (202401055306 / 1601150-X)**.
+
+### 2. Buyout / one-time settlement
+
+- A customer may settle the remaining term in one payment at any time.
+- **Operation/Finance gets a Settlement action**: when a customer elects to settle, finance
+  **clears the payment off** from the finance surface (the remaining months close in one move).
+- A **supporting document** rides the settlement: the customer signs it first, then it is
+  **attached** to the agreement (same upload discipline as the DO/POD attachments).
+
+### 3. Stripe — penalty yes, auto-terminate no
+
+- **8%/month late interest is NOT a native Stripe feature.** Stripe Billing has dunning retries,
+  not percentage interest. The engine computes the penalty and pushes it onto the next invoice as
+  a one-off invoice item — supported, and it keeps the arithmetic ours (auditable).
+- **No auto-termination.** The subscription is configured so a failed payment leaves the
+  subscription past-due/unpaid rather than cancelling it. Six consecutive missed months is a
+  MANUAL termination by Carres (the contract's right, exercised by a person).
+
+### 4. Approver page (new tab)
+
+- Flow: sales takes the order + customer signature → the order lands on a **finance Approver
+  page** (new tab) instead of going straight to operations.
+- The page shows the customer's particulars; **later** it calls the **CBM API** to verify them
+  (the hook is planned, not built now).
+- **Approve** → the sales order moves on to operations. **Reject** → the order fails.
+- This is the system's implementation of the T&C's credit-assessment clause.

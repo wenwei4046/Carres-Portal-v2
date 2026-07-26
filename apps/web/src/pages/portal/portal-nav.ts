@@ -264,6 +264,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // ADMIN door: only the principal touches selling prices (0226). Costing
       // stays in Operations as the Operation Catalog above.
       { key: "catalog", label: "Product & Maintenance", icon: BookOpen },
+      // Rental split out of P&M (Loo 2026-07-26): the rent/buy offer config
+      // had outgrown a tab strip that is otherwise pure catalog work. Settings
+      // only — the agreements/units registry stays the Operations "Rental" page.
+      { key: "rental-setting", label: "Rental", icon: Repeat },
     ],
   },
 ];

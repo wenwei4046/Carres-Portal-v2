@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Repeat, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -30,13 +31,22 @@ import {
   useRentalConfig,
   useSyncRentalPlanStripe,
 } from "@/lib/queries";
+import { PillTabs } from "@/pages/catalog/components/PillTabs";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
-import RentalOfferEditor from "../rental/RentalOfferEditor";
+import RentalOfferEditor from "./RentalOfferEditor";
 
 /**
- * Rental — the rent & buy config tab (migrations 0248/0249 + 0264; Loo
- * 2026-07-25 / 2026-07-26). Two principal-owned, principal-gated subsystems,
- * both DORMANT until authored:
+ * Rental setting — its OWN Admin tab (Loo 2026-07-26: the rental config had
+ * outgrown a strip inside Product & Maintenance, which is otherwise pure
+ * catalog work). A SETTINGS page only: what a rental product is sold as at
+ * the POS. Collections, service visits and the rented-out fleet are
+ * operations and live elsewhere; SKUs stay in SKU Master.
+ *
+ * Offers are filed by PRODUCT FAMILY (`?section=mattress|bedframe|sofa`,
+ * plus the service-package tab) — same editor, one category at a time.
+ *
+ * Two principal-owned, principal-gated subsystems (0248/0249 + 0264), both
+ * DORMANT until authored:
  *
  *   (a) Offers — ONE per Modular model. The offer says which variants (or
  *       sofa compartments / combos) are on offer, prices them monthly (rent)
@@ -54,12 +64,38 @@ import RentalOfferEditor from "../rental/RentalOfferEditor";
  * Writes are principal-only at RLS (0248/0264 `*_write_principal`);
  * non-principal internal roles see everything read-only.
  */
-export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
+/** The families an offer can be filed under + the standalone care-plan tab. */
+export type RentalSectionKey = "mattress" | "bedframe" | "sofa" | "service";
+
+export const RENTAL_SECTION_PARAM = "section";
+
+export const RENTAL_SECTIONS: readonly { key: RentalSectionKey; label: string }[] = [
+  { key: "mattress", label: "Mattress" },
+  { key: "bedframe", label: "Bed frame" },
+  { key: "sofa", label: "Sofa" },
+  { key: "service", label: "Service package" },
+];
+
+export function isRentalSectionKey(value: string | null): value is RentalSectionKey {
+  return value != null && RENTAL_SECTIONS.some((s) => s.key === value);
+}
+
+export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolean }) {
   const configQ = useRentalConfig();
   const catalogQ = useCatalog();
   const [pkgOpen, setPkgOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
+  // `?section=` keeps the family on refresh / deep link (the P&M contract).
+  const [params, setParams] = useSearchParams();
+  const raw = params.get(RENTAL_SECTION_PARAM);
+  const section: RentalSectionKey = isRentalSectionKey(raw) ? raw : "mattress";
+  const setSection = (key: RentalSectionKey) =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set(RENTAL_SECTION_PARAM, key);
+      return next;
+    });
 
   if (configQ.isPending || catalogQ.isPending) {
     return <div className="t-small text-base-500">Loading rental config…</div>;
@@ -83,8 +119,41 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
   const editingModel =
     editing && catalog ? catalog.models.find((m) => m.id === editing.modelId) ?? null : null;
 
+  /** An offer belongs to the family of the model it was authored off. */
+  const categoryOf = (offer: RentalOffer): string | null =>
+    catalog?.models.find((m) => m.id === offer.modelId)?.category ?? null;
+  const offersOf = (cat: RentalSectionKey) => offers.filter((o) => categoryOf(o) === cat);
+  const shownOffers = section === "service" ? [] : offersOf(section);
+  const tabs = RENTAL_SECTIONS.map((t) => ({
+    key: t.key,
+    label:
+      t.key === "service"
+        ? `${t.label} (${servicePackages.length})`
+        : `${t.label} (${offersOf(t.key).length})`,
+  }));
+
   return (
     <div className="flex flex-col gap-6 max-w-[1120px]">
+      <div className="flex justify-between items-end gap-4 flex-wrap">
+        <div>
+          <div className="kicker">Rental</div>
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">Rental</h1>
+          <p className="t-small text-base-600 mt-1 max-w-[560px]">
+            What each rental product is sold as at the POS — rent monthly or buy outright, which
+            options and colours the customer may pick, and which care plan rides along.
+          </p>
+        </div>
+        <PillTabs
+          tabs={tabs}
+          active={section}
+          onChange={(key) => {
+            setEditingOfferId(null);
+            setSection(key);
+          }}
+          ariaLabel="Rental"
+        />
+      </div>
+
       <section className="flex items-start justify-between gap-4">
         <p className="t-tiny text-base-500 max-w-[520px]">
           An <b>offer</b> says which model is on offer, in which variants, with which options and
@@ -102,19 +171,22 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
             >
               + New service package
             </button>
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="btn-primary text-[12px]"
-              data-testid="offer-add"
-            >
-              + New offer
-            </button>
+            {section !== "service" && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="btn-primary text-[12px]"
+                data-testid="offer-add"
+              >
+                + New offer
+              </button>
+            )}
           </div>
         )}
       </section>
 
-      {editing && editingModel && catalog ? (
+      {section !== "service" &&
+        (editing && editingModel && catalog ? (
         <RentalOfferEditor
           key={editing.id}
           offer={editing}
@@ -128,7 +200,8 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
         />
       ) : (
         <OffersSection
-          offers={offers}
+          section={section}
+          offers={shownOffers}
           plans={plans}
           buyPrices={buyPrices}
           offerServices={offerServices}
@@ -136,11 +209,12 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
           isPrincipal={isPrincipal}
           onEdit={setEditingOfferId}
         />
-      )}
+      ))}
 
       {pickerOpen && catalog && (
         <ModelPickerModal
           catalog={catalog}
+          category={section === "service" ? null : section}
           takenModelIds={new Set(offers.map((o) => o.modelId))}
           onClose={() => setPickerOpen(false)}
           onCreated={(id) => {
@@ -150,12 +224,19 @@ export default function RentalTab({ isPrincipal }: { isPrincipal: boolean }) {
         />
       )}
 
-      <ServicePackagesSection
-        packages={servicePackages}
-        isPrincipal={isPrincipal}
-        addOpen={pkgOpen}
-        onCloseAdd={() => setPkgOpen(false)}
-      />
+      {section === "service" && (
+        <ServicePackagesSection
+          packages={servicePackages}
+          isPrincipal={isPrincipal}
+          addOpen={pkgOpen}
+          onCloseAdd={() => setPkgOpen(false)}
+        />
+      )}
+      {section !== "service" && pkgOpen && isPrincipal && (
+        <Modal title="Create service package" onClose={() => setPkgOpen(false)}>
+          <PackageForm onDone={() => setPkgOpen(false)} />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -179,7 +260,15 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 // (a) Offers
 // ---------------------------------------------------------------------------
 
+const SECTION_LABEL: Record<RentalSectionKey, string> = {
+  mattress: "Mattress",
+  bedframe: "Bed frame",
+  sofa: "Sofa",
+  service: "Service package",
+};
+
 function OffersSection({
+  section,
   offers,
   plans,
   buyPrices,
@@ -188,6 +277,7 @@ function OffersSection({
   isPrincipal,
   onEdit,
 }: {
+  section: RentalSectionKey;
   offers: RentalOffer[];
   plans: RentalPlan[];
   buyPrices: RentalBuyPrice[];
@@ -200,7 +290,7 @@ function OffersSection({
     <section className="card p-5">
       <div className="t-h4 font-display flex items-center gap-2 mb-1">
         <Repeat size={16} strokeWidth={1.75} className="text-primary" />
-        Offers
+        {SECTION_LABEL[section]} offers
         <span className="pill pill-neutral">{offers.length}</span>
       </div>
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
@@ -210,7 +300,8 @@ function OffersSection({
 
       {offers.length === 0 && (
         <div className="t-small text-base-500 py-4" data-testid="offers-empty">
-          No offers yet — pick a model to author the first rent-to-own or outright offer.
+          No {SECTION_LABEL[section].toLowerCase()} offer yet — pick a model to author the first
+          rent-to-own or outright offer.
         </div>
       )}
 
@@ -398,11 +489,14 @@ function OfferRow({
  *  to models that don't already have one (UNIQUE model_id). */
 function ModelPickerModal({
   catalog,
+  category,
   takenModelIds,
   onClose,
   onCreated,
 }: {
   catalog: CatalogResponse;
+  /** Only models of the open family may be picked (null = every family). */
+  category: string | null;
   takenModelIds: Set<string>;
   onClose: () => void;
   onCreated: (offerId: string) => void;
@@ -414,6 +508,7 @@ function ModelPickerModal({
     const needle = q.trim().toLowerCase();
     return catalog.models
       .filter((m) => !m.discontinuedAt && !takenModelIds.has(m.id))
+      .filter((m) => category == null || m.category === category)
       .filter(
         (m) =>
           !needle ||
@@ -422,7 +517,7 @@ function ModelPickerModal({
       )
       .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
       .slice(0, 60);
-  }, [catalog.models, q, takenModelIds]);
+  }, [catalog.models, q, takenModelIds, category]);
 
   function pick(m: ProductModelDto) {
     create.mutate(
