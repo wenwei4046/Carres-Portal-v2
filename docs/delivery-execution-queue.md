@@ -137,7 +137,7 @@ doesn't watch extension columns, so the extend route appends
 reason — the required-if-Others rule died with Others. `DELIVERY_REASONS` lives in
 `packages/shared/src/delivery-reasons.ts`, ready for T7's queues + the future dashboard.
 
-## T5 · Booking progress spine in the drawer (read-only)
+## T5 · Booking progress spine in the drawer (read-only) ✅ (PR #382)
 
 **Concept (Jess):** staff see WHERE the delivery is in 3 seconds — a checklist, not a status word.
 
@@ -154,6 +154,14 @@ existing signals (no new writes):
 
 **Touch:** `OrderDetailDrawer.tsx` delivery block only. **No migration. Web-only.**
 **Done when:** ticks agree with the chip/column for the same order, always.
+**Shipped note (PR #382):** the DO row needed NO greyed fallback — `orders.do_number`
+is a real signal (auto-assigned on the dispatch transition by the 0098 trigger and
+already riding the drawer's order payload), so the tick reads it directly. Spine =
+new `BookingSpine.tsx` (dumb, read-only), fed the SAME sources as the header chip
+(carrier name · `booking_stage`+`confirmed_date` · `do_number` · the chip's own
+delivered signal) so ticks and chip cannot disagree by construction. Photo row
+greyed "later" until T6. 4 tests incl. a banned-word guard (POD/Unscheduled/Not
+booked grep 0 in the spine).
 
 ## T6 · Delivery photo (the artifact — needs a migration)
 
@@ -252,7 +260,7 @@ else is planned past T11 on purpose.
 | T2 | ✅ shipped 2026-07-26 | #367 |
 | T3 | ✅ shipped 2026-07-26 | #370 |
 | T4 | ✅ shipped 2026-07-26 | #377 |
-| T5 | ⬜ | — |
+| T5 | ✅ shipped 2026-07-26 | #382 |
 | T6 | ⬜ | — |
 | T7 | ⬜ queue split + auto-overdue | — |
 | T8 | ⬜ unblocked — ruling recorded in card | — |
