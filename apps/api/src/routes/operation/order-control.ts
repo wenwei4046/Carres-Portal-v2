@@ -3,7 +3,6 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsOrderControlInput,
-  isOpsManager,
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
@@ -25,6 +24,7 @@ import {
   type SofaLoanDto,
   type BalancePayStatus,
 } from "@carres/shared";
+import { requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -124,13 +124,11 @@ orderControlRouter.put("/:id/control", async (c) => {
     );
   }
 
-  // Staff owner (0232): MANUAL assignment is management-only (Jess 2026-07-18
-  // — operation@carres.com + principal); staff sessions get a clean 403. The
-  // web hides the controls; this is the enforcement.
-  if ("assigned_staff" in parsed.data && !isOpsManager(auth.role, auth.email)) {
-    throw new HTTPException(403, {
-      message: "Only management can assign or reassign the PIC",
-    });
+  // Staff owner (0232): MANUAL assignment is management-only (Jess 2026-07-18);
+  // staff sessions get a clean 403. The web hides the controls; this is the
+  // enforcement. HR-P2 (0260): "management" = the `ops_manager` duty key.
+  if ("assigned_staff" in parsed.data) {
+    await requireDuty(c, "ops_manager", "Only management can assign or reassign the PIC");
   }
 
   const sb = userClient(c.env, auth.jwt);

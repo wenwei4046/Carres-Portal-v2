@@ -1,21 +1,32 @@
 # Carres HR System — Full Spec (v1, 2026-07-26)
 
-> Status: **RATIFIED 2026-07-26 (Loo)** — HR-P2…P6 approved; **HR-P7 + HR-P8 CUT**
-> ("no need p7, p8"); D3/D4/D5 therefore moot. Standing law added by Loo: **every
-> phase must have its UX/UI design done and shown BEFORE implementation starts.**
+> Status: **RATIFIED 2026-07-26 (Loo)** — HR-P2…P6 approved. Standing law added by
+> Loo: **every phase must have its UX/UI design done and shown BEFORE
+> implementation starts.**
+>
+> **HR-P7 + HR-P8 RESTORED (Loo, 2026-07-26, same day)** — cut earlier that day
+> ("no need p7, p8"), reinstated on his call. D3/D4/D5 went live again with them
+> and were **all three decided the same day** — see §7 for the rulings (D3 =
+> hr + principal; D4 = signal only; D5 = no request flow at all).
+> Restoring costs ZERO rework: both phases were designed as extensions on
+> top of P4/P5 (`staff_comp` FKs into `hr_employees`; leave ladders key off
+> `join_date`), and those fields are already in the P4 spec. **The statutory-
+> payroll exclusion (§6) is UNAFFECTED** — P7 stores base salary as a typed-in
+> number for a cost ratio; it never computes EPF/SOCSO/EIS/PCB.
 >
 > **HR-P3 CUT (Loo, same day)** — native orders always carry a salesperson
 > (verified: 18/18 native have salesperson_id; the 37 blanks are ALL AutoCount
 > testimonial imports). The change-with-reason correction door survives as a
 > micro-add inside HR-P5 (the run-lock guard needs it anyway). Remaining build
-> order: **P2 → P4 → P5 → P6.**
+> order: **P2 → P4 → P5 → P6 → P7 → P8.**
 >
-> **4 NEW PROPOSALS pending Loo's pick** (mocked in the design artifact):
-> **O1 Overview** (HR landing digest: month money + needs-a-human rail + one-click
-> "mark 37 AutoCount blanks as legacy", size S) · **O2 Appraisals** (semi-annual,
-> scorecard-anchored, needs P5+P6 live first, size M) · **O3 Claims** (receipt +
-> approve inbox + rides the statement CSV, size M) · **O4 My HR** (staff
-> self-service, GATED on the email restructure, size M).
+> **PROPOSALS — Loo picked O1 + O4 (2026-07-26).**
+> ✅ **O1 Overview** (HR landing digest: month money + needs-a-human rail + one-click
+> "mark 37 AutoCount blanks as legacy", size S) · ✅ **O4 My HR** (staff
+> self-service, size M — **carries an unresolved login dependency, see §2a**) ·
+> ⬜ **O2 Appraisals** (semi-annual, scorecard-anchored, needs P5+P6 live first,
+> size M) · ⬜ **O3 Claims** (receipt + approve inbox + rides the statement CSV,
+> size M) — O2/O3 not picked, still on the table.
 > Produced by the hr-hierarchy line via an 8-agent ultracode workflow: 4 current-state
 > readers (web UI / API+engines / data model / decisions+CFs) → 3 independent designs
 > (people-ops-first · performance-first · ERP-integration-first) → 1 completeness critic.
@@ -73,15 +84,65 @@ staffless showrooms unconfigurable in Setup · per-outlet scheme dimension dorma
 
 ## 2. Roadmap at a glance
 
-| Phase | Module | Size | Migration | Blocking decision |
-|---|---|---|---|---|
-| **HR-P2** | Hierarchy-driven permissions (duty keys) + audit/di-taxonomy fixes | M | 1 | D2 |
-| **HR-P3** | Attribution at source (POS stamps salesperson) + re-assign door | S-M | 0-1 | — |
-| **HR-P4** | Employee master + documents vault + on/offboarding + revocation | L | 1 | D1 |
-| **HR-P5** | Commission runs (month lock + adjustments + CSV export) | M-L | 1 | D1 |
-| **HR-P6** | KPI targets + scorecards + rollups | M | 1 | — |
-| **HR-P7** | Chairman overview (cost vs revenue) — needs comp register | M | 1 | D3 |
-| **HR-P8** | Roster + presence signal · Leave (records-first) | L | 1-2 | D4, D5 |
+Build order: **P2 → P4 → P5 → P6 → P7 → P8** (P7 reads P4's comp register + P5's
+run totals, so it cannot precede either; P8's leave ladders key off P4's
+`join_date`).
+
+| # | Phase | Module | Size | Migration | Blocking decision |
+|---|---|---|---|---|---|
+| 1 | **HR-P2** | Hierarchy-driven permissions (duty keys) + audit/taxonomy fixes | M | 1 | D2 ✅ |
+| — | ~~HR-P3~~ | ~~Attribution at source~~ — **CUT** (18/18 native orders already attributed) | — | — | — |
+| 2 | **HR-P4** | Employee master + documents vault + on/offboarding + revocation | L | 1 | D1 ✅ |
+| 3 | **HR-P5** | Commission runs (month lock + adjustments + CSV export) | M-L | 1 | D1 ✅ |
+| 4 | **HR-P6** | KPI targets + scorecards + rollups | M | 1 | — |
+| 5 | **HR-P7** | Chairman overview (cost vs revenue) — needs comp register | M | 1 | D3 ✅ |
+| 6 | **HR-P8** | Roster + presence signal · Leave (HR-entered records, no request flow) | M-L | 1-2 | D4 ✅ D5 ✅ |
+| +1 | **O1 Overview** | HR landing digest — slots in right after P2 (reads data that is already live) | S | 0 | — |
+| +2 | **O4 My HR** | Staff self-service — after P5 at the earliest (needs P4 profile + P5 statement to have anything to show) | M | 1 | **login gap, §2a** |
+
+### 2a. O4's unresolved dependency — who can actually log in
+
+O4 is "staff self-service", but **most of the staff it serves have no login**.
+Showroom floor staff exist as `salespersons` rows with a PIN identity (0233/0241);
+`salespersons.user_id` is mostly null, and CF `staff-salesperson-user-id-provisioning`
+records that future email logins start unlinked. The email restructure that would fix
+this is PARKED by Loo.
+
+Three ways out, and the honest cost of each:
+
+| Route | Serves | Cost / risk |
+|---|---|---|
+| **A. HQ-only O4** (recommended default) | 12 HQ staff who already have real email logins + RLS | No new dependency, ships clean. Floor staff get nothing — which may gut the point if O4 was meant for them |
+| **B. Revive the email restructure**, give floor staff real logins, then O4 for everyone | Everyone | Unparks work Loo shelved; that plan already exists in chat and is the "proper" fix |
+| **C. Floor staff reach My HR behind the POS PIN** | Everyone, no email work | **Names a real conflict**: "PIN = workflow, not a security boundary" is a locked law. Personal pay + leave data behind a 6-digit code on a shared showroom tablet is PII on weak protection. The my-orders board (PR #259) already sets a PIN-gated precedent, so this is a *widening* of an existing door, not a new one — but it is still a deliberate downgrade for PII and must be Loo's explicit call, not a silent build choice |
+
+**RESOLVED — Loo picked B (2026-07-26): floor staff get real logins.**
+
+**Scope correction, made when B was costed against live data.** The option-B wording
+above ("revive the email restructure") bundled two things that do not need to be
+bundled — that framing was wrong. What O4 actually needs is *floor staff can log in*,
+which is far smaller than the parked email project:
+
+- Live count: **5 salesperson rows total** — 3 at `litte mattress sdn bhd` (channel
+  `dealer`) and 2 at `Carres Kelana Jaya` (channel `showroom`). **0 have `user_id`.**
+- The dealer-exclusion law removes the 3 dealer staff from HR entirely. **O4's
+  floor-staff population today is 2 people**, 1 of whom already has an email on file.
+- A portal login needs an address that can receive a password reset — **not** a
+  Google Workspace mailbox. A personal address works. Workspace seats cost
+  RM35/user/month; using them as a login prerequisite would be paying a recurring
+  fee for a capability Supabase Auth already gives free.
+
+**Therefore B executes as:** (1) create a Supabase Auth account per showroom staff
+member, (2) close CF `staff-salesperson-user-id-provisioning` so the existing Team-tab
+account door WRITES `salespersons.user_id` instead of leaving it null, (3) done —
+scales automatically as showrooms open. Recurring cost RM0.
+
+**The email restructure is NOT a prerequisite and is NOT unparked by this ruling.**
+It (Groups-as-forwarders, `opshub@` → Cloudflare Email Worker on
+`in.carresofficial.com` → ERP Mail page) is a separate initiative about company mail
+routing, with its own value and its own decision. Related open item worth revisiting
+on its own merits, not O4's: 4 unidentified Workspace users (Kris / LeeLee / Richard /
+Vivian, 3 of whom have never signed in) at RM35/mo ≈ **RM1,680/yr of seats nobody uses.**
 
 Every phase: own worktree, tail-checked migration numbers (parallel lines active),
 full suites at §17.7 baseline, union-tip deploy.
@@ -227,9 +288,10 @@ kpi_manual_actuals  kpi_id · subject · y/m · value · entered_by (the escape 
 
 Resolution: person > store > position > department > band (pure
 `resolveKpiTarget` in shared). Actuals derive from the same month slice
-`hr_commission_source` already returns — attribution is the ground truth, which is
-why HR-P3 comes first. **Self-action guard (critic miss #8):** an hr-role user
-cannot author rates/targets/tiers scoped to themselves — principal must.
+`hr_commission_source` already returns — attribution is the ground truth.
+**Self-action guard — REMOVED (Loo 2026-07-26):** an hr-role user MAY author
+rates/targets/tiers scoped to themselves; the audit trail is the control (§4), and
+such writes carry the `SELF · …` marker.
 
 **Scorecards:** computed, not stored (until locked into a run). New **Performance
 tab**: per-staff attainment bars (green ≥100 / amber 70-99 / grey), prose breakdown
@@ -238,32 +300,53 @@ transitive reports along `reports_to`; showroom staff → store → the seat hol
 Sales-Manager duty over that store; department chart cards get an attainment dot —
 the chart becomes a live health board.
 
-### HR-P7 — Chairman overview: people cost vs revenue *(gated on D3)*
+### HR-P7 — Chairman overview: people cost vs revenue *(D3 ✅ hr + principal)*
 
-Optional comp register `staff_comp` (employee_id · base_monthly · fixed_allowance ·
+Comp register `staff_comp` (employee_id · base_monthly · fixed_allowance ·
 employer_burden_pct typed estimate · effective_from, append-only). Loaded cost =
-(base+allowance)×(1+burden) + run totals. **Overview tab** (principal default):
-per-outlet and per-department cost / attributed pure item revenue / ratio, 6-month
-trend. Honest labels: HQ departments show cost with revenue "—" — cost-visibility,
-not a fake P&L. If D3 = "salary stays off-system", this phase degrades gracefully to
-commission + headcount only.
+(base+allowance)×(1+burden) + run totals. **Overview tab**: per-outlet and
+per-department cost / attributed pure item revenue / ratio, 6-month trend. Honest
+labels: HQ departments show cost with revenue "—" — cost-visibility, not a fake P&L.
 
-### HR-P8 — Roster + presence · Leave (records-first)
+**Access (D3):** RLS + the read RPC admit `app_role() in ('hr','principal')`. HR
+administers comp, so HR reads every row; principal reaches the same numbers through
+each person's tab. **Write = same set, including your own row** (Loo 2026-07-26,
+§4): an hr user MAY edit their own `staff_comp`. No subject ≠ caller block. The
+audited DEFINER RPC stamps `SELF · …` on the audit action when subject = caller, so
+self-edits stay one filter away rather than blocked.
+
+**Statutory line (unmoved):** `employer_burden_pct` is a number a human types as an
+estimate. This phase never computes EPF/SOCSO/EIS/PCB, never issues a payslip, never
+generates a bank or e-filing file — see §6. Restoring P7 did not reopen that door.
+
+### HR-P8 — Roster + presence · Leave (HR-entered records only, no request flow)
 
 **Roster:** `shift_templates` + `roster_entries` (staff × outlet × date) + week grid
 UI; store-side "My week" read-only via existing staff-scoped POS routes.
 **Presence signal:** first/last PIN unlock per day upserts `staff_presence` — UI
 hard-labels it "seen at POS", an informational signal, never an automatic pay input
 (named boundary; real time-and-attendance = the payroll SaaS's mobile clock-in).
-**Leave v1 = HR-records, not self-service** (respects the keyhole; floor staff have
-no logins; HQ is 12 people): `leave_types` + `hr_leave_entitlements` +
-`leave_records`; balance derived, never stored. **Malaysian presets** seeded (EA
-ladders: annual 8/12/16d, MC 14/18/22d + 60d hospitalisation, maternity 98d,
-paternity 7d) **with per-population work calendars** (critic miss #6): HQ counts
-skip Sun+PH; floor-staff calendars count per store roster, and PH-worked days can
-record replacement leave. Approved leave overlays the roster grid so "planned but
-not seen" days aren't false alarms. Self-service + manager approval flows wait for
-the email restructure + a `my_team_leave()` DEFINER design.
+**Leave (D5 ✅) = an HR-entered RECORD. There is no request flow.** Loo's ruling:
+HR types in who took leave. Explicitly NOT built — not deferred, not phase-2'd,
+simply not in scope until Loo asks for it: employee leave submission, manager
+approval chain, approval inbox, notifications, employee self-service, and the
+`my_team_leave()` DEFINER design that a request flow would have needed. This is
+what makes P8 land at M-L instead of L — the request/approval machinery was the
+bulk of the original estimate.
+
+Tables: `leave_types` + `hr_leave_entitlements` + `leave_records`; balance derived,
+never stored. **Malaysian presets** seeded (EA ladders: annual 8/12/16d, MC
+14/18/22d + 60d hospitalisation, maternity 98d, paternity 7d) **with per-population
+work calendars** (critic miss #6): HQ counts skip Sun+PH; floor-staff calendars
+count per store roster, and PH-worked days can record replacement leave.
+
+**Judgement call to confirm at build time:** entitlement + derived balance is KEPT
+even though only the record was asked for — without it "who took leave" is a bare
+log and HR still can't answer "can Ali take 3 more days?". It is ~1 seed table plus
+arithmetic, nowhere near the cost of the request flow. If Loo wants a pure log,
+drop `hr_leave_entitlements` and the balance column; nothing else changes.
+Recorded leave overlays the roster grid so "planned but not seen" days aren't
+false alarms.
 
 ---
 
@@ -275,15 +358,26 @@ the email restructure + a `my_team_leave()` DEFINER design.
 - **Notifications**: approval inboxes get a delivery mechanism only when the mail
   phase (parked opshub/ERP-mail plan) lands; until then tabs + the existing
   unattributed-banner pattern are the notification.
-- **Segregation of duties**: no self-authored rates/targets/claims; every such write
-  checks subject ≠ caller (principal exempt); all audited.
+- **Segregation of duties — OVERRULED by Loo 2026-07-26.** The original rule was
+  "no self-authored rates/targets/claims; every such write checks subject ≠ caller".
+  Loo's ruling: *"hr can change ownself de, nvm, audit log got record all action, so
+  can track back."* **Detective control replaces preventive control** — hr may write
+  rows about themselves (comp, rates, targets, claims); nothing is blocked.
+  Implementation duty that FOLLOWS from his own rationale: the control is only real
+  if the trail is legible, so every self-write is **marked as such** in the audit
+  action text (`SELF · …` prefix when subject = caller), making "did anyone edit
+  their own numbers?" a one-filter question instead of a manual row-by-row read.
+  Applies to BOTH the P7 comp register and the P6 rates/targets guard.
 
 ## 5. Explicitly parked (each has an owner decision, none is forgotten)
 
-@carresofficial.com email restructure + login-email change door (Loo parked) ·
-salesperson email logins (CF `staff-salesperson-user-id-provisioning`) · appraisal
-cycles (build after 2-3 months of locked scorecard history exists) · claims module
-(pairs naturally with the payroll SaaS's) · employee self-service.
+@carresofficial.com email restructure + login-email change door (Loo parked — but
+note it is now route B of O4's §2a decision, so it is parked-with-a-consequence, not
+forgotten) · salesperson email logins (CF `staff-salesperson-user-id-provisioning`) ·
+appraisal cycles = O2, not picked (build after 2-3 months of locked scorecard history
+exists) · claims module = O3, not picked (pairs naturally with the payroll SaaS's).
+
+~~employee self-service~~ — no longer parked: approved as **O4** (2026-07-26).
 
 ## 6. Never build — and why
 
@@ -298,13 +392,15 @@ cycles (build after 2-3 months of locked scorecard history exists) · claims mod
 
 ## 7. Decisions for Loo (the 拍板 list)
 
-| # | Decision | Recommendation |
+**ALL FIVE DECIDED (Loo, 2026-07-26).**
+
+| # | Decision | Ruling |
 |---|---|---|
-| **D1** | Ratify the scope expansion (full HR system; statutory payroll stays excluded forever) | Yes — this doc |
-| **D2** | HR-P2 permissions via duty-keys + transition fallback | Yes — already proposed 2026-07-25 |
-| **D3** | Does base salary enter the ERP (comp register, gates the cost-vs-revenue Overview)? Options: hr+principal · principal-only · off-system | **principal-only** — chairman-eyes-only, one-policy swap |
-| **D4** | Attendance = presence signal only (never a pay input)? | Yes — signal only |
-| **D5** | Leave v1 = HR records on behalf (self-service waits for email restructure)? | Yes — records-first |
+| **D1** | Ratify the scope expansion (full HR system; statutory payroll stays excluded forever) | ✅ **Yes** |
+| **D2** | HR-P2 permissions via duty-keys + transition fallback | ✅ **Yes** |
+| **D3** | Does base salary enter the ERP, and who reads it? | ✅ **hr + principal.** Loo: *"hr 一定看得到的. principal 看得到, 是因为可以进去每一个人的 tab"* — HR administers comp, so hiding it from HR is nonsense; principal reads it via the per-person tab (principal's reach is universal by nature, not a special comp grant). **Overrides the earlier principal-only recommendation.** Segregation of duties still binds: an hr user may READ all comp rows but may NOT write their OWN (§4) — principal must. |
+| **D4** | Attendance = presence signal only (never a pay input)? | ✅ **Yes — signal only.** |
+| **D5** | Leave scope | ✅ **NO request/approval flow at all.** Loo: *"不需要做请假的东西先… 他的 request（请假）这边暂时放给 HR 自己去填, 谁有没有请假"* — HR types in who took leave. No employee submission, no manager approval chain, no notifications, no self-service. Narrower than the earlier "records-first" recommendation, which still implied a future request flow. |
 
 ## 8. Risk register (top 5, merged from the three designs)
 

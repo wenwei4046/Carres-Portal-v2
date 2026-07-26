@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type {
-  BdPosition,
-  CommissionConfig,
-  CommissionMethod,
-  CommissionProgram,
+import {
+  STAFF_TIER_LABEL,
+  type BdPosition,
+  type CommissionConfig,
+  type CommissionMethod,
+  type CommissionProgram,
 } from "@carres/shared";
 import Btn from "@/components/Btn";
 import { fieldCls } from "@/components/Field";
@@ -38,12 +39,6 @@ import {
  *      the per-model method — the BD program's own per-model numbers)
  * Everything is dormant RM0 until authored here.
  */
-
-const ROLE_LABEL: Record<string, string> = {
-  principal: "Principal",
-  manager: "Manager",
-  salesperson: "Salesperson",
-};
 
 const BD_POSITION_LABEL: Record<BdPosition, string> = {
   executive: "BD Executive",
@@ -713,7 +708,7 @@ export default function HrSetupTab({
                       {s.name}
                     </span>
                     <span className="pill pill-neutral shrink-0">
-                      {ROLE_LABEL[s.staffRole] ?? s.staffRole}
+                      {STAFF_TIER_LABEL[s.staffRole] ?? s.staffRole}
                     </span>
                     <span className="text-[11px] text-base-500 truncate">
                       {[s.storeName, s.outletName].filter(Boolean).join(" · ")}

@@ -4,6 +4,7 @@ import {
   hrCreateShowroomStaffInput,
   hrCreateTeamAccountInput,
   isTeamInternalRole,
+  setPositionDutyInput,
   setReportsToInput,
   setStaffCodeInput,
   setTeamPositionInput,
@@ -31,7 +32,8 @@ import type { AppEnv } from "../types";
  */
 const hrTeamRouter = new Hono<AppEnv>();
 
-/** GET /api/hr/team — accounts + showroom staff + positions + 职位更替 history. */
+/** GET /api/hr/team — accounts + showroom staff + positions + 职位更替 history
+ *  + (0260) the duty catalogue and its position grants. */
 hrTeamRouter.get("/", requireHr, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("hr_team_source");
@@ -39,7 +41,60 @@ hrTeamRouter.get("/", requireHr, async (c) => {
     if (error.code === "42501") throw new HTTPException(403, { message: "forbidden" });
     throw new HTTPException(500, { message: error.message });
   }
-  return c.json(data as unknown as HrTeamSource);
+  const source = data as unknown as HrTeamSource;
+
+  // HR-P2 (0260): read the duty tables DIRECTLY rather than widening
+  // hr_team_source — that function is large, shared with other surfaces, and
+  // a CREATE OR REPLACE on it risks a ghost overload for a purely additive
+  // payload. RLS on both tables already admits exactly hr + principal, which
+  // is precisely this route's audience.
+  // Pre-0260 DB → leave both keys absent; the card hides and every gate keeps
+  // running on the legacy email fallback. The try/catch matters as much as the
+  // `.error` checks: this block is a PURELY ADDITIVE extension of an existing
+  // payload, so no failure mode of it — error result or thrown — may be
+  // allowed to turn a working Team page into a 500.
+  try {
+    const [duties, grants] = await Promise.all([
+      sb.from("org_duties").select("key, name, description, sort").order("sort"),
+      sb.from("org_position_duties").select("position_id, duty_key"),
+    ]);
+    if (!duties.error && !grants.error) {
+      source.duties = (duties.data ?? []) as HrTeamSource["duties"];
+      source.positionDuties = (grants.data ?? []).map((r) => ({
+        positionId: r.position_id as string,
+        dutyKey: r.duty_key as string,
+      }));
+    }
+  } catch {
+    // Additive payload only — the Team page renders fine without it.
+  }
+
+  return c.json(source);
+});
+
+/** POST /api/hr/team/position-duty — grant/revoke a duty on a position (0260). */
+hrTeamRouter.post("/position-duty", requireHr, async (c) => {
+  const parsed = setPositionDutyInput.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("hr_set_position_duty", {
+    p_position_id: parsed.data.positionId,
+    p_duty_key: parsed.data.dutyKey,
+    p_granted: parsed.data.granted,
+  });
+  if (error) {
+    if (error.code === "42501") throw new HTTPException(403, { message: "forbidden" });
+    if (error.message.includes("position_not_found")) {
+      throw new HTTPException(422, { message: "position not found or retired" });
+    }
+    if (error.message.includes("duty_not_found")) {
+      throw new HTTPException(422, { message: "unknown duty" });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+  return c.json({ ok: true });
 });
 
 /** POST /api/hr/team/position — set/clear a user's registry position (audited). */
