@@ -1356,3 +1356,25 @@ not code.
 **Ship**: PR #352 (merge `dd867214`) → api Worker `ce089f7b` (deployed AFTER 0274; unauth 401 on three routes via the custom domain) + web `index-BuTmS3FM.js` → carres-portal `f550ec7a` + carres-pos `ce25d0d8`; downloaded 4,169,655 bytes, `SERVICE_ROLE` 0, all three markers present. **Two of four canonicals first served PR #351's `index-A7uOnzQ8.js`** — `wrangler pages deployment list` showed MINE newest and `git merge-base --is-ancestor e657f28 dd86721` proved my tip contains theirs, so it was edge lag, not a clobber; both flipped inside ~20s of polling. Tests +14; suites shared 1141/1141 · api 3 · web 16 (baseline).
 
 **Two carry-forwards recorded, not hidden**: `guarantee-service-two-registries` (the rental-INCLUDED package still comes from `service_packages` — one concept, two registries; folding it in would touch a just-shipped credit-gated money path, so the firm fix is written down instead) and `guarantee-recurring-no-visit-schedule` (0274 counts visits REMAINING but not when they are DUE, so nothing can yet say "this customer is owed a clean this month").
+
+---
+
+## 2026-07-26 ⑳ · One door for care plans (PR #356, web-only, deployed)
+
+**Loo, looking at his own data**: "why this sku didnt show up, and why the service package stilll right here, suppose chage place le".
+
+Two symptoms, one cause, and the cause was **my scoping call — not a bug**.
+
+**The SKU was never missing.** `SVC-MAT-CLEAN-1Y3` was in SKU Master the whole time, under the **Service** chip: it was authored through Admin → Rental → Service package, the OLD registry, so it carried category `service`. Only `GRT-MATTRESS-15Y` carries `guarantee`, which is why the "Guarantee & Service" filter showed exactly one row. **Loo was looking in the right place; his plan was in the wrong one.**
+
+**Why it was still there**: 0274 (entry ⑲) moved the SELLABLE authoring into SKU Master but left the Rental door standing, filed as CF `guarantee-service-two-registries`. Loo's ask had been that it MOVE. Two open doors is exactly what let a care plan be created into the wrong registry with the wrong category — the confusion the merge existed to remove.
+
+**Durable lesson, and the one worth carrying: when a merge is meant to give something ONE home, closing the old door is not the optional half. Leaving it open while documenting a carry-forward looks disciplined and behaves like a trap — the next person through it (here, the person who asked for the merge) pays for the deferral. If the new door is not ready to be the only door, the merge is not ready to ship.**
+
+Shipped: "+ New service package" removed, along with the now-dead `pkgOpen` state and the cross-section create modal it drove (nothing could open them any more — removed rather than left to rot). The section still LISTS the legacy package, because a rental offer references it and hiding it would strand that reference silently. A notice above the list names the replacement IN FULL — page, button, category and type — rather than just saying "moved".
+
+Tests: the two asserting the retired button now assert the new truth; the old "create a package here" payload test was DELETED rather than kept alive through a back channel (asserting a payload nothing can send is testing dead code — the shape is covered by the guarantee route's own suite). Net +1.
+
+**Ship**: PR #356 (merge `e26fd1ae`) → web `index-Boz1uDzu.js` → carres-portal `b13303d0` + carres-pos `2fbecd1a`; downloaded 4,170,195 bytes, `SERVICE_ROLE` 0, the new notice present AND the retired button's string grepping **0** in the shipped bundle — a removal is worth verifying in the artifact, not just in the diff. `pos.carresofficial.com` lagged ~20s (third deploy in a row where one of four did). api/DB untouched. Web suite at baseline (16 pre-existing).
+
+**Still open, said out loud rather than buried**: the DATA half. The legacy `Mattress Care` row and its one `rental_offer_services` link still live in `service_packages`, and `rental_approve_agreement` still mints `service_entitlements` instead of the 0274 visit-counting `guarantee_entitlements`. Small in data terms (1 package · 1 offer link · 0 entitlements · 0 plans referencing one) but it re-points a credit-gated money path deployed the same day, so it gets its own pass. **This ship stopped the wrong door being used; it did not move what already came through it.**
