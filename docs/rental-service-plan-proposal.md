@@ -133,3 +133,23 @@ operations. SKUs still live in SKU Master.
   (the hook is planned, not built now).
 - **Approve** → the sales order moves on to operations. **Reject** → the order fails.
 - This is the system's implementation of the T&C's credit-assessment clause.
+
+
+### 5. The offer-tab design is LOCKED to the approved mock
+
+Loo, 2026-07-26: the Rental **offer** surface follows the approved artifact —
+https://claude.ai/code/artifact/c6ea9f74-23ac-47a9-b198-7df5cadb3c79 — and the POS lane
+must speak the same language:
+
+- two lanes per offer: **Rent** (monthly, per variant / compartment / combo) and **Buy**
+  (one-off), each with its own free-gift cell;
+- every option value carries a **one-time** and/or **monthly** price, with the
+  over-the-term figure shown;
+- fabric drills **series → colour** (open 4 of 16 if that is the offer);
+- manual **surcharge slots**, principal-authored, ticked but never typed by a store;
+- a **service-plan block** whose plans are SKUs;
+- category-driven editors: a mattress shows sizes and price only; legs / divan / gaps /
+  fabric belong to the bed frame; a sofa swaps the size axis for compartments and combos.
+
+Anything built later — POS configure page, signing view, the printed agreement — reads
+the same fields and uses the same words as that mock. Do not reinvent the vocabulary.
