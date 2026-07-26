@@ -877,3 +877,16 @@ history was backfilled).
 **Fix**: `SIZELESS_CATEGORIES` (service + guarantee) + `categoryHasSizeAxis()` in `@carres/shared` so the rule has ONE home. Filtered to a sizeless category → the SIZE column is dropped outright (header + the 100px grid track, via a `GRID_COLS_NO_SIZE` twin) and edit-all offers no phantom size input; under "All" the column stays (mattress/bedframe/sofa need it) and a sizeless ROW renders "—". **`accessory` is deliberately NOT in the set** — its variant is a legitimate optional "option" label (the POS calls it that) and is merely empty on today's two rows; hiding the column there could hide a real value later. Display-only — nothing writes differently, and the value still round-trips through Export / Import SKUs.
 
 **Ship**: PR #318 (merge `31e3f97a`) → web `index-CC1XlVpH.js` → carres-portal `816fadd0` + carres-pos `29de7199`; all 4 canonicals ✓; live bundle downloaded 4,079,060 bytes, `SERVICE_ROLE` grep 0. Tests: SkuMasterTab 37/37 (+5 locking the behaviour), full web 1512/1528 (16 = §17.7 baseline), shared 1064/1064, typecheck api 0 / web 0, design-standard + check:v4 clean. api/DB untouched (Worker stays `3da6c7bb`).
+
+
+## 2026-07-26 ⑩ · SKU Master — rows must use the header's grid template (PR #321, web-only, deployed)
+
+**Loo, screenshot**: on the Service filter every column from Category rightwards sat well left of its header — "category 跟价钱偏离这么远，它应该是 vertical 对齐的".
+
+**My own regression from ⑨.** THREE grids render this table: the header, the sofa-size row variant and the flat row. The first two read the `gridCols` the tab computes; **the flat row hardcoded `GRID_COLS`**. When ⑨ gave the header the no-size template, the row kept the 9-track one — the same `minmax(...,1.4fr)` / `1fr` tracks, but an extra fixed 100px track eating the free width, so the flexible columns came out narrower INSIDE the row and everything after Description drifted left. Fix = the flat row reads `gridCols` like the other two. **Durable lesson: when a component renders the same table in more than one grid, the template must be ONE value threaded to every renderer — a hardcoded twin will silently desync the moment the shared one changes.**
+
+Three tests lock header ≡ row (size present / size dropped / Guarantee); **verified they go red (2 fails) with the fix reverted**, so it cannot drift back.
+
+**Ship**: PR #321 (merge `b62c2b61`) → web `index-5c_O6Gw0.js` → carres-portal `eeb15f16` + carres-pos `114bee82`. Tests: SkuMasterTab 40/40 (+3), full web 1518/1534 (16 = §17.7 baseline), typecheck 0, design-standard + check:v4 clean. api/DB untouched (Worker stays `3da6c7bb`).
+
+**Parallel-deploy scare worth recording**: right after the deploy `erp.carresofficial.com` served `index-D638ZWqg.js` — the HR-O1 line's bundle (#319) — while the other three canonicals served mine. Not a clobber: `wrangler pages deployment list` showed MY `eeb15f16` (from `b62c2b6`) as the newest, and `git log b62c2b61` proved my merge commit already CONTAINS #319 (`5a9c5380`), so my bundle is the true union — confirmed by grepping the live file for BOTH lines' markers. The custom domain was simply ~1-2 min behind the pages.dev alias. **Check the deployment list + whether your commit contains theirs BEFORE concluding you overwrote someone.**
