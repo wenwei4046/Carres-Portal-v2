@@ -272,6 +272,8 @@ export const qk = {
     posPlans: () => ["rental", "pos-plans"] as const,
     checkoutSession: (agreementId: string, sessionId: string) =>
       ["rental", "checkout", agreementId, sessionId] as const,
+    // 0268 — the finance approver's credit queue.
+    approvals: () => ["rental", "approvals"] as const,
   },
   // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
   // so the desk, the order badge and any open drawer all re-read together.
@@ -6921,6 +6923,80 @@ export function useRentalAgreements(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 0268 — the Approver gate. A rent-to-own agreement is born `pending_approval`
+// and materialises nothing (no billing schedule, no asset, no entitlement, and
+// no chargeable Stripe checkout) until finance decides. This is that desk.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One row of `rental_pending_approvals()` — an application awaiting credit
+ *  assessment, plus the particulars a human needs to judge it. */
+export interface RentalApproval {
+  id: string;
+  agreementNo: string;
+  status: string;
+  sku: string;
+  termMonths: number;
+  monthlyFee: number;
+  oneOffTotal: number;
+  /** monthlyFee × termMonths — the credit this one decision extends. */
+  termTotal: number;
+  startDate: string;
+  createdAt: string;
+  notes: string | null;
+  /** Signing is not built yet (0267 landed the columns, nothing writes them),
+   *  so these are null today and the page says so rather than implying a
+   *  signature exists. CF `rental-approve-without-signature`. */
+  signedAt: string | null;
+  signedName: string | null;
+  signedNric: string | null;
+  signaturePath: string | null;
+  signedDocPath: string | null;
+  templateVersion: number | null;
+  /** The CBM hook's landing strip — planned, not built. */
+  creditCheckedAt: string | null;
+  creditReference: string | null;
+  orderId: string | null;
+  orderSo: number | null;
+  customer: {
+    id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+  };
+  dealer: { id: string; name: string; channel: string | null } | null;
+  salesperson: { id: string; name: string } | null;
+}
+
+export function useRentalApprovals(
+  opts?: Partial<UseQueryOptions<{ approvals: RentalApproval[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.rental.approvals(),
+    queryFn: () => apiFetch<{ approvals: RentalApproval[] }>("/api/rental/approvals"),
+    staleTime: 15_000,
+    ...opts,
+  });
+}
+
+/** Approve or reject one application. Blasts the whole ["rental"] sub-tree:
+ *  an approval mints the schedule + asset + entitlement, so the agreements
+ *  list and the unit registry are both stale the moment it lands. */
+export function useDecideRentalAgreement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; approve: boolean; note?: string }) =>
+      apiFetch<{ agreement: RentalAgreementListItem }>(
+        `/api/rental/agreements/${v.id}/decide`,
+        { method: "POST", body: JSON.stringify({ approve: v.approve, note: v.note }) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["rental"] });
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 0244/0245 — HR commission portal (2026-07-25). One report read + eight writes
 // (0250 adds the BD-rate + dealer-portfolio pair).
 // All writes invalidate the whole ["hr"] sub-tree: every month report embeds
@@ -7187,9 +7263,15 @@ export interface RentalStripeSyncOutcome {
 export interface CreateRentalAgreementResponse {
   agreement: RentalAgreement;
   customer: Customer;
-  unit: RentalStockUnit;
+  /** NULL since 0268 — the unit is only allocated when finance approves, so a
+   *  fresh signup has no asset yet. Same for the entitlement and its visits. */
+  unit: RentalStockUnit | null;
   entitlementId: string | null;
   visitsTotal: number;
+  /** 0268 — true while the application waits on the finance Approver page.
+   *  Optional so a browser on this build against a pre-0268 Worker degrades
+   *  rather than crashing. */
+  pendingApproval?: boolean;
 }
 
 export function useRentalPosPlans(opts?: Partial<UseQueryOptions<{ plans: PosRentalPlan[] }>>) {

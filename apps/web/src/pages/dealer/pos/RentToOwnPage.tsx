@@ -64,6 +64,12 @@ export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Pro
   const [subscribed, setSubscribed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // 0268 — an application waits on the finance Approver page before it becomes
+  // a contract. Read the agreement's own status (not the response flag) so a
+  // browser on this build talking to a pre-0268 Worker still behaves: there,
+  // the agreement comes back 'active' and the old collect-now flow is correct.
+  const awaitingApproval = created?.agreement.status === "pending_approval";
+
   // Offers grouped per SKU — one card per rentable product, term chips inside.
   const offers = useMemo(() => {
     const plans = plansQ.data?.plans ?? [];
@@ -112,7 +118,13 @@ export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Pro
       {
         onSuccess: (res) => {
           setCreated(res);
-          toast.success(`${res.agreement.agreementNo} signed`);
+          // 0268: an application is not a live contract — don't tell the store
+          // it is "signed" when finance still has to approve the credit.
+          toast.success(
+            res.agreement.status === "pending_approval"
+              ? `${res.agreement.agreementNo} sent for approval`
+              : `${res.agreement.agreementNo} signed`,
+          );
         },
         onError: (e: unknown) =>
           setSubmitError(e instanceof ApiError ? e.message : "Could not sign the agreement"),
@@ -163,17 +175,37 @@ export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Pro
           <div style={{ maxWidth: 560, margin: "32px auto", display: "flex", flexDirection: "column", gap: 16, textAlign: "center" }}>
             <CheckCircle2 size={44} strokeWidth={1.5} className="text-success" style={{ margin: "0 auto" }} />
             <h2 className="os-head__title" data-testid="rental-created-no">
-              {created.agreement.agreementNo} signed
+              {created.agreement.agreementNo} {awaitingApproval ? "submitted" : "signed"}
             </h2>
             <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
               {created.customer.name} · {created.agreement.sku} · RM{" "}
               {created.agreement.monthlyFee.toLocaleString()} × {created.agreement.termMonths} months
               (total {rm(rentalContractValue(created.agreement.monthlyFee, created.agreement.termMonths))})
-              <br />
-              Unit {created.unit.unitCode}
-              {created.visitsTotal > 0 ? ` · includes ${created.visitsTotal} service visits` : ""}
+              {/* 0268: the unit is only allocated on approval, so there is
+                  nothing to name here until finance decides. */}
+              {created.unit ? (
+                <>
+                  <br />
+                  Unit {created.unit.unitCode}
+                  {created.visitsTotal > 0 ? ` · includes ${created.visitsTotal} service visits` : ""}
+                </>
+              ) : null}
             </p>
-            {subscribed ? (
+            {awaitingApproval ? (
+              /* Do NOT offer the card button here — the checkout route refuses
+                 a pending application (422 pending_approval), so a button would
+                 be a dead end. Tell the store whose move it is instead. */
+              <p
+                style={{ fontSize: 13, fontWeight: 600 }}
+                data-testid="rental-awaiting-approval"
+              >
+                Sent to finance for approval — no payment is collected yet.
+                <br />
+                <span style={{ fontWeight: 400, fontSize: 12, color: "var(--fg-muted)" }}>
+                  Once it is approved you can collect month 1 and switch on the auto-debit.
+                </span>
+              </p>
+            ) : subscribed ? (
               <p style={{ fontSize: 13, fontWeight: 600 }} data-testid="rental-subscribed">
                 Auto-debit is ACTIVE — month 1 collected, card saved.
               </p>
@@ -184,7 +216,7 @@ export default function RentToOwnPage({ actingDealerId, dealerId, onClose }: Pro
               </p>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              {!subscribed && (
+              {!subscribed && !awaitingApproval && (
                 <button
                   type="button"
                   className="btn btn--primary btn--lg"

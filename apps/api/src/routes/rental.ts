@@ -1027,6 +1027,105 @@ rentalRouter.get("/agreements", async (c) => {
   return c.json({ agreements });
 });
 
+// ---------------------------------------------------------------------------
+// The Approver gate (0268) — the T&C's credit-assessment clause.
+//
+// A rent-to-own agreement is born `pending_approval` and materialises NOTHING
+// (no billing schedule, no RU asset, no entitlement) until a human decides. The
+// Stripe checkout route already refuses anything that is not `active`, so this
+// gate also blocks the card charge for free.
+//
+// Gate: finance + principal ONLY. Deliberately narrower than internalOnly() —
+// that set includes `bd`, and a BD who sells rentals must not approve their own
+// credit application. The DB says the same thing in rental_can_approve(); this
+// is the friendly-403 twin, not the boundary.
+// ---------------------------------------------------------------------------
+
+const APPROVER_ROLES = new Set<string>(["finance", "principal"]);
+
+function approverOnly(c: { var: { auth: { role: string } } }) {
+  if (!APPROVER_ROLES.has(c.var.auth.role)) {
+    throw new HTTPException(403, {
+      message: "Only finance or the principal can decide a rental application",
+    });
+  }
+}
+
+/** Approve or reject, the ChangeRequest precedent's one-field shape. */
+const decideRentalAgreementSchema = z
+  .object({
+    approve: z.boolean(),
+    note: z.string().trim().max(500).optional(),
+  })
+  .refine((v) => v.approve || (v.note != null && v.note.length > 0), {
+    message: "A rejection needs a reason",
+    path: ["note"],
+  });
+
+// GET /approvals — the approver's worklist. ONE definer RPC returns the
+// application plus the particulars a human needs to judge it (customer, store,
+// salesperson, signature state, and the total credit the decision extends).
+rentalRouter.get("/approvals", async (c) => {
+  approverOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_pending_approvals");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ approvals: (data ?? []) as unknown[] });
+});
+
+// POST /agreements/:id/decide — Approve puts the contract live and materialises
+// its money; Reject fails the application and leaves nothing behind. Both are
+// one atomic SECURITY DEFINER RPC on the USER's JWT — never service_role.
+rentalRouter.post("/agreements/:id/decide", async (c) => {
+  approverOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, decideRentalAgreementSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { approve, note } = parsed.data;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = approve
+    ? await sb.rpc("rental_approve_agreement", { p_agreement_id: id, p_note: note ?? null })
+    : await sb.rpc("rental_reject_agreement", { p_agreement_id: id, p_reason: note ?? "" });
+
+  if (error) {
+    const detail = (error as { details?: string | null }).details ?? "";
+    if (detail === "forbidden") {
+      return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
+    }
+    if (detail === "agreement_not_found") {
+      return c.json({ error: "not_found", code: detail, message: error.message }, 404);
+    }
+    if (detail === "not_pending" || detail === "reason_required") {
+      return c.json({ error: "decide_blocked", code: detail, message: error.message }, 422);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const out = data as {
+    agreement: DB.RentalAgreementRow;
+    unit?: DB.RentalStockUnitRow | null;
+    entitlementId?: string | null;
+    visitsTotal?: number;
+  } | null;
+  if (!out?.agreement) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "decision returned no agreement" },
+      500,
+    );
+  }
+  return c.json({
+    agreement: Adapters.rentalAgreementFromRow(out.agreement),
+    unit: out.unit ? Adapters.rentalStockUnitFromRow(out.unit) : null,
+    entitlementId: out.entitlementId ?? null,
+    visitsTotal: out.visitsTotal ?? 0,
+  });
+});
+
 // GET /units — the rented-out asset registry, newest first, capped at 500.
 rentalRouter.get("/units", async (c) => {
   internalOnly(c);
@@ -1135,19 +1234,27 @@ rentalRouter.get("/pos-plans", async (c) => {
   return c.json({ plans });
 });
 
-/** The create_rental_agreement RPC's jsonb payload. */
+/**
+ * The create_rental_agreement RPC's jsonb payload.
+ *
+ * `unit` / `entitlementId` are NULL since 0268: a signup is an APPLICATION, and
+ * the asset + entitlement are only materialised when finance approves. The keys
+ * stay in the shape so an older client degrades to "nothing yet".
+ */
 type CreateAgreementRpcResult = {
   agreement: DB.RentalAgreementRow;
   customer: DB.CustomerRow;
-  unit: DB.RentalStockUnitRow;
+  unit: DB.RentalStockUnitRow | null;
   entitlementId: string | null;
   visitsTotal: number;
+  pendingApproval?: boolean;
 };
 
 // POST /agreements — sign a rent-to-own agreement at the POS. ONE atomic
 // SECURITY DEFINER RPC: the client names a plan_id, the DB re-reads
-// price/split and writes customer + agreement + full billing schedule + RU
-// asset + included entitlement/visits. No money in the payload.
+// price/split and writes customer + agreement. Since 0268 the agreement is born
+// `pending_approval` and NOTHING is materialised until finance approves — no
+// billing schedule, no RU asset, no entitlement. No money in the payload.
 rentalRouter.post("/agreements", async (c) => {
   sellerOnly(c);
   const parsed = await parseJsonBody(c, createRentalAgreementInputSchema);
@@ -1193,9 +1300,11 @@ rentalRouter.post("/agreements", async (c) => {
     {
       agreement: Adapters.rentalAgreementFromRow(out.agreement),
       customer: Adapters.customerFromRow(out.customer),
-      unit: Adapters.rentalStockUnitFromRow(out.unit),
+      // null until finance approves (0268) — never adapt a null row
+      unit: out.unit ? Adapters.rentalStockUnitFromRow(out.unit) : null,
       entitlementId: out.entitlementId,
       visitsTotal: out.visitsTotal,
+      pendingApproval: out.pendingApproval ?? true,
     },
     201,
   );
@@ -1287,9 +1396,22 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   if (!idCheck.success) throw new HTTPException(404, { message: "Agreement not found" });
 
   const ag = await fetchAgreementForCheckout(c, idCheck.data);
+  // 0268: this check is now ALSO the money gate — an application sits at
+  // `pending_approval` until finance decides, so no card can be charged before
+  // the credit assessment. Say which of the two it is; "not active" alone left
+  // a store staring at a dead button with no idea whose move it was.
   if (ag.status !== "active") {
+    const pending = ag.status === "pending_approval";
     return c.json(
-      { error: "rental_checkout_blocked", code: "wrong_status", message: "Agreement is not active." },
+      {
+        error: "rental_checkout_blocked",
+        code: pending ? "pending_approval" : "wrong_status",
+        message: pending
+          ? "Waiting for finance to approve this rental — you can collect once it is approved."
+          : ag.status === "rejected"
+            ? "This rental application was rejected."
+            : "Agreement is not active.",
+      },
       422,
     );
   }
