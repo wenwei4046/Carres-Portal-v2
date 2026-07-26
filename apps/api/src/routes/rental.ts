@@ -1111,6 +1111,11 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
     unit?: DB.RentalStockUnitRow | null;
     entitlementId?: string | null;
     visitsTotal?: number;
+    // 0275 — approve proceeds the Sales Order; reject cancels it. Both report
+    // what actually happened so the desk can say so instead of guessing.
+    orderProceeded?: boolean;
+    orderBlockedBy?: string | null;
+    orderCancelled?: boolean;
   } | null;
   if (!out?.agreement) {
     return c.json(
@@ -1123,6 +1128,9 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
     unit: out.unit ? Adapters.rentalStockUnitFromRow(out.unit) : null,
     entitlementId: out.entitlementId ?? null,
     visitsTotal: out.visitsTotal ?? 0,
+    orderProceeded: out.orderProceeded ?? false,
+    orderBlockedBy: out.orderBlockedBy ?? null,
+    orderCancelled: out.orderCancelled ?? false,
   });
 });
 
@@ -1248,6 +1256,9 @@ type CreateAgreementRpcResult = {
   entitlementId: string | null;
   visitsTotal: number;
   pendingApproval?: boolean;
+  /** 0275 — the Sales Order minted alongside the agreement. */
+  orderId?: string | null;
+  so?: number | null;
 };
 
 // POST /agreements — sign a rent-to-own agreement at the POS. ONE atomic
@@ -1271,6 +1282,8 @@ rentalRouter.post("/agreements", async (c) => {
     p_salesperson_id: d.salespersonId ?? null,
     p_start_date: d.startDate ?? null,
     p_notes: d.notes ?? null,
+    // 0275 — the Sales Order the rental mints needs this to reach operations.
+    p_delivery_date: d.deliveryDate ?? null,
   });
   if (error) {
     const detail = (error as { details?: string | null }).details ?? "";
@@ -1285,7 +1298,11 @@ rentalRouter.post("/agreements", async (c) => {
       detail === "invalid_customer" ||
       detail === "invalid_phone" ||
       detail === "invalid_start_date" ||
-      detail === "invalid_salesperson"
+      detail === "invalid_salesperson" ||
+      // 0275 — a rental now mints a Sales Order, so it needs a store; and a
+      // combo plan carries no SKU to deliver (CF rental-combo-agreement-sku-null).
+      detail === "dealer_required" ||
+      detail === "plan_has_no_sku"
     ) {
       return c.json({ error: "invalid_param", code: detail, message: error.message }, 422);
     }
@@ -1305,6 +1322,9 @@ rentalRouter.post("/agreements", async (c) => {
       entitlementId: out.entitlementId,
       visitsTotal: out.visitsTotal,
       pendingApproval: out.pendingApproval ?? true,
+      // 0275 — the Sales Order this rental now has, so the POS can show it.
+      orderId: out.orderId ?? null,
+      so: out.so ?? null,
     },
     201,
   );

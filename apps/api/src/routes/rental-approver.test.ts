@@ -432,3 +432,102 @@ describe("the sell + checkout lanes under the new gate", () => {
     expect(body.message).toMatch(/rejected/i);
   });
 });
+
+describe("0275 — a rental mints a Sales Order", () => {
+  it("passes the delivery date through, so the order can reach operations", async () => {
+    const sb = makeSb({
+      data: {
+        agreement: PENDING_ROW,
+        customer: { id: CUST_ID, name: "T", phone: "0111", phone_key: "111",
+          email: null, address: null, created_at: "x", updated_at: "x", created_by: null },
+        unit: null, entitlementId: null, visitsTotal: 0, pendingApproval: true,
+        orderId: "ord-1", so: 1301,
+      },
+      error: null,
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("/api/rental/agreements", "showroom", {
+      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
+      deliveryDate: "2026-08-15",
+    });
+    expect(res.status).toBe(201);
+    expect((sb.calls.rpc[0].args as { p_delivery_date: string }).p_delivery_date)
+      .toBe("2026-08-15");
+    const body = (await res.json()) as { orderId: string; so: number };
+    // the store must be able to SEE the SO it just created
+    expect(body.orderId).toBe("ord-1");
+    expect(body.so).toBe(1301);
+  });
+
+  it("sends null rather than omitting the date when the wizard has none", async () => {
+    const sb = makeSb({
+      data: { agreement: PENDING_ROW, customer: {}, unit: null, visitsTotal: 0 },
+      error: null,
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post("/api/rental/agreements", "showroom", {
+      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
+    });
+    expect((sb.calls.rpc[0].args as { p_delivery_date: unknown }).p_delivery_date).toBeNull();
+  });
+
+  it.each([
+    ["dealer_required", "a rental with no store"],
+    ["plan_has_no_sku", "a combo plan with nothing to deliver"],
+  ])("maps %s to a readable 422 (%s)", async (detail) => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ data: null, error: { message: "nope", details: detail } }) as never,
+    );
+    const res = await post("/api/rental/agreements", "showroom", {
+      planId: PLAN_ID, customerName: "T", customerPhone: "0123456789",
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe(detail);
+  });
+
+  it("a decision reports what happened to the order, not just the agreement", async () => {
+    const sb = makeSb({
+      data: {
+        agreement: { ...PENDING_ROW, status: "active" },
+        unit: null, entitlementId: null, visitsTotal: 0,
+        orderProceeded: true, orderBlockedBy: null,
+      },
+      error: null,
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", { approve: true });
+    const body = (await res.json()) as { orderProceeded: boolean };
+    expect(body.orderProceeded).toBe(true);
+  });
+
+  it("says WHY the order is still stuck when approve could not proceed it", async () => {
+    const sb = makeSb({
+      data: {
+        agreement: { ...PENDING_ROW, status: "active" },
+        orderProceeded: false, orderBlockedBy: "Delivery date is required",
+      },
+      error: null,
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", { approve: true });
+    const body = (await res.json()) as { orderProceeded: boolean; orderBlockedBy: string };
+    // the credit decision stands; the desk is told what is still missing
+    expect(body.orderProceeded).toBe(false);
+    expect(body.orderBlockedBy).toMatch(/Delivery date/i);
+  });
+
+  it("reject reports the order was cancelled", async () => {
+    const sb = makeSb({
+      data: {
+        agreement: { ...PENDING_ROW, status: "rejected", rejection_reason: "x" },
+        orderCancelled: true,
+      },
+      error: null,
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", {
+      approve: false, note: "x",
+    });
+    expect(((await res.json()) as { orderCancelled: boolean }).orderCancelled).toBe(true);
+  });
+});
