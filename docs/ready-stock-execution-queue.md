@@ -14,7 +14,7 @@
 >   not after-the-fact OOS. No expiry tracking; slow-moving alert instead.
 > - Only the COO edits reorder points / reserve levels / approval rules.
 >
-> **Sidebar home: Stock · On Hand (EXISTS — gains a `Ready stock` tab). No new menu item.**
+> **Sidebar home: the ONE `Stock` door (K0 merges On Hand + Movements into it; Ready stock is its middle tab). No new menu item.**
 
 ## Ground truth (read before ANY card)
 
@@ -26,6 +26,27 @@
   never re-implements demand math.
 - `docs/inventory-module-proposal.md` exists — sibling spec; on conflict, THIS queue +
   Jess's locked shape above win.
+
+## K0 · One Stock door (kills the word confusion)
+
+**Problem (Jess, 2026-07-27):** On Hand / Movements / Inventory / Ready stock — four words
+for ONE warehouse. **Fix:** merge the two sidebar items into ONE `Stock` entry with tabs:
+
+```
+Stock
+├─ On hand      what's here now        (existing OperationStockOnHand, unchanged)
+├─ Ready stock  how much to keep       (tab appears when K2 ships; hidden until then)
+└─ In & out     when things moved      (existing Movements page — RENAMED; its own h1
+                                        already says "Stock in & out history")
+```
+
+**Word law (add to COPY-STANDARD):** user-facing word is `Stock` only; `Inventory` and
+`Movements` are banned from UI (same treatment as POD). Ready stock is a PLAN about the
+same goods, never a second pool.
+**Touch:** sidebar config + tab shell in `OperationApp.tsx`; both pages mount unchanged
+inside. **No migration. Nav-only.** Keep old tab keys working (kept-mounted pages pattern
+already exists there — follow it).
+**Done when:** the sidebar has ONE stock entry; no visible "Movements"/"Inventory" string.
 
 ## K1 · Reorder alert for import accessories
 
@@ -78,6 +99,7 @@ SKU rows.
 
 | Card | Status | PR |
 |---|---|---|
+| K0 | ⬜ nav-only, can ship any time | — |
 | K1 | ⬜ | — |
 | K2 | ⬜ | — |
 | K3 | ⬜ | — |

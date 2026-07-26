@@ -14,11 +14,11 @@
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | not started |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R5 | not started |
-| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K1-K5 | not started |
+| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | not started |
 
 **Recommended order:** finish ① T3-T6 first (drawer work), then start ② J1 (same drawer,
 so it waits for T6). ③④⑤ are independent of the drawer — any of them can interleave with
-① after T6, still one chat at a time. Total = 29 cards.
+① after T6, still one chat at a time. Total = 30 cards.
 
 ## Sidebar map — where every line lands
 
@@ -30,8 +30,9 @@ Dashboard
 Orders              ← ① T1-T6 live here · ② Order Journey button lives in its drawer
 Purchasing          ← ④ R1-R3 (Receiving tab exists; Claims becomes a sibling tab)
 Delivery            ← NEW at ① T11 only (the 3-pane module page)
-Stock · On Hand     ← ⑤ K-series (gains a "Ready stock" tab)
-Stock · Movements   ← unchanged
+Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tabs
+                       (On hand · Ready stock · In & out); "Inventory"/"Movements"
+                       banned from UI — one warehouse, three questions
 Payments            ← unchanged (reminder schedule stays parked here)
 Operation Catalog   ← unchanged
 Suppliers           ← ④ R5 supplier scorecard lands here
