@@ -1562,3 +1562,35 @@ reported `mergeable: UNKNOWN` — that is a stale-computation state, not a confl
 No `hr`-role user exists to smoke the non-principal path (CF `hr-role-nobody-holds-it`). P6 is
 data-empty until Loo sets a target: both tables are at 0 rows, so the page shows RM 52,081 sold
 against "—".
+
+---
+
+## 2026-07-26 ㉑ · A rental produces a Sales Order (0275, PR #358, deployed)
+
+**Loo**: "start with the SO".
+
+A rental produced an `RA-` and nothing else. No Sales Order meant no SO document, no invoice, and — the part that bites — **operations never saw it**. The unit was stamped `allocated` in the asset registry while nothing told a warehouse to deliver it. The locked spec already said otherwise ("Approve → the sales order moves on to operations. Reject → the order fails"); the built lane had drifted.
+
+**THE MONEY DECISION, and it is the reusable part.** The rental order's line is priced ZERO and its total is zero. A rental order is a FULFILMENT document, not a money document — the money lives in `rental_billings` and Stripe. Priced at retail, AR shows RM2,499 outstanding for a customer who owes nothing today; priced at the contract value, AR double-counts every ringgit already scheduled. **Zero is the only figure that is not a lie.** What the paperwork should print rides in `attrs.rental` instead.
+
+**Why `proceed_order` needed a branch — and why it is not a hole.** Its money gates exist because a normal order must be half paid before Carres spends on stock. A rental's guarantee is not a deposit: signed agreement + credit approval + card on file. So for a rental they collapse to ONE gate — the agreement must be `active`. The order's own signature/terms gates are skipped because the contract signed is the RENTAL AGREEMENT. **And because this branch requires `active`, tightening 0268's approve-side signature guard when signing ships tightens this gate too — one place to fix, everything downstream inherits it.** That is the shape to reach for whenever two gates guard the same fact.
+
+A missing delivery date must NOT undo a credit decision, so the auto-proceed is wrapped: approval stands, the order waits in Place, finance is told what is missing (`orderBlockedBy`). Asserted, not assumed.
+
+**Verified BEFORE applying — 27 assertions across two rolled-back transactions.** Ten covered `proceed_order`, and **five exist only to prove ORDINARY orders are untouched** (no signature blocks · terms block · under-50% blocks · a valid 50% order proceeds · a zero-total non-rental order still refused). `proceed_order` is on every order's path; testing only the new branch would have been negligent.
+
+**Narrowings, said out loud**: a dealer is now required (CF `rental-hq-direct-no-longer-allowed`); combo plans are refused up front instead of blowing up on a NOT NULL (CF `rental-combo-agreement-sku-null`); a rental SO contributes nothing to sales/AR/margin reports (CF `rental-order-total-is-zero`). The signature change was **DROP + CREATE**, not CREATE OR REPLACE — adding a parameter makes a SECOND overload (the 0153/0154 ghost trap); verified after apply: exactly one copy.
+
+**Correction I owed Loo**: I had implied RA-1003's mattress was stranded and urgent. It is his TEST record (customer "TEST RENTAL", sku "TEST-RENTAL-K"). Backfilling it an SO would have put a phantom delivery job into a real store's queue. Not backfilled.
+
+### The defect this work surfaced, in my own PR #347
+
+**A rental cart could never be submitted.** `step4Valid` requires a payment slip (or a Stripe amount) because an ordinary order must be part-paid; a rental collects NOTHING at signing, so `confirmReady` was permanently false and the Complete button stayed disabled **with no visible reason**. `step4ValidRental` is the same gate minus the money, still demanding the signature and terms — which for a rental are not a formality, they ARE the agreement. Six tests both ways, including `step4Valid` asserted UNCHANGED so nothing loosened for real sales.
+
+**Durable lesson: when a new flow reuses an existing gate, check what that gate was really guarding. Here it was guarding MONEY, and the new flow has none — so reuse silently produced a dead end that looked like a working feature.**
+
+**A window I created and should have flagged first**: 0275 DROPped the old 9-arg RPC while the live Worker still called it, so between apply and this deploy rentals were broken. Loo had asked to hold the deploy until the whole program was done; applying a signature-changing migration under that instruction was the wrong order. **Apply a migration that breaks the live caller ONLY as part of the same deploy.**
+
+**Ship**: PR #358 (merge `fe60f204`) → api Worker `b8c0159d` (unauth 401 on three routes) + web `index-DGMmYLHd.js` → carres-portal `31c22186` + carres-pos `f98a22fa`; 4,193,674 bytes downloaded-then-grepped, `SERVICE_ROLE` 0. `erp.carresofficial.com` served PR #363's bundle for ~40s; `deployment list` showed mine newest and `merge-base --is-ancestor 474e67b fe60f204` proved containment, so it was lag not a clobber. **Also learned while verifying: "Sent to finance for approval" grepped 0 because it lives in the RETIRED `RentToOwnPage`, correctly tree-shaken — pick markers from MOUNTED components or a clean deploy reads as a failure.** Suites at baseline (shared 1158 · api 3 · web 16); typecheck 0, check:v4 + design-standard clean.
+
+**Remaining in the program Loo asked for (not started / half done)**: signing writes nothing to `rental_agreements.signed_*` yet (the confirm gate is in, the capture is not, and 0268's `not_signed` guard stays disabled); the billing engine is untouched (0 of 84 months read as paid — finance can only see the truth in Stripe); buyout / ownership transfer / repossession have status values but no flows.
