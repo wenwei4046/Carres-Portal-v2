@@ -21,6 +21,8 @@ vi.mock("@/lib/queries", () => ({
 function ent(over: Partial<GuaranteeEntitlementDto> = {}): GuaranteeEntitlementDto {
   return {
     id: "g1",
+    guaranteeId: "ABCD123456",
+    claimedGuaranteeId: null,
     orderId: "o1",
     so: 1240,
     orderLineId: "l1",
@@ -64,6 +66,23 @@ describe("GuaranteeCoverStrip", () => {
     state.error = true;
     const { container } = render(<GuaranteeCoverStrip orderId="o1" />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("leads with the guarantee ID — the handle the customer quotes to claim", () => {
+    state.items = [ent()];
+    state.error = false;
+    render(<GuaranteeCoverStrip orderId="o1" />);
+    expect(screen.getByText("ABCD123456")).toBeInTheDocument();
+  });
+
+  it("shows a claimed guarantee's RETIRED id — the customer's document still has it", () => {
+    state.items = [
+      ent({ guaranteeId: null, claimedGuaranteeId: "ZZZZ000111", status: "claimed", effectiveStatus: "claimed" }),
+    ];
+    state.error = false;
+    render(<GuaranteeCoverStrip orderId="o1" />);
+    expect(screen.getByText("ZZZZ000111")).toBeInTheDocument();
+    expect(screen.getByText("Used")).toBeInTheDocument();
   });
 
   it("names the covered item and the end date", () => {

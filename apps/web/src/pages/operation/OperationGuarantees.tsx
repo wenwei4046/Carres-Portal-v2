@@ -7,6 +7,7 @@ import { Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  displayGuaranteeId,
   guaranteeCoverageLine,
   isGuaranteeClaimable,
   type GuaranteeEntitlementDto,
@@ -94,8 +95,8 @@ export default function OperationGuarantees() {
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
         <h1 className="t-h1 text-base-900">Guarantees</h1>
         <p className="text-sm text-base-600 mt-2">
-          Look a guarantee up by Sales Order, customer name, phone or customer ID — then swap the
-          item and record the claim.
+          Look a guarantee up by its ID — or by Sales Order, customer name, phone or customer ID —
+          then swap the item and record the claim.
         </p>
       </div>
 
@@ -110,7 +111,7 @@ export default function OperationGuarantees() {
             type="search"
             value={rawSearch}
             onChange={(e) => setRawSearch(e.target.value)}
-            placeholder="SO number, customer name, phone, or customer ID…"
+            placeholder="Guarantee ID (ABCD123456), SO number, customer name, phone…"
             aria-label="Search guarantees"
             className="w-full rounded border border-base-300 bg-white pl-9 pr-3 py-2 t-body focus:border-base-500 outline-none"
           />
@@ -138,7 +139,8 @@ export default function OperationGuarantees() {
           <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
           <p className="t-body text-base-700">Search to pull up a customer's guarantee.</p>
           <p className="t-small text-base-500 mt-1">
-            Any of: the Sales Order number, the customer's name, their phone, or their customer ID.
+            The guarantee ID off their Sales Order (<span className="font-mono">ABCD123456</span>) —
+            or the SO number, the customer's name, their phone, or their customer ID.
           </p>
         </div>
       )}
@@ -161,6 +163,9 @@ export default function OperationGuarantees() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-base-200 text-left">
+                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">
+                  Guarantee ID
+                </th>
                 <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Status</th>
                 <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Customer</th>
                 <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Order</th>
@@ -176,6 +181,19 @@ export default function OperationGuarantees() {
                 const d = STATUS_DISPLAY[g.effectiveStatus];
                 return (
                   <tr key={g.id} className="border-b border-base-100 last:border-0 align-top">
+                    {/* The handle everything is tracked by. A claimed row shows
+                        its RETIRED id struck through — the customer's document
+                        still carries that string, so it has to be recognisable
+                        here even though it is no longer a live guarantee. */}
+                    <td className="px-4 py-3">
+                      <span
+                        className={`font-mono text-[12px] ${
+                          g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
+                        }`}
+                      >
+                        {displayGuaranteeId(g) ?? "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`pill ${d.pill}`}>{d.label}</span>
                     </td>

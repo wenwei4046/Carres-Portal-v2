@@ -1,5 +1,5 @@
 import { ShieldCheck } from "lucide-react";
-import type { GuaranteeStatus } from "@carres/shared";
+import { displayGuaranteeId, type GuaranteeStatus } from "@carres/shared";
 import { useOrderGuarantees } from "@/lib/queries";
 
 /**
@@ -52,6 +52,14 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
         {items.map((g) => (
           <li key={g.id} className="flex items-start justify-between gap-2">
             <span className="min-w-0 text-[12px] text-base-800">
+              {/* The ID leads: it is what the customer quotes at claim time. */}
+              <span
+                className={`font-mono ${
+                  g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
+                }`}
+              >
+                {displayGuaranteeId(g) ?? "—"}
+              </span>{" "}
               {g.coversLabel ?? g.coversSku ?? "item not attached"}
               <span className="text-base-500">
                 {" "}

@@ -103,6 +103,8 @@ export type InvoiceTemplateData = {
    *  which item is covered and until when. Absent / empty = no block. */
   guarantees?: Array<{
     label: string;
+    /** The `ABCD123456` handle the customer quotes to claim (0267). */
+    guarantee_id: string | null;
     /** The covered item, spelled out ("B1201S King"). */
     covers: string;
     coverage_years: number;

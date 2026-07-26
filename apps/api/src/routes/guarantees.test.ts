@@ -102,6 +102,8 @@ function buildSb(tables: Record<string, unknown[]>, rpc?: { data?: unknown; erro
 
 const ROW = {
   id: "e1",
+  guarantee_id: "ABCD123456",
+  claimed_guarantee_id: null,
   order_id: "o1",
   order_line_id: "l1",
   guarantee_sku: "GRT-MATTRESS-15Y",
@@ -147,6 +149,7 @@ describe("GET /api/guarantees/order/:orderId", () => {
     const body = (await res.json()) as any;
     expect(body.items).toHaveLength(1);
     expect(body.items[0]).toMatchObject({
+      guaranteeId: "ABCD123456",
       so: 1240,
       coversLabel: "B1201S King",
       guaranteeLabel: "Mattress Guarantee 15 Years",
@@ -255,5 +258,50 @@ describe("POST /api/guarantees/:id/attach", () => {
       env,
     );
     expect(res.status).toBe(422);
+  });
+});
+
+describe("GET /api/guarantees — the ID is the primary handle (0267)", () => {
+  it("looks a typed ID up against BOTH the live and the retired column", async () => {
+    const sb = buildSb({ guarantee_entitlements: [ROW], guarantee_terms: TERMS });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/guarantees?q=abcd-123%20456", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.items[0].guaranteeId).toBe("ABCD123456");
+  });
+
+  it("surfaces a CLAIMED guarantee's retired id — never a bare 'not found'", async () => {
+    const spent = {
+      ...ROW,
+      guarantee_id: null,
+      claimed_guarantee_id: "ZZZZ000111",
+      status: "claimed",
+      claimed_at: "2026-08-02T00:00:00Z",
+    };
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ guarantee_entitlements: [spent], guarantee_terms: TERMS }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/guarantees?q=ZZZZ000111", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.items[0]).toMatchObject({
+      guaranteeId: null,
+      claimedGuaranteeId: "ZZZZ000111",
+      effectiveStatus: "claimed",
+    });
   });
 });

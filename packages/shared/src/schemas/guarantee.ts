@@ -94,6 +94,28 @@ export function guaranteeAttrs(coversSku: string, coversLabel?: string) {
  * effectiveGuaranteeStatus: expiry is derived from the date so nothing depends
  * on a nightly job running.
  */
+/**
+ * The customer-facing handle (0267, Loo): FOUR letters + SIX digits —
+ * `ABCD123456`. Minted server-side the moment the Sales Order is created, and
+ * the thing a claim is looked up by.
+ *
+ * The two blocks are positional on purpose: letters can only appear in the
+ * first four slots and digits only in the last six, so O-vs-0 and I-vs-1 are
+ * never ambiguous when someone reads it off a printed Sales Order.
+ */
+export const GUARANTEE_ID_REGEX = /^[A-Z]{4}[0-9]{6}$/;
+
+/** True when the typed text IS a guarantee ID (case-insensitive, spaces ok). */
+export function isGuaranteeId(raw: string): boolean {
+  return GUARANTEE_ID_REGEX.test(normalizeGuaranteeId(raw));
+}
+
+/** What the operator typed → the stored form. Uppercases and drops spaces and
+ *  dashes, so `abcd-123 456` finds `ABCD123456`. */
+export function normalizeGuaranteeId(raw: string): string {
+  return raw.replace(/[\s-]/g, "").toUpperCase();
+}
+
 export const guaranteeStatusSchema = z.enum([
   "pending", // sold, awaiting delivery — the clock has not started
   "active", // delivered and inside the window
@@ -105,6 +127,11 @@ export type GuaranteeStatus = z.infer<typeof guaranteeStatusSchema>;
 
 export type GuaranteeEntitlementDto = {
   id: string;
+  /** The `ABCD123456` handle — null once claimed (the ID is retired). */
+  guaranteeId: string | null;
+  /** The retired handle, kept so a re-presented ID reads "already claimed on
+   *  <date>" rather than the indistinguishable "not found". */
+  claimedGuaranteeId: string | null;
   // what was sold
   orderId: string;
   so: number | null;
@@ -161,6 +188,15 @@ export function isGuaranteeClaimable(g: {
   expiresOn: string | null;
 }): boolean {
   return effectiveGuaranteeStatus(g.status, g.expiresOn) === "active";
+}
+
+/** The ID to SHOW for a row, live or spent — the UI should never have to
+ *  decide which column to read. */
+export function displayGuaranteeId(g: {
+  guaranteeId: string | null;
+  claimedGuaranteeId: string | null;
+}): string | null {
+  return g.guaranteeId ?? g.claimedGuaranteeId;
 }
 
 /** Customer-facing one-liner for the invoice / drawer badge. */

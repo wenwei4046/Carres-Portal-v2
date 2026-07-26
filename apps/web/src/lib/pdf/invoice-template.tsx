@@ -109,6 +109,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   guaranteeTitle: { fontSize: 10, fontWeight: 700, marginBottom: 2 },
+  // The claim handle — the single most important string on this block for the
+  // customer, so it gets the accent and sits directly under the title.
+  guaranteeId: { fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 3 },
   guaranteeLine: { fontSize: 9, color: "#3F3A33", marginBottom: 1 },
   guaranteeTerms: { fontSize: 8, color: MUTED, marginTop: 3 },
   totalsValue: { fontSize: 10, fontWeight: 700 },
@@ -216,6 +219,9 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
         {guarantees.map((g, idx) => (
           <View key={`g-${idx}`} style={styles.guaranteeRow}>
             <Text style={styles.guaranteeTitle}>{g.label}</Text>
+            {g.guarantee_id ? (
+              <Text style={styles.guaranteeId}>Guarantee ID: {g.guarantee_id}</Text>
+            ) : null}
             <Text style={styles.guaranteeLine}>Covers: {g.covers}</Text>
             <Text style={styles.guaranteeLine}>
               {g.coverage_years} years ·{" "}
