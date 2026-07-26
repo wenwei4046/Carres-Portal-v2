@@ -931,3 +931,20 @@ Three tests lock header ≡ row (size present / size dropped / Guarantee); **ver
 **Shared**: `agreementTokens` · `fillAgreement` (an unfilled blank stays VISIBLE and is reported — a silent gap on a contract is worse than an ugly one) · `blocksFromText` (paste from Word). **API**: POST assigns the next version server-side + caches tokens; PATCH touches binding/name/date/active but NEVER the wording. **Web**: the Rental tab's Agreements section — load the supplied wording, read it, save as version 1; preview any version; only the newest offers "New version".
 
 **Evidence**: shared 1075/1075 · api 1551/1554 (3 = §17.7 baseline; rental route 46/46) · web 1525/1541 (16 = baseline; RentalSettingPage 29/29) · design-standard clean. **Ship**: PR #329 (merge `5cf6c092`, union with #326/#328) → api Worker `8ed1f1b6` (unauth /api/rental/config 401 ✓) + web `index-K-sQWa48.js` → carres-portal `614b51bc` + carres-pos `8e81b245`; 4 canonicals ✓; live bundle 4,107,142 bytes, `SERVICE_ROLE` grep 0, wording marker present.
+
+
+## 2026-07-26 ⑫ · Guarantees desk lists on arrival (PR #333, web-only, deployed)
+
+**Loo**: created an order with a guarantee, opened Operation → Guarantees, saw nothing.
+
+**Not a data bug** — the order carried `KQYZ939913` and the order-detail strip rendered it. **The page was wrong.** I had shipped it as a search-ONLY desk (`enabled: search.length > 0 || status !== ""`), and since the default "All" filter is the empty string, arriving with an empty box never called the endpoint at all. A guarantee that plainly existed looked missing, and there was no way to browse.
+
+**The wrong call for this data's shape**: guarantees are countable, not a million-row log. It now LISTS newest-first on arrival (one indexed read, capped at 100 with the existing truncation notice) and the box NARROWS. The empty state also splits — "No guarantees sold yet" (register genuinely empty) vs "No guarantee matches that search" (a filter is on); before, both read as a prompt to go searching.
+
+**Durable lesson: a "search-first" surface is only right when listing is genuinely expensive or meaningless. For a register an operator opens expecting to see its contents, defaulting to blank reads as a BUG, not as a design.**
+
+Five tests, led by "LISTS on arrival — no typing required" (asserts the endpoint is called with no q and no status); **verified all five go red with the old gate restored**.
+
+**Ship**: PR #333 (merge `f8438c5f`) → web `index-JV59p66j.js` → carres-portal `fcfa1341` + carres-pos `7091ac42`; downloaded 4,107,031 bytes, `SERVICE_ROLE` 0, new empty-state marker ✓. Tests: web 1532/1548 (16 = §17.7 baseline), typecheck 0, design-standard + check:v4 clean. api/DB untouched.
+
+**Edge-lag note (second time today)**: right after deploying, two canonicals still served `index-K-sQWa48.js`. That was the parallel line's OLDER bundle still cached — `wrangler pages deployment list` showed MY deployment (from the main tip) newest on both projects. The two Pages projects lag INDEPENDENTLY and can take several minutes; poll each until it flips rather than redeploying.
