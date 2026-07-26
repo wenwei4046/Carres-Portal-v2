@@ -178,6 +178,7 @@ import {
   type PatchDeliveryStopInput,
   type OpsOrderControl,
   type ConfirmBookingInput,
+  type DeliveryPhotoListResponse,
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
   type OpsStaffListResponse,
@@ -254,7 +255,7 @@ import {
   type HrCreateShowroomStaffInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
-import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
+import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -368,6 +369,10 @@ export const qk = {
      *  drawer. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
     orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
+    /** T6 (migration 0280) — the order's delivery-photo ledger + signed view
+     *  urls. Nested under the order id, same blunt-invalidate family. */
+    deliveryPhotos: (id: string) =>
+      ["operation", "orders", id, "delivery-photos"] as const,
     /** Staff assignment pool (migration 0232) — operation accounts + pool state. */
     staff: ["operation", "staff"] as const,
     /** PO duty rotation (migration 0236) — this month's PO holder. */
@@ -3750,6 +3755,50 @@ export function useConfirmBooking(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** T6 (migration 0280) — the order's delivery-photo ledger with short-lived
+ *  signed view urls. Enabled only while the drawer shows the delivery card
+ *  for a delivered order (the caller passes `enabled`). Fails soft
+ *  (retry:false): a Worker that predates the route just leaves the row
+ *  showing the ledger count without view links. */
+export function useDeliveryPhotos(
+  orderId: string,
+  opts?: Partial<UseQueryOptions<DeliveryPhotoListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.deliveryPhotos(orderId),
+    queryFn: () =>
+      apiFetch<DeliveryPhotoListResponse>(
+        `/api/operation/orders/${orderId}/delivery-photos`,
+      ),
+    // Signed urls live 1h; refresh well inside that.
+    staleTime: 10 * 60_000,
+    retry: false,
+    ...opts,
+  });
+}
+
+/** T6 (migration 0280) — upload ONE delivery photo: shrink → signed upload
+ *  into the private proof-of-delivery bucket → attach to the order's ledger
+ *  (the server gates on delivered + writes the activity line). Invalidates
+ *  the control overlay (the spine tick), the photo ledger and the orders
+ *  tree. */
+export function useUploadDeliveryPhoto(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<OpsOrderControl, Error, Blob>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<OpsOrderControl, Error, Blob>({
+    mutationFn: (file) => uploadDeliveryPhoto(orderId, file),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.deliveryPhotos(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

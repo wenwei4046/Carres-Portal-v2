@@ -3,6 +3,7 @@ import {
   type MutableRefObject,
   Fragment,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -80,6 +81,8 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
+  useDeliveryPhotos,
+  useUploadDeliveryPhoto,
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -3598,13 +3601,16 @@ function DrawerBody({
                           signal this card already reads — the carrier name
                           above, booking_stage (0277), do_number (auto on
                           dispatch, 0098), the same delivered signal as the
-                          chip — so ticks and chip can never disagree. Photo
-                          row stays greyed until T6 ships the upload. */}
+                          chip, the delivery-photo ledger (T6, 0280) — so
+                          ticks and chip can never disagree. */}
                       <BookingSpine
                         partnerAssigned={!!chasePartnerName}
                         customerConfirmed={bookingConfirmed}
                         doIssued={!!order.do_number}
                         delivered={deliveredDone}
+                        photoUploaded={
+                          (form.control?.delivery_photos?.length ?? 0) > 0
+                        }
                       />
                       {/* body */}
                       <div className="border-t border-base-100 px-3 py-2">
@@ -3738,6 +3744,13 @@ function DrawerBody({
                           balanceOwingHint={balanceOwing}
                           outstandingHint={moneyOutstanding}
                         />
+                      )}
+                      {/* T6 (0280) — the artifact: once delivered, the proof
+                          photo attaches here. The server refuses uploads on a
+                          not-yet-delivered order; this row simply doesn't
+                          render until then. */}
+                      {deliveredDone && (
+                        <DeliveryPhotoRow orderId={order.id} />
                       )}
                       {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
                           tucked behind a fold, opened only when needed (Jess
@@ -4702,6 +4715,75 @@ function BookingBlock({
         </div>
       )}
     </>
+  );
+}
+
+/** T6 (0280) — the delivery-photo row inside the delivery card, shown only
+ *  once the order is delivered. Existing photos open in a new tab via
+ *  short-lived signed urls (the bucket is private); Upload shrinks the file
+ *  browser-side, then runs the sign-upload → attach flow. The SERVER is the
+ *  gate (delivered-only + own-order path prefix) — this row is assistance. */
+function DeliveryPhotoRow({ orderId }: { orderId: string }) {
+  const photosQ = useDeliveryPhotos(orderId);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const upload = useUploadDeliveryPhoto(orderId, {
+    onSuccess: () => toast.success("Delivery photo uploaded"),
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : "Couldn't upload the delivery photo",
+      ),
+  });
+  const photos = photosQ.data?.photos ?? [];
+  return (
+    <DRow k="Delivery photo">
+      <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+        {photos.length === 0 ? (
+          <span className="text-[12px] text-base-400">no photo yet</span>
+        ) : (
+          photos.map((p, i) =>
+            p.url ? (
+              <a
+                key={p.path}
+                href={p.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[12px] text-info hover:underline whitespace-nowrap"
+              >
+                Photo {i + 1}
+              </a>
+            ) : (
+              <span
+                key={p.path}
+                className="text-[12px] text-base-500 whitespace-nowrap"
+              >
+                Photo {i + 1}
+              </span>
+            ),
+          )
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          aria-label="Delivery photo file"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) upload.mutate(f);
+            e.target.value = "";
+          }}
+        />
+        <Btn
+          variant="box"
+          size="sm"
+          icon={Upload}
+          disabled={upload.isPending}
+          onClick={() => inputRef.current?.click()}
+        >
+          {upload.isPending ? "Uploading…" : "Upload delivery photo"}
+        </Btn>
+      </span>
+    </DRow>
   );
 }
 

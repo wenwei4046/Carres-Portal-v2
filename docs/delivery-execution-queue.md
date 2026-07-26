@@ -163,7 +163,7 @@ delivered signal) so ticks and chip cannot disagree by construction. Photo row
 greyed "later" until T6. 4 tests incl. a banned-word guard (POD/Unscheduled/Not
 booked grep 0 in the spine).
 
-## T6 · Delivery photo (the artifact — needs a migration)
+## T6 · Delivery photo (the artifact — needs a migration) ✅ (PR #384)
 
 **Concept (Jess):** every completed delivery has proof: photo (+ optional signature/remark).
 Named "delivery photo" everywhere — POD stays banned.
@@ -171,6 +171,21 @@ Named "delivery photo" everywhere — POD stays banned.
 **Goal:** upload from drawer once delivered; Storage bucket; `delivered_at` + photo path
 columns (one additive migration — check remote tracker tail FIRST, guardrail #8).
 **Done when:** a delivered order can attach ≥1 photo; T5's last tick goes live; activity logs it.
+**Shipped note (PR #384, migration 0280):** the migration is ONE column, not two —
+`delivered_at` already exists on `orders` (0019) with real writers (partner deliver RPC,
+bulk-complete, the 0106 auto-status family), so adding a copy would have been a second
+home for a load-bearing fact. The ledger is `ops_order_control.delivery_photos` jsonb
+(`{path, at, by}` entries, server-stamped). The bucket is REUSED, not created: the private
+`proof-of-delivery` bucket (0069) under an `order/{order_id}/` prefix — the partner flow
+keys on `{thread_id}/`, so the families can't collide, and zero storage policies changed
+(the Worker signs upload + view URLs with the service client after its own
+operation/principal gate; 0069's read policy still names the pre-0121 'logistics' role, so
+user-JWT storage was never a working path for HQ). Server is the gate: sign-upload AND
+attach refuse unless the order reads delivered; the path must sit under the order's own
+prefix. Activity rides the T4 `operation_add_annotation` door, fail-soft. The drawer's
+delivery card gains the Delivery photo row (delivered orders only, signed-url view links +
+`Upload delivery photo` with browser-side shrink); the T5 spine's last tick is live, fed by
+the same ledger the row reads.
 
 ---
 
@@ -261,7 +276,7 @@ else is planned past T11 on purpose.
 | T3 | ✅ shipped 2026-07-26 | #370 |
 | T4 | ✅ shipped 2026-07-26 | #377 |
 | T5 | ✅ shipped 2026-07-26 | #382 |
-| T6 | ⬜ | — |
+| T6 | ✅ shipped 2026-07-26 | #384 |
 | T7 | ⬜ queue split + auto-overdue | — |
 | T8 | ⬜ unblocked — ruling recorded in card | — |
 | T9 | ⬜ partner profiles | — |

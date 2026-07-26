@@ -1,9 +1,12 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsOrderControlInput,
   confirmBookingInput,
+  signDeliveryPhotoUploadInput,
+  attachDeliveryPhotoInput,
+  type DeliveryPhoto,
   bookingConfirmGate,
   isSundayIso,
   stockMatchKey,
@@ -30,7 +33,7 @@ import {
 } from "@carres/shared";
 import { requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -57,7 +60,7 @@ const ORDER_ID = z.string().uuid();
 /** The full overlay column list — ONE copy for GET / PUT / booking-confirm so
  *  the three responses can never drift apart. */
 const CONTROL_COLUMNS =
-  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, updated_at, updated_by";
+  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, updated_at, updated_by";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -318,6 +321,232 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   }
 
   return c.json({ control: data });
+});
+
+// ── T6 delivery photo (migration 0280) ──────────────────────────────────────
+// Every completed delivery has proof. Photos live in the PRIVATE
+// `proof-of-delivery` bucket (0069) under `order/{order_id}/` — the partner
+// POD flow keys on `{thread_id}/`, so the families never collide. The Worker
+// signs upload AND view URLs with the SERVICE client after its own
+// operation/principal gate: 0069's storage policies are partner-scoped and its
+// read policy still names the pre-0121 'logistics' role, so user-JWT storage
+// ops were never a working path for HQ here (same admin-signing pattern as
+// partner/pod.ts's 2026-05-13 path + the 0279 rental signature upload).
+
+/** The T6 gate: a delivery photo proves a delivery that HAPPENED — the order
+ *  must read delivered before anything may be signed or attached. Same two
+ *  signals the drawer's own delivered chip folds (orders.operation_stage /
+ *  orders.status). Returns a Response to send, or null when the gate passes. */
+async function refuseUnlessDelivered(
+  c: Context<AppEnv>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+): Promise<Response | null> {
+  const { data: order, error } = await sb
+    .from("orders")
+    .select("id, status, operation_stage")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!order) throw new HTTPException(404, { message: "Order not found" });
+  const delivered =
+    order.operation_stage === "delivered" || order.status === "delivered";
+  if (!delivered) {
+    return c.json(
+      {
+        error: "not_delivered",
+        code: "not_delivered",
+        message:
+          "A delivery photo can only be attached once the order is delivered",
+      },
+      422,
+    );
+  }
+  return null;
+}
+
+// POST /:id/delivery-photo/sign-upload — short-lived signed upload URL into
+// the proof-of-delivery bucket, delivered orders only. Server-generated key;
+// the client can neither pick nor overwrite a path.
+orderControlRouter.post("/:id/delivery-photo/sign-upload", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = signDeliveryPhotoUploadInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: issue?.message ?? "invalid input",
+        field: issue?.path.join(".") ?? "unknown",
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  if (refusal) return refusal;
+
+  const ext =
+    parsed.data.mimeType === "image/png"
+      ? "png"
+      : parsed.data.mimeType === "image/webp"
+        ? "webp"
+        : "jpg";
+  const path = `order/${idCheck.data}/${crypto.randomUUID()}-delivery.${ext}`;
+  const admin = adminClient(c.env);
+  const { data, error } = await admin.storage
+    .from("proof-of-delivery")
+    .createSignedUploadUrl(path);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  return c.json({ token: data.token, path: data.path });
+});
+
+// POST /:id/delivery-photo/attach — record an uploaded photo on the order's
+// ledger. Append-only read-modify-write on the overlay row (one operator per
+// order; same plain-table pattern as the rest of the overlay).
+orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = attachDeliveryPhotoInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: issue?.message ?? "invalid input",
+        field: issue?.path.join(".") ?? "unknown",
+      },
+      422,
+    );
+  }
+  // The path must sit under THIS order's own prefix — a photo can never be
+  // attached across orders (and never point outside the order/ family).
+  if (!parsed.data.path.startsWith(`order/${idCheck.data}/`)) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "Photo path does not belong to this order",
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  if (refusal) return refusal;
+
+  const { data: ctrl, error: ctrlErr } = await sb
+    .from("ops_order_control")
+    .select("delivery_photos")
+    .eq("order_id", idCheck.data)
+    .maybeSingle();
+  if (ctrlErr) {
+    const m = mapPgError(ctrlErr);
+    return c.json(m.body, m.status);
+  }
+  const existing: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
+    ? (ctrl.delivery_photos as DeliveryPhoto[])
+    : [];
+  const entry: DeliveryPhoto = {
+    path: parsed.data.path,
+    at: new Date().toISOString(),
+    by: auth.id,
+  };
+
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: idCheck.data,
+        delivery_photos: [...existing, entry],
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_COLUMNS)
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  // T6 done-when: activity logs it. The 0211 trigger doesn't watch the overlay
+  // ledger, so append through the existing SECURITY DEFINER annotation door —
+  // FAIL-SOFT (supabase-js reports errors in the result; an audit hiccup must
+  // never undo a recorded photo), same as the T4 postpone write.
+  await sb.rpc("operation_add_annotation", {
+    p_order_id: idCheck.data,
+    p_content: "Delivery photo uploaded",
+    p_tag: null,
+  });
+
+  return c.json({ control: data }, 201);
+});
+
+// GET /:id/delivery-photos — the ledger + a short-lived signed VIEW url per
+// photo. No delivered gate on reads: an order with no photos just answers [].
+orderControlRouter.get("/:id/delivery-photos", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: ctrl, error } = await sb
+    .from("ops_order_control")
+    .select("delivery_photos")
+    .eq("order_id", idCheck.data)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const entries: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
+    ? (ctrl.delivery_photos as DeliveryPhoto[])
+    : [];
+  if (entries.length === 0) return c.json({ photos: [] });
+
+  const admin = adminClient(c.env);
+  const photos = await Promise.all(
+    entries.map(async (e) => {
+      const { data: signed } = await admin.storage
+        .from("proof-of-delivery")
+        .createSignedUrl(e.path, 3600);
+      return { ...e, url: signed?.signedUrl ?? null };
+    }),
+  );
+  return c.json({ photos });
 });
 
 // POST /import-stock-eta — bulk-fill per-line Stock ETA from Jess's Master "Ops"
