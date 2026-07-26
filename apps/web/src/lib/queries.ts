@@ -218,6 +218,13 @@ import {
   type SetBdPositionInput,
   // HR Team hierarchy (Phase 1) — org registry + THE account door.
   type HrTeamSource,
+  // HR-P4 (0269) — employee master
+  type HrPeopleSource,
+  type HrEmployeeDetail,
+  type HrEmployeePatchInput,
+  type HrRecordExitInput,
+  type HrChecklistToggleInput,
+  type HrSetAccessInput,
   type SetTeamPositionInput,
   type SetReportsToInput,
   type SetStaffCodeInput,
@@ -483,6 +490,9 @@ export const qk = {
   hr: {
     report: (year: number, month: number) => ["hr", "report", year, month] as const,
     team: () => ["hr", "team"] as const,
+    // HR-P4 (0269) — the employee master.
+    people: () => ["hr", "people"] as const,
+    person: (employeeId: string) => ["hr", "people", employeeId] as const,
   },
 };
 
@@ -7619,5 +7629,104 @@ export function useOrderGuarantees(
     staleTime: 30_000,
     retry: false,
     ...opts,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR-P4 (0269) — the employee master. `hr_employees` is an HR-private satellite
+// of app_users/salespersons: identity is read THROUGH the join, so a name or a
+// position edited in the Team tab is already correct here. Every write
+// invalidates the whole ["hr"] sub-tree because Team, Overview and People all
+// read the same staff universe.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useHrPeople(opts?: Partial<UseQueryOptions<HrPeopleSource>>) {
+  return useQuery({
+    queryKey: qk.hr.people(),
+    queryFn: () => apiFetch<HrPeopleSource>("/api/hr/people"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useHrEmployee(
+  employeeId: string | null,
+  opts?: Partial<UseQueryOptions<HrEmployeeDetail>>,
+) {
+  return useQuery({
+    queryKey: qk.hr.person(employeeId ?? "none"),
+    queryFn: () => apiFetch<HrEmployeeDetail>(`/api/hr/people/${employeeId}`),
+    enabled: employeeId !== null,
+    staleTime: 15_000,
+    ...opts,
+  });
+}
+
+export function useHrPatchEmployee(employeeId: string) {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, HrEmployeePatchInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>(`/api/hr/people/${employeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Reveal ONE masked value. Deliberately a mutation, not a query: the server
+ * writes an audit row in the same transaction that reads the number, so this
+ * must never be cached, retried in the background, or prefetched on hover.
+ */
+export function useHrRevealField(employeeId: string) {
+  return useMutation<
+    { field: string; value: string },
+    ApiError,
+    { field: "ic_number" | "bank_account_no" }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ field: string; value: string }>(`/api/hr/people/${employeeId}/reveal`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  });
+}
+
+export function useHrRecordExit(employeeId: string) {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, HrRecordExitInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>(`/api/hr/people/${employeeId}/exit`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useHrToggleChecklist(employeeId: string) {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true }, ApiError, HrChecklistToggleInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true }>(`/api/hr/people/${employeeId}/checklist`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+/** The door Loo approved 2026-07-26: HR may disable a login. Separate from the
+ *  exit record on purpose — writing a date must never look like revoking access. */
+export function useHrSetAccess(employeeId: string) {
+  const invalidate = useHrInvalidate();
+  return useMutation<{ ok: true; status: string }, ApiError, HrSetAccessInput>({
+    mutationFn: (input) =>
+      apiFetch<{ ok: true; status: string }>(`/api/hr/people/${employeeId}/access`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
   });
 }
