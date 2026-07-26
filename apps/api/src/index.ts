@@ -70,6 +70,7 @@ import hrTeamRouter from "./routes/hr-team";
 import hrPeopleRouter from "./routes/hr-people";
 import hrRunsRouter from "./routes/hr-runs";
 import hrKpiRouter from "./routes/hr-kpi";
+import hrCompRouter from "./routes/hr-comp";
 // 0233 — staff PIN login (outlet pick + 6-digit-PIN staff identity + tiers).
 import staffRouter from "./routes/staff";
 // 0240 — store-account self-service (dealer-principal email-change requests).
@@ -153,6 +154,7 @@ api.route("/hr/team", hrTeamRouter);
 api.route("/hr/people", hrPeopleRouter);
 api.route("/hr/runs", hrRunsRouter);
 api.route("/hr/kpi", hrKpiRouter);
+api.route("/hr/comp", hrCompRouter);
 api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);
