@@ -72,7 +72,7 @@ order** row joins the card's six (`orders.do_number` → the DO PDF the drawer c
 print) because DONE WHEN asks for *every* existing artifact. 13 new tests incl. a
 banned-word guard (POD / Proof of Delivery / Unscheduled grep 0).
 
-## J2 · Related cases cross-links (both directions)
+## J2 · Related cases cross-links (both directions) ✅ (PR #389)
 
 **Goal:** the order drawer shows its related cases; each case shows its order.
 
@@ -85,6 +85,31 @@ banned-word guard (POD / Proof of Delivery / Unscheduled grep 0).
 a second link column if one exists. **No migration expected.**
 **Done when:** order→case and case→order are each one click; an order with zero cases
 shows nothing (not an empty box).
+**Shipped note (PR #389):** ZERO migration. **ALREADY EXISTS held** — `service_cases.order_id`
+is the link (0210's "permanent key"), and no second column was added; what was missing was
+that `order_id` is a **uuid**, so nothing on screen could NAME the order. The API joins
+`orders(so)` (verified exactly one FK, so the PostgREST embed resolves unambiguously) and the
+new `so` field is **OPTIONAL, not just nullable** — absent = a Worker older than J2 (the link
+still works, it travels by id), null = genuinely no order. **The live data decided the design**:
+prod holds 56 orders, 1 service case and 0 claimed guarantees, and that one case has
+`order_id` NULL with a `ref_no` (TCF0497) pointing at an order wiped in the 06-24 reset. So the
+states that had to read well were the EMPTY ones: the drawer's `Cases` tab **renders only when
+the order has a case** (a permanent tab reading "0" is exactly the empty box DONE WHEN forbids),
+and "Not linked to an order" is a first-class state, not an error. **Claimed guarantees only** —
+an active guarantee is cover, not an incident, and `GuaranteeCoverStrip` already shows it;
+listing live ones would make every guaranteed order look like it had a problem. A claim that
+opened a service case is **ONE row, not two** (same incident). Supplier claims / receiving
+issues are deliberately NOT stubbed — a placeholder row would be a promise the data cannot keep
+until the R-series ships. **Fixed a real defect found on the case side**: `ServiceCaseModal`
+rendered the literal word `"linked"` for any case opened for EDITING, because the SO number was
+only ever set by the create-mode lookup — an existing case could name its order only in the
+session that created it. Wiring: `?orderId=` narrows in the DATABASE (not fetch-all-then-filter);
+`/operation/orders?order=` and `?tab=service-notes&case=` open the far side, each stripping its
+param once consumed so closing a drawer returns to the list; the guarantee desk now reads
+`?q=`/`?status=` so "filtered to the case" is true rather than just landing on the page, and an
+unrecognised status word is ignored. 31 new tests. **NOT done: browser verification** — reaching
+the drawer needs a portal login and passwords are not entered; covered by unit tests + live
+prod queries instead.
 
 ## J3 · Journey header — current stage · current owner · health
 
@@ -115,5 +140,5 @@ zero new writes.
 | Card | Status | PR |
 |---|---|---|
 | J1 | ✅ shipped 2026-07-27 | #385 |
-| J2 | ⬜ | — |
+| J2 | ✅ shipped 2026-07-27 | #389 |
 | J3 | ⬜ | — |
