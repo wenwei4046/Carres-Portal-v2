@@ -1,5 +1,6 @@
 import {
   PRODUCT_MODEL_PHOTOS_BUCKET,
+  type OpsOrderControl,
   type ProductModelDto,
   type SofaCompartmentDto,
 } from "@carres/shared";
@@ -92,4 +93,45 @@ export async function uploadCompartmentPhoto(
     },
   );
   return res.compartment;
+}
+
+/**
+ * T6 delivery photo upload (migration 0280) — same signed-upload flow against
+ * the operation order-control routes. The server refuses unless the order is
+ * delivered (a delivery photo proves a delivery that happened); the photo
+ * lands in the private proof-of-delivery bucket under `order/{order_id}/` and
+ * the attach route appends it to `ops_order_control.delivery_photos` + writes
+ * the activity line. Returns the refreshed control overlay.
+ */
+export async function uploadDeliveryPhoto(
+  orderId: string,
+  file: Blob,
+): Promise<OpsOrderControl> {
+  const { blob } = await shrinkImage(file);
+
+  const sign = await apiFetch<SignUploadResponse>(
+    `/api/operation/orders/${orderId}/delivery-photo/sign-upload`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: blob.size }),
+    },
+  );
+
+  const { error } = await supabase.storage
+    .from("proof-of-delivery")
+    .uploadToSignedUrl(sign.path, sign.token, blob, { contentType: "image/jpeg" });
+  if (error) {
+    throw new Error(`Photo upload failed: ${error.message}`);
+  }
+
+  const res = await apiFetch<{ control: OpsOrderControl }>(
+    `/api/operation/orders/${orderId}/delivery-photo/attach`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: sign.path }),
+    },
+  );
+  return res.control;
 }

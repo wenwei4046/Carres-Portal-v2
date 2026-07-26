@@ -86,6 +86,64 @@ export type StorageWaiverStatus = (typeof STORAGE_WAIVER_STATUSES)[number];
 /** ISO yyyy-mm-dd (no time) — matches the DB `date` column for stock_eta. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 
+// ── T6 delivery photo (migration 0280) ──────────────────────────────────────
+/** One delivery-photo ledger entry as stored in
+ *  ops_order_control.delivery_photos (jsonb array). `path` is the object key
+ *  inside the private `proof-of-delivery` bucket (0069) under the
+ *  `order/{order_id}/` prefix — the partner POD flow keys on `{thread_id}/`,
+ *  so the two artifact families can never collide. Entries are SERVER-built
+ *  (path from the sign-upload response, at/by stamped by the attach route). */
+export const deliveryPhotoSchema = z.object({
+  path: z.string(),
+  /** When the photo was attached (ISO timestamp, server-stamped). */
+  at: z.string(),
+  /** Who attached it (app_users.id, server-stamped). */
+  by: z.string().uuid().nullable().default(null),
+});
+export type DeliveryPhoto = z.infer<typeof deliveryPhotoSchema>;
+
+/** Allowed upload types — photos only (the partner POD flow additionally
+ *  takes PDF; a delivery photo is a photo). */
+export const DELIVERY_PHOTO_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export const DELIVERY_PHOTO_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB
+
+/** POST /:id/delivery-photo/sign-upload — ask for a short-lived signed upload
+ *  URL into the proof-of-delivery bucket. The route refuses unless the order
+ *  is delivered (the artifact proves a delivery that HAPPENED). */
+export const signDeliveryPhotoUploadInput = z
+  .object({
+    mimeType: z.enum(DELIVERY_PHOTO_MIMES),
+    sizeBytes: z.number().int().positive().max(DELIVERY_PHOTO_MAX_BYTES),
+  })
+  .strict();
+export type SignDeliveryPhotoUploadInput = z.infer<
+  typeof signDeliveryPhotoUploadInput
+>;
+
+/** POST /:id/delivery-photo/attach — record an uploaded photo on the order's
+ *  ledger. The route verifies the path sits under this order's own prefix. */
+export const attachDeliveryPhotoInput = z
+  .object({
+    path: z.string().min(1).max(500),
+  })
+  .strict();
+export type AttachDeliveryPhotoInput = z.infer<typeof attachDeliveryPhotoInput>;
+
+/** GET /:id/delivery-photos — the ledger + a short-lived signed VIEW url per
+ *  photo (the bucket is private; the Worker signs after its own role gate). */
+export const deliveryPhotoListResponseSchema = z.object({
+  photos: z.array(
+    deliveryPhotoSchema.extend({ url: z.string().nullable().default(null) }),
+  ),
+});
+export type DeliveryPhotoListResponse = z.infer<
+  typeof deliveryPhotoListResponseSchema
+>;
+
 /** PostgREST returns `numeric` columns as JSON strings (precision-safe). Read
  *  them as number|string|null → number|null. */
 const dbNumeric = z
@@ -215,6 +273,14 @@ export const opsOrderControlSchema = z.object({
   assigned_staff: z.string().uuid().nullable().default(null),
   assigned_by: z.string().uuid().nullable().default(null),
   assigned_at: z.string().nullable().default(null),
+  /** T6 delivery photos (migration 0280) — the proof a delivery happened:
+   *  server-appended {path, at, by} entries pointing into the
+   *  proof-of-delivery Storage bucket (order/{order_id}/… keys). READ-only on
+   *  the overlay — written only by the dedicated /delivery-photo/attach
+   *  endpoint (which gates on the order being delivered), never the generic
+   *  control PUT. Default keeps a pre-0280 Worker response parseable (the
+   *  HR-O1 degrade lesson). */
+  delivery_photos: z.array(deliveryPhotoSchema).default([]),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });

@@ -6,28 +6,30 @@ import { Check } from "lucide-react";
  *  feed the SAME sources the header chip uses so the two can never disagree:
  *  partner = the card's own carrier name · confirmed = booking_stage (0277)
  *  · DO = orders.do_number (auto-assigned on dispatch, 0098) · delivered =
- *  the same pipeline signal as the "Delivered ✓" chip. The photo row stays
- *  greyed "later" until T6 ships the upload. */
+ *  the same pipeline signal as the "Delivered ✓" chip · photo = the
+ *  delivery-photo ledger (T6, 0280 — ≥1 entry lights the tick). */
 
-type SpineState = "done" | "todo" | "later";
+type SpineState = "done" | "todo";
 
 export default function BookingSpine({
   partnerAssigned,
   customerConfirmed,
   doIssued,
   delivered,
+  photoUploaded,
 }: {
   partnerAssigned: boolean;
   customerConfirmed: boolean;
   doIssued: boolean;
   delivered: boolean;
+  photoUploaded: boolean;
 }) {
   const steps: { label: string; state: SpineState }[] = [
     { label: "Logistic assigned", state: partnerAssigned ? "done" : "todo" },
     { label: "Customer confirmed", state: customerConfirmed ? "done" : "todo" },
     { label: "Delivery order issued", state: doIssued ? "done" : "todo" },
     { label: "Delivered", state: delivered ? "done" : "todo" },
-    { label: "Delivery photo", state: "later" },
+    { label: "Delivery photo", state: photoUploaded ? "done" : "todo" },
   ];
   return (
     <div className="px-3 py-2 border-t border-base-100">
@@ -48,25 +50,18 @@ export default function BookingSpine({
           ) : (
             <span
               aria-hidden
-              className={`h-[11px] w-[11px] rounded-[3px] border-[1.5px] shrink-0 ${
-                s.state === "later" ? "border-base-200" : "border-base-300"
-              }`}
+              className="h-[11px] w-[11px] rounded-[3px] border-[1.5px] shrink-0 border-base-300"
             />
           )}
           <span
             className={
               s.state === "done"
                 ? "font-medium text-base-900"
-                : s.state === "later"
-                  ? "text-base-300"
-                  : "text-base-500"
+                : "text-base-500"
             }
           >
             {s.label}
           </span>
-          {s.state === "later" && (
-            <span className="text-[11px] text-base-300">· later</span>
-          )}
         </div>
       ))}
     </div>
