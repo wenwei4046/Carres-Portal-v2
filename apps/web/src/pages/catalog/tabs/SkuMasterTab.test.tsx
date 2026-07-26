@@ -702,7 +702,7 @@ describe("SkuMasterTab — SIZE column dropped where there is no size axis", () 
 
   it("drops the Size header under the Guarantee filter", () => {
     render(wrap(<SkuMasterTab catalog={CAT()} />));
-    fireEvent.click(screen.getByRole("button", { name: "Guarantee" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guarantee & Service" }));
     expect(screen.queryByText("Size")).not.toBeInTheDocument();
     // The invoice sentence must not be sitting in a SIZE cell.
     expect(screen.queryByText("Mattress Guarantee 15 Years")).not.toBeInTheDocument();
@@ -760,7 +760,7 @@ describe("SkuMasterTab — header and rows share ONE grid template", () => {
 
   it("rows line up with the header on the Guarantee filter too", () => {
     const { container } = render(wrap(<SkuMasterTab catalog={CAT()} />));
-    fireEvent.click(screen.getByRole("button", { name: "Guarantee" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guarantee & Service" }));
     const row = screen.getByTestId("sku-row-GRT-MATTRESS-15Y");
     expect(row.style.gridTemplateColumns).toBe(headerCols(container));
   });

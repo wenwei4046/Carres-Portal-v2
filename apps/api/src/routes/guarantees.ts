@@ -11,6 +11,7 @@ import {
   guaranteeProductInputSchema,
   guaranteeScopeLabel,
   deriveGuaranteeSkuCode,
+  guaranteeVisitsTotal,
   PRODUCT_MODELS,
   PRODUCT_SKUS,
   SOFA_COMBO_PRICING,
@@ -403,9 +404,17 @@ guaranteesRouter.post("/products", async (c) => {
     },
     { model: modelName, combo: comboLabel, compartment: compartmentCode },
   );
+  // 0274 — the default name has to say which of the two things this is, or a
+  // care plan and a guarantee over the same product read identically in SKU
+  // Master. A recurring plan also carries its visit count, since "3 years" on
+  // its own does not tell an operator how many cleans they sold.
+  const visitsTotal = guaranteeVisitsTotal(d.kind, d.coverageYears, d.visitsPerYear);
+  const scopeTitle = `${scopeLabel.charAt(0).toUpperCase()}${scopeLabel.slice(1)}`;
   const label =
     d.label?.trim() ||
-    `${scopeLabel.charAt(0).toUpperCase()}${scopeLabel.slice(1)} Guarantee ${d.coverageYears} Years`;
+    (d.kind === "recurring"
+      ? `${scopeTitle} Care Plan ${d.coverageYears} Years · ${visitsTotal} visits`
+      : `${scopeTitle} Guarantee ${d.coverageYears} Years`);
   const sku = deriveGuaranteeSkuCode({
     coversCategory: d.coversCategory,
     modelKey,
@@ -413,6 +422,8 @@ guaranteesRouter.post("/products", async (c) => {
     compartmentCode,
     comboLabel,
     coverageYears: d.coverageYears,
+    kind: d.kind,
+    visitsPerYear: d.visitsPerYear ?? null,
   });
 
   // 1. the guarantee product_model (one per authored guarantee — the SKU
@@ -461,6 +472,10 @@ guaranteesRouter.post("/products", async (c) => {
     covers_category: d.coversCategory,
     coverage_years: d.coverageYears,
     remedy: d.remedy,
+    // 0274 — which of the two kinds, and (recurring only) how often. The DB
+    // CHECKs enforce the same pairing the zod refinements do.
+    kind: d.kind,
+    visits_per_year: d.kind === "recurring" ? (d.visitsPerYear ?? null) : null,
     terms_text: d.description ?? null,
     covers_model_id: d.coversModelId ?? null,
     covers_variants: variants.length > 0 ? variants : null,

@@ -21,7 +21,33 @@ import { productCategorySchema, type ProductCategory } from "./product-category"
 
 // ── terms (config, principal-owned) ────────────────────────────────────────
 
-export const guaranteeRemedySchema = z.enum(["replace", "repair"]);
+/** 0274 — `service` joined replace/repair: a care plan's remedy is not something
+ *  you do to a broken item, it is someone turning up to clean it. */
+export const guaranteeRemedySchema = z.enum(["replace", "repair", "service"]);
+
+/**
+ * 0274 (Loo 2026-07-26) — the two kinds of cover under one category.
+ *
+ *   one_time  — a guarantee: ONE claim, then it is spent.
+ *   recurring — a care plan: `visitsPerYear × coverageYears` visits, counted
+ *               down as they are used ("系统还会去检查它还剩几次").
+ *
+ * A guarantee is a care plan with exactly one visit, which is why they share a
+ * table and a ledger rather than running two parallel engines.
+ */
+export const guaranteeKindSchema = z.enum(["one_time", "recurring"]);
+export type GuaranteeKind = z.infer<typeof guaranteeKindSchema>;
+
+/** Total visits a cover carries. one_time is always 1; recurring is years ×
+ *  per-year, never below 1 (mirrors the rental engine's own floor). */
+export function guaranteeVisitsTotal(
+  kind: GuaranteeKind,
+  coverageYears: number,
+  visitsPerYear: number | null | undefined,
+): number {
+  if (kind === "one_time") return 1;
+  return Math.max(1, Math.round(coverageYears * (visitsPerYear ?? 0)));
+}
 export type GuaranteeRemedy = z.infer<typeof guaranteeRemedySchema>;
 
 const guaranteeTermFields = z
@@ -61,6 +87,10 @@ export const guaranteeProductInputSchema = z
     /** How long. */
     coverageYears: z.number().int().min(1).max(50),
     remedy: guaranteeRemedySchema.default("replace"),
+    /** 0274 — one_time (a guarantee) or recurring (a care plan). */
+    kind: guaranteeKindSchema.default("one_time"),
+    /** recurring ONLY: visits a year. 1-12 mirrors the DB CHECK. */
+    visitsPerYear: z.number().int().min(1).max(12).nullable().optional(),
     /** Money + copy. */
     price: z.number().nonnegative().default(0),
     description: z.string().trim().max(600).nullable().optional(),
@@ -68,6 +98,25 @@ export const guaranteeProductInputSchema = z
     label: z.string().trim().min(1).max(120).nullable().optional(),
   })
   .strict()
+  // The DB enforces the same two rules (0274) — these give the operator a field
+  // error instead of a 500 from a CHECK violation.
+  .refine((d) => d.kind !== "recurring" || (d.visitsPerYear ?? 0) >= 1, {
+    message: "a recurring package must say how many visits a year",
+    path: ["visitsPerYear"],
+  })
+  .refine((d) => d.kind !== "one_time" || d.visitsPerYear == null, {
+    message: "a one-time cover has no visit schedule",
+    path: ["visitsPerYear"],
+  })
+  .refine(
+    (d) =>
+      d.kind === "recurring" ? d.remedy === "service" : d.remedy !== "service",
+    {
+      // A swap is one-shot by nature; a care plan never promises a replacement.
+      message: "a recurring package services the item; a one-time cover replaces or repairs it",
+      path: ["remedy"],
+    },
+  )
   .refine(
     (d) => !(d.coversComboId && d.coversCompartmentId),
     { message: "pick a combo OR a compartment, not both", path: ["coversComboId"] },
@@ -104,13 +153,18 @@ export function deriveGuaranteeSkuCode(parts: {
   compartmentCode?: string | null;
   comboLabel?: string | null;
   coverageYears: number;
+  /** 0274 — a recurring plan codes as SVC-… with its visit count, so a care
+   *  plan and a guarantee can never collide on one code. */
+  kind?: GuaranteeKind | null;
+  visitsPerYear?: number | null;
 }): string {
   const chunk = (v: string) =>
     v
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-  const bits = ["GRT"];
+  const recurring = parts.kind === "recurring";
+  const bits = [recurring ? "SVC" : "GRT"];
   if (parts.compartmentCode) bits.push(chunk(parts.compartmentCode));
   else if (parts.comboLabel) bits.push(chunk(parts.comboLabel));
   else if (parts.modelKey) bits.push(chunk(parts.modelKey));
@@ -119,6 +173,13 @@ export function deriveGuaranteeSkuCode(parts: {
   if (vs.length === 1) bits.push(chunk(vs[0]!));
   else if (vs.length > 1) bits.push(`${vs.length}SIZES`);
   bits.push(`${parts.coverageYears}Y`);
+  // "…-3Y-6V" reads as three years, six visits — the two numbers an operator
+  // needs off the code itself.
+  if (recurring) {
+    bits.push(
+      `${guaranteeVisitsTotal("recurring", parts.coverageYears, parts.visitsPerYear)}V`,
+    );
+  }
   return bits.filter(Boolean).join("-");
 }
 export type GuaranteeTermInput = z.infer<typeof guaranteeTermInputSchema>;

@@ -9,7 +9,13 @@ import type {
   VariantKind,
 } from "@carres/shared";
 import type { SofaComboDto } from "@carres/shared";
-import { PRODUCT_CATEGORIES, autoBedSkuDescription, canonicalSize } from "@carres/shared";
+import {
+  PRODUCT_CATEGORIES,
+  autoBedSkuDescription,
+  canonicalSize,
+  guaranteeVisitsTotal,
+  type GuaranteeKind,
+} from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -128,6 +134,11 @@ export default function NewSkuModal({
   const [gScope, setGScope] = useState<GuaranteeScopeValue>(EMPTY_GUARANTEE_SCOPE);
   const [gYears, setGYears] = useState("15");
   const [gBusy, setGBusy] = useState(false);
+  // 0274 (Loo 2026-07-26) — the same category now authors BOTH kinds of cover.
+  // one_time = a guarantee (one claim). recurring = a care plan whose visits are
+  // counted down. Defaults to one_time so the existing flow is unchanged.
+  const [gKind, setGKind] = useState<GuaranteeKind>("one_time");
+  const [gVisitsPerYear, setGVisitsPerYear] = useState("2");
 
   const sortedModels = useMemo(
     () =>
@@ -260,6 +271,16 @@ export default function NewSkuModal({
   const guaranteeFlow = mode === "new" && category === "guarantee";
   const gYearsNum = Number(gYears);
   const gYearsOk = Number.isInteger(gYearsNum) && gYearsNum >= 1 && gYearsNum <= 50;
+  const gVisitsNum = Number(gVisitsPerYear);
+  const gVisitsOk =
+    gKind === "one_time" ||
+    (Number.isInteger(gVisitsNum) && gVisitsNum >= 1 && gVisitsNum <= 12);
+  /** What the customer actually gets — the number the operator is selling. */
+  const gVisitsTotal = guaranteeVisitsTotal(
+    gKind,
+    gYearsOk ? gYearsNum : 0,
+    gKind === "recurring" ? gVisitsNum : null,
+  );
   const gScopeOk =
     gScope.coversCategory === "sofa"
       ? gScope.sofaKind === "any" ||
@@ -306,7 +327,7 @@ export default function NewSkuModal({
   const chipTargetOk =
     mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel;
   const valid = guaranteeFlow
-    ? gYearsOk && gScopeOk && isPrincipal && priceOk
+    ? gYearsOk && gVisitsOk && gScopeOk && isPrincipal && priceOk
     : compFlow
     ? chipTargetOk && selectedComps.size > 0
     : sizeFlow
@@ -339,7 +360,12 @@ export default function NewSkuModal({
           coversComboId: gScope.coversComboId,
           coversCompartmentId: gScope.coversCompartmentId,
           coverageYears: gYearsNum,
-          remedy: "replace",
+          // 0274 — the two travel together: a care plan SERVICES the item, a
+          // guarantee REPLACES it. The zod refinement and the DB CHECK both
+          // enforce the pairing, so sending them apart would just 422.
+          kind: gKind,
+          remedy: gKind === "recurring" ? "service" : "replace",
+          visitsPerYear: gKind === "recurring" ? gVisitsNum : null,
           price: priceNum,
           description: description.trim() || null,
         });
@@ -530,8 +556,42 @@ export default function NewSkuModal({
                   sofaCompartments={sofaCompartments}
                   sofaCombos={sofaCombos}
                 />
+                {/* 0274 — which of the two covers this is. Asked BEFORE the
+                    years, because it changes what "years" means: 15 years of a
+                    single swap promise, or 3 years of scheduled visits. */}
+                <div>
+                  <span className="label block mb-1">Type</span>
+                  <div className="flex gap-1.5">
+                    {(
+                      [
+                        ["one_time", "One-time", "One claim, then it is used up"],
+                        ["recurring", "Recurring", "Visits counted down each year"],
+                      ] as [GuaranteeKind, string, string][]
+                    ).map(([k, title, hint]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setGKind(k)}
+                        aria-pressed={gKind === k}
+                        title={hint}
+                        data-testid={`new-sku-guarantee-kind-${k}`}
+                        className={`flex-1 text-left px-3 py-2 rounded-[4px] border transition-colors ${
+                          gKind === k
+                            ? "bg-base-900 text-white border-base-900"
+                            : "bg-white text-base-700 border-base-300 hover:border-base-500"
+                        }`}
+                      >
+                        <span className="t-small font-semibold block">{title}</span>
+                        <span className="t-tiny opacity-80">{hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <label className="block">
-                  <span className="label block mb-1">Covered for (years)</span>
+                  <span className="label block mb-1">
+                    {gKind === "recurring" ? "Plan runs for (years)" : "Covered for (years)"}
+                  </span>
                   <input
                     type="number"
                     min={1}
@@ -546,6 +606,33 @@ export default function NewSkuModal({
                     <p className="t-tiny text-danger mt-1">Between 1 and 50 years.</p>
                   )}
                 </label>
+
+                {gKind === "recurring" && (
+                  <label className="block">
+                    <span className="label block mb-1">Visits per year</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      step={1}
+                      value={gVisitsPerYear}
+                      onChange={(e) => setGVisitsPerYear(e.target.value)}
+                      data-testid="new-sku-guarantee-visits"
+                      className={INPUT_CLS}
+                    />
+                    {!gVisitsOk && gVisitsPerYear.trim() !== "" ? (
+                      <p className="t-tiny text-danger mt-1">Between 1 and 12 visits a year.</p>
+                    ) : (
+                      // The total is the thing being sold — an operator should
+                      // never have to multiply it in their head at the counter.
+                      <p className="t-tiny text-base-500 mt-1" data-testid="new-sku-guarantee-total">
+                        {gYearsOk
+                          ? `${gVisitsTotal} visits in total over ${gYearsNum} year${gYearsNum === 1 ? "" : "s"}.`
+                          : "Set the years to see the total."}
+                      </p>
+                    )}
+                  </label>
+                )}
                 {isPrincipal ? (
                   <label className="block">
                     <span className="label block mb-1">Price (RM)</span>

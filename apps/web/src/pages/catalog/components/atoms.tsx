@@ -6,14 +6,30 @@ import type { ProductCategory } from "@carres/shared";
  * on v17 tokens — no hand-rolled colours.
  */
 
-/** Display labels for the 6 product categories (sentence case). */
+/**
+ * Display labels for the 6 product categories (sentence case).
+ *
+ * `guarantee` reads "Guarantee & Service Package" since 0274 (Loo 2026-07-26):
+ * the category now authors BOTH a one-time guarantee and a recurring care plan,
+ * because they are the same object with a different visit count. The DB value
+ * stays `guarantee` — renaming a category enum would ripple through the POS, the
+ * catalog, the invoice and five RPCs for no behavioural gain, so the rename Loo
+ * asked for lives here, where labels belong.
+ */
 export const CATEGORY_LABEL: Record<ProductCategory, string> = {
   mattress: "Mattress",
   bedframe: "Bedframe",
   sofa: "Sofa",
   accessory: "Accessory",
   service: "Service",
-  guarantee: "Guarantee",
+  guarantee: "Guarantee & Service Package",
+};
+
+/** The short form, for places where the full label will not fit (filter chips,
+ *  narrow table headers). */
+export const CATEGORY_LABEL_SHORT: Record<ProductCategory, string> = {
+  ...CATEGORY_LABEL,
+  guarantee: "Guarantee & Service",
 };
 
 /**
