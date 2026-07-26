@@ -107,6 +107,12 @@ into the FIRST consumer only: the existing postpone/reschedule action in the dra
 - logistic: `Driver unavailable` · `Vehicle breakdown` · `Logistic capacity full`
 - site: `Condo approval required` · `Lift booking required`
 
+Each reason ALSO carries a hidden `responsibility: 'customer' | 'carres' | 'external'`
+(customer-category → customer; stock/logistic → carres; site → external). Not shown to staff.
+This is what later lets the storage-fee rule say "customer delay starts the storage clock,
+Carres delay never charges" and lets the dashboard split delay causes — without a second tagging
+pass. Costs one field now, saves a re-tag of history later.
+
 **Touch:** `packages/shared` constant + the reschedule write path stores `reason_key`
 (ride an existing attrs/jsonb column if one fits; a migration ONLY if nothing fits — and then
 one nullable column, nothing more) + drawer dropdown replaces/augments free text.
@@ -144,16 +150,36 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 ## LATER (do not start; listed so no chat reinvents them)
 
 - **L1 Queue split** — `Assign logistic / Confirm booking / Issue DO / Deliver today / Upload
-  delivery photo` as real queues (needs T1-T3 signals stable first).
+  delivery photo` as real queues (needs T1-T3 signals stable first). Each step gets its own
+  deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
+  before · delivery order 1 day before · photo same/next day) so a queue item can turn
+  overdue BY ITSELF — no human watching required.
 - **L2 Delivery calendar as single source** (reads the same booking fields; never a second store).
 - **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — build when storage countdown or
   booking lead-time first needs it, as a shared util, NOT an admin page.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
 - **L5 Delivery module page (3-pane)** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
   the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
+- **L6 Logistic partner profiles** — per-partner rules the booking flow will eventually read:
+  working days (Sat half/full), blackout dates ("truck maintenance 15-18 Feb"), daily capacity
+  ("NETS max N drops/day"), booking lead time ("needs 2 working days notice" → warn when an
+  operator confirms a date the partner cannot honour). Today partners are bare rows; build the
+  fields WITH the first consumer (likely L1's deadlines or L2's calendar), not as an admin page
+  up front.
+- **L7 Delivery groups / partial delivery — NEEDS A JESS RULING BEFORE ANY BUILD.**
+  The business rule from Jess's design conversation: mattress + bed frame = ONE delivery
+  (hard, never split) · sofa = prefer together but may go as a second trip · accessories
+  (pillow/protector) NEVER block a delivery, back-order them. Today's `bookingConfirmGate`
+  enforces the STRICTEST version — every goods line reserved or no confirm — so a missing
+  RM39 pillow currently blocks a RM5,000 bed delivery. The first bite will be exactly that.
+  When it bites: (1) Jess rules which categories may lag, (2) the gate learns delivery groups,
+  (3) a split creates a second booking on the same SO ("confirm delivery preference with
+  customer" flow — ASK the customer wait-vs-split, never auto-split).
 - **NOT delivery, parked elsewhere:** Ready-stock planning (inventory proposal) · Receiving/
   Claim module (purchase v2 + 2990s list) · Service case wizard (own initiative) · Business
-  Rules admin page (rules ship with the phase that needs them — standing decision).
+  Rules admin page (rules ship with the phase that needs them — standing decision) · Payment
+  reminder schedule 7/3/1 days (Payments Collections Desk owns it; its "催钱前先看货" rule
+  already implements "never chase payment for an undeliverable order").
 
 ## Status
 
