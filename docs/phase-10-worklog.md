@@ -1402,7 +1402,7 @@ Tests: the two asserting the retired button now assert the new truth; the old "c
 **Tests**: +8 shared (`booking-gate.test.ts`) · +9 api (`booking-confirm.test.ts` — 401/403/missing-slot 422/Sunday 422/goods-gate 422 naming the sku/balance-gate 422 naming RM/reserved-ledger satisfies/happy path payload/PUT rejects booking_stage). Suites at baseline: shared 1174/1174 · api 3 pre-existing · web 16 pre-existing. tsc(app) 0 · build ✓ · check:v4 ✓ · design lint ✓ (2 hex literals swapped for `text-success`/`text-warning` tokens after the lint caught them). Known pre-existing: `packages/shared` standalone `tsc --noEmit` fails in `schemas/orders.test.ts` (0258 edit_addon union) — reproduced with my changes stashed.
 
 **Not done, said out loud**: (a) no visual smoke — the login wall requires typing a password, which the agent doesn't do; Loo smokes per habit; (b) the orders LIST/queues still key on the old signals — D1 scoped the drawer + API + chip only, per the implementation doc's "其余不动"; (c) service-only orders pass the goods gate vacuously (the drawer's `allReceived` reads false there — that flag feeds the pipeline word, not this gate; blocking a pure-service booking forever would be the real bug).
-## 2026-07-26 ㉒ · HR-P6 — targets + the scoreboard (0276, branch `feat/hr-p6-kpi`, NOT yet deployed)
+## 2026-07-26 ㉒ · HR-P6 — targets + the scoreboard (PR #359 merge `2ad24013`, 0276, Worker `abff79eb` + web `index-DtlbnO4w.js` — DEPLOYED)
 
 Worktree `hr-hierarchy`, re-homed off the parked `feat/hr-p4-employee-master` onto `origin/main`
 `e456c87a` first. Design mock approved by Loo before any code (his standing law):
@@ -1541,8 +1541,24 @@ and it explicitly covers "BOTH the P7 comp register and the P6 rates/targets gua
 the stale clause in place would have had P6 built backwards. The retraction is now written into the
 row itself rather than silently deleted.
 
+### Deploy
+
+Merged and deployed same session. Worker `abff79eb`; web `index-DtlbnO4w.js` (carres-portal
+`77da79e6` + carres-pos `a9df1568`), all 4 canonicals converged, live bundle downloaded to a file
+before grepping — 4,192,734 bytes, `SERVICE_ROLE` 0, `hr/kpi` + "Manager view" both present. Unauth
+401 verified on `/api/hr/kpi`, `/api/hr/runs`, `/api/hr/people`, `/api/guarantees`.
+
+`carres-pos.pages.dev` lagged one poll on the OLD `index-B9ZL9k9A.js`. Followed the rule instead of
+re-deploying: `wrangler pages deployment list` showed `a9df1568` from source `2ad2401` (the union
+tip) as the newest production deployment, so it was edge cache and not a clobber — polled until it
+flipped. **Three merge rounds were needed** because origin/main moved under me twice mid-verify
+(#356/#357, then #360-#362 which also took 0277); each round re-ran the full union suites. The
+first `gh pr merge` also failed with "merge commit cannot be cleanly created" while GitHub still
+reported `mergeable: UNKNOWN` — that is a stale-computation state, not a conflict; polling until
+`MERGEABLE` merged first try.
+
 ### Not done
 
-No deploy (needs a merge to origin/main first — Loo's permanent rule). No `hr`-role user exists to
-smoke the non-principal path. P6 is data-empty until Loo sets a target: the tables are at 0 rows,
-so the page will show RM 52,081 sold against "—" until then.
+No `hr`-role user exists to smoke the non-principal path (CF `hr-role-nobody-holds-it`). P6 is
+data-empty until Loo sets a target: both tables are at 0 rows, so the page shows RM 52,081 sold
+against "—".
