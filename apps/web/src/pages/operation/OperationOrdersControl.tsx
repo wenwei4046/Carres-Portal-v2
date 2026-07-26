@@ -528,6 +528,7 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
 const NEXT_QUEUE_VERBS = [
   "Order PO",
   "Chase supplier",
+  "Call customer (stock delay)",
   "Assign logistic",
   "Chase logistic",
 ] as const;
@@ -535,6 +536,8 @@ const NEXT_QUEUE_DESC: Record<string, string> = {
   "Order PO": "Goods not ordered from any supplier yet — raise the PO",
   "Chase supplier":
     "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
+  "Call customer (stock delay)":
+    "Stock ETA lands AFTER the promised date — tell the customer now, before the window (delay radar, T3)",
   "Assign logistic": "No delivery partner picked yet — assign one",
   "Chase logistic":
     "Partner assigned but no delivery booked with the customer — chase the logistic",
@@ -658,7 +661,10 @@ function ovlOf(o: operationOrderListRow) {
 
 /** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
  *  a stock track ∥ a logistic track, surfaced as the one most-urgent verb —
- *    Order PO → Chase supplier → Assign logistic → Chase logistic → Confirm.
+ *    Order PO → Call customer (stock delay) → Chase supplier → Assign logistic
+ *    → Chase logistic → Confirm.
+ *  T3 Delay Radar (2026-07-26): "Call customer (stock delay)" fires when the
+ *  latest waiting-line stock ETA overshoots the customer's delivery date.
  *  WORD LAW (Jess 2026-07-19, C-vocab): "assign" = WE pick the carrier;
  *  "booked" = the PARTNER fixed a slot with the customer (a STATE, never our
  *  verb). "Book logistic" was firing on no-carrier rows — wrong word, dead.
@@ -703,6 +709,23 @@ export function nextActionOf(
   // STOCK TRACK — leads until the goods are secured.
   if (!ready) {
     if (stock.state === "unknown") return { label: "Order PO", tone: "danger" };
+    // T3 DELAY RADAR (Jess's Golden Rule, 2026-07-26): risk is not "is stock
+    // here today" — it is "can the LATEST stock ETA still honour the customer's
+    // date". Once the max waiting-line ETA OVERSHOOTS the promised date the
+    // miss is already certain, so chasing the supplier can no longer save the
+    // date — the action flips to telling the CUSTOMER now, not to showing
+    // overdue after the window. Completed orders never reach here (guardrail
+    // #2, the Done return above); No-PO stays RUNG 1 (the real unblock is
+    // ordering the goods); the past-deadline Chase-logistic escalation above
+    // stays locked (Loo, freeze gate 2026-07-12).
+    const se = stockEtaOf(o);
+    if (
+      se.etaIso &&
+      !o.delivery_date_tbd &&
+      o.delivery_date &&
+      se.etaIso > o.delivery_date
+    )
+      return { label: "Call customer (stock delay)", tone: "danger" };
     // "Chase supplier" turns red once we're inside the stock-arrival window and
     // it still hasn't landed (MS/BF = deadline−7d, Sofa = deadline−5d), amber otherwise.
     const hasMsbf = lines.some((l) => {
@@ -2471,7 +2494,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       label={v}
                       count={nextCounts.get(v) ?? 0}
                       tone={
-                        v === "Order PO"
+                        v === "Order PO" || v === "Call customer (stock delay)"
                           ? "danger"
                           : v === "Chase supplier"
                             ? "warning"

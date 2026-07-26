@@ -73,7 +73,7 @@ exist anymore — the C-vocab rewrite (2026-07-19) had already merged them into
 every visible POD string (partner upload dialog + hints) now says "delivery photo";
 COPY-STANDARD carries the naming law + the reserved labels for T3/T6.
 
-## T3 · Delay Radar — catch the miss BEFORE the window
+## T3 · Delay Radar — catch the miss BEFORE the window ✅ (PR #370)
 
 **Concept (Jess, the Golden Rule):** delivery risk is not "is stock here today"; it is
 "can the LATEST stock ETA still honour the customer's delivery date". If supplier ETA is
@@ -90,6 +90,14 @@ flip to `Call customer (stock delay)` NOW, not show overdue on 16 Aug.
 that is T4's reason write, not a new column here.
 **Done when:** an order whose ETA overshoots its date shows `Call customer (stock delay)`
 while the date is still in the future; delivered/completed orders never show it (guardrail #2).
+**Shipped note (PR #370):** web-only, no migration — ETAs already ride the list payload
+(`ops_order_control.line_etas`). The rung sits INSIDE the stock track: above `Chase supplier`
+(chasing can't save a certain miss) but below `Order PO` (raising the PO stays the real
+unblock) and below the LOCKED past-deadline `Chase logistic` escalation (freeze gate
+2026-07-12 — post-deadline behaviour unchanged; the radar's job is BEFORE the window).
+Strict overshoot only (ETA > date; ETA ON the date is not a delay); TBD dates / missing
+ETAs stay silent. The verb also joined the QUEUES rows (C-vocab: counts match the NEXT
+column by construction), danger tone, PIC chip.
 
 ## T4 · Reason Library v1 (structured, no free text)
 
@@ -106,6 +114,12 @@ into the FIRST consumer only: the existing postpone/reschedule action in the dra
 - payment: `Waiting balance payment` · `Waiting storage fee`
 - logistic: `Driver unavailable` · `Vehicle breakdown` · `Logistic capacity full`
 - site: `Condo approval required` · `Lift booking required`
+
+Each reason ALSO carries a hidden `responsibility: 'customer' | 'carres' | 'external'`
+(customer-category → customer; stock/logistic → carres; site → external). Not shown to staff.
+This is what later lets the storage-fee rule say "customer delay starts the storage clock,
+Carres delay never charges" and lets the dashboard split delay causes — without a second tagging
+pass. Costs one field now, saves a re-tag of history later.
 
 **Touch:** `packages/shared` constant + the reschedule write path stores `reason_key`
 (ride an existing attrs/jsonb column if one fits; a migration ONLY if nothing fits — and then
@@ -141,19 +155,83 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 
 ---
 
-## LATER (do not start; listed so no chat reinvents them)
+## Road ahead — T7-T11 (locked with Jess 2026-07-27; the queue ENDS at T11)
 
-- **L1 Queue split** — `Assign logistic / Confirm booking / Issue DO / Deliver today / Upload
-  delivery photo` as real queues (needs T1-T3 signals stable first).
-- **L2 Delivery calendar as single source** (reads the same booking fields; never a second store).
-- **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — build when storage countdown or
-  booking lead-time first needs it, as a shared util, NOT an admin page.
+The T-series is ELEVEN cards total. T1-T6 finish the delivery lifecycle INSIDE the order
+panel. T7-T11 build it OUT into a standalone Delivery capability. Same law: one card, one
+chat, one PR, one deploy, in this order. Detail for each lives in the LATER entry it
+promotes — the implementing chat reads BOTH this card and its L-entry.
+
+## T7 · Queue split + auto-overdue (promotes L1)
+
+Real queues: `Assign logistic / Confirm booking / Deliver today / Upload delivery photo`,
+each with its own deadline relative to the confirmed date so items turn overdue by
+themselves. Needs T1-T6 signals — that is why it waits for them.
+
+## T8 · Delivery groups / partial delivery (promotes L7) — ✅ RULING RECEIVED, unblocked
+
+**Jess's ruling (2026-07-27, verbatim confirmed):** mattress + bed frame = together (HARD,
+never split) · sofa = prefer together but MAY go as a second trip (SOFT — ASK the customer
+wait-vs-split, never auto-split) · pillow / mattress protector NEVER block a delivery
+(back-order them). Build: the confirm gate learns delivery groups (accessory lines stop
+blocking); a sofa split creates a second booking on the same SO via the
+"confirm delivery preference with customer" flow.
+
+## T9 · Logistic partner profiles (promotes L6)
+
+Working days · blackout dates · daily capacity · booking lead time — and the confirm flow
+warns when an operator books a date the partner cannot honour. First real consumer of
+partner rules; the working-day util (L3) ships inside this card or T10, whichever needs it
+first.
+
+## T10 · Delivery calendar as single source (promotes L2)
+
+Today / Tomorrow / This week views reading the SAME booking fields — never a second store.
+Partner capacity from T9 shows on the day.
+
+## T11 · Delivery module page (promotes L5) — the LAST card
+
+The 3-pane standalone module per `docs/delivery-module-proposal.md` (LOCKED 2026-07-22
+with Jess). By T11 every signal, queue, reason and profile already exists — this card is
+ASSEMBLY, not invention. After T11: two weeks of live usage writes the fix list; nothing
+else is planned past T11 on purpose.
+
+---
+
+## LATER (no card number = not planned; listed so no chat reinvents them)
+
+- **L1 Queue split → PROMOTED TO T7** — `Assign logistic / Confirm booking / Issue DO /
+  Deliver today / Upload delivery photo` as real queues (needs T1-T3 signals stable first).
+  Each step gets its own
+  deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
+  before · delivery order 1 day before · photo same/next day) so a queue item can turn
+  overdue BY ITSELF — no human watching required.
+- **L2 Delivery calendar → PROMOTED TO T10** (reads the same booking fields; never a second store).
+- **L3 Working-day calendar engine** (condo Sat 0.5d etc.) — ships INSIDE T9 or T10,
+  whichever needs it first, as a shared util, NOT an admin page. Not its own card.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
-- **L5 Delivery module page (3-pane)** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
+- **L5 Delivery module page (3-pane) → PROMOTED TO T11** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
   the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
+- **L6 Logistic partner profiles → PROMOTED TO T9** — per-partner rules the booking flow will eventually read:
+  working days (Sat half/full), blackout dates ("truck maintenance 15-18 Feb"), daily capacity
+  ("NETS max N drops/day"), booking lead time ("needs 2 working days notice" → warn when an
+  operator confirms a date the partner cannot honour). Today partners are bare rows; build the
+  fields WITH the first consumer (likely L1's deadlines or L2's calendar), not as an admin page
+  up front.
+- **L7 Delivery groups / partial delivery → PROMOTED TO T8 — NEEDS A JESS RULING BEFORE ANY BUILD.**
+  The business rule from Jess's design conversation: mattress + bed frame = ONE delivery
+  (hard, never split) · sofa = prefer together but may go as a second trip · accessories
+  (pillow/protector) NEVER block a delivery, back-order them. Today's `bookingConfirmGate`
+  enforces the STRICTEST version — every goods line reserved or no confirm — so a missing
+  RM39 pillow currently blocks a RM5,000 bed delivery. The first bite will be exactly that.
+  When it bites: (1) Jess rules which categories may lag, (2) the gate learns delivery groups,
+  (3) a split creates a second booking on the same SO ("confirm delivery preference with
+  customer" flow — ASK the customer wait-vs-split, never auto-split).
 - **NOT delivery, parked elsewhere:** Ready-stock planning (inventory proposal) · Receiving/
   Claim module (purchase v2 + 2990s list) · Service case wizard (own initiative) · Business
-  Rules admin page (rules ship with the phase that needs them — standing decision).
+  Rules admin page (rules ship with the phase that needs them — standing decision) · Payment
+  reminder schedule 7/3/1 days (Payments Collections Desk owns it; its "催钱前先看货" rule
+  already implements "never chase payment for an undeliverable order").
 
 ## Status
 
@@ -161,7 +239,12 @@ columns (one additive migration — check remote tracker tail FIRST, guardrail #
 |---|---|---|
 | T1 | ✅ shipped 2026-07-26 | #363 |
 | T2 | ✅ shipped 2026-07-26 | #367 |
-| T3 | ⬜ | — |
+| T3 | ✅ shipped 2026-07-26 | #370 |
 | T4 | ⬜ | — |
 | T5 | ⬜ | — |
 | T6 | ⬜ | — |
+| T7 | ⬜ queue split + auto-overdue | — |
+| T8 | ⬜ unblocked — ruling recorded in card | — |
+| T9 | ⬜ partner profiles | — |
+| T10 | ⬜ delivery calendar | — |
+| T11 | ⬜ delivery module page (FINAL) | — |
