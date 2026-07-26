@@ -948,3 +948,18 @@ Five tests, led by "LISTS on arrival — no typing required" (asserts the endpoi
 **Ship**: PR #333 (merge `f8438c5f`) → web `index-JV59p66j.js` → carres-portal `fcfa1341` + carres-pos `7091ac42`; downloaded 4,107,031 bytes, `SERVICE_ROLE` 0, new empty-state marker ✓. Tests: web 1532/1548 (16 = §17.7 baseline), typecheck 0, design-standard + check:v4 clean. api/DB untouched.
 
 **Edge-lag note (second time today)**: right after deploying, two canonicals still served `index-K-sQWa48.js`. That was the parallel line's OLDER bundle still cached — `wrangler pages deployment list` showed MY deployment (from the main tip) newest on both projects. The two Pages projects lag INDEPENDENTLY and can take several minutes; poll each until it flips rather than redeploying.
+
+
+## 2026-07-26 ⑬ · Guarantees desk — STATUS is the ORDER's status (PR #335, deployed)
+
+**Loo**: make that column the status of the order — placed, delivered, and so on.
+
+It was showing the guarantee's own lifecycle word ("Starts on delivery"), which answers a question the operator hasn't asked yet. What they want at the counter is where the ORDER is — and the guarantee's clock hangs off exactly that (cover starts on delivery), so the order status is genuinely the more useful column.
+
+**Kept rather than replaced**: the guarantee's own state now rides as a small pill directly UNDER the guarantee ID. "Used" and "Expired" are what decide whether a claim can be honoured, so a straight swap would have hidden the one fact this desk exists to surface — same information, no extra column width. **Whenever a request would replace a signal, check whether that signal is the load-bearing one before deleting it; moving usually satisfies the ask without the loss.**
+
+New `orderStatusWord()` lives in `apps/web/src/lib/status-pill.ts` — the file that already declares itself the single status→pill source — so the vocabulary matches the POS board LANES and the order drawer (one order can never read "Order placed" here and "place" there). Unmapped values degrade to de-underscored Title Case instead of leaking a DB word; the pill colour reuses `orderStatusPill`, so this column obeys the same colour law as every other status.
+
+The route ships the RAW status (`orders!inner(so, status)`) and the UI maps it — the mapping stays in one place rather than in the API.
+
+**Ship**: PR #335 (merge `de0c01c9`) → api Worker `f4565b8b` (unauth 401 ✓) + web `index-gSSCw-kl.js` → carres-portal `2b86b202` + carres-pos `2bf8f803`; all 4 canonicals ✓; downloaded 4,107,409 bytes, `SERVICE_ROLE` 0. Tests: shared 1080/1080 · api 3 = §17.7 baseline (guarantees 9/9) · web 16 = baseline (+4 new, incl. one asserting the claimed row still shows "Used" and its retired ID) · typecheck 0 · design-standard + check:v4 clean.
