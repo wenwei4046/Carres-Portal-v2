@@ -93,11 +93,32 @@ Jess first.
 **Done when:** a Klang receiving lands in the system with zero ops typing — ops only
 reviews.
 
+## R7 · GRN duty — receiving assigns itself (from PORTAL_CORE_ENGINE, 2026-07-27)
+
+**Concept (Jess's architecture doc):** the PO-duty holder does NOT do GRN; the OTHER
+operational staff share receiving, round-robin, one owner per GRN — separation gives
+independent verification (the person who ordered isn't the person who checks it in).
+
+**ALREADY EXISTS — do not rebuild:** `org_duties` (HR-P2, 0260) holds duty keys incl.
+PO-duty; the orders fair-split auto-assign (PRs #188-#192) is the proven distribution
+pattern; the offset-1 PO/GRN rotation is today a HUMAN planning rule (memory:
+Jul = Shasha PO / Yu Jun GRN) — R7 makes the system enforce what the roster already does.
+**Build:** each receiving (R1's form) auto-stamps ONE owner: round-robin over active
+operation staff EXCLUDING the current PO-duty holder; owner shows on the Receiving row +
+a "My receiving" count. Manual reassign stays possible (manager override), logged.
+**Needs R1 first** (the owner must have a form to own). Small migration likely (owner
+column) — guardrail #8.
+**Done when:** no GRN exists without exactly one owner; the PO-duty holder never
+auto-receives their own PO.
+
 ## LATER
 
 - Purchase Return flow (2990s has it — port, don't invent) · claim → service-case
   cross-link view (J2 covers the order side) · multi-warehouse On-hand filtering (the
-  P4 note in OperationReceiving) · partner-warehouse (SSY/EU) logins after Klang proves R6.
+  P4 note in OperationReceiving) · partner-warehouse (SSY/EU) logins after Klang proves R6
+  · **Smart Cover** (staff on leave stop receiving NEW assignments automatically — needs
+  leave data, which nothing tracks yet; when HR grows leave records, this becomes a card
+  across orders-assign + R7 + S-line in one move).
 
 ## Status
 
@@ -109,3 +130,4 @@ reviews.
 | R4 | ⬜ | — |
 | R5 | ⬜ | — |
 | R6 | ⬜ after R1-R2 · warehouse login | — |
+| R7 | ⬜ after R1 · GRN duty auto-assign | — |
