@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
 import { Download, ArrowUp, ArrowDown } from "lucide-react";
+import StockTabs from "./StockTabs";
 
 /**
  * OperationMovements — HQ stock-in/out history with KPIs + period chips +
@@ -300,6 +301,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
   }
 
   return (
+    <>
+    <StockTabs />
     <div className="px-9 py-7 pb-14" data-testid="operation-movements-page">
       {/* Header */}
       <div className="flex justify-between items-start mb-[22px] gap-4">
@@ -727,6 +730,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
         </div>
       )}
     </div>
+    </>
   );
 }
 

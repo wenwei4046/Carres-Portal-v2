@@ -194,6 +194,14 @@ doubt, grep the codebase and match what already ships.
 | The Purchase panel's three stages | **Send · Chase · Receive** | Place · Follow up · Book in |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
 | Call to fix delivery date + slot | **Call customer (book delivery)** | Schedule delivery · Book delivery · Confirm delivery date |
+| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
+| Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+
+**The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
+`On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
+the same goods, never a second pool) · `In & out` (when things moved).
+"Inventory" and "Movements" are banned UI words (POD treatment); internal
+keys/routes keep their names.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The

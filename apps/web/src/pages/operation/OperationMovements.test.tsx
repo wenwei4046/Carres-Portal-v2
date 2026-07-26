@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import OperationMovements from "./OperationMovements";
 import { listMovementsQuery, type CatalogResponse } from "@carres/shared";
 import type {
@@ -46,7 +47,13 @@ vi.mock("@/lib/queries", async () => {
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{node}</QueryClientProvider>;
+  // K0: the page mounts StockTabs (react-router Link/useLocation), so it must
+  // mount inside a Router — same as OperationReceiving.test with PurchasingTabs.
+  return (
+    <MemoryRouter initialEntries={["/operation?tab=movements"]}>
+      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
 const WAREHOUSE_KL = {

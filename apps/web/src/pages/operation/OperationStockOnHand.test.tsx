@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import OperationStockOnHand from "./OperationStockOnHand";
 import type { OpsStockItem } from "@carres/shared";
 
@@ -54,7 +55,13 @@ const UNITS: OpsStockItem[] = [
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+  // K0: the page mounts StockTabs (react-router Link/useLocation), so it must
+  // mount inside a Router — same as OperationReceiving.test with PurchasingTabs.
+  return render(
+    <MemoryRouter initialEntries={["/operation?tab=stock-onhand"]}>
+      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    </MemoryRouter>,
+  );
 }
 
 const statusBtn = (name: RegExp) => screen.getByRole("button", { name });
