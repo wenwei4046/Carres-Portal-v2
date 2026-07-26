@@ -209,7 +209,7 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
       body: JSON.stringify({ status: "disabled" }),
     });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("no_login_to_disable");
+    expect(((await res.json()) as { code: string }).code).toBe("no_login_to_disable");
     // service_role must never have been touched for a request that cannot proceed
     expect(admin).not.toHaveBeenCalled();
   });
@@ -289,7 +289,7 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
       body: JSON.stringify({ status: "disabled" }),
     });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("cannot_disable_principal");
+    expect(((await res.json()) as { code: string }).code).toBe("cannot_disable_principal");
     expect(update).not.toHaveBeenCalled();
   });
 });
