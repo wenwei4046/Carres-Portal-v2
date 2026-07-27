@@ -151,6 +151,11 @@ to be remembered.
   shape: `Standard production working days` (optionally min / max / default planning). Then
   `chase from = customer date − production working days − internal buffer`. **Belongs to the
   Purchasing line** — the Orders arrival window reads it once it exists.
+- **Does a supplier's record change the promise we make?** R5 built the scorecard but left
+  its "feeds Purchase's promise-setting" clause unbuilt — with 0 POs there is no performance
+  to price a promise off, and it carries a business decision Jess has not made: does a
+  supplier's on-time record shorten the promise we give the CUSTOMER, or only the date we
+  expect from the FACTORY? **Belongs to the Purchasing line**, with the lead-time work.
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
 

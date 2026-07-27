@@ -339,6 +339,18 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 **Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
 different failure words.
 
+### A number is not a status until someone sets a target (locked 2026-07-27)
+
+A percentage, a count or a rate is a FACT. It gets a colour only when a human has set the
+line it is being judged against. Painting 82% amber invents a policy nobody ruled, and the
+reader cannot tell an opinion from a measurement.
+
+Two consequences, both already shipped: **a rate with too few records is not printed at
+all** — `0 ÷ 0` shown as `0%` reads "this supplier never delivers on time" and shown as
+`100%` reads "perfect", and both are lies a screen tells with a straight face (R5); and
+**"nobody has set a number yet" is its own visible state**, never a reassuring green
+(K1's `Set a number`). A quiet screen must mean *watched and fine*, never *nobody looked*.
+
 ### Working days — one definition everywhere
 
 Monday–Saturday · Sunday excluded · Malaysian public holidays excluded (the live calendar
