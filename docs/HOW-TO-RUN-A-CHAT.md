@@ -19,6 +19,7 @@
 | `docs/COPY-STANDARD.md` | every visible word — the dictionary, the audit table, the banned words |
 | `docs/UI-KIT.md` | the shell: colour, spacing, icons, components |
 | `docs/execution-queues-index.md` | every line, every card, what is shipped, the lane rules |
+| `docs/<MODULE>-WORKING-FLOW.md` | that module's actions — trigger, checklist, completion, due, owner; which shows first; the gates |
 
 **One concern, one file. When Jess re-rules something, the old text is DELETED and
 overwritten — never annotated "superseded", never two versions side by side.**
@@ -35,7 +36,10 @@ FIRST, read these and treat them as law that outranks anything I paste:
   docs/COPY-STANDARD.md
   docs/UI-KIT.md
   docs/execution-queues-index.md
-  the queue doc for the module we are discussing (from the index)
+  docs/<MODULE>-WORKING-FLOW.md for the module we are discussing — if that file does not
+    exist yet, creating it is part of your job, in the SAME shape as
+    docs/ORDERS-WORKING-FLOW.md (sections 1-8, every action carrying its six things)
+  the queue doc for that module (from the index)
 
 Then read the conversation I paste below and answer THREE questions, in this order,
 each backed by evidence from THIS repo and THIS database — never from the pasted text:
