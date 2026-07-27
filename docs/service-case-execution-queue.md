@@ -143,7 +143,7 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 | Card | Status | PR |
 |---|---|---|
 | S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
-| S2 | ✅ | __PRLINK__ · migration **0288** |
+| S2 | ✅ | [#410](https://github.com/wenwei4046/Carres-Portal-v2/pull/410) · migration **0288** |
 | S3 | ⬜ | — |
 | S4 | ⬜ | — |
 | S5 | ⬜ | — |
