@@ -475,7 +475,7 @@ check the tracker tail immediately before applying. **Depends on C2.**
 loses its original promised date; one that cannot be solved opens exactly one logistics
 action.
 
-## C9 · Storage fee holds the delivery, and only the manager can release it (Jess 2026-07-27)
+## C9 · Storage fee holds the delivery, and only the manager can release it — ✅ LIVE (PR #472)
 
 **The ruling:** an uncollected storage fee is the same as an unpaid balance — the goods do
 not go. If something must go out anyway, **the manager approves it and nobody else**, and
@@ -508,7 +508,98 @@ first; draft to Jess before applying. **Depends on C5** (shipped).
 **Done when:** an order with an uncollected storage fee cannot issue its delivery order; the
 manager can release it; a release that does not waive leaves the money action open.
 
-## C10 · The three dots become real (found by C1)
+### What shipped (PR #472, 2026-07-27 — **no migration**)
+
+**The two outcomes ride the existing columns, so there is no migration.** Checked, as the
+card asked. `storage_waiver_status` has four values and the outcomes need five states — but
+only if the write-off has to live in that column. It does not: `storage_fee_override = 0`
+already means "this order owes no storage fee", is already honoured by every storage reader,
+and is a DIFFERENT column from the Master-imported `storage_fee_msbf` / `_sof`, so the figure
+that was written off stays on the record instead of vanishing.
+
+| The manager's decision | `storage_waiver_status` | `storage_fee_override` |
+|---|---|---|
+| `Release, fee still owed` (default) | `approved` | untouched — the fee stays owed |
+| `Release and waive the fee` | `approved` | `0` — written off, with the reason |
+| `Reject` | `rejected` | untouched |
+
+So **`approved` now means RELEASED, not forgiven** — the one meaning change, and it is what
+makes "a release never quietly forgives money" true rather than aspirational.
+
+**The split that makes it work is in the shared rule, not in a screen.** `orderMoney` gained
+`holding` beside `outstanding`, and `holds` beside `owing`: **what is OWED and what still
+BLOCKS are two questions**, and a release is the one thing that parts them. The 🔒 and the
+booking gate read `holds`; the money ACTION and the Owing facet read `owing`. That is one
+line of arithmetic and it is why a released order books while `Collect RM …` stays on its row.
+
+**Finding the card did not predict: the storage fee was read THREE different ways** — the
+same drift C5 found for the goods balance, one card later and one column over.
+
+| Reader | What it read | What it missed |
+|---|---|---|
+| the Orders ladder's 🔒 | `storage_fee_msbf + _sof` | **`storage_fee_override`** — an order the operator marked "No storage" still showed its fee |
+| the dispatch gate (`storageBlock`) | override + computed | **the Master-imported columns** — an order carrying Jess's own keyed fee and no `storage_from` dispatched with the money unpaid |
+| the drawer | all three, correctly | — |
+
+`packages/shared/storage-hold.ts` is now the ONE ladder (override, including 0 → Master
+figure → computed) with four readers: the ladder, the booking gate, the dispatch gate and the
+decide route's audit line. The list API had to start selecting `storage_from` and
+`storage_fee_override` — without them the row cannot honour an override, and "one rule" would
+have been one rule the row could not ask.
+
+**"UNKNOWN never holds" survives, and it needed a decision.** Rule 4 of the card is about the
+order VALUE, so `goodsOwing` stays 0 on the 37 unpriced imports and holds nothing. A storage
+fee is the opposite case — a figure a human typed — so it DOES hold an unpriced order.
+Written as two tests that state the distinction, because the two readings look alike in the
+card's one sentence.
+
+**The audit is a sentence, not a column.** The 0211 activity trigger does not watch
+`storage_fee_override`, so a waive would otherwise be a silent zero. The decide route reads
+the fee through the shared rule BEFORE it writes and appends
+`Delivery released by manager — RM 150 storage fee still owed` / `… written off` through the
+same fail-soft annotation door `/storage/extend` uses. An audit line may never undo a decision
+the manager already made.
+
+**`approved` is still accepted on the wire** and reads as `waived` — that is exactly what the
+single old outcome did — so a browser left open across the deploy keeps working instead of
+422-ing on a word it was built with.
+
+**No alert engine, as ruled**: the release flips the row's own headline (the 🔒 comes off
+`Confirm delivery`) and the collection stays in the queue it was already in.
+
+Tests +34 (shared 25 · api 7 · web 2 net). Suites at baseline (shared 1788/1788 · api 3
+pre-existing · web 16 pre-existing); typecheck 0 new, build + v4 guard + lint clean.
+
+### What C9 found — reported, not fixed (Law 0)
+
+1. **§5 of the working flow puts the money gate on ISSUING the delivery order, and the code
+   puts it on CONFIRMING the date.** §5: "Issuing the delivery order is the hard gate, not
+   agreeing a date… Agreeing the date still WARNS about the same three." Live, the ONLY money
+   gate is `bookingConfirmGate`, which REFUSES a confirmation — C5 fixed it there and this
+   card widened it there, because moving a gate is not a bug-fix card's business. **C7 owns
+   this**: it builds `Issue delivery order`, and it must decide whether the confirm gate
+   drops to a warning when it does. Until then the card's own "cannot issue its delivery
+   order" is satisfied one step earlier than the flow describes.
+2. **Nothing was measured live.** The Supabase MCP refused every call this session
+   (`You do not have permission to perform this action`), so the card's "ZERO live orders
+   carry a storage fee today (measured 2026-07-27)" could not be re-checked, and no migration
+   could have been applied even if one had been needed. Every behaviour change here is
+   invisible on an order with no storage fee, so a stale measurement changes nothing about
+   what ships — but the figure in this doc is the card's, not this chat's.
+3. **"The manager" is the `principal` role, and that is an assumption the card let stand.**
+   HR-P2 built duty keys (`org_duties`) precisely so a permission can follow a POSITION
+   instead of a role, and Jess's word is "manager", not "principal". The card said "reuse the
+   existing approval channel", so the gate was left alone — but the release is now a MONEY
+   decision, and the only person who can make it is whoever holds the principal login.
+4. **The release has no expiry and no scope.** Once released, the order is released forever
+   and for every trip — including a second trip booked weeks later under a fee that has kept
+   accruing. Nothing in the ruling says otherwise, and there is no live case, but a release is
+   currently a permanent property of the order rather than of a delivery.
+5. **A rejected release cannot be re-asked without an operator noticing.** `rejected` is
+   sticky: the request button reappears, but nothing tells the operator the fee has grown
+   since the refusal. Small, and it belongs to whoever next touches the Storage panel.
+
+## C10 · The three dots become real (found by C1) — ✅ LIVE (PR #471)
 
 **`rowDotsOf()` computes goods · delivery · money, is unit tested, and NOTHING RENDERS IT.**
 The list's `Status` column shows a stage pill; its tooltip was even describing the three
@@ -544,6 +635,55 @@ take it from the widest neighbour, not from the Actions column, which C3 is abou
 byte-identical to today, and a delivered order still never alarms on goods or delivery
 while it may show red money.
 
+**SHIPPED (PR #471).** All three done-whens met. The dots render beside the stage pill in
+the Status column, each as **its own icon** from the UI-KIT §A4 canonical mapping — goods
+`package` · delivery `truck` · money `wallet`, 14px, never emoji. The icon is what labels
+the dot, which is exactly why the dots need no header of their own.
+
+**The proof that dead code became a screen is measured, not asserted.** The four dot
+tooltips and the `row-dot-` testid grep **0 in the previous live bundle** (`index-BYggEOBr.js`,
+C2's — they were tree-shaken, which is what "rendered nowhere" really meant) and **1 in the
+new one** (`index-CToiHJof.js`). Both directions, on the downloaded file.
+
+**`rowDotsOf` now returns the STATE, not a hex** — the hue is the renderer's business, so the
+tests pin the meaning and the paint stays in the one existing `DOT_HEX` map (no new hex
+literal; the ratchet holds at 43). **The dot ORDER flipped to the law's** goods · delivery ·
+money; the §14 note of 2026-07-18 had money first, the 2026-07-27 laws re-ruled it, and since
+nothing had ever rendered these dots, no screen changed when it flipped.
+
+**Widths were measured against the app's own stylesheet**, in a real 1448px `table-fixed`:
+the widest pill is 137px and three icons 50px, so Status went **11 → 14** and both fit intact
+with 15px spare, the pill untruncated — and **the row stays exactly 40px, it does not grow**.
+The 3 points came from the two neighbours with real slack (deadline 13 → 12, needs 142 of
+174; stock 11 → 9, needs 119 of 130), **never from Actions**, which C3 is about to grow. On a
+narrower screen the pill truncates and the dots stay whole (`shrink-0`) — the stage word has
+a tooltip and a five-word vocabulary; a half-drawn signal would not.
+
+### What C10 found — read before C3
+
+1. **`rowDotsOf` had NO tests.** Both the C5 note above and this card state it is "unit
+   tested"; the repo-wide grep returns the definition and nothing else. C10 wrote the first
+   cover its truth table has ever had — 11 tests, with a negative control (reverse the dot
+   order → 8 fail). **The lesson is about the claim, not the gap**: "computed and tested but
+   not rendered" reads as *two thirds done*, and it was one third.
+2. **Law 6 still says "the column carries no header word", and that sentence is now wrong —
+   Jess needs to strike it.** It was written when the dots were to OWN that column. Her own
+   later ruling put the stage pill beside them, and a column holding a stage pill needs a
+   word for it. This card's own text resolves it ("the dots need no header **of their own**"),
+   which is what shipped: `Status` heads the pill, the dots are labelled by their icons.
+   **A future chat reading only Law 6's older sentence would strip the header and leave the
+   pill unlabelled.**
+3. **The card's stated width was stale** — it says the column "is 9 units wide today"; C1 had
+   already widened it to 11. The instruction behind it (take from the widest neighbour, never
+   from Actions) was followed, but split across the two columns that actually had measured
+   slack rather than gutting one.
+4. **§7 gives the money dot no amber** — green, red or grey only, while goods and delivery
+   each have three tones. If "owing but not yet due" should ever read differently from "owing
+   and late", that rung does not exist. Not invented here.
+5. **The Stock and Delivery cells were already written for this card.** Their comments have
+   said "the 货 dot carries the colour" since the §14 rebuild, and they render facts in
+   ink/grey. C10 changed neither — the colour channel they were waiting for finally exists.
+
 ## Status
 
 | Card | Status | PR |
@@ -556,5 +696,5 @@ while it may show red money.
 | C6 | ⬜ after C2 + C5 · action checklists | — |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
-| C9 | ⬜ storage fee holds delivery · manager override | — |
-| C10 | ⬜ the three dots become real (needs one Jess call) | — |
+| C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
+| C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |

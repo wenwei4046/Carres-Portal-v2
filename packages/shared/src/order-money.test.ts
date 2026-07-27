@@ -81,6 +81,61 @@ describe("orderMoney", () => {
     expect(m.storageOwing).toBe(150);
     expect(m.outstanding).toBe(150);
     expect(m.owing).toBe(true);
+    // C9 — nobody released it, so it holds the delivery too.
+    expect(m.holding).toBe(150);
+    expect(m.holds).toBe(true);
+  });
+});
+
+// ── C9 · the manager's release (Jess 2026-07-27) ─────────────────────────────
+describe("orderMoney — a released storage fee is owed and does not hold", () => {
+  it("release lifts the hold and leaves the money", () => {
+    const m = orderMoney({
+      lineSum: 2000,
+      paid: 2000,
+      storageOwing: 150,
+      storageReleased: true,
+    });
+    expect(m.outstanding).toBe(150);
+    expect(m.owing).toBe(true); // Collect RM 150 stays on the worklist
+    expect(m.holding).toBe(0);
+    expect(m.holds).toBe(false); // …and the goods go
+  });
+
+  it("a release never lets an unpaid BALANCE through — only its own fee", () => {
+    const m = orderMoney({
+      lineSum: 2000,
+      paid: 500,
+      storageOwing: 150,
+      storageReleased: true,
+    });
+    expect(m.outstanding).toBe(1650);
+    expect(m.holding).toBe(1500);
+    expect(m.holds).toBe(true);
+  });
+
+  it("with nothing released, holding and outstanding are the same number", () => {
+    const m = orderMoney({ lineSum: 4000, paid: 1000, storageOwing: 200 });
+    expect(m.holding).toBe(m.outstanding);
+    expect(m.holds).toBe(m.owing);
+  });
+
+  it("UNKNOWN order value still holds nothing", () => {
+    // The 37 imported rows: no line prices, no keyed balance, no storage. A
+    // number nobody knows may not stand between a customer and their goods.
+    const m = orderMoney({ lineSum: 0, paid: 1300, controlBalance: null });
+    expect(m.holding).toBe(0);
+    expect(m.holds).toBe(false);
+  });
+
+  it("…but a storage fee a human KEYED does hold an unpriced order", () => {
+    // Not a contradiction: "unknown never holds" is about the order VALUE.
+    // RM 150 of storage is a figure somebody entered, and Jess's ruling is that
+    // it holds the goods exactly as an unpaid balance does.
+    const m = orderMoney({ lineSum: 0, controlBalance: null, storageOwing: 150 });
+    expect(m.known).toBe(false);
+    expect(m.goodsOwing).toBe(0);
+    expect(m.holds).toBe(true);
   });
 
   it("numeric(12,2) arrives from PostgREST as a string", () => {

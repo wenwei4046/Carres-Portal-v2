@@ -1,20 +1,25 @@
-import { computeOrderStorage } from "@carres/shared";
+import { storageHold } from "@carres/shared";
 
 /**
  * Collect-before-delivery gate (balance job — Jess 2026-06-23: collect the
- * storage fee BEFORE delivery, gate delivery until collected; a waiver needs
- * principal approval). Migration 0184.
+ * storage fee BEFORE delivery, gate delivery until collected; a release needs
+ * the manager). Migration 0184.
  *
  * Returns a blocker `{ message, amount }` when an order has a storage fee owed
- * that has NOT been collected and has NOT been waived by a principal — else
- * `null` (dispatch may proceed). One shared definition of "is a fee owed?"
- * (`computeOrderStorage`) keeps this in lock-step with the Payments panel + the
- * drawer, so the gate never fires on an order the operator sees as RM0.
+ * that has NOT been collected and that the manager has NOT released — else
+ * `null` (dispatch may proceed).
+ *
+ * C9 (2026-07-27) — this now asks the ONE shared rule (`storageHold`) instead
+ * of computing its own answer, and that closed a real hole: it read the
+ * override and the computed fee but **not** the Master-imported
+ * `storage_fee_msbf` / `storage_fee_sof` columns (0207), so an order carrying
+ * Jess's own keyed fee and no `storage_from` was counted by the Orders ladder
+ * and waved through by this gate. Same rule now for the ladder, the booking
+ * gate and this one.
  *
  * Fail-OPEN by design: if the lookups error or the order has no storage scope,
  * we return null. The gate's job is to stop a KNOWN-owed fee slipping through,
- * not to block dispatch on an infra hiccup (158 live orders dispatch through
- * here; 0 currently carry storage).
+ * not to block dispatch on an infra hiccup.
  */
 export async function storageBlock(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,7 +30,9 @@ export async function storageBlock(
     const [controlRes, linesRes] = await Promise.all([
       sb
         .from("ops_order_control")
-        .select("storage_from, storage_fee_override, storage_collected_at, storage_waiver_status")
+        .select(
+          "storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
+        )
         .eq("order_id", orderId)
         .maybeSingle(),
       sb.from("order_lines").select("sku").eq("order_id", orderId),
@@ -34,28 +41,32 @@ export async function storageBlock(
     const control = controlRes?.data ?? null;
     // No overlay row → the operator never turned storage on → gate open.
     if (!control) return null;
-    // Already collected, or a principal approved a waiver → gate open.
-    if (control.storage_collected_at) return null;
-    if (control.storage_waiver_status === "approved") return null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skus: string[] = (linesRes?.data ?? []).map((l: any) => String(l.sku));
-    const asOf = new Date().toISOString().slice(0, 10);
-    const { due, amount } = computeOrderStorage({
+    const hold = storageHold({
       storageFrom: control.storage_from ?? null,
-      override:
-        control.storage_fee_override != null ? Number(control.storage_fee_override) : null,
+      override: control.storage_fee_override ?? null,
+      importedMsbf: control.storage_fee_msbf ?? null,
+      importedSof: control.storage_fee_sof ?? null,
       skus,
-      asOf,
+      asOf: new Date().toISOString().slice(0, 10),
+      collectedAt: control.storage_collected_at ?? null,
+      waiverStatus: control.storage_waiver_status ?? null,
     });
-    if (!due) return null;
+    // Collected, waived, or released by the manager → the goods go. A release
+    // that did not waive leaves `owing` above zero on purpose: the money action
+    // stays open, it just no longer stands in front of the delivery.
+    if (hold.released || hold.owing <= 0) return null;
 
     return {
-      amount,
-      message: `Storage fee of RM${amount.toLocaleString()} must be collected (or waived by a principal) before this order can be dispatched.`,
+      amount: hold.owing,
+      message:
+        `Storage fee of RM ${hold.owing.toLocaleString()} must be collected before this order ` +
+        `can be dispatched — or a manager releases the delivery.`,
     };
   } catch {
-    // Fail OPEN — a gate-lookup hiccup must not block dispatch of the 158 live
+    // Fail OPEN — a gate-lookup hiccup must not block dispatch of the live
     // orders (0 of which currently carry storage).
     return null;
   }

@@ -64,6 +64,7 @@ import {
   openOrderActions,
   orderIsDelivering,
   orderMoney,
+  storageHold,
   type OrderActionKey,
   type OrderActionSignals,
   type OrderOpenAction,
@@ -104,6 +105,10 @@ import {
   Users,
   PackagePlus,
   MessageCircle,
+  // C10 — the three dots' glyphs (UI-KIT §A4 canonical mapping:
+  // stock `package` · logistic `truck` · money `wallet`).
+  Package,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -431,7 +436,9 @@ function addDaysIso(iso: string, n: number): string {
 // NOTE the PO-date+lead formula (下PO日 + MS/BF 7d · SOF 5d) is deferred to
 // Phase 2 — there's no PO-raised date on the order; this reads stock_eta only.
 type StockEtaState = "ready" | "on_track" | "late" | "overdue" | "no_eta" | "none";
-interface StockEta {
+/** Exported because `rowDotsOf` takes one — a caller (and its test) could not
+ *  otherwise name the type of an argument it has to build. */
+export interface StockEta {
   /** Latest ETA among waiting lines (ISO), or null when none / all ready. */
   etaIso: string | null;
   /** Any line still waiting on stock. */
@@ -630,18 +637,28 @@ const NEXT_PILL_CLASS: Record<NextTone, string> = {
   neutral: "pill-neutral",
 };
 
-// ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
-// One row = three dots in a FIXED order — Money · Stock · Delivery — sharing
-// the §8 dial hues. The dots are the row's ONLY colour channel; the fact cells
-// (n/m, ETA, partner, ladder word) stay ink/grey. Grey = not applicable.
+// ─── The three dots (C10, Jess 2026-07-27 — ACTION-FLOW Law 6 + §7) ──────────
+// THREE INDEPENDENT FACTS — goods · delivery · money — never merged into one
+// word. They sit BESIDE the stage pill (Jess: the pill says WHERE the order is,
+// the dots say WHICH PART has trouble); neither replaces the other. The dots are
+// the row's ONLY colour channel; the fact cells (n/m, ETA, logistics, ladder
+// word) stay ink/grey. Grey = not applicable / nothing known yet.
+//
+// ORDER: goods · delivery · money, per Law 6 and ORDERS-WORKING-FLOW §7. (The
+// §14 note of 2026-07-18 said Money · Stock · Delivery; the 2026-07-27 laws
+// re-ruled it, and since nothing had ever rendered these dots no screen changes.)
+//
+// This function returns the STATE, never a colour: the hue is the renderer's
+// business, so a test can pin the meaning without pinning a hex.
 const DOT_HEX = {
   green: "#639922",
   amber: "#EF9F27",
   red: "#E24B4A",
   grey: "#D1D5DB",
 } as const;
+type DotState = keyof typeof DOT_HEX;
 interface RowDot {
-  color: string;
+  state: DotState;
   title: string;
 }
 export function rowDotsOf(
@@ -657,42 +674,92 @@ export function rowDotsOf(
   // reserved for genuinely UNKNOWN money — an order nobody has priced.
   const m = moneyOf(o);
   const money: RowDot = !m.known
-    ? { color: DOT_HEX.grey, title: "Money — no order value on record" }
+    ? { state: "grey", title: "Money — no order value on record" }
     : m.owing
-      ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
-      : { color: DOT_HEX.green, title: "Money — settled" };
+      ? { state: "red", title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
+      : { state: "green", title: "Money — settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
-  if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
+  if (completed) goods = { state: "green", title: "Stock — done (delivered)" };
   else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
-    goods = { color: DOT_HEX.green, title: "Stock — all in" };
+    goods = { state: "green", title: "Stock — all in" };
   else if (stock.state === "unknown")
-    goods = { color: DOT_HEX.red, title: "Stock — no PO raised yet" };
+    goods = { state: "red", title: "Stock — no PO raised yet" };
   else if (se.state === "overdue" || se.state === "late")
-    goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
-  else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
+    goods = { state: "red", title: "Stock — supplier ETA late vs the deadline" };
+  else goods = { state: "amber", title: "Stock — waiting arrival" };
   // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
   // reserved for the CUSTOMER's confirmation; a provisional logistics date stays
   // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
-  if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
+  if (completed) delivery = { state: "green", title: "Delivery — delivered" };
   else if (logi.key === "confirmed")
-    delivery = { color: DOT_HEX.green, title: "Delivery — customer confirmed" };
+    delivery = { state: "green", title: "Delivery — customer confirmed" };
   else if (logi.key === "unassigned")
-    delivery = { color: DOT_HEX.grey, title: "Delivery — no logistics picked yet" };
+    delivery = { state: "grey", title: "Delivery — no logistics picked yet" };
   else {
     const dd = daysToDue(o);
     const late = dd !== null && dd < 0;
     delivery =
       logi.key === "provisional"
         ? late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, customer not confirmed" }
-          : { color: DOT_HEX.amber, title: "Delivery — logistics date only, customer not confirmed" }
+          ? { state: "red", title: "Delivery — past deadline, customer not confirmed" }
+          : { state: "amber", title: "Delivery — logistics date only, customer not confirmed" }
         : late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, no booking" }
-          : { color: DOT_HEX.amber, title: "Delivery — customer has not confirmed a date" };
+          ? { state: "red", title: "Delivery — past deadline, no booking" }
+          : { state: "amber", title: "Delivery — customer has not confirmed a date" };
   }
-  return [money, goods, delivery];
+  return [goods, delivery, money];
+}
+/** The three dots on screen (C10). Each dot IS its own icon — that is what
+ *  labels it, which is why the dots need no header of their own (Jess
+ *  2026-07-27). Glyphs come from the UI-KIT §A4 canonical mapping so the same
+ *  meaning wears the same icon portal-wide: goods `package` · delivery `truck`
+ *  · money `wallet`. Never emoji (§A11 rule 2), never a bare coloured circle —
+ *  a circle with no icon would be unreadable without a header to look up.
+ *
+ *  Each dot carries its own tooltip, because a colour alone states a fact
+ *  nobody can name (COPY-STANDARD rule 7: the label says WHAT, the tip WHY).
+ *  `shrink-0` is deliberate: on a narrow screen the stage PILL truncates (it
+ *  has a tooltip and a five-word vocabulary) and the dots stay whole. */
+const DOT_ICON: Record<"goods" | "delivery" | "money", LucideIcon> = {
+  goods: Package,
+  delivery: Truck,
+  money: Wallet,
+};
+function RowDots({
+  o,
+  stock,
+  se,
+  logi,
+}: {
+  o: operationOrderListRow;
+  stock: StockInfo;
+  se: StockEta;
+  logi: LogisticState;
+}) {
+  const dots = rowDotsOf(o, stock, se, logi);
+  const kinds = ["goods", "delivery", "money"] as const;
+  return (
+    <span className="inline-flex items-center gap-1 shrink-0" data-testid="row-dots">
+      {dots.map((dot, i) => {
+        const kind = kinds[i];
+        const Icon = DOT_ICON[kind];
+        return (
+          <span
+            key={kind}
+            title={dot.title}
+            aria-label={dot.title}
+            data-testid={`row-dot-${kind}`}
+            data-dot-state={dot.state}
+            className="inline-flex"
+          >
+            <Icon size={14} strokeWidth={2} style={{ color: DOT_HEX[dot.state] }} />
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 export function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
@@ -723,31 +790,41 @@ function ovlOf(o: operationOrderListRow) {
 // drawer and the collections desk (`orderMoney`, packages/shared). Before this
 // card every money surface here read `ops_order_control.balance` — NULL on all
 // 55 live control rows — so the 🔒, the Owing facet row and the Collect RM pill
-// were all permanently silent while 18 orders owed RM 56,859. (The money DOT
-// reads this too, but `rowDotsOf` is dead code — nothing renders it; the
-// Status column shows a stage-word pill. Its strings grep 0 in the bundle.)
+// were all permanently silent while 18 orders owed RM 56,859. The money DOT
+// reads this too — since C10 it is on screen, beside the stage pill, so a row
+// that owes money says so in three places that cannot disagree.
 //
-// STORAGE is folded in here, not inside the shared rule: its clock and its
-// collected/waived flags are this page's own signals, and the shared function
-// only carries the number it is handed.
+// STORAGE comes through its own shared rule (`storageHold`, C9) — this page
+// used to read the Master-imported fee columns and IGNORE `storage_fee_override`,
+// so an order the operator had marked "No storage" still counted its fee, and
+// the dispatch gate disagreed with this row. One rule now, three readers.
+//
+// C9 also split two questions that used to be one: a manager may RELEASE a
+// delivery over an uncollected storage fee. That lifts the 🔒 (`holds`) and
+// leaves the money owed (`owing`), so `Collect RM …` stays on the worklist —
+// a release never quietly forgives money.
 export function moneyOf(o: operationOrderListRow): OrderMoney {
   const ovl = ovlOf(o);
-  const storageFee =
-    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
-  const storageOwing =
-    storageFee > 0 &&
-    !ovl?.storage_collected_at &&
-    ovl?.storage_waiver_status !== "approved"
-      ? storageFee
-      : 0;
+  const lines = o.order_lines ?? [];
+  const hold = storageHold({
+    storageFrom: ovl?.storage_from ?? null,
+    override: ovl?.storage_fee_override ?? null,
+    importedMsbf: ovl?.storage_fee_msbf ?? null,
+    importedSof: ovl?.storage_fee_sof ?? null,
+    skus: lines.map((l) => String(l.sku ?? "")),
+    asOf: todayIso(),
+    collectedAt: ovl?.storage_collected_at ?? null,
+    waiverStatus: ovl?.storage_waiver_status ?? null,
+  });
   const price = (r: { qty: number; unit_price?: number | string | null }) =>
     Number(r.unit_price ?? 0) * Number(r.qty ?? 0);
   return orderMoney({
-    lineSum: (o.order_lines ?? []).reduce((s, l) => s + price(l), 0),
+    lineSum: lines.reduce((s, l) => s + price(l), 0),
     addonSum: (o.order_addons ?? []).reduce((s, a) => s + price(a), 0),
     paid: o.paid,
     controlBalance: ovl?.balance ?? null,
-    storageOwing,
+    storageOwing: hold.owing,
+    storageReleased: hold.released,
   });
 }
 
@@ -794,6 +871,7 @@ export function orderActionSignalsOf(
     return c === "mattress" || c === "bedframe";
   });
   const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const money = moneyOf(o);
   return {
     completed: controlTabOf(o) === "completed",
     goodsReady:
@@ -815,7 +893,10 @@ export function orderActionSignalsOf(
     photoOnFile: Array.isArray(ovlOf(o)?.delivery_photos)
       ? (ovlOf(o)!.delivery_photos as unknown[]).length > 0
       : null,
-    moneyOwing: moneyOf(o).owing,
+    // C9 — two different questions. `owing` raises the money ACTION; `holds`
+    // is the 🔒 on the delivery, and a manager's release parts them.
+    moneyOwing: money.owing,
+    moneyHolds: money.holds,
   };
 }
 
@@ -905,7 +986,8 @@ type LogisticStateKey =
   | "provisional"
   | "need_booking"
   | "unassigned";
-interface LogisticState {
+/** Exported for the same reason as `StockEta` — `rowDotsOf` takes one. */
+export interface LogisticState {
   key: LogisticStateKey;
   partner: string | null;
   /** ISO date — the customer's confirmed date on "confirmed"; the logistics
@@ -1240,22 +1322,24 @@ interface OrderColDef {
  *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status shows a STAGE word pill (Placed / Proceed / To book / Customer
-  // confirmed), not the old anonymous dots — 11% since C1 renamed the two
-  // longest words, so "Customer confirmed" never clips (Jess 2026-07-19 asked
-  // for exactly that on the old pair). Rebalanced out of customer/next.
-  { key: "dots", label: "Status", w: 11 },
-  // C3 gave 1 unit to Actions. `SO-1002` + `CR0418 +1` are both short mono
-  // strings with visible slack; the two longest STATUS words are what pinned
-  // `dots` at 11 (C1), so that column was left alone.
+  // Status holds TWO things since C10 (Jess 2026-07-27): the STAGE word pill
+  // (Placed / Proceed / To book / Customer confirmed / Delivered) and, beside
+  // it, the three dots. 11 → 14: the widest pill measures 135px and the three
+  // 14px icons 50px, so both fit intact (12px cell padding + 135 + 6 + 50 =
+  // 203px ≈ 14% of the table's ~1448px). The 3 points came from the two
+  // neighbours with MEASURED slack, never from Actions: deadline 13 → 12
+  // (needs 142px, had 188) and stock 11 → 9 (needs ~107px, had 159).
+  { key: "dots", label: "Status", w: 14 },
+  // C3 took 1 of the 2 points Actions grew by. `SO-1002` + `CR0418 +1` are
+  // short mono strings: 9 ≈ 130px against ~62px of content.
   { key: "order", label: "Order", w: 9 },
   { key: "customer", label: "Customer", w: 11 },
   // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
-  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law).
-  { key: "deadline", label: "Deadline", w: 13 },
-  // The other unit C3 moved to Actions. The widest thing here is
-  // `ETA 20 Jul 26, Sun` on a caption line, which still fits.
-  { key: "stock", label: "Stock", w: 10 },
+  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law). C3 took the
+  // other point from C10's own measurement: 142px needed, 12 → 11 ≈ 159px.
+  // `stock` was left alone — C10 had already cut it to its measured floor.
+  { key: "deadline", label: "Deadline", w: 11 },
+  { key: "stock", label: "Stock", w: 9 },
   // Delivery + Actions each took a point from the cells beside them: C1's words
   // name the party, so the strings are longer ("NETS — confirm delivery date").
   { key: "delivery", label: "Delivery", w: 13 },
@@ -1265,8 +1349,8 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // ACTIONS, plural (Jess 2026-07-27): an order can have several. Was "Manage".
   //
   // C3 · the truncation question Jess deferred to this card, DECIDED: the
-  // column takes 2 more units (from `order` and `stock`, the two with real
-  // slack) and the longest lines still truncate with their tooltip — and that
+  // column takes 2 more units (from `order` and `deadline`, the two with slack
+  // left after C10) and the longest lines still truncate with their tooltip — that
   // is accepted, not conceded. A row of eight columns cannot hold
   // `Call NETS Logistics — confirm delivery date` whole without starving a
   // neighbour, the visible half is the half that acts (verb + party), and since
@@ -3173,10 +3257,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </th>
               {showCol("dots") && (
                 <Th>
-                  {/* This cell shows the pipeline STAGE in words, not the
-                      three-dot signal its `dots` key still names — see the
-                      column def. The tooltip describes what actually renders. */}
-                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered">
+                  {/* The word heads the STAGE PILL only. The three dots beside
+                      it need no header of their own (Jess 2026-07-27) — each is
+                      labelled by its own icon and carries its own tooltip. */}
+                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.">
                     Status
                   </span>
                 </Th>
@@ -4196,15 +4280,25 @@ function OrderRow({
           .pill for the live stages; a muted "Delivered" (no pill) once done. */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        {completed ? (
-          <span className="text-[12px] text-base-400">Delivered</span>
-        ) : (
-          (() => {
-            const label = TAB_LABEL[controlTabOf(o, availableBySku)];
-            // ONE shared status→pill map (no per-surface hand-roll).
-            return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
-          })()
-        )}
+        {/* C10 (Jess 2026-07-27): the stage pill and the three dots SIDE BY
+            SIDE — they answer different questions and neither replaces the
+            other. The pill is byte-identical to before this card; the dots are
+            new. The pill takes the slack and truncates on a narrow screen; the
+            dots are fixed-width and never squeezed out. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="min-w-0 truncate">
+            {completed ? (
+              <span className="text-[12px] text-base-400">Delivered</span>
+            ) : (
+              (() => {
+                const label = TAB_LABEL[controlTabOf(o, availableBySku)];
+                // ONE shared status→pill map (no per-surface hand-roll).
+                return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
+              })()
+            )}
+          </span>
+          <RowDots o={o} stock={stock} se={se} logi={logi} />
+        </div>
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the

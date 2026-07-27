@@ -98,8 +98,15 @@ export interface OrderActionSignals {
   photoOnFile: boolean | null;
   /** C5's shared money rule says this order still owes something. UNKNOWN
    *  money is not owing — a number nobody knows may not stand between a
-   *  customer and their goods. */
+   *  customer and their goods. This raises the money ACTION. */
   moneyOwing: boolean;
+  /** C9 — money still HOLDS the delivery (`orderMoney.holds`). Normally the
+   *  same answer as `moneyOwing`; they part company on one order, and that
+   *  order is the whole point of the card: a manager has released a delivery
+   *  over an uncollected storage fee, so the 🔒 comes off while the collection
+   *  stays on the worklist. Omit it and the lock reads `moneyOwing`, which is
+   *  exactly the pre-C9 behaviour. */
+  moneyHolds?: boolean;
 }
 
 function action(
@@ -147,6 +154,12 @@ function goodsAction(s: OrderActionSignals): OrderOpenAction | null {
  * Reading a delivery signal here does not break Law 1: independence is about
  * OUTPUTS. The lock REMOVES no action from the list — `collect` is open either
  * way, and it is a gate, which Law 4 keeps ("Money still LOCKS").
+ *
+ * C9 lives inside this one question: it asks whether money still HOLDS, not
+ * whether it is owed. A manager may have released this delivery over an
+ * uncollected storage fee, and a released delivery is one you ARE allowed to
+ * make — so the goods go, the 🔒 comes off, and the collection stays on the
+ * worklist as an ordinary open action.
  */
 function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
   return (
@@ -154,7 +167,7 @@ function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
     s.goodsReady &&
     s.hasLogistics &&
     s.bookingConfirmed &&
-    s.moneyOwing
+    (s.moneyHolds ?? s.moneyOwing)
   );
 }
 
@@ -167,14 +180,16 @@ function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
  * fact instead of a verb nobody can close, and the drawer's list is one row
  * shorter.
  *
- * It is deliberately FALSE while the money holds the delivery: printing
+ * It is deliberately FALSE while the money HOLDS the delivery: printing
  * "Delivering 27 Jul" over an order the server will refuse to send would be the
  * screen telling a lie. In that case the money track carries the row, locked.
+ * C9's released order is not that case — the goods go on the day — but it still
+ * has an open `collect`, so the row shows that action and never reaches here.
  */
 export function orderIsDelivering(s: OrderActionSignals): boolean {
   if (s.completed || !s.goodsReady || !s.hasLogistics || !s.bookingConfirmed)
     return false;
-  if (s.moneyOwing) return false;
+  if (s.moneyHolds ?? s.moneyOwing) return false;
   // A confirmed date that is today or past is not "still ahead" — those are
   // `Deliver today` and the broken-run escalation, both real actions.
   return !(s.confirmedDateIso && s.confirmedDateIso <= s.todayIso);
@@ -219,7 +234,9 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
   // you do not run, a delivery you are not allowed to make. The delivery track
   // therefore says nothing at all, exactly as it did when this was a locked
   // `Confirm delivery` sitting in front of the date split; the money track
-  // carries the row and carries the 🔒 (`deliveryHeldOnMoney`).
+  // carries the row and carries the 🔒 (`deliveryHeldOnMoney`). C9's release is
+  // honoured inside that predicate: a released delivery is one you ARE allowed
+  // to make, so the track carries on to the date split below.
   if (deliveryHeldOnMoney(s)) return null;
 
   // T7: a confirmed booking is not one resting state — its own date splits it.

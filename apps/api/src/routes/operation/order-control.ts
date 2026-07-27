@@ -8,6 +8,7 @@ import {
   attachDeliveryPhotoInput,
   type DeliveryPhoto,
   bookingConfirmGate,
+  storageHold,
   isSundayIso,
   partnerBookingWarnings,
   partnerDeliveryRules,
@@ -259,7 +260,9 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     sb
       .from("ops_order_control")
       .select(
-        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips",
+        // C9 — the storage columns ride this select because an uncollected
+        // storage fee holds a delivery exactly as an unpaid balance does.
+        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
       )
       .eq("order_id", idCheck.data)
       .maybeSingle(),
@@ -279,6 +282,20 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   const lines = (linesRes.data ?? []) as { sku: string; qty: number; unit_price: number | null }[];
   const sum = (rows: { qty: number; unit_price: number | null }[]) =>
     rows.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
+  // C9 — the storage fee is part of the ONE money number, through the one rule
+  // the ladder and the dispatch gate also ask. A manager's release lifts the
+  // HOLD and leaves the fee owed, which is why the gate reads `holding`.
+  const ctrl = (controlRes.data ?? null) as Record<string, unknown> | null;
+  const hold = storageHold({
+    storageFrom: (ctrl?.storage_from as string | null) ?? null,
+    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
+    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
+    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
+    skus: lines.map((l) => l.sku),
+    asOf: new Date().toISOString().slice(0, 10),
+    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
+    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
+  });
   const money = {
     lineSum: sum(lines),
     addonSum: sum(
@@ -286,6 +303,8 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     ),
     paid: (order as { paid?: number | string | null }).paid ?? 0,
     controlBalance: controlRes.data?.balance ?? null,
+    storageOwing: hold.owing,
+    storageReleased: hold.released,
   };
   const reservedQtyByKey: Record<string, number> = {};
   for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
@@ -321,8 +340,18 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     const reasons: string[] = [];
     if (!gate.goodsReady)
       reasons.push(`goods not ready — not reserved: ${gate.notReadySkus.join(", ")}`);
-    if (!gate.balanceReady)
-      reasons.push(`balance not ready — RM ${gate.outstanding.toFixed(2)} outstanding`);
+    if (!gate.balanceReady) {
+      // C9 — name WHICH money is missing. "RM 150 outstanding" on an order the
+      // customer paid in full sends an operator hunting the wrong thing.
+      const goods = gate.holding - gate.storageOwing;
+      reasons.push(
+        goods > 0 && gate.storageOwing > 0
+          ? `balance not ready — RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee uncollected`
+          : gate.storageOwing > 0
+            ? `storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collect it, or a manager releases the delivery`
+            : `balance not ready — RM ${gate.holding.toFixed(2)} outstanding`,
+      );
+    }
     return c.json(
       {
         error: "booking_gate",

@@ -237,6 +237,31 @@ describe("delivery track", () => {
     expect(openOrderActions(s).find((a) => a.key === "collect")?.locked).toBeUndefined();
   });
 
+  // C9 — the lock and the money action stop being the same question. C3 moved
+  // the 🔒 onto `collect`, so a RELEASE now reads as the lock simply coming off
+  // an action that stays open, which is exactly what a release means.
+  it("a RELEASED order unlocks the delivery and keeps its Collect action", () => {
+    // The manager let the goods go over an uncollected storage fee. The 🔒
+    // comes off; the money is still ours, so the money track is untouched.
+    const s = sig({ moneyOwing: true, moneyHolds: false });
+    const list = openOrderActions(s);
+    // The delivery track raises nothing: the goods are going on their booked
+    // day and there is no human step before it (C3's FACT covers that state).
+    expect(list.find((a) => a.track === "delivery")).toBeUndefined();
+    expect(list.find((a) => a.track === "money")).toMatchObject({ key: "collect" });
+    expect(list.find((a) => a.track === "money")?.locked).toBeUndefined();
+    // The trip IS going ahead — a release is a release — but the row never
+    // prints the quiet fact, because an open action always outranks it.
+    expect(orderIsDelivering(s)).toBe(true);
+    expect(first(s)).toBe("collect");
+  });
+
+  it("omitting moneyHolds reproduces the pre-C9 lock exactly", () => {
+    const s = sig({ moneyOwing: true });
+    expect(s.moneyHolds).toBeUndefined();
+    expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
+  });
+
   it("booked for a future day while the goods are still out → no delivering fact either", () => {
     // The fact says "everything is ready"; it may not be said over goods that
     // are not in. The goods action is what is open, and it is still listed.

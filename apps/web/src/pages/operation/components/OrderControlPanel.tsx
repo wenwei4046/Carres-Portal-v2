@@ -1442,9 +1442,15 @@ export function StorageExtensionRow({
 }
 
 /** Collect-before-delivery (migration 0184): collect the storage fee → issue a
- *  receipt → open the delivery gate. A waiver is the principal-approved
- *  alternative. Reads the gate state off the loaded overlay row (form.control).
- *  Jess IS the principal, so this never gates him — it's the operator guardrail. */
+ *  receipt → open the delivery gate. Reads the gate state off the loaded
+ *  overlay row (form.control).
+ *
+ *  C9 (Jess 2026-07-27) — the manager's decision is TWO outcomes, not one, and
+ *  the operator sees which one was taken. `Release, fee still owed` is the
+ *  default: the goods go and `Collect RM …` stays on the worklist. `Release and
+ *  waive the fee` writes it off. Only the manager decides — Jess IS the
+ *  principal, so this never gates her; it stops an operator releasing their own
+ *  order. */
 export function StorageCollectWaiver({
   orderId,
   control,
@@ -1464,7 +1470,7 @@ export function StorageCollectWaiver({
     onError: (e) => toast.error(`Couldn't collect — ${e.message}`),
   });
   const requestWaiver = useRequestStorageWaiver(orderId, {
-    onSuccess: () => toast.success("Waiver requested — pending principal approval"),
+    onSuccess: () => toast.success("Release requested — the manager decides"),
     onError: (e) => toast.error(`Couldn't request — ${e.message}`),
   });
   const decideWaiver = useDecideStorageWaiver(orderId, {
@@ -1488,12 +1494,18 @@ export function StorageCollectWaiver({
       </FieldRow>
     );
   }
+  // C9 — released. The fee tells the operator WHICH release it was: a waived
+  // fee is 0 (the manager wrote it off), an owed one is still on the bill and
+  // its Collect action is still on the row. The two states must not read alike.
   if (waiverStatus === "approved") {
+    const stillOwed = charge > 0;
     return (
-      <FieldRow label="Waiver">
-        <div className="px-2 py-1.5 text-[13px] text-success font-semibold inline-flex items-center gap-1">
+      <FieldRow label="Released">
+        <div className="px-2 py-1.5 text-[13px] font-semibold inline-flex items-center gap-1 text-success">
           <ShieldCheck size={14} strokeWidth={2.5} />
-          Waived by principal · delivery unlocked
+          {stillOwed
+            ? `Released by the manager · RM ${Math.round(charge).toLocaleString()} storage fee still to collect`
+            : "Released by the manager · storage fee written off"}
         </div>
       </FieldRow>
     );
@@ -1572,7 +1584,7 @@ export function StorageCollectWaiver({
                 onClick={() => setRequesting((v) => !v)}
                 className="text-[12px] text-base-500 hover:text-base-700"
               >
-                Request waiver
+                Ask the manager to release
               </button>
             )}
           </div>
@@ -1585,8 +1597,8 @@ export function StorageCollectWaiver({
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason for waiver (the principal reviews this)"
-              aria-label="Waiver reason"
+              placeholder="Why must these goods go before the storage fee is in? (the manager reads this)"
+              aria-label="Reason for releasing the delivery"
               className={CELL + " resize-y block"}
             />
             <div className="flex items-center gap-2">
@@ -1614,41 +1626,65 @@ export function StorageCollectWaiver({
           </div>
         )}
 
-        {/* Waiver pending — operator sees status, principal decides */}
+        {/* Release requested — the operator sees the state, the manager picks
+            ONE of two outcomes out loud (C9). The default releases the goods
+            and leaves the money owed; waiving is the deliberate second click,
+            because an override must never quietly forgive money. */}
         {waiverStatus === "requested" && (
           <div className="border border-warning/40 bg-warning-soft/40 rounded-[3px] p-2 space-y-1.5">
             <div className="text-[12px] text-base-700">
-              <span className="pill pill-warning mr-1.5">Waiver requested</span>
+              <span className="pill pill-warning mr-1.5">Release requested</span>
               {control?.storage_waiver_reason ?? ""}
             </div>
             {isPrincipal ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={decideWaiver.isPending}
-                  onClick={() => decideWaiver.mutate({ decision: "approved" })}
+                  onClick={() => decideWaiver.mutate({ decision: "released" })}
+                  title={
+                    charge > 0
+                      ? `The goods go now. RM ${Math.round(charge).toLocaleString()} of storage fee stays on this order to collect.`
+                      : "The goods go now. Any storage fee stays on this order to collect."
+                  }
                   className="btn-primary text-[12px] py-1 px-2.5 disabled:opacity-50"
                 >
-                  Approve waiver
+                  Release, fee still owed
+                </button>
+                <button
+                  type="button"
+                  disabled={decideWaiver.isPending}
+                  onClick={() => decideWaiver.mutate({ decision: "waived" })}
+                  title={
+                    charge > 0
+                      ? `The goods go now and RM ${Math.round(charge).toLocaleString()} is written off. Carres never collects it.`
+                      : "The goods go now and the storage fee is written off."
+                  }
+                  className="text-[12px] text-base-700 hover:underline"
+                >
+                  Release and waive the fee
                 </button>
                 <button
                   type="button"
                   disabled={decideWaiver.isPending}
                   onClick={() => decideWaiver.mutate({ decision: "rejected" })}
+                  title="The goods stay. Collect the storage fee first."
                   className="text-[12px] text-danger hover:underline"
                 >
                   Reject
                 </button>
               </div>
             ) : (
-              <div className="text-[12px] text-base-500">Awaiting principal approval.</div>
+              <div className="text-[12px] text-base-500">
+                The manager decides. The goods stay until then.
+              </div>
             )}
           </div>
         )}
 
         {waiverStatus === "rejected" && (
           <div className="text-[12px] text-danger">
-            Waiver rejected — collect the fee to dispatch.
+            Release rejected — collect the storage fee before this order goes out.
           </div>
         )}
       </div>

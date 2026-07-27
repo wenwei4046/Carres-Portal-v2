@@ -669,6 +669,9 @@ export {
   // S4 (0298) — the deadline's recorded events.
   caseSlaEventSchema,
   recordCaseSlaInputSchema,
+  // S5 (no migration) — the Numbers tab's whole answer.
+  serviceCaseNumbersResponseSchema,
+  type ServiceCaseNumbersResponse,
   type CaseProgressEntryRecord,
   type RecordCaseStepInput,
   type CaseSlaEventRecord,
@@ -734,6 +737,9 @@ export {
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  // C9 — the manager's three outcomes
+  STORAGE_RELEASE_DECISIONS,
+  type StorageReleaseDecision,
   recordStorageExtensionInput,
   confirmBookingInput,
   type ConfirmBookingInput,
@@ -1567,11 +1573,43 @@ export {
   type CaseSlaClock,
   type CaseSlaRecordInput,
 } from "./service-case-sla";
+// S5 — the monthly numbers. NO migration and no new table: the day a case ended
+// is the `customer_confirmed` entry S3's own close gate already demands, so the
+// review layer reads the cases exactly as the card asked.
+export {
+  CASE_NUMBERS_MONTHS,
+  CASE_NUMBERS_CATEGORIES,
+  CASE_UNCLASSIFIED,
+  CASE_UNCLASSIFIED_LABEL,
+  CASE_SUPPLIER_UNKNOWN_LABEL,
+  caseNumbersMonths,
+  caseCategoryBucketLabel,
+  caseIssueBucketLabel,
+  caseFinishedOn,
+  caseNumbersHeadline,
+  computeCaseNumbers,
+  type CaseCategoryBucket,
+  type CaseNumbersCase,
+  type CaseNumbersInput,
+  type CaseNumbers,
+  type CaseMonthRow,
+  type CaseIssueRow,
+  type CaseSupplierRow,
+  type CaseCoverage,
+  type CaseFinishReport,
+  type CaseOnTimeReport,
+  type CaseResponsibilityCounts,
+} from "./service-case-numbers";
 export {
   orderMoney,
   type OrderMoneyInput,
   type OrderMoney,
 } from "./order-money";
+export {
+  storageHold,
+  type StorageHoldInput,
+  type StorageHold,
+} from "./storage-hold";
 export {
   bookingConfirmGate,
   isSundayIso,
@@ -1723,6 +1761,28 @@ export {
   type AccuracyWithheld,
   type MonthAccuracy,
 } from "./stock-health";
+// R5 · the supplier scorecard — the review layer of the receiving & claim line.
+// NO migration: it reads R1's three numbers on a PO line, R2/R3's claims and
+// R4's quarantine, and stores nothing. Its withholding gates are load-bearing,
+// not cosmetic: live prod holds 10 suppliers and ZERO purchase orders, so the
+// naive build of this card opens every negotiation with a percentage nobody
+// earned. See the module header.
+export {
+  MIN_JUDGED_POS,
+  SCORECARD_UNKNOWN_TEXT,
+  poVerdict,
+  computeSupplierScorecard,
+  scorecardHeadline,
+  type ScorecardPo,
+  type ScorecardLine,
+  type ScorecardClaim,
+  type ScorecardRate,
+  type ScorecardUnknownReason,
+  type ScorecardCoverage,
+  type ScorecardClaimStats,
+  type SupplierScorecard,
+  type PoVerdict,
+} from "./supplier-scorecard";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

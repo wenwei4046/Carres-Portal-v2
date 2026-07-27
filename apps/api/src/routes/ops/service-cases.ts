@@ -10,12 +10,14 @@ import {
   caseEvidenceSlot,
   caseEvidenceUploadedSchema,
   caseFollowUpPlan,
+  caseNumbersMonths,
   caseOpenSteps,
   caseSlaClock,
   caseSlaRecordProblem,
   caseSlaWorkingDay,
   caseStepDefinition,
   caseStepDone,
+  computeCaseNumbers,
   createServiceCaseInputSchema,
   myHolidaySet,
   recordCaseSlaInputSchema,
@@ -24,6 +26,7 @@ import {
   updateServiceCaseInputSchema,
   type CaseEvidenceUploaded,
   type CaseFollowUpInput,
+  type CaseNumbersCase,
   type CaseProgressEntry,
   type CaseSlaEvent,
   type CaseWantKey,
@@ -43,6 +46,7 @@ import type { AppEnv } from "../../types";
  * Routes (literal paths registered BEFORE /:id so they win):
  *   GET    /config                 — { types[], statuses[] } for the dropdowns
  *   GET    /lookup?ref|so           — order autofill (0/>1 matches → manual entry)
+ *   GET    /numbers?period          — S5: the monthly numbers (reads only)
  *   POST   /evidence/sign-upload    — S2: signed upload URL (draft or case)
  *   GET    /                        — list (filter ?state=ongoing|closed)
  *   POST   /                        — create (auto case_no via next_case_no() RPC)
@@ -150,6 +154,59 @@ scRouter.get("/lookup", requireOperationOrPrincipal, async (c) => {
       })),
     },
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S5 (no migration) — the numbers. **Monthly numbers that answer WHY.**
+//
+// GET /numbers?period=YYYY-MM
+//
+// Registered BEFORE /:id so the literal path wins. It READS ONLY: S5 mints no
+// table, no column and no number of its own — the card said "no new tables,
+// read the cases", and the day a case ended is already on file as the
+// `customer_confirmed` entry S3's close gate demands.
+//
+// Every judgement — the headline, the rankings, the coverage gates — is made
+// HERE by the shared pure engine, so the browser renders an answer it cannot
+// disagree with.
+// ─────────────────────────────────────────────────────────────────────────────
+scRouter.get("/numbers", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const todayIso = todayIsoMYT();
+
+  const raw = (c.req.query("period") ?? "").trim();
+  // A malformed month narrows to nothing rather than silently reporting the
+  // whole window under a heading naming one month.
+  const period = /^\d{4}-\d{2}$/.test(raw) ? raw : null;
+
+  // Only the window is fetched. `opened_at` is the cohort key (the month a case
+  // was REPORTED), which is the same key the month strip counts on.
+  const months = caseNumbersMonths(todayIso);
+  const from = `${months[months.length - 1]}-01`;
+
+  const { data, error } = await sb
+    .from("service_cases")
+    .select(
+      "id, case_no, opened_at, product_category, issue_type, progress, sla_events, service_case_statuses(is_closed), suppliers(name)",
+    )
+    .gte("opened_at", from);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  const cases: CaseNumbersCase[] = ((data ?? []) as unknown as NumbersRow[]).map((r) => ({
+    id:              r.id,
+    caseNo:          r.case_no,
+    openedAt:        r.opened_at,
+    closed:          r.service_case_statuses?.is_closed ?? false,
+    productCategory: r.product_category ?? null,
+    issueType:       r.issue_type ?? null,
+    supplierName:    embeddedSupplier(r.suppliers ?? null),
+    progress:        shapeProgress(r.progress),
+    slaEvents:       shapeSlaEvents(r.sla_events),
+  }));
+
+  return c.json(
+    computeCaseNumbers({ cases, todayIso, period }, { holidays: myHolidaySet() }),
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -838,6 +895,22 @@ function shapeSlaEvents(raw: unknown): CaseSlaEvent[] {
       byRole: String(r.by_role ?? ""),
     };
   });
+}
+
+/** S5 reads a NARROW row — only what the numbers are made of. Everything is
+ *  optional except the two facts every case has had since 0210 (when it was
+ *  reported, and which status it carries), so a case filed before S1/S3/S4
+ *  counts rather than crashing the read. */
+interface NumbersRow {
+  id: string;
+  case_no: string;
+  opened_at: string;
+  product_category?: string | null;
+  issue_type?: string | null;
+  progress?: unknown;
+  sla_events?: unknown;
+  service_case_statuses: { is_closed: boolean } | null;
+  suppliers?: { name: string } | { name: string }[] | null;
 }
 
 interface OrderRow {

@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import {
+  MIN_JUDGED_POS,
+  SCORECARD_UNKNOWN_TEXT,
+  scorecardHeadline,
+  type ScorecardRate,
+  type SupplierScorecard,
+} from "@carres/shared";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -13,6 +20,26 @@ import { fmtDate } from "@/lib/fmt-date";
  * the read-only roster/oversight view. Endpoint /api/operation/suppliers-overview.
  *
  * 2026-05-19 — moved from PrincipalSuppliers.
+ *
+ * ── R5 · the scorecard lives here (2026-07-27) ──────────────────────────────
+ * `docs/receiving-claim-execution-queue.md`: "Lives on the Suppliers page …
+ * Done when: next supplier negotiation opens with numbers, not memory."
+ *
+ * Every figure is computed by `computeSupplierScorecard` in the shared module
+ * and arrives on the row — this file renders the answer and does no arithmetic
+ * of its own, so the card and the drawer can never disagree.
+ *
+ * TWO deliberate absences, both of them the point:
+ *
+ *  · **No colour on any figure.** UI-KIT reserves colour for action, selection,
+ *    status and alert. A percentage is none of those until somebody sets a
+ *    target, and NOBODY HAS: painting 82% amber would be the portal inventing
+ *    a supplier policy Jess never ruled — the same trap R2 and R3 each refused.
+ *    When a target exists it becomes a status and earns its colour.
+ *  · **No score where there are no records.** Live prod holds ten suppliers and
+ *    zero purchase orders, so a naive build opens ten cards with `0%` against
+ *    ten names that never failed. Where a rate is withheld the card says WHY
+ *    and what changes it, which is the empty-state law, not decoration.
  */
 
 type SupplierRow = {
@@ -28,6 +55,7 @@ type SupplierRow = {
   openPos: number;
   receivedPos: number;
   totalPos: number;
+  scorecard: SupplierScorecard;
 };
 
 type PoRow = {
@@ -38,12 +66,29 @@ type PoRow = {
   placedAt: string | null;
 };
 
+type OverviewResponse = {
+  suppliers: SupplierRow[];
+  scorecardWindow?: { days: number; asOf: string; truncated: boolean };
+};
+
+/** The figure, or an em dash. Never a zero nobody earned. */
+function rateText(r: ScorecardRate): string {
+  return r.known ? `${r.pct}%` : "—";
+}
+
+/** Why a figure is missing — the sentence goes under the dash so the reader is
+ *  never left guessing whether the supplier is perfect or unmeasured. */
+function rateWhy(r: ScorecardRate): string | null {
+  return r.known ? null : SCORECARD_UNKNOWN_TEXT[r.reason];
+}
+
 export default function OperationSuppliers() {
-  const { data, isLoading } = useQuery<{ suppliers: SupplierRow[] }>({
+  const { data, isLoading } = useQuery<OverviewResponse>({
     queryKey: qk.operation.suppliersOverview(),
     queryFn: () => apiFetch("/api/operation/suppliers-overview"),
   });
   const suppliers = data?.suppliers ?? [];
+  const win = data?.scorecardWindow;
   const [open, setOpen] = useState<SupplierRow | null>(null);
 
   return (
@@ -56,6 +101,14 @@ export default function OperationSuppliers() {
         <div className="text-[13px] text-base-600 mt-1.5">
           {suppliers.length} active · upstream of stock pipeline.
         </div>
+        {win && (
+          <div className="text-[11.5px] text-base-500 mt-1">
+            Delivery record covers the last {win.days} days, to {fmtDate(win.asOf)}.
+            {win.truncated
+              ? " Older POs beyond the scan limit are not counted."
+              : ""}
+          </div>
+        )}
       </div>
 
       {isLoading && <div className="text-[13px] text-base-600">Loading…</div>}
@@ -88,6 +141,7 @@ export default function OperationSuppliers() {
             <div className="mt-3 text-[11px] text-base-500">
               Covers · {s.catCovered.length ? s.catCovered.join(" · ") : "—"}
             </div>
+            <CardScorecard sc={s.scorecard} />
           </button>
         ))}
       </div>
@@ -117,7 +171,35 @@ function Stat({ label, v }: { label: string; v: number | string }) {
       <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-base-500">
         {label}
       </div>
-      <div className="text-[15px] font-semibold text-base-900 mt-0.5">{v}</div>
+      <div className="text-[15px] font-semibold text-base-900 mt-0.5 tabular-nums">
+        {v}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The card's scorecard strip.
+ *
+ * When nothing can be scored yet it shows ONE sentence instead of a row of
+ * dashes — ten identical rows of "—" teach nothing, and the sentence says both
+ * why the figures are absent and what makes them appear.
+ */
+function CardScorecard({ sc }: { sc: SupplierScorecard }) {
+  const anyKnown =
+    sc.onTime.known || sc.inFull.known || sc.faulty.known || sc.claimRate.known;
+
+  return (
+    <div className="mt-3.5 pt-3 border-t border-base-100">
+      {anyKnown && (
+        <div className="grid grid-cols-4 gap-2.5 mb-2">
+          <Stat label="On time" v={rateText(sc.onTime)} />
+          <Stat label="In full" v={rateText(sc.inFull)} />
+          <Stat label="Damaged or wrong" v={rateText(sc.faulty)} />
+          <Stat label="Needed a claim" v={rateText(sc.claimRate)} />
+        </div>
+      )}
+      <div className="text-[11.5px] text-base-600">{scorecardHeadline(sc)}</div>
     </div>
   );
 }
@@ -152,6 +234,8 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
           </button>
         </div>
 
+        <ScorecardBlock sc={supplier.scorecard} />
+
         <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
           Recent POs
         </div>
@@ -182,6 +266,126 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The negotiation sheet — the five numbers the card asks for, each one either
+ * backed by records or replaced by the reason it is not.
+ *
+ * The coverage lines below the figures are not filler: they are what stops the
+ * reader treating "12 deliveries" as the whole story when four of them carried
+ * no promised date and were never scored.
+ */
+function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
+  const c = sc.coverage;
+  const notes: string[] = [];
+  if (c.noPromisedDate > 0)
+    notes.push(
+      c.noPromisedDate === 1
+        ? "1 PO carries no promised date and cannot be scored"
+        : `${c.noPromisedDate} POs carry no promised date and cannot be scored`,
+    );
+  if (c.notDueYet > 0)
+    notes.push(
+      c.notDueYet === 1
+        ? "1 PO has not reached its promised date"
+        : `${c.notDueYet} POs have not reached their promised date`,
+    );
+  if (c.noDeliveryDate > 0)
+    notes.push(
+      c.noDeliveryDate === 1
+        ? "1 PO arrived complete with no receipt date, so on time cannot be answered for it"
+        : `${c.noDeliveryDate} POs arrived complete with no receipt date, so on time cannot be answered for them`,
+    );
+
+  return (
+    <div className="mb-6">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
+        Scorecard
+      </div>
+      <div className="border border-base-200 rounded p-4">
+        <div className="text-[12.5px] text-base-800 mb-3">
+          {scorecardHeadline(sc)}
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <Measure label="On time" r={sc.onTime} noun="deliveries" />
+          <Measure label="In full" r={sc.inFull} noun="deliveries" />
+          <Measure label="Damaged or wrong" r={sc.faulty} noun="units they sent" />
+          <Measure label="Needed a claim" r={sc.claimRate} noun="deliveries" />
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-base-100">
+          <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-base-500">
+            Claims
+          </div>
+          <div className="text-[12px] text-base-800 mt-1 tabular-nums">
+            {sc.claims.open} open · {sc.claims.closed} settled
+            {sc.claims.avgDaysToSettle !== null
+              ? ` · settled in ${sc.claims.avgDaysToSettle} day${sc.claims.avgDaysToSettle === 1 ? "" : "s"} on average`
+              : ""}
+          </div>
+          {sc.claims.closed === 0 && sc.claims.open > 0 && (
+            <div className="text-[11px] text-base-500 mt-1">
+              Nothing settled yet, so there is no average to show.
+            </div>
+          )}
+          {sc.claims.oldestOpenDays !== null && (
+            <div className="text-[11px] text-base-500 mt-1 tabular-nums">
+              Oldest open claim: {sc.claims.oldestOpenDays} day
+              {sc.claims.oldestOpenDays === 1 ? "" : "s"}.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-base-100 text-[11px] text-base-500">
+          <div className="tabular-nums">
+            {c.pos} PO{c.pos === 1 ? "" : "s"} on file
+            {c.from ? ` since ${fmtDate(c.from)}` : ""} · {c.judged} scored.
+          </div>
+          {notes.map((n) => (
+            <div key={n} className="mt-0.5">
+              {n}.
+            </div>
+          ))}
+          {c.judged > 0 && c.judged < MIN_JUDGED_POS && (
+            <div className="mt-0.5">
+              A score needs {MIN_JUDGED_POS} deliveries — one late delivery out
+              of one is not a record.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Measure({
+  label,
+  r,
+  noun,
+}: {
+  label: string;
+  r: ScorecardRate;
+  /** What the denominator counts — "deliveries" or "units they sent". The
+   *  fraction is always spelt out beneath the percentage, so nobody reads
+   *  "33%" without seeing it is one delivery out of three. */
+  noun: string;
+}) {
+  const why = rateWhy(r);
+  return (
+    <div>
+      <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-base-500">
+        {label}
+      </div>
+      <div className="text-[18px] font-semibold text-base-900 mt-0.5 tabular-nums">
+        {rateText(r)}
+      </div>
+      <div className="text-[10.5px] text-base-500 mt-0.5">
+        {why ?? `${r.hits} of ${r.of} ${noun}`}
       </div>
     </div>
   );

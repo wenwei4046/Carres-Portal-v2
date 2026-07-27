@@ -11,6 +11,12 @@ import OperationOrdersControl, {
   stockEtaOf,
   slackDays,
   logisticStateOf,
+  rowDotsOf,
+} from "./OperationOrdersControl";
+import type {
+  StockInfo,
+  StockEta,
+  LogisticState,
 } from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
@@ -1577,7 +1583,11 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + customer confirmed + storage waived → NOT held", () => {
+  // ── C9 · the manager's release (Jess 2026-07-27) ──
+  it("storage RELEASED → nothing is held, and Collect stays on the worklist", () => {
+    // The card's own done-when: "a release that does not waive leaves the money
+    // action open". The manager let the goods go; the RM 150 is still ours, so
+    // since C3 the row's headline IS that collection — unlocked.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1589,8 +1599,41 @@ describe("nextActionOf (C2)", () => {
       },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Delivering");
+    expect(r.label).toBe("Collect");
     expect(r.locked).toBeFalsy();
+    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toContain(
+      "collect",
+    );
+  });
+
+  it("storage WAIVED (the override written to 0) → nothing left to collect", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: {
+        ...BOOKED,
+        storage_fee_msbf: 150,
+        storage_fee_override: 0,
+        storage_waiver_status: "approved",
+      },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
+    expect(
+      openActionsOf(o, { state: "ready" }, []).map((a) => a.key),
+    ).not.toContain("collect");
+  });
+
+  it("a keyed override beats the Master figure — 'No storage' really means no fee", () => {
+    // The ladder used to read storage_fee_msbf and ignore the override, so an
+    // order the operator had exempted still showed its 🔒.
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, storage_fee_msbf: 150, storage_fee_override: 0 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
   // ── T7 · the confirmed date is itself a deadline ──
@@ -2008,6 +2051,196 @@ describe("Delivery column (T1 booking truth)", () => {
     expect(conf).toHaveStyle({ color: "#3B6D11" });
   });
 });
+
+// ── C10 · the three dots become real ────────────────────────────────────────
+// `rowDotsOf` computed goods · delivery · money for nine days and NOTHING
+// rendered it — and, contrary to what the C5 note and the C10 card both state,
+// nothing TESTED it either. So this block is the first cover the truth table
+// (ORDERS-WORKING-FLOW §7) has ever had, and it is written against the STATE
+// the function returns, never the hex the renderer paints.
+describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
+  const READY: StockInfo = { state: "ready" };
+  const NO_PO: StockInfo = { state: "unknown" };
+  const WAITING: StockInfo = { state: "awaiting" };
+  const NO_ETA: StockEta = { etaIso: null, waiting: false, state: "none" };
+  const LATE_ETA: StockEta = { etaIso: "2026-07-01", waiting: true, state: "late" };
+  const NO_LOGI: LogisticState = { key: "unassigned", partner: null, date: null, slot: null };
+  const CONFIRMED: LogisticState = {
+    key: "confirmed",
+    partner: "NETS",
+    date: "2026-07-27",
+    slot: "Morning (9–11 AM)",
+  };
+  const PROVISIONAL: LogisticState = {
+    key: "provisional",
+    partner: "NETS",
+    date: "2026-07-27",
+    slot: null,
+  };
+  const NEED_BOOKING: LogisticState = {
+    key: "need_booking",
+    partner: "NETS",
+    date: null,
+    slot: null,
+  };
+  const day = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+  /** Priced RM 4,000 of goods, nothing paid → the money dot is RED. */
+  const owing = { order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }], paid: 0 };
+  const settled = { ...owing, paid: 4000 };
+
+  it("returns the three tracks in the LAW's order — goods · delivery · money", () => {
+    // Law 6's sketch and §7's table both read goods → delivery → money. (The
+    // §14 note of 2026-07-18 had money first; it was re-ruled, and since nothing
+    // had ever rendered these dots, no screen changed when this flipped.)
+    const o = makeRow({ id: "x", so: 1, ...owing });
+    const [goods, delivery, money] = rowDotsOf(o, NO_PO, NO_ETA, NO_LOGI);
+    expect(goods.title).toMatch(/^Stock —/);
+    expect(delivery.title).toMatch(/^Delivery —/);
+    expect(money.title).toMatch(/^Money —/);
+  });
+
+  it("goods: all in → green · no PO → red · supplier ETA late → red · otherwise waiting → amber", () => {
+    const o = makeRow({ id: "x", so: 1, ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[0].state).toBe("green");
+    expect(rowDotsOf(o, NO_PO, NO_ETA, NO_LOGI)[0].state).toBe("red");
+    expect(rowDotsOf(o, WAITING, LATE_ETA, NO_LOGI)[0].state).toBe("red");
+    expect(rowDotsOf(o, WAITING, NO_ETA, NO_LOGI)[0].state).toBe("amber");
+  });
+
+  it("delivery: the CUSTOMER's yes is the only green — a logistics date stays amber", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: day(5), ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, CONFIRMED)[1].state).toBe("green");
+    expect(rowDotsOf(o, READY, NO_ETA, PROVISIONAL)[1].state).toBe("amber");
+    expect(rowDotsOf(o, READY, NO_ETA, NEED_BOOKING)[1].state).toBe("amber");
+    // Nothing is known yet — grey states an absence, it does not alarm.
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[1].state).toBe("grey");
+  });
+
+  it("delivery: past the deadline and still unconfirmed → red", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: day(-2), ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NEED_BOOKING)[1].state).toBe("red");
+    expect(rowDotsOf(o, READY, NO_ETA, PROVISIONAL)[1].state).toBe("red");
+  });
+
+  it("money: settled → green · owing → red with the figure · unpriced → grey, never an alarm", () => {
+    const o = makeRow({ id: "x", so: 1, ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[2].state).toBe("green");
+    const red = rowDotsOf(makeRow({ id: "y", so: 2, ...owing }), READY, NO_ETA, NO_LOGI)[2];
+    expect(red.state).toBe("red");
+    expect(red.title).toBe("Money — RM 4,000 outstanding");
+    // An order nobody has priced: 37 live rows look like this. A number nobody
+    // knows may not paint an alarm (ORDERS-WORKING-FLOW §2).
+    const unpriced = makeRow({
+      id: "z",
+      so: 3,
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+      paid: 0,
+    });
+    expect(rowDotsOf(unpriced, READY, NO_ETA, NO_LOGI)[2].state).toBe("grey");
+  });
+
+  it("a DELIVERED order never alarms on goods or delivery — and still shows red money", () => {
+    // §7's last line, and the card's own done-when. Delivered is not paid.
+    const done = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivery_date: day(-30),
+      ...owing,
+    });
+    // The worst possible goods/delivery inputs — no PO, a late supplier ETA, no
+    // logistics, a deadline a month gone. A closed order alarms on none of it.
+    expect(rowDotsOf(done, NO_PO, LATE_ETA, NO_LOGI).map((d) => d.state)).toEqual([
+      "green",
+      "green",
+      "red",
+    ]);
+  });
+});
+
+// ── C10 · the dots on screen, beside the stage pill ─────────────────────────
+describe("The three dots on the row (C10)", () => {
+  const dotRows: operationOrderListRow[] = [
+    makeRow({
+      id: "open",
+      so: 3001,
+      status: "proceed_order",
+      operation_stage: "in_production",
+      delivery_partners: { id: "p-nets", name: "NETS" },
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+      paid: 0,
+    }),
+    makeRow({
+      id: "done",
+      so: 3002,
+      status: "delivered",
+      operation_stage: "delivered",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+      paid: 0,
+    }),
+  ];
+  beforeEach(() => {
+    listHookState.data = { orders: dotRows };
+  });
+  function row(so: number) {
+    return screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes(`SO-${so}`))!;
+  }
+
+  it("every row renders three dots, in the law's order, each naming its own track", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3001));
+    // Order on screen, not merely presence.
+    const rendered = [...r.getByTestId("row-dots").children].map((c) =>
+      c.getAttribute("data-testid"),
+    );
+    expect(rendered).toEqual(["row-dot-goods", "row-dot-delivery", "row-dot-money"]);
+    // Each dot says what it is — a colour on its own names nothing.
+    expect(r.getByTestId("row-dot-money").getAttribute("title")).toMatch(/^Money —/);
+    expect(r.getByTestId("row-dot-goods").getAttribute("title")).toMatch(/^Stock —/);
+  });
+
+  it("the dots sit BESIDE the stage pill — neither replaces the other (Jess 2026-07-27)", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3001));
+    // The pill is untouched by this card: same word, same shared pill map.
+    const pill = r.getByText("To book");
+    expect(pill).toHaveClass("pill");
+    // One cell holds both.
+    expect(pill.closest("td")).toBe(r.getByTestId("row-dots").closest("td"));
+  });
+
+  it("a delivered row keeps its Delivered word, alarms on neither goods nor delivery, and still shows red money", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3002));
+    expect(r.getByText("Delivered")).toBeInTheDocument();
+    expect(r.getByTestId("row-dot-goods").getAttribute("data-dot-state")).toBe("green");
+    expect(r.getByTestId("row-dot-delivery").getAttribute("data-dot-state")).toBe("green");
+    expect(r.getByTestId("row-dot-money").getAttribute("data-dot-state")).toBe("red");
+  });
+
+  it("the dots are ICONS, never emoji and never a bare coloured circle (UI-KIT §A11 rule 2)", () => {
+    wrap(<OperationOrdersControl />);
+    const dots = within(row(3001)).getByTestId("row-dots");
+    // No text at all in the group — the glyphs carry it.
+    expect(dots.textContent).toBe("");
+    // Three Lucide SVGs at the kit's 14px inline size.
+    const svgs = dots.querySelectorAll("svg");
+    expect(svgs).toHaveLength(3);
+    svgs.forEach((s) => expect(s.getAttribute("width")).toBe("14"));
+    expect(/\p{Extended_Pictographic}/u.test(dots.innerHTML)).toBe(false);
+  });
+});
+
 
 // ─── C3 · the Actions column shows the whole truth ───────────────────────────
 // (docs/portal-core-execution-queue.md · Jess 2026-07-27)
