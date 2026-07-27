@@ -99,6 +99,8 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
+  usePartnerBookingCheck,
+  useSetPartnerDeliveryRules,
   useDeliveryPhotos,
   useUploadDeliveryPhoto,
   useOrderServiceCases,
@@ -4895,6 +4897,15 @@ function BookingBlock({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [slot, setSlot] = useState("");
+  // T9 (0283) — what the ORDER'S CARRIER says about this date. Asked only while
+  // the panel is open (a closed panel has no date to ask about). Advisory: the
+  // Confirm button never reads it, because a partner's working pattern is the
+  // partner's fact, not one of our obligations — the operator may have already
+  // phoned them.
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const partnerCheck = usePartnerBookingCheck(orderId, open ? date : "");
+  const partnerWarnings = partnerCheck.data?.warnings ?? [];
+  const checkedPartner = partnerCheck.data?.partner ?? null;
   // T8 — which groups THIS trip carries. null = the whole order, and it is the
   // default on purpose: the operator has to actively choose a split, because
   // splitting requires having asked the customer (Jess: never auto-split).
@@ -4910,9 +4921,14 @@ function BookingBlock({
     ? groupStates.map((g) => g.key).filter((k) => !bookedGroups.includes(k))
     : [];
   const confirm = useConfirmBooking(orderId, {
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Booking confirmed — the customer's date + slot are recorded");
+      // T9 — the booking is SAVED either way; if the carrier's own rules bend
+      // on that date, say so once so the operator knows to ring them.
+      const first = res.partnerWarnings?.[0];
+      if (first) toast.warning(first.message);
       setOpen(false);
+      setRulesOpen(false);
       setTripGroups(null);
     },
     onError: (e) =>
@@ -5117,6 +5133,39 @@ function BookingBlock({
               Sunday is not a delivery working day — pick another date
             </div>
           )}
+          {/* T9 (0283) — the carrier's own rules against THIS date. Amber, not
+              red, and the Confirm button stays live: these are the partner's
+              facts, and a phone call can change them. Every line names the
+              carrier so a new hire knows who to ring. */}
+          {partnerWarnings.length > 0 && (
+            <div className="text-right text-[12px] text-warning py-0.5 space-y-0.5">
+              {partnerWarnings.map((w) => (
+                <div key={w.key}>{w.message}</div>
+              ))}
+            </div>
+          )}
+          {checkedPartner && (
+            <div className="text-right py-0.5">
+              <Btn
+                variant="ghost"
+                size="sm"
+                onClick={() => setRulesOpen((v) => !v)}
+              >
+                {rulesOpen ? "Close" : `${checkedPartner.name} delivery rules`}
+              </Btn>
+            </div>
+          )}
+          {rulesOpen && checkedPartner && (
+            <PartnerRulesEditor
+              partnerId={checkedPartner.id}
+              partnerName={checkedPartner.name}
+              rules={partnerCheck.data?.rules ?? null}
+              onSaved={() => {
+                setRulesOpen(false);
+                void partnerCheck.refetch();
+              }}
+            />
+          )}
           {gateHints.length > 0 && (
             <div className="text-right text-[12px] text-warning py-0.5">
               Not ready yet: {gateHints.join(" · ")} — the system refuses to
@@ -5131,6 +5180,185 @@ function BookingBlock({
         </div>
       )}
     </>
+  );
+}
+
+/** T9 (0283) — the carrier's own delivery rules, edited where they are FIRST
+ *  read (L6: "build the fields WITH the first consumer, not as an admin page up
+ *  front"). Four facts, plain words: which days it runs, days it is not running
+ *  at all, how many drops it takes, and how much notice it needs.
+ *
+ *  Sunday is not offered: nobody delivers on Sunday, and the booking gate
+ *  refuses it for every carrier — showing a switch for it would suggest the
+ *  rule is negotiable per partner.
+ *
+ *  The rules belong to the CARRIER, not this order: saving here changes what
+ *  the portal warns about on every order that uses it, which is why the panel
+ *  says so out loud and why the write is audited server-side. */
+function PartnerRulesEditor({
+  partnerId,
+  partnerName,
+  rules,
+  onSaved,
+}: {
+  partnerId: string;
+  partnerName: string;
+  rules: {
+    offDays: number[];
+    blackoutDates: string[];
+    dailyCapacity: number | null;
+    bookingLeadDays: number;
+  } | null;
+  onSaved: () => void;
+}) {
+  const [offDays, setOffDays] = useState<number[]>(rules?.offDays ?? [0]);
+  const [blackouts, setBlackouts] = useState<string[]>(rules?.blackoutDates ?? []);
+  const [capacity, setCapacity] = useState<string>(
+    rules?.dailyCapacity != null ? String(rules.dailyCapacity) : "",
+  );
+  const [lead, setLead] = useState<string>(String(rules?.bookingLeadDays ?? 0));
+  const [newBlackout, setNewBlackout] = useState("");
+  const save = useSetPartnerDeliveryRules(partnerId, {
+    onSuccess: () => {
+      toast.success(`${partnerName} delivery rules saved`);
+      onSaved();
+    },
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : "Couldn't save the delivery rules",
+      ),
+  });
+  const FIELD =
+    "rounded border border-base-300 bg-white px-1.5 py-0.5 text-[13px] text-base-900 outline-none hover:border-base-400 focus:border-primary";
+  const WEEK = [
+    { n: 1, label: "Mon" },
+    { n: 2, label: "Tue" },
+    { n: 3, label: "Wed" },
+    { n: 4, label: "Thu" },
+    { n: 5, label: "Fri" },
+    { n: 6, label: "Sat" },
+  ];
+  const runsOn = (n: number) => !offDays.includes(n);
+  const toggleDay = (n: number) =>
+    setOffDays((cur) =>
+      cur.includes(n) ? cur.filter((d) => d !== n) : [...cur, n],
+    );
+  // Sunday is always off; the API validates the same thing, this keeps the
+  // operator from saving a carrier that runs no day at all.
+  const runsSomeDay = WEEK.some((d) => runsOn(d.n));
+  const capacityNum = capacity.trim() === "" ? null : Number(capacity);
+  const leadNum = Number(lead || 0);
+  const valid =
+    runsSomeDay &&
+    Number.isInteger(leadNum) &&
+    leadNum >= 0 &&
+    leadNum <= 30 &&
+    (capacityNum === null ||
+      (Number.isInteger(capacityNum) && capacityNum >= 1 && capacityNum <= 999));
+  return (
+    <DRow k={`${partnerName} rules`} block>
+      <div className="py-1 space-y-1.5 text-right">
+        <div className="text-[11px] text-base-500">
+          These are {partnerName}&apos;s own rules — they apply to every order
+          this carrier delivers, and they warn, never block.
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <span className="text-[12px] text-base-600">Delivers on</span>
+          {WEEK.map((d) => (
+            <Btn
+              key={d.n}
+              variant={runsOn(d.n) ? "box" : "ghost"}
+              size="sm"
+              onClick={() => toggleDay(d.n)}
+              title={
+                runsOn(d.n)
+                  ? `${partnerName} runs on ${d.label}`
+                  : `${partnerName} does not run on ${d.label}`
+              }
+            >
+              {d.label}
+            </Btn>
+          ))}
+        </div>
+        {!runsSomeDay && (
+          <div className="text-[12px] text-danger">
+            A carrier must run on at least one day of the week
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <span className="text-[12px] text-base-600">Needs</span>
+          <input
+            type="number"
+            min={0}
+            max={30}
+            value={lead}
+            onChange={(e) => setLead(e.target.value)}
+            aria-label={`${partnerName} booking notice in working days`}
+            className={`${FIELD} w-[70px]`}
+          />
+          <span className="text-[12px] text-base-600">
+            working days notice · takes at most
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={999}
+            value={capacity}
+            placeholder="not set"
+            onChange={(e) => setCapacity(e.target.value)}
+            aria-label={`${partnerName} deliveries a day`}
+            className={`${FIELD} w-[90px]`}
+          />
+          <span className="text-[12px] text-base-600">deliveries a day</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <span className="text-[12px] text-base-600">Not running on</span>
+          {blackouts.length === 0 && (
+            <span className="text-[12px] text-base-400">no dates</span>
+          )}
+          {blackouts.map((b) => (
+            <Btn
+              key={b}
+              variant="ghost"
+              size="sm"
+              onClick={() => setBlackouts((cur) => cur.filter((x) => x !== b))}
+              title="Remove this date"
+            >
+              {fmtDate(b).split(",")[0]} ×
+            </Btn>
+          ))}
+          <input
+            type="date"
+            value={newBlackout}
+            onChange={(e) => {
+              const v = e.target.value;
+              setNewBlackout("");
+              if (v && !blackouts.includes(v))
+                setBlackouts((cur) => [...cur, v].sort());
+            }}
+            aria-label={`Add a date ${partnerName} is not running`}
+            className={`${FIELD} w-[150px]`}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 justify-end">
+          <Btn
+            variant="box"
+            size="sm"
+            disabled={!valid || save.isPending}
+            onClick={() =>
+              save.mutate({
+                offDays: [0, ...WEEK.filter((d) => !runsOn(d.n)).map((d) => d.n)],
+                blackoutDates: blackouts,
+                dailyCapacity: capacityNum,
+                bookingLeadDays: leadNum,
+              })
+            }
+          >
+            {save.isPending ? "Saving…" : "Save rules"}
+          </Btn>
+        </div>
+      </div>
+    </DRow>
   );
 }
 

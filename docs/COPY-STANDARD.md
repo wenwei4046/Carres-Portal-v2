@@ -265,6 +265,18 @@ doubt, grep the codebase and match what already ships.
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| A carrier's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
+| Notice a carrier needs before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
+| A date a carrier is closed | **not running on** | Blackout · Unavailable · Out of service |
+| Most drops a carrier takes in a day | **deliveries a day** | Capacity · Max load · Slots |
+
+**The carrier-rule word law (T9, Jess 2026-07-27):** every one of these lines
+WARNS and none of them blocks, so every one of them must name the carrier and
+end in something the operator can do — "call them" or "pick another day". A
+warning that only states a fact ("capacity exceeded") tells a new hire nothing
+about the next second. Sunday never appears in a carrier's rules: it is refused
+for everyone, and a per-partner Sunday line would read as though a phone call
+could buy one.
 
 **The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about

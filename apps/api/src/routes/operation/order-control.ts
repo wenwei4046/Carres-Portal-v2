@@ -9,6 +9,11 @@ import {
   type DeliveryPhoto,
   bookingConfirmGate,
   isSundayIso,
+  partnerBookingWarnings,
+  partnerDeliveryRules,
+  myHolidaySet,
+  type PartnerBookingWarning,
+  type PartnerDeliveryRules,
   deliveryGroupLabel,
   deliveryScopeSentence,
   type DeliveryGroupKey,
@@ -406,7 +411,166 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     });
   }
 
-  return c.json({ control: data });
+  // T9 (0283) — what the carrier's own rules say about the date that was just
+  // recorded. AFTER the write on purpose: these warn, they never block, so a
+  // partner rule can never cost the customer their confirmed booking. An
+  // API-only caller (or a browser on an older build) gets the same sentences
+  // the pre-check shows, from the same shared engine.
+  let partnerWarnings: PartnerBookingWarning[] = [];
+  try {
+    partnerWarnings = (await partnerBookingCheck(sb, idCheck.data, confirmedDate))
+      .warnings;
+  } catch {
+    // Fail-soft, same rule as the T4/T6 activity writes: an advisory must never
+    // turn a successful booking into an error.
+    partnerWarnings = [];
+  }
+
+  return c.json({ control: data, partnerWarnings });
+});
+
+// ── T9 · logistic partner rules (migration 0283) ────────────────────────────
+// Four facts a carrier states about itself — working days, blackout dates,
+// daily capacity, notice period — turned into a warning BEFORE a date is
+// promised to a customer.
+//
+// It WARNS, it never blocks. The refusals (goods reserved · balance collected ·
+// no Sunday) are about OUR obligations; a carrier's working pattern is not one
+// of ours, and the carrier is reachable by phone. An operator who already rang
+// NETS and got a yes must be able to record that yes — a refusal here would
+// only teach staff to type a fake date.
+//
+// The warning text is composed by the SHARED engine, so the pre-check below and
+// the confirm response say the same sentence (no second wording).
+
+/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
+ *  is already tomorrow in Klang, and "you cannot book a date in the past" must
+ *  not fire a day early (or late) because of it. */
+function todayIsoMYT(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+interface PartnerCheck {
+  partner: { id: string; name: string } | null;
+  rules: PartnerDeliveryRules | null;
+  bookedOnDate: number | null;
+  warnings: PartnerBookingWarning[];
+}
+
+/**
+ * The order's carrier + how full its day already is + every rule this date
+ * bends. Same partner precedence the list and the drawer already use
+ * (`delivery_partner_id` first, else the Inbox-triaged `ops_assigned_logistic`)
+ * — a second precedence would put a warning against a different carrier than
+ * the column names.
+ */
+async function partnerBookingCheck(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  dateIso: string,
+): Promise<PartnerCheck> {
+  const empty: PartnerCheck = {
+    partner: null,
+    rules: null,
+    bookedOnDate: null,
+    warnings: [],
+  };
+  const { data: order } = await sb
+    .from("orders")
+    .select("id, delivery_partner_id, ops_assigned_logistic")
+    .eq("id", orderId)
+    .maybeSingle();
+  const partnerId: string | null =
+    order?.delivery_partner_id ?? order?.ops_assigned_logistic ?? null;
+  // No carrier assigned yet ⇒ nobody to check the date against. Silence, not a
+  // complaint: picking the carrier is a different step (Assign logistic).
+  if (!partnerId) return empty;
+
+  const { data: partner } = await sb
+    .from("delivery_partners")
+    .select("id, name, off_days, blackout_dates, daily_capacity, booking_lead_days")
+    .eq("id", partnerId)
+    .maybeSingle();
+  if (!partner) return empty;
+
+  const rules = partnerDeliveryRules({
+    offDays: (partner.off_days as number[] | null) ?? undefined,
+    blackoutDates: ((partner.blackout_dates as string[] | null) ?? []).map((d) =>
+      String(d).slice(0, 10),
+    ),
+    dailyCapacity: (partner.daily_capacity as number | null) ?? null,
+    bookingLeadDays: (partner.booking_lead_days as number | null) ?? 0,
+  });
+
+  // How full that day already is for this carrier. Counted only when the
+  // partner actually states a limit — otherwise the number would be trivia
+  // nobody reads, at the cost of a query on every keystroke.
+  let bookedOnDate: number | null = null;
+  if (rules.dailyCapacity != null) {
+    const { data: sameDay } = await sb
+      .from("ops_order_control")
+      .select(
+        "order_id, orders!inner(id, status, delivery_partner_id, ops_assigned_logistic)",
+      )
+      .eq("booking_stage", "confirmed")
+      .eq("confirmed_date", dateIso);
+    const rows = (sameDay ?? []) as {
+      order_id: string;
+      orders: {
+        status?: string | null;
+        delivery_partner_id?: string | null;
+        ops_assigned_logistic?: string | null;
+      } | null;
+    }[];
+    bookedOnDate = rows.filter((r) => {
+      if (r.order_id === orderId) return false; // this order is not its own load
+      const o = r.orders;
+      if (!o) return false;
+      if (o.status === "cancelled") return false;
+      return (o.delivery_partner_id ?? o.ops_assigned_logistic ?? null) === partnerId;
+    }).length;
+  }
+
+  return {
+    partner: { id: partner.id as string, name: (partner.name as string) ?? "" },
+    rules,
+    bookedOnDate,
+    warnings: partnerBookingWarnings({
+      partnerName: (partner.name as string) ?? "the carrier",
+      rules,
+      dateIso,
+      todayIso: todayIsoMYT(),
+      bookedOnDate,
+      holidays: myHolidaySet(),
+    }),
+  };
+}
+
+// GET /:id/booking/partner-check?date=YYYY-MM-DD — what this carrier says about
+// this date, BEFORE the operator promises it to the customer.
+orderControlRouter.get("/:id/booking/partner-check", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const date = (c.req.query("date") ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "date must be yyyy-mm-dd",
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const check = await partnerBookingCheck(sb, idCheck.data, date);
+  return c.json(check);
 });
 
 // ── T6 delivery photo (migration 0280) ──────────────────────────────────────

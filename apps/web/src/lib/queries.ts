@@ -180,6 +180,10 @@ import {
   type PatchDeliveryStopInput,
   type OpsOrderControl,
   type ConfirmBookingInput,
+  // T9 (0283) — logistic partner delivery rules + the date pre-check.
+  type PartnerBookingCheckResponse,
+  type PartnerBookingWarningWire,
+  type SetPartnerDeliveryRulesInput,
   type DeliveryPhotoListResponse,
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
@@ -383,6 +387,11 @@ export const qk = {
      *  urls. Nested under the order id, same blunt-invalidate family. */
     deliveryPhotos: (id: string) =>
       ["operation", "orders", id, "delivery-photos"] as const,
+    /** T9 (migration 0283) — what the order's carrier says about ONE candidate
+     *  delivery date. Keyed by the date so picking another day is a fresh
+     *  question, not a stale answer. */
+    partnerBookingCheck: (id: string, date: string) =>
+      ["operation", "orders", id, "partner-check", date] as const,
     /** Staff assignment pool (migration 0232) — operation accounts + pool state. */
     staff: ["operation", "staff"] as const,
     /** PO duty rotation (migration 0236) — this month's PO holder. */
@@ -2608,6 +2617,13 @@ export interface DeliveryPartnerRow {
    *  bar's Logistic ⋮ → Chase/Remind. Seeded for NETS/AL/TEOW/TT; null = not set
    *  (the review card shows "group not set", Copy still works). */
   whatsapp_group_url?: string | null;
+  /** T9 (migration 0283) — the carrier's own delivery rules. OPTIONAL on the
+   *  type so a browser on this build against an older Worker degrades to "no
+   *  rules recorded" (silence) instead of crashing. */
+  off_days?: number[] | null;
+  blackout_dates?: string[] | null;
+  daily_capacity?: number | null;
+  booking_lead_days?: number | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
@@ -3755,6 +3771,15 @@ export function useSaveOrderControl(
   });
 }
 
+/** What a successful confirmation returns. `partnerWarnings` (T9, 0283) is what
+ *  the carrier's own rules say about the date that was just recorded — it
+ *  arrives AFTER the booking is saved because these warn and never block.
+ *  Optional: an older Worker simply doesn't send it. */
+export interface ConfirmBookingResult {
+  control: OpsOrderControl;
+  partnerWarnings?: PartnerBookingWarningWire[];
+}
+
 /** D1 booking confirm (migration 0277) — record the CUSTOMER's confirmed date
  *  + time slot. The server enforces the gates (goods ready + balance ready +
  *  no Sunday + date/slot both); a 422 carries the plain-English reason to show.
@@ -3762,19 +3787,77 @@ export function useSaveOrderControl(
 export function useConfirmBooking(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<{ control: OpsOrderControl }, ApiError, ConfirmBookingInput>
+    UseMutationOptions<ConfirmBookingResult, ApiError, ConfirmBookingInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ control: OpsOrderControl }, ApiError, ConfirmBookingInput>({
+  return useMutation<ConfirmBookingResult, ApiError, ConfirmBookingInput>({
     mutationFn: (input) =>
-      apiFetch<{ control: OpsOrderControl }>(
+      apiFetch<ConfirmBookingResult>(
         `/api/operation/orders/${orderId}/booking/confirm`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** T9 (migration 0283) — what the order's carrier says about ONE candidate
+ *  delivery date: the weekday it doesn't run, a blackout, its notice period,
+ *  and how full that day already is. Advisory only — the Confirm button never
+ *  reads it. Fails soft (retry:false, no throw path in the UI): a Worker that
+ *  predates the route simply warns about nothing, which is the same thing an
+ *  unconfigured partner does. */
+export function usePartnerBookingCheck(
+  orderId: string,
+  date: string,
+  opts?: Partial<UseQueryOptions<PartnerBookingCheckResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.partnerBookingCheck(orderId, date),
+    queryFn: () =>
+      apiFetch<PartnerBookingCheckResponse>(
+        `/api/operation/orders/${orderId}/booking/partner-check?date=${encodeURIComponent(date)}`,
+      ),
+    enabled: /^\d{4}-\d{2}-\d{2}$/.test(date),
+    staleTime: 60_000,
+    retry: false,
+    ...opts,
+  });
+}
+
+/** T9 (migration 0283) — save a carrier's delivery rules. The WHOLE profile
+ *  goes every time (a partial patch cannot distinguish "cleared the blackout
+ *  dates" from "didn't mention them"). Invalidates the partners list every
+ *  surface reads, plus any open date check. */
+export function useSetPartnerDeliveryRules(
+  partnerId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { partner: DeliveryPartnerRow },
+      ApiError,
+      SetPartnerDeliveryRulesInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { partner: DeliveryPartnerRow },
+    ApiError,
+    SetPartnerDeliveryRulesInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ partner: DeliveryPartnerRow }>(
+        `/api/operation/partners/${partnerId}/delivery-rules`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.partners() });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

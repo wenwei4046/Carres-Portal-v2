@@ -713,6 +713,30 @@ export {
   type DeliveryGroupKey,
 } from "./delivery-groups";
 
+// T9 · Logistic partner profiles (0283) — the carrier's own working days,
+// blackout dates, daily capacity and notice period. These WARN, never block.
+export {
+  DEFAULT_PARTNER_DELIVERY_RULES,
+  earliestPartnerDate,
+  partnerBookingWarnings,
+  partnerDeliveryRules,
+  partnerRunsOn,
+  type PartnerBookingCheckInput,
+  type PartnerBookingWarning,
+  type PartnerDeliveryRules,
+  type PartnerWarningKey,
+} from "./partner-delivery-rules";
+export {
+  partnerDeliveryRulesSchema,
+  setPartnerDeliveryRulesInput,
+  partnerBookingWarningSchema,
+  partnerBookingCheckResponseSchema,
+  type PartnerDeliveryRulesWire,
+  type SetPartnerDeliveryRulesInput,
+  type PartnerBookingWarningWire,
+  type PartnerBookingCheckResponse,
+} from "./schemas/delivery-partner-rules";
+
 export {
   monthKeyMYT,
   isPoDayMYT,
