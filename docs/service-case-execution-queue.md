@@ -66,8 +66,8 @@ Checklists live as ONE shared constant (like T4's reasons) — NOT a config tabl
 **Done when:** submitting without required evidence is impossible; each file shows its
 uploader role in the case view.
 
-> **SHIPPED 2026-07-27 (PR __PR__, migration 0289 applied, Worker __WORKER__ + web
-> __BUNDLE__).** Notes for the cards that follow:
+> **SHIPPED 2026-07-27 (PR #410 + renumber #419, migration 0289 applied, Worker `0cd3106b`
+> + web `index-CD_Zji_Q.js`).** Notes for the cards that follow:
 > - The checklist is `packages/shared/src/service-case-evidence.ts` — a global slot
 >   registry (`CASE_EVIDENCE_SLOTS`: what a piece of evidence IS) plus
 >   `CASE_EVIDENCE_BY_ISSUE` (which slots, how many, required or not). Slot KEYS are
