@@ -68,9 +68,69 @@ finish; it never changes and is never repeated on an action.
 - Due: red once inside the arrival window
 - Task Owner: the module assigns it
 
-### Supplier exception (opens when the goods will not arrive as promised)
+### Delay recovery — a state machine, not a story
 
-The lifecycle is one shared vocabulary, used by every module that waits on a supplier:
+**Purpose:** when the customer's promised date can no longer be met, the system runs an
+INTERNAL recovery to completion before anyone reaches the customer.
+
+**Stage 1 — Internal recovery**
+- Trigger: latest supplier ready date **>** the customer's promised date
+- Owner: **Operations**
+- Action: `Call {supplier} — confirm ready date` (getting the real date IS the work here)
+- Checklist: confirm the real ready date with the supplier · check available dates with
+  logistics · decide the date or window to propose · name who will call logistics
+- Completion: **Recovery plan ready = TRUE** — a proposed date exists AND a person is named
+- **The customer is NOT contacted in this stage.**
+
+**Stage 2 — Logistics arranges the customer's new date**
+- Trigger: recovery plan ready = TRUE
+- Owner: **Operations** — see the note below; the CONVERSATION with the customer is done by
+  logistics, the ACTION in this portal is ours
+- Action: `Call {logistics} — arrange new delivery date`
+- Checklist: give logistics the proposed date · logistics contacts the customer · record the
+  date the customer agreed · record the time slot · record the customer's response
+- Completion: a customer-confirmed date AND a time slot are recorded
+
+> **Why Stage 2 is owned by Operations and not by logistics.** A `partner` role exists and
+> one logistics company has a login, but **eight companies are in use and seven have no
+> account at all**, and the partner portal has no screen for arranging a delivery
+> appointment. An action owned by "Logistics" today would be a task nobody can see and
+> nobody can close. So the portal's action is ours — we call them, they call the customer,
+> we record what came back. This ownership moves to logistics the day the partner portal
+> covers appointments; that is a card, not an assumption.
+
+**Stage 3 — The system updates the order**
+- Trigger: a customer-confirmed new date exists
+- Owner: **System** (no human step)
+- Writes: the booking (`confirmed_date` + `confirmed_time_slot`) — and, because the promised
+  date is **read-only**, the promise moves only through the existing one-time extension
+  (`extension_new_date` + `extension_reason` + `extension_count`) carrying a reason from the
+  shared reason list. **Nothing overwrites `orders.delivery_date` directly.**
+- Then: the recovery closes and the normal delivery flow continues
+
+**Who may move it on**
+
+| Stage | Owner | Next stage |
+|---|---|---|
+| Stock delay detected | System | Internal recovery |
+| Internal recovery | Operations | Logistics arranges the date |
+| Logistics arranges the date | Operations (logistics performs the call) | System updates the order |
+| System updates the order | System | Normal delivery flow |
+
+```
+Normal delivery → Stock delay detected → Internal recovery
+   → Recovery plan ready → Logistics arranges the customer's date
+   → Customer agreed → System updates the order → Normal delivery flow
+```
+
+**THE RULE THAT GOVERNS THIS WHOLE SECTION (Jess, 2026-07-27).** Carres does not phone the
+customer about a delay — logistics does, because logistics arranges every delivery
+appointment. And **nobody reaches the customer before the real ready date is known**: a call
+that can only say "it will be late" and cannot answer "then when?" makes it worse.
+
+### Supplier exception (goods short, damaged or wrong)
+
+One shared vocabulary, used by every module that waits on a supplier:
 
 ```
 Receiving Exception Created
@@ -83,7 +143,7 @@ Case Owner Decision Required                    Exception Closed
 ```
 
 **`Contact {supplier} — confirm what happens next`**
-- Trigger: the goods will miss the customer's promised date, or arrived short / damaged / wrong
+- Trigger: goods arrived short / damaged / wrong
 - Checklist: state the problem · agree what the supplier will do · record the reply · record the new arrival date
 - Completion: a supplier reply is recorded AND either a new arrival date exists or the supplier has said it cannot fulfil
 - Task Owner: the module assigns it
@@ -91,20 +151,10 @@ Case Owner Decision Required                    Exception Closed
 **`Case Owner Decision Required`**
 - Trigger: the supplier cannot fulfil
 - Completion: the case owner has chosen what happens to this order
-- Owner: the **Case Owner** — this is the one action that is never delegated
+- Owner: the **Case Owner** — the one action that is never delegated
 
-**`Call {logistics} — arrange new delivery date`**
-- Trigger: the goods will miss the promised date **and the real ready date is known**
-- Checklist: give logistics the new ready date · logistics contacts the customer · record the date the customer accepted · record the time slot · record the outcome
-- Completion: a customer-confirmed new date AND slot are recorded
-- Task Owner: the module assigns it
-
-**THE RULE THAT GOVERNS THIS WHOLE SECTION (Jess, 2026-07-27).** Carres does not phone the
-customer about a delay. **Logistics does** — they are the ones who arrange every delivery
-appointment, so they carry this one too. And **nobody contacts the customer before the ready
-date is known**: a call that can only say "it will be late" and cannot answer "then when?"
-makes things worse. The order of the world is: we try to fix it → we get the real ready date
-→ we hand it to logistics → logistics agrees a new date with the customer.
+If either outcome pushes the goods past the customer's promised date, it does not invent a
+second customer conversation: it opens **Stage 1** of the delay recovery above.
 
 ### Payment
 

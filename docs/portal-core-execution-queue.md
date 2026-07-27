@@ -233,36 +233,34 @@ document exists for this trip (and, once logistics have their own portal, has be
 **Done when:** an operator never types a DO again; the document is available the moment the
 customer's date is confirmed.
 
-## C8 · A stock delay goes through logistics, not to the customer (Jess ruling 2026-07-27)
+## C8 · Delay recovery as a state machine (Jess ruling 2026-07-27)
 
-**Two things are wrong in what shipped as T3.** It tells the operator to
-`Call customer (stock delay)` — and Carres does not phone the customer about a delay
-(logistics arranges every delivery appointment, so they carry this one too), and it fires
-the moment the miss is certain, before anyone knows the new ready date. An operator who
-rings and cannot answer "then when?" has made it worse.
+**Build the three stages exactly as `docs/ORDERS-WORKING-FLOW.md` §3 states them** —
+stage · trigger · owner · action · checklist · completion, plus the transition table. That
+file is the specification; this card is the work.
 
-**The chain (from Jess's own words):**
-```
-stock problem  →  we try to fix it ourselves (the customer knows nothing)
-               →  we get the REAL ready date from the supplier
-               →  we hand it to logistics
-               →  logistics agrees a new date with the customer
-               →  the customer-confirmed new date lands in the system
-```
+**What shipped as T3 has two faults, both fixed here:** it tells the operator to
+`Call customer (stock delay)` — the wrong party, Carres does not phone a customer about a
+delay — and it fires the moment the miss is certain, before anyone knows the new date.
+Until a real ready date exists the rung stays on `Call {supplier} — confirm ready date`.
 
-**Build:**
-1. The stock-delay rung stops naming the customer. Until the real ready date is known it
-   stays on the supplier (`Call {supplier} — confirm ready date`) — chasing the date IS the
-   work at that point.
-2. Once a ready date exists and it misses the promise, the action becomes
-   **`Call {logistics} — arrange new delivery date`**, completing on a customer-confirmed
-   date + slot — the same evidence the normal booking flow records, so no second path.
-3. **Nothing may open a customer call about a delay.** No label, no queue, no preset.
+**The two invariants a build chat must not soften:**
+1. **No surface may open a customer call about a delay.** No label, no queue, no preset.
+2. **Stage 2 cannot open before Stage 1 completes** (a proposed date exists AND a person is
+   named). The gate is the data, not a warning.
 
-**Small additive migration** for the proposed date / who is handling it — draft to Jess
-first. Reuse T4's `DELIVERY_REASONS`; never a second reason list. **Depends on C2.**
-**Done when:** no surface anywhere tells an operator to phone a customer about a delay, and
-the logistics action cannot open before a ready date exists.
+**Stage 2's owner is Operations, not logistics** — seven of eight logistics companies have
+no login and the partner portal has no appointment screen. Do not create a task nobody can
+see. (Moving it to logistics later is its own card.)
+
+**Stage 3 writes carefully:** the booking goes to `confirmed_date` + `confirmed_time_slot`;
+the PROMISED date is read-only and moves only through the existing one-time extension with a
+reason from `DELIVERY_REASONS`. Nothing overwrites `orders.delivery_date`.
+
+**Small additive migration** for the proposed date + the named person — draft to Jess first,
+check the tracker tail immediately before applying. **Depends on C2.**
+**Done when:** the three stages exist with their triggers and completions; no surface tells
+an operator to phone a customer about a delay; Stage 2 cannot open early.
 
 ## Status
 
