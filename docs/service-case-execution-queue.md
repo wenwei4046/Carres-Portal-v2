@@ -116,6 +116,44 @@ uploader role in the case view.
 
 **Done when:** closing a case requires all its tasks closed + customer-confirmed.
 
+> **SHIPPED 2026-07-27 (PR #431, migration 0293 applied).** Notes for the cards that follow:
+> - **The steps are DERIVED, not created.** `packages/shared/src/service-case-plan.ts`
+>   turns question 5 into the chain (`caseFollowUpPlan`), so there is no task row to
+>   forget to create, none to delete, and none that can drift from what the customer
+>   asked for. What IS stored is the opposite half — each step's OUTCOME
+>   (`service_cases.progress`: the date it happened, stamped with who recorded it).
+>   Nothing in this card is a tick-box; every step closes on a fact.
+> - The chain, from the wants: repair → supplier date · collect · send to supplier ·
+>   check in · redeliver · **replace** → supplier date · collect · redeliver (a
+>   replacement does not go to the factory) · **missing parts** → supplier date ·
+>   redeliver (nothing comes back — what the customer has is not faulty) ·
+>   **inspection** → inspect (a note is mandatory) · **refund** → collect ·
+>   **and every case ends on the customer's own word**, including a case with no
+>   answers at all.
+> - **The close gate is the server's** (422 `case_steps_open`, naming what is left),
+>   plus a DB floor: 0293's trigger refuses the transition INTO a closed status
+>   without a `customer_confirmed` entry. The floor is strictly weaker than the API
+>   gate, and it fires on the TRANSITION only — the one live case (SC2607-01) is
+>   already closed and stays editable.
+> - **The supplier is nameable today and the PO is not**: prod holds 0 purchase
+>   orders but 200 of 205 SKUs carry a `supplier_id`, so the factory is resolved from
+>   the SKU at intake, server-side, and snapshotted onto `service_cases.supplier_id`.
+>   The label reads `Call Ohana — confirm the repair date`, degrading to "the
+>   supplier" only where no name exists.
+> - **No supplier-claim row is minted.** R2/R3's `supplier_claims` is keyed to a PO
+>   LINE (a receiving problem) and a customer complaint has no PO — cross-linking the
+>   two is R3's territory, not this card's. The card's own words are what shipped:
+>   the call, with the supplier named.
+> - **Two of Law 2's six things are deliberately absent, and S4 owns one of them**:
+>   the steps carry no DEADLINE (the 14-working-day SLA is S4; a per-step clock
+>   invented here would be a second rule S4 must unpick) and no per-step OWNER
+>   (nothing in service cases assigns a PIC; the module is operation-scoped).
+>   **Nothing in S3 ever turns red.**
+> - `progress` is append-only through `POST /:id/progress` — the generic PATCH never
+>   had the field. One outcome per step; a second is refused (`step_already_recorded`).
+>   A step OUTSIDE the current plan can still be recorded (the answers stay editable
+>   and history must not lie); the plan only decides what is still OWED.
+
 ## S4 · 14 working days SLA + at-risk alert
 
 **Goal:** every case shows its deadline (14 WORKING days from report — Sun excluded,
@@ -144,6 +182,6 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 |---|---|---|
 | S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
 | S2 | ✅ | [#410](https://github.com/wenwei4046/Carres-Portal-v2/pull/410) · migration **0289** |
-| S3 | ⬜ | — |
+| S3 | ✅ | [#431](https://github.com/wenwei4046/Carres-Portal-v2/pull/431) · migration **0293** |
 | S4 | ⬜ | — |
 | S5 | ⬜ | — |

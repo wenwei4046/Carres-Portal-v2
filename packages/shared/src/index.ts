@@ -640,6 +640,11 @@ export {
   caseEvidenceUploadedSchema,
   signCaseEvidenceUploadInputSchema,
   signCaseEvidenceUploadResponseSchema,
+  // S3 (0291) — the recorded outcomes of the follow-up chain.
+  caseProgressEntrySchema,
+  recordCaseStepInputSchema,
+  type CaseProgressEntryRecord,
+  type RecordCaseStepInput,
   type CaseEvidenceEntry,
   type CaseEvidenceListResponse,
   type CaseEvidenceUploaded,
@@ -1407,6 +1412,27 @@ export {
   type CaseEvidenceGap,
   type CaseEvidenceMimeType,
 } from "./service-case-evidence";
+// S3 — the case drives the follow-ups. The chain is DERIVED from the intake
+// answers; only its outcomes are stored (service_cases.progress, 0291).
+export {
+  CASE_STEP_ORDER,
+  CASE_STEP_KEYS,
+  caseFollowUpPlan,
+  caseStepCatalogue,
+  caseStepDefinition,
+  caseStepEntry,
+  caseStepDone,
+  caseOpenSteps,
+  caseNextStep,
+  caseMayClose,
+  caseCloseBlockerMessage,
+  caseTimeline,
+  type CaseStepKey,
+  type CaseStep,
+  type CaseFollowUpInput,
+  type CaseProgressEntry,
+  type CaseTimelineRow,
+} from "./service-case-plan";
 export {
   bookingConfirmGate,
   isSundayIso,

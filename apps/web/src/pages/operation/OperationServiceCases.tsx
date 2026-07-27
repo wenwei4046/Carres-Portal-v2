@@ -4,7 +4,9 @@ import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import {
+  caseFollowUpPlan,
   caseNeedsManager,
+  caseOpenSteps,
   type CasePriority,
   type ServiceCase,
   type ServiceCaseListResponse,
@@ -117,6 +119,10 @@ export default function OperationServiceCases() {
                 <th className="text-left px-3 py-2 font-medium">Type</th>
                 <th className="text-left px-3 py-2 font-medium">Customer / Ref</th>
                 <th className="text-left px-3 py-2 font-medium">What Happened</th>
+                {/* S3 — the row says what to DO next, not only what happened.
+                    Derived from the case's own answers, so it costs no extra
+                    query and cannot drift from the case view. */}
+                <th className="text-left px-3 py-2 font-medium">Next step</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
                 <th className="text-left px-3 py-2 font-medium">Opened</th>
                 <th className="text-right px-3 py-2 font-medium">Actions</th>
@@ -156,6 +162,9 @@ export default function OperationServiceCases() {
                       {r.whatHappened || <span className="text-base-400">—</span>}
                     </p>
                   </td>
+                  <td className="px-3 py-2 max-w-[15rem]">
+                    <NextStepCell row={r} />
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`pill ${r.statusIsClosed ? "pill-confirmed" : "pill-neutral"}`}>
                       {r.statusLabel ?? "Unset"}
@@ -190,6 +199,41 @@ export default function OperationServiceCases() {
         <ServiceCaseModal mode="edit" id={editId} onClose={() => setEditId(null)} onSaved={() => setEditId(null)} />
       )}
     </div>
+  );
+}
+
+/**
+ * S3 — the ONE follow-up that shows first, with the rest behind a "+N"
+ * (ACTION-FLOW-STANDARD Law 1, layer 2: nothing is suppressed, only out-ranked;
+ * every open step is visible the moment the case is opened).
+ *
+ * A closed case shows the terminal fact instead of an action — there is nothing
+ * to do on it, and "Done" is a fact, not a to-do word.
+ */
+function NextStepCell({ row }: { row: ServiceCase }) {
+  if (row.statusIsClosed) return <span className="text-xs text-base-500">Done</span>;
+
+  const open = caseOpenSteps(
+    caseFollowUpPlan({
+      customerWants: row.customerWants ?? [],
+      customerName:  row.customerName,
+      supplierName:  row.supplierName ?? null,
+    }),
+    row.progress ?? [],
+  );
+  if (open.length === 0) {
+    return (
+      <span className="text-sm text-base-700">Everything done — close this case.</span>
+    );
+  }
+
+  return (
+    <span className="block">
+      <span className="block text-sm text-base-900">{open[0].label}</span>
+      {open.length > 1 && (
+        <span className="t-tiny text-base-500">+{open.length - 1} more</span>
+      )}
+    </span>
   );
 }
 
