@@ -292,12 +292,58 @@ chooser appears ONLY when part is ready and part is not, and opens on `Wait for 
 `docs/COPY-STANDARD.md` gains the group words (`Bed set` · `Sofa` · `Second trip`;
 "partial delivery" / "split shipment" / "back-order" banned on screen).
 
-## T9 · Logistic partner profiles (promotes L6)
+## T9 · Logistic partner profiles (promotes L6) ✅ (PR #398)
 
 Working days · blackout dates · daily capacity · booking lead time — and the confirm flow
 warns when an operator books a date the partner cannot honour. First real consumer of
 partner rules; the working-day util (L3) ships inside this card or T10, whichever needs it
 first.
+
+**Shipped note (PR #398, migration 0283):** shared + api + web, four additive columns.
+
+**These WARN, they never BLOCK — the one design call.** The gates that *refuse* a
+confirmation (goods reserved · balance collected · no Sunday, `booking-gate.ts`) are about
+**our own** obligations. A carrier's working pattern is not one of ours, and the carrier is
+reachable by phone: an operator who already rang NETS and got a yes must be able to record
+that yes. A refusal here would teach staff to enter fake dates, which is worse than a real
+date with a note against it. So the Confirm button never reads these warnings, and the
+confirm response hands them back *after* the write.
+
+**The working-day util did NOT ship inside this card** — the card offered T9 or T10 as its
+home, but `packages/shared/working-days.ts` + `my-holidays.ts` already shipped with
+procurement 2026-07-21 (the same discovery T7 made). So T9 *delegates* to it rather than
+reimplementing, and the notice period counts the **partner's own** working week: a
+Saturday-off carrier's "2 days' notice" is not our 2 days.
+
+**Silence over a false alarm** (the T7 law, held): all 8 live carriers are bare rows, so
+every one reads "no rules recorded" and produces **zero** warnings. Absent data means "we
+never asked", never "it's fine". Capacity stays quiet unless the partner states a limit
+*and* the day's load was actually counted — `null` is not zero, and the count is skipped
+entirely for a partner with no limit rather than fetched as trivia nobody reads.
+
+**Sunday is deliberately absent from a carrier's rules.** It is refused for *every* partner
+by the existing gate; a softer per-partner voice saying "call them" would read as though a
+phone call could buy a Sunday. The off-day rule skips weekday 0 and the editor offers
+Mon–Sat only.
+
+**Why an RPC, not a policy:** `partners_principal_write` (0002) is principal-only and
+operation is exactly who maintains these rules — but an UPDATE policy cannot be narrowed to
+four columns, so widening it would also hand operation the partner's name, contact and rate
+card. `set_partner_delivery_rules` (SECURITY DEFINER) names the four columns and audits the
+change, because a change to these rules changes what the portal warns about tomorrow.
+
+The editor lives in the drawer where the rules are FIRST read, per L6's own instruction
+("build the fields WITH the first consumer, not as an admin page up front"). Today in MYT,
+not UTC — the Worker's clock is UTC, and between 16:00 and midnight UTC it is already
+tomorrow in Klang, so "cannot take a date in the past" must not fire a day early.
+`docs/COPY-STANDARD.md` gains the carrier-rule words (`delivery rules` · `working days
+notice` · `not running on` · `deliveries a day`) and the law that every one of these lines
+names the carrier and ends in something the operator can do.
+
+**Found, not fixed (not this card):** the drawer's delivery badge still renders
+`Unscheduled` for "carrier assigned, no date" (`OrderDetailDrawer.tsx` ~3814 and ~3853).
+T1 banned that word and fixed the LIST column; these two drawer copies were left behind.
+One-line fix to T1's `need booking`, flagged rather than touched.
 
 ## T10 · Delivery calendar as single source (promotes L2)
 
@@ -325,17 +371,21 @@ else is planned past T11 on purpose.
 - **L3 Working-day calendar engine** — **already existed** (found in T7):
   `packages/shared/working-days.ts` + `my-holidays.ts`, shipped with procurement
   2026-07-21 (Mon–Sat, Selangor holidays, calendar injected). T7's deadlines use it.
-  What is still NOT built is the per-site refinement (condo Sat 0.5d etc.) — that
-  belongs to T9's partner profiles, not to a new engine.
+  What is still NOT built is the per-site refinement (condo Sat 0.5d etc.) — T9 did NOT
+  take it: T9 models a carrier's whole days (`off_days`) because half a day answers
+  neither question it asks. A site-level refinement is a different subject (the customer's
+  building, not the carrier), so it stays here unclaimed rather than being wedged into a
+  partner profile.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
 - **L5 Delivery module page (3-pane) → PROMOTED TO T11** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
   the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
-- **L6 Logistic partner profiles → PROMOTED TO T9** — per-partner rules the booking flow will eventually read:
-  working days (Sat half/full), blackout dates ("truck maintenance 15-18 Feb"), daily capacity
-  ("NETS max N drops/day"), booking lead time ("needs 2 working days notice" → warn when an
-  operator confirms a date the partner cannot honour). Today partners are bare rows; build the
-  fields WITH the first consumer (likely L1's deadlines or L2's calendar), not as an admin page
-  up front.
+- **L6 Logistic partner profiles → SHIPPED as T9 (PR #398, migration 0283).**
+  All four fields landed (working days · blackout dates · daily capacity · booking lead
+  time), and the editor sits WITH its first consumer — the drawer's confirm flow — exactly
+  as this entry asked, not as an admin page up front. **One thing L6 wanted was NOT built:**
+  Saturday *half*-days. Half a working day answers neither question T9 asks (does the
+  partner run at all · what is the earliest date it can take), so a day is open or it is
+  not. The per-site refinement (condo Sat 0.5d etc.) stays unbuilt — see L3.
 - **L7 Delivery groups / partial delivery → SHIPPED as T8 (PR #391, migration 0282).**
   The business rule from Jess's design conversation: mattress + bed frame = ONE delivery
   (hard, never split) · sofa = prefer together but may go as a second trip · accessories
@@ -363,6 +413,6 @@ else is planned past T11 on purpose.
 | T6 | ✅ shipped 2026-07-26 | #384 |
 | T7 | ✅ shipped 2026-07-27 | #386 |
 | T8 | ✅ shipped 2026-07-27 | #391 |
-| T9 | ⬜ partner profiles | — |
+| T9 | ✅ shipped 2026-07-27 | #398 |
 | T10 | ⬜ delivery calendar | — |
 | T11 | ⬜ delivery module page (FINAL) | — |
