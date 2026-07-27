@@ -6,6 +6,10 @@ import {
   CASE_USABLE_KEYS,
   CASE_WANT_KEYS,
 } from "../service-case-intake";
+import {
+  CASE_EVIDENCE_MIME_TYPES,
+  CASE_EVIDENCE_SLOT_KEYS,
+} from "../service-case-evidence";
 
 /**
  * Service Cases (migration 0210) — the case / 病历 parent layer above Service
@@ -42,6 +46,78 @@ export const serviceCaseConfigSchema = z.object({
   statuses: z.array(caseStatusSchema),
 });
 export type ServiceCaseConfig = z.infer<typeof serviceCaseConfigSchema>;
+
+// ── Evidence (S2, migration 0288) ────────────────────────────────────────────
+
+/**
+ * One filed piece of evidence. `at` / `by` / `byRole` are stamped by the SERVER,
+ * never sent by a client — the card's "every file is stamped who-uploaded +
+ * when" is only worth anything if the stamp cannot be authored by the uploader.
+ * (0288's CHECK makes them structurally non-optional in the row as well.)
+ *
+ * `slot` is a plain string rather than the slot enum on the READ side: a file
+ * filed under a slot key that is later retired must still be visible in the case
+ * view, not vanish from the ledger.
+ */
+export const caseEvidenceEntrySchema = z.object({
+  slot:   z.string(),
+  path:   z.string(),
+  kind:   z.enum(["photo", "video"]),
+  at:     z.string(),
+  by:     z.string(),
+  byRole: z.string(),
+});
+export type CaseEvidenceEntry = z.infer<typeof caseEvidenceEntrySchema>;
+
+/** The ledger read, with a short-lived signed URL per file. `url` is null when
+ *  signing failed — the row still says a file exists rather than pretending the
+ *  evidence was never taken. */
+export const caseEvidenceListResponseSchema = z.object({
+  evidence: z.array(caseEvidenceEntrySchema.extend({ url: z.string().nullable() })),
+});
+export type CaseEvidenceListResponse = z.infer<typeof caseEvidenceListResponseSchema>;
+
+/**
+ * Ask for a signed upload URL. Exactly ONE of `draftId` / `caseId`:
+ *   - draftId — the wizard, before the case exists. "No evidence, no case" means
+ *     the files must be uploadable BEFORE there is a case to hang them on.
+ *   - caseId  — an existing case gaining a file later (the customer sends the
+ *     photo the next day).
+ * The server builds the object key from whichever it gets; the client can
+ * neither pick nor overwrite a path.
+ */
+export const signCaseEvidenceUploadInputSchema = z
+  .object({
+    draftId:  z.string().uuid().optional(),
+    caseId:   z.string().uuid().optional(),
+    slot:     z.enum(CASE_EVIDENCE_SLOT_KEYS),
+    mimeType: z.enum(CASE_EVIDENCE_MIME_TYPES),
+  })
+  .refine((v) => !!v.draftId !== !!v.caseId, {
+    message: "Give exactly one of draftId or caseId",
+  });
+export type SignCaseEvidenceUploadInput = z.infer<typeof signCaseEvidenceUploadInputSchema>;
+
+export const signCaseEvidenceUploadResponseSchema = z.object({
+  token: z.string(),
+  path:  z.string(),
+});
+export type SignCaseEvidenceUploadResponse = z.infer<typeof signCaseEvidenceUploadResponseSchema>;
+
+/**
+ * What the client hands back once the bytes are in the bucket.
+ *
+ * Just the slot and the path. `at` / `by` / `byRole` are stamped by the server,
+ * and `kind` is DERIVED from the slot registry rather than sent — a client that
+ * could declare its own kind could file a photo as the video the checklist asked
+ * for and satisfy the count while proving nothing. (The mime type is checked
+ * against the slot at sign-upload time, before any bytes move.)
+ */
+export const caseEvidenceUploadedSchema = z.object({
+  slot: z.enum(CASE_EVIDENCE_SLOT_KEYS),
+  path: z.string().min(1),
+});
+export type CaseEvidenceUploaded = z.infer<typeof caseEvidenceUploadedSchema>;
 
 // ── The case record ──────────────────────────────────────────────────────────
 
@@ -100,6 +176,13 @@ export const serviceCaseSchema = z.object({
   usable:          z.enum(CASE_USABLE_KEYS).nullable().optional(),
   priority:        z.enum(["low", "normal", "high"]).nullable().optional(),
   customerWants:   z.array(z.enum(CASE_WANT_KEYS)).optional(),
+
+  /**
+   * S2 — the evidence ledger (migration 0288). Every file the case was filed
+   * with, stamped with WHO uploaded it and WHEN. Optional for the same
+   * degrade-don't-crash reason as the S1 fields above.
+   */
+  evidence:        z.array(caseEvidenceEntrySchema).optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 
@@ -134,10 +217,27 @@ export const createServiceCaseInputSchema = z.object({
   issueType:       z.enum(CASE_ISSUE_KEYS).optional(),
   usable:          z.enum(CASE_USABLE_KEYS).optional(),
   customerWants:   z.array(z.enum(CASE_WANT_KEYS)).optional(),
+
+  /**
+   * S2 — the evidence uploaded against `draftId` before this case existed. The
+   * server checks every path really sits under that draft's own prefix, then
+   * checks the files satisfy `issueType`'s required checklist and REFUSES the
+   * create if they do not. A disabled button is not "impossible"; this is.
+   */
+  draftId:         z.string().uuid().optional(),
+  evidence:        z.array(caseEvidenceUploadedSchema).optional(),
 });
 export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema>;
 
-export const updateServiceCaseInputSchema = createServiceCaseInputSchema.partial();
+/**
+ * Update deliberately DROPS `evidence` / `draftId`: the ledger is append-only
+ * through its own endpoint, so a PATCH can neither replace the evidence nor
+ * quietly delete it. (`.omit` before `.partial()` — a partial of a schema that
+ * still has the field would let it through as optional.)
+ */
+export const updateServiceCaseInputSchema = createServiceCaseInputSchema
+  .omit({ evidence: true, draftId: true })
+  .partial();
 export type UpdateServiceCaseInput = z.infer<typeof updateServiceCaseInputSchema>;
 
 // ── Lookup (Ref No or Order ID → order autofill) ─────────────────────────────

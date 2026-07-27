@@ -2055,3 +2055,113 @@ No dunning ladder, no reminders, no Credit Bureau call, and `invoice.payment_fai
 recorded (the events table has no `payment_failed` kind — a one-line CHECK change when it lands).
 All of it waits on a comms channel and the bureau contract, both of which Loo said to stand by
 rather than build.
+
+---
+
+## 2026-07-27 · Service Case S2 — no evidence, no case
+
+**Card**: `docs/service-case-execution-queue.md` S2, one card only.
+**Worktree**: `service-case-execution-queue-s2-cef81e` · branch `claude/service-case-execution-queue-s2-cef81e`.
+
+S1 made "what's wrong" a stable key. S2 makes that key decide which photos the case cannot
+be filed without, and stamps every file with who uploaded it and when.
+
+### The card's one line that cannot be followed literally
+
+Its worked example is Colour uneven → customer WhatsApp screenshot · overall photo ·
+close-up ×2 · SKU label · 10–20s video. Implemented verbatim — **except** that a screenshot
+of the customer's message cannot exist when the WAREHOUSE found the fault before it ever
+shipped. A required item nobody can produce does not stop a bad case; it teaches staff to
+upload a junk photo to get past the gate, which is worse than no gate because the junk photo
+now looks like evidence.
+
+So a checklist rule may name the `reporters` it applies to, and the customer-message slot is
+asked only when question 1 said "Customer". A test asserts every issue type still demands at
+least one file on **every** reporter (all 7 × 5 combinations) and that each list can be
+satisfied by uploading exactly what it asks for — a checklist that cannot be completed is the
+failure mode this replaces.
+
+Same reasoning made the **carton photo optional** wherever it appears (damaged, missing
+parts): a complaint raised weeks after delivery has no box left to photograph. The
+instruction says why it helps instead ("Show whether the box is torn or wet. This decides who
+pays.").
+
+### Where the rule lives
+
+`packages/shared/src/service-case-evidence.ts` — a global slot registry (what a piece of
+evidence IS: label, photo vs video, default instruction) plus `CASE_EVIDENCE_BY_ISSUE` (which
+slots, how many, required or not, whose instruction differs). Two structures, one file. Slot
+KEYS are stored, so labels can be reworded without re-tagging a filed case, and S5 can count
+"cases with no close-up" off one column.
+
+**Deliberately NOT mirrored in SQL.** 0285 paid the two-copy cost for the priority ladder
+because that rule is three rungs and the database had to reach the answer alone. This one is a
+function of two answers plus per-slot counts — a SQL copy would not be a mirror, it would be a
+differently-shaped rule that drifts.
+
+What the database *does* hold alone:
+
+1. **The stamp.** `service_case_evidence_wellformed` refuses any entry missing
+   slot/path/kind/at/by/by_role, so "every file is stamped who-uploaded + when" is
+   structurally true rather than a promise the write path is trusted to keep.
+2. **The floor.** `issue_type is not null` ⇒ at least one file. Strictly WEAKER than the API
+   checklist (every issue type's required list is non-empty for every reporter — asserted), so
+   it can never refuse something the API would allow. Same spirit as making `priority`
+   generated rather than merely un-offered.
+
+### The dry run caught a real defect in my own migration
+
+The floor was first written `check (issue_type is null or jsonb_array_length(evidence) > 0)`.
+CHECK constraints on one row evaluate in an **unspecified order**, and `jsonb_array_length()`
+on a non-array raises 22023 — a hard error, not a check violation. Writing an object instead of
+an array therefore crashed *before* `sc_evidence_wellformed` could refuse it, and the sanity
+block's `exception when check_violation` handler did not catch it. Found on live prod in a
+rolled-back transaction, fixed with a `jsonb_typeof(evidence) = 'array'` guard, re-run clean:
+12 assertions, `DRY_RUN_REACHED_END`, then verified the rollback left no column, no bucket, no
+function and the one real case (SC2607-01) untouched.
+
+The payload contained every object the migration changes — column, function, both constraints,
+bucket, both storage policies — the rule 0279 and 0281 both learned the hard way.
+
+### The gate is the server's, not the button's
+
+`POST /api/ops/service-cases` recomputes `caseEvidenceGaps` from the same shared function the
+disabled button asks, and answers 422 `evidence_missing` naming what is short. A client that
+skips the button, an old cached bundle and a future caller all meet the same refusal. It also
+checks every submitted path really sits under the draft the client claims, so a case can never
+be filed with another draft's files.
+
+Three things the client is not trusted with: `at`/`by`/`by_role` (stamped server-side), `kind`
+(derived from the slot registry — a photo declared as the video would satisfy the count and
+prove nothing), and the object key (built by the sign-upload route, so a path can be neither
+picked nor overwritten). The mime type is checked against the slot **before any bytes move**.
+
+### Chicken-and-egg, and what it costs
+
+"No evidence, no case" means the files must be uploadable BEFORE a case row exists to hang them
+on. The wizard mints a `draftId` (once, in a `useState` initialiser — a re-render that re-minted
+it would orphan every upload and the server would refuse the create) and uploads to
+`draft/{id}/`; the create hands the paths over. Abandoning the wizard therefore leaves orphans
+in the bucket → CF `case-evidence-abandoned-draft-orphans`. A move-on-create would make the
+prefix its own liveness test but adds a failure mode between "bytes uploaded" and "case filed",
+which is the one place S2 must not become flaky.
+
+### Surfaces
+
+Wizard is 6 steps now; step 6 is the tick-list — one line per requirement, a plain instruction
+under each (the instruction IS the training), a count when more than one is asked for, "If you
+have it" on the optional ones, one obvious Upload button. The case view gains
+`CaseEvidenceGallery`: thumbnails, the slot's name, and **`{role} · 27 Jul 26 · 15:14`** per
+file. Files can be ADDED there later (the customer sends the photo the next day) but never
+removed — no remove endpoint, and 0288 grants the bucket no delete policy. Evidence is evidence.
+
+Bucket `service-case-evidence` is PRIVATE (a complaint photo shows a customer's home, and the
+video may carry their voice) at 25 MB, not 2 MB: the checklist asks for a 10–20 second video and
+a phone clip cannot be re-encoded in the browser the way a photo can. Photos still go through
+`shrinkImage`; videos are size-refused in plain words up front.
+
+### Evidence
+
+shared **1432/1432** (+22) · api **3** = §17.7 baseline · web **16** = §17.7 baseline — zero new.
+Web +17 tests (11 wizard, 6 gallery), api +14. typecheck 0, build + `check:v4` + design-standard
+clean, `SERVICE_ROLE` grep 0 on the built bundle.

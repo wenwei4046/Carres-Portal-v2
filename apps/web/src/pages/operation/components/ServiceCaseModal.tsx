@@ -14,6 +14,7 @@ import {
 } from "@carres/shared";
 import { Search, X } from "lucide-react";
 import CaseOrderLink from "./CaseOrderLink";
+import CaseEvidenceGallery from "./CaseEvidenceGallery";
 
 /**
  * Create / edit a Service Case (病历).
@@ -298,6 +299,17 @@ export default function ServiceCaseModal({
                 />
               </dl>
             </div>
+          )}
+
+          {/* S2 — the evidence the case was filed with, each file naming who
+              uploaded it and when. Edit mode only: on create the wizard owns
+              the checklist, and this modal no longer creates cases anyway. */}
+          {mode === "edit" && id && (
+            <CaseEvidenceGallery
+              caseId={id}
+              issueType={existingQ.data?.issueType ?? null}
+              reportedBy={existingQ.data?.reportedBy ?? null}
+            />
           )}
 
           {/* Medical record */}
