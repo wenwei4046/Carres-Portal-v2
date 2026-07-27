@@ -230,12 +230,9 @@ async function recordRentalSession(c: Context<AppEnv>, stripe: Stripe, session: 
  * OLDEST still-owing instalment, which is what "paying your rent" means.
  */
 async function recordRentalInvoice(c: Context<AppEnv>, invoice: Stripe.Invoice) {
-  // SDK v22 moved this: `invoice.subscription` is gone, the link now hangs off
-  // `parent.subscription_details.subscription`. Read out of the installed
-  // types rather than assumed — the same lesson 0255 learned when v22 swapped
-  // a schedule's `iterations` for `duration`.
-  const sub = invoice.parent?.subscription_details?.subscription ?? null;
-  const subId = typeof sub === "string" ? sub : sub?.id ?? null;
+  // Both invoice shapes — see subscriptionIdOf. Reading only the v22 field was
+  // a live no-op against our acacia-pinned endpoint.
+  const subId = subscriptionIdOf(invoice);
   // No subscription = not a rental instalment (a one-off invoice, say). Ignore
   // rather than guess, and acknowledge so Stripe stops retrying.
   if (!subId) return c.json({ received: true, ignored: "not_a_subscription_invoice" });
@@ -272,6 +269,32 @@ async function recordRentalInvoice(c: Context<AppEnv>, invoice: Stripe.Invoice) 
   }
   const out = data as { already?: boolean; seq?: number } | null;
   return c.json({ received: true, seq: out?.seq ?? null, already: out?.already ?? false });
+}
+
+/**
+ * Which subscription an invoice belongs to — under BOTH invoice shapes.
+ *
+ * Found 2026-07-27 while checking the live endpoint: it is pinned to API
+ * version `2025-02-24.acacia`, while our SDK is v22 (Basil-era). Stripe shapes
+ * a webhook payload to the ENDPOINT's pinned version, not to the SDK's — and
+ * Basil is where `invoice.subscription` was replaced by
+ * `parent.subscription_details.subscription`. So the acacia-shaped payload we
+ * actually receive has no `parent`, and reading only the new field meant every
+ * rental invoice — paid or refused — resolved to "not a subscription invoice"
+ * and was silently dropped.
+ *
+ * Rather than pin down which release moved it and code to that answer, read
+ * both. It is correct under either version, it survives the endpoint being
+ * upgraded later, and it costs one fallback. `subscription` is absent from the
+ * v22 types, hence the narrow cast — the shape is asserted by the tests below.
+ */
+function subscriptionIdOf(invoice: Stripe.Invoice): string | null {
+  const viaParent = invoice.parent?.subscription_details?.subscription ?? null;
+  if (viaParent) return typeof viaParent === "string" ? viaParent : viaParent.id ?? null;
+  const legacy =
+    (invoice as unknown as { subscription?: string | { id?: string } | null }).subscription ?? null;
+  if (!legacy) return null;
+  return typeof legacy === "string" ? legacy : legacy.id ?? null;
 }
 
 /**
@@ -325,8 +348,7 @@ async function recordRentalInvoiceFailure(
   eventId: string,
   invoice: Stripe.Invoice,
 ) {
-  const sub = invoice.parent?.subscription_details?.subscription ?? null;
-  const subId = typeof sub === "string" ? sub : sub?.id ?? null;
+  const subId = subscriptionIdOf(invoice);
   if (!subId) return c.json({ received: true, ignored: "not_a_subscription_invoice" });
 
   const admin = adminClient(c.env);
