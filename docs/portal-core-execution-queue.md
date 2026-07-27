@@ -446,7 +446,7 @@ first; draft to Jess before applying. **Depends on C5** (shipped).
 **Done when:** an order with an uncollected storage fee cannot issue its delivery order; the
 manager can release it; a release that does not waive leaves the money action open.
 
-## C10 · The three dots become real (found by C1)
+## C10 · The three dots become real (found by C1) — ✅ LIVE (PR #471)
 
 **`rowDotsOf()` computes goods · delivery · money, is unit tested, and NOTHING RENDERS IT.**
 The list's `Status` column shows a stage pill; its tooltip was even describing the three
@@ -482,6 +482,55 @@ take it from the widest neighbour, not from the Actions column, which C3 is abou
 byte-identical to today, and a delivered order still never alarms on goods or delivery
 while it may show red money.
 
+**SHIPPED (PR #471).** All three done-whens met. The dots render beside the stage pill in
+the Status column, each as **its own icon** from the UI-KIT §A4 canonical mapping — goods
+`package` · delivery `truck` · money `wallet`, 14px, never emoji. The icon is what labels
+the dot, which is exactly why the dots need no header of their own.
+
+**The proof that dead code became a screen is measured, not asserted.** The four dot
+tooltips and the `row-dot-` testid grep **0 in the previous live bundle** (`index-BYggEOBr.js`,
+C2's — they were tree-shaken, which is what "rendered nowhere" really meant) and **1 in the
+new one** (`index-CToiHJof.js`). Both directions, on the downloaded file.
+
+**`rowDotsOf` now returns the STATE, not a hex** — the hue is the renderer's business, so the
+tests pin the meaning and the paint stays in the one existing `DOT_HEX` map (no new hex
+literal; the ratchet holds at 43). **The dot ORDER flipped to the law's** goods · delivery ·
+money; the §14 note of 2026-07-18 had money first, the 2026-07-27 laws re-ruled it, and since
+nothing had ever rendered these dots, no screen changed when it flipped.
+
+**Widths were measured against the app's own stylesheet**, in a real 1448px `table-fixed`:
+the widest pill is 137px and three icons 50px, so Status went **11 → 14** and both fit intact
+with 15px spare, the pill untruncated — and **the row stays exactly 40px, it does not grow**.
+The 3 points came from the two neighbours with real slack (deadline 13 → 12, needs 142 of
+174; stock 11 → 9, needs 119 of 130), **never from Actions**, which C3 is about to grow. On a
+narrower screen the pill truncates and the dots stay whole (`shrink-0`) — the stage word has
+a tooltip and a five-word vocabulary; a half-drawn signal would not.
+
+### What C10 found — read before C3
+
+1. **`rowDotsOf` had NO tests.** Both the C5 note above and this card state it is "unit
+   tested"; the repo-wide grep returns the definition and nothing else. C10 wrote the first
+   cover its truth table has ever had — 11 tests, with a negative control (reverse the dot
+   order → 8 fail). **The lesson is about the claim, not the gap**: "computed and tested but
+   not rendered" reads as *two thirds done*, and it was one third.
+2. **Law 6 still says "the column carries no header word", and that sentence is now wrong —
+   Jess needs to strike it.** It was written when the dots were to OWN that column. Her own
+   later ruling put the stage pill beside them, and a column holding a stage pill needs a
+   word for it. This card's own text resolves it ("the dots need no header **of their own**"),
+   which is what shipped: `Status` heads the pill, the dots are labelled by their icons.
+   **A future chat reading only Law 6's older sentence would strip the header and leave the
+   pill unlabelled.**
+3. **The card's stated width was stale** — it says the column "is 9 units wide today"; C1 had
+   already widened it to 11. The instruction behind it (take from the widest neighbour, never
+   from Actions) was followed, but split across the two columns that actually had measured
+   slack rather than gutting one.
+4. **§7 gives the money dot no amber** — green, red or grey only, while goods and delivery
+   each have three tones. If "owing but not yet due" should ever read differently from "owing
+   and late", that rung does not exist. Not invented here.
+5. **The Stock and Delivery cells were already written for this card.** Their comments have
+   said "the 货 dot carries the colour" since the §14 rebuild, and they render facts in
+   ink/grey. C10 changed neither — the colour channel they were waiting for finally exists.
+
 ## Status
 
 | Card | Status | PR |
@@ -495,4 +544,4 @@ while it may show red money.
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ⬜ storage fee holds delivery · manager override | — |
-| C10 | ⬜ the three dots become real (needs one Jess call) | — |
+| C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |
