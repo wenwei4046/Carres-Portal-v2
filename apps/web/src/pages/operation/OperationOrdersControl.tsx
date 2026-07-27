@@ -64,6 +64,7 @@ import {
   displayOrderAction,
   openOrderActions,
   orderMoney,
+  storageHold,
   type OrderActionKey,
   type OrderActionSignals,
   type OrderOpenAction,
@@ -793,27 +794,37 @@ function ovlOf(o: operationOrderListRow) {
 // reads this too — since C10 it is on screen, beside the stage pill, so a row
 // that owes money says so in three places that cannot disagree.
 //
-// STORAGE is folded in here, not inside the shared rule: its clock and its
-// collected/waived flags are this page's own signals, and the shared function
-// only carries the number it is handed.
+// STORAGE comes through its own shared rule (`storageHold`, C9) — this page
+// used to read the Master-imported fee columns and IGNORE `storage_fee_override`,
+// so an order the operator had marked "No storage" still counted its fee, and
+// the dispatch gate disagreed with this row. One rule now, three readers.
+//
+// C9 also split two questions that used to be one: a manager may RELEASE a
+// delivery over an uncollected storage fee. That lifts the 🔒 (`holds`) and
+// leaves the money owed (`owing`), so `Collect RM …` stays on the worklist —
+// a release never quietly forgives money.
 export function moneyOf(o: operationOrderListRow): OrderMoney {
   const ovl = ovlOf(o);
-  const storageFee =
-    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
-  const storageOwing =
-    storageFee > 0 &&
-    !ovl?.storage_collected_at &&
-    ovl?.storage_waiver_status !== "approved"
-      ? storageFee
-      : 0;
+  const lines = o.order_lines ?? [];
+  const hold = storageHold({
+    storageFrom: ovl?.storage_from ?? null,
+    override: ovl?.storage_fee_override ?? null,
+    importedMsbf: ovl?.storage_fee_msbf ?? null,
+    importedSof: ovl?.storage_fee_sof ?? null,
+    skus: lines.map((l) => String(l.sku ?? "")),
+    asOf: todayIso(),
+    collectedAt: ovl?.storage_collected_at ?? null,
+    waiverStatus: ovl?.storage_waiver_status ?? null,
+  });
   const price = (r: { qty: number; unit_price?: number | string | null }) =>
     Number(r.unit_price ?? 0) * Number(r.qty ?? 0);
   return orderMoney({
-    lineSum: (o.order_lines ?? []).reduce((s, l) => s + price(l), 0),
+    lineSum: lines.reduce((s, l) => s + price(l), 0),
     addonSum: (o.order_addons ?? []).reduce((s, a) => s + price(a), 0),
     paid: o.paid,
     controlBalance: ovl?.balance ?? null,
-    storageOwing,
+    storageOwing: hold.owing,
+    storageReleased: hold.released,
   });
 }
 
@@ -860,6 +871,7 @@ export function orderActionSignalsOf(
     return c === "mattress" || c === "bedframe";
   });
   const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const money = moneyOf(o);
   return {
     completed: controlTabOf(o) === "completed",
     goodsReady:
@@ -881,7 +893,10 @@ export function orderActionSignalsOf(
     photoOnFile: Array.isArray(ovlOf(o)?.delivery_photos)
       ? (ovlOf(o)!.delivery_photos as unknown[]).length > 0
       : null,
-    moneyOwing: moneyOf(o).owing,
+    // C9 — two different questions. `owing` raises the money ACTION; `holds`
+    // is the 🔒 on the delivery, and a manager's release parts them.
+    moneyOwing: money.owing,
+    moneyHolds: money.holds,
   };
 }
 

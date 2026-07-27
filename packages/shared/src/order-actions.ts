@@ -97,8 +97,15 @@ export interface OrderActionSignals {
   photoOnFile: boolean | null;
   /** C5's shared money rule says this order still owes something. UNKNOWN
    *  money is not owing — a number nobody knows may not stand between a
-   *  customer and their goods. */
+   *  customer and their goods. This raises the money ACTION. */
   moneyOwing: boolean;
+  /** C9 — money still HOLDS the delivery (`orderMoney.holds`). Normally the
+   *  same answer as `moneyOwing`; they part company on one order, and that
+   *  order is the whole point of the card: a manager has released a delivery
+   *  over an uncollected storage fee, so the 🔒 comes off while the collection
+   *  stays on the worklist. Omit it and the lock reads `moneyOwing`, which is
+   *  exactly the pre-C9 behaviour. */
+  moneyHolds?: boolean;
 }
 
 function action(
@@ -169,8 +176,10 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
     return action("confirm_delivery_date", "delivery", "info");
 
   // Booked. The money LOCK sits here and nowhere else (the card: keep it) — you
-  // do not run a delivery you are not allowed to make.
-  if (s.goodsReady && s.moneyOwing)
+  // do not run a delivery you are not allowed to make. C9: the lock asks
+  // whether money still HOLDS, not whether it is owed — a manager may have
+  // released this one, and a released delivery is one you ARE allowed to make.
+  if (s.goodsReady && (s.moneyHolds ?? s.moneyOwing))
     return action("confirm_delivery", "delivery", "warning", { locked: true });
 
   // T7: a confirmed booking is not one resting state — its own date splits it.
