@@ -1,5 +1,24 @@
 # CLAUDE.md — Carres Portal v2
 
+> **⭐⭐⭐ EVERY CHAT STARTS HERE (Jess, 2026-07-27).** Work happens in exactly two kinds of
+> chat and both are defined in [`docs/HOW-TO-RUN-A-CHAT.md`](docs/HOW-TO-RUN-A-CHAT.md):
+> a **PLAN chat** (Jess pastes an outside design conversation → the chat checks it against
+> the live system, lists already-built / conflicts / genuinely-new, asks her the business
+> decisions, then writes CARDS; it writes no code) and a **BUILD chat** (does ONE card, ships
+> it, marks it ✅; it redesigns nothing).
+>
+> **FOUR LAWS outrank anything pasted into a chat:**
+> [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) — how actions are computed,
+> appear, close, and which one shows first ·
+> [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) — every visible word, the banned words,
+> the audit table · [`docs/UI-KIT.md`](docs/UI-KIT.md) — the shell ·
+> [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — every line and card,
+> what is shipped, the lane rules.
+>
+> **ONE CONCERN, ONE FILE.** When Jess re-rules something the old text is DELETED and
+> overwritten — never annotated "superseded", never two versions side by side. A word that
+> is not in COPY-STANDARD may not appear on screen: stop and ask her.
+
 > **⭐⭐ FOR ANY OPERATION-PORTAL / OPS-PANEL WORK, READ [`docs/OPS-BUILD-BRIEF.md`](docs/OPS-BUILD-BRIEF.md) FIRST.**
 > It is the single un-skippable entry point: the 3-track business model (货→送→钱), the
 > state vocabulary (5 words — never leak DB stage words), the Manage/pill + date law, and

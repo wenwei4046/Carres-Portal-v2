@@ -56,6 +56,12 @@ Suppliers           ← ④ R5 supplier scorecard lands here
 Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note stay)
 ```
 
+## How to start a chat
+
+`docs/HOW-TO-RUN-A-CHAT.md` holds the TWO paste-ready prompts — a PLAN chat (integrate an
+outside design conversation into cards) and a BUILD chat (do one card). Nothing else needs
+to be remembered.
+
 ## The engine law (read before any C-card, and before any new module)
 
 `docs/ACTION-FLOW-STANDARD.md` — two layers (compute every track · display picks one),
