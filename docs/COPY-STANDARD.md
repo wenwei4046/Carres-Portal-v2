@@ -359,12 +359,19 @@ it is in the wrong element.
 **Banned words — never visible anywhere** (each names a mood or a gap instead of work):
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
-`Pending` · `Processing` · `In Progress` · `Waiting` · `At Risk` · `Attention` ·
+`Pending` · `Processing` · `In Progress` · `At Risk` · `Attention` ·
 `Inventory` · `Movements` · `Recovery` (staff say "this order going to delay" — the word on
 screen is `Delay planning`)
 
 (Filters may name a real STATE — `Placed`, `Proceed`, `Delivered`, `Owing` — but never
 one of the words above.)
+
+**`Waiting` alone is banned; `Waiting <the exact thing>` is allowed as a STATE.**
+`Waiting` on its own tells the reader nothing — waiting for what? But
+`Waiting supplier reply` and `Waiting goods arrival` name precisely what is being waited
+for, and they are states, not actions: **nobody acts while one is true.** Never use such a
+phrase as an action label, and never shorten one to the bare word. (Ruled 2026-07-27 after
+S4 found this file banning a word its own receiving vocabulary approved.)
 
 **The no-decorative-checkbox law.** A checklist item may exist only if it is either
 (a) DERIVED from a signal the system already stores, or (b) an input the system then
