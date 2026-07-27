@@ -4,8 +4,30 @@
 // receipt. Same call the parent OperationRental page makes.
 import { useState } from "react";
 import { toast } from "sonner";
-import { useRentalCollections, useRecordRentalPayment } from "@/lib/queries";
+import {
+  useRentalCollections,
+  useRecordRentalPayment,
+  useChargeRentalInterest,
+  useRentalSettlementQuote,
+  useSettleRentalAgreement,
+} from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
+
+/**
+ * The signed settlement document, as a data URL.
+ *
+ * The API takes bytes rather than a path so the object key stays server-owned
+ * — this is evidence for a credit contract, and a client-chosen key is a
+ * traversal and a collision waiting to happen (0279's rule, reused).
+ */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read that file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * What has actually been collected on one rental agreement (0281).
@@ -30,9 +52,30 @@ export default function RentalCollectionsPanel({
 }) {
   const q = useRentalCollections(agreementId);
   const record = useRecordRentalPayment(agreementId);
+  const charge = useChargeRentalInterest(agreementId);
   const [recordingSeq, setRecordingSeq] = useState<number | null>(null);
+  const [chargingSeq, setChargingSeq] = useState<number | null>(null);
+  const [settleOpen, setSettleOpen] = useState(false);
 
   const data = q.data;
+  const canSettle = data?.agreement.status === "active";
+
+  const doCharge = (seq: number) => {
+    setChargingSeq(seq);
+    charge.mutate(
+      { seq },
+      {
+        onSuccess: () => {
+          toast.success(`Late interest charged on instalment ${seq}`);
+          setChargingSeq(null);
+        },
+        onError: (e) => {
+          toast.error(String((e as Error)?.message ?? e));
+          setChargingSeq(null);
+        },
+      },
+    );
+  };
 
   const doRecord = (seq: number) => {
     setRecordingSeq(seq);
@@ -73,14 +116,35 @@ export default function RentalCollectionsPanel({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-4 shrink-0">
+            {/* Only a live contract can be settled — a completed or rejected one
+                has nothing left to pay, and the RPC would refuse anyway. */}
+            {canSettle && (
+              <button
+                type="button"
+                onClick={() => setSettleOpen(true)}
+                data-testid="open-settle"
+                className="text-[13px] font-medium text-primary underline underline-offset-2"
+              >
+                Settle early
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-[13px] text-muted-foreground hover:text-foreground"
+            >
+              Close
+            </button>
+          </div>
         </header>
+
+        {settleOpen && (
+          <SettleDialog
+            agreementId={agreementId}
+            onClose={() => setSettleOpen(false)}
+          />
+        )}
 
         {q.isPending && (
           <div className="p-8 text-[13px] text-muted-foreground">Loading collections…</div>
@@ -158,7 +222,33 @@ export default function RentalCollectionsPanel({
                   >
                     <td className="px-3 py-2 t-num text-base-500">{b.seq}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-base-700">{b.dueDate}</td>
-                    <td className="px-3 py-2 whitespace-nowrap t-num">{rm(b.amountDue)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap t-num">
+                      {rm(b.amountDue)}
+                      {/* 0300 — two different facts, never conflated. CHARGED is
+                          on the customer's account; ACCRUED is only what the
+                          clock says so far, and stays grey until someone acts. */}
+                      {b.lateInterest != null && b.lateInterest > 0 ? (
+                        <div
+                          className="text-[11.5px] text-danger font-medium mt-0.5"
+                          data-testid={`interest-charged-${b.seq}`}
+                        >
+                          + {rm(b.lateInterest)} interest
+                          {b.interestChargedAt ? (
+                            <span className="text-base-400 font-normal">
+                              {" "}
+                              charged {b.interestChargedAt.slice(0, 10)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (b.accruedInterest ?? 0) > 0 ? (
+                        <div
+                          className="text-[11.5px] text-base-500 mt-0.5"
+                          data-testid={`interest-accrued-${b.seq}`}
+                        >
+                          + {rm(b.accruedInterest ?? 0)} not charged yet
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2">
                       {b.status === "paid" ? (
                         <span className="text-emerald-700 font-semibold whitespace-nowrap">Paid</span>
@@ -204,7 +294,7 @@ export default function RentalCollectionsPanel({
                         </>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       {b.status !== "paid" && (
                         <button
                           type="button"
@@ -215,6 +305,26 @@ export default function RentalCollectionsPanel({
                         >
                           {recordingSeq === b.seq ? "Recording…" : "Record transfer"}
                         </button>
+                      )}
+                      {/* Only offered where it is legal: a month that is unpaid,
+                          past its day, and has actually grown a penalty. No
+                          button that exists only to return an error. */}
+                      {b.status !== "paid" && (b.accruedInterest ?? 0) > 0 && (
+                        <div className="mt-1">
+                          <button
+                            type="button"
+                            onClick={() => doCharge(b.seq)}
+                            disabled={charge.isPending}
+                            data-testid={`charge-interest-${b.seq}`}
+                            className="text-[12px] font-medium text-danger underline underline-offset-2 disabled:opacity-50"
+                          >
+                            {chargingSeq === b.seq
+                              ? "Charging…"
+                              : b.lateInterest != null && b.lateInterest > 0
+                                ? "Update interest"
+                                : "Charge interest"}
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -233,6 +343,143 @@ export default function RentalCollectionsPanel({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Settling early — the customer pays the rest off in one go (0300).
+ *
+ * The figure is the SERVER's, fetched not computed: this dialog shows the same
+ * number the settlement demands, from the same function, so the confirmation a
+ * human gives is a confirmation of what will actually happen.
+ *
+ * The document is required rather than optional because Loo's rule is that the
+ * customer signs it first. There is no "settle now, attach later" — that is how
+ * a signed contract ends up with no signed paper behind it.
+ */
+function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: () => void }) {
+  const quoteQ = useRentalSettlementQuote(agreementId, true);
+  const settle = useSettleRentalAgreement(agreementId);
+  const [file, setFile] = useState<File | null>(null);
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const quote = quoteQ.data?.quote;
+
+  const submit = async () => {
+    if (!quote || !file) return;
+    setBusy(true);
+    try {
+      const documentDataUrl = await readAsDataUrl(file);
+      await settle.mutateAsync({
+        amount: quote.total,
+        documentDataUrl,
+        reference: reference.trim() || null,
+      });
+      toast.success(`${quote.agreementNo} settled — ${quote.monthsLeft} months closed`);
+      onClose();
+    } catch (e) {
+      toast.error(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6"
+      onClick={onClose}
+      data-testid="settle-overlay"
+    >
+      <div
+        className="w-full max-w-[460px] bg-card rounded shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border">
+          <div className="t-h4 font-semibold">Settle this rental early</div>
+          <div className="text-[12.5px] text-muted-foreground mt-0.5">
+            Closes every remaining month in one payment.
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          {quoteQ.isPending && <div className="text-[13px] text-muted-foreground">Working out the amount…</div>}
+          {quoteQ.error && (
+            <div className="text-[13px] text-danger">
+              {String((quoteQ.error as Error)?.message ?? quoteQ.error)}
+            </div>
+          )}
+          {quote && (
+            <>
+              <div className="bg-base-50 border border-base-200 rounded px-4 py-3 text-[13px]">
+                <Line label={`${quote.monthsLeft} months of rent`} value={rm(quote.rentRemaining)} />
+                {quote.interestCharged > 0 && (
+                  <Line label="Late interest charged" value={rm(quote.interestCharged)} />
+                )}
+                <div className="border-t border-base-200 mt-2 pt-2 flex justify-between font-semibold">
+                  <span>Customer pays</span>
+                  <span className="t-num" data-testid="settle-total">{rm(quote.total)}</span>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="text-[12.5px] font-medium text-base-700">
+                  Signed settlement document
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  data-testid="settle-doc"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="mt-1 block w-full text-[12.5px]"
+                />
+                <span className="text-[11.5px] text-muted-foreground">
+                  The customer signs it first. PDF or a photo.
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="text-[12.5px] font-medium text-base-700">
+                  Payment reference <span className="text-muted-foreground">(optional)</span>
+                </span>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="Bank transfer reference"
+                  className="mt-1 block w-full border border-base-200 rounded px-2 py-1.5 text-[13px]"
+                />
+              </label>
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-border flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="btn-secondary text-[13px]">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            /* No document, no button. The rule is enforced server-side too —
+               this just stops the operator finding out the hard way. */
+            disabled={!quote || !file || busy}
+            data-testid="settle-confirm"
+            className="btn-primary text-[13px] disabled:opacity-50"
+          >
+            {busy ? "Settling…" : quote ? `Settle ${rm(quote.total)}` : "Settle"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between text-base-700">
+      <span>{label}</span>
+      <span className="t-num">{value}</span>
     </div>
   );
 }
