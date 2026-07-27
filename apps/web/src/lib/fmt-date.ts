@@ -33,6 +33,22 @@ export function fmtDate(
 }
 
 /**
+ * Format a `YYYY-MM` period as "Jul 2026". For month switchers and any screen
+ * that names a month rather than a day.
+ *
+ * Lives here rather than beside each caller so the portal has ONE month
+ * spelling, and reads the parts directly instead of going through
+ * `toLocaleDateString` (COPY-STANDARD: never hand a date to the locale).
+ */
+export function fmtMonth(period: string | null | undefined): string {
+  if (!period) return "—";
+  const [y, m] = period.slice(0, 7).split("-").map(Number);
+  const mon = MONTHS[(m ?? 0) - 1];
+  if (!mon || !Number.isFinite(y)) return "—";
+  return `${mon} ${y}`;
+}
+
+/**
  * Format an ISO date as "12 Jun 26" (no weekday). For compact spots like the
  * Calendar panel's selected-day header.
  */

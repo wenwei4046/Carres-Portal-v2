@@ -212,7 +212,7 @@ needs:
 - **Nothing seeded** — the split reads "Nothing has been taken from ready stock this month"
   and every SKU reads "Set a number" until the COO picks one.
 
-## K5 · Stock health + proposal accuracy
+## K5 · Stock health + proposal accuracy ✅ (PR #451)
 
 **Goal:** the review layer. Stock health per SKU
 (`🟢 healthy · 🟡 low · 🟠 over-stocked · 🔴 critical`) + slow-moving alert
@@ -220,6 +220,45 @@ needs:
 so planning improves instead of repeating.
 **Done when:** COO opens one tab and knows what needs attention today — without reading
 SKU rows.
+
+**Shipped 2026-07-27** (PR #451, **NO migration**). The digest sits FIRST on the Ready
+stock tab, above the monthly plan: one sentence, five counts, and every SKU row behind a
+click — the Done-when made literal. Notes for whoever touches this line next:
+
+- **K5 mints nothing, and that is the design.** The ladder reads K1's reorder points (when
+  to BUY) and K4's reserve levels (how low it may GO); the accuracy reads K2's own cycles.
+  No third number, no table, no duty key, and `GET /api/ops/stock/health` calls **no RPC**
+  (asserted). A review layer with its own state would be a fourth number to keep in step
+  with three. `low` is not a second buy signal — it IS K1's alert, read.
+- **Computed the obvious way this card lies TWICE**, and the live data says so: 49
+  warehouse SKUs, **zero with a single real sale**, seven days of real records, zero
+  configured numbers. (1) "No sales in 90 days" is true of all 49 — a list that names
+  everything names nothing. (2) A run-rate `over-stocked` rung reads 0 units/month for
+  every SKU, so the whole floor covers infinite months and everything is 🟠.
+- **So four gates, and all four heal by themselves** — nothing to switch on later: the
+  ladder reads the numbers a HUMAN set, never a run rate · the 90/180-day alerts stay
+  silent until the records SPAN 90 and 180 days, and a never-sold SKU is reported quiet for
+  exactly `coverage.days`, never longer than we can see · `unrated` is a first-class rung
+  reading **"Set a number"** (K1's law — today's honest headline is *"Nothing is watched
+  yet — 49 items still need a number"*, not 49 green ticks) · a month still RUNNING gets no
+  accuracy figure (HR-P7's law), though the ask and the order still print.
+- **A WINDOW is not a HISTORY.** The route fetches 200 days of order lines and tells the
+  engine where that window ends (`salesKnownFrom`), because left alone the coverage is
+  wrong in BOTH directions: a SKU that genuinely sold 200 days ago looks like it never
+  sold, and the window's own oldest row becomes "when our records start", switching the
+  90-day alert on the day the window does. The window also stretches back to cover any
+  approved plan month — a month can only be scored against sales somebody fetched.
+- **The archive probe had to be spelled `is.null OR neq.autocount`**: every native order on
+  prod carries a **NULL** `source_system` and only the AutoCount import fills it, so the
+  obvious `not.eq.autocount` returns NOTHING and the screen would report a company with no
+  sales records at all. Its own route test.
+- **`over` is a multiple of the reorder point (×3), not months of cover** — derived from a
+  number the COO already set, so it needs no sales history and asks no second question.
+- **"Slow-moving" never reaches the screen** (jargon a low-English operator guesses at) —
+  the section is `Not selling`. Every ladder noun is already shipped: "reorder point" and
+  "Enough" are K1's, "keep level" is K4's `Keep {n}`, "Set a number" is both of theirs.
+- **Nothing seeded** — every SKU reads "Set a number", the alert states how far the records
+  go, and the accuracy reads "No month has been approved yet" until K2 approves one.
 
 ## LATER
 
@@ -235,4 +274,4 @@ SKU rows.
 | K2 | ✅ shipped 2026-07-27 | #409 |
 | K3 | ✅ shipped 2026-07-27 | #424 |
 | K4 | ✅ shipped 2026-07-27 | #434 |
-| K5 | ⬜ | — |
+| K5 | ✅ shipped 2026-07-27 | #451 |

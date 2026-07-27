@@ -542,6 +542,15 @@ export {
   opsUsageSkuSliceSchema,
   opsPoolUsageEntrySchema,
   opsStockUsageResponseSchema,
+  opsStockHealthStateSchema,
+  opsStockHealthRowSchema,
+  opsSlowMoverSchema,
+  opsStockHealthCountsSchema,
+  opsMonthAccuracySchema,
+  opsStockHealthResponseSchema,
+  type OpsStockHealthRow,
+  type OpsMonthAccuracy,
+  type OpsStockHealthResponse,
   type OpsReorderPointInput,
   type OpsReorderRow,
   type OpsReorderResponse,
@@ -1632,6 +1641,34 @@ export {
   type UsageSkuSlice,
   type PoolUsageSummary,
 } from "./pool-usage";
+// Ready Stock K5 — the review layer. NO migration: it reads the two numbers K1
+// and K4 already ask the COO for and K2's own cycles, adds no third number and
+// writes nothing. Its coverage gates are load-bearing, not cosmetic: live prod
+// keeps 7 days of real sales records, so the naive build of this card flags all
+// 49 warehouse SKUs as dead stock. See the module header.
+export {
+  OVER_STOCK_MULTIPLE,
+  SLOW_MOVING_WINDOWS,
+  STOCK_HEALTH_STATES,
+  STOCK_HEALTH_LABEL,
+  ACCURACY_WITHHELD_LABEL,
+  computeStockHealthRows,
+  stockHealthCounts,
+  stockHealthHeadline,
+  computeSlowMovers,
+  computePlanAccuracy,
+  type StockHealthState,
+  type StockHealthRow,
+  type StockHealthCounts,
+  type SlowMovingWindow,
+  type SlowMover,
+  type SlowMovingWindowResult,
+  type SlowMovingReport,
+  type AccuracyPlanInput,
+  type AccuracyRow,
+  type AccuracyWithheld,
+  type MonthAccuracy,
+} from "./stock-health";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,
