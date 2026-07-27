@@ -2,10 +2,13 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
+  HELD_STOCK_STATUS,
+  STOCK_HOLD_OUTCOME_KEYS,
   SUPPLIER_CLAIM_LATE,
   SUPPLIER_CLAIM_REQUEST_KEYS,
   SUPPLIER_CLAIM_RESPONSE_KEYS,
   claimNextMove,
+  holdOutcomeNeedsNote,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -26,11 +29,17 @@ import type { AppEnv } from "../../types";
  * close. Each is its own RPC in 0291 — `supplier_claims` has no write policy at
  * all, so there is no PostgREST door that can edit a claim by hand.
  *
+ * R4 adds the GOODS. A damaged or wrong unit is quarantined by the same receive
+ * that raised the claim (`on_hold`, migration 0299) and can never be sold,
+ * reserved or delivered until somebody says what happened to it. The claim is
+ * where that is said, because the claim is the thing that knows the answer.
+ *
  *   GET  /                — the queue (status filter, names, who owes next)
  *   GET  /:id/photos      — signed URLs for that claim's evidence
  *   POST /:id/request     — what WE ask the supplier to do
  *   POST /:id/response    — what the SUPPLIER answered
  *   POST /:id/close       — settle it (refuses unless both sides are on file)
+ *   POST /:id/hold-resolve — R4: what happened to the quarantined units
  *
  * Role: operation + principal, on every route. `supplier_claims` RLS admits
  * every internal role (principal/operation/finance/bd) for SELECT; this
@@ -161,9 +170,35 @@ supplierClaimsRouter.get("/", async (c) => {
     }
   }
 
+  // R4 — how many of this claim's units are still quarantined.
+  //
+  // Read from the register rather than derived from `qty`: the claim's qty is
+  // what the operator REPORTED, and the units actually held can be fewer (a
+  // partner warehouse keeps no per-unit register at all) or zero (they have
+  // already been resolved). The panel must say what is true of the goods, not
+  // what was true of the paperwork.
+  const claimIds = claims.map((r) => r.id as string);
+  const heldByClaim = new Map<string, { units: number; reason: string | null }>();
+  if (claimIds.length > 0) {
+    const { data: held } = await sb
+      .from("ops_stock_items")
+      .select("hold_claim_id, hold_reason")
+      .in("hold_claim_id", claimIds)
+      .eq("status", HELD_STOCK_STATUS);
+    for (const u of held ?? []) {
+      const key = u.hold_claim_id as string;
+      const prev = heldByClaim.get(key);
+      heldByClaim.set(key, {
+        units: (prev?.units ?? 0) + 1,
+        reason: prev?.reason ?? ((u.hold_reason as string | null) ?? null),
+      });
+    }
+  }
+
   return c.json({
     claims: claims.map((r) => {
       const supplier_name = supplierNames.get(r.supplier_id as string) ?? null;
+      const held = heldByClaim.get(r.id as string);
       const line_pending = r.po_line_id
         ? (linePending.get(r.po_line_id as string) ?? null)
         : null;
@@ -175,6 +210,9 @@ supplierClaimsRouter.get("/", async (c) => {
           : null,
         photo_count: Array.isArray(r.photos) ? r.photos.length : 0,
         line_pending,
+        // R4 — the goods, as they stand right now.
+        held_units: held?.units ?? 0,
+        hold_reason: held?.reason ?? null,
         // Computed here so the row, the button and any future digest all read
         // the same sentence — one rule, in the shared module.
         next_move: claimNextMove({
@@ -309,6 +347,56 @@ supplierClaimsRouter.post("/:id/close", async (c) => {
   const { data, error } = await sb.rpc("supplier_claim_close", {
     p_claim_id: c.req.param("id"),
     p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+// ----- R4 · what happened to the quarantined units --------------------------
+//
+// The card's third clause: "claim resolution flips them back to free (or writes
+// them off)", plus the return leg. One door, three outcomes, and the DATABASE
+// decides which status each one means — a browser that could name the status
+// would be a browser that could name `free`.
+//
+// Deliberately NOT tied to the claim's close: the goods and the paperwork move
+// on different days. A supplier can repair a unit on our floor this morning and
+// still owe us an answer on Friday, and a claim can close weeks before anyone
+// clears the shelf. Forcing one order would just teach people to close a claim
+// early so the button would light up.
+const holdResolveSchema = z.object({
+  outcome: z.enum(STOCK_HOLD_OUTCOME_KEYS),
+  note: noteSchema,
+});
+
+supplierClaimsRouter.post("/:id/hold-resolve", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, holdResolveSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  // The note rule is asked here as well as in the RPC so the operator gets a
+  // sentence instead of a database error — the RPC is still the one that
+  // decides, exactly as with the claim's own moves.
+  const note = parsed.data.note?.trim() ?? "";
+  if (holdOutcomeNeedsNote(parsed.data.outcome) && note.length === 0) {
+    return c.json(
+      {
+        error: "note_required",
+        code: "unprocessable",
+        message: "Say why the units were written off.",
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("ops_stock_resolve_hold", {
+    p_claim_id: c.req.param("id"),
+    p_outcome: parsed.data.outcome,
+    p_note: note || null,
   });
   if (error) {
     const m = mapPgError(error);

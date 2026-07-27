@@ -28,6 +28,13 @@ export const opsStockStatusSchema = z.enum([
   "sold",
   "transferred",
   "voided",
+  // R4 (0299) — problem stock is quarantined. A held unit can never become
+  // reserved / sold / transferred (a trigger, not a convention), and the two
+  // terminal states record goods that physically left. Labels live in
+  // OPS_STOCK_STATUS_LABEL; the transition rules live in stock-hold.ts.
+  "on_hold",
+  "returned_to_supplier",
+  "written_off",
 ]);
 export type OpsStockStatus = z.infer<typeof opsStockStatusSchema>;
 

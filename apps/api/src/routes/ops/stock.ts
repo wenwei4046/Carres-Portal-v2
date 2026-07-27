@@ -832,8 +832,18 @@ interface RawRow {
   sku: string;
   warehouse_id: string;
   condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
-  // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled).
-  status: "incoming" | "free" | "reserved" | "sold" | "transferred" | "voided";
+  // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled);
+  // 0299 added the R4 quarantine trio.
+  status:
+    | "incoming"
+    | "free"
+    | "reserved"
+    | "sold"
+    | "transferred"
+    | "voided"
+    | "on_hold"
+    | "returned_to_supplier"
+    | "written_off";
   reserved_ref: string | null;
   ref_history: string[];
   needs_repair: boolean;
