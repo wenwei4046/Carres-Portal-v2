@@ -69,6 +69,7 @@ import {
   type OpsStockListResponse,
   type OpsOrderControl,
   type OrderPaymentMethod,
+  type OrderActionTrack,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -987,10 +988,48 @@ function agoWord(iso: string): string {
 function ChaseNowPanel({
   rows,
   lastChasedAt,
+  collapsed,
 }: {
   rows: ChaseNowRow[];
   lastChasedAt: string | null;
+  /** UI-KIT §1.4 rule 1 — Current Action is ALWAYS VISIBLE. The rail may
+   *  collapse to 56px, but this block may not vanish with it: it is the reason
+   *  the record is open, and a user must never expand something to find out
+   *  what to do today. Collapsed = the same truth in icon form. */
+  collapsed?: boolean;
 }) {
+  if (collapsed) {
+    const overdueN = rows.filter((r) => r.urgency === "overdue").length;
+    return (
+      <div
+        className="kpi-box grid place-items-center py-2 shrink-0"
+        title={
+          rows.length === 0
+            ? "Actions — 0 calls to make"
+            : `Actions — ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
+        }
+      >
+        <span className="relative">
+          <Bell size={18} strokeWidth={2} aria-hidden="true" className="text-base-500" />
+          {rows.length > 0 && (
+            <span
+              aria-hidden="true"
+              className={`absolute -top-1 -right-1.5 min-w-4 h-4 px-1 rounded-full ring-2 ring-white grid place-items-center text-[11px] font-bold text-white ${
+                overdueN > 0 ? "bg-danger" : "bg-warning"
+              }`}
+            >
+              {rows.length}
+            </span>
+          )}
+        </span>
+        <span className="sr-only">
+          {rows.length === 0
+            ? "No actions"
+            : `${rows.length} action${rows.length > 1 ? "s" : ""}`}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="kpi-box shrink-0">
       <span className="flex items-baseline gap-2 mb-1">
@@ -1062,6 +1101,135 @@ function ChaseNowPanel({
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+/** One CURRENT ISSUES row — a state that is holding this order up. */
+interface CurrentIssueRow {
+  key: string;
+  /** UI-KIT §1.4 rule 4 — the SAME three business categories the list row's
+   *  dots use. The type is `OrderActionTrack` from packages/shared, so a
+   *  fourth category does not compile and the list and the drawer structurally
+   *  cannot speak two vocabularies. */
+  track: OrderActionTrack;
+  /** A FACT, never a to-do — the to-do is ACTIONS, one block above. */
+  text: string;
+  tone: "danger" | "warning";
+  onOpen?: () => void;
+}
+
+const ISSUE_TRACK: Record<
+  OrderActionTrack,
+  { icon: LucideIcon; label: string }
+> = {
+  goods: { icon: Package, label: "Goods" },
+  delivery: { icon: Truck, label: "Delivery" },
+  money: { icon: Wallet, label: "Money" },
+};
+/** Law 6 order — goods · delivery · money, the same order the list row's dots
+ *  render in. */
+const ISSUE_TRACK_ORDER: OrderActionTrack[] = ["goods", "delivery", "money"];
+
+/** CURRENT ISSUES (UI-KIT §1.4 ③) — what is stopping this order RIGHT NOW,
+ *  grouped by the three business tracks.
+ *
+ *  Why it exists: the five reasons an order stalls were readable only by
+ *  assembling them yourself out of a spine node, a tab dot and two tab bodies,
+ *  so no single surface answered "why is this stuck".
+ *
+ *  Why it is not ACTIONS: that block names a COUNTERPARTY and carries the
+ *  message buttons — it answers *who to call*. This one answers *what is
+ *  wrong*, including the things nobody can be called about.
+ *
+ *  §1.4 rule 2 — it AUTO-HIDES when there is nothing wrong. No "✓ None", no
+ *  empty card, no reassuring tick: an ERP exists to say where today is not
+ *  normal, and §1.3 is a height budget this block only draws against when it
+ *  has earned it. */
+function CurrentIssuesPanel({
+  rows,
+  collapsed,
+}: {
+  rows: CurrentIssueRow[];
+  collapsed?: boolean;
+}) {
+  if (rows.length === 0) return null;
+  const danger = rows.some((r) => r.tone === "danger");
+  if (collapsed) {
+    return (
+      <div
+        className="kpi-box grid place-items-center py-2 shrink-0"
+        title={`Current issues — ${rows.map((r) => r.text).join(" / ")}`}
+      >
+        <span className="relative">
+          <AlertCircle
+            size={18}
+            strokeWidth={2}
+            aria-hidden="true"
+            className={danger ? "text-danger" : "text-warning"}
+          />
+          <span
+            aria-hidden="true"
+            className={`absolute -top-1 -right-1.5 min-w-4 h-4 px-1 rounded-full ring-2 ring-white grid place-items-center text-[11px] font-bold text-white ${
+              danger ? "bg-danger" : "bg-warning"
+            }`}
+          >
+            {rows.length}
+          </span>
+        </span>
+        <span className="sr-only">
+          {rows.length} current issue{rows.length > 1 ? "s" : ""}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="kpi-box shrink-0">
+      <span className="flex items-baseline gap-2 mb-1">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
+          Current issues
+        </span>
+        <span className="ml-auto text-[12px] text-base-400 whitespace-nowrap">
+          {rows.length}
+        </span>
+      </span>
+      {ISSUE_TRACK_ORDER.flatMap((track) => {
+        const inTrack = rows.filter((r) => r.track === track);
+        if (inTrack.length === 0) return [];
+        const { icon: Icon, label } = ISSUE_TRACK[track];
+        return inTrack.map((r, i) => (
+          <div
+            key={r.key}
+            className={`flex items-center gap-2 min-h-9 min-w-0 ${
+              r.onOpen
+                ? "cursor-pointer rounded-[6px] -mx-1 px-1 hover:bg-hovertint"
+                : ""
+            }`}
+            onClick={r.onOpen}
+            role={r.onOpen ? "button" : undefined}
+            title={r.onOpen ? `${label} — open where this is worked` : label}
+          >
+            {/* The track icon labels the group; only the FIRST row of a track
+                carries it, so three issues on one track read as one group. */}
+            <span className="w-4 shrink-0 grid place-items-center text-base-400">
+              {i === 0 ? (
+                <Icon size={14} strokeWidth={2} aria-hidden="true" />
+              ) : null}
+            </span>
+            <span
+              className={`block min-w-0 flex-1 text-[13px] leading-tight truncate ${
+                r.tone === "danger"
+                  ? "text-danger font-medium"
+                  : "text-base-900"
+              }`}
+              title={r.text}
+            >
+              {i === 0 && <span className="sr-only">{label}: </span>}
+              {r.text}
+            </span>
+          </div>
+        ));
+      })}
     </div>
   );
 }
@@ -2216,6 +2384,99 @@ function DrawerBody({
     (a, b) => Number(b.urgency === "overdue") - Number(a.urgency === "overdue"),
   );
 
+  // ── CURRENT ISSUES (UI-KIT §1.4 ③) ───────────────────────────────────────
+  // What is HOLDING THIS ORDER UP, grouped by the three business tracks.
+  //
+  // Every value below is already computed above for some other surface — this
+  // block READS them, it does not decide anything. No new business rule, no
+  // new request, no new threshold: if this list is wrong, the surface that
+  // owns the number is wrong, and it is wrong there too.
+  //
+  // Not the same as ACTIONS: that block names a counterparty and carries the
+  // message buttons (who to call). This one states the condition (what is
+  // wrong) — including the ones nobody can be called about, like a storage
+  // fee that is holding the delivery.
+  const currentIssues: CurrentIssueRow[] = [];
+  // 📦 GOODS — the lines that cannot be delivered yet, and why.
+  if (nopoN > 0) {
+    currentIssues.push({
+      key: "goods-nopo",
+      track: "goods",
+      text: `${nopoN} ${nopoN === 1 ? "line has" : "lines have"} no PO`,
+      tone: "danger",
+      onOpen: () => setTab("items"),
+    });
+  }
+  const notReadyN = goodsLines.length - readyN - nopoN;
+  if (notReadyN > 0) {
+    currentIssues.push({
+      key: "goods-notready",
+      track: "goods",
+      text: `${notReadyN} ${notReadyN === 1 ? "line" : "lines"} not in stock yet`,
+      tone: "warning",
+      onOpen: () => setTab("items"),
+    });
+  }
+  // A supplier past its own ETA is a GOODS problem even when the chase row for
+  // it already exists — the chase says who to call, this says why we are late.
+  const lateSuppliers = [...byParty.values()].filter((p) => p.overdue);
+  if (lateSuppliers.length > 0) {
+    currentIssues.push({
+      key: "goods-supplier-late",
+      track: "goods",
+      text:
+        lateSuppliers.length === 1
+          ? `${lateSuppliers[0].label} is past its ETA`
+          : `${lateSuppliers.length} suppliers past their ETA`,
+      tone: "danger",
+      onOpen: () => setTab("items"),
+    });
+  }
+  // 🚚 DELIVERY — a fact may state an ABSENCE but never a to-do word (C1).
+  if (!deliveredDone && !bookedEta) {
+    currentIssues.push({
+      key: "delivery-nodate",
+      track: "delivery",
+      text: "No delivery date confirmed",
+      tone: overDeadline ? "danger" : "warning",
+      onOpen: () => setTab("delivery"),
+    });
+  }
+  if (!deliveredDone && overDeadline) {
+    currentIssues.push({
+      key: "delivery-late",
+      track: "delivery",
+      text: `Past the deadline · ${deadlineLabel}`,
+      tone: "danger",
+      onOpen: () => setTab("delivery"),
+    });
+  }
+  // 💰 MONEY — `hold` means it is stopping the goods, `warn` that it will.
+  if (balanceOwing) {
+    currentIssues.push({
+      key: "money-balance",
+      track: "money",
+      text:
+        balanceGate === "hold"
+          ? `${RM(moneyOutstanding)} outstanding · holding delivery`
+          : `${RM(moneyOutstanding)} outstanding`,
+      tone: balanceGate === "hold" ? "danger" : "warning",
+      onOpen: () => setTab("balance"),
+    });
+  }
+  if (storageOwing) {
+    currentIssues.push({
+      key: "money-storage",
+      track: "money",
+      text:
+        storageGate === "hold"
+          ? "Storage fee uncollected · holding delivery"
+          : "Storage fee uncollected",
+      tone: storageGate === "hold" ? "danger" : "warning",
+      onOpen: () => setTab("storage"),
+    });
+  }
+
   // THE journey spine — extracted so each tab header can wear the SAME step
   // number + colour as its spine node (Jess 甲 2026-07-19): one numbered journey,
   // whether you read the rail (overview) or the header (you-are-here).
@@ -2489,12 +2750,23 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* ═══ TWO-COLUMN SHELL (rev 9, 2026-07-18) ═══
-            LEFT 260px fixed (collapsible to 56 icon-only): the Customer block
-            on top + the section tab rail below. RIGHT fills the rest: the 3
-            KPI track boxes (Balance · Stock wider · Delivery — 1fr 1.8fr 1fr,
-            equal height) pinned on top + the selected tab's content scrolling
-            below. Desktop ~1920 is the truth — no responsive reflow. */}
+        {/* ═══ TWO-COLUMN SHELL — the UI-KIT §1.4 Information Hierarchy ═══
+            LEFT 280px (collapsible to 56 icon-only), top to bottom:
+              ① Identity        CustomerIdentityCard
+              ② Current Action  ChaseNowPanel      — ALWAYS visible
+              ③ Current Issues  CurrentIssuesPanel — auto-hides when empty
+              ④ Progress        JourneyCard
+                 then the section rail (⑤⑥) and Activity (⑦), which open in
+                 the RIGHT column.
+            RIGHT: the selected tab's content owns the whole column.
+            Desktop ~1920 is the truth — no responsive reflow.
+
+            NOTE for the next reader: the rev9 comment that used to sit here
+            described "3 KPI track boxes pinned on top" of the right column.
+            They were removed at rev15 and the comment was not — it then
+            outlived them by long enough to be quoted back as the live design.
+            A stale comment is a second source of truth; delete it with the
+            code it describes. */}
         <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
         {/* LEFT — customer identity + the section rail. */}
         <div
@@ -2514,15 +2786,20 @@ function DrawerBody({
             }
             collapsed={railCollapsed}
           />
-          {/* ACTIONS (MASTER SPEC §7) — a PANEL (not a tab) between the
-              Customer block and the tab rail; hides with the collapsed rail
-              (the tab dots still carry the alerts). */}
-          {!railCollapsed && (
-            <ChaseNowPanel
-              rows={chaseRows}
-              lastChasedAt={form.control?.last_chased_at ?? null}
-            />
-          )}
+          {/* ② CURRENT ACTION (UI-KIT §1.4) — a PANEL, not a tab, directly
+              under Identity. It used to hide with the collapsed rail; §1.4
+              rule 1 forbids that (it is the reason the record is open), so it
+              now renders in icon form instead of disappearing. */}
+          <ChaseNowPanel
+            rows={chaseRows}
+            lastChasedAt={form.control?.last_chased_at ?? null}
+            collapsed={railCollapsed}
+          />
+          {/* ③ CURRENT ISSUES (UI-KIT §1.4) — why the order is not moving,
+              grouped by goods · delivery · money. Renders NOTHING when there
+              is nothing wrong (rule 2), so it costs no height on a healthy
+              order. */}
+          <CurrentIssuesPanel rows={currentIssues} collapsed={railCollapsed} />
           {/* THE SPINE — nav + progress + status in one (Jess 2026-07-18):
               deposit → goods → balance → storage (when storing categories
               exist) → deliver. Collapsed rail shows nodes only. */}

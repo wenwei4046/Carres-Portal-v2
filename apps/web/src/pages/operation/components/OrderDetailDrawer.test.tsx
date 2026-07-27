@@ -95,3 +95,70 @@ describe("OrderDetailDrawer — no banned word reaches the screen (C1)", () => {
     });
   }
 });
+
+/**
+ * T2 — the UI-KIT §1.4 Information Hierarchy, guarded.
+ *
+ * WHY A SOURCE SCAN AGAIN. Same reason as C1 above, plus one specific to this
+ * card: the rules being guarded are about what happens when the rail is
+ * COLLAPSED and when the issue list is EMPTY. A render test proves those only
+ * for the branches its fixture reaches, and the bug §1.4 rule 1 exists to fix
+ * — Current Action vanishing with the rail — survived precisely because the
+ * collapsed branch is the one nobody mounts.
+ *
+ * These four assertions are the difference between a hierarchy that is written
+ * down and one that a future edit cannot quietly undo.
+ */
+describe("OrderDetailDrawer — Information Hierarchy (UI-KIT §1.4)", () => {
+  const at = (needle: string) => SRC.indexOf(needle);
+
+  it("orders the left rail Identity → Current Action → Current Issues → Progress", () => {
+    const identity = at("<CustomerIdentityCard");
+    const action = at("<ChaseNowPanel");
+    const issues = at("<CurrentIssuesPanel");
+    const progress = at("<JourneyCard");
+    // Negative control: every block must actually be rendered, or the
+    // ascending check below passes on a file that renders none of them.
+    for (const [name, i] of [
+      ["CustomerIdentityCard", identity],
+      ["ChaseNowPanel", action],
+      ["CurrentIssuesPanel", issues],
+      ["JourneyCard", progress],
+    ] as const) {
+      expect(i, `${name} is not rendered`).toBeGreaterThan(-1);
+    }
+    expect(identity).toBeLessThan(action);
+    expect(action).toBeLessThan(issues);
+    expect(issues).toBeLessThan(progress);
+  });
+
+  it("rule 1 — Current Action is never hidden by the collapsed rail", () => {
+    const i = at("<ChaseNowPanel");
+    // Nothing may gate the render site on the rail being open. This is the
+    // exact shape that used to sit here: `{!railCollapsed && (`.
+    const before = SRC.slice(Math.max(0, i - 400), i);
+    expect(before).not.toMatch(/!railCollapsed\s*&&\s*\(?\s*$/);
+    // It must instead be TOLD it is collapsed, so it can render in icon form.
+    const site = SRC.slice(i, i + 400);
+    expect(site).toContain("collapsed={railCollapsed}");
+  });
+
+  it("rule 2 — Current Issues renders nothing when there is nothing wrong", () => {
+    const i = SRC.indexOf("function CurrentIssuesPanel(");
+    expect(i, "CurrentIssuesPanel is missing").toBeGreaterThan(-1);
+    const body = SRC.slice(i, i + 900);
+    expect(body).toMatch(/if\s*\(rows\.length === 0\)\s*return null;/);
+    // No consolation card: an ERP says where today is NOT normal.
+    expect(SRC).not.toMatch(/No (current )?issues/i);
+  });
+
+  it("rule 4 — issues use the SAME three categories as the list row's dots", () => {
+    // The type is the enforcement: a fourth category does not compile.
+    expect(SRC).toMatch(/track:\s*OrderActionTrack;/);
+    expect(SRC).toMatch(/type OrderActionTrack,?\s*\n?\s*\}?\s*from "@carres\/shared"|type OrderActionTrack,/);
+    // Law 6 order — goods · delivery · money, the order the dots render in.
+    expect(SRC).toMatch(
+      /ISSUE_TRACK_ORDER[^=]*=\s*\[\s*"goods",\s*"delivery",\s*"money",?\s*\]/,
+    );
+  });
+});
