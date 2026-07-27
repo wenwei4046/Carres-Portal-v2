@@ -162,9 +162,10 @@ kit does not bend to a page. See §14.
 
 ---
 
-# §1 Decision Process
+# §1 Decision Process & Information Hierarchy
 
-中文：画之前先过这一关。填不出来 = 不准画。
+中文：§1.1–§1.3 决定「可不可以放上去」。§1.4 决定「重要性排第几」。
+两个都在画之前，不在画之后。
 
 > **The home page is not a display of all information. It is a tool for
 > finishing today's work.**
@@ -254,6 +255,104 @@ Orders today cost four orders on every screen, every day.
 | A list page cannot exceed 200px fixed chrome | Build Guard H | ⏳ D1 | `check-design.mjs` |
 | A list page cannot add an 8th band | Type System — `list` variant has no `extraBand` / `kpi` prop | ⏳ D0.5c | `PageShell.tsx` |
 | The four questions are answered before building | Human Review | ⏳ D0 | card template in `ui-kit-execution-queue.md` |
+
+---
+
+## §1.4 Information Hierarchy (FROZEN 2026-07-28 — Jess)
+
+中文：不管版面怎么变，重要性永远一样。
+
+> **This freezes the HIERARCHY, not the LAYOUT.** Desktop may put it left/right,
+> a tablet top/bottom, a phone in an accordion — the *order of importance* is the
+> same on all three. That is why it is not called "reading order": reading order
+> still sounds like "left to right", and it would stop being true the moment the
+> layout changed.
+
+```
+Identity                    ① Whose order is this?
+   │                           ref · customer · state word
+   │
+   ├── Current Action       ② What has to be done today
+   │                           ⭐ ALWAYS VISIBLE — see the rule below
+   │
+   ├── Current Issues       ③ What is stopping it right now
+   │                           ⭐ AUTO-HIDES — see the rule below
+   │                           grouped by goods · delivery · money
+   │
+   ├── Progress             ④ How far it has got, and what is next
+   │                           the fixed business steps + their state
+   │
+   ├── Business Sections    ⑤⑥ The detail, opened on demand
+   │                           Items (default) · Payment · Delivery ·
+   │                           Receiving · Purchasing · Storage · Service ·
+   │                           Documents · Cases · Loan …
+   │                           a module switches one on; the blueprint
+   │                           never changes
+   │
+   └── Activity            ⑦ Who did what, when — and where a human
+                              writes a note
+```
+
+### The four rules that make it real
+
+**1. Current Action is always visible.** On every surface — drawer, full page,
+tablet, phone — and it survives a collapsed rail. It is the reason the record is
+open; a user must never expand something to find out what to do today.
+*(Today the drawer hides `ChaseNowPanel` when the rail collapses. That is the
+bug this rule names.)*
+
+**2. Current Issues disappears when there are none.** No "✓ None", no empty
+card, no reassuring green tick — an ERP's job is to say where today is *not*
+normal, and a block that says "nothing is wrong" is spending height to say
+nothing. §1.3 is a budget; this block only draws when it has earned it.
+
+**3. Progress answers two questions and refuses the rest.**
+
+| Progress answers | Progress must NEVER answer |
+|---|---|
+| where has it got to | who did it |
+| what is the next step | when they did it |
+| | what they wrote in a note |
+
+Those belong to **Activity**. The two blocks may never both claim "what
+happened" — which is why ④ is called **Progress** and not "Timeline": Activity
+is already a timeline (`AnnotationTimeline`), and one word for two blocks is
+how a reader stops trusting either.
+
+Progress also carries no KPI tiles, no buttons and no warnings — every one of
+those already has a home above it (② and ③). *(This retires the three separate
+Balance / Stock / Delivery KPI boxes, which stated the same facts the spine
+already carried.)*
+
+**4. A list and its detail use the SAME business categories.** If the list row
+says `goods · delivery · money`, the detail groups its issues by
+`goods · delivery · money`. Never `Stock / Delivery / Payment` on one screen and
+`Supply Chain / Logistics / Finance` on the other — that is two languages for
+one business, and the user pays for the translation every time.
+
+> **Business Vocabulary First.** The categories are decided ONCE and then every
+> surface follows: list, detail, dashboard, KPI, notification, Current Issues.
+> A page does not get to invent its own names for them.
+> The words themselves live in [`COPY-STANDARD.md`](COPY-STANDARD.md); the
+> machine-readable set is **`OrderActionTrack` in
+> `packages/shared/src/order-actions.ts`** — already a union type
+> (`"goods" | "delivery" | "money"`), already read by the list row's dots and by
+> the two-layer action ladder. A surface that invents a fourth category does not
+> compile.
+
+### What this is for
+
+A user learns the order once — *whose order · what to do · what is wrong · how
+far · the detail · the record* — and it is then true of Delivery, Payment,
+Purchasing, Receiving and Service Detail without learning any of them again.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Same categories on list and detail | **Type System** — both read `OrderActionTrack` | ✅ live for the three tracks | `packages/shared/src/order-actions.ts` |
+| Current Action always visible | Component API — the slot has no `collapsible` option | ⏳ D0.5c | `DetailShell.tsx` |
+| Current Issues auto-hides when empty | Component API — the slot renders nothing for an empty list | ⏳ D0.5c | `DetailShell.tsx` |
+| Blocks cannot be reordered | Component API — named ORDERED slots, not `children` | ⏳ D0.5c | `DetailShell.tsx` |
+| Progress carries no events / KPIs / buttons | **Human Review** | ⚠ **debt** | — |
 
 ---
 
@@ -874,17 +973,18 @@ document.
   Icons         ██▌░░░░░░░    25%     1 / 4
   Components    ░░░░░░░░░░    0%      0 / 6
   Layout        ░░░░░░░░░░    0%      0 / 6
+  Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ▋░░░░░░░░░    7%      2 / 28
+  TOTAL         ▉░░░░░░░░░    9%      3 / 33
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **28** | design rules stated in §1–§8 |
-| **Enforced** | **2** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 20 | a card exists (D0.5–D5) |
+| Rules | **33** | design rules stated in §1–§8 |
+| **Enforced** | **3** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 22 | a card exists (D0.5–D5) |
 | **Blocked on a decision** | 3 | Q1 spacing · Q3 weight · Q4 stroke — see PENDING REGISTER |
-| **Human Review debt** | 3 | `fmtDate()` · "max 2 reds per screen" · facet group order — nobody has found a mechanism |
+| **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
 
 **Two health rules:**
 
