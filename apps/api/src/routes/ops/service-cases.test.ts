@@ -84,6 +84,10 @@ afterAll(() => _setJwksForTesting(null));
 function buildSb(rows: unknown[]) {
   const eqCalls: Array<[string, unknown]> = [];
   const selects: string[] = [];
+  /** S1 — what actually reached the INSERT. The five wizard answers are only
+   *  worth anything if they land in their own columns; a route that quietly
+   *  dropped them would still return 201 and still show the composed sentence. */
+  const inserts: Record<string, unknown>[] = [];
   const chain: Record<string, unknown> = {
     then: (res: (v: { data: unknown[]; error: null }) => unknown) =>
       Promise.resolve({ data: rows, error: null }).then(res),
@@ -95,6 +99,10 @@ function buildSb(rows: unknown[]) {
       selects.push(cols);
       return chain;
     },
+    insert: (row: Record<string, unknown>) => {
+      inserts.push(row);
+      return chain;
+    },
   };
   for (const m of ["order", "limit", "in", "is", "or", "contains", "single"]) {
     chain[m] = () => chain;
@@ -104,8 +112,56 @@ function buildSb(rows: unknown[]) {
     rpc: vi.fn(async () => ({ data: "SC2607-02", error: null })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
-  return { sb, eqCalls, selects };
+  return { sb, eqCalls, selects, inserts };
 }
+
+/** The create path needs `.single()` to resolve to a ROW, not an array. */
+function buildInsertSb() {
+  const inserts: Record<string, unknown>[] = [];
+  const chain: Record<string, unknown> = {
+    insert: (row: Record<string, unknown>) => {
+      inserts.push(row);
+      return chain;
+    },
+    then: (res: (v: { data: unknown; error: null }) => unknown) =>
+      Promise.resolve({ data: { id: "new-case", case_no: "SC2607-02" }, error: null }).then(res),
+  };
+  for (const m of ["select", "eq", "single", "order"]) chain[m] = () => chain;
+  const sb = {
+    from: vi.fn(() => chain),
+    rpc: vi.fn(async () => ({ data: "SC2607-02", error: null })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+  return { sb, inserts };
+}
+
+async function post(body: unknown, sb: unknown, role = "operation") {
+  vi.mocked(userClient).mockReturnValue(sb as never);
+  return app.request(
+    "/api/ops/service-cases",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await makeJwt(role)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+    env,
+  );
+}
+
+const WIZARD_BODY = {
+  customerName: "Ryan Chong",
+  whatHappened: "Colour uneven — Sofa · SF2201. Found by Customer. Still usable: No.",
+  reportedBy: "customer",
+  orderLineId: "11111111-1111-1111-1111-111111111111",
+  productSku: "SF2201 3 Seater",
+  productCategory: "sofa",
+  issueType: "colour_uneven",
+  usable: "no",
+  customerWants: ["repair", "replace"],
+};
 
 const CASE_ROW = {
   id: "c1",
@@ -191,9 +247,97 @@ describe("GET /api/ops/service-cases", () => {
     expect(body.items[0].so).toBe(1301);
   });
 
+  it("carries the intake answers back so the case reads the way it was filed", async () => {
+    const { sb } = buildSb([
+      { ...CASE_ROW, issue_type: "damaged", usable: "no", priority: "high",
+        customer_wants: ["replace"], reported_by: "logistic", product_category: "sofa" },
+    ]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as { items: Record<string, unknown>[] };
+
+    expect(body.items[0]).toMatchObject({
+      issueType: "damaged",
+      usable: "no",
+      priority: "high",
+      customerWants: ["replace"],
+      reportedBy: "logistic",
+      productCategory: "sofa",
+    });
+  });
+
+  it("reports a pre-wizard case as unanswered rather than inventing a priority", async () => {
+    // SC2607-01 — the one real case on file, filed before 0285 existed.
+    const { sb } = buildSb([CASE_ROW]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as { items: Record<string, unknown>[] };
+
+    expect(body.items[0].priority).toBeNull();
+    expect(body.items[0].issueType).toBeNull();
+    expect(body.items[0].customerWants).toEqual([]);
+  });
+
   it("still refuses a dealer — the cross-link opens no new door", async () => {
     const { sb } = buildSb([CASE_ROW]);
     const res = await get("/ops/service-cases?orderId=ord-1", sb, "dealer");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/ops/service-cases — the S1 guided intake", () => {
+  it("lands all five answers in their own columns, not only in the prose", async () => {
+    const { sb, inserts } = buildInsertSb();
+    const res = await post(WIZARD_BODY, sb);
+
+    expect(res.status).toBe(201);
+    expect(inserts[0]).toMatchObject({
+      reported_by: "customer",
+      order_line_id: "11111111-1111-1111-1111-111111111111",
+      product_sku: "SF2201 3 Seater",
+      product_category: "sofa",
+      issue_type: "colour_uneven",
+      usable: "no",
+      customer_wants: ["repair", "replace"],
+    });
+  });
+
+  it("never writes `priority` — it is generated from `usable` in the database", async () => {
+    // The card's law is that staff never pick a priority. Enforcing it means the
+    // write path must not HAVE the column, not merely decline to offer a picker.
+    const { sb, inserts } = buildInsertSb();
+    await post({ ...WIZARD_BODY, priority: "low" }, sb);
+    expect(inserts[0]).not.toHaveProperty("priority");
+  });
+
+  it("refuses an answer that is not one of the offered keys", async () => {
+    const { sb } = buildInsertSb();
+    const bad = await post({ ...WIZARD_BODY, issueType: "smells_funny" }, sb);
+    expect(bad.status).toBe(400);
+
+    const { sb: sb2 } = buildInsertSb();
+    const bad2 = await post({ ...WIZARD_BODY, customerWants: ["free_sofa"] }, sb2);
+    expect(bad2.status).toBe(400);
+
+    const { sb: sb3 } = buildInsertSb();
+    const bad3 = await post({ ...WIZARD_BODY, usable: "maybe" }, sb3);
+    expect(bad3.status).toBe(400);
+  });
+
+  it("still accepts a case with no wizard answers — the edit modal writes prose only", async () => {
+    const { sb, inserts } = buildInsertSb();
+    const res = await post({ customerName: "Walk-in", whatHappened: "typed by hand" }, sb);
+
+    expect(res.status).toBe(201);
+    expect(inserts[0]).toMatchObject({
+      reported_by: null,
+      issue_type: null,
+      usable: null,
+      customer_wants: [],
+    });
+  });
+
+  it("still refuses a dealer — the wizard opens no new door", async () => {
+    const { sb } = buildInsertSb();
+    const res = await post(WIZARD_BODY, sb, "dealer");
     expect(res.status).toBe(403);
   });
 });

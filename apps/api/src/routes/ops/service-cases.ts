@@ -182,6 +182,17 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
       incurred_charges: parsed.incurredCharges ?? null,
       opened_at:        parsed.openedAt        ?? new Date().toISOString().slice(0, 10),
       created_by:       c.var.auth.id,
+
+      // S1 (0285) — the guided intake's answers. `priority` is NOT here and
+      // must never be: it is a generated column derived from `usable`, which
+      // is how "staff never pick a priority" is enforced rather than promised.
+      reported_by:      parsed.reportedBy      ?? null,
+      order_line_id:    parsed.orderLineId     ?? null,
+      product_sku:      parsed.productSku      ?? null,
+      product_category: parsed.productCategory ?? null,
+      issue_type:       parsed.issueType       ?? null,
+      usable:           parsed.usable          ?? null,
+      customer_wants:   parsed.customerWants   ?? [],
     })
     .select("id, case_no")
     .single();
@@ -228,6 +239,14 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   if (parsed.whatAffected    !== undefined) patch.what_affected    = parsed.whatAffected;
   if (parsed.incurredCharges !== undefined) patch.incurred_charges = parsed.incurredCharges;
   if (parsed.openedAt        !== undefined) patch.opened_at        = parsed.openedAt;
+  // S1 — same set as create, minus priority (generated).
+  if (parsed.reportedBy      !== undefined) patch.reported_by      = parsed.reportedBy;
+  if (parsed.orderLineId     !== undefined) patch.order_line_id    = parsed.orderLineId;
+  if (parsed.productSku      !== undefined) patch.product_sku      = parsed.productSku;
+  if (parsed.productCategory !== undefined) patch.product_category = parsed.productCategory;
+  if (parsed.issueType       !== undefined) patch.issue_type       = parsed.issueType;
+  if (parsed.usable          !== undefined) patch.usable           = parsed.usable;
+  if (parsed.customerWants   !== undefined) patch.customer_wants   = parsed.customerWants;
 
   const { error } = await sb.from("service_cases").update(patch).eq("id", id);
   if (error) throw new HTTPException(500, { message: error.message });
@@ -268,6 +287,17 @@ interface RawCase {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** S1 (0285) — the guided intake. Optional on the type as well as nullable:
+   *  a Worker built after 0285 but pointed at a database before it would
+   *  otherwise read `undefined` off every row and crash the mapper. */
+  reported_by?: string | null;
+  order_line_id?: string | null;
+  product_sku?: string | null;
+  product_category?: string | null;
+  issue_type?: string | null;
+  usable?: string | null;
+  priority?: string | null;
+  customer_wants?: string[] | null;
   service_case_types:    { label: string } | null;
   service_case_statuses: { label: string; is_closed: boolean } | null;
   /** J2 — embedded `orders(so)`. A to-one embed, but PostgREST has been seen
@@ -299,6 +329,18 @@ function shapeCase(r: RawCase) {
     statusLabel:         r.service_case_statuses?.label ?? null,
     statusIsClosed:      r.service_case_statuses?.is_closed ?? false,
     so:                  embeddedSo(r.orders),
+
+    // S1 — the guided intake's answers travel back so the case can be READ the
+    // way it was filed (list badge, case view). `?? null` rather than a spread
+    // so the shape is stable whether or not the row predates 0285.
+    reportedBy:      r.reported_by      ?? null,
+    orderLineId:     r.order_line_id    ?? null,
+    productSku:      r.product_sku      ?? null,
+    productCategory: r.product_category ?? null,
+    issueType:       r.issue_type       ?? null,
+    usable:          r.usable           ?? null,
+    priority:        r.priority         ?? null,
+    customerWants:   r.customer_wants   ?? [],
   };
 }
 

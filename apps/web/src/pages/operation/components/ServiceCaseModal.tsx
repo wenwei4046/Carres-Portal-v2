@@ -1,10 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import type {
-  CaseLookupResponse,
-  ServiceCase,
-  ServiceCaseConfig,
+import {
+  CASE_REPORTERS,
+  caseIssueLabel,
+  caseNeedsManager,
+  caseProductCategoryLabel,
+  caseUsableLabel,
+  caseWantLabel,
+  type CaseLookupResponse,
+  type ServiceCase,
+  type ServiceCaseConfig,
 } from "@carres/shared";
 import { Search, X } from "lucide-react";
 import CaseOrderLink from "./CaseOrderLink";
@@ -245,6 +251,55 @@ export default function ServiceCaseModal({
             </Field>
           </div>
 
+          {/* S1 — the guided intake's answers, read-only.
+              They are shown, not edited: the five questions are asked once, at
+              intake, and re-answering them later would silently change the
+              urgency the case has been worked at. (Editing an answer is S3+
+              territory, where the follow-up tasks exist to be re-driven.)
+              Absent on every case filed before the wizard — the block simply
+              does not render. */}
+          {existingQ.data?.issueType && (
+            <div className="rounded border border-base-200 bg-base-50 p-3">
+              <div className="flex items-center justify-between">
+                <p className="t-tiny uppercase tracking-wider text-base-500">Reported issue</p>
+                {existingQ.data.priority && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className={`pill ${existingQ.data.priority === "high" ? "pill-overdue" : "pill-neutral"}`}>
+                      {existingQ.data.priority === "high"
+                        ? "Urgent"
+                        : existingQ.data.priority === "normal"
+                          ? "Normal"
+                          : "Low"}
+                    </span>
+                    {caseNeedsManager(existingQ.data.priority) && (
+                      <span className="text-xs text-base-600">tell manager</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <IntakeRow label="Found by" value={reporterLabel(existingQ.data.reportedBy)} />
+                <IntakeRow
+                  label="Product"
+                  value={[
+                    existingQ.data.productCategory
+                      ? caseProductCategoryLabel(existingQ.data.productCategory)
+                      : null,
+                    existingQ.data.productSku,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+                <IntakeRow label="What is wrong" value={caseIssueLabel(existingQ.data.issueType)} />
+                <IntakeRow label="Still usable" value={caseUsableLabel(existingQ.data.usable)} />
+                <IntakeRow
+                  label="Customer wants"
+                  value={(existingQ.data.customerWants ?? []).map(caseWantLabel).join(", ")}
+                />
+              </dl>
+            </div>
+          )}
+
           {/* Medical record */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="What happened">
@@ -294,6 +349,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <div className="mt-1">{children}</div>
     </div>
   );
+}
+
+function IntakeRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="t-tiny w-24 shrink-0 pt-0.5 text-base-500">{label}</dt>
+      <dd className="text-sm text-base-800">{value || "—"}</dd>
+    </div>
+  );
+}
+
+function reporterLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return CASE_REPORTERS.find((r) => r.key === key)?.label ?? key;
 }
 
 function today(): string {
