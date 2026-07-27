@@ -190,12 +190,17 @@ a module's workflow → `docs/<MODULE>-WORKING-FLOW.md` · execution queues →
 The delivery lifecycle is FOUR queues; the queue's label IS the row's top
 checklist item. The list is closed; a new chat does not add a fifth:
 
-| Step | The label | It holds | It goes late |
-|---|---|---|---|
-| 1 | `Assign logistics` | Stock in, no logistics company picked | 3 working days before the promised date |
-| 2 | `Confirm delivery date` | Logistics assigned, customer has not confirmed (row line: `Call {logistics} — confirm delivery date`) | 1 working day before the promised date |
-| 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
-| 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
+| Step | The label |
+|---|---|
+| 1 | `Assign logistics` |
+| 2 | `Confirm delivery date` (row line: `Call {logistics} — confirm delivery date`) |
+| 3 | `Deliver today` |
+| 4 | `Upload delivery photo` |
+
+**Only the words live here.** What each queue holds and when it goes late are TRIGGERS and
+DUE conditions — they live in `docs/ORDERS-WORKING-FLOW.md` §3, and nowhere else (Law 0A).
+This table used to carry them; C2 found the copy and it was deleted rather than kept in
+step.
 
 Every deadline is counted in **working days** (see the one definition above) — the same
 engine procurement uses. Lateness is written as the count
@@ -294,6 +299,13 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 Purchasing** — same trigger, same completion, same words. They are listed twice
 because both flows show them; they are never spelt differently.
 
+**RETIRED, and it is not in the table above because it is no longer an action**
+(C3, PR #479): the old bare `Confirm` fired when everything was already arranged
+and the day had simply not come — the one drawer row no button could close. It is
+now a FACT: `Delivering 27 Jul · 9-11 AM` in the drawer, the bare word
+`Delivering` in the row, because the Delivery cell beside it already prints the
+day.
+
 **FACTS (the delivery column, badges):**
 
 | Ships today | Verdict | Must become |
@@ -363,6 +375,18 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 **Waiting words are STATES, never actions** — nobody acts while one is true (engine law).
 **Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
 different failure words.
+
+### A number is not a status until someone sets a target (locked 2026-07-27)
+
+A percentage, a count or a rate is a FACT. It gets a colour only when a human has set the
+line it is being judged against. Painting 82% amber invents a policy nobody ruled, and the
+reader cannot tell an opinion from a measurement.
+
+Two consequences, both already shipped: **a rate with too few records is not printed at
+all** — `0 ÷ 0` shown as `0%` reads "this supplier never delivers on time" and shown as
+`100%` reads "perfect", and both are lies a screen tells with a straight face (R5); and
+**"nobody has set a number yet" is its own visible state**, never a reassuring green
+(K1's `Set a number`). A quiet screen must mean *watched and fine*, never *nobody looked*.
 
 ### Working days — one definition everywhere
 

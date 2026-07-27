@@ -48,7 +48,9 @@ import OrderDetailDrawer from "./components/OrderDetailDrawer";
 // move on the same commit instead of one drifting into a second answer.
 import {
   deliveryStepAnchor,
+  fmtRM,
   logisticStateOf,
+  moneyOf,
   nextActionOf,
   stageOf,
   stockReadiness,
@@ -203,15 +205,23 @@ export default function OperationDelivery() {
       const def = deliveryQueueForLabel(next.label);
       const anchor = def ? deliveryStepAnchor(o, def.key) : null;
       const state = logisticStateOf(o, partnerNameById);
+      const money = moneyOf(o);
       out.push({
         order: o,
         queue: def?.key ?? null,
         label: next.label,
         // C1 — the row says the action WITH the party in it, built by the same
         // shared helper the Orders list uses; no second spelling can appear.
+        // C3 — the money line has to carry its FIGURE here too: a held order is
+        // exactly the kind that reaches this pane (booked truck, off the board),
+        // and `Collect from Kong Chai Yin` names no measurable object. The date
+        // is deliberately NOT passed: for an order waiting on its booked day the
+        // line reads the short `Delivering`, because the two lines under this
+        // one already state `confirmed 27 Jul · 12pm–3pm`.
         line: orderActionLine(next.key, {
           logistics: state.partner,
           customer: o.customer_name,
+          amount: money.known ? fmtRM(money.outstanding) : null,
         }),
         tone: next.tone,
         locked: !!next.locked,

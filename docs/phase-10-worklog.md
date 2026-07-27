@@ -3057,3 +3057,232 @@ because **every migration file on the tip was confirmed applied first — the tr
 0299**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the
 `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom
 domain returns 200.
+
+---
+
+## 2026-07-27 · Late interest, and paying the whole thing off early (0300)
+
+**PR #463** merged as `48262309`, migration **0300_rental_interest_and_settlement** applied, api Worker **`ea4889b3`** + web **`index-DNmwKQrc.js`** — **DEPLOYED**, 4 canonicals first poll. Worktree `rental-modular-sku`.
+
+Loo: *"先做罚息 + 买断结清，一个 PR."* — taken against my own advice to wait for a real signup first; he heard the reasoning and chose to build now.
+
+### What was actually there before
+
+Two empty shells. `rental_agreements` has carried `buyout_at`, `buyout_amount` and the `buyout_pending` status since **0249**; `rental_billings` has carried `late_interest` and `interest_charged_at` since **0281**. Measured before starting: **0 rows with a buyout, 0 with interest, 0 `interest_charged` events, 0 buyout/settle RPCs**, and `rentalLateInterest()` with **zero callers outside its own test file**. The columns were a promise nobody had kept.
+
+### The four decisions
+
+**1 · ACCRUED vs CHARGED — the distinction everything else follows from.** Interest owed grows every day, so a figure written down today is wrong tomorrow. That is exactly the trap `late` avoids by being derived on the read, and `Card declined` avoids by being derived from events. So:
+
+* **accrued** — a pure function of amount and days late, computed on the collections read, never stored, never stale.
+* **charged** — a human act at a moment: this figure, now, onto their account. THAT is what `late_interest` + `interest_charged_at` hold.
+
+The row can therefore say "+RM5.52 interest charged 21 Aug" or "+RM6.90 not charged yet", and the two can never silently disagree because only one of them is ever written.
+
+**2 · The one-writer law, honoured with a named seam.** 0281 made `rental_record_payment` the only writer of `rental_billings` and 0295 kept it. This did not break it:
+
+* `rental_charge_late_interest` touches **exactly two columns**, and the migration's own sanity block asserts by regex that it can never write `status` / `paid_amount` / the split columns.
+* `rental_settle_agreement` writes **nothing** in `rental_billings` itself — it **calls `rental_record_payment`** once per remaining month. That is not a workaround, it is the point: one split implementation, one history trail, and each month genuinely was paid, in one transfer instead of 83. Asserted both ways (must not write the table; must call the RPC).
+
+The writer count is now a tripwire: exactly three functions may write `rental_billings` (approve mints the schedule, record takes money, charge sets interest), and a fourth fails the migration.
+
+**3 · The split is on RENT, not on the penalty.** Loo's rates are "of every RM59 **collected**, 49% supplier / 20% sales". A late penalty is not rent, and handing a supplier 49% of a customer's punishment is a policy nobody has decided. So each settled month is recorded at its own `amount_due` — the split lands exactly as it always has — and the interest rides the settlement event as its own figure. `buyout_amount` is the sum, because that is what the customer paid. Verified live: settling RA-1003 collected RM5,796 (84 × 69) with a supplier share of RM2,840.04, exactly 49%.
+
+**4 · A discounted settlement is REFUSED, not guessed.** The locked rule is "pays the remaining term in one shot". Real settlements are often discounted and nobody has ruled how a discount spreads across 83 months and two payees. Rather than invent an allocation that quietly shorts a supplier, a mismatched amount is refused — **with the exact figure in the message**, because finance needs to see what it should have been. Filed as a CF rather than decided unilaterally.
+
+Plus **no document, no settlement** (Loo: the customer signs it first). Enforced in the RPC so the PostgREST door cannot route around it; server-generated object key; the blob is removed again if the RPC refuses. 0279's discipline, reused rather than re-argued.
+
+**And settling is not owning.** The money side closes (`completed`); the RU asset is deliberately untouched. Ownership transfers when the request-to-buy form is signed, which is still unbuilt.
+
+### Two defects caught in my own migration before it went near the DB
+
+1. The writer-count assertion expected **2** writers of `rental_billings` — it had forgotten that the new interest RPC is itself a (narrow, asserted) writer. Would have failed the apply.
+2. `rental_settle_agreement` looped `FOR ... IN SELECT ... WHERE status IN ('due','overdue')` while its own body flipped each row out of that predicate. How much of that a cursor snapshot sees is not a thing to leave to reasoning when the subject is money — the seqs are materialised into an array first.
+
+### Verification
+
+**21 assertions against live prod in a rolled-back transaction before apply**: showroom and BD refused on both actions (the gate is `rental_can_approve()`, narrower than `is_internal()` — a BD sells these) · not-late-yet refused · a collected month cannot grow a penalty · the figure is right (RM69 × 8%/mo × 30/30 = RM5.52) · same-day re-charge is a no-op with no second history line · **charging interest leaves every money-received column untouched** · the quote's arithmetic · four settlement refusals (no doc, wrong bucket, wrong amount, not active) · **a refused settlement moves no money** · after settling, 0 months owing, status `completed`, buyout stamped, the supplier share on all 84 months · exactly one `settled` event and 84 `payment_recorded` · audit read back **by ref, never by time** · settling twice refused.
+
+Post-apply the file was reconciled to live by `md5(prosrc)` — **all four functions byte-identical this time**, because the apply payload was the file rather than a hand-trimmed copy. That is the 0295 lesson applied.
+
+A functional smoke of the **deployed** RPCs then passed in its own rolled-back transaction (45 days → RM8.28; quote RM5,735.28; 84/84 collected; supplier RM2,840.04).
+
+### Not built, on purpose
+
+Pushing the penalty onto the next Stripe invoice as a one-off item. **No live agreement has a Stripe subscription** (measured: 0 of 1), so that path cannot be verified today, and 0281's own reasoning applies — recording a capability we cannot yet trigger is honest; shipping an unverifiable money path is not. The penalty is on the books and visible to finance, which is the substance. CF filed.
+
+### Deploy
+
+Tracker checked before numbering (0299 → mine is 0300) and again before applying. Before deploying, main's last migration file was 0300 and the tracker tail was 0300 — nothing ahead of the database. api Worker **`ea4889b3`** via `wrangler deploy --env production`, bindings receipt read (`PUBLIC_WEB_URL: https://pos.carresofficial.com` + the custom domain). web **`index-DNmwKQrc.js`** to carres-portal (`1c8cf0c0`) + carres-pos (`263e3d6d`), both `--branch=main`; **all 4 canonicals converged on the first poll**. Live bundle downloaded to a file then grepped: 4,423,947 bytes, `SERVICE_ROLE` **0**, four markers from mounted components present (`Settle early`, `not charged yet`, `Signed settlement document`, `Charge interest`).
+
+Suites at baseline: shared **1726/1726** · api **3** pre-existing · web **16** pre-existing. Tests added: api 11 (new `rental-money.test.ts`), web 9. web typecheck **0**; build, v4 guard and design-standard clean.
+
+**Note the api typecheck baseline moved again, downward**: the two `hr.ts` errors from #440 were fixed by that line, so it is back to **4** (all in `rental-sell.test.ts`).
+
+---
+
+**2026-07-27 · Portal Core C2 — the ladder splits into two layers, and nothing hides any more** (PR #466 merge `bc92e4cc`, no migration, web `index-BYggEOBr.js` [carres-portal `19d0fbbf` + carres-pos `a8c77e64`, **all 4 canonicals converged on the first poll**, 4,426,596 bytes downloaded-then-grepped, `SERVICE_ROLE` 0] + Worker `739d4be8` — DEPLOYED from main tip `bc92e4cc`; every migration file on the tip was confirmed applied first, tracker tail **0300**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron, and `GET /health` through the custom domain returns 200. Worktree `card-c2-implementation`) — card C2 of `docs/portal-core-execution-queue.md`: "replace `first matching rule wins` with a function that returns every open action … a separate pure function picks which one goes first", **done when an order with three open actions shows three rows; no action can be hidden by another; the drawer and the row can never disagree.**
+
+**The bug the card names is real and it was a whole class of invisible work.** `nextActionOf` returned on its first match, so an order with no PO, RM 2,000 owing and no logistics company printed one pill — `Send PO` — and the other two facts did not exist anywhere on screen. That is what ACTION-FLOW Law 1 retired the single ladder for.
+
+**Layer 1 = three tracks, one action each at most.** `packages/shared/src/order-actions.ts` — goods · delivery · money, each evaluated on its own. One per track is not a shortcut: the rungs INSIDE a track are states of the same question ("where are these goods?"), not parallel work, so `Send PO` and `Call {supplier} — confirm ready date` genuinely cannot both be open. Across tracks nothing suppresses anything.
+
+**Layer 2 = a total order, and "broken" is not a rank.** `displayOrderAction` gives every key its own number inside its Law 4 rung, so two actions can never tie and flip between renders. A BROKEN commitment (the promised date passed unconfirmed; a booked run that did not happen) jumps every rung whatever track raised it — that is the one thing the rank table cannot express, because broken is a fact about THIS order, not about the kind of action. Modelling it as a flag rather than as a rank is what let the past-deadline escalation keep its exact behaviour.
+
+**The row is unchanged and it is PROVED, not asserted.** `nextActionOf` kept its signature and became Layer 2 over Layer 1, which makes its entire existing suite the parity oracle: Loo's freeze gate (an escalation never leapfrogs `Send PO`), the T3 delay radar, T7's confirmed-date split, C5's money hold, every tone — 103 assertions, all green across the split, none rewritten. Any behaviour drift would have failed one of them.
+
+**What it unhides on today's board**, measured live rather than predicted (56 orders · 0 delivered · **0 confirmed bookings** · 51 with logistics assigned · 18 owing): the delivery call now sits BESIDE the supplier call instead of behind it (51 rows), and `Assign logistics` stopped waiting for stock it never depended on — its own trigger in ORDERS-WORKING-FLOW §3 never mentioned stock and its deadline is 3 working days before the customer's date, so a queue you cannot enter until the goods arrive is a queue that is always late.
+
+**The one row headline that changes: money survives delivery.** §3 says a delivered order that still owes keeps the action; it used to read `Done` with an empty cell and now reads `Collect RM … from {customer}`. Live there are 0 delivered orders, so no row moved on the day — but the row's line builder had to start passing the amount, or the new headline would have read `Collect from John Tan` and named no figure.
+
+**The drawer's Dynamic Checklist carries no control, and that is the feature.** `OrderActionList` renders the list handed to it by the same call that produced the row's pill — so its first row IS that pill, structurally, not by careful agreement. No button, no checkbox, no drag handle: an action leaves when the system measures its completion (the no-decorative-checkbox law), and a test asserts the component contains zero `<button>` and zero `<input>`. Its empty state teaches ("A new action appears here by itself when something changes") instead of saying "No data".
+
+**Deliberately not built, and reported instead of quietly done:** the `+N` (C3 owns it), per-action checklists (C6), and any ticked/done rows — the journey strip directly above already renders ✓ per stage, so a second ticked list would say the same thing twice. And `Confirm delivery with {customer}` still waits for the goods, because "everything ready, confirm" must not be said over goods that are not in; nothing is suppressed by that, the goods action is still open and still listed.
+
+**Also in this card, handed over mid-build by PR #464:** the `To book` predicate demanded stock be IN *and* the customer confirmed, so an order whose customer had already confirmed a date but whose goods were out landed in `To book` — where the word is wrong, there is nothing left to book. It now answers only "has the customer confirmed?"; a provisional logistics date is still not a booking (T1/0277). 0 of 56 rows carry a confirmed booking, so nothing moved.
+
+**Five findings for Jess, four of them law contradictions** (full text in the card doc): (1) COPY-STANDARD's delivery-queue table states a TRIGGER for `Assign logistics` ("Stock in, no logistics company picked") that contradicts the working flow and Law 1 — its own header says it defines WORDING only, so the working flow won; (2) `Confirm delivery with {customer}` is ranked by Law 4 nowhere, listed by §3 nowhere, and `Confirm` is not one of the five verbs, yet it ships — and it is the one row in the drawer's list that **no button in the portal closes**; (3) Law 4 rung 2 and §4 rung 2 name different parties for the same rung (logistics vs customer); (4) Law 4 rung 1 names a "failed-delivery follow-up" that does not exist; (5) **no action has a Task Owner** — Law 2 requires one on every action and the portal stores `assigned_staff` per ORDER, which C6 will need.
+
+Tests added: shared **37** (the engine, incl. the card's own three-open-actions example and a proof that reversing the input list never changes the answer) · web **7** row-level + **8** component. Suites at baseline: shared **1763/1763** · api **3** pre-existing · web **16** pre-existing. web typecheck **0**; build, v4 guard and design-standard clean.
+
+**Proved in the shipped bundle, both directions** (downloaded to a file first — a piped `curl | grep` on 4.4 MB truncates and reports a false 0): the new strings are present (`Nothing to do on this order` · `A new action appears here by itself` · `order-action-list` · both rewritten tab tooltips), and the retired ones grep **0** (`Stock in AND the customer confirmed` · the old `To book` tooltip · and C1's `Chase logistic` / `Unscheduled` / `need booking` still at 0).
+
+---
+
+**2026-07-27 · Portal Core C10 — the three dots become real · PR #471 · no migration · web `index-CToiHJof.js` (carres-portal `e67004d8` + carres-pos `83d2c2b8`, both `--branch=main`, all 4 canonicals converged on the FIRST poll) — DEPLOYED.** `rowDotsOf()` computed goods · delivery · money, and nothing rendered it, so Law 6 of the engine standard described a screen that did not exist. It does now: three dots beside the stage pill in the Status column.
+
+**Jess's ruling built as ruled — side by side.** The stage pill says WHERE the order is (Placed → Proceed → To book → Customer confirmed → Delivered); the three dots say WHICH PART has trouble. Different questions, neither replaces the other, and the pill's markup is unchanged — it simply sits in a flex row now. **Each dot IS its own icon** (UI-KIT §A4 canonical mapping: goods `package` · delivery `truck` · money `wallet`, 14px, stroke 2), and the icon is what labels it — which is exactly why the dots need no header of their own. Never emoji, and never a bare coloured circle: a circle with no icon is a colour nobody can name without looking somewhere else.
+
+**The proof that dead code became a screen is measured, not asserted.** The four dot tooltips and the `row-dot-` testid grep **0 in the previous live bundle** (`index-BYggEOBr.js`, C2's — they had been tree-shaken, which is what "rendered nowhere" actually meant) and **1 in the new one**. Both bundles downloaded to a file first. The testid itself is a composed template (`row-dot-${kind}`), so the marker had to be the literal fragment — the whole string `row-dot-goods` correctly greps 0, the same trap the S4 entry records.
+
+**`rowDotsOf` now returns the STATE, never a hex.** The hue is the renderer's business, so the tests pin the meaning and the paint stays in the one existing `DOT_HEX` map — no new hex literal, and the RULE A ratchet holds at 43 for that file. **The dot ORDER flipped to the law's** goods · delivery · money; the §14 note of 2026-07-18 had Money · Stock · Delivery, the 2026-07-27 laws re-ruled it, and since nothing had ever rendered these dots, no screen changed when it flipped.
+
+**Widths were measured against the app's own stylesheet**, in a real 1448px `table-fixed` node — not estimated. Widest pill 137px + three icons 50px, so Status went **11 → 14** and both fit intact with 15px spare and the pill untruncated; **the row stays exactly 40px, it does not grow** (§A7). The 3 points came from the two neighbours with real slack — deadline 13 → 12 (needs 142 of 174) and stock 11 → 9 (needs 119 of 130) — **never from Actions**, which C3 is about to grow. On a narrower screen the pill truncates and the dots stay whole (`shrink-0`): the stage word has a tooltip and a five-word vocabulary, a half-drawn signal has neither.
+
+**The card said `rowDotsOf` was unit tested. It never was** — the repo-wide grep returns the definition and nothing else, and the C5 note says the same thing. C10 wrote the first cover its truth table (§7) has ever had: **11 tests**, with a **negative control** (reverse the dot order → 8 of them fail). The lesson is about the claim more than the gap: "computed and unit-tested but not rendered" reads as two thirds done, and it was one third. Also exported `StockEta` and `LogisticState` — an exported function whose parameter types cannot be named is a gap its own test walked into.
+
+**Four findings reported, two of them law problems** (full text in the card doc): (1) Law 6 still says "the column carries no header word", written when the dots were to OWN that column — Jess's later side-by-side ruling put the stage pill there, and a column holding a stage pill needs a word for it; the card's own text resolves it ("the dots need no header **of their own**"), which is what shipped, but **a chat reading only Law 6's older sentence would strip the header and leave the pill unlabelled**; (2) the card's stated width was stale (it says 9 units, C1 had already made it 11); (3) §7 gives the money dot no amber while goods and delivery each have three tones, so "owing but not yet due" cannot read differently from "owing and late" — not invented here; (4) the Stock and Delivery cells have said "the 货 dot carries the colour" since the §14 rebuild and render facts in ink/grey — C10 changed neither, the colour channel they were waiting for simply exists now.
+
+Closes carry-forward `row-dots-of-is-dead-code` — revived rather than deleted, which was the option Law 6 wanted. **No Worker deploy**: `git diff bc92e4cc..origin/main -- apps/api packages/shared supabase/migrations` is empty, so the live Worker `739d4be8` already carries the tip. Suites at baseline (web **16** pre-existing, 4 files; this file's suite 109 → **120**); `tsc -p tsconfig.app.json` 0, design-standard lint, `check:v4` and build clean; `SERVICE_ROLE` greps **0** in the live bundle (4,428,600 bytes).
+
+---
+
+## 2026-07-27 · Portal Core C9 — a storage fee holds the delivery, and only the manager releases it
+
+**PR #472** (merge `a12e8ff6`) · **no migration** · Worker `13c77a71` + web `index-hp2T-FN4.js`
+(carres-portal `e061cba9` + carres-pos `82b4dfec`, both `--branch=main`) — **DEPLOYED**, then
+superseded within minutes by PR #474's `index-CsnNUn76.js` from `b464257c`, which **contains
+C9** (`git merge-base --is-ancestor a12e8ff6 b464257c` passes — the containment proof the
+deploy rules ask for). All 4 canonicals converged on that hash; verified there.
+
+Jess's ruling, 2026-07-27: *an uncollected storage fee is the same as an unpaid balance — the
+goods do not go. If something must go out anyway, the manager approves it and nobody else.*
+
+**Not urgent, and the card said so: ZERO live orders carry a storage fee.** Every change here
+is invisible on an order without one. This decides the behaviour before the first appears
+rather than improvising when it does.
+
+### The split that closes the card is one line of arithmetic
+
+The gate now reads the ONE number — `lines + add-ons + chargeable storage − orders.paid` —
+with no softer path for storage. But a release has to lift the HOLD without forgiving the
+MONEY, so `orderMoney` gained `holding` beside `outstanding` and `holds` beside `owing`:
+**what is OWED and what still BLOCKS became two questions**, and a manager's release is the
+one thing that parts them. The 🔒 and the booking gate ask `holds`; the money action and the
+Owing facet ask `owing`. That is why a released order books **while `Collect RM …` stays on
+its row** — the card's own done-when, and the reason a release can never quietly forgive
+money. `order-actions.ts` took the same split as an OPTIONAL `moneyHolds` signal, so omitting
+it reproduces the pre-C9 lock exactly (asserted).
+
+### No migration — checked, as the card asked, and the answer was not obvious
+
+`storage_waiver_status` has four values and the outcomes need five states — but only if the
+write-off has to live in that column. It does not. `storage_fee_override = 0` already means
+"this order owes no storage fee", is already honoured by every storage reader, and is a
+DIFFERENT column from the Master-imported `storage_fee_msbf` / `_sof`, so **the figure that
+was written off stays on the record** instead of vanishing.
+
+| The manager's decision | `storage_waiver_status` | `storage_fee_override` |
+|---|---|---|
+| `Release, fee still owed` (default) | `approved` | untouched — the fee stays owed |
+| `Release and waive the fee` | `approved` | `0` — written off, with the reason |
+| `Reject` | `rejected` | untouched |
+
+**`approved` therefore means RELEASED, not forgiven** — the one meaning change, and what makes
+the ruling true rather than aspirational. `approved` is still accepted on the wire and reads
+as `waived`, which is exactly what the single old outcome did, so a browser left open across
+the deploy keeps working instead of 422-ing on a word it was built with.
+
+### The finding the card did not predict: the fee was read THREE ways
+
+The same drift C5 found for the goods balance, one card later and one column over.
+
+| Reader | What it read | What it missed |
+|---|---|---|
+| the Orders ladder's 🔒 | `storage_fee_msbf + _sof` | **`storage_fee_override`** — an order the operator had marked "No storage" still showed its fee |
+| the dispatch gate (`storageBlock`) | override + computed | **the Master-imported columns** — an order carrying Jess's own keyed fee and no `storage_from` dispatched with the money unpaid |
+| the drawer | all three, correctly | — |
+
+`packages/shared/storage-hold.ts` is now the ONE ladder (override incl. 0 → Master figure →
+computed) with four readers: the ladder, the booking gate, the dispatch gate and the decide
+route's audit line. **The list API had to start selecting `storage_from` and
+`storage_fee_override`** — without them the row cannot honour an override, and "one rule"
+would have been one rule the row could not ask.
+
+### "UNKNOWN never holds" survives, and it needed a decision
+
+Rule 4 of the card and §2 of the working flow are about the order VALUE, so `goodsOwing` stays
+0 on the 37 unpriced imports and holds nothing. A storage fee is the opposite case — a figure
+a human typed — so it DOES hold an unpriced order. Written as two tests that state the
+distinction, because the two readings look alike in the card's one sentence.
+
+### The audit is a sentence, not a column
+
+The 0211 activity trigger does not watch `storage_fee_override`, so a waive would otherwise be
+a silent zero. The decide route reads the fee through the shared rule BEFORE it writes and
+appends `Delivery released by manager — RM 150 storage fee still owed` / `… written off`
+through the same fail-soft annotation door `/storage/extend` uses — an audit line may never
+undo a decision the manager already made.
+
+**No alert engine, as ruled**: the release flips the row's own headline (the 🔒 comes off
+`Confirm delivery`) and the collection stays in the queue it was already in.
+
+### Reported, not fixed (Law 0)
+
+1. **`ORDERS-WORKING-FLOW.md` §5 puts the money gate on ISSUING the delivery order; the code
+   puts it on CONFIRMING the date.** §5: "Issuing the delivery order is the hard gate, not
+   agreeing a date… Agreeing the date still WARNS about the same three." Live, the only money
+   gate is `bookingConfirmGate`, which REFUSES a confirmation — C5 fixed it there and C9
+   widened it there, because moving a gate is not a bug-fix card's business. **C7 owns this**
+   and must decide whether the confirm gate drops to a warning when `Issue delivery order`
+   exists. Until then the card's "cannot issue its delivery order" is satisfied one step
+   earlier than the flow describes.
+2. **Nothing was measured live.** The Supabase MCP refused every call this session
+   (`You do not have permission to perform this action`), so the card's "ZERO live orders
+   carry a storage fee (measured 2026-07-27)" could not be re-checked — and no migration could
+   have been applied even if one had been needed. Bounded: every behaviour change here is
+   invisible on an order with no storage fee, so a stale figure changes nothing about what
+   ships. But the figure quoted above is the card's, not this chat's.
+3. **"The manager" is the `principal` role, and the card let that stand.** HR-P2 built duty
+   keys (`org_duties`) precisely so a permission can follow a POSITION, and Jess's word is
+   "manager", not "principal". The card said reuse the existing approval channel, so the gate
+   was left alone — but this is now a MONEY decision, and the only person who can make it is
+   whoever holds the principal login.
+4. **The release has no expiry and no scope** — once released, released forever and for every
+   trip, including a second trip booked weeks later under a fee that has kept accruing. A
+   release is currently a permanent property of the ORDER rather than of a delivery.
+5. **A rejected release can be re-asked with nothing telling the operator the fee has grown**
+   since the refusal. Small, and it belongs to whoever next touches the Storage panel.
+
+### Verification
+
+Suites at baseline on the union tip (shared **1788/1788** incl. +25 · api **3** pre-existing ·
+web **16** pre-existing); `tsc -p tsconfig.app.json` 0, api `tsc` 4 pre-existing in
+`rental-sell.test.ts`, build + `check:v4` + lint clean, `wrangler --dry-run --env production`
+clean. Tests +34 (shared 25 · api 7 · web 2 net). **Proved BOTH directions on the downloaded
+live bundle** (4,443,920 bytes, `SERVICE_ROLE` 0): the new strings are present
+(`Release, fee still owed` · `Release and waive the fee` · `Ask the manager to release` ·
+`Released by the manager` · `written off by the manager`) and the retired ones grep **0**
+(`Approve waiver` · `Waived by principal` · `Request waiver` · `Waiver requested` ·
+`pending principal approval`). The one surviving `Awaiting principal approval` is Finance
+Refunds' own >RM 1,000 line, a different feature.

@@ -17,7 +17,7 @@ const EVERY_KEY: OrderActionKey[] = [
   "confirm_delivery_date",
   "deliver_today",
   "upload_delivery_photo",
-  "confirm_delivery",
+  "delivering",
   "collect",
   "done",
 ];
@@ -56,8 +56,30 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("agree_new_delivery_date", { customer: "John Tan" })).toBe(
       "Call John Tan — agree new delivery date",
     );
-    expect(orderActionLine("confirm_delivery", { customer: "John Tan" })).toBe(
-      "Confirm delivery with John Tan",
+  });
+
+  // C3 — the FACT that replaced `Confirm delivery with {customer}`. Two forms
+  // on purpose: the full sentence where nothing else on screen carries the day
+  // (the drawer's journey strip), the bare queue word where a neighbouring cell
+  // already prints it (the Orders row, the Delivery detail pane).
+  it("the delivering FACT states the day, and shortens to one word without it", () => {
+    expect(
+      orderActionLine("delivering", {
+        deliveryDate: "27 Jul",
+        deliverySlot: "12pm–3pm",
+      }),
+    ).toBe("Delivering 27 Jul · 12pm–3pm");
+    expect(orderActionLine("delivering", { deliveryDate: "27 Jul" })).toBe(
+      "Delivering 27 Jul",
+    );
+    // No slot dangling on its own, and no half-sentence when neither is known.
+    expect(orderActionLine("delivering", { deliverySlot: "12pm–3pm" })).toBe(
+      "Delivering",
+    );
+    expect(orderActionLine("delivering")).toBe(orderActionQueue("delivering"));
+    // It carries NO verb a human could act on — that is the whole ruling.
+    expect(orderActionLine("delivering", { customer: "John Tan" })).not.toMatch(
+      /confirm/i,
     );
   });
 
@@ -117,5 +139,12 @@ describe("order action words — the banned words", () => {
   it("exposes every queue word so a caller can guard the whole set", () => {
     expect(ORDER_ACTION_QUEUES).toHaveLength(EVERY_KEY.length);
     expect(new Set(ORDER_ACTION_QUEUES).size).toBe(EVERY_KEY.length);
+  });
+
+  it("the retired `Confirm delivery` is gone, not merely unused (C3)", () => {
+    // Exact match, never a substring: `Confirm delivery date` is a live action
+    // and shares its opening words.
+    expect(ORDER_ACTION_QUEUES).not.toContain("Confirm delivery");
+    expect(orderActionForQueue("Confirm delivery")).toBeNull();
   });
 });

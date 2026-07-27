@@ -217,8 +217,7 @@ describe("storage waiver inputs", () => {
     expect(requestStorageWaiverInput.safeParse({ reason: "ok" }).success).toBe(false);
   });
 
-  it("decideStorageWaiverInput only allows approved | rejected", () => {
-    expect(decideStorageWaiverInput.safeParse({ decision: "approved" }).success).toBe(true);
+  it("decideStorageWaiverInput refuses a lifecycle word as a decision", () => {
     expect(decideStorageWaiverInput.safeParse({ decision: "rejected", note: "no" }).success).toBe(true);
     expect(decideStorageWaiverInput.safeParse({ decision: "requested" }).success).toBe(false);
     expect(decideStorageWaiverInput.safeParse({ decision: "none" }).success).toBe(false);
@@ -332,5 +331,27 @@ describe("countsAsInToday (round-3 auto-MC cutoff)", () => {
     expect(countsAsInToday("2026-07-17T15:00:00Z", cutoff)).toBe(false);
     // stamped this morning → in
     expect(countsAsInToday("2026-07-18T00:30:00Z", cutoff)).toBe(true);
+  });
+});
+
+// ── C9 · the manager's release decision (Jess 2026-07-27) ────────────────────
+describe("decideStorageWaiverInput", () => {
+  it("takes the three outcomes Jess named", () => {
+    for (const decision of ["released", "waived", "rejected"] as const) {
+      expect(decideStorageWaiverInput.parse({ decision }).decision).toBe(decision);
+    }
+  });
+
+  it("the old single outcome still parses, and reads as WAIVED", () => {
+    // A browser left open across the deploy keeps working. `approved` did
+    // exactly what waiving does — the fee stopped counting the moment it was
+    // approved — so mapping it anywhere else would rewrite its meaning.
+    expect(decideStorageWaiverInput.parse({ decision: "approved" }).decision).toBe(
+      "waived",
+    );
+  });
+
+  it("refuses anything else — a release is not a free-text field", () => {
+    expect(decideStorageWaiverInput.safeParse({ decision: "maybe" }).success).toBe(false);
   });
 });

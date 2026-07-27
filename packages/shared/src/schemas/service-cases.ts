@@ -361,6 +361,73 @@ export const updateServiceCaseInputSchema = createServiceCaseInputSchema
   .partial();
 export type UpdateServiceCaseInput = z.infer<typeof updateServiceCaseInputSchema>;
 
+// ── The numbers (S5, NO migration) ───────────────────────────────────────────
+
+/**
+ * The Numbers tab's whole answer, decided server-side by `computeCaseNumbers`.
+ *
+ * Every figure that can be withheld carries its own coverage — `measured`,
+ * `unmeasured` and the reason it is silent — because the live database holds a
+ * case that cannot be measured at all, and a review layer that prints a
+ * confident average off it is worse than one that prints nothing.
+ */
+const caseCoverageShape = {
+  measured:       z.number().int(),
+  unmeasured:     z.number().int(),
+  withheldReason: z.string().nullable(),
+};
+
+export const serviceCaseNumbersResponseSchema = z.object({
+  /** The months reported on, newest first. */
+  months: z.array(z.string()),
+  /** The one month narrowed to, or null for the whole window. */
+  period: z.string().nullable(),
+  totals: z.object({
+    opened:                  z.number().int(),
+    finished:                z.number().int(),
+    closedWithoutFinishDate: z.number().int(),
+    stillOpen:               z.number().int(),
+    stillOpenLate:           z.number().int(),
+  }),
+  byMonth: z.array(
+    z.object({
+      period:     z.string(),
+      total:      z.number().int(),
+      byCategory: z.record(z.number().int()),
+    }),
+  ),
+  byIssue: z.array(
+    z.object({
+      key:        z.string(),
+      label:      z.string(),
+      count:      z.number().int(),
+      byCategory: z.record(z.number().int()),
+    }),
+  ),
+  bySupplier: z.array(
+    z.object({
+      name:      z.string(),
+      count:     z.number().int(),
+      lateCount: z.number().int(),
+    }),
+  ),
+  byResponsibility: z.object({
+    supplier: z.number().int(),
+    carres:   z.number().int(),
+    customer: z.number().int(),
+  }),
+  delayReasonsRecorded: z.number().int(),
+  finish: z.object({ ...caseCoverageShape, avgWorkingDays: z.number().nullable() }),
+  onTime: z.object({
+    ...caseCoverageShape,
+    onTime: z.number().int(),
+    late:   z.number().int(),
+    pct:    z.number().nullable(),
+  }),
+  headline: z.string(),
+});
+export type ServiceCaseNumbersResponse = z.infer<typeof serviceCaseNumbersResponseSchema>;
+
 // ── Lookup (Ref No or Order ID → order autofill) ─────────────────────────────
 
 /** One order line surfaced by the lookup (product/model, qty). */

@@ -238,7 +238,8 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 
 ```
 1  Broken commitment or today's run
-     Deliver today · the failed-delivery follow-up · Upload delivery photo
+     Deliver today · Upload delivery photo
+     (the follow-up after a FAILED delivery is not built — see below)
 2  The customer must be told something — THROUGH LOGISTICS, never by us
      Call {logistics} — arrange new delivery date
 3  Goods are not secured
@@ -249,12 +250,21 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
      Collect RM {amount} from {customer}
 ```
 
+**Not built yet, and named so nobody reads this list as a description of the screen:** the
+follow-up action after a failed delivery. `Deliver today` completes on delivered OR a
+Delivery Exception with its reason, but nothing yet turns that exception into the next
+action. It belongs to whichever card next touches the delivery day.
+
 Money shows last and this is not a demotion — you do not chase payment for goods you
 cannot deliver. It never disappears: it is always in the drawer list and the Owing filter.
 
 ## 5 · Gates — different from display order
 
 A gate REFUSES an action. Display order only decides what is read first.
+
+**TODAY the money gate sits on CONFIRMING the date, not on issuing** — `bookingConfirmGate`
+is the only live money gate. **C7 moves it** to where this section says it belongs. Until
+C7 ships, read the paragraph below as the target, not the screen.
 
 **Issuing the delivery order is the hard gate**, not agreeing a date: a date can be agreed
 with a customer while the goods and the money are still coming. Issuing is refused unless
@@ -307,15 +317,21 @@ outranks a small one going out tomorrow.
 
 ## 7 · The three dots
 
-Three independent facts, so the column has no header; each dot carries its own small icon.
+Three independent facts. Each dot carries its own small icon, so the dots need no header of
+their own; the column's `Status` header belongs to the stage pill beside them.
 
 | | green | amber | red |
 |---|---|---|---|
 | goods | all in | Waiting Goods Arrival | no PO raised, or the supplier's date is late against the deadline |
 | delivery | the CUSTOMER confirmed | logistics gave a date, customer has not confirmed | past the deadline and still unconfirmed |
-| money | settled | — | still owing (stays red after delivery) |
+| money | settled | still owing, and the money is not late yet | still owing AND late — the balance due date has passed, or the goods have been delivered |
 
-A delivered order never alarms on goods or delivery. Delivered is not paid.
+A delivered order never alarms on goods or delivery. Delivered is not paid — and once the
+goods are out, owing money is always RED: there is nothing left to wait for.
+
+**The money dot had no amber until C10 reported it** — every other track has three tones, so
+"owing but not due yet" could not read differently from "owing and late", and the loudest
+colour was spent on both. The rule above uses the balance due date the system already keeps.
 
 ## 8 · What is deliberately NOT an action here
 
@@ -325,3 +341,10 @@ A delivered order never alarms on goods or delivery. Delivered is not paid.
 - **Waiting states are not actions.** `Waiting Supplier Reply` · `Waiting Goods Arrival` are
   monitoring states: nobody does anything while they are true. They become an action only
   when the wait EXPIRES or a human decision is required.
+- **"Everything is ready, the day has not come" is not an action either** (Jess ruled
+  2026-07-27). Goods in · logistics assigned · the customer's date confirmed · that date
+  still ahead — there is nothing for a human to do, which is exactly why the old
+  `Confirm delivery with {customer}` was the one row in the drawer with no button that
+  could close it. A row with no button teaches a new hire that they have missed something.
+  It becomes a FACT — `Delivering 27 Jul · 9–11 AM`, quiet tone, never red — and
+  `Deliver today` takes over on the day.

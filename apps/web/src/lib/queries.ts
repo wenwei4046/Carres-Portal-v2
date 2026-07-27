@@ -84,6 +84,8 @@ import {
   type RentalOfferServicePatchInput,
   type RentalAgreementTemplate,
   type RecordRentalPaymentInput,
+  type ChargeRentalInterestInput,
+  type SettleRentalAgreementInput,
   type AgreementTemplateInput,
   type AgreementTemplatePatchInput,
   type RentalAgreement,
@@ -325,6 +327,9 @@ export const qk = {
     agreementTemplate: () => ["rental", "agreement-template"] as const,
     // 0281 — what has actually been collected against one agreement.
     collections: (agreementId: string) => ["rental", "collections", agreementId] as const,
+    // 0300 — what paying the rest off today would cost, worked out server-side.
+    settlementQuote: (agreementId: string) =>
+      ["rental", "settlement-quote", agreementId] as const,
   },
   // 0261-0263 — Guarantee packages. Blast ["guarantees"] after a claim/attach
   // so the desk, the order badge and any open drawer all re-read together.
@@ -2813,6 +2818,13 @@ export interface opsRemarkEmbed {
    *  compute. All optional so pre-C2 fixtures keep typechecking. */
   balance?: number | string | null;
   payment_status?: string | null;
+  /** C9 — the ladder reads the storage fee through the ONE shared rule
+   *  (`storageHold`), which needs the operator's start date and the keyed
+   *  override, not just the Master-imported figures. Optional, so a browser on
+   *  this build against an older Worker degrades to the imported fee instead of
+   *  crashing. */
+  storage_from?: string | null;
+  storage_fee_override?: number | string | null;
   storage_fee_msbf?: number | string | null;
   storage_fee_sof?: number | string | null;
   storage_paid?: boolean | null;
@@ -8050,6 +8062,25 @@ export interface RentalCollectionRow {
   lastDecline?: { at: string; reason: string | null } | null;
   /** How many times the card was refused for this month. */
   declineCount?: number;
+  /**
+   * 0300 — the 8%/month penalty that HAS accrued on this month as of today.
+   * Derived server-side, never stored, so it is never a day out of date.
+   * Zero once the month is collected.
+   */
+  accruedInterest?: number;
+  /** When the penalty above was last actually CHARGED, or null if never. */
+  interestChargedAt?: string | null;
+}
+
+/** 0300 — what settling the whole thing today would cost. */
+export interface RentalSettlementQuote {
+  agreementNo: string;
+  status: string;
+  monthsLeft: number;
+  rentRemaining: number;
+  /** Interest already charged on those months — not accrued-but-uncharged. */
+  interestCharged: number;
+  total: number;
 }
 
 export interface RentalCollections {
@@ -8110,6 +8141,50 @@ export function useRecordRentalPayment(agreementId: string) {
         `/api/rental/agreements/${agreementId}/collections/${seq}/record`,
         { method: "POST", body: JSON.stringify(body) },
       ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
+  });
+}
+
+/**
+ * 0300 — charge the 8%/month penalty on one overdue month.
+ *
+ * No amount crosses the wire: the server recomputes it from the instalment and
+ * the date. A client that could name the penalty could name any penalty.
+ */
+export function useChargeRentalInterest(agreementId: string) {
+  const qc = useQueryClient();
+  return useMutation<{ charged: unknown }, ApiError, { seq: number } & ChargeRentalInterestInput>({
+    mutationFn: ({ seq, ...body }) =>
+      apiFetch<{ charged: unknown }>(
+        `/api/rental/agreements/${agreementId}/collections/${seq}/interest`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
+  });
+}
+
+/** 0300 — the server's own figure for settling early. */
+export function useRentalSettlementQuote(agreementId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.rental.settlementQuote(agreementId ?? ""),
+    queryFn: () =>
+      apiFetch<{ quote: RentalSettlementQuote }>(
+        `/api/rental/agreements/${agreementId}/settlement-quote`,
+      ),
+    enabled: !!agreementId && enabled,
+    staleTime: 15_000,
+  });
+}
+
+/** 0300 — settle the remaining term in one payment. Needs the signed document. */
+export function useSettleRentalAgreement(agreementId: string) {
+  const qc = useQueryClient();
+  return useMutation<{ settled: unknown }, ApiError, SettleRentalAgreementInput>({
+    mutationFn: (body) =>
+      apiFetch<{ settled: unknown }>(`/api/rental/agreements/${agreementId}/settle`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
   });
 }

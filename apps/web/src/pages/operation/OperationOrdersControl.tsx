@@ -56,12 +56,18 @@ import {
   deliveryQueueForLabel,
   deliveryStepOverdue,
   myHolidaySet,
-  collectPillLabel,
   deliveryDateGapFact,
   orderActionLine,
   orderActionQueue,
+  orderActionsInDisplayOrder,
+  displayOrderAction,
+  openOrderActions,
+  orderIsDelivering,
   orderMoney,
+  storageHold,
   type OrderActionKey,
+  type OrderActionSignals,
+  type OrderOpenAction,
   type OrderMoney,
   type DeliveryQueueKey,
   type OpsTask,
@@ -99,6 +105,10 @@ import {
   Users,
   PackagePlus,
   MessageCircle,
+  // C10 — the three dots' glyphs (UI-KIT §A4 canonical mapping:
+  // stock `package` · logistic `truck` · money `wallet`).
+  Package,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -180,8 +190,8 @@ const TAB_DESC: Record<SettledTab, string> = {
   placed: "New order, not processed yet (a salesperson placed it)",
   proceed: "Confirmed — being arranged. Every AutoCount-imported order starts here.",
   pending:
-    "The goods and/or the customer's delivery date are still outstanding — the Actions column says which",
-  scheduled: "Stock in AND the customer confirmed a delivery date + time slot",
+    "The customer has not confirmed a delivery date yet — the Actions column says who to call",
+  scheduled: "The customer confirmed a delivery date + time slot",
   completed: "Delivered and closed",
 };
 
@@ -211,18 +221,21 @@ function controlTabOf(
   // fall back to the old stage mapping (the param-less `=== "completed"`
   // callers).
   if (availableBySku) {
-    // Stock is READY when EITHER the live free-stock check says so OR the Master
-    // import marked every line ready (line_stock_status='ready', via stockEtaOf).
-    // Without the Master signal, AutoCount SKUs never match the catalog → the
-    // live check is always "awaiting" → NOTHING ever reached the confirmed tab
-    // (Jess 2026-07-19: "why scheduled no showing?"). Same fix as the ladder's.
-    const stockReady =
-      stockBucketOf(o, availableBySku) === "Ready" || stockEtaOf(o).state === "ready";
-    // T1 (0277): "a slot booked" = the CUSTOMER confirmed (booking_stage), not
-    // the logistics company's provisional logistic_eta — provisional rows stay
-    // in To book, so the tab counts agree with the drawer's booking chip.
-    const logisticBooked = bookingConfirmedOf(o);
-    return stockReady && logisticBooked ? "scheduled" : "pending";
+    // C2 (2026-07-27) — the predicate now matches the WORD. C1 renamed these
+    // tabs `To book` / `Customer confirmed` and correctly left the computation
+    // alone; this card owns it. The old split also required stock to be in, so
+    // an order whose customer HAD confirmed a date but whose goods were still
+    // out landed in `To book` — where the word is simply wrong, because there
+    // is nothing left to book. Goods and the booking are two independent facts
+    // (Law 1), and the goods one is already told by the Stock column and by the
+    // goods action; this tab answers only "has the customer confirmed?".
+    //
+    // T1 (0277): "confirmed" = the CUSTOMER's yes (booking_stage + a date), not
+    // the logistics company's provisional word — provisional rows stay in
+    // `To book`, so the tab agrees with the drawer's booking chip.
+    //
+    // Nothing moves today: 0 of 56 live control rows carry a confirmed booking.
+    return bookingConfirmedOf(o) ? "scheduled" : "pending";
   }
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
   if (s === "in_production") return "pending";
@@ -423,7 +436,9 @@ function addDaysIso(iso: string, n: number): string {
 // NOTE the PO-date+lead formula (下PO日 + MS/BF 7d · SOF 5d) is deferred to
 // Phase 2 — there's no PO-raised date on the order; this reads stock_eta only.
 type StockEtaState = "ready" | "on_track" | "late" | "overdue" | "no_eta" | "none";
-interface StockEta {
+/** Exported because `rowDotsOf` takes one — a caller (and its test) could not
+ *  otherwise name the type of an argument it has to build. */
+export interface StockEta {
   /** Latest ETA among waiting lines (ISO), or null when none / all ready. */
   etaIso: string | null;
   /** Any line still waiting on stock. */
@@ -622,18 +637,28 @@ const NEXT_PILL_CLASS: Record<NextTone, string> = {
   neutral: "pill-neutral",
 };
 
-// ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
-// One row = three dots in a FIXED order — Money · Stock · Delivery — sharing
-// the §8 dial hues. The dots are the row's ONLY colour channel; the fact cells
-// (n/m, ETA, partner, ladder word) stay ink/grey. Grey = not applicable.
+// ─── The three dots (C10, Jess 2026-07-27 — ACTION-FLOW Law 6 + §7) ──────────
+// THREE INDEPENDENT FACTS — goods · delivery · money — never merged into one
+// word. They sit BESIDE the stage pill (Jess: the pill says WHERE the order is,
+// the dots say WHICH PART has trouble); neither replaces the other. The dots are
+// the row's ONLY colour channel; the fact cells (n/m, ETA, logistics, ladder
+// word) stay ink/grey. Grey = not applicable / nothing known yet.
+//
+// ORDER: goods · delivery · money, per Law 6 and ORDERS-WORKING-FLOW §7. (The
+// §14 note of 2026-07-18 said Money · Stock · Delivery; the 2026-07-27 laws
+// re-ruled it, and since nothing had ever rendered these dots no screen changes.)
+//
+// This function returns the STATE, never a colour: the hue is the renderer's
+// business, so a test can pin the meaning without pinning a hex.
 const DOT_HEX = {
   green: "#639922",
   amber: "#EF9F27",
   red: "#E24B4A",
   grey: "#D1D5DB",
 } as const;
+type DotState = keyof typeof DOT_HEX;
 interface RowDot {
-  color: string;
+  state: DotState;
   title: string;
 }
 export function rowDotsOf(
@@ -649,44 +674,94 @@ export function rowDotsOf(
   // reserved for genuinely UNKNOWN money — an order nobody has priced.
   const m = moneyOf(o);
   const money: RowDot = !m.known
-    ? { color: DOT_HEX.grey, title: "Money — no order value on record" }
+    ? { state: "grey", title: "Money — no order value on record" }
     : m.owing
-      ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
-      : { color: DOT_HEX.green, title: "Money — settled" };
+      ? { state: "red", title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
+      : { state: "green", title: "Money — settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
-  if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
+  if (completed) goods = { state: "green", title: "Stock — done (delivered)" };
   else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
-    goods = { color: DOT_HEX.green, title: "Stock — all in" };
+    goods = { state: "green", title: "Stock — all in" };
   else if (stock.state === "unknown")
-    goods = { color: DOT_HEX.red, title: "Stock — no PO raised yet" };
+    goods = { state: "red", title: "Stock — no PO raised yet" };
   else if (se.state === "overdue" || se.state === "late")
-    goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
-  else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
+    goods = { state: "red", title: "Stock — supplier ETA late vs the deadline" };
+  else goods = { state: "amber", title: "Stock — waiting arrival" };
   // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
   // reserved for the CUSTOMER's confirmation; a provisional logistics date stays
   // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
-  if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
+  if (completed) delivery = { state: "green", title: "Delivery — delivered" };
   else if (logi.key === "confirmed")
-    delivery = { color: DOT_HEX.green, title: "Delivery — customer confirmed" };
+    delivery = { state: "green", title: "Delivery — customer confirmed" };
   else if (logi.key === "unassigned")
-    delivery = { color: DOT_HEX.grey, title: "Delivery — no logistics picked yet" };
+    delivery = { state: "grey", title: "Delivery — no logistics picked yet" };
   else {
     const dd = daysToDue(o);
     const late = dd !== null && dd < 0;
     delivery =
       logi.key === "provisional"
         ? late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, customer not confirmed" }
-          : { color: DOT_HEX.amber, title: "Delivery — logistics date only, customer not confirmed" }
+          ? { state: "red", title: "Delivery — past deadline, customer not confirmed" }
+          : { state: "amber", title: "Delivery — logistics date only, customer not confirmed" }
         : late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, no booking" }
-          : { color: DOT_HEX.amber, title: "Delivery — customer has not confirmed a date" };
+          ? { state: "red", title: "Delivery — past deadline, no booking" }
+          : { state: "amber", title: "Delivery — customer has not confirmed a date" };
   }
-  return [money, goods, delivery];
+  return [goods, delivery, money];
 }
-function fmtRM(n: number): string {
+/** The three dots on screen (C10). Each dot IS its own icon — that is what
+ *  labels it, which is why the dots need no header of their own (Jess
+ *  2026-07-27). Glyphs come from the UI-KIT §A4 canonical mapping so the same
+ *  meaning wears the same icon portal-wide: goods `package` · delivery `truck`
+ *  · money `wallet`. Never emoji (§A11 rule 2), never a bare coloured circle —
+ *  a circle with no icon would be unreadable without a header to look up.
+ *
+ *  Each dot carries its own tooltip, because a colour alone states a fact
+ *  nobody can name (COPY-STANDARD rule 7: the label says WHAT, the tip WHY).
+ *  `shrink-0` is deliberate: on a narrow screen the stage PILL truncates (it
+ *  has a tooltip and a five-word vocabulary) and the dots stay whole. */
+const DOT_ICON: Record<"goods" | "delivery" | "money", LucideIcon> = {
+  goods: Package,
+  delivery: Truck,
+  money: Wallet,
+};
+function RowDots({
+  o,
+  stock,
+  se,
+  logi,
+}: {
+  o: operationOrderListRow;
+  stock: StockInfo;
+  se: StockEta;
+  logi: LogisticState;
+}) {
+  const dots = rowDotsOf(o, stock, se, logi);
+  const kinds = ["goods", "delivery", "money"] as const;
+  return (
+    <span className="inline-flex items-center gap-1 shrink-0" data-testid="row-dots">
+      {dots.map((dot, i) => {
+        const kind = kinds[i];
+        const Icon = DOT_ICON[kind];
+        return (
+          <span
+            key={kind}
+            title={dot.title}
+            aria-label={dot.title}
+            data-testid={`row-dot-${kind}`}
+            data-dot-state={dot.state}
+            className="inline-flex"
+          >
+            <Icon size={14} strokeWidth={2} style={{ color: DOT_HEX[dot.state] }} />
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+export function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
 }
 
@@ -715,52 +790,126 @@ function ovlOf(o: operationOrderListRow) {
 // drawer and the collections desk (`orderMoney`, packages/shared). Before this
 // card every money surface here read `ops_order_control.balance` — NULL on all
 // 55 live control rows — so the 🔒, the Owing facet row and the Collect RM pill
-// were all permanently silent while 18 orders owed RM 56,859. (The money DOT
-// reads this too, but `rowDotsOf` is dead code — nothing renders it; the
-// Status column shows a stage-word pill. Its strings grep 0 in the bundle.)
+// were all permanently silent while 18 orders owed RM 56,859. The money DOT
+// reads this too — since C10 it is on screen, beside the stage pill, so a row
+// that owes money says so in three places that cannot disagree.
 //
-// STORAGE is folded in here, not inside the shared rule: its clock and its
-// collected/waived flags are this page's own signals, and the shared function
-// only carries the number it is handed.
+// STORAGE comes through its own shared rule (`storageHold`, C9) — this page
+// used to read the Master-imported fee columns and IGNORE `storage_fee_override`,
+// so an order the operator had marked "No storage" still counted its fee, and
+// the dispatch gate disagreed with this row. One rule now, three readers.
+//
+// C9 also split two questions that used to be one: a manager may RELEASE a
+// delivery over an uncollected storage fee. That lifts the 🔒 (`holds`) and
+// leaves the money owed (`owing`), so `Collect RM …` stays on the worklist —
+// a release never quietly forgives money.
 export function moneyOf(o: operationOrderListRow): OrderMoney {
   const ovl = ovlOf(o);
-  const storageFee =
-    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
-  const storageOwing =
-    storageFee > 0 &&
-    !ovl?.storage_collected_at &&
-    ovl?.storage_waiver_status !== "approved"
-      ? storageFee
-      : 0;
+  const lines = o.order_lines ?? [];
+  const hold = storageHold({
+    storageFrom: ovl?.storage_from ?? null,
+    override: ovl?.storage_fee_override ?? null,
+    importedMsbf: ovl?.storage_fee_msbf ?? null,
+    importedSof: ovl?.storage_fee_sof ?? null,
+    skus: lines.map((l) => String(l.sku ?? "")),
+    asOf: todayIso(),
+    collectedAt: ovl?.storage_collected_at ?? null,
+    waiverStatus: ovl?.storage_waiver_status ?? null,
+  });
   const price = (r: { qty: number; unit_price?: number | string | null }) =>
     Number(r.unit_price ?? 0) * Number(r.qty ?? 0);
   return orderMoney({
-    lineSum: (o.order_lines ?? []).reduce((s, l) => s + price(l), 0),
+    lineSum: lines.reduce((s, l) => s + price(l), 0),
     addonSum: (o.order_addons ?? []).reduce((s, a) => s + price(a), 0),
     paid: o.paid,
     controlBalance: ovl?.balance ?? null,
-    storageOwing,
+    storageOwing: hold.owing,
+    storageReleased: hold.released,
   });
 }
 
-/** NEXT — one action per order, DUAL-TRACK (Jess spec §5, 2026-07-12): a stock
- *  track ∥ a delivery track, surfaced as the one most-urgent action —
- *    Send PO → Agree new delivery date → Confirm ready date
- *    → Assign logistics → Confirm delivery date → Confirm delivery.
- *  T3 Delay Radar (2026-07-26): the customer call fires when the latest
- *  waiting-line stock ETA overshoots the customer's delivery date.
+/** NEXT — TWO LAYERS since C2 (Jess 2026-07-27, `docs/ACTION-FLOW-STANDARD.md`
+ *  Law 1). This file no longer decides what an order's next step IS: it reads
+ *  the row's signals, hands them to the shared engine (`order-actions`), and
+ *  renders the answer.
+ *
+ *    LAYER 1 · `openOrderActions` — every track evaluated independently, so a
+ *              goods action can no longer swallow the delivery and money work.
+ *    LAYER 2 · `displayOrderAction` — which ONE the row shows.
+ *
+ *  `nextActionOf` keeps its exact signature and its exact answers: it is now
+ *  Layer 2 over Layer 1, and its whole test suite (the ladder's locked rulings —
+ *  Loo's freeze gate, the T3 delay radar, the T7 date split, C5's money hold)
+ *  is the parity oracle proving the split changed no row's headline.
+ *
  *  WORD LAW (Jess 2026-07-19 C-vocab, re-ruled 2026-07-27): "Assign" = WE pick
  *  the logistics company; "Confirmed" = the CUSTOMER fixed a date + slot (a
  *  STATE, never our verb). "Chase" is banned — every former Chase label is a
  *  `Call {party} — {measurable outcome}` (COPY-STANDARD).
- *  Stock leads while it isn't secured (you don't arrange delivery of goods that
- *  don't exist yet); once Ready the delivery track takes over. Confirm delivery
- *  is the close, and it stays 🔒 LOCKED while a money-hold (unpaid balance /
- *  storage) is outstanding. Operation never calls the customer about a delay
- *  from here — logistics carries that call.
  *
  *  `label` is the action's QUEUE word (party-free). The pill the operator reads
  *  is `orderActionLine(key, …)` — the same action with the real name in it. */
+
+/** The row's signals, in the engine's vocabulary. ONE mapping, so Layer 1 and
+ *  the drawer's list can never read the same order two different ways.
+ *
+ *  `goodsReady` honours BOTH signals (Jess 2026-07-19 #5 fix): the live
+ *  free-stock check AND the Master import's per-line `line_stock_status`.
+ *  AutoCount SKUs miss the catalog, so the live check alone is always
+ *  "awaiting" and a Master-ready order would never leave the goods track. */
+export function orderActionSignalsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): OrderActionSignals {
+  const se = stockEtaOf(o);
+  // The stock-arrival window: MS/BF = deadline−7d, sofa = −5d. Still a flat
+  // per-category number — the supplier master holds production time as free
+  // text, so nothing can compute a real one yet (ORDERS-WORKING-FLOW §3).
+  const hasMsbf = lines.some((l) => {
+    const c = lineCategory(l.sku);
+    return c === "mattress" || c === "bedframe";
+  });
+  const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const money = moneyOf(o);
+  return {
+    completed: controlTabOf(o) === "completed",
+    goodsReady:
+      stock.state === "ready" ||
+      stock.state === "in_stock" ||
+      se.state === "ready",
+    goodsUnordered: stock.state === "unknown",
+    stockEtaIso: se.etaIso,
+    promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
+    daysToDue: daysToDue(o),
+    stockWindowDays: hasMsbf ? 7 : hasSofa ? 5 : 7,
+    hasLogistics: !!(o.delivery_partners?.name || o.ops_assigned_logistic),
+    bookingConfirmed: bookingConfirmedOf(o),
+    confirmedDateIso: ovlOf(o)?.confirmed_date ?? null,
+    todayIso: todayIso(),
+    // T7's three-way answer: [] is "no photo yet", absent is UNKNOWN — an older
+    // Worker that doesn't select the column must not flood every delivered row
+    // with a demand we cannot substantiate.
+    photoOnFile: Array.isArray(ovlOf(o)?.delivery_photos)
+      ? (ovlOf(o)!.delivery_photos as unknown[]).length > 0
+      : null,
+    // C9 — two different questions. `owing` raises the money ACTION; `holds`
+    // is the 🔒 on the delivery, and a manager's release parts them.
+    moneyOwing: money.owing,
+    moneyHolds: money.holds,
+  };
+}
+
+/** LAYER 1 for this row — every open action, in display order. The drawer's
+ *  dynamic checklist and the row's headline read this same list. */
+export function openActionsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): OrderOpenAction[] {
+  return orderActionsInDisplayOrder(orderActionSignalsOf(o, stock, lines));
+}
+
 /** One action, one word — the label is never typed here. */
 function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
   return locked
@@ -768,119 +917,23 @@ function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
     : { key, label: orderActionQueue(key), tone };
 }
 
+/** LAYER 2 for this row. Nothing open → a FACT, because the engine refuses to
+ *  invent one (an empty list is its honest answer) and this is the surface that
+ *  has to print something. TWO facts, and picking the wrong one is the whole
+ *  point of C3: `Delivering …` when the trip is arranged and the day has not
+ *  come, `Done` when the order is genuinely finished. Both are quiet, neither
+ *  is ever a queue — no facet row and no delivery queue names either word. */
 export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
 ): NextAction {
-  if (controlTabOf(o) === "completed") {
-    // T7 (Jess 2026-07-27): a delivered order whose delivery photo is still
-    // missing has ONE real action left, so it is not "Done" yet — this is the
-    // only action a closed order ever shows. WARNING tone, never danger:
-    // guardrail #2 says a delivered order must not alarm red.
-    // `undefined` = the answer is UNKNOWN (an older Worker that doesn't select
-    // the column, or no overlay row at all) → stay Done rather than flood every
-    // delivered row with a demand we can't substantiate. An explicit [] is the
-    // real "no photo yet".
-    const photos = ovlOf(o)?.delivery_photos;
-    if (Array.isArray(photos) && photos.length === 0)
-      return act("upload_delivery_photo", "warning");
-    return act("done", "neutral");
-  }
-
-  // PAST-DEADLINE ESCALATION (Loo locked, freeze gate 2026-07-12): once the
-  // promise date has passed with logistics assigned but no delivery booked, the
-  // responsibility shifts from their "call now" to OPS's own call — this
-  // OVERRIDES the stock track. Scoped to has-logistics (you cannot call a
-  // company that isn't assigned yet) AND to stock NOT "unknown": a No-PO
-  // order's real unblock is RUNG 1 `Send PO`, which the escalation must never
-  // leapfrog (calling logistics about un-ordered goods is an empty action).
-  const dd = daysToDue(o);
-  const hasPartner = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
-  // T1 (0277): "no delivery booked" = the customer hasn't confirmed — a
-  // provisional logistics date past the deadline still escalates.
-  if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !bookingConfirmedOf(o))
-    return act("confirm_delivery_date", "danger");
-
-  // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
-  // Master import's per-line `line_stock_status='ready'` (stockEtaOf), but
-  // nextActionOf used to trust ONLY stockReadiness (order_lines vs live
-  // stock_balances) — which is always "awaiting" for AutoCount SKUs that don't
-  // match the catalog → the row stayed on `Confirm ready date` even when the
-  // STOCK column showed "Ready". Honour BOTH signals so a Master-ready order
-  // flows to the delivery track, matching what the row shows.
-  const ready =
-    stock.state === "ready" ||
-    stock.state === "in_stock" ||
-    stockEtaOf(o).state === "ready";
-
-  // STOCK TRACK — leads until the goods are secured.
-  if (!ready) {
-    if (stock.state === "unknown") return act("send_po", "danger");
-    // T3 DELAY RADAR (Jess's Golden Rule, 2026-07-26): risk is not "is stock
-    // here today" — it is "can the LATEST stock ETA still honour the customer's
-    // date". Once the max waiting-line ETA OVERSHOOTS the promised date the
-    // miss is already certain, so calling the supplier can no longer save the
-    // date — the action flips to agreeing a new date with the CUSTOMER now, not
-    // to showing overdue after the window. Completed orders never reach here
-    // (guardrail #2, the Done return above); No-PO stays RUNG 1 (the real
-    // unblock is ordering the goods); the past-deadline delivery escalation
-    // above stays locked (Loo, freeze gate 2026-07-12).
-    const se = stockEtaOf(o);
-    if (
-      se.etaIso &&
-      !o.delivery_date_tbd &&
-      o.delivery_date &&
-      se.etaIso > o.delivery_date
-    )
-      return act("agree_new_delivery_date", "danger");
-    // `Confirm ready date` turns red once we're inside the stock-arrival window
-    // and it still hasn't landed (MS/BF = deadline−7d, Sofa = −5d), else amber.
-    const hasMsbf = lines.some((l) => {
-      const c = lineCategory(l.sku);
-      return c === "mattress" || c === "bedframe";
-    });
-    const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
-    const lead = hasMsbf ? 7 : hasSofa ? 5 : 7;
-    const overdue = dd !== null && dd < lead;
-    return act("confirm_ready_date", overdue ? "danger" : "warning");
-  }
-
-  // DELIVERY TRACK — stock is in; arrange the delivery. T1 (0277): the call ends
-  // only on the CUSTOMER's confirmation — a provisional logistics date
-  // (logistic_eta alone) keeps the row in the Confirm-delivery-date queue,
-  // matching the drawer's "not confirmed" chip.
-  if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
-    return act("assign_logistics", "info");
-  if (!bookingConfirmedOf(o)) return act("confirm_delivery_date", "info");
-
-  // Both tracks done → confirm the delivery with the customer. A money-hold
-  // keeps it 🔒 (never a separate action). C5 (2026-07-27): the hold reads the
-  // shared `orderMoney` — goods money from `orders.paid` against the priced
-  // lines, plus any storage still owed. It used to read
-  // `ops_order_control.balance`, NULL on every live row, so this 🔒 had never
-  // fired for a single order while 18 of them owed RM 56,859. An order nobody
-  // has priced stays UNKNOWN and is never held.
-  const ovl = ovlOf(o);
-  if (moneyOf(o).owing) return act("confirm_delivery", "warning", true);
-
-  // T7 (Jess 2026-07-27): the CUSTOMER's confirmed date is itself a deadline, so
-  // a confirmed booking is not one resting state — it splits by that date.
-  //   today  → "Deliver today" (this is today's run; a real queue of its own)
-  //   passed → the booked run did not happen and nothing recorded a delivery →
-  //            back to `Call {logistics} — confirm delivery date` (they are who
-  //            to ask). This is the auto-overdue: the row leaves the
-  //            Deliver-today queue by itself.
-  // The money-hold above still wins (PayHold law — you don't collect for a
-  // delivery you're not allowed to make), and bookingConfirmedOf() guarantees a
-  // date here.
-  const confirmedDate = ovl?.confirmed_date ?? null;
-  if (confirmedDate) {
-    const today = todayIso();
-    if (confirmedDate < today) return act("confirm_delivery_date", "danger");
-    if (confirmedDate === today) return act("deliver_today", "info");
-  }
-  return act("confirm_delivery", "success");
+  const s = orderActionSignalsOf(o, stock, lines);
+  const top = displayOrderAction(openOrderActions(s));
+  if (!top) return act(orderIsDelivering(s) ? "delivering" : "done", "neutral");
+  return top.locked
+    ? act(top.key, top.tone, true)
+    : act(top.key, top.tone);
 }
 
 /** Sort by SLACK ascending (Jess spec §5) — the most dangerous order (least
@@ -933,7 +986,8 @@ type LogisticStateKey =
   | "provisional"
   | "need_booking"
   | "unassigned";
-interface LogisticState {
+/** Exported for the same reason as `StockEta` — `rowDotsOf` takes one. */
+export interface LogisticState {
   key: LogisticStateKey;
   partner: string | null;
   /** ISO date — the customer's confirmed date on "confirmed"; the logistics
@@ -1268,17 +1322,24 @@ interface OrderColDef {
  *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status shows a STAGE word pill (Placed / Proceed / To book / Customer
-  // confirmed), not the old anonymous dots — 11% since C1 renamed the two
-  // longest words, so "Customer confirmed" never clips (Jess 2026-07-19 asked
-  // for exactly that on the old pair). Rebalanced out of customer/next.
-  { key: "dots", label: "Status", w: 11 },
-  { key: "order", label: "Order", w: 10 },
+  // Status holds TWO things since C10 (Jess 2026-07-27): the STAGE word pill
+  // (Placed / Proceed / To book / Customer confirmed / Delivered) and, beside
+  // it, the three dots. 11 → 14: the widest pill measures 135px and the three
+  // 14px icons 50px, so both fit intact (12px cell padding + 135 + 6 + 50 =
+  // 203px ≈ 14% of the table's ~1448px). The 3 points came from the two
+  // neighbours with MEASURED slack, never from Actions: deadline 13 → 12
+  // (needs 142px, had 188) and stock 11 → 9 (needs ~107px, had 159).
+  { key: "dots", label: "Status", w: 14 },
+  // C3 took 1 of the 2 points Actions grew by. `SO-1002` + `CR0418 +1` are
+  // short mono strings: 9 ≈ 130px against ~62px of content.
+  { key: "order", label: "Order", w: 9 },
   { key: "customer", label: "Customer", w: 11 },
   // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
-  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law).
-  { key: "deadline", label: "Deadline", w: 13 },
-  { key: "stock", label: "Stock", w: 11 },
+  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law). C3 took the
+  // other point from C10's own measurement: 142px needed, 12 → 11 ≈ 159px.
+  // `stock` was left alone — C10 had already cut it to its measured floor.
+  { key: "deadline", label: "Deadline", w: 11 },
+  { key: "stock", label: "Stock", w: 9 },
   // Delivery + Actions each took a point from the cells beside them: C1's words
   // name the party, so the strings are longer ("NETS — confirm delivery date").
   { key: "delivery", label: "Delivery", w: 13 },
@@ -1286,7 +1347,16 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
   // ACTIONS, plural (Jess 2026-07-27): an order can have several. Was "Manage".
-  { key: "next", label: "Actions", w: 14 },
+  //
+  // C3 · the truncation question Jess deferred to this card, DECIDED: the
+  // column takes 2 more units (from `order` and `deadline`, the two with slack
+  // left after C10) and the longest lines still truncate with their tooltip — that
+  // is accepted, not conceded. A row of eight columns cannot hold
+  // `Call NETS Logistics — confirm delivery date` whole without starving a
+  // neighbour, the visible half is the half that acts (verb + party), and since
+  // C2 the FULL text has a proper home one click away: the drawer lists every
+  // open action in full. The `+N` beside the pill says how much is behind it.
+  { key: "next", label: "Actions", w: 16 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1705,17 +1775,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const holdAmount = money.known ? money.outstanding : null;
     const na = nextActionOf(o, stock, o.order_lines ?? []);
     const sid = primarySupplierId(o, skuMeta, suppliers);
+    // C3 — the drawer is the ONE surface that prints the delivering FACT in
+    // full (`Delivering 27 Jul · 12pm–3pm`). The Orders row and the Delivery
+    // detail pane both sit beside a cell that already carries the booked day,
+    // so they print the short `Delivering`; here nothing else says it.
+    const booking = orderBookingDay(o);
+    const actionParties = {
+      supplier: sid ? supplierNameById.get(sid) ?? null : null,
+      logistics: logisticOf(o, partnerName),
+      customer: o.customer_name,
+      amount: money.known ? fmtRM(money.outstanding) : null,
+      deliveryDate:
+        booking.kind === "confirmed" && booking.date ? dayMon(booking.date) : null,
+      deliverySlot:
+        booking.kind === "confirmed" && booking.slot ? shortSlot(booking.slot) : null,
+    };
     return {
       next: {
         ...na,
         // C1 — the strip shows the SAME row line the list pill shows, built by
         // the same shared helper. One action, one spelling, two surfaces.
-        line: orderActionLine(na.key, {
-          supplier: sid ? supplierNameById.get(sid) ?? null : null,
-          logistics: logisticOf(o, partnerName),
-          customer: o.customer_name,
-          amount: money.known ? fmtRM(money.outstanding) : null,
-        }),
+        line: orderActionLine(na.key, actionParties),
       },
       // The same test the ladder's RUNG 1 makes: goods with no purchase order
       // anywhere are goods nobody has ordered.
@@ -1731,6 +1811,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
       // T7's three-way answer: [] is "no photo yet", undefined is UNKNOWN.
       photoOnFile: Array.isArray(photos) ? photos.length > 0 : null,
       holdAmount,
+      // C2 — LAYER 1: every open action, in display order. The drawer's list
+      // and this row's pill are the same computation, so the count the drawer
+      // shows and the headline the row shows can never contradict each other.
+      // The party names are resolved ONCE, here, where the maps live.
+      openActions: openActionsOf(o, stock, o.order_lines ?? []).map((a) => ({
+        key: a.key,
+        line: orderActionLine(a.key, actionParties),
+        tone: a.tone,
+        locked: a.locked,
+      })),
     };
   };
   const nextCounts = useMemo(() => {
@@ -3167,10 +3257,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </th>
               {showCol("dots") && (
                 <Th>
-                  {/* This cell shows the pipeline STAGE in words, not the
-                      three-dot signal its `dots` key still names — see the
-                      column def. The tooltip describes what actually renders. */}
-                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered">
+                  {/* The word heads the STAGE PILL only. The three dots beside
+                      it need no header of their own (Jess 2026-07-27) — each is
+                      labelled by its own icon and carries its own tooltip. */}
+                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.">
                     Status
                   </span>
                 </Th>
@@ -4190,15 +4280,25 @@ function OrderRow({
           .pill for the live stages; a muted "Delivered" (no pill) once done. */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        {completed ? (
-          <span className="text-[12px] text-base-400">Delivered</span>
-        ) : (
-          (() => {
-            const label = TAB_LABEL[controlTabOf(o, availableBySku)];
-            // ONE shared status→pill map (no per-surface hand-roll).
-            return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
-          })()
-        )}
+        {/* C10 (Jess 2026-07-27): the stage pill and the three dots SIDE BY
+            SIDE — they answer different questions and neither replaces the
+            other. The pill is byte-identical to before this card; the dots are
+            new. The pill takes the slack and truncates on a narrow screen; the
+            dots are fixed-width and never squeezed out. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="min-w-0 truncate">
+            {completed ? (
+              <span className="text-[12px] text-base-400">Delivered</span>
+            ) : (
+              (() => {
+                const label = TAB_LABEL[controlTabOf(o, availableBySku)];
+                // ONE shared status→pill map (no per-surface hand-roll).
+                return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
+              })()
+            )}
+          </span>
+          <RowDots o={o} stock={stock} se={se} logi={logi} />
+        </div>
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
@@ -4401,12 +4501,13 @@ function OrderRow({
         />
       </td>
       )}
-      {/* ACTIONS — the action, with the party NAMED (C1, Jess 2026-07-27), and
-          a one-click act (2026-07-19): the whole row opens the drawer, so the
-          pill itself is the button that acts on the order. The pill reads the
-          row LINE (`Call NETS — confirm delivery date`); the QUEUE word behind
-          it (`Confirm delivery date`) is what the facet rail and the counts
-          use, and `data-next-action` keeps carrying that stable word. */}
+      {/* ACTIONS — the whole truth (C3, Jess 2026-07-27): the top action from
+          Layer 2, with the party NAMED (C1), plus `+N` when more are open. The
+          pill reads the row LINE (`Call NETS — confirm delivery date`); the
+          QUEUE word behind it (`Confirm delivery date`) is what the facet rail
+          and the counts use, and `data-next-action` keeps carrying that stable
+          word. One-click act (2026-07-19): the whole row opens the drawer, so
+          the pill itself is the button that acts on the order. */}
       {showCol("next") && (
       <td className="pl-2 pr-2">
         {(() => {
@@ -4415,29 +4516,71 @@ function OrderRow({
           // already says "Delivered"; a "Done" pill is redundant — and would be
           // wrong if a 2nd delivery were still outstanding, which keeps the
           // order in-pipeline, not Delivered).
-          // T7 exception: a delivered order with NO delivery photo still owes
-          // one real act, so the ladder returns "Upload delivery photo" instead
-          // of "Done" and that pill DOES show. Only "Done" blanks the cell.
+          // TWO exceptions, and both are actions a delivered order genuinely
+          // still owes, so their pill DOES show — only "Done" blanks the cell:
+          // T7's "Upload delivery photo" (no photo on file) and, since C2,
+          // "Collect RM …" — money is its own track and it SURVIVES delivery
+          // (ORDERS-WORKING-FLOW §3). Delivered is not paid.
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
           if (completed && na.key === "done") return null;
-          // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
-          // is the PRIMARY action; an outstanding balance is an INDEPENDENT
-          // track, shown as a secondary `Collect RM {amount}` pill (max two
-          // pills). Hidden once the order is closed. A 🔒 Confirm delivery
-          // already means "money-held", so the pill isn't doubled up there.
-          // C5: the figure comes from the shared money rule, so the pill, the
-          // 🔒 and the Owing facet can never disagree. An order nobody has
-          // priced shows no money pill at all — we do not know what it owes.
           const m = moneyOf(o);
-          const owing = !completed && m.owing;
-          const showMoney = owing && na.key !== "confirm_delivery";
-          const line = orderActionLine(na.key, {
+          const parties = {
             supplier: supplierName,
             logistics: logi.partner,
             customer: o.customer_name,
-          });
-          const amount = fmtRM(m.outstanding);
+            amount: m.known ? fmtRM(m.outstanding) : null,
+            // C3 — the fact's own two values, already formatted; the words
+            // module owns the sentence and never a date (see below: this cell
+            // prints the SHORT form, so they only reach the tooltip).
+            deliveryDate: logi.date ? dayMon(logi.date) : null,
+            deliverySlot: logi.slot ? shortSlot(logi.slot) : null,
+          };
+          // C3 — the FACT that replaced `Confirm delivery with {customer}`:
+          // everything is arranged and the day has not come, so there is
+          // nothing to do and nothing to click. Quiet grey, never a pill: a
+          // pill in this column is a button, and a fact is not one.
+          //
+          // WHICH FORM: the short one. The Delivery cell immediately to the
+          // left already prints `27 Jul · 12pm–3pm`, so the full
+          // `Delivering 27 Jul · 12pm–3pm` would say the same thing twice in
+          // adjacent columns — the trap C1 hit in the delivery badge and solved
+          // by dropping the verb. Here the duplicated half is the DATE, so the
+          // cell keeps the word and the tooltip carries the day. The full
+          // sentence still ships, in the drawer's journey strip, where nothing
+          // else on screen says it.
+          if (na.key === "delivering") {
+            const full = orderActionLine("delivering", parties);
+            return (
+              <span
+                className="t4-caption truncate block"
+                data-next-action={na.label}
+                title={
+                  full === "Delivering"
+                    ? "Goods in, logistics booked, the customer confirmed the day. Nothing to do until then."
+                    : `Goods in, logistics booked. Nothing to do until ${full.replace(/^Delivering /, "")}.`
+                }
+              >
+                {na.label}
+              </span>
+            );
+          }
+          // C2/C3: money is its own track, so `collect` can BE the headline —
+          // on a delivered order that still owes, or on one whose delivery is
+          // held for the balance, it is the only action left. The amount rides
+          // the line then, or the pill reads "Collect from John Tan" and names
+          // no figure. C5: the figure comes from the shared money rule, so the
+          // pill, the 🔒 and the Owing facet can never disagree.
+          const line = orderActionLine(na.key, parties);
+          // C3 — everything else that is open, folded into ONE `+N`. It
+          // replaces the old secondary `Collect RM …` pill: a cell may have
+          // exactly one way of saying "there is more", and the `+N` covers all
+          // three tracks where the money pill covered one (and, since Law 4,
+          // money is the one that displays LAST). The count is
+          // `open.length − 1` by construction, so the drawer opened by this row
+          // shows exactly `1 + N` rows — it is the same computation.
+          const open = openActionsOf(o, stock, lines);
+          const more = open.slice(1);
           return (
             <div className="flex items-center gap-1.5 max-w-full">
               <button
@@ -4453,21 +4596,20 @@ function OrderRow({
                 {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
                 <span className="truncate min-w-0">{line}</span>
               </button>
-              {showMoney && (
+              {more.length > 0 && (
                 <button
                   type="button"
+                  data-testid="next-more"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onNextAction(orderActionQueue("collect"));
+                    onOpen();
                   }}
-                  className="pill pill-collected shrink-0 hover:brightness-95"
-                  data-next-action={orderActionQueue("collect")}
-                  title={orderActionLine("collect", {
-                    amount,
-                    customer: o.customer_name,
-                  })}
+                  className="shrink-0 tabular-nums text-[12px] font-semibold text-base-500 hover:text-base-900"
+                  title={`Also open: ${more
+                    .map((a) => orderActionLine(a.key, parties))
+                    .join(" · ")} — click to see them all`}
                 >
-                  {collectPillLabel(amount)}
+                  +{more.length}
                 </button>
               )}
             </div>

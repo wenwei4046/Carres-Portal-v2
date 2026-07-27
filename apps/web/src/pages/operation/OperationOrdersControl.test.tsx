@@ -7,9 +7,16 @@ import OperationOrdersControl, {
   buildOrdersPrintHtml,
   catQty,
   nextActionOf,
+  openActionsOf,
   stockEtaOf,
   slackDays,
   logisticStateOf,
+  rowDotsOf,
+} from "./OperationOrdersControl";
+import type {
+  StockInfo,
+  StockEta,
+  LogisticState,
 } from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
@@ -965,6 +972,61 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.queryByTestId("filter-delivery")).toBeNull();
   });
 
+  // C2 — the `To book` predicate now matches its own word (found by C1).
+  // The old split also demanded stock be IN, so an order whose customer had
+  // already confirmed a date sat in `To book` with nothing left to book.
+  it("a customer-confirmed order sits in Customer confirmed even while its goods are out", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "t1",
+          so: 1451,
+          status: "proceed_order",
+          operation_stage: "in_production",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+          ops_order_control: {
+            booking_stage: "confirmed",
+            confirmed_date: relISO(6),
+            confirmed_time_slot: "Morning (9–11 AM)",
+          },
+        }),
+      ],
+    };
+    // A live stock snapshot that covers NONE of the order's SKUs → goods out.
+    stockHookState = { data: stockResponse([{ sku: "other", available: 0 }]) };
+    wrap(<OperationOrdersControl />);
+    clickStatus("Customer confirmed");
+    expect(rowsBySo()).toEqual(["1451"]);
+    clickStatus("To book");
+    expect(screen.queryAllByTestId("order-row")).toHaveLength(0);
+  });
+
+  it("a provisional logistics date is NOT a booking — that order stays in To book", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "t2",
+          so: 1452,
+          status: "proceed_order",
+          operation_stage: "in_production",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+          ops_order_control: {
+            booking_stage: "provisional",
+            logistic_eta: relISO(6),
+          },
+        }),
+      ],
+    };
+    stockHookState = { data: stockResponse([{ sku: "other", available: 0 }]) };
+    wrap(<OperationOrdersControl />);
+    clickStatus("To book");
+    expect(rowsBySo()).toEqual(["1452"]);
+  });
+
   it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
     wrap(<OperationOrdersControl />);
@@ -1411,7 +1473,11 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + customer confirmed + paid → Confirm (green)", () => {
+  // C3 (Jess 2026-07-27) — "everything ready, the day has not come" stopped
+  // being an action: it was the one row in the drawer no button could close.
+  // The ladder answers with the quiet FACT instead, and `Deliver today` takes
+  // over on the day.
+  it("ready + carrier + customer confirmed + paid → the Delivering FACT, quiet", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1419,12 +1485,14 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
-      tone: "success",
+      label: "Delivering",
+      tone: "neutral",
     });
+    // Never red, and never an action: the drawer's list is EMPTY for this row.
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("ready + carrier + customer confirmed + owing balance → Confirm, held (🔒)", () => {
+  it("ready + carrier + customer confirmed + owing balance → Collect, held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1432,7 +1500,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
@@ -1443,7 +1511,7 @@ describe("nextActionOf (C2)", () => {
   // them owed RM 56,859. It now reads the shared `orderMoney` — the priced
   // lines against `orders.paid` — the SAME rule the server's booking gate asks.
 
-  it("SO-1256's shape: priced lines with a 50% deposit → Confirm, held (🔒)", () => {
+  it("SO-1256's shape: priced lines with a 50% deposit → held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1256,
@@ -1454,12 +1522,12 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
 
-  it("SO-1209's shape: paid in full → Confirm, NOT held", () => {
+  it("SO-1209's shape: paid in full → NOT held, and the day is simply ahead", () => {
     // The live false-block. RM 6,998 + RM 250 of add-ons, `orders.paid`
     // RM 7,248, balance NULL. Nothing may hold this delivery.
     const o = makeRow({
@@ -1472,7 +1540,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm delivery");
+    expect(r.label).toBe("Delivering");
     expect(r.locked).toBeFalsy();
   });
 
@@ -1502,7 +1570,7 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
-  it("ready + carrier + customer confirmed + owing storage → Confirm, held", () => {
+  it("ready + carrier + customer confirmed + owing storage → held", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1510,12 +1578,16 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
 
-  it("ready + carrier + customer confirmed + storage waived → Confirm, NOT held", () => {
+  // ── C9 · the manager's release (Jess 2026-07-27) ──
+  it("storage RELEASED → nothing is held, and Collect stays on the worklist", () => {
+    // The card's own done-when: "a release that does not waive leaves the money
+    // action open". The manager let the goods go; the RM 150 is still ours, so
+    // since C3 the row's headline IS that collection — unlocked.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1527,8 +1599,41 @@ describe("nextActionOf (C2)", () => {
       },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm delivery");
+    expect(r.label).toBe("Collect");
     expect(r.locked).toBeFalsy();
+    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toContain(
+      "collect",
+    );
+  });
+
+  it("storage WAIVED (the override written to 0) → nothing left to collect", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: {
+        ...BOOKED,
+        storage_fee_msbf: 150,
+        storage_fee_override: 0,
+        storage_waiver_status: "approved",
+      },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
+    expect(
+      openActionsOf(o, { state: "ready" }, []).map((a) => a.key),
+    ).not.toContain("collect");
+  });
+
+  it("a keyed override beats the Master figure — 'No storage' really means no fee", () => {
+    // The ladder used to read storage_fee_msbf and ignore the override, so an
+    // order the operator had exempted still showed its 🔒.
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, storage_fee_msbf: 150, storage_fee_override: 0 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
   // ── T7 · the confirmed date is itself a deadline ──
@@ -1558,17 +1663,18 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("confirmed for a future day → still Confirm (T7 changes nothing before the day)", () => {
+  it("confirmed for a future day → the quiet FACT, with no action behind it", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, confirmed_date: inDays(3) },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm delivery");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Delivering");
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("owing balance beats Deliver today (PayHold: never chase a delivery we may not make)", () => {
+  it("owing balance beats Deliver today (PayHold: never arrange a delivery we may not make)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1576,7 +1682,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
@@ -1621,6 +1727,88 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { balance: 0 },
     });
     expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
+  });
+
+  // ── C2 · the SPLIT — every rung above is unchanged, and now nothing hides ──
+  // Every assertion in this describe block ran green BEFORE the two-layer
+  // split and after it: that suite is the parity oracle proving Layer 2 keeps
+  // the ladder's locked rulings. What follows tests the half that is new —
+  // that Layer 1 stops one track eating another's work.
+  describe("openActionsOf (C2 · Layer 1)", () => {
+    it("the card's own example: no PO + no logistics + owing → THREE open actions", () => {
+      // The old ladder showed `Send PO` and the other two facts vanished.
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+        paid: 2000,
+      });
+      expect(openActionsOf(o, { state: "unknown" }, MS).map((a) => a.key)).toEqual([
+        "send_po",
+        "assign_logistics",
+        "collect",
+      ]);
+    });
+
+    it("goods still coming no longer hides the delivery call — the live board's shape", () => {
+      // 51 of 56 live orders carry a logistics company and NONE has a confirmed
+      // booking, so this is what most of the board looks like today.
+      const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
+      expect(openActionsOf(o, { state: "awaiting" }, MS).map((a) => a.key)).toEqual([
+        "confirm_ready_date",
+        "confirm_delivery_date",
+      ]);
+    });
+
+    it("the drawer's first row IS the row's pill — they cannot disagree", () => {
+      const rows = [
+        makeRow({ id: "a", so: 1, order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }], paid: 0 }),
+        makeRow({ id: "b", so: 2, ops_assigned_logistic: "p1", delivery_date: inDays(-2) }),
+        makeRow({ id: "c", so: 3, ops_assigned_logistic: "p1", ops_order_control: { ...BOOKED } }),
+      ];
+      for (const o of rows) {
+        const stock = { state: "awaiting" } as const;
+        expect(openActionsOf(o, stock, MS)[0]?.key).toBe(
+          nextActionOf(o, stock, MS).key,
+        );
+      }
+    });
+
+    it("a delivered order that still owes money keeps its collect action", () => {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        status: "delivered",
+        operation_stage: "delivered",
+        delivered_at: inDays(-3),
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+        paid: 1000,
+        ops_order_control: {
+          delivery_photos: [{ path: "order/x/a.jpg", at: inDays(-3), by: null }],
+        },
+      });
+      // Delivered is not paid (ORDERS-WORKING-FLOW §3). This is the ONE row
+      // whose headline C2 changes: it used to read Done and show nothing.
+      expect(openActionsOf(o, { state: "ready" }, MS).map((a) => a.key)).toEqual([
+        "collect",
+      ]);
+      expect(nextActionOf(o, { state: "ready" }, MS).key).toBe("collect");
+    });
+
+    it("a closed, paid, photographed order has no open action at all", () => {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        status: "delivered",
+        operation_stage: "delivered",
+        delivered_at: inDays(-3),
+        ops_order_control: {
+          delivery_photos: [{ path: "order/x/a.jpg", at: inDays(-3), by: null }],
+        },
+      });
+      expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
+      expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
+    });
   });
 });
 
@@ -1861,5 +2049,338 @@ describe("Delivery column (T1 booking truth)", () => {
     expect(prov).not.toHaveStyle({ color: "#3B6D11" });
     const conf = within(row(2001)).getByText("27 Jul · 9–11 AM");
     expect(conf).toHaveStyle({ color: "#3B6D11" });
+  });
+});
+
+// ── C10 · the three dots become real ────────────────────────────────────────
+// `rowDotsOf` computed goods · delivery · money for nine days and NOTHING
+// rendered it — and, contrary to what the C5 note and the C10 card both state,
+// nothing TESTED it either. So this block is the first cover the truth table
+// (ORDERS-WORKING-FLOW §7) has ever had, and it is written against the STATE
+// the function returns, never the hex the renderer paints.
+describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
+  const READY: StockInfo = { state: "ready" };
+  const NO_PO: StockInfo = { state: "unknown" };
+  const WAITING: StockInfo = { state: "awaiting" };
+  const NO_ETA: StockEta = { etaIso: null, waiting: false, state: "none" };
+  const LATE_ETA: StockEta = { etaIso: "2026-07-01", waiting: true, state: "late" };
+  const NO_LOGI: LogisticState = { key: "unassigned", partner: null, date: null, slot: null };
+  const CONFIRMED: LogisticState = {
+    key: "confirmed",
+    partner: "NETS",
+    date: "2026-07-27",
+    slot: "Morning (9–11 AM)",
+  };
+  const PROVISIONAL: LogisticState = {
+    key: "provisional",
+    partner: "NETS",
+    date: "2026-07-27",
+    slot: null,
+  };
+  const NEED_BOOKING: LogisticState = {
+    key: "need_booking",
+    partner: "NETS",
+    date: null,
+    slot: null,
+  };
+  const day = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+  /** Priced RM 4,000 of goods, nothing paid → the money dot is RED. */
+  const owing = { order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }], paid: 0 };
+  const settled = { ...owing, paid: 4000 };
+
+  it("returns the three tracks in the LAW's order — goods · delivery · money", () => {
+    // Law 6's sketch and §7's table both read goods → delivery → money. (The
+    // §14 note of 2026-07-18 had money first; it was re-ruled, and since nothing
+    // had ever rendered these dots, no screen changed when this flipped.)
+    const o = makeRow({ id: "x", so: 1, ...owing });
+    const [goods, delivery, money] = rowDotsOf(o, NO_PO, NO_ETA, NO_LOGI);
+    expect(goods.title).toMatch(/^Stock —/);
+    expect(delivery.title).toMatch(/^Delivery —/);
+    expect(money.title).toMatch(/^Money —/);
+  });
+
+  it("goods: all in → green · no PO → red · supplier ETA late → red · otherwise waiting → amber", () => {
+    const o = makeRow({ id: "x", so: 1, ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[0].state).toBe("green");
+    expect(rowDotsOf(o, NO_PO, NO_ETA, NO_LOGI)[0].state).toBe("red");
+    expect(rowDotsOf(o, WAITING, LATE_ETA, NO_LOGI)[0].state).toBe("red");
+    expect(rowDotsOf(o, WAITING, NO_ETA, NO_LOGI)[0].state).toBe("amber");
+  });
+
+  it("delivery: the CUSTOMER's yes is the only green — a logistics date stays amber", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: day(5), ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, CONFIRMED)[1].state).toBe("green");
+    expect(rowDotsOf(o, READY, NO_ETA, PROVISIONAL)[1].state).toBe("amber");
+    expect(rowDotsOf(o, READY, NO_ETA, NEED_BOOKING)[1].state).toBe("amber");
+    // Nothing is known yet — grey states an absence, it does not alarm.
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[1].state).toBe("grey");
+  });
+
+  it("delivery: past the deadline and still unconfirmed → red", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: day(-2), ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NEED_BOOKING)[1].state).toBe("red");
+    expect(rowDotsOf(o, READY, NO_ETA, PROVISIONAL)[1].state).toBe("red");
+  });
+
+  it("money: settled → green · owing → red with the figure · unpriced → grey, never an alarm", () => {
+    const o = makeRow({ id: "x", so: 1, ...settled });
+    expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[2].state).toBe("green");
+    const red = rowDotsOf(makeRow({ id: "y", so: 2, ...owing }), READY, NO_ETA, NO_LOGI)[2];
+    expect(red.state).toBe("red");
+    expect(red.title).toBe("Money — RM 4,000 outstanding");
+    // An order nobody has priced: 37 live rows look like this. A number nobody
+    // knows may not paint an alarm (ORDERS-WORKING-FLOW §2).
+    const unpriced = makeRow({
+      id: "z",
+      so: 3,
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+      paid: 0,
+    });
+    expect(rowDotsOf(unpriced, READY, NO_ETA, NO_LOGI)[2].state).toBe("grey");
+  });
+
+  it("a DELIVERED order never alarms on goods or delivery — and still shows red money", () => {
+    // §7's last line, and the card's own done-when. Delivered is not paid.
+    const done = makeRow({
+      id: "x",
+      so: 1,
+      status: "delivered",
+      operation_stage: "delivered",
+      delivery_date: day(-30),
+      ...owing,
+    });
+    // The worst possible goods/delivery inputs — no PO, a late supplier ETA, no
+    // logistics, a deadline a month gone. A closed order alarms on none of it.
+    expect(rowDotsOf(done, NO_PO, LATE_ETA, NO_LOGI).map((d) => d.state)).toEqual([
+      "green",
+      "green",
+      "red",
+    ]);
+  });
+});
+
+// ── C10 · the dots on screen, beside the stage pill ─────────────────────────
+describe("The three dots on the row (C10)", () => {
+  const dotRows: operationOrderListRow[] = [
+    makeRow({
+      id: "open",
+      so: 3001,
+      status: "proceed_order",
+      operation_stage: "in_production",
+      delivery_partners: { id: "p-nets", name: "NETS" },
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+      paid: 0,
+    }),
+    makeRow({
+      id: "done",
+      so: 3002,
+      status: "delivered",
+      operation_stage: "delivered",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+      paid: 0,
+    }),
+  ];
+  beforeEach(() => {
+    listHookState.data = { orders: dotRows };
+  });
+  function row(so: number) {
+    return screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes(`SO-${so}`))!;
+  }
+
+  it("every row renders three dots, in the law's order, each naming its own track", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3001));
+    // Order on screen, not merely presence.
+    const rendered = [...r.getByTestId("row-dots").children].map((c) =>
+      c.getAttribute("data-testid"),
+    );
+    expect(rendered).toEqual(["row-dot-goods", "row-dot-delivery", "row-dot-money"]);
+    // Each dot says what it is — a colour on its own names nothing.
+    expect(r.getByTestId("row-dot-money").getAttribute("title")).toMatch(/^Money —/);
+    expect(r.getByTestId("row-dot-goods").getAttribute("title")).toMatch(/^Stock —/);
+  });
+
+  it("the dots sit BESIDE the stage pill — neither replaces the other (Jess 2026-07-27)", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3001));
+    // The pill is untouched by this card: same word, same shared pill map.
+    const pill = r.getByText("To book");
+    expect(pill).toHaveClass("pill");
+    // One cell holds both.
+    expect(pill.closest("td")).toBe(r.getByTestId("row-dots").closest("td"));
+  });
+
+  it("a delivered row keeps its Delivered word, alarms on neither goods nor delivery, and still shows red money", () => {
+    wrap(<OperationOrdersControl />);
+    const r = within(row(3002));
+    expect(r.getByText("Delivered")).toBeInTheDocument();
+    expect(r.getByTestId("row-dot-goods").getAttribute("data-dot-state")).toBe("green");
+    expect(r.getByTestId("row-dot-delivery").getAttribute("data-dot-state")).toBe("green");
+    expect(r.getByTestId("row-dot-money").getAttribute("data-dot-state")).toBe("red");
+  });
+
+  it("the dots are ICONS, never emoji and never a bare coloured circle (UI-KIT §A11 rule 2)", () => {
+    wrap(<OperationOrdersControl />);
+    const dots = within(row(3001)).getByTestId("row-dots");
+    // No text at all in the group — the glyphs carry it.
+    expect(dots.textContent).toBe("");
+    // Three Lucide SVGs at the kit's 14px inline size.
+    const svgs = dots.querySelectorAll("svg");
+    expect(svgs).toHaveLength(3);
+    svgs.forEach((s) => expect(s.getAttribute("width")).toBe("14"));
+    expect(/\p{Extended_Pictographic}/u.test(dots.innerHTML)).toBe(false);
+  });
+});
+
+
+// ─── C3 · the Actions column shows the whole truth ───────────────────────────
+// (docs/portal-core-execution-queue.md · Jess 2026-07-27)
+//
+// Two things ship here. The `+N` — the row shows Layer 2's top action and says
+// how many more are open, so nothing is hidden by the one that leads. And the
+// retirement of `Confirm delivery with {customer}`: "everything ready, the day
+// has not come" is a FACT, not work, so the cell states it quietly and the
+// drawer's list is one row shorter instead of holding a row no button can
+// close.
+describe("Actions column · +N and the delivering FACT (C3)", () => {
+  const iso = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  /** Three open actions: nothing ordered (goods) · no logistics (delivery) ·
+   *  a priced order with nothing paid (money). The card's own example. */
+  const THREE = makeRow({
+    id: "three",
+    so: 3001,
+    status: "proceed_order",
+    operation_stage: "confirmed",
+    customer_name: "John Tan",
+    delivery_date: iso(10),
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 2455 }],
+    paid: 0,
+  });
+  /** One open action: goods are in, the money is settled, no logistics yet. */
+  const ONE = makeRow({
+    id: "one",
+    so: 3002,
+    status: "proceed_order",
+    operation_stage: "ready_to_dispatch",
+    customer_name: "Siti",
+    delivery_date: iso(10),
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1000 }],
+    paid: 1000,
+    ops_order_control: { line_stock_status: { "mattress:MAT-1": "ready" } },
+  });
+  /** Everything arranged, the day is ahead, paid in full → the FACT. */
+  const ARRANGED = makeRow({
+    id: "arranged",
+    so: 3003,
+    status: "proceed_order",
+    operation_stage: "ready_to_dispatch",
+    customer_name: "Kong",
+    delivery_date: iso(6),
+    delivery_partners: { id: "p-nets", name: "NETS" },
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1000 }],
+    paid: 1000,
+    ops_order_control: {
+      line_stock_status: { "mattress:MAT-1": "ready" },
+      booking_stage: "confirmed",
+      confirmed_date: iso(6),
+      confirmed_time_slot: "Morning (9–11 AM)",
+    },
+  });
+
+  beforeEach(() => {
+    listHookState.data = { orders: [THREE, ONE, ARRANGED] };
+  });
+
+  function row(so: number) {
+    return screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes(`SO-${so}`))!;
+  }
+
+  it("an order with three open actions leads with one and counts the rest", () => {
+    wrap(<OperationOrdersControl />);
+    const cell = row(3001);
+    expect(within(cell).getByText("Send PO to supplier")).toBeInTheDocument();
+    expect(within(cell).getByTestId("next-more")).toHaveTextContent("+2");
+  });
+
+  it("a row with one action shows no +N", () => {
+    wrap(<OperationOrdersControl />);
+    expect(within(row(3002)).getByText("Assign logistics")).toBeInTheDocument();
+    expect(within(row(3002)).queryByTestId("next-more")).toBeNull();
+  });
+
+  it("the count always equals C2's row count — 1 + N is the drawer's list length", () => {
+    // Asserted against the DRAWER the row opens, never against a second run of
+    // the ladder: if these two ever diverge the row is lying about what is open.
+    wrap(<OperationOrdersControl />);
+    for (const so of [3001, 3002]) {
+      const cell = row(so);
+      const more = within(cell).queryByTestId("next-more");
+      const claimed = 1 + (more ? Number(more.textContent!.replace("+", "")) : 0);
+      fireEvent.click(cell);
+      const journey = JSON.parse(
+        screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+      );
+      expect(journey.openActions).toHaveLength(claimed);
+      fireEvent.click(screen.getByText("close"));
+    }
+  });
+
+  it("the +N names what it is hiding and opens the drawer's full list", () => {
+    wrap(<OperationOrdersControl />);
+    const more = within(row(3001)).getByTestId("next-more");
+    expect(more.getAttribute("title")).toContain("Collect RM 2,455 from John Tan");
+    fireEvent.click(more);
+    expect(screen.getByTestId("drawer-stub")).toHaveAttribute("data-order-id", "three");
+  });
+
+  it("everything arranged, the day ahead → a quiet FACT, no verb and nothing to click", () => {
+    wrap(<OperationOrdersControl />);
+    const cell = row(3003);
+    const fact = within(cell).getByText("Delivering");
+    // A fact, not a pill: a pill in this column is a button, and there is
+    // nothing here for a human to press.
+    expect(fact.className).toContain("t4-caption");
+    expect(fact.className).not.toContain("pill");
+    expect(within(cell).queryByTestId("next-more")).toBeNull();
+    expect(within(cell).queryByText(/Confirm delivery with/)).toBeNull();
+    // Never red — quiet tone is the ruling.
+    expect(fact.className).not.toContain("danger");
+  });
+
+  it("the row keeps the day OUT of the cell and the drawer states it in full", () => {
+    // The Delivery cell one column to the left already prints the booked day,
+    // so printing it again here would say the same thing twice; the tooltip
+    // carries it, and the drawer's journey strip says the whole sentence.
+    wrap(<OperationOrdersControl />);
+    const cell = row(3003);
+    const fact = within(cell).getByText("Delivering");
+    expect(fact.getAttribute("title")).toMatch(/Nothing to do until/);
+    fireEvent.click(cell);
+    const journey = JSON.parse(
+      screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+    );
+    expect(journey.next.line).toMatch(/^Delivering \d+ \w+ · 9–11 AM$/);
+    // …and the drawer's dynamic checklist is EMPTY: one fewer row, not a row
+    // nobody can act on.
+    expect(journey.openActions).toEqual([]);
   });
 });

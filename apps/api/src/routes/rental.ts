@@ -22,6 +22,11 @@ import {
   customerInputSchema,
   createRentalAgreementInputSchema,
   recordRentalPaymentInputSchema,
+  chargeRentalInterestInputSchema,
+  settleRentalAgreementInputSchema,
+  // 0300 — the ONE interest implementation. The SQL mirror in the migration
+  // asserts the same worked examples, so the two cannot drift apart silently.
+  rentalLateInterest,
   RENTAL_AGREEMENT_DOC_KEY,
   CUSTOMERS,
   SERVICE_PACKAGES,
@@ -1150,6 +1155,9 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
     .reduce((a, r) => a + num(r.paid_amount), 0);
   const contract = Math.round(num(ag.monthly_fee) * num(ag.term_months) * 100) / 100;
   const today = new Date().toISOString().slice(0, 10);
+  /** Whole days between a due date and today, floored at 0. UTC both sides. */
+  const daysLate = (due: string): number =>
+    Math.max(0, Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000));
 
   // 0295 — a decline attaches to an instalment, so the instalment can say so.
   // Ordered newest-first by the query, so the FIRST hit per seq is the latest
@@ -1219,6 +1227,16 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
       commissionShare: r.commission_share == null ? null : num(r.commission_share),
       stripeInvoiceId: r.stripe_invoice_id ?? null,
       lateInterest: r.late_interest == null ? null : num(r.late_interest),
+      // 0300 — ACCRUED, derived here and never stored, exactly like `late`
+      // above: interest owed grows every day, so a figure written down is wrong
+      // by tomorrow. What IS stored is `lateInterest` — the penalty actually
+      // CHARGED, at a moment, by a person. The screen can show both and they
+      // can never silently disagree.
+      accruedInterest:
+        r.status === "paid" || r.status === "waived" || r.status === "written_off"
+          ? 0
+          : rentalLateInterest(num(r.amount_due), daysLate(String(r.due_date))),
+      interestChargedAt: r.interest_charged_at ?? null,
       late: r.status !== "paid" && String(r.due_date) < today,
       // 0295. Derived, like `late` above and for the same reason: a stored
       // "card failed" flag is one somebody forgets to clear the day the money
@@ -1275,6 +1293,166 @@ rentalRouter.post("/agreements/:id/collections/:seq/record", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ recorded: data });
+});
+
+// ---------------------------------------------------------------------------
+// 0300 — late interest, and paying the whole thing off early.
+// ---------------------------------------------------------------------------
+
+// POST /agreements/:id/collections/:seq/interest — commit the 8%/month penalty
+// on one overdue instalment.
+//
+// The FIGURE is never sent: the RPC recomputes it from the instalment's own
+// amount and how many days late it is, the same doctrine that keeps the POS
+// from pricing its own sofas. The client says WHICH month and WHEN, nothing more.
+rentalRouter.post("/agreements/:id/collections/:seq/interest", async (c) => {
+  approverOnly(c);
+  const idCheck = AGREEMENT_ID.safeParse(c.req.param("id"));
+  const seq = Number(c.req.param("seq"));
+  if (!idCheck.success || !Number.isInteger(seq) || seq < 1) {
+    throw new HTTPException(404, { message: "Instalment not found" });
+  }
+  const parsed = await parseJsonBody(c, chargeRentalInterestInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_charge_late_interest", {
+    p_agreement_id: idCheck.data,
+    p_seq: seq,
+    p_as_of: parsed.data.asOf ?? null,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const detail = (error as { details?: string | null }).details ?? "";
+    if (detail === "forbidden") {
+      return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
+    }
+    if (detail === "agreement_not_found" || detail === "billing_not_found") {
+      return c.json({ error: "not_found", code: detail, message: error.message }, 404);
+    }
+    // Not late yet, already collected, nothing to charge — all things a human
+    // can do by mistake, all worth saying in words rather than as a 500.
+    if (detail === "not_overdue" || detail === "not_owing" || detail === "no_interest") {
+      return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ charged: data });
+});
+
+// GET /agreements/:id/settlement-quote — what settling would cost today.
+//
+// Server-computed on purpose: this is the number the confirm dialog shows AND
+// the number the settlement demands, and they come from one function so they
+// cannot disagree.
+rentalRouter.get("/agreements/:id/settlement-quote", async (c) => {
+  internalOnly(c);
+  const idCheck = AGREEMENT_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Agreement not found" });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_settlement_quote", { p_agreement_id: idCheck.data });
+  if (error) {
+    const detail = (error as { details?: string | null }).details ?? "";
+    if (detail === "agreement_not_found") {
+      return c.json({ error: "not_found", code: detail, message: error.message }, 404);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ quote: data });
+});
+
+/**
+ * The signed settlement document, as bytes.
+ *
+ * A sibling of `decodeSignature` rather than a widening of it: a signature is a
+ * drawing and may only ever be an image, while a settlement document is
+ * whatever the customer signed — usually a scan or a PDF. Keeping them apart
+ * means loosening one cannot quietly loosen the other.
+ */
+function decodeSettlementDoc(dataUrl: string): { bytes: Uint8Array; contentType: string; ext: string } {
+  const m = /^data:(application\/pdf|image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) {
+    throw new HTTPException(422, {
+      message: "The settlement document must be a base64 pdf/png/jpeg data URL",
+    });
+  }
+  const binary = atob(m[2]!);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const ext = m[1] === "application/pdf" ? "pdf" : m[1] === "image/png" ? "png" : "jpg";
+  return { bytes, contentType: m[1]!, ext };
+}
+
+// POST /agreements/:id/settle — the customer pays the remaining term in one go.
+//
+// Loo: "the customer signs it first, then it is attached to the agreement."
+// So the document is written FIRST and the RPC refuses without a path — the
+// same order, and the same reasoning, as 0279's signature: there is no draft
+// state to forget to finish, and a refused settlement leaves nothing behind.
+//
+// The bytes travel through Hono even though a finance JWT could write to the
+// bucket directly, because the object key must be SERVER-generated: this is
+// evidence for a credit contract, and a client-chosen key is a traversal and a
+// collision waiting to happen.
+rentalRouter.post("/agreements/:id/settle", async (c) => {
+  approverOnly(c);
+  const idCheck = AGREEMENT_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Agreement not found" });
+  const parsed = await parseJsonBody(c, settleRentalAgreementInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+
+  const { bytes, contentType, ext } = decodeSettlementDoc(d.documentDataUrl);
+  const objectKey = `settlements/${new Date().getUTCFullYear()}/${crypto.randomUUID()}.${ext}`;
+  const admin = adminClient(c.env);
+  const up = await admin.storage.from(SIGNATURE_BUCKET).upload(objectKey, bytes, {
+    contentType,
+    // Evidence is written once. The bucket has no delete policy for the same reason.
+    upsert: false,
+  });
+  if (up.error) {
+    throw new HTTPException(500, {
+      message: `Could not store the settlement document: ${up.error.message}`,
+    });
+  }
+  const docPath = `${SIGNATURE_BUCKET}/${objectKey}`;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_settle_agreement", {
+    p_agreement_id: idCheck.data,
+    p_amount: d.amount,
+    p_doc_path: docPath,
+    p_reference: d.reference ?? null,
+    p_note: d.note ?? null,
+  });
+  if (error) {
+    // Nothing was settled, so this blob indexes nothing. Best-effort cleanup —
+    // a failed remove must not mask the error finance actually needs to read.
+    await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
+    const detail = (error as { details?: string | null }).details ?? "";
+    if (detail === "forbidden") {
+      return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
+    }
+    if (detail === "agreement_not_found") {
+      return c.json({ error: "not_found", code: detail, message: error.message }, 404);
+    }
+    if (
+      detail === "agreement_not_active" ||
+      detail === "nothing_to_settle" ||
+      // The discounted-settlement refusal. Its message carries the exact figure,
+      // which is the whole point — finance needs to see what it should have been.
+      detail === "amount_mismatch" ||
+      detail === "settlement_doc_required" ||
+      detail === "invalid_settlement_doc_path"
+    ) {
+      return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ settled: data });
 });
 
 // POST /agreements/:id/decide — Approve puts the contract live and materialises

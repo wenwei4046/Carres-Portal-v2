@@ -190,6 +190,7 @@ import OrderJourneyHeader, {
   deriveOrderJourney,
   type OrderJourneySignals,
 } from "./OrderJourneyHeader";
+import OrderActionList from "./OrderActionList";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -1588,6 +1589,9 @@ function DrawerBody({
     ((hasMsbf || hasSof) && !!effectiveStorageStart ||
       Number(form.control?.storage_fee_msbf ?? 0) > 0 ||
       Number(form.control?.storage_fee_sof ?? 0) > 0);
+  // C9 — what stops HOLDING the delivery: collected, or the manager released
+  // it. A release is not a payment, so the fee stays in the invoice below and
+  // its Collect action stays on the row; only the hold goes.
   const storageCleared =
     !!form.control?.storage_collected_at ||
     form.control?.storage_waiver_status === "approved";
@@ -2465,6 +2469,11 @@ function DrawerBody({
             second full-width line of order truth belongs alongside it.
             Renders nothing when the ladder's answer is absent. */}
         {journeyView && <OrderJourneyHeader journey={journeyView} />}
+        {/* C2 — the dynamic checklist. The strip above names the action that
+            leads; this names ALL of them, because an order has several open at
+            once and the old ladder showed one and hid the rest. Same computed
+            list, same order, so its first row is always the strip's Next. */}
+        {journey && <OrderActionList actions={journey.openActions} />}
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
           <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
@@ -6181,7 +6190,12 @@ function StorageCard({
         ? (impMsbf ?? 0) + (impSof ?? 0)
         : auto.total;
   const collectedAt = form.control?.storage_collected_at ?? null;
-  const waived = form.control?.storage_waiver_status === "approved";
+  // C9 — `approved` means the manager RELEASED the delivery, which is not the
+  // same as forgiving the fee. Waived = released with nothing left to collect
+  // (the decision wrote the override to 0). Released-and-still-owed keeps
+  // counting and keeps its `unpaid` pill, because the money is still ours.
+  const released = form.control?.storage_waiver_status === "approved";
+  const waived = released && effTotal <= 0;
   const d2n = (iso: string) =>
     new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
   const dayDiff = (a: string, b: string) =>
@@ -6206,22 +6220,26 @@ function StorageCard({
       ? "Collected"
       : waived
         ? "Waived"
-        : exempt
-          ? "No storage"
-          : counting
-            ? "Counting"
-            : "Not counting";
+        : released
+          ? "Released"
+          : exempt
+            ? "No storage"
+            : counting
+              ? "Counting"
+              : "Not counting";
   const statusName = delivered
     ? "Delivered"
     : collectedAt
       ? "Fee collected"
       : waived
         ? "Fee waived"
-        : exempt
-          ? "Exempted"
-          : counting
-            ? `Day ${soFar}`
-            : "In the free week";
+        : released
+          ? `RM ${Math.round(effTotal).toLocaleString()} still to collect`
+          : exempt
+            ? "Exempted"
+            : counting
+              ? `Day ${soFar}`
+              : "In the free week";
   const feeDue = counting && effTotal > 0;
 
   const deadlinePassed = !!deadline && deadline < todayIso;
@@ -6350,7 +6368,7 @@ function StorageCard({
             collected · {fmtDate(String(collectedAt).slice(0, 10))}
           </span>
         ) : waived ? (
-          <span className={soft}>waived</span>
+          <span className={soft}>written off by the manager</span>
         ) : exempt ? (
           <span className="inline-flex items-center gap-2">
             <span className={soft}>No storage</span>

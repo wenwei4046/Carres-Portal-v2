@@ -326,7 +326,11 @@ describe("OperationDelivery — the calendar reads the booking, never the promis
     fireEvent.click(screen.getByText("Calendar"));
     fireEvent.click(within(screen.getByTestId(`delivery-day-${TODAY}`)).getByText("SO-1223"));
     const detail = screen.getByTestId("delivery-detail");
-    expect(within(detail).getByText(/Confirm/)).toBeTruthy();
+    // C3 — the money-held order's line is the action that CLEARS the hold, with
+    // its figure, where it used to read `Confirm delivery with …`: the resting
+    // Confirm was retired and the 🔒 moved onto `Collect`.
+    expect(within(detail).getByText(/Collect RM 2,455 from/)).toBeTruthy();
+    expect(within(detail).getByText("🔒")).toBeTruthy();
   });
 
   it("calls a logistics-only date what it is — never green, never 'carrier'", () => {

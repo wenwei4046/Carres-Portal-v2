@@ -161,20 +161,27 @@ Secondary: the customer's promised date.
 Tertiary: order value, high to low — **a tie-breaker only.** A RM 20,000 order three weeks
 out never outranks a RM 1,500 order going out tomorrow.
 
-## Law 6 — the three dots have no header
+## Law 6 — the three dots — ✅ BUILT (C10, PR #471)
 
-The dots are three INDEPENDENT facts, not one status, so the column carries no header word
-(`Status` was wrong, `Checks` reads as "cheques" next to money). Each dot is labelled by
-its own small icon instead — goods · delivery · money — using the portal's icon set, not
-emoji, per `docs/UI-KIT.md`.
+The dots are three INDEPENDENT facts, never one status: **goods · delivery · money**. Each
+is labelled by its own small icon from the portal icon set (never emoji, per
+`docs/UI-KIT.md`) — **so the dots need no header of their own.**
+
+**They sit BESIDE the stage pill, never replacing it** (Jess 2026-07-27). The pill is the
+order's overall progress summary — WHERE this order is; the dots are WHICH PART has
+trouble. Different questions, both kept. The column keeps the header word `Status`, which
+is correct for the pill it heads.
 
 ```
-Customer        📦 🚚 $        Actions
-John Tan        🟢 🟡 🔴       Call Ohana — confirm ready date  +2
+Customer     Status                    Actions
+John Tan     Proceed  📦 🚚 $          Call Ohana — confirm ready date  +2
+                      🟢 🟡 🔴
 ```
 
-A delivered order may still show a red money dot and keep an open payment action.
-Delivered is not paid.
+A delivered order never alarms on goods or delivery, and may still show a red money dot
+with an open payment action. Delivered is not paid.
+
+Tones live in `docs/ORDERS-WORKING-FLOW.md` §7 — one home (Law 0A).
 
 **NOT BUILT YET — this is a specification, not a description of the screen.** `rowDotsOf()`
 computes the three dots and nothing renders them; the Orders list shows a single stage pill

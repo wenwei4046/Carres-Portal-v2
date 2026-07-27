@@ -1,6 +1,6 @@
 # Execution queues — THE index (Jess's build map, 2026-07-27)
 
-> **The whole balance of work lives in SIX card-queue docs.** Open a new chat, pick ONE
+> **The whole balance of work lives in SEVEN card-queue docs.** Open a new chat, pick ONE
 > card from ONE line, paste the line's kickoff sentence. When a card ships, that chat
 > marks ✅ + PR number in its own doc. These docs are the memory; chats are disposable.
 >
@@ -26,23 +26,77 @@
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 · S4 ✅ #449 — **S5 is the last** |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 — R5 next |
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned · the three dots) |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** — C4 · C6 · C7 · C8 left |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
 
-**State 2026-07-27:** ① ② ⑤ **LINE COMPLETE** · ③ S1-S4 ✅, S5 left · ④ R1-R4 ✅, R5 next ·
-⑥ C1 ✅ #461 · C5 ✅ #447 · ⑦ opened.
-**Orders lane, in this order:** C2 → C3 → C6 → C10 → C7 → C8 (C9 any time after C5).
-S / R / P run in parallel throughout; **C4 shares the Purchasing pages — never alongside an
-R-chat or a P-chat.**
+**State 2026-07-27:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
+⑦ opened, nothing built yet.
+**Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
+**C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
+`Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
+**it IS an action**, the system produces the document and the operator presses one button.
+COPY-STANDARD now says so once.
+S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
+only ONE of those three at a time.**
 
 **Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
 specified a different purchasing module and none was authoritative, so every build chat
 picked a different one. They are DELETED. The single owner is
 `docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
 turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
+
+**What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
+describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status
+column, each as its own icon (`package` · `truck` · `wallet`) with its own tooltip — the icon
+is what labels the dot, which is why the dots need no header of their own. `rowDotsOf` had
+computed them for nine days and nothing rendered it; **proved both directions on the
+downloaded bundles**, its strings grep 0 in the previous live bundle and 1 in this one.
+Widths were measured against the app's own stylesheet (Status 11 → 14, taken from deadline
+and stock, never from Actions) and **the row still stays exactly 40px**. It also found that
+`rowDotsOf` was never unit tested, contrary to two docs, and wrote the first cover its truth
+table has had.
+
+**What C9 changed (2026-07-27, PR #472) — no migration.** An uncollected storage fee now
+holds a delivery exactly as an unpaid balance does: the booking gate reads ONE number
+(lines + add-ons + chargeable storage − `orders.paid`), and only the manager can release it,
+in two outcomes they pick out loud — `Release, fee still owed` (default; `Collect RM …` stays
+on the row) and `Release and waive the fee` (written off). The two ride the columns that
+already exist, so `storage_waiver_status = 'approved'` means RELEASED and the write-off is
+`storage_fee_override = 0`. **The enabling split is in `orderMoney`:** `holds` (what blocks a
+delivery) is now a different question from `owing` (what is due), and a release is the one
+thing that parts them. **It also found the storage fee being read three different ways** —
+the ladder ignored the override, the dispatch gate ignored the Master-imported fee — now one
+shared rule with four readers. Live it changes nothing today: no order carries a storage fee.
+
+**What C3 changed (2026-07-27, PR #479).** The Actions cell leads with Layer 2's top
+action and folds everything else into `+N` — which **replaces the secondary `Collect RM …`
+pill**, so a cell has exactly one way of saying "there is more" and it covers all three
+tracks instead of the one Law 4 displays last (the figure rides the `+N` tooltip and the
+drawer). And `Confirm delivery with {customer}` **stops being an action**: it fired when
+everything was arranged and the day had not come, which is why it was the one row in the
+drawer no button could close. It is now the quiet fact `Delivering 27 Jul · 9–11 AM` — full
+sentence in the drawer, the bare word `Delivering` in the row, because the Delivery cell
+beside it already prints the day. The money 🔒 survives and moved onto `Collect`, the action
+that clears it; PayHold behaviour is unchanged. **C7 is BLOCKED on a law conflict C3 found:
+COPY-STANDARD says both that `Issue delivery order` IS an action and that it is not.**
+
+**What C2 changed (2026-07-27, PR #466).** The ladder is TWO LAYERS now: three tracks —
+goods · delivery · money — computed independently, then one pure function picks which goes
+first. **The row's headline is unchanged and that is proved, not claimed**: `nextActionOf`
+kept its signature, became Layer 2 over Layer 1, and its whole existing suite (Loo's freeze
+gate, the T3 radar, T7's date split, C5's money hold — 103 assertions) passed across the
+split. What is NEW is the drawer: it lists every open action, built from the same call that
+produced the row's pill, so the two cannot disagree. **What that unhides on today's board:**
+51 of 56 orders carry a logistics company and **0 have a confirmed booking**, so the
+delivery call now sits beside the supplier call instead of behind it, and `Assign logistics`
+no longer waits for stock it never depended on. **The one headline that changes**: money is
+its own track and survives delivery, so a delivered order that still owes reads
+`Collect RM … from {customer}` where it read `Done` — live there are 0 delivered orders, so
+no row moved on the day. C2 also fixed the `To book` predicate PR #464 handed it (it demanded
+stock be in; the tab now answers only "has the customer confirmed?").
 
 **What C1 changed on screen (2026-07-27).** Every action label on Orders, its queues,
 its drawer and the Delivery module now names the party: `Chase logistic` → the queue
@@ -101,6 +155,27 @@ to be remembered.
 
 ## Frozen rulings waiting for their line (Jess 2026-07-27)
 
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
+| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** — C4 · C6 · C7 · C8 left |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
+
+**State 2026-07-27:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
+⑦ opened, nothing built yet.
+**Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
+**C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
+`Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
+**it IS an action**, the system produces the document and the operator presses one button.
+COPY-STANDARD now says so once.
+S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
+only ONE of those three at a time.**
+
+**Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
+specified a different purchasing module and none was authoritative, so every build chat
+picked a different one. They are DELETED. The single owner is
+`docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
+turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
 - **UI-KIT carries retired vocabulary and more than one version of some rules.** Jess flagged

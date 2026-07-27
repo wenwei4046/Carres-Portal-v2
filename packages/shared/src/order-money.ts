@@ -44,10 +44,14 @@ export interface OrderMoneyInput {
   /** `ops_order_control.balance` (0165) — a hand-keyed OUTSTANDING, used only
    *  when the lines carry no prices. */
   controlBalance?: number | string | null;
-  /** Chargeable storage neither collected nor waived. Storage has its own
-   *  clock and its own collection flag, so the caller computes it and this
+  /** Chargeable storage still owed. Storage has its own clock and its own
+   *  collection flag, so the caller computes it (`storageHold`) and this
    *  function only carries it. */
   storageOwing?: number;
+  /** C9 — the manager released the delivery over an uncollected storage fee.
+   *  The money stays OWED (`outstanding` is untouched); only the HOLD lifts,
+   *  which is `holding`. An override must never quietly forgive money. */
+  storageReleased?: boolean;
 }
 
 export interface OrderMoney {
@@ -59,10 +63,17 @@ export interface OrderMoney {
   goodsOwing: number;
   /** Storage money still owed (carried through, never derived here). */
   storageOwing: number;
-  /** goodsOwing + storageOwing. */
+  /** goodsOwing + storageOwing — everything still OWED. */
   outstanding: number;
-  /** Something is still owed. */
+  /** What still HOLDS a delivery: `outstanding` minus a storage fee the
+   *  manager released (C9). Equal to `outstanding` on every other order. */
+  holding: number;
+  /** Something is still owed — the money ACTION stays open on this. */
   owing: boolean;
+  /** Money still blocks the delivery — the 🔒 and the booking gate read this,
+   *  never `owing`, so a released order stops being held while its collection
+   *  stays on the worklist. */
+  holds: boolean;
   /** A number exists to reason about. When false NOTHING may be held: an
    *  order whose value nobody has entered cannot owe a figure nobody knows. */
   known: boolean;
@@ -83,6 +94,7 @@ export function orderMoney({
   paid,
   controlBalance,
   storageOwing = 0,
+  storageReleased = false,
 }: OrderMoneyInput): OrderMoney {
   const paidNum = Math.max(0, n(paid));
   const priced = n(lineSum) + n(addonSum);
@@ -113,13 +125,20 @@ export function orderMoney({
   }
 
   const outstanding = goodsOwing + storage;
+  // C9 — a released storage fee is still owed and no longer holds. `goodsOwing`
+  // is already 0 on an order whose value nobody has entered, so "UNKNOWN never
+  // holds" survives untouched: the only thing an unpriced order can hold on is
+  // a storage fee a human keyed in, which is a number somebody DOES know.
+  const holding = goodsOwing + (storageReleased ? 0 : storage);
   return {
     total,
     paid: paidNum,
     goodsOwing,
     storageOwing: storage,
     outstanding,
+    holding,
     owing: outstanding > 0,
+    holds: holding > 0,
     known: source !== "unknown",
     source,
   };

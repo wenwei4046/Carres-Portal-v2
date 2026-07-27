@@ -221,6 +221,82 @@ breakdown Excel can't do: issues by type per category, by supplier, avg days to 
 SLA hit rate. A small `Numbers` tab on the module; no new tables — read the cases.
 **Done when:** "which supplier / which issue type causes the most cases" is one glance.
 
+> **SHIPPED 2026-07-27 (PR #474, NO migration, Worker `ace384c3` + web
+> `index-CsnNUn76.js`).** Notes for whoever comes back to this module:
+> - **The carry-forward said add a column; the column is not needed.**
+>   `case-sla-no-closed-at` wanted `closed_at` in S5's own migration. That is
+>   true of the STATUS FLIP and false of the case: S3 (0293) made closing
+>   impossible without a `customer_confirmed` entry in `service_cases.progress`,
+>   and that entry carries `on` — the BUSINESS date the customer said it was
+>   solved, stamped server-side. A `closed_at` column would record the afternoon
+>   somebody changed a dropdown. So the finish date is DERIVED
+>   (`caseFinishedOn`), the card's "no new tables — read the cases" is kept
+>   literally, and the S3/S4 law holds one rung further out.
+> - **The cost of that is named, not hidden**: a case closed BEFORE 0293 has no
+>   such entry. It lands in `finish.unmeasured`, says so on screen, and is
+>   never averaged and never assumed on time.
+> - **Every figure carries its own coverage and withholds itself with a reason.**
+>   Live there is ONE case — closed, opened 2026-06-16, filed before S1 — so an
+>   average off `updated_at` would be a row-touch and an on-time rate would be a
+>   coin toss. Both print the reason instead (K5's rule B, inherited).
+> - **`unclassified` is a first-class rung, NOT `other`.** `other` is an answer a
+>   human picks; "nobody was asked" is a different fact and reads
+>   `Filed before the questions`. Folding them would tell Jess her staff keep
+>   choosing Other.
+> - **The card's `SLA hit rate` is the one line NOT built as written** — the same
+>   ruling S4 made. COPY-STANDARD bans `At Risk` and lists `SLA` as a do-not-use,
+>   and the four laws outrank a card. The behaviour is the card's, the words are
+>   the laws': `Finished on time` · `Average working days to finish`, asserted by
+>   a test against the banned list.
+> - **Days are WORKING days, not calendar days**, so the average reads directly
+>   against the 14-working-day promise it is being judged by.
+> - S4's hidden `responsibility` per delay reason is finally READ — "why they ran
+>   long" needed no second tagging pass, exactly as S4 predicted.
+> - The engine is `packages/shared/src/service-case-numbers.ts`; the route is
+>   `GET /api/ops/service-cases/numbers?period=`, reads only, registered before
+>   `/:id` (a test proves it is not shadowed). `?tab=numbers` is a real deep
+>   link and the no-tab default is unchanged.
+> - **NOT re-measured on prod this session**: the Supabase MCP in the build
+>   environment is authorised to a different account and has no access to
+>   `kfprgpjpaffedghytstl`. The live figures above are S4's, recorded the same
+>   day. Nothing in S5 writes, so the risk of that is a stale sentence in this
+>   note, not a wrong row in the database.
+
+### Two things S5 locked (confirmed 2026-07-27 — do not undo them)
+
+**No `closed_at` column, ever.** The carry-forward insisted S5 add one; S5 refused and it
+was right. A column would record *the afternoon someone changed a dropdown*. The finish date
+is already on the record with the right meaning: S3's `customer_confirmed` entry carries
+`on` — the business date the customer said it was solved, stamped server-side — and 0293
+makes closing impossible without it. The finish date is DERIVED from that entry. The
+proposed backfill (`closed_at` from `updated_at`, flagged "approximate") is exactly the trap:
+it puts a row-touch into a business figure.
+
+**A figure withholds itself rather than inventing one.** Too few records ⇒ print the reason,
+not a number (the portal-wide law in COPY-STANDARD). A case filed before the guided questions
+reads `Filed before the questions`, never the `Other` a human actually picks.
+
+## S6 · A case closes itself (Jess ruling 2026-07-27)
+
+**The inconsistency S5 found:** a case can carry a `customer_confirmed` entry while its
+status is still open. S5 counts it as FINISHED (the business fact); the list still shows it
+RUNNING. Two surfaces, one case, two answers.
+
+**Ruling: the business fact wins, and the system does the closing.** The engine law says an
+action disappears BY ITSELF when its completion becomes true — and this completion is
+already the human act: someone recorded that the customer confirmed, on a real date, and
+0293 refuses to close without it. Nothing is left for a person to decide, so leaving the
+case "running" until somebody remembers a dropdown is exactly the stale status word this
+portal exists to remove.
+
+**Build:** recording the `customer_confirmed` entry closes the case in the same transaction
+— not a sweep, not a nightly job, so the two surfaces can never disagree even briefly. Every
+other close gate (S3's open-steps refusal) still applies: if a step is open, recording the
+confirmation does not close the case, and the API says which step is short.
+**Small. No migration expected** — 0293's trigger already detects the transition; check
+whether it can carry the flip before adding anything. **Done when:** no case can be finished
+on the Numbers tab and running on the list.
+
 ## LATER
 
 - WhatsApp-side customer updates · quality score per case · decision-tree admin editor
@@ -235,4 +311,6 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 | S2 | ✅ | [#410](https://github.com/wenwei4046/Carres-Portal-v2/pull/410) · migration **0289** |
 | S3 | ✅ | [#431](https://github.com/wenwei4046/Carres-Portal-v2/pull/431) · migration **0293** |
 | S4 | ✅ | [#449](https://github.com/wenwei4046/Carres-Portal-v2/pull/449) · migration **0298** |
-| S5 | ⬜ | — |
+| S5 | ✅ | [#474](https://github.com/wenwei4046/Carres-Portal-v2/pull/474) · **no migration** |
+
+**Line ③ COMPLETE: S1-S5.**
