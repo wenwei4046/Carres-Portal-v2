@@ -116,6 +116,25 @@ export default function RentalCollectionsPanel({
                   </span>
                 </>
               ) : null}
+              {/* 0295 — a refused card is a DIFFERENT problem from an unpaid
+                  month and needs a different call, so it gets its own count
+                  rather than being folded into "past due". */}
+              {(data.totals.declinedCount ?? 0) > 0 ? (
+                <>
+                  {" · "}
+                  <span className="text-danger font-semibold" data-testid="declined-count">
+                    {data.totals.declinedCount} card declined
+                  </span>
+                </>
+              ) : null}
+              {(data.totals.unattachedDeclines ?? 0) > 0 ? (
+                <>
+                  {" · "}
+                  <span className="text-danger font-semibold">
+                    {data.totals.unattachedDeclines} declined with no month to match
+                  </span>
+                </>
+              ) : null}
             </div>
 
             <table className="w-full border-collapse text-[13px]">
@@ -140,11 +159,31 @@ export default function RentalCollectionsPanel({
                     <td className="px-3 py-2 t-num text-base-500">{b.seq}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-base-700">{b.dueDate}</td>
                     <td className="px-3 py-2 whitespace-nowrap t-num">{rm(b.amountDue)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td className="px-3 py-2">
                       {b.status === "paid" ? (
-                        <span className="text-emerald-700 font-semibold">Paid</span>
+                        <span className="text-emerald-700 font-semibold whitespace-nowrap">Paid</span>
+                      ) : b.lastDecline ? (
+                        /* 0295 — "Card declined" outranks "Past due" because it
+                           is the more specific fact AND the one with an action
+                           behind it: the money did not fail to be asked for, it
+                           was refused. The reason underneath is what decides
+                           whether finance asks for a new card or a top-up. */
+                        <span data-testid={`declined-${b.seq}`}>
+                          <span className="text-danger font-semibold whitespace-nowrap">
+                            Card declined
+                          </span>
+                          <div className="text-[11.5px] text-base-500 mt-0.5">
+                            {b.lastDecline.at.slice(0, 10)}
+                            {(b.declineCount ?? 0) > 1 ? ` · ${b.declineCount} tries` : ""}
+                          </div>
+                          {b.lastDecline.reason ? (
+                            <div className="text-[11.5px] text-base-600 mt-0.5 max-w-[200px] whitespace-normal">
+                              {b.lastDecline.reason}
+                            </div>
+                          ) : null}
+                        </span>
                       ) : b.late ? (
-                        <span className="text-danger font-semibold">Past due</span>
+                        <span className="text-danger font-semibold whitespace-nowrap">Past due</span>
                       ) : (
                         <span className="text-base-500">Due</span>
                       )}
@@ -184,10 +223,12 @@ export default function RentalCollectionsPanel({
             </table>
 
             <p className="px-6 py-4 text-[12px] text-muted-foreground leading-relaxed">
-              Card payments record themselves when Stripe collects them. “Record transfer” is for
-              money that never touched Stripe — a bank transfer or cash at the counter — and it
+              Card payments record themselves when Stripe collects them, and a refused card records
+              itself too — every attempt the bank turns down is kept, so a month that says “Card
+              declined” has been asked for and refused, not simply left alone. “Record transfer” is
+              for money that never touched Stripe — a bank transfer or cash at the counter — and it
               goes through the same door, so the supplier and sales split is always worked out the
-              same way.
+              same way. Recording the money is also what clears the decline.
             </p>
           </>
         )}

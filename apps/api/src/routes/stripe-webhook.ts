@@ -24,6 +24,9 @@ import type { AppEnv } from "../types";
  *   invoice.paid                       → 0281: record the rental instalment
  *                                        (the collection ledger's only entry
  *                                        point from Stripe)
+ *   invoice.payment_failed             → 0295: record the decline, so finance
+ *                                        can tell "the card was refused" from
+ *                                        "we have not billed this month yet"
  *   everything else                    → 200 ignored
  *
  * Recording goes through the 0223 RPC — idempotent (row lock + status guard),
@@ -74,6 +77,14 @@ stripeWebhookRouter.post("/webhook", async (c) => {
     case "invoice.paid": {
       // 0281 — segment 2a. Every month after signup arrives here.
       return recordRentalInvoice(c, event.data.object);
+    }
+    case "invoice.payment_failed": {
+      // 0295 — the bank said no. Until this branch existed the system wrote
+      // NOTHING, so a declined card and a month we had simply not billed yet
+      // looked identical on the finance screen. The event id is passed down
+      // because a failure changes no state and so has nothing else to be
+      // idempotent by.
+      return recordRentalInvoiceFailure(c, stripe, event.id, event.data.object);
     }
     case "checkout.session.expired": {
       const session = event.data.object;
@@ -260,6 +271,106 @@ async function recordRentalInvoice(c: Context<AppEnv>, invoice: Stripe.Invoice) 
     return c.json({ error: "record_failed", message: error.message }, 500);
   }
   const out = data as { already?: boolean; seq?: number } | null;
+  return c.json({ received: true, seq: out?.seq ?? null, already: out?.already ?? false });
+}
+
+/**
+ * Why the bank said no, in words finance can act on (0295).
+ *
+ * Lives here rather than in lib/stripe with its siblings for one deliberate
+ * reason: this file's tests mock that whole module, so a reader parked there is
+ * a reader no test can exercise — it would have been stubbed and the test would
+ * have asserted the stub. It has exactly one caller, so local is honest.
+ *
+ * The distinction matters to the person making the phone call: "insufficient
+ * funds" means ask them to top up and we retry, "expired card" means we need a
+ * new card on file. Stripe's own `message` is already a plain, customer-safe
+ * sentence, so it wins over the raw code and the code is only the fallback.
+ *
+ * NOTE the reason is NOT on the Invoice: `last_finalization_error` is the
+ * invoice failing to finalise, a different failure entirely. A card decline
+ * lives on the PaymentIntent.
+ */
+function declineMessageOf(pi: Stripe.PaymentIntent | null): string | null {
+  const err = pi?.last_payment_error;
+  if (!err) return null;
+  const msg = err.message?.trim();
+  if (msg) return msg;
+  const code = err.decline_code ?? err.code;
+  return code ? String(code) : null;
+}
+
+/**
+ * 0295 — Stripe tried the card and the bank said no.
+ *
+ * Everything about the resolution is deliberately the SAME as the paid path
+ * above (subscription → agreement, then let the RPC find the instalment), so
+ * the two halves of a month's story cannot drift apart. Two things differ, and
+ * both follow from the fact that a decline changes no state:
+ *
+ *  1. The idempotency key is Stripe's EVENT id, not the invoice id. A retry of
+ *     the same delivery must be a no-op; a genuine second attempt on the same
+ *     invoice (Smart Retries) is a real, separate event and must be a second
+ *     row. Keying on the invoice would collapse three refusals into one.
+ *  2. `amount_due` is the figure, not `amount_paid` — nothing was paid, and the
+ *     amount we FAILED to collect is the number finance cares about.
+ *
+ * Unlike the paid path, an unresolvable agreement is still the end of the road
+ * (we cannot file a decline against a subscription that is not ours), but a
+ * missing INSTALMENT is not: the RPC files those against the agreement alone.
+ */
+async function recordRentalInvoiceFailure(
+  c: Context<AppEnv>,
+  stripe: Stripe,
+  eventId: string,
+  invoice: Stripe.Invoice,
+) {
+  const sub = invoice.parent?.subscription_details?.subscription ?? null;
+  const subId = typeof sub === "string" ? sub : sub?.id ?? null;
+  if (!subId) return c.json({ received: true, ignored: "not_a_subscription_invoice" });
+
+  const admin = adminClient(c.env);
+  const { data: ag } = await admin
+    .from("rental_agreements")
+    .select("id")
+    .eq("stripe_subscription_id", subId)
+    .maybeSingle();
+  const agreementId = (ag as { id: string } | null)?.id ?? null;
+  if (!agreementId) return c.json({ received: true, ignored: "unknown_subscription" });
+
+  // Why the card was refused is what turns this row into an action ("ask for a
+  // new card" vs "ask them to top up"), but it lives on the PaymentIntent, not
+  // on the invoice. Same discipline as the receipt lookup in recordSession:
+  // sugar, fetched in a try, never allowed to stop the money fact landing.
+  let reason: string | null = null;
+  if (invoice.id) {
+    try {
+      const full = await stripe.invoices.retrieve(invoice.id, {
+        expand: ["payments.data.payment.payment_intent"],
+      });
+      const pi = full.payments?.data?.[0]?.payment?.payment_intent ?? null;
+      reason = typeof pi === "string" || !pi ? null : declineMessageOf(pi);
+    } catch {
+      reason = null;
+    }
+  }
+
+  const attempted = (invoice.amount_due ?? 0) / 100;
+  const { data, error } = await admin.rpc("rental_record_payment_failure", {
+    p_agreement_id: agreementId,
+    p_stripe_invoice_id: invoice.id ?? null,
+    p_stripe_event_id: eventId,
+    // 0 would be a lie about a real charge attempt; null lets the RPC fall back
+    // to the instalment's own amount, which is what Stripe was asking for.
+    p_amount: attempted > 0 ? attempted : null,
+    p_failed_at: new Date(invoice.created * 1000).toISOString(),
+    p_reason: reason,
+    p_reference: invoice.number ?? invoice.id ?? null,
+  });
+  if (error) {
+    return c.json({ error: "record_failed", message: error.message }, 500);
+  }
+  const out = data as { already?: boolean; seq?: number | null } | null;
   return c.json({ received: true, seq: out?.seq ?? null, already: out?.already ?? false });
 }
 
