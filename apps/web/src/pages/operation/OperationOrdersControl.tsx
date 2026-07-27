@@ -104,6 +104,10 @@ import {
   Users,
   PackagePlus,
   MessageCircle,
+  // C10 — the three dots' glyphs (UI-KIT §A4 canonical mapping:
+  // stock `package` · logistic `truck` · money `wallet`).
+  Package,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -431,7 +435,9 @@ function addDaysIso(iso: string, n: number): string {
 // NOTE the PO-date+lead formula (下PO日 + MS/BF 7d · SOF 5d) is deferred to
 // Phase 2 — there's no PO-raised date on the order; this reads stock_eta only.
 type StockEtaState = "ready" | "on_track" | "late" | "overdue" | "no_eta" | "none";
-interface StockEta {
+/** Exported because `rowDotsOf` takes one — a caller (and its test) could not
+ *  otherwise name the type of an argument it has to build. */
+export interface StockEta {
   /** Latest ETA among waiting lines (ISO), or null when none / all ready. */
   etaIso: string | null;
   /** Any line still waiting on stock. */
@@ -630,18 +636,28 @@ const NEXT_PILL_CLASS: Record<NextTone, string> = {
   neutral: "pill-neutral",
 };
 
-// ─── 三线点 row dots (§14, Jess picked C 2026-07-18) ─────────────────────────
-// One row = three dots in a FIXED order — Money · Stock · Delivery — sharing
-// the §8 dial hues. The dots are the row's ONLY colour channel; the fact cells
-// (n/m, ETA, partner, ladder word) stay ink/grey. Grey = not applicable.
+// ─── The three dots (C10, Jess 2026-07-27 — ACTION-FLOW Law 6 + §7) ──────────
+// THREE INDEPENDENT FACTS — goods · delivery · money — never merged into one
+// word. They sit BESIDE the stage pill (Jess: the pill says WHERE the order is,
+// the dots say WHICH PART has trouble); neither replaces the other. The dots are
+// the row's ONLY colour channel; the fact cells (n/m, ETA, logistics, ladder
+// word) stay ink/grey. Grey = not applicable / nothing known yet.
+//
+// ORDER: goods · delivery · money, per Law 6 and ORDERS-WORKING-FLOW §7. (The
+// §14 note of 2026-07-18 said Money · Stock · Delivery; the 2026-07-27 laws
+// re-ruled it, and since nothing had ever rendered these dots no screen changes.)
+//
+// This function returns the STATE, never a colour: the hue is the renderer's
+// business, so a test can pin the meaning without pinning a hex.
 const DOT_HEX = {
   green: "#639922",
   amber: "#EF9F27",
   red: "#E24B4A",
   grey: "#D1D5DB",
 } as const;
+type DotState = keyof typeof DOT_HEX;
 interface RowDot {
-  color: string;
+  state: DotState;
   title: string;
 }
 export function rowDotsOf(
@@ -657,42 +673,92 @@ export function rowDotsOf(
   // reserved for genuinely UNKNOWN money — an order nobody has priced.
   const m = moneyOf(o);
   const money: RowDot = !m.known
-    ? { color: DOT_HEX.grey, title: "Money — no order value on record" }
+    ? { state: "grey", title: "Money — no order value on record" }
     : m.owing
-      ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
-      : { color: DOT_HEX.green, title: "Money — settled" };
+      ? { state: "red", title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
+      : { state: "green", title: "Money — settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
-  if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
+  if (completed) goods = { state: "green", title: "Stock — done (delivered)" };
   else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
-    goods = { color: DOT_HEX.green, title: "Stock — all in" };
+    goods = { state: "green", title: "Stock — all in" };
   else if (stock.state === "unknown")
-    goods = { color: DOT_HEX.red, title: "Stock — no PO raised yet" };
+    goods = { state: "red", title: "Stock — no PO raised yet" };
   else if (se.state === "overdue" || se.state === "late")
-    goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
-  else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
+    goods = { state: "red", title: "Stock — supplier ETA late vs the deadline" };
+  else goods = { state: "amber", title: "Stock — waiting arrival" };
   // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
   // reserved for the CUSTOMER's confirmation; a provisional logistics date stays
   // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
-  if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
+  if (completed) delivery = { state: "green", title: "Delivery — delivered" };
   else if (logi.key === "confirmed")
-    delivery = { color: DOT_HEX.green, title: "Delivery — customer confirmed" };
+    delivery = { state: "green", title: "Delivery — customer confirmed" };
   else if (logi.key === "unassigned")
-    delivery = { color: DOT_HEX.grey, title: "Delivery — no logistics picked yet" };
+    delivery = { state: "grey", title: "Delivery — no logistics picked yet" };
   else {
     const dd = daysToDue(o);
     const late = dd !== null && dd < 0;
     delivery =
       logi.key === "provisional"
         ? late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, customer not confirmed" }
-          : { color: DOT_HEX.amber, title: "Delivery — logistics date only, customer not confirmed" }
+          ? { state: "red", title: "Delivery — past deadline, customer not confirmed" }
+          : { state: "amber", title: "Delivery — logistics date only, customer not confirmed" }
         : late
-          ? { color: DOT_HEX.red, title: "Delivery — past deadline, no booking" }
-          : { color: DOT_HEX.amber, title: "Delivery — customer has not confirmed a date" };
+          ? { state: "red", title: "Delivery — past deadline, no booking" }
+          : { state: "amber", title: "Delivery — customer has not confirmed a date" };
   }
-  return [money, goods, delivery];
+  return [goods, delivery, money];
+}
+/** The three dots on screen (C10). Each dot IS its own icon — that is what
+ *  labels it, which is why the dots need no header of their own (Jess
+ *  2026-07-27). Glyphs come from the UI-KIT §A4 canonical mapping so the same
+ *  meaning wears the same icon portal-wide: goods `package` · delivery `truck`
+ *  · money `wallet`. Never emoji (§A11 rule 2), never a bare coloured circle —
+ *  a circle with no icon would be unreadable without a header to look up.
+ *
+ *  Each dot carries its own tooltip, because a colour alone states a fact
+ *  nobody can name (COPY-STANDARD rule 7: the label says WHAT, the tip WHY).
+ *  `shrink-0` is deliberate: on a narrow screen the stage PILL truncates (it
+ *  has a tooltip and a five-word vocabulary) and the dots stay whole. */
+const DOT_ICON: Record<"goods" | "delivery" | "money", LucideIcon> = {
+  goods: Package,
+  delivery: Truck,
+  money: Wallet,
+};
+function RowDots({
+  o,
+  stock,
+  se,
+  logi,
+}: {
+  o: operationOrderListRow;
+  stock: StockInfo;
+  se: StockEta;
+  logi: LogisticState;
+}) {
+  const dots = rowDotsOf(o, stock, se, logi);
+  const kinds = ["goods", "delivery", "money"] as const;
+  return (
+    <span className="inline-flex items-center gap-1 shrink-0" data-testid="row-dots">
+      {dots.map((dot, i) => {
+        const kind = kinds[i];
+        const Icon = DOT_ICON[kind];
+        return (
+          <span
+            key={kind}
+            title={dot.title}
+            aria-label={dot.title}
+            data-testid={`row-dot-${kind}`}
+            data-dot-state={dot.state}
+            className="inline-flex"
+          >
+            <Icon size={14} strokeWidth={2} style={{ color: DOT_HEX[dot.state] }} />
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
@@ -723,9 +789,9 @@ function ovlOf(o: operationOrderListRow) {
 // drawer and the collections desk (`orderMoney`, packages/shared). Before this
 // card every money surface here read `ops_order_control.balance` — NULL on all
 // 55 live control rows — so the 🔒, the Owing facet row and the Collect RM pill
-// were all permanently silent while 18 orders owed RM 56,859. (The money DOT
-// reads this too, but `rowDotsOf` is dead code — nothing renders it; the
-// Status column shows a stage-word pill. Its strings grep 0 in the bundle.)
+// were all permanently silent while 18 orders owed RM 56,859. The money DOT
+// reads this too — since C10 it is on screen, beside the stage pill, so a row
+// that owes money says so in three places that cannot disagree.
 //
 // STORAGE is folded in here, not inside the shared rule: its clock and its
 // collected/waived flags are this page's own signals, and the shared function
@@ -901,7 +967,8 @@ type LogisticStateKey =
   | "provisional"
   | "need_booking"
   | "unassigned";
-interface LogisticState {
+/** Exported for the same reason as `StockEta` — `rowDotsOf` takes one. */
+export interface LogisticState {
   key: LogisticStateKey;
   partner: string | null;
   /** ISO date — the customer's confirmed date on "confirmed"; the logistics
@@ -1236,17 +1303,21 @@ interface OrderColDef {
  *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status shows a STAGE word pill (Placed / Proceed / To book / Customer
-  // confirmed), not the old anonymous dots — 11% since C1 renamed the two
-  // longest words, so "Customer confirmed" never clips (Jess 2026-07-19 asked
-  // for exactly that on the old pair). Rebalanced out of customer/next.
-  { key: "dots", label: "Status", w: 11 },
+  // Status holds TWO things since C10 (Jess 2026-07-27): the STAGE word pill
+  // (Placed / Proceed / To book / Customer confirmed / Delivered) and, beside
+  // it, the three dots. 11 → 14: the widest pill measures 135px and the three
+  // 14px icons 50px, so both fit intact (12px cell padding + 135 + 6 + 50 =
+  // 203px ≈ 14% of the table's ~1448px). The 3 points come from the two
+  // neighbours with MEASURED slack, never from Actions (C3 is about to grow
+  // it): deadline 13 → 12 (needs 142px, had 188) and stock 11 → 9 (needs
+  // ~107px, had 159).
+  { key: "dots", label: "Status", w: 14 },
   { key: "order", label: "Order", w: 10 },
   { key: "customer", label: "Customer", w: 11 },
   // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
   // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law).
-  { key: "deadline", label: "Deadline", w: 13 },
-  { key: "stock", label: "Stock", w: 11 },
+  { key: "deadline", label: "Deadline", w: 12 },
+  { key: "stock", label: "Stock", w: 9 },
   // Delivery + Actions each took a point from the cells beside them: C1's words
   // name the party, so the strings are longer ("NETS — confirm delivery date").
   { key: "delivery", label: "Delivery", w: 13 },
@@ -3146,10 +3217,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </th>
               {showCol("dots") && (
                 <Th>
-                  {/* This cell shows the pipeline STAGE in words, not the
-                      three-dot signal its `dots` key still names — see the
-                      column def. The tooltip describes what actually renders. */}
-                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered">
+                  {/* The word heads the STAGE PILL only. The three dots beside
+                      it need no header of their own (Jess 2026-07-27) — each is
+                      labelled by its own icon and carries its own tooltip. */}
+                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.">
                     Status
                   </span>
                 </Th>
@@ -4169,15 +4240,25 @@ function OrderRow({
           .pill for the live stages; a muted "Delivered" (no pill) once done. */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
-        {completed ? (
-          <span className="text-[12px] text-base-400">Delivered</span>
-        ) : (
-          (() => {
-            const label = TAB_LABEL[controlTabOf(o, availableBySku)];
-            // ONE shared status→pill map (no per-surface hand-roll).
-            return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
-          })()
-        )}
+        {/* C10 (Jess 2026-07-27): the stage pill and the three dots SIDE BY
+            SIDE — they answer different questions and neither replaces the
+            other. The pill is byte-identical to before this card; the dots are
+            new. The pill takes the slack and truncates on a narrow screen; the
+            dots are fixed-width and never squeezed out. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="min-w-0 truncate">
+            {completed ? (
+              <span className="text-[12px] text-base-400">Delivered</span>
+            ) : (
+              (() => {
+                const label = TAB_LABEL[controlTabOf(o, availableBySku)];
+                // ONE shared status→pill map (no per-surface hand-roll).
+                return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
+              })()
+            )}
+          </span>
+          <RowDots o={o} stock={stock} se={se} logi={logi} />
+        </div>
       </td>
       )}
       {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
