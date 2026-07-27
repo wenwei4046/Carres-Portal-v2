@@ -793,6 +793,18 @@ export {
   type OrderActionParties,
 } from "./order-action-words";
 
+// C2 · The order action engine — two layers (compute every track · display
+// picks one). One track may never suppress another's action.
+export {
+  displayOrderAction,
+  openOrderActions,
+  orderActionsInDisplayOrder,
+  type OrderActionSignals,
+  type OrderActionTone,
+  type OrderActionTrack,
+  type OrderOpenAction,
+} from "./order-actions";
+
 // T7 · Delivery queues + auto-overdue (each step carries its own deadline)
 export {
   DELIVERY_QUEUES,

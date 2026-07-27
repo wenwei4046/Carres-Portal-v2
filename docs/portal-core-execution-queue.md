@@ -112,7 +112,7 @@ Three findings are recorded under **What C1 found** below — read them before C
    two different states share one word. Its banned neighbour WAS renamed (`Pending` →
    `Goods not in`). One word for two states is the worse error; this needs Jess's call.
 
-## C2 · Split the ladder into TWO LAYERS + the drawer's action list
+## C2 · Split the ladder into TWO LAYERS + the drawer's action list — ✅ LIVE (PR #466)
 
 **This is the structural card. Read `docs/ACTION-FLOW-STANDARD.md` first.**
 
@@ -139,6 +139,51 @@ delivery — display order is not gating.
 **No migration expected.**
 **Done when:** an order with three open actions shows three rows; no action can be hidden
 by another; the drawer and the row can never disagree.
+
+**SHIPPED (PR #466).** Both layers live in `packages/shared/src/order-actions.ts`, pure,
+with the clock handed in. THREE tracks — goods · delivery · money — one action each at most,
+because the rungs inside a track are states of the same question, not parallel work.
+Layer 2 gives every key its own rank inside its Law 4 rung, so the sort is **total** (two
+actions can never tie and flip between renders), and **a broken commitment jumps every
+rung** — the one thing a rank table cannot express, because "broken" is a fact about the
+order, not about the kind of action.
+
+**The row is unchanged, and it is PROVED rather than asserted.** `nextActionOf` kept its
+signature and became Layer 2 over Layer 1, so its entire existing suite is the parity
+oracle — Loo's freeze gate, the T3 delay radar, T7's date split, C5's money hold and every
+tone, 103 assertions, all green across the split. The drawer's `OrderActionList` is built
+from the SAME call that produced the row's pill, so its first row IS that pill.
+
+### What C2 found — read before C3 and C6
+
+1. **`COPY-STANDARD.md`'s delivery-queue table states a TRIGGER and contradicts the working
+   flow.** Step 1 `Assign logistics` is described as holding "Stock in, no logistics company
+   picked"; `ORDERS-WORKING-FLOW.md` §3 gives it "the order needs delivering and no logistics
+   company is chosen" — no stock condition — and Law 1 forbids one track gating another.
+   COPY-STANDARD's own header says it defines WORDING only, so the working flow won and the
+   stock condition is gone. **Jess: that "It holds" clause needs to move or go**, or the next
+   chat re-derives the old behaviour from it.
+2. **`Confirm delivery with {customer}` is ranked by nothing and listed by nobody.** Law 4
+   does not rank it, §3 does not list it as an action, and `Confirm` is not one of the five
+   verbs — yet it ships as the ladder's terminal word. C2 ranked it under delivery
+   preparation and changed nothing else. It is arguably a FACT ("everything is arranged")
+   wearing an action's clothes, and it is the one row in the drawer's list that **no button
+   in the portal closes**. Needs Jess.
+3. **Law 4 rung 2 and §4 rung 2 name different parties for the same rung** —
+   `Call {logistics} — arrange new delivery date` vs `Call {customer} — agree new delivery
+   date`. The shipped key is the customer one. **C8 owns this**; C2 changed nothing there.
+4. **Law 4 rung 1 lists "the failed-delivery follow-up" and no such action exists.**
+5. **No action has a Task Owner.** Law 2 requires one on every action; the portal stores
+   `assigned_staff` per ORDER, not per action. **C6 needs this and it is not built.**
+6. **Money now survives delivery, which is the one row headline C2 changes**: a delivered
+   order that still owes used to read `Done` with an empty cell and now reads
+   `Collect RM … from {customer}` (§3: "A delivered order that still owes money keeps this
+   action"). Live there are 0 delivered orders, so no row moved on the day it shipped.
+
+**Not built here, on purpose:** the `+N` (C3's), per-action checklists (C6's), and any
+ticked/done rows — the journey strip directly above already renders ✓ per stage, so a second
+ticked list would say the same thing twice. The list holds what is OPEN, and its empty state
+teaches that a new action appears by itself.
 
 ## C3 · The Actions column shows the whole truth
 
@@ -404,8 +449,8 @@ a column that is 9 units wide today.
 | Card | Status | PR |
 |---|---|---|
 | C1 | ✅ LIVE 2026-07-27 | #461 |
-| C2 | ⬜ after C1 | — |
-| C3 | ⬜ after C2 | — |
+| C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
+| C3 | ⬜ **next** — the `+N` on the Actions column (C2 shipped its list) | — |
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |

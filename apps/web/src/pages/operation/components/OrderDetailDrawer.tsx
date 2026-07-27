@@ -190,6 +190,7 @@ import OrderJourneyHeader, {
   deriveOrderJourney,
   type OrderJourneySignals,
 } from "./OrderJourneyHeader";
+import OrderActionList from "./OrderActionList";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -2465,6 +2466,11 @@ function DrawerBody({
             second full-width line of order truth belongs alongside it.
             Renders nothing when the ladder's answer is absent. */}
         {journeyView && <OrderJourneyHeader journey={journeyView} />}
+        {/* C2 — the dynamic checklist. The strip above names the action that
+            leads; this names ALL of them, because an order has several open at
+            once and the old ladder showed one and hid the rest. Same computed
+            list, same order, so its first row is always the strip's Next. */}
+        {journey && <OrderActionList actions={journey.openActions} />}
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
           <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
