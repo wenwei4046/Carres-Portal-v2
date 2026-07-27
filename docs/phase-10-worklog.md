@@ -2591,3 +2591,71 @@ Post-apply reconciliation (not eyeballed): `hr_assign_salesperson` **0 copies** 
 form · `commission_close_month` exactly **1** copy, `md5(prosrc)`
 `fb86b781e05476d3b570df94f66390f3`, length 4228 · **0** rows violate the constraint ·
 tracker tail `0296_attribution_becomes_a_constraint`.
+
+---
+
+## 2026-07-27 · A bounced card stops being invisible (0295) + the retired rental page deleted
+
+**PR #439** merged as `afcaf12e`, migration **0295_rental_payment_failed** applied, api Worker **`571ee2e3`** + web **`index-BUVL2ge4.js`** — **DEPLOYED**. Worktree `rental-modular-sku`.
+
+Loo: *"卡刷失败什么都不记 —— webhook 只接「付款成功」，跳票了系统里一片空白，finance 看不到."*
+
+### The hole, stated exactly
+
+0281 built the collection ledger for money **IN** and said so in its own header: it handled `invoice.paid` and nothing else. So when Stripe tried the card on the 7th and the bank refused, the system wrote **nothing**. The instalment read `Due`, and once its date passed, `Past due` — the same two words it shows for a month we simply have not billed yet.
+
+Those two situations call for opposite actions. One is a wait. The other is a phone call for a new card. The screen could not tell them apart, so neither could finance.
+
+### Three decisions that shaped it
+
+**1 · A decline does NOT touch `rental_billings`.** The obvious move is to flip the row to `overdue`. Refused twice over. (a) 0281 gave that table exactly **one writer**, and a second writer is how two systems start disagreeing again — the CF that migration existed to close. (b) `overdue` would be a **second source of truth for lateness**, when the collections read already *derives* late from the due date precisely so it can never be a stale flag somebody forgot to clear. And a card can decline **on** the due date, which is a refusal and not yet late — collapsing them loses the distinction that makes this worth building. So a decline is an **event**, and both screens derive from it, exactly as they already derive `late`.
+
+**2 · Idempotency needed a key, because nothing changes state.** `rental_record_payment` is idempotent for free: the row flips to `paid` and a re-delivery sees it. A failure flips nothing, so a re-delivered webhook would write a second identical row and finance would count two refusals where the bank said no once. `rental_billing_events` therefore learns `stripe_event_id` + a unique index.
+
+This is a real distinction rather than caution: **Stripe Smart Retries fire `invoice.payment_failed` again on each new ATTEMPT, and each is a separate event with its own id.** Three genuine attempts write three rows; one event delivered three times writes one. Keying on the invoice id instead would have collapsed a customer's three refusals into one.
+
+**3 · The list badge is not polish, it is the feature.** Recording a decline that only appears inside one agreement's drawer is not "finance can see it" — nobody opens a drawer they have no reason to suspect. A `security_invoker` view (`rental_agreement_card_trouble`) answers the one grouped question the LIST asks: which agreements have an unresolved card problem? A decline counts as open while the instalment it hit is still unpaid; **paying the month is what clears it**, so there is no flag to forget. `undefined` — an older Worker, or a failed read — prints **nothing** rather than a reassuring zero.
+
+Also: a refusal is recorded **even when no instalment matches** (every month collected, a drifted schedule). It lands on the agreement with a null billing and gets its own figure on screen. Refusing to record a real decline for want of a row to hang it on would have rebuilt, in miniature, the silence this migration exists to end.
+
+### What was found in live data along the way
+
+- **`rental-agreement-wording-unpublished` is no longer true.** The CF says in bold that it "blocks every rental signup right now". Measured: `rental_agreement_templates` holds v1, `active`, and `rental_current_agreement_template()` returns version 1. Somebody pressed Save. **Closed.**
+- **`rental-reject-does-not-cancel-the-order` was closed by 0275 and never removed from the index.** `rental_reject_agreement` demonstrably mentions cancel and touches `orders`; the 07-26 ㉑ entry says "closes CF" itself. **Closed.**
+- **The first dry run failed, and was right to.** It asserted the oldest owing instalment was `seq 1`; the DB said `seq 2`. The cause was real: **RA-1003 seq 1 had been collected by hand at 04:39 UTC that morning** by principal@carres.com (RM 69, supplier 33.81 / sales 13.80) — a human pressing "Record transfer", not the dry run (which uses service_role, leaves `recorded_by` NULL, and rolled back). The assertions now compute the expected seq instead of pinning it — the same lesson as the T7 fixture that hardcoded a date.
+
+### Verification
+
+**13 assertions against live prod in a rolled-back transaction before apply**: showroom refused 42501 · **bd refused** (the gate is `rental_can_approve() OR service_role`, deliberately narrower than `is_internal()` — that admits bd, and a BD sells these) · resolution lands on the oldest owing · re-delivery a no-op · a genuine retry a second row · **`rental_billings` md5 byte-identical after recording failures** · the view goes quiet the moment the month is paid, and history survives · an unattached decline still recorded and still counted · `agreement_not_found` / `agreement_required` detail codes · `audit_log` read back **by ref, never by time** · finance stamped `finance`, the webhook stamped `stripe-webhook` · **0281's paid path and its 49% split untouched**.
+
+Post-apply the FILE was reconciled to live by `md5(prosrc)` — **and it did not match**. 3013 chars live vs 3688 in the file: the apply payload had been hand-assembled with the body comments stripped. Re-applied the file's version verbatim; md5 now identical (`b749926e…`). The length still reads 4 short because `length()` counts characters and two em-dashes are multi-byte — the md5 is the authority. **This is the second time the reconcile step has earned its place; do not skip it.**
+
+A functional smoke of the **deployed** function (not the dry-run copy) then passed in its own rolled-back transaction.
+
+### The test that lied for one run
+
+`declineMessageOf` was first written into `lib/stripe.ts` beside its siblings. The test asserting it returned **null** — because `stripe.test.ts` mocks that whole module with a factory, so the import was `undefined`, the call threw, and **the route's own try/catch swallowed it**. The guard is correct in production and hid the cause here. Moved into the route file: it has exactly one caller, and a helper no test can exercise is worse than a slightly asymmetric one.
+
+### Also in this PR
+
+- **`RentToOwnPage.tsx` + its test deleted** on Loo's word — ~550 lines of a second rental signup UI, unmounted since rental became a POS category and shut from the inside by 0279. Closes CF `rental-retired-page-still-on-disk`. The `DealerPos` comment that pointed at it was rewritten rather than left dangling.
+- **A trap worth remembering**: a `git stash -u` / `stash pop` round-trip (used to check whether some typecheck errors pre-existed) **un-stages a deletion** — ` D` instead of `D `. `git ls-files` therefore still listed the deleted page and `check-design-standard.mjs` crashed trying to open it. `git add -A` fixed it; the checker was not at fault.
+- `OperationRental` stopped redeclaring the agreements row type and now reads `RentalAgreementListItem` from `queries.ts`, beside the hook that fetches it — the duplicate is exactly how it fell a field behind.
+
+### Deliberately not built
+
+8%/month late interest still **computes and never fires**. Deciding a payment is late is the dunning ladder's job and that needs a comms channel that does not exist (CF `rental-dunning-has-no-send-channel`, Loo: skip for now). Recording a decline is not charging for it.
+
+### The one step that is not code
+
+The Stripe webhook endpoint must be **subscribed to `invoice.payment_failed`**. If the endpoint lists its events explicitly, this branch is dead code and nothing will ever reach the ledger. The MCP key available in the session **cannot read webhook endpoints** (`GetWebhookEndpoints` → permission denied), so this could not be verified from here — it needs eyes on the Stripe dashboard. Filed as CF `rental-payment-failed-event-not-subscribed` until confirmed.
+
+### Deploy
+
+Migration tracker checked immediately before numbering **and** again before applying (tail 0294 both times → 0295). Before deploying, every migration file on the union tip was confirmed applied; a parallel line has **0296** applied whose code is not yet in main, which is the DB ahead of the code and safe.
+
+api Worker **`571ee2e3`** via `wrangler deploy --env production` — bindings receipt read: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + `api.carresofficial.com (custom domain)`. web **`index-BUVL2ge4.js`** to carres-portal (`90236cc3`) + carres-pos (`0f2de115`), both `--branch=main`. **All 4 canonicals converged on the first poll.**
+
+Live bundle downloaded to a file before grepping: **4,392,025 bytes**, `SERVICE_ROLE` **0**, three markers from MOUNTED components present (`Card declined`, `declined with no month to match`, `a refused card records`), and the deleted page's own `pos-rental-page` testid greps **0** — the delete shipped. Webhook trust boundary re-checked live: unsigned POST **400**, bad signature **400 `invalid_signature`**.
+
+Suites at baseline: shared **1582/1582** · api **3** pre-existing (partner/pickups ×1, supplier/pos ×2) · web **16** pre-existing (4 files). web typecheck **0**; api and shared typecheck at their pre-existing counts (4 and 3, both reproduced on clean origin/main before claiming so). Build + v4 guard + design-standard all clean.
