@@ -348,7 +348,8 @@ it is in the wrong element.
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
 `Pending` · `Processing` · `In Progress` · `Waiting` · `At Risk` · `Attention` ·
-`Inventory` · `Movements`
+`Inventory` · `Movements` · `Recovery` (staff say "this order going to delay" — the word on
+screen is `Delay planning`)
 
 (Filters may name a real STATE — `Placed`, `Proceed`, `Delivered`, `Owing` — but never
 one of the words above.)
@@ -381,6 +382,7 @@ doubt, grep the codebase and match what already ships.
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
 | Getting a faulty item back from the customer | **`Pick up the item from {customer}`** | Collect the item · Retrieve · Recall — `Collect` means MONEY in this portal (Jess 2026-07-27) |
+| Working out what to do about a delay, before anyone calls the customer | **`Delay planning`** | Recovery · Recovery plan · Exception handling · Escalation |
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The delivery company (any page/label) | **Logistics** (with s) · a named one reads `NETS Logistics` | Logistic · Carrier · Partner · Delivery partner |

@@ -71,6 +71,16 @@ Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note 
 outside design conversation into cards) and a BUILD chat (do one card). Nothing else needs
 to be remembered.
 
+## Frozen rulings waiting for their line (Jess 2026-07-27)
+
+- **Supplier production time must become a NUMBER.** The supplier master holds free text
+  ("7-10 days") and 8 of 10 suppliers are empty, so nothing can compute a chase date. Frozen
+  shape: `Standard production working days` (optionally min / max / default planning). Then
+  `chase from = customer date − production working days − internal buffer`. **Belongs to the
+  Purchasing line** — the Orders arrival window reads it once it exists.
+- **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
+  the driver today, not Carres. Revisit only if Carres runs its own fleet.
+
 ## Source of Truth Law
 
 Every rule exists in ONE place only. Business rules → the module's working flow · action

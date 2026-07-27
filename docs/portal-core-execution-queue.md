@@ -233,34 +233,36 @@ document exists for this trip (and, once logistics have their own portal, has be
 **Done when:** an operator never types a DO again; the document is available the moment the
 customer's date is confirmed.
 
-## C8 · Delay recovery as a state machine (Jess ruling 2026-07-27)
+## C8 · Delay planning + the gate before the customer (Jess rulings 2026-07-27)
 
-**Build the three stages exactly as `docs/ORDERS-WORKING-FLOW.md` §3 states them** —
-stage · trigger · owner · action · checklist · completion, plus the transition table. That
-file is the specification; this card is the work.
+**Build the stages exactly as `docs/ORDERS-WORKING-FLOW.md` §3 states them.** That file is
+the specification; this card is the work. The word on screen is **`Delay planning`** —
+`Recovery` is banned (staff say "this order going to delay").
 
-**What shipped as T3 has two faults, both fixed here:** it tells the operator to
-`Call customer (stock delay)` — the wrong party, Carres does not phone a customer about a
-delay — and it fires the moment the miss is certain, before anyone knows the new date.
-Until a real ready date exists the rung stays on `Call {supplier} — confirm ready date`.
+**The gate is the point of this card.** A supplier saying a later date is not yet a delay:
+we may have ready stock, or another supplier may cover it. `Delay planning` completes with
+a DECISION — *can we still make the promised date?* Only NO opens the logistics call.
+**The customer is the last to know, and only when we have tried and failed.**
 
-**The two invariants a build chat must not soften:**
-1. **No surface may open a customer call about a delay.** No label, no queue, no preset.
-2. **Stage 2 cannot open before Stage 1 completes** (a proposed date exists AND a person is
-   named). The gate is the data, not a warning.
+**Three invariants a build chat must not soften:**
+1. **The promised date never moves.** `orders.delivery_date` stays at what was sold — every
+   late/on-time figure measures against it. The delay flow must never call `set_order_date`
+   (that RPC exists to correct a date typed wrong, not to rewrite history). The live
+   extension path already records a requested date without touching the promise; reuse those
+   fields for "customer accepted the delay", the reason and the history — no new store.
+2. **No surface may open a customer call about a delay.** Logistics carries that call.
+3. **Stage 2 cannot open before the decision is recorded**, and never opens at all when the
+   answer is YES.
 
-**Stage 2's owner is Operations, not logistics** — seven of eight logistics companies have
-no login and the partner portal has no appointment screen. Do not create a task nobody can
-see. (Moving it to logistics later is its own card.)
+**Stage 2's owner is Operations, not logistics** — eight companies are in use, only NETS has
+a login, and the partner portal has no appointment screen. Do not create a task nobody can
+see.
 
-**Stage 3 writes carefully:** the booking goes to `confirmed_date` + `confirmed_time_slot`;
-the PROMISED date is read-only and moves only through the existing one-time extension with a
-reason from `DELIVERY_REASONS`. Nothing overwrites `orders.delivery_date`.
-
-**Small additive migration** for the proposed date + the named person — draft to Jess first,
+**Small additive migration** for the decision + the named person — draft to Jess first,
 check the tracker tail immediately before applying. **Depends on C2.**
-**Done when:** the three stages exist with their triggers and completions; no surface tells
-an operator to phone a customer about a delay; Stage 2 cannot open early.
+**Done when:** an order whose delay we solve internally never reaches the customer and never
+loses its original promised date; one that cannot be solved opens exactly one logistics
+action.
 
 ## Status
 

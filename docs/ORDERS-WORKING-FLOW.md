@@ -65,68 +65,86 @@ finish; it never changes and is never repeated on an action.
 - Trigger: ready date missing · due for re-confirmation · passed with no goods in · later than the customer's date · changed by the supplier
 - Checklist: production status · ready date · ready quantity · any delayed item · record the latest ready date · record the outcome
 - Completion: latest ready date recorded AND outcome recorded
-- Due: red once inside the arrival window
+- Due: red once inside the arrival window. **Today that window is a flat 7 days (mattress /
+  bed frame) and 5 days (sofa), which is wrong — a sofa takes longer to make and gets the
+  shorter warning.** The fix is frozen but not buildable here: the supplier master must
+  carry production time as a NUMBER (`Standard production working days`), not the free text
+  it holds today (8 of 10 suppliers are empty). Then the rule becomes
+  `customer date − production working days − internal buffer`. **That change belongs to the
+  Purchasing line**, and this window reads it once it exists.
 - Task Owner: the module assigns it
 
-### Delay recovery — a state machine, not a story
+### Delay planning — a state machine, with a gate before the customer
 
-**Purpose:** when the customer's promised date can no longer be met, the system runs an
-INTERNAL recovery to completion before anyone reaches the customer.
+**The principle (Jess, 2026-07-27): the customer is the LAST to know.** A supplier saying
+"12 Aug" is not yet a delay — we may have the item in ready stock, or another supplier may
+cover it. Only when we have tried and failed does anyone reach the customer.
 
-**Stage 1 — Internal recovery**
+**The word is `Delay planning`.** `Recovery` is banned on screen: staff say "this order
+going to delay", never "this order is in recovery". Nothing is being recovered yet — a
+decision is being planned.
+
+**Stage 1 — Delay planning**
 - Trigger: latest supplier ready date **>** the customer's promised date
 - Owner: **Operations**
-- Action: `Call {supplier} — confirm ready date` (getting the real date IS the work here)
-- Checklist: confirm the real ready date with the supplier · check available dates with
-  logistics · decide the date or window to propose · name who will call logistics
-- Completion: **Recovery plan ready = TRUE** — a proposed date exists AND a person is named
-- **The customer is NOT contacted in this stage.**
+- Checklist: confirm the supplier's real ready date · check ready stock or another supplier
+  · check available dates with logistics · decide the best delivery date · **decide whether
+  the customer needs to be told at all**
+- Completion: the delay decision is recorded
+- **The customer is not contacted in this stage.**
 
-**Stage 2 — Logistics arranges the customer's new date**
-- Trigger: recovery plan ready = TRUE
-- Owner: **Operations** — see the note below; the CONVERSATION with the customer is done by
-  logistics, the ACTION in this portal is ours
+**The gate — can we still make the promised date?**
+
+```
+Stock delay detected
+        ↓
+   Delay planning
+        ↓
+Can we still make the promised date?
+   ┌────┴────┐
+  YES        NO
+   │          ↓
+   │     Call {logistics} — arrange new delivery date
+   │          ↓
+   │     logistics agrees a new date with the customer
+   │          ↓
+   │     the system records the new booking
+   ↓
+Continue the original delivery — the customer is never told
+```
+
+**Stage 2 — Logistics arranges the customer's new date** (opens only on NO)
+- Trigger: the delay decision says the promised date cannot be met
+- Owner: **Operations** — the CONVERSATION is logistics', the ACTION in this portal is ours
 - Action: `Call {logistics} — arrange new delivery date`
-- Checklist: give logistics the proposed date · logistics contacts the customer · record the
-  date the customer agreed · record the time slot · record the customer's response
+- Checklist: give logistics the decided date · logistics contacts the customer · record the
+  date the customer agreed · record the time slot · record the response
 - Completion: a customer-confirmed date AND a time slot are recorded
 
-> **Why Stage 2 is owned by Operations and not by logistics.** A `partner` role exists and
-> one logistics company has a login, but **eight companies are in use and seven have no
-> account at all**, and the partner portal has no screen for arranging a delivery
-> appointment. An action owned by "Logistics" today would be a task nobody can see and
-> nobody can close. So the portal's action is ours — we call them, they call the customer,
-> we record what came back. This ownership moves to logistics the day the partner portal
-> covers appointments; that is a card, not an assumption.
+> **Why Operations owns it.** Eight logistics companies are in use; **only NETS has a
+> login**, and the partner portal has no screen for arranging an appointment. A task owned
+> by "Logistics" would be one nobody can see or close. It moves to them the day the partner
+> portal covers appointments — that is a card, not an assumption.
 
-**Stage 3 — The system updates the order**
-- Trigger: a customer-confirmed new date exists
-- Owner: **System** (no human step)
-- Writes: the booking (`confirmed_date` + `confirmed_time_slot`) — and, because the promised
-  date is **read-only**, the promise moves only through the existing one-time extension
-  (`extension_new_date` + `extension_reason` + `extension_count`) carrying a reason from the
-  shared reason list. **Nothing overwrites `orders.delivery_date` directly.**
-- Then: the recovery closes and the normal delivery flow continues
+**Stage 3 — The system records it** (no human step)
+- The new date and slot go to the **booking** (`confirmed_date` + `confirmed_time_slot`).
+- **THE PROMISED DATE NEVER MOVES.** `orders.delivery_date` stays at what was sold. Every
+  "late / overdue / on-time" figure keeps measuring against it, so a delay can never be
+  tidied away by pushing the date. The live code already behaves this way — the extension
+  path records a requested new date and deliberately does not touch `orders.delivery_date`.
+  The delay flow must never call the RPC that does (`set_order_date`); that RPC exists to
+  correct a date typed wrong at the counter, not to rewrite history.
+- What IS recorded: the customer accepted the delay · the reason (from the shared reason
+  list) · the delay history. Those are the existing extension fields — no new store.
 
 **Who may move it on**
 
-| Stage | Owner | Next stage |
+| Stage | Owner | Next |
 |---|---|---|
-| Stock delay detected | System | Internal recovery |
-| Internal recovery | Operations | Logistics arranges the date |
-| Logistics arranges the date | Operations (logistics performs the call) | System updates the order |
-| System updates the order | System | Normal delivery flow |
-
-```
-Normal delivery → Stock delay detected → Internal recovery
-   → Recovery plan ready → Logistics arranges the customer's date
-   → Customer agreed → System updates the order → Normal delivery flow
-```
-
-**THE RULE THAT GOVERNS THIS WHOLE SECTION (Jess, 2026-07-27).** Carres does not phone the
-customer about a delay — logistics does, because logistics arranges every delivery
-appointment. And **nobody reaches the customer before the real ready date is known**: a call
-that can only say "it will be late" and cannot answer "then when?" makes it worse.
+| Stock delay detected | System | Delay planning |
+| Delay planning | Operations | Continue original delivery **or** Logistics arranges the date |
+| Logistics arranges the date | Operations (logistics performs the call) | System records it |
+| System records it | System | Normal delivery flow |
 
 ### Supplier exception (goods short, damaged or wrong)
 
