@@ -2165,3 +2165,84 @@ a phone clip cannot be re-encoded in the browser the way a photo can. Photos sti
 shared **1432/1432** (+22) · api **3** = §17.7 baseline · web **16** = §17.7 baseline — zero new.
 Web +17 tests (11 wizard, 6 gallery), api +14. typecheck 0, build + `check:v4` + design-standard
 clean, `SERVICE_ROLE` grep 0 on the built bundle.
+
+## 2026-07-27 · Delivery T10 — the calendar reads the booking, not the promise (PR #413 merge `7f7c676b`, web `index-CD_Zji_Q.js` — DEPLOYED, no migration, no API change)
+
+Card T10 of `docs/delivery-execution-queue.md` (promotes L2). Web + `packages/shared` only.
+
+### There was no calendar to build — the calendar WAS the second store
+
+The card's law is "Today / Tomorrow / This week views reading the SAME booking fields —
+never a second store". That law was already broken, by the calendar itself: the right-rail
+Calendar has had a Deliveries lens since 2026-07-23, and it bucketed orders by
+`orders.delivery_date` — **the date we promised the customer**. That is not when a truck
+moves. Since D1 (0277) the truck's day is the booking (`booking_stage` + `confirmed_date`,
+with `logistic_eta` as the carrier's provisional word), and the two dates diverge the moment
+anything is rescheduled, which is the entire reason D1 split them.
+
+So the fix is structural, not cosmetic. `bookingDayOf` in
+`packages/shared/src/delivery-calendar.ts` is now the ONE function deciding which day an
+order sits on and how solid that day is; `logisticStateOf` (the Orders list Delivery column,
+T1) **delegates to it**, and its 99 existing tests pass unchanged. `apps/web/src/lib/
+order-booking.ts` is the single adapter from a list row to those four fields, so even the
+PostgREST embed unwrap does not live twice. Two surfaces cannot put the same order on two
+different days, because there is only one rule left.
+
+### The live finding that shaped the screen
+
+The database holds **zero bookings** — 0 confirmed, 0 provisional, across all 55
+`ops_order_control` rows — while **52 orders carry a promised date**. The pre-T10 calendar
+was showing 52 deliveries and not one of them was a booked truck.
+
+Reading only the booking would therefore have emptied the calendar completely and read as a
+broken panel. The promise stays on screen **as what it is**: a separate `Promised this day,
+needs a date` block carrying `Call {customer} — book delivery date`, never counted as a
+delivery. The day badge counts trucks; the block counts calls. A day can now be honestly
+empty of trucks and honestly full of work at the same time.
+
+### Ranges
+
+`This week` is the REST of the week — today through Saturday, because Sunday is refused for
+every carrier by the booking gate. On a Saturday it is just today; on a Sunday it is the
+Mon–Sat starting tomorrow. Range chips and a grid day-click are mutually exclusive: exactly
+one selection is live. Empty days are skipped inside a multi-day range (noise), but a single
+empty day still says so out loud — that is the answer to the question asked.
+
+### T9 on the day, under T9's own law
+
+Each carrier's row shows what it is carrying, and **only CONFIRMED bookings count toward its
+limit** — a provisional date is not a promise, so it cannot fill a truck (the same rule the
+confirm flow's capacity warning counts by). All 8 live carriers are bare rows, so today every
+one shows a plain count and warns about nothing.
+
+**Sunday is deliberately silent as a carrier rule.** Every live carrier holds the default
+`off_days [0]`, so voicing it per-partner would have blamed all 8 of them for a rule none of
+them set — and T9 already ruled that a phone call cannot buy a Sunday. Caught by checking the
+live partner rows against the T9 doc rather than trusting `partnerRunsOn` to be the whole
+answer.
+
+### Found, not fixed (not this card)
+
+- The panel's PO lens still has a tab labelled `Chase`, banned by the 2026-07-27 copy
+  rewrite. That word belongs to the Purchase vocabulary and the C-line owns the rename;
+  renaming another panel's word from a delivery card is how vocabularies drift.
+- Still open from T9: the drawer's two `Unscheduled` copies (`OrderDetailDrawer.tsx` ~3814,
+  ~3853).
+
+### Deploy note (worth remembering)
+
+Deployed **web only** from the main tip, deliberately. The union tip also carried two
+parallel lines' undeployed API code, and one of them (S2, `0288_service_case_evidence`) has
+**not been applied** to the database — `service_case_evidence_wellformed` does not exist in
+prod, while R2's `0288_supplier_claims` does. Shipping that Worker would have taken routes
+live against a missing migration. T10 needs zero API change, so the API was left alone.
+Two files both numbered `0288` sit on main; the tracker keys on timestamp, so the collision
+is cosmetic, but the unapplied one is not.
+
+### Evidence
+
+shared **1454/1454** (+34) · web **+17** · api untouched. Suites at the §17.7 baseline (api 3,
+web 16) — zero new failures. typecheck 0, build + `check:v4` clean, design-standard lint clean
+(one new grey hover caught and fixed to `hover:bg-hovertint`). Live bundle downloaded to a
+file (4,327,283 bytes) before grepping: 5 T10 markers present, `SERVICE_ROLE` 0. All 4
+canonicals converged on `index-CD_Zji_Q.js` on the first poll.
