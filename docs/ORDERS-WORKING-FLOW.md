@@ -21,6 +21,14 @@ An order can have **several open actions at once**. They are computed independen
 action never hides another. The row shows the highest-priority one plus `+N`; the drawer
 shows them all.
 
+**The Delivery page is a VIEW of this file's delivery track, not a module of its own.**
+It has its own sidebar item (T11) because operators live there all day, but it owns no
+records and raises no actions — it renders §3's delivery actions for the orders that carry
+them, through the same shared computation the Orders list runs. **There is no
+`DELIVERY-WORKING-FLOW.md` and there must never be one:** a second file would mean the same
+action described in two places, which Law 0A forbids. Same rule for any future page that
+re-cuts these orders by another angle.
+
 ## 2 · What the flow reads
 
 | Signal | Where it lives |
