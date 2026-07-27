@@ -236,9 +236,11 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
   // The order → SO ref (the reserved-units ledger keys on 'SO-<so>').
+  // C5 (2026-07-27): `paid` rides this select because it is the money truth —
+  // the only figure a live payment path writes.
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .select("id, so")
+    .select("id, so, paid")
     .eq("id", idCheck.data)
     .maybeSingle();
   if (orderErr) {
@@ -248,25 +250,26 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   if (!order) throw new HTTPException(404, { message: "Order not found" });
   const soRef = `SO-${order.so}`;
 
-  const [linesRes, addonsRes, controlRes, reservedRes, paymentsRes] =
-    await Promise.all([
-      sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", idCheck.data),
-      sb.from("order_addons").select("qty, unit_price").eq("order_id", idCheck.data),
-      sb
-        .from("ops_order_control")
-        .select(
-          "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips",
-        )
-        .eq("order_id", idCheck.data)
-        .maybeSingle(),
-      sb
-        .from("ops_stock_items")
-        .select("sku, qty")
-        .eq("status", "reserved")
-        .eq("reserved_ref", soRef),
-      sb.from("order_payments").select("kind, amount").eq("order_id", idCheck.data),
-    ]);
-  for (const r of [linesRes, addonsRes, controlRes, reservedRes, paymentsRes]) {
+  // C5: the `order_payments` read is GONE. It holds zero rows and no live
+  // payment path writes it, so summing it made "collected" RM 0 for every
+  // order and this gate refused bookings for customers who had already paid.
+  const [linesRes, addonsRes, controlRes, reservedRes] = await Promise.all([
+    sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", idCheck.data),
+    sb.from("order_addons").select("qty, unit_price").eq("order_id", idCheck.data),
+    sb
+      .from("ops_order_control")
+      .select(
+        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips",
+      )
+      .eq("order_id", idCheck.data)
+      .maybeSingle(),
+    sb
+      .from("ops_stock_items")
+      .select("sku, qty")
+      .eq("status", "reserved")
+      .eq("reserved_ref", soRef),
+  ]);
+  for (const r of [linesRes, addonsRes, controlRes, reservedRes]) {
     if (r.error) {
       const m = mapPgError(r.error);
       return c.json(m.body, m.status);
@@ -274,19 +277,16 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   }
 
   const lines = (linesRes.data ?? []) as { sku: string; qty: number; unit_price: number | null }[];
-  // Total: the SAME formula the operation detail route serves (orders.ts) —
-  // Σ lines + addons; AutoCount lines carry no prices, so fall back to the
-  // keyed ops_order_control.balance.
-  const lineSum = [
-    ...lines,
-    ...((addonsRes.data ?? []) as { qty: number; unit_price: number | null }[]),
-  ].reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
-  const orderTotal =
-    lineSum > 0 ? lineSum : Number(controlRes.data?.balance ?? 0);
-  // Collected: goods money only — kind payment|deposit (the drawer's Money rule).
-  const collected = ((paymentsRes.data ?? []) as { kind: string; amount: number }[])
-    .filter((p) => p.kind === "payment" || p.kind === "deposit")
-    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const sum = (rows: { qty: number; unit_price: number | null }[]) =>
+    rows.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
+  const money = {
+    lineSum: sum(lines),
+    addonSum: sum(
+      (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
+    ),
+    paid: (order as { paid?: number | string | null }).paid ?? 0,
+    controlBalance: controlRes.data?.balance ?? null,
+  };
   const reservedQtyByKey: Record<string, number> = {};
   for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
     const k = stockMatchKey(u.sku);
@@ -298,8 +298,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     lineReceived:
       (controlRes.data?.line_received as Record<string, number> | null) ?? null,
     reservedQtyByKey,
-    orderTotal,
-    collected,
+    money,
     deliverGroups,
   });
   // A scope naming a group this order does not have is a caller bug, not a

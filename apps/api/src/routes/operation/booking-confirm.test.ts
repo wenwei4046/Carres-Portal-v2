@@ -110,7 +110,13 @@ function post(jwt: string | null, body: unknown) {
 }
 
 /** Standard happy-path table set: one reserved mattress line, RM2500 fully
- *  collected. Overridable per test. */
+ *  collected. Overridable per test.
+ *
+ *  C5 (2026-07-27): "collected" is `orders.paid`, NOT an `order_payments` sum.
+ *  That table is deliberately NOT mocked here any more — `makeSb` throws on an
+ *  unmocked table, so if a future edit points the money gate back at the empty
+ *  ledger, every one of these tests fails loudly instead of quietly refusing a
+ *  paid customer's booking. */
 function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableMock>>>) {
   const confirmedRow = {
     order_id: ORDER_ID,
@@ -119,7 +125,10 @@ function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableM
     confirmed_time_slot: OK_BODY.confirmedTimeSlot,
   };
   return {
-    orders: tableMock({ data: { id: ORDER_ID, so: 1234 }, error: null }),
+    orders: tableMock({
+      data: { id: ORDER_ID, so: 1234, paid: 2500 },
+      error: null,
+    }),
     order_lines: tableMock({
       data: [{ sku: MATTRESS, qty: 1, unit_price: 2500 }],
       error: null,
@@ -130,10 +139,6 @@ function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableM
       { data: confirmedRow, error: null },
     ),
     ops_stock_items: tableMock({ data: [], error: null }),
-    order_payments: tableMock({
-      data: [{ kind: "payment", amount: 2500 }],
-      error: null,
-    }),
     ...overrides,
   };
 }
@@ -185,10 +190,11 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
   });
 
   it("422 when the balance is outstanding — reports the RM figure", async () => {
+    // RM 2,500 of lines, RM 1,000 paid ⇒ RM 1,500 still owed.
     const sb = makeSb(
       happyTables({
-        order_payments: tableMock({
-          data: [{ kind: "deposit", amount: 1000 }],
+        orders: tableMock({
+          data: { id: ORDER_ID, so: 1234, paid: 1000 },
           error: null,
         }),
       }),
@@ -216,6 +222,57 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       }),
     });
     const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+  });
+
+  // ── C5 · the money gate reads the number that exists ──────────────────────
+
+  it("SO-1209's shape: paid in full through orders.paid ⇒ the booking confirms", async () => {
+    // The live order that proved the bug (2026-07-27): RM 6,998 of lines +
+    // RM 250 of add-ons, `orders.paid` RM 7,248, `ops_order_control.balance`
+    // NULL, `order_payments` empty. The gate used to sum that empty ledger, so
+    // it refused this booking for RM 7,248 the customer had already paid.
+    const sb = makeSb(
+      happyTables({
+        orders: tableMock({
+          data: { id: ORDER_ID, so: 1209, paid: 7248 },
+          error: null,
+        }),
+        order_lines: tableMock({
+          data: [{ sku: MATTRESS, qty: 1, unit_price: 6998 }],
+          error: null,
+        }),
+        order_addons: tableMock({
+          data: [{ qty: 1, unit_price: 250 }],
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+  });
+
+  it("an imported row with no prices and no keyed balance is UNKNOWN, and unknown never blocks", async () => {
+    // SO-1221's shape: AutoCount, RM 1,300 paid, no line prices, balance NULL.
+    // Nobody has said what it is worth, so it cannot owe a figure — the gate
+    // must not invent one.
+    const sb = makeSb(
+      happyTables({
+        orders: tableMock({
+          data: { id: ORDER_ID, so: 1221, paid: 1300 },
+          error: null,
+        }),
+        order_lines: tableMock({
+          data: [{ sku: MATTRESS, qty: 1, unit_price: null }],
+          error: null,
+        }),
+      }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
