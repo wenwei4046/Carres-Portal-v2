@@ -7551,6 +7551,13 @@ export interface RentalConfigResponse {
 export type RentalAgreementListItem = RentalAgreement & {
   customerName: string | null;
   customerPhone: string | null;
+  /**
+   * Unresolved refused-card attempts (0295). `undefined` means the API could
+   * not answer — an older Worker, or the read failed — and the list says
+   * nothing rather than claiming a clean card. 0 means genuinely none.
+   */
+  openDeclines?: number;
+  lastDeclineAt?: string | null;
 };
 
 export function useRentalConfig(opts?: Partial<UseQueryOptions<RentalConfigResponse>>) {
@@ -7972,6 +7979,17 @@ export interface RentalCollectionRow {
   lateInterest: number | null;
   /** Derived server-side from the date, never stored — so it cannot go stale. */
   late: boolean;
+  /**
+   * The most recent refused card attempt on this month (0295), or null. Derived
+   * the same way `late` is, and only ever present on an UNPAID month — paying
+   * is what clears it, so there is no flag to forget.
+   *
+   * Optional so a browser on this build talking to a pre-0295 Worker degrades
+   * to "no decline shown" instead of crashing.
+   */
+  lastDecline?: { at: string; reason: string | null } | null;
+  /** How many times the card was refused for this month. */
+  declineCount?: number;
 }
 
 export interface RentalCollections {
@@ -7994,6 +8012,10 @@ export interface RentalCollections {
     lateCount: number;
     supplierShare: number;
     commissionShare: number;
+    /** Unpaid months currently sitting on a refused card (0295). */
+    declinedCount?: number;
+    /** Refusals we could not attach to any month — always worth a human look. */
+    unattachedDeclines?: number;
   };
   billings: RentalCollectionRow[];
   events: Array<Record<string, unknown>>;

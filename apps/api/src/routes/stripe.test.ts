@@ -91,6 +91,9 @@ function makeStripe(overrides: Record<string, unknown> = {}) {
   return {
     webhooks: { constructEventAsync: vi.fn() },
     paymentIntents: { retrieve: vi.fn().mockResolvedValue({ id: "pi_1", latest_charge: null }) },
+    // 0295 — the decline-reason lookup. Default: an invoice with no expanded
+    // payment, i.e. "we could not find out why", which must still record.
+    invoices: { retrieve: vi.fn().mockResolvedValue({ id: "in_1", payments: undefined }) },
     checkout: {
       sessions: {
         create: vi.fn().mockResolvedValue({ id: "cs_test_abc", url: "https://checkout.stripe.com/c/cs_test_abc" }),
@@ -422,5 +425,178 @@ describe("POST /stripe/webhook", () => {
     expect(res.status).toBe(200);
     expect(admin.calls.updates).toHaveLength(1);
     expect(admin.calls.updates[0]).toEqual({ status: "expired" });
+  });
+
+  // ── 0295: a bounced card stops being invisible ─────────────────────────────
+  describe("invoice.payment_failed", () => {
+    const AG = "aaaaaaaa-0000-0000-0000-000000000001";
+
+    /** A failed subscription invoice as Stripe delivers it (v22 shape). */
+    function failedInvoice(over: Record<string, unknown> = {}) {
+      return {
+        id: "in_failed_1",
+        number: "CARRES-0007",
+        amount_due: 6900,
+        amount_paid: 0,
+        created: 1_800_000_000,
+        parent: { subscription_details: { subscription: "sub_1" } },
+        ...over,
+      };
+    }
+    function declineEvent(over: Record<string, unknown> = {}) {
+      return {
+        id: "evt_fail_1",
+        type: "invoice.payment_failed",
+        data: { object: failedInvoice(over) },
+      };
+    }
+    function withAgreement(rpc?: { data: unknown; error: unknown }) {
+      return makeSb(
+        { rental_agreements: { maybeSingle: { data: { id: AG }, error: null } } },
+        rpc ?? { data: { already: false, seq: 3 }, error: null },
+      );
+    }
+
+    it("records the decline through the RPC, keyed on the EVENT id", async () => {
+      const admin = withAgreement();
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect(admin.calls.rpc[0].name).toBe("rental_record_payment_failure");
+      const args = admin.calls.rpc[0].args as Record<string, unknown>;
+      // The event id, NOT the invoice id: Smart Retries fire again on the same
+      // invoice and each attempt is a real, separate refusal.
+      expect(args.p_stripe_event_id).toBe("evt_fail_1");
+      expect(args.p_agreement_id).toBe(AG);
+      // amount_DUE — nothing was paid, and what we failed to collect is the
+      // figure finance cares about.
+      expect(args.p_amount).toBe(69);
+      expect(args.p_reference).toBe("CARRES-0007");
+    });
+
+    it("passes the bank's reason, read off the PaymentIntent", async () => {
+      const admin = withAgreement();
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe({
+        invoices: {
+          retrieve: vi.fn().mockResolvedValue({
+            id: "in_failed_1",
+            payments: {
+              data: [
+                {
+                  payment: {
+                    payment_intent: {
+                      id: "pi_9",
+                      last_payment_error: {
+                        code: "card_declined",
+                        decline_code: "insufficient_funds",
+                        message: "Your card has insufficient funds.",
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          }),
+        },
+      });
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      const args = admin.calls.rpc[0].args as Record<string, unknown>;
+      // The plain sentence beats the raw code: it is what finance reads before
+      // deciding between "send a new card" and "top up and we retry".
+      expect(args.p_reason).toBe("Your card has insufficient funds.");
+    });
+
+    it("still records when the reason lookup fails — sugar never blocks the fact", async () => {
+      const admin = withAgreement();
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe({
+        invoices: { retrieve: vi.fn().mockRejectedValue(new Error("stripe down")) },
+      });
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_reason).toBeNull();
+    });
+
+    it("sends null rather than 0 when Stripe reports no amount due", async () => {
+      const admin = withAgreement();
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent({ amount_due: 0 }));
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      await app.fetch(hook({}, "good"), env);
+      // RM0 would be a lie about a real charge attempt; null lets the RPC use
+      // the instalment's own amount.
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBeNull();
+    });
+
+    it("ignores an invoice that belongs to no subscription", async () => {
+      const admin = withAgreement();
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent({ parent: null }));
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      expect((await res.json()) as { ignored?: string }).toEqual({
+        received: true,
+        ignored: "not_a_subscription_invoice",
+      });
+      expect(admin.calls.rpc).toHaveLength(0);
+    });
+
+    it("acknowledges a subscription that is not ours, so Stripe stops retrying", async () => {
+      const admin = makeSb({ rental_agreements: { maybeSingle: { data: null, error: null } } });
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      expect((await res.json()) as { ignored?: string }).toEqual({
+        received: true,
+        ignored: "unknown_subscription",
+      });
+      expect(admin.calls.rpc).toHaveLength(0);
+    });
+
+    it("500s on a real recording failure so Stripe retries the delivery", async () => {
+      const admin = withAgreement({ data: null, error: { message: "db down", details: null } });
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(500);
+    });
+
+    it("reports a re-delivered event as already recorded, not as a new one", async () => {
+      const admin = withAgreement({ data: { already: true, seq: 3 }, error: null });
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue(declineEvent());
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+
+      const res = await app.fetch(hook({}, "good"), env);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ received: true, seq: 3, already: true });
+    });
   });
 });

@@ -1012,18 +1012,39 @@ type AgreementRowWithCustomer = DB.RentalAgreementRow & {
 rentalRouter.get("/agreements", async (c) => {
   internalOnly(c);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(RENTAL_AGREEMENTS)
-    .select("*, customers(name, phone)")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) throw new HTTPException(500, { message: error.message });
-  const agreements = ((data ?? []) as AgreementRowWithCustomer[]).map((r) => {
+  const [listR, troubleR] = await Promise.all([
+    sb.from(RENTAL_AGREEMENTS)
+      .select("*, customers(name, phone)")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    // 0295 — recording a decline that only shows inside one agreement's drawer
+    // is not "finance can see it": nobody opens a drawer they have no reason to
+    // suspect. The view answers the one grouped question the LIST asks, and it
+    // is security_invoker, so it reads through this caller's own RLS.
+    sb.from("rental_agreement_card_trouble").select("agreement_id, open_declines, last_decline_at"),
+  ]);
+  if (listR.error) throw new HTTPException(500, { message: listR.error.message });
+  // A missing trouble read must not blank the whole page — the agreements are
+  // the answer, the decline badge is the annotation. Degrade to "unknown"
+  // (undefined) rather than to a confident "no problem" (0).
+  const trouble = new Map<string, { openDeclines: number; lastDeclineAt: string | null }>();
+  if (!troubleR.error) {
+    for (const t of (troubleR.data ?? []) as Array<Record<string, unknown>>) {
+      trouble.set(String(t.agreement_id), {
+        openDeclines: Number(t.open_declines ?? 0),
+        lastDeclineAt: (t.last_decline_at as string | null) ?? null,
+      });
+    }
+  }
+  const agreements = ((listR.data ?? []) as AgreementRowWithCustomer[]).map((r) => {
     const { customers, ...row } = r;
+    const t = troubleR.error ? undefined : trouble.get(String(r.id)) ?? { openDeclines: 0, lastDeclineAt: null };
     return {
       ...Adapters.rentalAgreementFromRow(row as DB.RentalAgreementRow),
       customerName: customers?.name ?? null,
       customerPhone: customers?.phone ?? null,
+      openDeclines: t?.openDeclines,
+      lastDeclineAt: t?.lastDeclineAt,
     };
   });
   return c.json({ agreements });
@@ -1090,7 +1111,7 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
   if (!idCheck.success) throw new HTTPException(404, { message: "Agreement not found" });
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const [agR, billR, evR] = await Promise.all([
+  const [agR, billR, evR, failR] = await Promise.all([
     sb.from(RENTAL_AGREEMENTS)
       .select("id, agreement_no, sku, term_months, monthly_fee, start_date, status, supplier_rate_pct, commission_base_pct")
       .eq("id", idCheck.data)
@@ -1104,10 +1125,21 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
       .eq("agreement_id", idCheck.data)
       .order("occurred_at", { ascending: false })
       .limit(200),
+    // 0295 — declines get their OWN read rather than being mined out of the
+    // feed above. The feed is capped at 200 and a long agreement fills it with
+    // ordinary collections; a decline that fell off the end would silently
+    // become "no card problem", which is the exact silence this is fixing.
+    sb.from("rental_billing_events")
+      .select("id, seq, billing_id, amount, note, actor_text, occurred_at")
+      .eq("agreement_id", idCheck.data)
+      .eq("kind", "payment_failed")
+      .order("occurred_at", { ascending: false })
+      .limit(200),
   ]);
   if (agR.error) throw new HTTPException(500, { message: agR.error.message });
   if (billR.error) throw new HTTPException(500, { message: billR.error.message });
   if (evR.error) throw new HTTPException(500, { message: evR.error.message });
+  if (failR.error) throw new HTTPException(500, { message: failR.error.message });
   const ag = agR.data as Record<string, unknown> | null;
   if (!ag) throw new HTTPException(404, { message: "Agreement not found" });
 
@@ -1118,6 +1150,28 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
     .reduce((a, r) => a + num(r.paid_amount), 0);
   const contract = Math.round(num(ag.monthly_fee) * num(ag.term_months) * 100) / 100;
   const today = new Date().toISOString().slice(0, 10);
+
+  // 0295 — a decline attaches to an instalment, so the instalment can say so.
+  // Ordered newest-first by the query, so the FIRST hit per seq is the latest
+  // attempt; earlier attempts stay in the ledger and are counted, not shown.
+  const declines = (failR.data ?? []) as Array<Record<string, unknown>>;
+  const lastDeclineBySeq = new Map<number, { at: string; reason: string | null }>();
+  const declineCountBySeq = new Map<number, number>();
+  for (const d of declines) {
+    if (d.seq == null) continue;
+    const seq = num(d.seq);
+    declineCountBySeq.set(seq, (declineCountBySeq.get(seq) ?? 0) + 1);
+    if (!lastDeclineBySeq.has(seq)) {
+      lastDeclineBySeq.set(seq, {
+        at: String(d.occurred_at),
+        reason: (d.note as string | null) ?? null,
+      });
+    }
+  }
+  // A decline against no instalment at all (every month collected, a drifted
+  // schedule) is still a real refusal — surfaced as its own figure rather than
+  // hidden, because it is precisely the case nobody would think to look for.
+  const unattachedDeclines = declines.filter((d) => d.billing_id == null).length;
 
   return c.json({
     agreement: {
@@ -1143,6 +1197,13 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
       lateCount: rows.filter((r) => r.status !== "paid" && String(r.due_date) < today).length,
       supplierShare: Math.round(rows.reduce((a, r) => a + num(r.supplier_share), 0) * 100) / 100,
       commissionShare: Math.round(rows.reduce((a, r) => a + num(r.commission_share), 0) * 100) / 100,
+      // 0295 — how many months are sitting on a refused card RIGHT NOW. Paid
+      // months drop out by construction (their instalment is 'paid'), so this
+      // number goes down when the problem is solved and never needs clearing.
+      declinedCount: rows.filter(
+        (r) => r.status !== "paid" && lastDeclineBySeq.has(num(r.seq)),
+      ).length,
+      unattachedDeclines,
     },
     billings: rows.map((r) => ({
       id: r.id,
@@ -1159,6 +1220,12 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
       stripeInvoiceId: r.stripe_invoice_id ?? null,
       lateInterest: r.late_interest == null ? null : num(r.late_interest),
       late: r.status !== "paid" && String(r.due_date) < today,
+      // 0295. Derived, like `late` above and for the same reason: a stored
+      // "card failed" flag is one somebody forgets to clear the day the money
+      // finally arrives. Only unpaid months carry it — paying IS the clear.
+      lastDecline:
+        r.status === "paid" ? null : lastDeclineBySeq.get(num(r.seq)) ?? null,
+      declineCount: r.status === "paid" ? 0 : declineCountBySeq.get(num(r.seq)) ?? 0,
     })),
     events: (evR.data ?? []) as unknown[],
   });

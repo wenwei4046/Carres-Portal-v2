@@ -164,6 +164,57 @@ describe("OperationRental", () => {
     expect(within(unitRow).getByText("RA-1001")).toBeInTheDocument();
   });
 
+  // ── 0295: a bounced card has to be findable from the LIST ─────────────────
+  it("badges an agreement whose card was refused", () => {
+    agreementsState = {
+      data: { agreements: [{ ...AGREEMENTS[0], openDeclines: 1 }] },
+      isPending: false,
+      error: null,
+    };
+    unitsState = { data: { units: [] }, isPending: false, error: null };
+    render(<OperationRental />);
+    expect(screen.getByTestId("agreement-card-declined")).toHaveTextContent("Card declined");
+  });
+
+  it("counts repeat refusals so a third attempt does not look like a first", () => {
+    agreementsState = {
+      data: { agreements: [{ ...AGREEMENTS[0], openDeclines: 3 }] },
+      isPending: false,
+      error: null,
+    };
+    unitsState = { data: { units: [] }, isPending: false, error: null };
+    render(<OperationRental />);
+    expect(screen.getByTestId("agreement-card-declined")).toHaveTextContent("Card declined 3×");
+  });
+
+  it("says nothing when the card is fine, and nothing when the server could not answer", () => {
+    // 0 = genuinely no problem. undefined = an older Worker or a failed read;
+    // both must stay silent, because a reassuring badge we cannot back up is
+    // worse than no badge at all.
+    for (const openDeclines of [0, undefined]) {
+      agreementsState = {
+        data: { agreements: [{ ...AGREEMENTS[0], openDeclines }] },
+        isPending: false,
+        error: null,
+      };
+      unitsState = { data: { units: [] }, isPending: false, error: null };
+      const { unmount } = render(<OperationRental />);
+      expect(screen.queryByTestId("agreement-card-declined")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("never badges a non-active agreement — it has no schedule to fail against", () => {
+    agreementsState = {
+      data: { agreements: [{ ...AGREEMENTS[1], openDeclines: 2 }] },
+      isPending: false,
+      error: null,
+    };
+    unitsState = { data: { units: [] }, isPending: false, error: null };
+    render(<OperationRental />);
+    expect(screen.queryByTestId("agreement-card-declined")).toBeNull();
+  });
+
   it("never leaks raw underscore DB status words", () => {
     agreementsState = {
       data: { agreements: AGREEMENTS },

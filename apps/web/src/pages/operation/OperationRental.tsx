@@ -4,10 +4,11 @@
 // OperationReceiving's sectioned tables).
 import { useMemo, useState } from "react";
 import { useRentalAgreements, useRentalUnits } from "@/lib/queries";
+import type { RentalAgreementListItem } from "@/lib/queries";
 import RentalCollectionsPanel from "./RentalCollectionsPanel";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
-import type { RentalAgreement, RentalStockUnit } from "@carres/shared/domain";
+import type { RentalStockUnit } from "@carres/shared/domain";
 
 /**
  * OperationRental — the Rental + Service Plan base page (Loo 2026-07-25).
@@ -22,11 +23,13 @@ import type { RentalAgreement, RentalStockUnit } from "@carres/shared/domain";
  * through the display maps below (no underscores on screen).
  */
 
-/** GET /api/rental/agreements enriches each agreement with the customer join. */
-type AgreementListRow = RentalAgreement & {
-  customerName: string | null;
-  customerPhone: string | null;
-};
+/**
+ * GET /api/rental/agreements enriches each agreement with the customer join
+ * (and, since 0295, the refused-card count). The shape is declared once in
+ * queries.ts beside the hook that fetches it — this page used to keep its own
+ * copy, which is how it fell a field behind.
+ */
+type AgreementListRow = RentalAgreementListItem;
 
 /** DB agreement status → display word + v4 pill tone. Never leak raw words. */
 const AGREEMENT_STATUS: Record<string, { label: string; pill: string }> = {
@@ -212,19 +215,35 @@ export default function OperationRental() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`pill ${st.pill}`}>{st.label}</span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3">
                       {/* 0281 — the collection ledger. Only an ACTIVE contract
                           has a schedule to collect against; a pending or
                           rejected application has nothing to show. */}
                       {a.status === "active" ? (
-                        <button
-                          type="button"
-                          onClick={() => setCollectionsFor(a.id)}
-                          data-testid="open-collections"
-                          className="text-[12px] font-medium text-primary underline underline-offset-2"
-                        >
-                          Collections
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setCollectionsFor(a.id)}
+                            data-testid="open-collections"
+                            className="text-[12px] font-medium text-primary underline underline-offset-2"
+                          >
+                            Collections
+                          </button>
+                          {/* 0295 — the badge that makes a refused card findable
+                              without opening every drawer. `undefined` means the
+                              server could not answer; say nothing rather than
+                              print a reassuring zero. */}
+                          {(a.openDeclines ?? 0) > 0 ? (
+                            <div
+                              className="text-[12px] text-danger font-semibold mt-1 whitespace-nowrap"
+                              data-testid="agreement-card-declined"
+                            >
+                              {a.openDeclines === 1
+                                ? "Card declined"
+                                : `Card declined ${a.openDeclines}×`}
+                            </div>
+                          ) : null}
+                        </>
                       ) : (
                         <span className="text-base-300">—</span>
                       )}

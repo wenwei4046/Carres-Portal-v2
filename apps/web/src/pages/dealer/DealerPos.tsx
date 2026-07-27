@@ -1067,11 +1067,10 @@ export default function DealerPos({
           {/* The Rent-to-Own top-bar button is GONE (Loo 2026-07-26). It was a
               second, hidden entrance to the catalog — Loo could not find his own
               rental offer through it — which is the whole reason renting is now
-              a CATEGORY in the left rail like every other product family.
-              `RentToOwnPage` is left on disk with its tests but is no longer
-              mounted anywhere; it is superseded by the Rental rail + the
-              RentalConfigurePage and should be deleted once the new lane has
-              carried a live pilot signup. */}
+              a CATEGORY in the left rail like every other product family. The
+              old `RentToOwnPage` it opened was deleted on Loo's word
+              (2026-07-27); the Rental rail + RentalConfigurePage are the only
+              rental entrance. */}
           {/* Every role gets the in-POS Order Status board (PIN-gated) — the
               principal's board scopes to the dealer they're acting for (all
               dealers until one is picked). The portal Orders trace tab still
