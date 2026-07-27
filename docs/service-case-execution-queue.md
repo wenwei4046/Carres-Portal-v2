@@ -66,6 +66,44 @@ Checklists live as ONE shared constant (like T4's reasons) — NOT a config tabl
 **Done when:** submitting without required evidence is impossible; each file shows its
 uploader role in the case view.
 
+> **SHIPPED 2026-07-27 (PR __PR__, migration 0287 applied, Worker __WORKER__ + web
+> __BUNDLE__).** Notes for the cards that follow:
+> - The checklist is `packages/shared/src/service-case-evidence.ts` — a global slot
+>   registry (`CASE_EVIDENCE_SLOTS`: what a piece of evidence IS) plus
+>   `CASE_EVIDENCE_BY_ISSUE` (which slots, how many, required or not). Slot KEYS are
+>   what gets stored, so labels and instructions can be reworded without re-tagging a
+>   filed case. **S5 can count "cases with no close-up" off one column.**
+> - **The card's one unfollowable line, and what replaced it**: it lists a customer
+>   WhatsApp screenshot as required for Colour uneven, but that file cannot exist when
+>   the WAREHOUSE found the fault before dispatch — and a required item nobody can
+>   produce teaches staff to upload a junk photo to get past the gate. So a rule may
+>   name the `reporters` it applies to, and the customer-message slot is asked only when
+>   question 1 said "Customer". Every issue type still demands at least one file on
+>   every reporter (asserted, for all 7 × 5 combinations).
+> - **The carton photo is OPTIONAL everywhere it appears** (damaged, missing parts) for
+>   the same reason: a complaint raised weeks later has no box left.
+> - "Submit is disabled" is the courtesy; the **server refusal is the rule**. `POST /`
+>   recomputes `caseEvidenceGaps` from the same shared function the button asks and
+>   answers 422 `evidence_missing` naming what is short. S3/S4 must not assume the
+>   client gate is the only one.
+> - **The stamp is server-side and structurally non-optional**: `at`/`by`/`by_role` are
+>   written by the API only, `kind` is derived from the slot registry (never taken from
+>   the client), and 0287's `sc_evidence_wellformed` CHECK refuses an entry missing any
+>   of them. The DB also holds a FLOOR (`issue_type is not null` ⇒ at least one file)
+>   that is strictly weaker than the API checklist, so it can never refuse something the
+>   API allows.
+> - **The checklist itself is deliberately NOT mirrored in SQL.** Unlike 0285's flat key
+>   lists, it is a function of two answers plus per-slot counts — a SQL copy would be a
+>   differently-shaped rule that drifts, not a mirror.
+> - Files live in a new PRIVATE bucket `service-case-evidence`, 25 MB (the checklist asks
+>   for a 10–20s video), **no delete policy and no remove endpoint** — evidence is
+>   evidence; a wrong photo is answered by uploading the right one.
+> - The wizard is **6 steps** now; step 6 is the tick-list. Uploads are keyed to a
+>   client-minted `draftId` because the files must exist before the case does — see CF
+>   `case-evidence-abandoned-draft-orphans`.
+> - The case view (`CaseEvidenceGallery`) can ADD a file later (the customer sends the
+>   photo the next day) via `POST /:id/evidence`, under `case/{id}/`.
+
 ## S3 · The case drives the follow-ups
 
 **Goal:** on submit, the system creates the next steps instead of the staff remembering:
@@ -105,7 +143,7 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 | Card | Status | PR |
 |---|---|---|
 | S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
-| S2 | ⬜ | — |
+| S2 | ✅ | __PRLINK__ · migration **0287** |
 | S3 | ⬜ | — |
 | S4 | ⬜ | — |
 | S5 | ⬜ | — |

@@ -7,6 +7,9 @@ import {
   CASE_PRODUCT_CATEGORIES,
   CASE_USABLE_OPTIONS,
   CASE_WANTS,
+  caseEvidenceComplete,
+  caseEvidenceGapMessage,
+  caseEvidenceGaps,
   caseIntakeComplete,
   caseIssuesFor,
   caseNeedsManager,
@@ -23,6 +26,8 @@ import {
   type CaseWantKey,
   type ServiceCaseConfig,
 } from "@carres/shared";
+import CaseEvidenceChecklist from "./CaseEvidenceChecklist";
+import type { UploadedEvidence } from "@/lib/case-evidence-upload";
 
 /**
  * New Service Case — the guided intake (S1).
@@ -41,8 +46,9 @@ import {
  * existing reader keeps working without knowing the wizard exists.
  */
 
-type Step = 1 | 2 | 3 | 4 | 5;
-const LAST_STEP: Step = 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
+const LAST_STEP: Step = 6;
+const STEPS: Step[] = [1, 2, 3, 4, 5, 6];
 
 const STEP_TITLE: Record<Step, string> = {
   1: "Who found it?",
@@ -50,6 +56,9 @@ const STEP_TITLE: Record<Step, string> = {
   3: "What is wrong?",
   4: "Can the customer still use it?",
   5: "What does the customer want?",
+  // S2 — the last question is not a question. What is wrong (step 3) decides
+  // which photos this case cannot be filed without.
+  6: "Take the photos",
 };
 
 export default function ServiceCaseWizard({
@@ -79,6 +88,19 @@ export default function ServiceCaseWizard({
   const [noOrder, setNoOrder]               = useState(false);
 
   const [note, setNote] = useState("");
+
+  /**
+   * S2 — the case's evidence, uploaded BEFORE the case exists.
+   *
+   * "No evidence, no case" means the files cannot wait for a case row to hang
+   * on, so the wizard mints its own id and the uploads are keyed to it; the
+   * create call hands the paths over and the server checks they really came
+   * from this draft. Minted ONCE per wizard (useState initialiser, not a plain
+   * call) — a re-render that re-minted it would orphan everything uploaded so
+   * far and the server would refuse the create.
+   */
+  const [draftId] = useState(() => crypto.randomUUID());
+  const [evidence, setEvidence] = useState<UploadedEvidence[]>([]);
 
   const configQ = useQuery<ServiceCaseConfig>({
     queryKey: ["ops", "service-cases", "config"],
@@ -157,6 +179,10 @@ export default function ServiceCaseWizard({
         issueType:       issueType ?? undefined,
         usable:          usable ?? undefined,
         customerWants:   wants,
+
+        // S2 — the evidence. `at` / `by` are NOT sent: the server stamps them.
+        draftId,
+        evidence,
       };
       return apiFetch("/api/ops/service-cases", {
         method: "POST",
@@ -170,12 +196,20 @@ export default function ServiceCaseWizard({
   });
 
   // ── what lets each step advance ────────────────────────────────────────────
+  // S2 — the same `caseEvidenceGaps` the server refuses with, so the button and
+  // the refusal can never disagree about what "enough" means.
+  const evidenceGaps = caseEvidenceGaps(issueType, reportedBy, evidence);
+
   const canAdvance: Record<Step, boolean> = {
     1: !!reportedBy,
     2: (!!line || (noOrder && !!manualCategory)) && customerName.length > 0,
     3: !!issueType,
     4: !!usable,
-    5: caseIntakeComplete(answers) && customerName.length > 0,
+    5: wants.length > 0,
+    6:
+      caseIntakeComplete(answers) &&
+      customerName.length > 0 &&
+      caseEvidenceComplete(issueType, reportedBy, evidence),
   };
 
   function goNext() {
@@ -217,7 +251,7 @@ export default function ServiceCaseWizard({
           </div>
 
           <div className="mt-3 flex items-center gap-1.5">
-            {([1, 2, 3, 4, 5] as Step[]).map((s) => (
+            {STEPS.map((s) => (
               <span
                 key={s}
                 className={`h-1 flex-1 rounded-full ${
@@ -405,7 +439,7 @@ export default function ServiceCaseWizard({
             </div>
           )}
 
-          {/* ── 5 · what the customer wants + confirm ────────────────────── */}
+          {/* ── 5 · what the customer wants ──────────────────────────────── */}
           {step === 5 && (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -444,6 +478,23 @@ export default function ServiceCaseWizard({
                   className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-sm"
                 />
               </div>
+            </div>
+          )}
+
+          {/* ── 6 · the evidence + confirm ───────────────────────────────── */}
+          {step === 6 && (
+            <div className="space-y-4">
+              <p className="t-tiny text-base-500">
+                A case cannot be opened without these. Take them now, while you have the item.
+              </p>
+
+              <CaseEvidenceChecklist
+                issueType={issueType}
+                reportedBy={reportedBy}
+                target={{ draftId }}
+                files={evidence}
+                onUploaded={(f) => setEvidence((prev) => [...prev, f])}
+              />
 
               {/* What is about to be filed, in the words it will be filed in. */}
               <div className="rounded border border-base-200 bg-base-50 p-3">
@@ -460,6 +511,13 @@ export default function ServiceCaseWizard({
                   </p>
                 )}
               </div>
+
+              {/* Rule 6 — the disabled button says WHY, by name. */}
+              {evidenceGaps.length > 0 && (
+                <p className="t-tiny text-base-700">
+                  Still needed: {caseEvidenceGapMessage(evidenceGaps)}
+                </p>
+              )}
 
               {saveMut.isError && (
                 <p className="break-words text-xs text-error-700">
@@ -488,7 +546,7 @@ export default function ServiceCaseWizard({
             <button
               type="button"
               onClick={() => saveMut.mutate()}
-              disabled={!canAdvance[5] || saveMut.isPending}
+              disabled={!canAdvance[LAST_STEP] || saveMut.isPending}
               className="btn-hero py-1.5 text-[13px] disabled:opacity-40"
             >
               {saveMut.isPending ? "Saving…" : "Create Case"}

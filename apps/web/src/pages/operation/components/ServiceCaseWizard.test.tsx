@@ -11,10 +11,22 @@ import ServiceCaseWizard from "./ServiceCaseWizard";
  * These tests type NOTHING except the sales order number in the search box —
  * every other answer is a click. If a future change reintroduces a required
  * free-text field, the first test stops passing.
+ *
+ * S2 adds the other half: "submitting without required evidence is impossible."
+ * The photos are the last step, and Create Case stays disabled until the
+ * checklist for THAT issue type is satisfied.
  */
 
 const apiFetchMock = vi.fn();
 vi.mock("@/lib/api", () => ({ apiFetch: (...a: unknown[]) => apiFetchMock(...a) }));
+
+/** The real uploader shrinks images on a canvas and talks to Supabase Storage —
+ *  neither exists in jsdom. What matters here is the GATE, not the transport. */
+const uploadMock = vi.fn();
+vi.mock("@/lib/case-evidence-upload", () => ({
+  uploadCaseEvidence: (...a: unknown[]) => uploadMock(...a),
+  attachCaseEvidence: vi.fn(),
+}));
 
 const ORDER = {
   id: "ord-1",
@@ -42,6 +54,8 @@ function wrap(node: React.ReactNode) {
   return <QueryClientProvider client={qc}>{node}</QueryClientProvider>;
 }
 
+let uploadSeq = 0;
+
 beforeEach(() => {
   apiFetchMock.mockReset();
   apiFetchMock.mockImplementation((path: string) => {
@@ -51,6 +65,13 @@ beforeEach(() => {
     }
     return Promise.resolve({ id: "new-case", caseNo: "SC2607-02" });
   });
+
+  uploadSeq = 0;
+  uploadMock.mockReset();
+  uploadMock.mockImplementation(
+    (target: { draftId: string }, slot: string) =>
+      Promise.resolve({ slot, path: `draft/${target.draftId}/f${++uploadSeq}-${slot}.jpg` }),
+  );
 });
 
 /** fireEvent + a flush, rather than adding @testing-library/user-event as a new
@@ -64,8 +85,16 @@ async function typeInto(el: HTMLElement, value: string) {
   await waitFor(() => {});
 }
 
-/** Walk the wizard to the end. The ONLY typing is the SO number. */
-async function fileASofaCase() {
+/** Hand a file to the tick-list line labelled `label`. */
+async function upload(label: string, name = "photo.jpg", type = "image/jpeg") {
+  const input = screen.getByLabelText(label);
+  fireEvent.change(input, { target: { files: [new File(["x"], name, { type })] } });
+  await waitFor(() => {});
+}
+
+/** Answer the five questions for a sofa colour complaint. Ends on step 5 with
+ *  the wants picked; the ONLY typing is the SO number. */
+async function answerASofaCase() {
   await click(screen.getByRole("button", { name: "Customer" }));
 
   await typeInto(screen.getByPlaceholderText(/SO-1147/), "SO-1147");
@@ -77,6 +106,23 @@ async function fileASofaCase() {
   await click(await screen.findByRole("button", { name: "Colour uneven" }));
   await click(await screen.findByRole("button", { name: /^No/ }));
   await click(await screen.findByRole("button", { name: "Repair" }));
+}
+
+/** Everything `colour_uneven` reported by the customer demands. */
+async function uploadColourUnevenEvidence() {
+  await upload("Screenshot of the customer's message");
+  await upload("Photo of the whole item");
+  await upload("Close-up of the problem", "close-1.jpg");
+  await upload("Close-up of the problem", "close-2.jpg");
+  await upload("Photo of the label on the item");
+  await upload("Video of the whole item, 10 to 20 seconds", "pan.mp4", "video/mp4");
+}
+
+/** Walk the wizard all the way to a submittable case. */
+async function fileASofaCase() {
+  await answerASofaCase();
+  await click(screen.getByRole("button", { name: "Next" })); // → step 6, the photos
+  await uploadColourUnevenEvidence();
 }
 
 describe("ServiceCaseWizard — a new hire files a case without writing a sentence", () => {
@@ -161,7 +207,7 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     // have offered and that S5 could never explain.
     render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
 
-    await fileASofaCase();
+    await answerASofaCase();
     await click(screen.getByRole("button", { name: "Back" })); // → step 4
     await click(screen.getByRole("button", { name: "Back" })); // → step 3
     await click(screen.getByRole("button", { name: "Back" })); // → step 2
@@ -172,13 +218,13 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
-  it("cannot be submitted with a question left unanswered", async () => {
+  it("cannot move past a question left unanswered", async () => {
     render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
 
-    await fileASofaCase();
+    await answerASofaCase();
     // Un-pick the only thing the customer wanted.
     await click(screen.getByRole("button", { name: "Repair" }));
-    expect(screen.getByRole("button", { name: "Create Case" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
   it("still lets a case be filed when there is no sales order", async () => {
@@ -196,6 +242,14 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     await click(await screen.findByRole("button", { name: "Missing parts" }));
     await click(await screen.findByRole("button", { name: /^Temporarily/ }));
     await click(await screen.findByRole("button", { name: "Inspection" }));
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    // The warehouse found it, so no customer screenshot is demanded — but the
+    // photos of the item still are.
+    expect(screen.queryByLabelText("Screenshot of the customer's message")).toBeNull();
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem");
+
     await click(screen.getByRole("button", { name: "Create Case" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -206,5 +260,123 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     expect(body.productCategory).toBe("bedframe");
     expect(body.orderId).toBeUndefined();
     expect(body.customerName).toBe("Walk-in");
+  });
+});
+
+describe("ServiceCaseWizard — no evidence, no case (S2)", () => {
+  it("keeps Create Case disabled until every required photo is in", async () => {
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
+
+    await answerASofaCase();
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    const create = () => screen.getByRole("button", { name: "Create Case" });
+    expect(create()).toBeDisabled();
+
+    // The checklist names what is missing while it is missing (rule 6).
+    expect(screen.getByText(/Still needed:/)).toBeInTheDocument();
+
+    await upload("Screenshot of the customer's message");
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem", "close-1.jpg");
+    await upload("Photo of the label on the item");
+    await upload("Video of the whole item, 10 to 20 seconds", "pan.mp4", "video/mp4");
+
+    // Five of six: the SECOND close-up is still outstanding, so still refused.
+    expect(create()).toBeDisabled();
+    expect(screen.getByText(/Close-up of the problem \(1 of 2\)/)).toBeInTheDocument();
+
+    await upload("Close-up of the problem", "close-2.jpg");
+    expect(create()).toBeEnabled();
+    expect(screen.queryByText(/Still needed:/)).toBeNull();
+  });
+
+  it("sends the uploaded paths with the draft they were uploaded against", async () => {
+    const onSaved = vi.fn();
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={onSaved} />));
+
+    await fileASofaCase();
+    await click(screen.getByRole("button", { name: "Create Case" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+
+    const post = apiFetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    )!;
+    const body = JSON.parse((post[1] as RequestInit).body as string);
+
+    expect(body.draftId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body.evidence).toHaveLength(6);
+    // Every path sits under this draft's own prefix — the server refuses
+    // anything that does not.
+    for (const f of body.evidence) {
+      expect(f.path.startsWith(`draft/${body.draftId}/`)).toBe(true);
+    }
+    expect(body.evidence.filter((f: { slot: string }) => f.slot === "closeup_photo")).toHaveLength(2);
+    // The stamp is the server's business: the client sends slot + path only.
+    expect(Object.keys(body.evidence[0]).sort()).toEqual(["path", "slot"]);
+  });
+
+  it("asks for the SKU label on a mattress and the video only on a sofa", async () => {
+    // The checklist follows the ISSUE, and a mattress cannot report an uneven
+    // colour at all — so the video is not part of its worst case.
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
+
+    await click(screen.getByRole("button", { name: "Customer" }));
+    await typeInto(screen.getByPlaceholderText(/SO-1147/), "SO-1147");
+    await click(screen.getByRole("button", { name: /Find/ }));
+    await click(await screen.findByText("MS1401F-K"));
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    await click(await screen.findByRole("button", { name: "Wrong SKU" }));
+    await click(await screen.findByRole("button", { name: /^Yes/ }));
+    await click(await screen.findByRole("button", { name: "Replace" }));
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByLabelText("Photo of the label on the item")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Video of the whole item, 10 to 20 seconds")).toBeNull();
+
+    await upload("Photo of the label on the item");
+    await upload("Photo of the whole item");
+    await upload("Screenshot of the customer's message");
+    expect(screen.getByRole("button", { name: "Create Case" })).toBeEnabled();
+  });
+
+  it("does not demand the carton photo — a box thrown away weeks ago is not evidence", async () => {
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
+
+    await click(screen.getByRole("button", { name: "Customer" }));
+    await typeInto(screen.getByPlaceholderText(/SO-1147/), "SO-1147");
+    await click(screen.getByRole("button", { name: /Find/ }));
+    await click(await screen.findByText("SF2201 3 Seater"));
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    await click(await screen.findByRole("button", { name: "Damaged" }));
+    await click(await screen.findByRole("button", { name: /^No/ }));
+    await click(await screen.findByRole("button", { name: "Replace" }));
+    await click(screen.getByRole("button", { name: "Next" }));
+
+    // It is offered, and it says so...
+    expect(screen.getByLabelText("Photo of the box it came in")).toBeInTheDocument();
+    expect(screen.getByText("If you have it")).toBeInTheDocument();
+
+    // ...and the case files without it.
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem", "a.jpg");
+    await upload("Close-up of the problem", "b.jpg");
+    await upload("Photo of the label on the item");
+    await upload("Screenshot of the customer's message");
+    expect(screen.getByRole("button", { name: "Create Case" })).toBeEnabled();
+  });
+
+  it("shows the upload's own error instead of silently doing nothing", async () => {
+    uploadMock.mockRejectedValueOnce(new Error("That video is too big (48 MB)."));
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={() => {}} />));
+
+    await answerASofaCase();
+    await click(screen.getByRole("button", { name: "Next" }));
+    await upload("Video of the whole item, 10 to 20 seconds", "big.mp4", "video/mp4");
+
+    expect(await screen.findByText(/That video is too big/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Case" })).toBeDisabled();
   });
 });

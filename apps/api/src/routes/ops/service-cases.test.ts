@@ -25,7 +25,7 @@ import type { AppEnv } from "../../types";
  */
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
 const KID = "test-kid-1";
@@ -151,6 +151,21 @@ async function post(body: unknown, sb: unknown, role = "operation") {
   );
 }
 
+/** S2 — the wizard now uploads against a draft before the case exists. */
+const DRAFT_ID = "22222222-2222-2222-2222-222222222222";
+const draftPath = (slot: string) => `draft/${DRAFT_ID}/abc-${slot}.jpg`;
+
+/** Everything `colour_uneven` + reported-by-customer demands: the customer's
+ *  screenshot, an overall photo, TWO close-ups, the SKU label and the video. */
+const FULL_EVIDENCE = [
+  { slot: "customer_message", path: draftPath("customer_message") },
+  { slot: "overall_photo", path: draftPath("overall_photo") },
+  { slot: "closeup_photo", path: draftPath("closeup_photo") },
+  { slot: "closeup_photo", path: `draft/${DRAFT_ID}/def-closeup_photo.jpg` },
+  { slot: "sku_label_photo", path: draftPath("sku_label_photo") },
+  { slot: "pan_video", path: `draft/${DRAFT_ID}/ghi-pan_video.mp4` },
+];
+
 const WIZARD_BODY = {
   customerName: "Ryan Chong",
   whatHappened: "Colour uneven — Sofa · SF2201. Found by Customer. Still usable: No.",
@@ -161,6 +176,8 @@ const WIZARD_BODY = {
   issueType: "colour_uneven",
   usable: "no",
   customerWants: ["repair", "replace"],
+  draftId: DRAFT_ID,
+  evidence: FULL_EVIDENCE,
 };
 
 const CASE_ROW = {
@@ -339,6 +356,248 @@ describe("POST /api/ops/service-cases — the S1 guided intake", () => {
     const { sb } = buildInsertSb();
     const res = await post(WIZARD_BODY, sb, "dealer");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/ops/service-cases — the S2 evidence gate", () => {
+  it("refuses a case whose issue type demands evidence it does not have", async () => {
+    // The card's acceptance: "submitting without required evidence is
+    // impossible." A disabled button is not impossible — this is the rule.
+    const { sb, inserts } = buildInsertSb();
+    const res = await post({ ...WIZARD_BODY, draftId: undefined, evidence: [] }, sb);
+
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("evidence_missing");
+    // Rule 6 — the error names what is still needed.
+    expect(body.message).toContain("Video of the whole item");
+    expect(body.message).toContain("Photo of the label on the item");
+    // Nothing reached the database.
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("refuses a half-done count as loudly as a missing file", async () => {
+    // Colour uneven asks for TWO close-ups. One is not "nearly enough".
+    const { sb, inserts } = buildInsertSb();
+    const res = await post(
+      { ...WIZARD_BODY, evidence: FULL_EVIDENCE.filter((_, i) => i !== 3) },
+      sb,
+    );
+
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message: string; missing: { need: number; have: number }[] };
+    expect(body.message).toContain("(1 of 2)");
+    expect(body.missing).toContainEqual(
+      expect.objectContaining({ slot: "closeup_photo", need: 2, have: 1 }),
+    );
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("accepts the case once the checklist is satisfied", async () => {
+    const { sb, inserts } = buildInsertSb();
+    const res = await post(WIZARD_BODY, sb);
+
+    expect(res.status).toBe(201);
+    expect((inserts[0].evidence as unknown[]).length).toBe(6);
+  });
+
+  it("stamps who uploaded each file and when — the client cannot author it", async () => {
+    const { sb, inserts } = buildInsertSb();
+    // A client trying to forge a different uploader: the extra keys are not in
+    // the schema, so they are stripped, and the server's own stamp is what lands.
+    await post(
+      {
+        ...WIZARD_BODY,
+        evidence: FULL_EVIDENCE.map((f) => ({
+          ...f,
+          by: "somebody-else",
+          by_role: "principal",
+          at: "1999-01-01T00:00:00Z",
+        })),
+      },
+      sb,
+    );
+
+    const entries = inserts[0].evidence as Record<string, string>[];
+    for (const e of entries) {
+      expect(e.by).toBe("11111111-1111-1111-1111-000000000999"); // the JWT's subject
+      expect(e.by_role).toBe("operation");
+      expect(e.at).not.toBe("1999-01-01T00:00:00Z");
+      expect(Number.isNaN(Date.parse(e.at))).toBe(false);
+    }
+  });
+
+  it("derives the file kind from the slot rather than trusting the client", async () => {
+    // Declaring the video slot to be a photo would satisfy the count while
+    // proving nothing the video was asked for.
+    const { sb, inserts } = buildInsertSb();
+    await post(
+      { ...WIZARD_BODY, evidence: FULL_EVIDENCE.map((f) => ({ ...f, kind: "photo" })) },
+      sb,
+    );
+
+    const entries = inserts[0].evidence as Record<string, string>[];
+    expect(entries.find((e) => e.slot === "pan_video")?.kind).toBe("video");
+    expect(entries.find((e) => e.slot === "overall_photo")?.kind).toBe("photo");
+  });
+
+  it("refuses a file that belongs to somebody else's draft", async () => {
+    const { sb, inserts } = buildInsertSb();
+    const res = await post(
+      {
+        ...WIZARD_BODY,
+        evidence: [
+          ...FULL_EVIDENCE.slice(1),
+          { slot: "customer_message", path: "draft/99999999-9999-9999-9999-999999999999/x.jpg" },
+        ],
+      },
+      sb,
+    );
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("evidence_path_mismatch");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("refuses evidence sent with no draft to belong to", async () => {
+    const { sb } = buildInsertSb();
+    const res = await post({ ...WIZARD_BODY, draftId: undefined }, sb);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("missing_draft_id");
+  });
+
+  it("drops the customer's screenshot from the demand when the WAREHOUSE found it", async () => {
+    // A fault found before dispatch has no customer chat to screenshot. If the
+    // gate demanded one anyway it could only be passed dishonestly.
+    const { sb, inserts } = buildInsertSb();
+    const res = await post(
+      {
+        ...WIZARD_BODY,
+        reportedBy: "warehouse",
+        evidence: FULL_EVIDENCE.filter((f) => f.slot !== "customer_message"),
+      },
+      sb,
+    );
+
+    expect(res.status).toBe(201);
+    expect((inserts[0].evidence as unknown[]).length).toBe(5);
+  });
+
+  it("still accepts a prose-only case with no issue type and no evidence", async () => {
+    // The edit modal asks no issue question; S1 kept that path alive and S2 must
+    // not close it. The gate binds to the issue type, not to the endpoint.
+    const { sb, inserts } = buildInsertSb();
+    const res = await post({ customerName: "Walk-in", whatHappened: "typed by hand" }, sb);
+
+    expect(res.status).toBe(201);
+    expect(inserts[0].evidence).toEqual([]);
+  });
+
+  it("refuses an unknown evidence slot outright", async () => {
+    const { sb } = buildInsertSb();
+    const res = await post(
+      { ...WIZARD_BODY, evidence: [{ slot: "receipt", path: draftPath("receipt") }] },
+      sb,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/ops/service-cases/evidence/sign-upload", () => {
+  async function sign(body: unknown, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(buildInsertSb().sb as never);
+    return app.request(
+      "/api/ops/service-cases/evidence/sign-upload",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  it("refuses a photo where the checklist asked for a video", async () => {
+    const res = await sign({ draftId: DRAFT_ID, slot: "pan_video", mimeType: "image/jpeg" });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("wrong_file_kind");
+    expect(body.message).toContain("needs a video");
+  });
+
+  it("refuses a video where the checklist asked for a photo", async () => {
+    const res = await sign({ draftId: DRAFT_ID, slot: "sku_label_photo", mimeType: "video/mp4" });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("wrong_file_kind");
+  });
+
+  it("refuses a request that names both a draft and a case, or neither", async () => {
+    const both = await sign({
+      draftId: DRAFT_ID,
+      caseId: "33333333-3333-3333-3333-333333333333",
+      slot: "overall_photo",
+      mimeType: "image/jpeg",
+    });
+    expect(both.status).toBe(400);
+
+    const neither = await sign({ slot: "overall_photo", mimeType: "image/jpeg" });
+    expect(neither.status).toBe(400);
+  });
+
+  it("still refuses a dealer — evidence opens no new door", async () => {
+    const res = await sign(
+      { draftId: DRAFT_ID, slot: "overall_photo", mimeType: "image/jpeg" },
+      "dealer",
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("builds the object key itself — the client can neither pick nor overwrite a path", async () => {
+    const signed: string[] = [];
+    vi.mocked(adminClient).mockReturnValue({
+      storage: {
+        from: () => ({
+          createSignedUploadUrl: async (p: string) => {
+            signed.push(p);
+            return { data: { token: "tok", path: p }, error: null };
+          },
+        }),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const res = await sign({ draftId: DRAFT_ID, slot: "pan_video", mimeType: "video/mp4" });
+    expect(res.status).toBe(200);
+
+    // Under the draft's own prefix, named for the slot, with the extension the
+    // mime type implies — none of it taken from the request body.
+    expect(signed[0]).toMatch(new RegExp(`^draft/${DRAFT_ID}/[0-9a-f-]{36}-pan_video\\.mp4$`));
+    expect((await res.json()) as { path: string }).toMatchObject({ token: "tok" });
+  });
+});
+
+describe("POST /api/ops/service-cases/:id/evidence", () => {
+  it("refuses a file that does not sit under this case's own prefix", async () => {
+    // Including a DRAFT path: once a case exists, its files live under case/{id}/.
+    vi.mocked(userClient).mockReturnValue(buildInsertSb().sb as never);
+    const res = await app.request(
+      "/api/ops/service-cases/33333333-3333-3333-3333-333333333333/evidence",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt("operation")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ slot: "overall_photo", path: draftPath("overall_photo") }),
+      },
+      env,
+    );
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("evidence_path_mismatch");
   });
 });
 
