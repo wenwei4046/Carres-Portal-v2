@@ -2515,3 +2515,79 @@ PR **#434** merged as `dc20c864`. Deployed from the MAIN TIP, not the feature br
 api Worker **`f5066b58`** via `wrangler deploy --env production` — bindings receipt read: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + `api.carresofficial.com (custom domain)`. Unauthenticated **401** on both new routes through the custom domain. web **`index-DrTHyYvy.js`** to carres-portal (`09379a51`) + carres-pos (`719802c6`), both `--branch=main`. **All 4 canonicals converged on the first poll.**
 
 Live bundle downloaded to a file before grepping (a piped grep on 4 MB truncates and reports a false 0): **4,390,624 bytes**, `SERVICE_ROLE` **0**, and five markers from MOUNTED components present — `Where the ready stock went`, `Why taken?`, `Nothing has been taken from ready stock this month`, `keep at least`, `Warranty exchange`. Database re-checked after the deploy: **0 usage rows, 0 reserve levels, 87 free units, 0 write policies, exactly 1 `ops_stock_takeout`** — nothing seeded, nothing disturbed.
+
+## 2026-07-27 · HR Commission becomes one door, and attribution stops existing
+
+Three ships in one session, all on the HR rail. It ended two rail items shorter and
+one database constraint heavier.
+
+**① Commission Setup becomes a sub-tab** (PR #430 merge `9f0f33c4`, web
+`index-Q8NddHf3.js` + Worker `7ac6ca26` — DEPLOYED, no migration).
+The HR rail carried `Commission`, `Commission Setup` and `Attribution` for one subject.
+Setup folded into Commission as a sub-tab bar (`HrCommissionTabs`: Earnings · Setup) —
+the same merge Stock (K0) and Purchasing made. Both `?tab=` values are unchanged, so
+every deep link still lands; `activeFor` keeps the rail item lit across both. Header
+follows the COPY-STANDARD module-tab law (the bar says "Setup", the page stops repeating
+it) and no month is stamped on the Setup tab, because a rate takes effect from today.
+
+**The API had to ship with it, and nearly did not.** The readiness `detail` strings are
+computed SERVER-side in `hr-runs.ts`; grepping the web bundle for `commissionReadiness`
+returns **0**. A web-only deploy would have left the live Close-month pre-flight telling
+the operator to "assign them in the Attribution tab" — a tab that had just been deleted.
+
+**② Attribution deleted whole** (PR #435 merge `2fe10f17`, web `index-CLIOk_2y.js` +
+Worker `9c4de3ce` — DEPLOYED).
+Loo: *"all order will be compulsory have sales man, cause is all from pos system order;
+those no sales man is testimony import from our previous system, which will delete later
+on."* Measured before touching anything: **19 native orders, 0 without a salesperson; 37
+autocount archive rows, all 37 without** — and of the four functions that INSERT INTO
+orders, three stamp `salesperson_id` in the INSERT itself; only `_import_autocount_order`
+does not. The premise held, so the worklist, the banner, the Overview todo, the client
+hook, the zod input, `POST /api/hr/assign` and the **blocking** `attribution` readiness
+check all went. A blocking gate whose remedy screen has been deleted is worse than no
+gate: it refuses a close that nothing on screen can clear.
+
+Two things were kept, each with a reason on the line above it: the `unattributed_orders`
+domain-error mapping (SQL still raised it at that point) and the Overview archive
+footnote, reworded — it is the only line reconciling HR against the orders list (55 on
+file, 19 counted) and it self-retires when those rows are deleted.
+
+**③ The rule moves into the database** (migration **0296 applied**).
+`orders.salesperson_id` was nullable with no guard: `create_order` and `order_create`
+write whatever they are handed, and `create_rental_agreement`'s parameter literally
+`DEFAULT`s to NULL. So the rule was true in practice and unenforced. 0296 drops
+`hr_assign_salesperson`, removes the now-unclearable gate from `commission_close_month`,
+and adds `orders_salesperson_required`.
+
+**The dry run caught a real defect in my own constraint.** The first form was
+`salesperson_id is not null or source_system = 'autocount'`. With both columns NULL that
+evaluates to `false OR NULL` = **NULL**, and **a CHECK accepts NULL** — the constraint
+would have guarded nothing while looking correct. `coalesce(source_system,'')` fixes it,
+and assertion A failed loudly before anything was applied.
+
+**A second trap, found by reading the rental function rather than assuming.** The
+exemption could not be `source_system IS NOT NULL`, because `create_rental_agreement`
+writes `source_system = 'rental'` — the loose form would have exempted exactly the path
+whose parameter defaults to NULL. The exemption is the literal `'autocount'`, so a future
+importer has to be added deliberately. Assertion D pins it.
+
+**A third thing the migration's own sanity block caught: itself.** The first apply
+asserted `position('unattributed_orders' in v_src) > 0` and matched the new function's
+own COMMENT about the removed gate, aborting a migration that was otherwise correct.
+Verified the abort was total (RPC still present, constraint absent, tail unmoved) before
+re-applying against the RAISE form.
+
+Because the constraint can now refuse a write the client is still allowed to make
+(`salespersonId` is optional in zod for dormant stores and internal callers), both live
+paths map `23514 / orders_salesperson_required` to a plain 422 — "Pick who sold this
+order before saving it." A store must never meet a raw Postgres constraint string.
+
+Checked and found harmless: the only store with zero active staff is **"AutoCount Archive
+(旧账)"**, the synthetic holder for the imported rows, with 0 native orders. Both real
+stores have staff.
+
+Post-apply reconciliation (not eyeballed): `hr_assign_salesperson` **0 copies** ·
+`orders_salesperson_required` present, `convalidated` true, definition is the coalesce
+form · `commission_close_month` exactly **1** copy, `md5(prosrc)`
+`fb86b781e05476d3b570df94f66390f3`, length 4228 · **0** rows violate the constraint ·
+tracker tail `0296_attribution_becomes_a_constraint`.

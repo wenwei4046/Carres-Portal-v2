@@ -889,6 +889,23 @@ ordersRouter.post("/", async (c) => {
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
       throw new HTTPException(403, { message: "Forbidden" });
     }
+    // 23514 = 0296's `orders_salesperson_required`. Every order the portal
+    // writes must name who sold it; the client can still omit the field (it is
+    // optional for dormant stores and internal callers), so without this the
+    // counter would meet a raw Postgres constraint string.
+    if (
+      error.code === "23514" &&
+      /orders_salesperson_required/.test(error.message ?? "")
+    ) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "salesperson_required",
+          message: "Pick who sold this order before saving it.",
+        },
+        422,
+      );
+    }
     if (error.code === "22023") {
       // Loo 2026-05-11 (migration 0089) — surface the new category mutex
       // detail to the client as a typed code so the UI can toast a friendly
