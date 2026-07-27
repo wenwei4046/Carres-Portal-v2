@@ -152,7 +152,7 @@ const COMMISSION_SOURCE = {
 const HAPPY = {
   kpi_source: { data: KPI_SOURCE },
   hr_commission_source: { data: COMMISSION_SOURCE },
-  commission_run_state: { data: { run: null, unattributed: 0, pendingAdjustments: 0, locked: false } },
+  commission_run_state: { data: { run: null, pendingAdjustments: 0, locked: false } },
 };
 
 describe("GET /api/hr/kpi", () => {
@@ -237,7 +237,7 @@ describe("GET /api/hr/kpi", () => {
     mockRpc({
       ...HAPPY,
       commission_run_state: {
-        data: { run: { status: "approved" }, unattributed: 0, pendingAdjustments: 0, locked: true },
+        data: { run: { status: "approved" }, pendingAdjustments: 0, locked: true },
       },
     });
     const body = (await (await authed("/api/hr/kpi?year=2026&month=7", "hr")).json()) as {

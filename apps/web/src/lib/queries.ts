@@ -7662,21 +7662,9 @@ export function useDecideRentalAgreement() {
 // 0244/0245 — HR commission portal (2026-07-25). One report read + eight writes
 // (0250 adds the BD-rate + dealer-portfolio pair).
 // All writes invalidate the whole ["hr"] sub-tree: every month report embeds
-// the live config + unattributed worklist, so any config/assign change must
-// re-derive whichever month is on screen.
+// the live config, so any config change must re-derive whichever month is on
+// screen.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** One unattributed order row of the month (GET /api/hr/report). */
-export interface HrUnattributedOrder {
-  orderId: string;
-  so: number;
-  placedAt: string;
-  dealerId: string;
-  outletId: string | null;
-  storeName: string | null;
-  customerName: string | null;
-  amount: number;
-}
 
 export interface HrModelOption {
   id: string;
@@ -7693,11 +7681,10 @@ export interface HrReportResponse {
   bdReport: BdCommissionReport;
   /** 0251 — the ONE global BD calculation method (absent config = percentage). */
   bdMethod: CommissionMethod;
-  unattributed: HrUnattributedOrder[];
-  /** 0265 — imported archive orders excluded from `unattributed`. An archive
-   *  row was never sold by anyone here, so no salesperson is the right
-   *  answer; counting them would make the worklist permanently non-zero.
-   *  Shown as a footnote so the exclusion is visible, not silent. */
+  /** 0265 — how many imported archive orders the month EXCLUDES. The rows
+   *  themselves predate the portal and carry no salesperson, so they are left
+   *  out of every figure on the page; this is the count that says so out loud,
+   *  and it is the only surviving reader of that idea. */
   /** OPTIONAL on purpose: web and api deploy separately, so a browser can be
    *  running this build against a Worker that predates 0265. Typed optional
    *  forces every reader to say what it does in that window instead of

@@ -141,7 +141,7 @@ describe("GET /api/hr/report", () => {
         }>;
         totalCommission: number;
       };
-      unattributed: unknown[];
+      unattributed?: unknown[];
       models: unknown[];
     };
     const kaan = body.report.perStaff.find((r) => r.staff.id === SP_KAAN)!;
@@ -150,7 +150,10 @@ describe("GET /api/hr/report", () => {
     expect(kaan.directCommission).toBe(100);
     expect(mayson.overrideCommission).toBe(20); // 1% of 2000
     expect(body.report.totalCommission).toBe(120);
-    expect(body.unattributed).toHaveLength(1);
+    // 0297: the report stops forwarding the unattributed list. The RPC blob
+    // above still contains one, so this asserts the ROUTE drops it rather than
+    // the fixture simply not having any.
+    expect(body.unattributed).toBeUndefined();
     expect(body.models).toHaveLength(1);
   });
 

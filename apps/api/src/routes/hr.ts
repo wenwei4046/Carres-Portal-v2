@@ -57,7 +57,6 @@ hrRouter.get("/report", requireHr, async (c) => {
     report,
     bdReport,
     bdMethod: source.bdMethod ?? "percentage",
-    unattributed: source.unattributed,
     // Pre-0265 Worker/DB → key absent → 0, i.e. "nothing was excluded".
     legacyUnattributed: source.legacyUnattributed ?? 0,
     monthSold,

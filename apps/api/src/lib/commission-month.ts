@@ -32,7 +32,6 @@ export interface HrSource {
   staff: CommissionStaff[];
   models: { id: string; name: string; category: string }[];
   lines: CommissionLine[];
-  unattributed: unknown[];
   legacyUnattributed?: number;
   bdUsers?: BdUser[];
   bdMethod?: CommissionMethod;

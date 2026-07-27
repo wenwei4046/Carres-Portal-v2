@@ -236,7 +236,9 @@ export function computeCommission(
   for (const s of staff) accFor(s);
 
   for (const line of lines) {
-    if (!line.salespersonId) continue; // unattributed — surfaced separately
+    // No salesperson = pays nobody. Since 0296 the database refuses to write
+    // such a line for a native order, so this is a floor, not a live case.
+    if (!line.salespersonId) continue;
     const seller = staffById.get(line.salespersonId);
     if (!seller) continue; // attributed to a non-showroom / unknown staff
     const a = accFor(seller);
