@@ -115,14 +115,14 @@ bearing for K3-K5:
   that closes proposals, so the two can never disagree. `rejected` is terminal.
 - **Nothing seeded** — no cycle exists until someone opens a month.
 
-## K3 · Emergency request lane ✅ (PR #421)
+## K3 · Emergency request lane ✅ (PR #424)
 
 **Goal:** same flow, any time, flagged `EMERGENCY` with reason
 (`Promotion · Unexpected demand · Weekend stock low · OOS risk · New launch · Other`);
 skips consolidation (straight to COO), never mixes into the monthly plan's numbers.
 **Done when:** a viral-product weekend can be restocked without waiting for month-end.
 
-**Shipped 2026-07-27** (PR #421, migration **0290**). The urgent lane is a section on the
+**Shipped 2026-07-27** (PR #424, migration **0290**). The urgent lane is a section on the
 same Ready stock tab, below the monthly plan — one place to ask, two speeds. Notes K4-K5
 need:
 
@@ -190,6 +190,6 @@ SKU rows.
 | K0 | ✅ shipped 2026-07-27 | #376 |
 | K1 | ✅ shipped 2026-07-27 | #400 |
 | K2 | ✅ shipped 2026-07-27 | #409 |
-| K3 | ✅ shipped 2026-07-27 | #421 |
+| K3 | ✅ shipped 2026-07-27 | #424 |
 | K4 | ⬜ | — |
 | K5 | ⬜ | — |
