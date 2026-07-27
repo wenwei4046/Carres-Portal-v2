@@ -172,6 +172,48 @@ haven't built it yet). At day 10 unresolved → `⚠ SLA at risk` on the list + 
 Special-order parts may extend once — extension recorded with reason.
 **Done when:** no case silently passes day 14.
 
+> **SHIPPED 2026-07-27 (PR #449, migration 0298 applied, Worker `ce4f4c9e` + web
+> `index-Ds-5K6Ke.js`).** Notes for the card that follows:
+> - **The deadline is DERIVED, not stored** — the S3 law applied to the clock.
+>   `opened_at + 14 working days`, computed by
+>   `packages/shared/src/service-case-sla.ts` on every read, off the working-day
+>   engine procurement and delivery T7 already share. There is no `due_at`
+>   column to disagree with the rule, and correcting the holiday calendar fixes
+>   every case at once. **S5 can therefore recompute any month's deadlines
+>   without trusting a stored number.**
+> - **The card's own `⚠ SLA at risk` is the one line NOT built as written.**
+>   `COPY-STANDARD.md` bans `At Risk` outright and lists `SLA` as a do-not-use,
+>   and the four laws outrank a card. The behaviour is exactly what the card
+>   asked for; the words are the laws': the FACT is the date plus
+>   `4 working days left` / `2 working days late`, and the ACTION is
+>   **`Call {customer} — say why it is taking longer`**. A test asserts every
+>   visible string against the banned list.
+> - **Every event carries the deadline it was made against** (`due`, and an
+>   extension's `until`). "The customer has been told" is only ever true about
+>   ONE deadline — without that field, moving the deadline would mark the new
+>   one as already explained, and the case the extension was created for would
+>   be the only case that never gets the second call.
+> - The reasons are ONE shared constant (`CASE_DELAY_REASONS`, seven, T4's
+>   shape) each carrying a hidden `responsibility` (supplier | carres |
+>   customer). Nothing shows it — **it is there so S5 can answer "which
+>   supplier causes the most late cases" without a second tagging pass.**
+> - **`caseSlaRecordProblem` is ONE function with two consumers** — the
+>   disabled button and the Hono route — so the screen can never be more
+>   permissive than the rule, or more strict.
+> - The extension's LENGTH is a decision the card did not make: it is bounded
+>   at one more full period (14 working days) measured against the BASE
+>   deadline, so it cannot be walked forward, and a date landing on a Sunday or
+>   a holiday moves to the next working day before the bound is checked.
+>   **The reason list is not narrowed to special-order parts**: the card names
+>   that case and it is the first option, but refusing every other true reason
+>   would only get the deadline moved under a false one.
+> - **Nothing sends anything.** S1 ruled "notify manager" a visible flag
+>   because no message channel exists in the API; the same holds here — the
+>   deadline turns the row by itself, on read. There is no cron and no message.
+> - Live state at ship: **1 case, closed, opened 2026-06-16** — so no case on
+>   file has a running clock and the column is the empty state until the next
+>   case is filed.
+
 ## S5 · Monthly numbers that answer WHY
 
 **Goal:** the counts Jess keeps by hand (per category per month), now derived — plus the
@@ -192,5 +234,5 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 | S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
 | S2 | ✅ | [#410](https://github.com/wenwei4046/Carres-Portal-v2/pull/410) · migration **0289** |
 | S3 | ✅ | [#431](https://github.com/wenwei4046/Carres-Portal-v2/pull/431) · migration **0293** |
-| S4 | ⬜ | — |
+| S4 | ✅ | [#449](https://github.com/wenwei4046/Carres-Portal-v2/pull/449) · migration **0298** |
 | S5 | ⬜ | — |
