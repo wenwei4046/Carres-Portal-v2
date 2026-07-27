@@ -60,8 +60,13 @@ import {
   deliveryDateGapFact,
   orderActionLine,
   orderActionQueue,
+  orderActionsInDisplayOrder,
+  displayOrderAction,
+  openOrderActions,
   orderMoney,
   type OrderActionKey,
+  type OrderActionSignals,
+  type OrderOpenAction,
   type OrderMoney,
   type DeliveryQueueKey,
   type OpsTask,
@@ -743,24 +748,84 @@ export function moneyOf(o: operationOrderListRow): OrderMoney {
   });
 }
 
-/** NEXT — one action per order, DUAL-TRACK (Jess spec §5, 2026-07-12): a stock
- *  track ∥ a delivery track, surfaced as the one most-urgent action —
- *    Send PO → Agree new delivery date → Confirm ready date
- *    → Assign logistics → Confirm delivery date → Confirm delivery.
- *  T3 Delay Radar (2026-07-26): the customer call fires when the latest
- *  waiting-line stock ETA overshoots the customer's delivery date.
+/** NEXT — TWO LAYERS since C2 (Jess 2026-07-27, `docs/ACTION-FLOW-STANDARD.md`
+ *  Law 1). This file no longer decides what an order's next step IS: it reads
+ *  the row's signals, hands them to the shared engine (`order-actions`), and
+ *  renders the answer.
+ *
+ *    LAYER 1 · `openOrderActions` — every track evaluated independently, so a
+ *              goods action can no longer swallow the delivery and money work.
+ *    LAYER 2 · `displayOrderAction` — which ONE the row shows.
+ *
+ *  `nextActionOf` keeps its exact signature and its exact answers: it is now
+ *  Layer 2 over Layer 1, and its whole test suite (the ladder's locked rulings —
+ *  Loo's freeze gate, the T3 delay radar, the T7 date split, C5's money hold)
+ *  is the parity oracle proving the split changed no row's headline.
+ *
  *  WORD LAW (Jess 2026-07-19 C-vocab, re-ruled 2026-07-27): "Assign" = WE pick
  *  the logistics company; "Confirmed" = the CUSTOMER fixed a date + slot (a
  *  STATE, never our verb). "Chase" is banned — every former Chase label is a
  *  `Call {party} — {measurable outcome}` (COPY-STANDARD).
- *  Stock leads while it isn't secured (you don't arrange delivery of goods that
- *  don't exist yet); once Ready the delivery track takes over. Confirm delivery
- *  is the close, and it stays 🔒 LOCKED while a money-hold (unpaid balance /
- *  storage) is outstanding. Operation never calls the customer about a delay
- *  from here — logistics carries that call.
  *
  *  `label` is the action's QUEUE word (party-free). The pill the operator reads
  *  is `orderActionLine(key, …)` — the same action with the real name in it. */
+
+/** The row's signals, in the engine's vocabulary. ONE mapping, so Layer 1 and
+ *  the drawer's list can never read the same order two different ways.
+ *
+ *  `goodsReady` honours BOTH signals (Jess 2026-07-19 #5 fix): the live
+ *  free-stock check AND the Master import's per-line `line_stock_status`.
+ *  AutoCount SKUs miss the catalog, so the live check alone is always
+ *  "awaiting" and a Master-ready order would never leave the goods track. */
+export function orderActionSignalsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): OrderActionSignals {
+  const se = stockEtaOf(o);
+  // The stock-arrival window: MS/BF = deadline−7d, sofa = −5d. Still a flat
+  // per-category number — the supplier master holds production time as free
+  // text, so nothing can compute a real one yet (ORDERS-WORKING-FLOW §3).
+  const hasMsbf = lines.some((l) => {
+    const c = lineCategory(l.sku);
+    return c === "mattress" || c === "bedframe";
+  });
+  const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+  return {
+    completed: controlTabOf(o) === "completed",
+    goodsReady:
+      stock.state === "ready" ||
+      stock.state === "in_stock" ||
+      se.state === "ready",
+    goodsUnordered: stock.state === "unknown",
+    stockEtaIso: se.etaIso,
+    promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
+    daysToDue: daysToDue(o),
+    stockWindowDays: hasMsbf ? 7 : hasSofa ? 5 : 7,
+    hasLogistics: !!(o.delivery_partners?.name || o.ops_assigned_logistic),
+    bookingConfirmed: bookingConfirmedOf(o),
+    confirmedDateIso: ovlOf(o)?.confirmed_date ?? null,
+    todayIso: todayIso(),
+    // T7's three-way answer: [] is "no photo yet", absent is UNKNOWN — an older
+    // Worker that doesn't select the column must not flood every delivered row
+    // with a demand we cannot substantiate.
+    photoOnFile: Array.isArray(ovlOf(o)?.delivery_photos)
+      ? (ovlOf(o)!.delivery_photos as unknown[]).length > 0
+      : null,
+    moneyOwing: moneyOf(o).owing,
+  };
+}
+
+/** LAYER 1 for this row — every open action, in display order. The drawer's
+ *  dynamic checklist and the row's headline read this same list. */
+export function openActionsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): OrderOpenAction[] {
+  return orderActionsInDisplayOrder(orderActionSignalsOf(o, stock, lines));
+}
+
 /** One action, one word — the label is never typed here. */
 function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
   return locked
@@ -768,119 +833,19 @@ function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
     : { key, label: orderActionQueue(key), tone };
 }
 
+/** LAYER 2 for this row. Nothing open → `Done`, the terminal FACT: the engine
+ *  refuses to invent it (an empty list is the honest answer), and this is the
+ *  one surface that has to print something. */
 export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
 ): NextAction {
-  if (controlTabOf(o) === "completed") {
-    // T7 (Jess 2026-07-27): a delivered order whose delivery photo is still
-    // missing has ONE real action left, so it is not "Done" yet — this is the
-    // only action a closed order ever shows. WARNING tone, never danger:
-    // guardrail #2 says a delivered order must not alarm red.
-    // `undefined` = the answer is UNKNOWN (an older Worker that doesn't select
-    // the column, or no overlay row at all) → stay Done rather than flood every
-    // delivered row with a demand we can't substantiate. An explicit [] is the
-    // real "no photo yet".
-    const photos = ovlOf(o)?.delivery_photos;
-    if (Array.isArray(photos) && photos.length === 0)
-      return act("upload_delivery_photo", "warning");
-    return act("done", "neutral");
-  }
-
-  // PAST-DEADLINE ESCALATION (Loo locked, freeze gate 2026-07-12): once the
-  // promise date has passed with logistics assigned but no delivery booked, the
-  // responsibility shifts from their "call now" to OPS's own call — this
-  // OVERRIDES the stock track. Scoped to has-logistics (you cannot call a
-  // company that isn't assigned yet) AND to stock NOT "unknown": a No-PO
-  // order's real unblock is RUNG 1 `Send PO`, which the escalation must never
-  // leapfrog (calling logistics about un-ordered goods is an empty action).
-  const dd = daysToDue(o);
-  const hasPartner = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
-  // T1 (0277): "no delivery booked" = the customer hasn't confirmed — a
-  // provisional logistics date past the deadline still escalates.
-  if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !bookingConfirmedOf(o))
-    return act("confirm_delivery_date", "danger");
-
-  // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
-  // Master import's per-line `line_stock_status='ready'` (stockEtaOf), but
-  // nextActionOf used to trust ONLY stockReadiness (order_lines vs live
-  // stock_balances) — which is always "awaiting" for AutoCount SKUs that don't
-  // match the catalog → the row stayed on `Confirm ready date` even when the
-  // STOCK column showed "Ready". Honour BOTH signals so a Master-ready order
-  // flows to the delivery track, matching what the row shows.
-  const ready =
-    stock.state === "ready" ||
-    stock.state === "in_stock" ||
-    stockEtaOf(o).state === "ready";
-
-  // STOCK TRACK — leads until the goods are secured.
-  if (!ready) {
-    if (stock.state === "unknown") return act("send_po", "danger");
-    // T3 DELAY RADAR (Jess's Golden Rule, 2026-07-26): risk is not "is stock
-    // here today" — it is "can the LATEST stock ETA still honour the customer's
-    // date". Once the max waiting-line ETA OVERSHOOTS the promised date the
-    // miss is already certain, so calling the supplier can no longer save the
-    // date — the action flips to agreeing a new date with the CUSTOMER now, not
-    // to showing overdue after the window. Completed orders never reach here
-    // (guardrail #2, the Done return above); No-PO stays RUNG 1 (the real
-    // unblock is ordering the goods); the past-deadline delivery escalation
-    // above stays locked (Loo, freeze gate 2026-07-12).
-    const se = stockEtaOf(o);
-    if (
-      se.etaIso &&
-      !o.delivery_date_tbd &&
-      o.delivery_date &&
-      se.etaIso > o.delivery_date
-    )
-      return act("agree_new_delivery_date", "danger");
-    // `Confirm ready date` turns red once we're inside the stock-arrival window
-    // and it still hasn't landed (MS/BF = deadline−7d, Sofa = −5d), else amber.
-    const hasMsbf = lines.some((l) => {
-      const c = lineCategory(l.sku);
-      return c === "mattress" || c === "bedframe";
-    });
-    const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
-    const lead = hasMsbf ? 7 : hasSofa ? 5 : 7;
-    const overdue = dd !== null && dd < lead;
-    return act("confirm_ready_date", overdue ? "danger" : "warning");
-  }
-
-  // DELIVERY TRACK — stock is in; arrange the delivery. T1 (0277): the call ends
-  // only on the CUSTOMER's confirmation — a provisional logistics date
-  // (logistic_eta alone) keeps the row in the Confirm-delivery-date queue,
-  // matching the drawer's "not confirmed" chip.
-  if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
-    return act("assign_logistics", "info");
-  if (!bookingConfirmedOf(o)) return act("confirm_delivery_date", "info");
-
-  // Both tracks done → confirm the delivery with the customer. A money-hold
-  // keeps it 🔒 (never a separate action). C5 (2026-07-27): the hold reads the
-  // shared `orderMoney` — goods money from `orders.paid` against the priced
-  // lines, plus any storage still owed. It used to read
-  // `ops_order_control.balance`, NULL on every live row, so this 🔒 had never
-  // fired for a single order while 18 of them owed RM 56,859. An order nobody
-  // has priced stays UNKNOWN and is never held.
-  const ovl = ovlOf(o);
-  if (moneyOf(o).owing) return act("confirm_delivery", "warning", true);
-
-  // T7 (Jess 2026-07-27): the CUSTOMER's confirmed date is itself a deadline, so
-  // a confirmed booking is not one resting state — it splits by that date.
-  //   today  → "Deliver today" (this is today's run; a real queue of its own)
-  //   passed → the booked run did not happen and nothing recorded a delivery →
-  //            back to `Call {logistics} — confirm delivery date` (they are who
-  //            to ask). This is the auto-overdue: the row leaves the
-  //            Deliver-today queue by itself.
-  // The money-hold above still wins (PayHold law — you don't collect for a
-  // delivery you're not allowed to make), and bookingConfirmedOf() guarantees a
-  // date here.
-  const confirmedDate = ovl?.confirmed_date ?? null;
-  if (confirmedDate) {
-    const today = todayIso();
-    if (confirmedDate < today) return act("confirm_delivery_date", "danger");
-    if (confirmedDate === today) return act("deliver_today", "info");
-  }
-  return act("confirm_delivery", "success");
+  const top = displayOrderAction(openOrderActions(orderActionSignalsOf(o, stock, lines)));
+  if (!top) return act("done", "neutral");
+  return top.locked
+    ? act(top.key, top.tone, true)
+    : act(top.key, top.tone);
 }
 
 /** Sort by SLACK ascending (Jess spec §5) — the most dangerous order (least
@@ -1705,17 +1670,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const holdAmount = money.known ? money.outstanding : null;
     const na = nextActionOf(o, stock, o.order_lines ?? []);
     const sid = primarySupplierId(o, skuMeta, suppliers);
+    const actionParties = {
+      supplier: sid ? supplierNameById.get(sid) ?? null : null,
+      logistics: logisticOf(o, partnerName),
+      customer: o.customer_name,
+      amount: money.known ? fmtRM(money.outstanding) : null,
+    };
     return {
       next: {
         ...na,
         // C1 — the strip shows the SAME row line the list pill shows, built by
         // the same shared helper. One action, one spelling, two surfaces.
-        line: orderActionLine(na.key, {
-          supplier: sid ? supplierNameById.get(sid) ?? null : null,
-          logistics: logisticOf(o, partnerName),
-          customer: o.customer_name,
-          amount: money.known ? fmtRM(money.outstanding) : null,
-        }),
+        line: orderActionLine(na.key, actionParties),
       },
       // The same test the ladder's RUNG 1 makes: goods with no purchase order
       // anywhere are goods nobody has ordered.
@@ -1731,6 +1697,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
       // T7's three-way answer: [] is "no photo yet", undefined is UNKNOWN.
       photoOnFile: Array.isArray(photos) ? photos.length > 0 : null,
       holdAmount,
+      // C2 — LAYER 1: every open action, in display order. The drawer's list
+      // and this row's pill are the same computation, so the count the drawer
+      // shows and the headline the row shows can never contradict each other.
+      // The party names are resolved ONCE, here, where the maps live.
+      openActions: openActionsOf(o, stock, o.order_lines ?? []).map((a) => ({
+        key: a.key,
+        line: orderActionLine(a.key, actionParties),
+        tone: a.tone,
+        locked: a.locked,
+      })),
     };
   };
   const nextCounts = useMemo(() => {
@@ -4415,9 +4391,11 @@ function OrderRow({
           // already says "Delivered"; a "Done" pill is redundant — and would be
           // wrong if a 2nd delivery were still outstanding, which keeps the
           // order in-pipeline, not Delivered).
-          // T7 exception: a delivered order with NO delivery photo still owes
-          // one real act, so the ladder returns "Upload delivery photo" instead
-          // of "Done" and that pill DOES show. Only "Done" blanks the cell.
+          // TWO exceptions, and both are actions a delivered order genuinely
+          // still owes, so their pill DOES show — only "Done" blanks the cell:
+          // T7's "Upload delivery photo" (no photo on file) and, since C2,
+          // "Collect RM …" — money is its own track and it SURVIVES delivery
+          // (ORDERS-WORKING-FLOW §3). Delivered is not paid.
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
           if (completed && na.key === "done") return null;
@@ -4431,13 +4409,19 @@ function OrderRow({
           // priced shows no money pill at all — we do not know what it owes.
           const m = moneyOf(o);
           const owing = !completed && m.owing;
-          const showMoney = owing && na.key !== "confirm_delivery";
+          const showMoney =
+            owing && na.key !== "confirm_delivery" && na.key !== "collect";
+          const amount = fmtRM(m.outstanding);
+          // C2: money is its own track now, so `collect` can BE the headline —
+          // on a delivered order that still owes, it is the only action left.
+          // The amount has to ride the line then, or the pill reads
+          // "Collect from John Tan" and names no figure.
           const line = orderActionLine(na.key, {
             supplier: supplierName,
             logistics: logi.partner,
             customer: o.customer_name,
+            amount: m.known ? amount : null,
           });
-          const amount = fmtRM(m.outstanding);
           return (
             <div className="flex items-center gap-1.5 max-w-full">
               <button

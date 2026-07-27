@@ -7,6 +7,7 @@ import OperationOrdersControl, {
   buildOrdersPrintHtml,
   catQty,
   nextActionOf,
+  openActionsOf,
   stockEtaOf,
   slackDays,
   logisticStateOf,
@@ -1621,6 +1622,88 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { balance: 0 },
     });
     expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
+  });
+
+  // ── C2 · the SPLIT — every rung above is unchanged, and now nothing hides ──
+  // Every assertion in this describe block ran green BEFORE the two-layer
+  // split and after it: that suite is the parity oracle proving Layer 2 keeps
+  // the ladder's locked rulings. What follows tests the half that is new —
+  // that Layer 1 stops one track eating another's work.
+  describe("openActionsOf (C2 · Layer 1)", () => {
+    it("the card's own example: no PO + no logistics + owing → THREE open actions", () => {
+      // The old ladder showed `Send PO` and the other two facts vanished.
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+        paid: 2000,
+      });
+      expect(openActionsOf(o, { state: "unknown" }, MS).map((a) => a.key)).toEqual([
+        "send_po",
+        "assign_logistics",
+        "collect",
+      ]);
+    });
+
+    it("goods still coming no longer hides the delivery call — the live board's shape", () => {
+      // 51 of 56 live orders carry a logistics company and NONE has a confirmed
+      // booking, so this is what most of the board looks like today.
+      const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
+      expect(openActionsOf(o, { state: "awaiting" }, MS).map((a) => a.key)).toEqual([
+        "confirm_ready_date",
+        "confirm_delivery_date",
+      ]);
+    });
+
+    it("the drawer's first row IS the row's pill — they cannot disagree", () => {
+      const rows = [
+        makeRow({ id: "a", so: 1, order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }], paid: 0 }),
+        makeRow({ id: "b", so: 2, ops_assigned_logistic: "p1", delivery_date: inDays(-2) }),
+        makeRow({ id: "c", so: 3, ops_assigned_logistic: "p1", ops_order_control: { ...BOOKED } }),
+      ];
+      for (const o of rows) {
+        const stock = { state: "awaiting" } as const;
+        expect(openActionsOf(o, stock, MS)[0]?.key).toBe(
+          nextActionOf(o, stock, MS).key,
+        );
+      }
+    });
+
+    it("a delivered order that still owes money keeps its collect action", () => {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        status: "delivered",
+        operation_stage: "delivered",
+        delivered_at: inDays(-3),
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+        paid: 1000,
+        ops_order_control: {
+          delivery_photos: [{ path: "order/x/a.jpg", at: inDays(-3), by: null }],
+        },
+      });
+      // Delivered is not paid (ORDERS-WORKING-FLOW §3). This is the ONE row
+      // whose headline C2 changes: it used to read Done and show nothing.
+      expect(openActionsOf(o, { state: "ready" }, MS).map((a) => a.key)).toEqual([
+        "collect",
+      ]);
+      expect(nextActionOf(o, { state: "ready" }, MS).key).toBe("collect");
+    });
+
+    it("a closed, paid, photographed order has no open action at all", () => {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        status: "delivered",
+        operation_stage: "delivered",
+        delivered_at: inDays(-3),
+        ops_order_control: {
+          delivery_photos: [{ path: "order/x/a.jpg", at: inDays(-3), by: null }],
+        },
+      });
+      expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
+      expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Done");
+    });
   });
 });
 

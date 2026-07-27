@@ -25,6 +25,9 @@ const SIG: OrderJourneySignals = {
   delivered: false,
   photoOnFile: null,
   holdAmount: null,
+  // C2 · the strip renders only the HEAD of this list; the drawer's
+  // OrderActionList renders all of it. Nothing in this module reads it.
+  openActions: [],
 };
 
 function input(over: Partial<OrderJourneyInput> = {}): OrderJourneyInput {

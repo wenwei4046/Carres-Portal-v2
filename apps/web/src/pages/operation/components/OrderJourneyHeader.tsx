@@ -2,6 +2,8 @@ import { AlertTriangle, Check } from "lucide-react";
 
 import { orderActionQueue } from "@carres/shared";
 
+import type { OrderActionRow } from "./OrderActionList";
+
 /**
  * J3 — the journey header. ONE strip at the top of the order drawer answering
  * the three questions in 3 seconds: where is this order · who is next · what is
@@ -98,6 +100,11 @@ export interface OrderJourneySignals {
   /** T6/0280 photo ledger: true = on file · false = genuinely none ·
    *  null = UNKNOWN (older Worker / no overlay row). Unknown never accuses. */
   photoOnFile: boolean | null;
+  /** C2 · LAYER 1 — every open action on this order, already in display order,
+   *  computed by the same engine that produced `next` above. `next` is this
+   *  list's first row; the drawer renders the whole list (`OrderActionList`)
+   *  and this strip renders only the head, so the two cannot disagree. */
+  openActions: OrderActionRow[];
   /** The money the LADDER locked on — `ops_order_control.balance` plus any
    *  uncollected storage fee, the exact inputs of its 🔒. `null` means the
    *  balance is not on file (the live case on every order today), which is why
