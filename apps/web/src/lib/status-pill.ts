@@ -17,6 +17,9 @@ export function orderStatusPill(word: string): string {
     // settled / good — green
     case "scheduled":
     case "confirmed":
+    // C1 (Jess 2026-07-27) — the Orders tab that was "Scheduled": a date the
+    // CUSTOMER confirmed is the settled one, and only that one is green (T1).
+    case "customer confirmed":
     case "collected":
     case "paid":
       return "pill-confirmed";
@@ -25,8 +28,13 @@ export function orderStatusPill(word: string): string {
     case "cancelled":
     case "unpaid":
       return "pill-overdue";
-    // LIVE / waiting — amber (Pending was wrongly grey before this)
+    // LIVE / waiting — amber (the state that was wrongly grey before this).
+    // `pending` / `unscheduled` are banned WORDS and no surface produces them
+    // any more; the cases survive so an older cached bundle asking this map
+    // still gets the right colour rather than a silent grey.
     case "pending":
+    case "to book":
+    case "goods not in":
     case "on hold":
     case "unscheduled":
     case "owing":

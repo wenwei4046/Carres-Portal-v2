@@ -229,8 +229,8 @@ describe("OperationOrdersControl", () => {
     expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
-    expect(g.getByRole("button", { name: /Pending\s*1/ })).toBeInTheDocument();
-    expect(g.getByRole("button", { name: /Scheduled\s*2/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /To book\s*1/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Customer confirmed\s*2/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Delivered\s*1/ })).toBeInTheDocument();
   });
 
@@ -257,7 +257,7 @@ describe("OperationOrdersControl", () => {
 
   it("Scheduled tab buckets both ready_to_dispatch and dispatched", () => {
     wrap(<OperationOrdersControl />);
-    clickStatus("Scheduled");
+    clickStatus("Customer confirmed");
     expect(rowsBySo().sort()).toEqual(["1005", "1006"]);
   });
 
@@ -277,14 +277,14 @@ describe("OperationOrdersControl", () => {
 
   it("resolves the triage LP (ops_assigned_logistic) via the partners map", () => {
     wrap(<OperationOrdersControl />);
-    clickStatus("Pending"); // order d has ops_assigned_logistic=p-nets
+    clickStatus("To book"); // order d has ops_assigned_logistic=p-nets
     const row = screen.getAllByTestId("order-row")[0];
     expect(within(row).getByText("NETS")).toBeInTheDocument();
   });
 
   it("shows the formal joined LP name on scheduled orders", () => {
     wrap(<OperationOrdersControl />);
-    clickStatus("Scheduled");
+    clickStatus("Customer confirmed");
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1005"))!;
@@ -580,8 +580,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
     // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
-    // merge into Order, Customer absorbs Region (caption line), Logistic became
-    // Delivery (truth-ladder words) and the "Manage" pills close the row.
+    // merge into Order, Customer absorbs Region (caption line), LOGISTIC became
+    // Delivery (truth-ladder words) and the "Actions" pills close the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -593,7 +593,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Stock",
       "Delivery",
       "PIC", // staff owner — its own column (Jess 2026-07-18)
-      "Manage", // all NEXT actions as tone-coloured pills (Jess 2026-07-19)
+      "Actions", // every action as a tone-coloured pill (Jess 2026-07-19/27)
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
     // stays on that cell; the Status cell names the pipeline STAGE in words.
@@ -733,21 +733,21 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   it("QUEUES speaks the NEXT verbs — a verb row filters to exactly its count (C-vocab)", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
-    // C-vocab (Jess 2026-07-19): queue rows ARE the NEXT verbs — one
-    // vocabulary across QUEUES · NEXT · Chase Now. The dead words never
-    // render; a rendered verb row's count = the open rows whose NEXT shows
-    // that verb, and clicking it filters the table to exactly those rows.
-    expect(screen.queryByRole("button", { name: /No logistic/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /To book/ })).toBeNull();
+    // C-vocab (Jess 2026-07-19): queue rows ARE the actions — one vocabulary
+    // across QUEUES · the Actions column · the drawer. The BANNED words never
+    // render (C1, 2026-07-27); a rendered row's count = the open rows whose
+    // action it names, and clicking it filters the table to exactly those.
+    expect(screen.queryByRole("button", { name: /Chase/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Order PO/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Waiting stock/ })).toBeNull();
-    // Locate queue rows via their unique tooltips (per-row hover actions also
-    // carry an "Assign logistic" accessible name — the title disambiguates).
-    // T7 moved the two delivery verbs into their own DELIVERY group (with their
-    // own deadlines) — they are covered by the DELIVERY-queue tests below, so
-    // this list is the STOCK verbs that stayed in QUEUES.
+    // Locate queue rows via their unique tooltips (per-row action pills also
+    // carry a matching accessible name — the title disambiguates).
+    // T7 moved the two delivery actions into their own DELIVERY group (with
+    // their own deadlines) — they are covered by the DELIVERY-queue tests
+    // below, so this list is the STOCK actions that stayed in QUEUES.
     const verbTitles = [
-      "Goods not ordered from any supplier yet — raise the PO",
-      "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
+      "Goods not ordered from any supplier yet — send the PO",
+      "PO sent but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
     expect(row).toBeTruthy();
@@ -789,7 +789,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
     const row = screen.getByTitle(
-      "Stock ETA lands AFTER the promised date — tell the customer now, before the window (delay radar, T3)",
+      "Stock ETA lands AFTER the promised date — call the customer now, before the window (delay radar, T3)",
     );
     expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
     fireEvent.click(row);
@@ -848,8 +848,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*4/ }));
     const g = within(screen.getByTestId("filter-delivery"));
     for (const label of [
-      "Assign logistic",
-      "Chase logistic",
+      "Assign logistics",
+      "Confirm delivery date",
       "Deliver today",
       "Upload delivery photo",
     ]) {
@@ -883,7 +883,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
     const row = within(screen.getByTestId("filter-delivery")).getByRole("button", {
-      name: /Assign logistic/,
+      name: /Assign logistics/,
     });
     expect(row.textContent).toContain("2 · 1 late");
     expect(row.getAttribute("title")).toContain("1 of 2 already past that deadline");
@@ -905,7 +905,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
     const row = within(screen.getByTestId("filter-delivery")).getByRole("button", {
-      name: /Assign logistic/,
+      name: /Assign logistics/,
     });
     expect(row.textContent).not.toContain("late");
   });
@@ -1015,7 +1015,7 @@ describe("orders export", () => {
     const csv = buildOrdersCsv(rows, new Map());
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
-      "SO,Customer,Phone,Address,Units,Items,Deadline,Proceed,Location,Logistic,Status",
+      "SO,Customer,Phone,Address,Units,Items,Deadline,Proceed,Location,Logistics,Status",
     );
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("SO-1001");
@@ -1103,20 +1103,24 @@ describe("orders export", () => {
     open.mockRestore();
   });
 
-  it("bulk Logistic ⋮ → Chase opens the partner chase review", () => {
+  it("bulk Logistics ⋮ → Call opens the logistics message review", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    // Option B: counterparty menus, not verb buttons — open Logistic ⋮ first.
-    fireEvent.click(screen.getByRole("button", { name: "Logistic" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    // Option B: counterparty menus, not verb buttons — open Logistics ⋮ first.
+    fireEvent.click(screen.getByRole("button", { name: "Logistics" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: /Call logistics — confirm delivery date/ }),
+    );
     expect(screen.getByTestId("chase-partner-review")).toBeInTheDocument();
   });
 
-  it("bulk Supplier ⋮ → Chase opens the supplier chase review", () => {
+  it("bulk Supplier ⋮ → Call opens the supplier message review", () => {
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Chase/ }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+    );
     expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
 
@@ -1160,27 +1164,27 @@ describe("nextActionOf (C2)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
     // stock is still awaiting, but the overdue unbooked delivery escalates to ops
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Chase logistic",
+      label: "Confirm delivery date",
       tone: "danger",
     });
   });
 
   it("past deadline + NO partner → stays on the stock track (not Chase logistic — can't chase an unassigned logistic)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2) });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).not.toBe("Chase logistic");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).not.toBe("Confirm delivery date");
   });
 
   it("past deadline + partner + No PO → Order PO (RUNG 1 not leapfrogged by the overdue escalation — SO-1104)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
     // stock.state 'unknown' = No PO → the real unblock is Order PO, not Chase logistic.
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Order PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Send PO");
   });
 
   // ── STOCK TRACK — leads until goods are secured ──
   it("no PO (unknown stock) → Order PO (red)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "unknown" }, [])).toMatchObject({
-      label: "Order PO",
+      label: "Send PO",
       tone: "danger",
     });
   });
@@ -1188,7 +1192,7 @@ describe("nextActionOf (C2)", () => {
   it("PO open + inside the MS/BF window (deadline−7d) → Chase supplier (red)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(5) });
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Chase supplier",
+      label: "Confirm ready date",
       tone: "danger",
     });
   });
@@ -1196,7 +1200,7 @@ describe("nextActionOf (C2)", () => {
   it("PO open + still outside the window → Chase supplier (amber)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(10) });
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Chase supplier",
+      label: "Confirm ready date",
       tone: "warning",
     });
   });
@@ -1224,7 +1228,7 @@ describe("nextActionOf (C2)", () => {
     // Without the radar this would be "Chase supplier" (amber) — the radar
     // outranks it: chasing the supplier can no longer save the date.
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Call customer (stock delay)",
+      label: "Agree new delivery date",
       tone: "danger",
     });
   });
@@ -1239,7 +1243,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(9) },
       },
     });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Confirm ready date");
   });
 
   it("stock ETA exactly ON the date → not a delay (strict overshoot only)", () => {
@@ -1252,7 +1256,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(10) },
       },
     });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Confirm ready date");
   });
 
   it("waiting stock with NO ETA → Chase supplier, never stock delay (radar needs a real ETA)", () => {
@@ -1262,7 +1266,7 @@ describe("nextActionOf (C2)", () => {
       delivery_date: inDays(10),
       ops_order_control: { line_stock_status: { "mattress:MAT-1": "waiting" } },
     });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Confirm ready date");
   });
 
   it("delivered order with an overshooting ETA → Done (guardrail #2 — completed never alarms)", () => {
@@ -1293,7 +1297,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistic");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistics");
   });
 
   it("No PO + overshooting ETA → Order PO (RUNG 1 not leapfrogged by the radar)", () => {
@@ -1306,7 +1310,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Order PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Send PO");
   });
 
   it("TBD delivery date → radar silent (no date to overshoot)", () => {
@@ -1320,7 +1324,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Chase supplier");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Confirm ready date");
   });
 
   it("past deadline + partner + waiting stock + overshooting ETA → Chase logistic stays (locked escalation not overridden)", () => {
@@ -1335,7 +1339,7 @@ describe("nextActionOf (C2)", () => {
       },
     });
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Chase logistic",
+      label: "Confirm delivery date",
       tone: "danger",
     });
   });
@@ -1344,14 +1348,14 @@ describe("nextActionOf (C2)", () => {
   it("ready + no carrier → Assign logistic (blue)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Assign logistic",
+      label: "Assign logistics",
       tone: "info",
     });
   });
 
   it("ready + carrier + no ETA → Chase logistic", () => {
     const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm delivery date");
   });
 
   it("Master says Ready (line_stock_status) → logistic track, NOT Chase supplier (#5 fix)", () => {
@@ -1366,7 +1370,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { line_stock_status: { "mattress:MAT-1": "ready" } },
     });
     // stock arg = the awaiting SKU-mismatch signal the row would pass.
-    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistic");
+    expect(nextActionOf(o, { state: "awaiting" }, MS).label).toBe("Assign logistics");
   });
 
   // ── CONFIRM gate — money-hold 🔒 only here (ops never schedules / calls) ──
@@ -1390,7 +1394,7 @@ describe("nextActionOf (C2)", () => {
       ops_assigned_logistic: "p1",
       ops_order_control: { logistic_eta: "2026-08-01", booking_stage: "provisional" },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Chase logistic");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm delivery date");
   });
 
   it("past deadline + partner + provisional date → Chase logistic (red) — carrier's word doesn't clear the escalation", () => {
@@ -1402,7 +1406,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { logistic_eta: inDays(1), booking_stage: "provisional" },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Chase logistic",
+      label: "Confirm delivery date",
       tone: "danger",
     });
   });
@@ -1415,7 +1419,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm",
+      label: "Confirm delivery",
       tone: "success",
     });
   });
@@ -1428,7 +1432,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm",
+      label: "Confirm delivery",
       locked: true,
     });
   });
@@ -1450,7 +1454,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm",
+      label: "Confirm delivery",
       locked: true,
     });
   });
@@ -1468,7 +1472,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm");
+    expect(r.label).toBe("Confirm delivery");
     expect(r.locked).toBeFalsy();
   });
 
@@ -1506,7 +1510,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm",
+      label: "Confirm delivery",
       locked: true,
     });
   });
@@ -1523,7 +1527,7 @@ describe("nextActionOf (C2)", () => {
       },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm");
+    expect(r.label).toBe("Confirm delivery");
     expect(r.locked).toBeFalsy();
   });
 
@@ -1549,7 +1553,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(-2) },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Chase logistic",
+      label: "Confirm delivery date",
       tone: "danger",
     });
   });
@@ -1561,7 +1565,7 @@ describe("nextActionOf (C2)", () => {
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, confirmed_date: inDays(3) },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm delivery");
   });
 
   it("owing balance beats Deliver today (PayHold: never chase a delivery we may not make)", () => {
@@ -1572,7 +1576,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm",
+      label: "Confirm delivery",
       locked: true,
     });
   });
@@ -1834,18 +1838,25 @@ describe("Delivery column (T1 booking truth)", () => {
       .find((r) => r.textContent?.includes(`SO-${so}`))!;
   }
 
-  it("confirmed → date · slot; provisional → carrier said; assigned-no-date → need booking; 'Unscheduled'/'Not booked' render NOWHERE", () => {
+  it("confirmed → date · slot; provisional → logistics said; assigned-no-date → the action that closes it; every banned gap-word renders NOWHERE", () => {
     wrap(<OperationOrdersControl />);
     expect(within(row(2001)).getByText("27 Jul · 9–11 AM")).toBeInTheDocument();
-    expect(within(row(2002)).getByText(/carrier said 27 Jul/)).toBeInTheDocument();
-    expect(within(row(2003)).getByText("need booking")).toBeInTheDocument();
+    expect(within(row(2002)).getByText(/logistics said 27 Jul/)).toBeInTheDocument();
+    expect(within(row(2003)).getByText("NETS — confirm delivery date")).toBeInTheDocument();
     expect(screen.queryByText(/unscheduled/i)).toBeNull();
     expect(screen.queryByText(/not booked/i)).toBeNull();
+    expect(screen.queryByText(/need booking/i)).toBeNull();
+    // The FACT slot carries the action WITHOUT its verb — its neighbours in
+    // that cell are facts too. The Actions pill is a separate, verb-led string
+    // and on these rows it is still the STOCK action (goods lead the ladder).
+    expect(
+      within(row(2003)).getByText(/^NETS — confirm delivery date$/),
+    ).toHaveClass("t4-caption");
   });
 
   it("a provisional row never paints the green booking text (green is the customer's yes only)", () => {
     wrap(<OperationOrdersControl />);
-    const prov = within(row(2002)).getByText(/carrier said 27 Jul/);
+    const prov = within(row(2002)).getByText(/logistics said 27 Jul/);
     expect(prov).toHaveClass("text-warning"); // amber token, not the green ink
     expect(prov).not.toHaveStyle({ color: "#3B6D11" });
     const conf = within(row(2001)).getByText("27 Jul · 9–11 AM");

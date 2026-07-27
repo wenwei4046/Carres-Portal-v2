@@ -18,10 +18,12 @@ import { TASKS_KEY } from "./rail/TasksPanel";
  */
 
 /** Preset follow-ups — UI-only starter list, all English (Jess to edit freely).
- *  T2 naming law (docs/COPY-STANDARD.md): verb + object + (reason). */
+ *  Action naming law (docs/COPY-STANDARD.md, re-ruled 2026-07-27): verb + named
+ *  party + measurable object. "Chase" is banned; the party is the role word here
+ *  because a preset cannot know a name. */
 const PRESET_FOLLOWUPS = [
-  "Call customer (book delivery)",
-  "Chase logistic for ETA",
+  "Call customer — book delivery date",
+  "Call logistics — confirm delivery date",
   "Customer wants to change address",
   "Customer wants to postpone",
   "Check stock availability",

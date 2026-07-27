@@ -7,6 +7,7 @@ import {
   deliveryStepOverdue,
 } from "./delivery-queue";
 import { myHolidaySet } from "./my-holidays";
+import { orderActionQueue } from "./order-action-words";
 
 // 2026-07-27 is a Monday; 2026-08-01 a Saturday; 2026-08-02 a Sunday.
 const HOLS = { holidays: myHolidaySet() };
@@ -20,17 +21,31 @@ describe("DELIVERY_QUEUES — the four delivery steps (T7)", () => {
       "photo",
     ]);
     expect(DELIVERY_QUEUE_LABELS).toEqual([
-      "Assign logistic",
-      "Chase logistic",
+      "Assign logistics",
+      "Confirm delivery date",
       "Deliver today",
       "Upload delivery photo",
     ]);
   });
 
-  it("never says POD / Unscheduled / Not booked (banned words, COPY-STANDARD)", () => {
-    const text = JSON.stringify(DELIVERY_QUEUES);
+  it("takes its labels from the ONE word module — never a local string (C1)", () => {
+    expect(DELIVERY_QUEUES.map((q) => q.label)).toEqual(
+      DELIVERY_QUEUES.map((q) => orderActionQueue(q.actionKey)),
+    );
+  });
+
+  it("never says a banned word — POD / Unscheduled / Not booked / Chase / carrier / partner", () => {
+    // The VISIBLE strings only: `key: "chase"` is an internal identifier, and
+    // COPY-STANDARD exempts internal keys and routes by name.
+    const text = DELIVERY_QUEUES.map((q) => `${q.label} ${q.description}`).join(" | ");
     expect(text).not.toMatch(/POD|Proof of Delivery/i);
-    expect(text).not.toMatch(/Unscheduled|Not booked/i);
+    expect(text).not.toMatch(/Unscheduled|Not booked|need booking/i);
+    // "Chase" names a mood, not an outcome (Jess 2026-07-27); "carrier" /
+    // "partner" are the banned words for a logistics company.
+    expect(text).not.toMatch(/\bchase/i);
+    expect(text).not.toMatch(/\bcarrier|\bpartner/i);
+    // "logistic" without the s is banned too — the noun is Logistics.
+    expect(text).not.toMatch(/logistic(?!s)/i);
   });
 
   it("labels are unique — a queue is one word for one step (C-vocab)", () => {

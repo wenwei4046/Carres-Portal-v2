@@ -12,6 +12,7 @@ import {
   isPoDutyEditor,
   isOpsManagerRow,
   isOpsGenericAccount,
+  orderActionQueue,
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { fmtDateShort } from "@/lib/fmt-date";
@@ -214,11 +215,11 @@ export default function TeamPanel() {
           )}
         </div>
         <div className="flex gap-1.5 mt-2">
-          <span className={VERB_CHIP} title="Raises every consolidated PO — the one voice to suppliers">
-            Order PO
+          <span className={VERB_CHIP} title="Sends every consolidated PO — the one voice to suppliers">
+            {orderActionQueue("send_po")}
           </span>
-          <span className={VERB_CHIP} title="Chases every open PO until the goods land">
-            Chase supplier
+          <span className={VERB_CHIP} title="Calls every open PO until the goods land">
+            {orderActionQueue("confirm_ready_date")}
           </span>
         </div>
       </div>
@@ -303,14 +304,14 @@ export default function TeamPanel() {
       <div className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9">
         <span
           className="text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
-          title="Each PIC chases their own orders — one counterparty, one REF-first message"
+          title="Each PIC follows up their own orders — one counterparty, one REF-first message"
         >
           PIC
         </span>
-        <span className={VERB_CHIP} title="Partner assigned but no slot booked — chase your own REF">
-          Chase logistic
+        <span className={VERB_CHIP} title="Logistics assigned but the customer has not confirmed a date — call about your own REF">
+          {orderActionQueue("confirm_delivery_date")}
         </span>
-        <span className={VERB_CHIP} title="Your customer still owes money — bulk Chase, one message a day">
+        <span className={VERB_CHIP} title="Your customer still owes money — one message a day, in bulk">
           Owing
         </span>
       </div>

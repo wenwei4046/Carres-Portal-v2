@@ -15,7 +15,9 @@ import {
   PAYMENT_KINDS,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
+  collectPillLabel,
   computeStorageFee,
+  orderActionLine,
   orderMoney,
   summarizePayments,
   type OrderPaymentRow,
@@ -308,7 +310,7 @@ interface Row {
   dueDate: string | null;
   overdue: boolean;
   owing: number;
-  /** delivery held: goods in, not delivered, money owing → the 🔒 on Collect $. */
+  /** delivery held: goods in, not delivered, money owing → the 🔒 on the money pill. */
   held: boolean;
   lastChasedAt: string | null;
 }
@@ -866,10 +868,20 @@ function PaymentRow({
                   type="button"
                   onClick={onChase}
                   className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
-                  title={r.held ? "Delivery held until paid — chase the customer" : "Outstanding balance — chase the customer"}
+                  title={
+                    r.held
+                      ? orderActionLine("collect", {
+                          amount: rm(r.owing),
+                          customer: r.customer,
+                        }) + " — delivery is held until it is paid"
+                      : orderActionLine("collect", {
+                          amount: rm(r.owing),
+                          customer: r.customer,
+                        })
+                  }
                 >
                   {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
-                  Collect $
+                  {collectPillLabel(rm(r.owing))}
                 </button>
                 <div
                   className="mt-1.5 text-[11px] text-base-400"

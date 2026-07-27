@@ -3,7 +3,8 @@
  *
  * The delivery lifecycle is FOUR real queues, not one blob of "delivery work":
  *
- *   Assign logistic → Chase logistic → Deliver today → Upload delivery photo
+ *   Assign logistics → Confirm delivery date → Deliver today
+ *   → Upload delivery photo
  *
  * The point of this module is the SECOND half of the card: **each step carries
  * its own deadline, so a queue item turns overdue BY ITSELF** — nobody has to
@@ -23,11 +24,19 @@
  * PURE — no I/O, no clock. `todayIso` is always passed in, so a test can sit on
  * any date and the caller owns the timezone question (MYT for this business).
  *
- * `label` is the queue's word AND the NEXT-column verb (C-vocab law, Jess
- * 2026-07-19: a row sits in exactly the queue its NEXT verb names, so the
- * counts match by construction — never a synonym between the two surfaces).
+ * `label` is the queue's word AND the action the NEXT column names (C-vocab
+ * law, Jess 2026-07-19: a row sits in exactly the queue its action names, so
+ * the counts match by construction — never a synonym between the two
+ * surfaces). C1 (2026-07-27) moved the WORDS themselves into
+ * `order-action-words.ts`: a queue word carries no party, and the row line that
+ * names one (`Call NETS — confirm delivery date`) comes from the same module,
+ * so a queue and a row can never spell the same action two ways.
  */
 
+import {
+  orderActionQueue,
+  type OrderActionKey,
+} from "./order-action-words";
 import {
   addWorkingDays,
   subtractWorkingDays,
@@ -42,7 +51,9 @@ export type DeliveryQueueAnchor = "delivery_date" | "confirmed_date" | "delivere
 
 export interface DeliveryQueueDef {
   key: DeliveryQueueKey;
-  /** The queue row's label — identical to the NEXT-column verb (C-vocab). */
+  /** Which action this step is — the words live in `order-action-words.ts`. */
+  actionKey: OrderActionKey;
+  /** The queue row's label — the action's QUEUE word, so it carries no party. */
   label: string;
   /** Tooltip: what sits in the queue + when it turns late. */
   description: string;
@@ -52,39 +63,43 @@ export interface DeliveryQueueDef {
   leadWorkingDays: number;
 }
 
-export const DELIVERY_QUEUES = [
+export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
   {
     key: "assign",
-    label: "Assign logistic",
+    actionKey: "assign_logistics",
+    label: orderActionQueue("assign_logistics"),
     anchor: "delivery_date",
     leadWorkingDays: 3,
     description:
-      "Stock is in but no delivery partner is picked yet — late once the customer's date is under 3 working days away",
+      "Stock is in but no logistics company is picked yet — late once the customer's date is under 3 working days away",
   },
   {
     key: "chase",
-    label: "Chase logistic",
+    actionKey: "confirm_delivery_date",
+    label: orderActionQueue("confirm_delivery_date"),
     anchor: "delivery_date",
     leadWorkingDays: 1,
     description:
-      "Partner assigned but the customer has not confirmed a date + slot — late once the promised date is 1 working day away",
+      "Logistics assigned but the customer has not confirmed a date + slot — late once the promised date is 1 working day away",
   },
   {
     key: "deliver_today",
-    label: "Deliver today",
+    actionKey: "deliver_today",
+    label: orderActionQueue("deliver_today"),
     anchor: "confirmed_date",
     leadWorkingDays: 0,
     description: "The customer confirmed TODAY as the delivery day — it goes out today",
   },
   {
     key: "photo",
-    label: "Upload delivery photo",
+    actionKey: "upload_delivery_photo",
+    label: orderActionQueue("upload_delivery_photo"),
     anchor: "delivered_at",
     leadWorkingDays: -1,
     description:
       "Delivered with no delivery photo attached yet — late one working day after the delivery",
   },
-] as const satisfies readonly DeliveryQueueDef[];
+];
 
 /** The four queue labels in lifecycle order — the DELIVERY facet renders these. */
 export const DELIVERY_QUEUE_LABELS = DELIVERY_QUEUES.map((q) => q.label) as [
@@ -93,12 +108,12 @@ export const DELIVERY_QUEUE_LABELS = DELIVERY_QUEUES.map((q) => q.label) as [
 ];
 
 /**
- * The step a NEXT verb names, or null when the verb is not a delivery step.
+ * The step a queue word names, or null when the word is not a delivery step.
  *
- * The C-vocab law says a row sits in exactly the queue its NEXT verb names, so
+ * The C-vocab law says a row sits in exactly the queue its action names, so
  * every surface that groups rows by queue does this same lookup. Naming it once
- * keeps the Orders list and the Delivery module reading ONE mapping — and when
- * C1 renames the labels, both move together instead of one growing a synonym.
+ * keeps the Orders list and the Delivery module reading ONE mapping instead of
+ * one of them growing a synonym.
  */
 export function deliveryQueueForLabel(label: string): DeliveryQueueDef | null {
   return DELIVERY_QUEUES.find((q) => q.label === label) ?? null;

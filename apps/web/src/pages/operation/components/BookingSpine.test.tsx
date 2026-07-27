@@ -11,7 +11,7 @@ import BookingSpine from "./BookingSpine";
  */
 
 const LABELS = [
-  "Logistic assigned",
+  "Logistics assigned",
   "Customer confirmed",
   "Delivery order issued",
   "Delivered",

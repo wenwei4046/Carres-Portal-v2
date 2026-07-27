@@ -2882,3 +2882,178 @@ Suites at baseline: api **3** pre-existing · web **16** pre-existing · shared 
 New tests: shared 22 · api 8 · web 6. typecheck 0 new (api 6 / shared 3 pre-existing,
 verified identical on a stashed tree), build + v4 guard + design lint clean, `SERVICE_ROLE`
 grep **0** in the live 4,414,341-byte bundle.
+
+---
+
+## 2026-07-27 · Portal Core C1 — the words name the party, and Chase is gone
+
+**PR #461** (merge `d1d640f2`) · **no migration** · web `index-84fbCu41.js`
+(carres-portal `2fc26610` + carres-pos `71626c49`, 4 canonicals converged on the first
+poll) · Worker `8ac7c764` · worktree `card-c1-implementation-7bd64a`.
+
+Card C1 of `docs/portal-core-execution-queue.md`. Every visible action label on the Orders
+list, its queues, its drawer and the Delivery module now reads **verb + named party +
+measurable object**, and the words Jess banned leave with it.
+
+### The structural part: an action carries TWO strings, not one
+
+| | | |
+|---|---|---|
+| **QUEUE word** | party-free | `Confirm delivery date` — facet row · filter chip · count |
+| **ROW line** | party named | `Call NETS — confirm delivery date` — one order's row |
+
+A queue holds many suppliers, so it cannot name one; a row shows a single order, so it must.
+COPY-STANDARD spells that split out for the delivery step (queue `Confirm delivery date`,
+row line `Call {logistics} — confirm delivery date`) and C1 applies the same shape to every
+action. Both strings come from ONE module — `packages/shared/src/order-action-words.ts` — so
+a queue and a row **structurally cannot spell one action two ways**, and the next rename
+lands in one file rather than in fourteen.
+
+`nextActionOf` gained a stable `key`. The queue counts, the `nextFilter` state and the
+`data-next-action` attribute keep keying on a word that never moves, while the visible line
+names a real company. `delivery-queue.ts` takes its four labels from the same module (its
+internal `key: "chase"` stays — COPY-STANDARD exempts internal keys by name, and its own
+banned-word test now scans the VISIBLE fields only rather than `JSON.stringify` of the whole
+object, which was matching that key).
+
+**A FACT slot gets the action WITHOUT its verb** — `NETS — confirm delivery date`, from
+`deliveryDateGapFact()`. A badge is a fact slot (the UI type dictionary) and its neighbours
+in those cells are facts too (`Confirmed`, `logistics said 27 Jul`); that is also exactly how
+COPY-STANDARD's audit table spells the replacement. The first build used the full row line
+there and the delivery cell read `Call NETS — confirm delivery date` beside a `NETS` on the
+line above — a test caught it.
+
+### The renames
+
+| Ships today | Becomes |
+|---|---|
+| `Order PO` | `Send PO` / `Send PO to {supplier}` |
+| `Chase supplier` | `Confirm ready date` / `Call {supplier} — confirm ready date` |
+| `Chase logistic` | `Confirm delivery date` / `Call {logistics} — confirm delivery date` |
+| `Call customer (stock delay)` | `Agree new delivery date` / `Call {customer} — agree new delivery date` |
+| `Confirm` | `Confirm delivery with {customer}` |
+| `Collect $` | `Collect RM 2,455` (pill) · `… from {customer}` (row) |
+| `Manage` (column + the drawer's row menu) | `Actions` — plural, an order can have several |
+| `Pending` / `Scheduled` (tabs, row pill, CSV) | `To book` / `Customer confirmed` |
+| `For Jess` | `For manager review` |
+| `Unassigned` (queue + chip) | `No logistics picked` |
+| `Chase now` (drawer panel) | `Actions`, empty state `0 calls to make · everything on track.` |
+| `Reminder` / `Chase` (message tones) | `Remind` / `Call` |
+| `logistic` · `carrier` · `partner` | `Logistics`, everywhere |
+
+The party is the REAL name when the system knows it and the ROLE word otherwise — never an
+empty gap. `Call  — confirm ready date` would be worse than the honest
+`Call supplier — confirm ready date`, so the fallback is asserted, and so is the absence of
+a double space or a dangling dash in every label the module can produce.
+
+### The T1 leftover, closed — and why nobody caught it
+
+`OrderDetailDrawer.tsx` still rendered **`Unscheduled`** in two places (the header MiniBadge
+and the delivery card's `statusWord`). T1 banned the word and fixed the LIST; these two
+survived. The replacement is **not** T1's `need booking` — Jess struck that word on
+2026-07-27: "need" is a to-do hiding inside a fact, and the reader still has to work out
+what to do.
+
+**The drawer had NO test file at all.** That is the whole reason the badge lived a week:
+`OrderDocuments`, `BookingSpine` and `OrderJourneyHeader` each ship a banned-word guard, each
+guards ITSELF, and the badge sat outside all three. Its new guard
+(`OrderDetailDrawer.test.tsx`) is therefore a **source scan, not a render test** — a render
+test can only see the branches its fixture happens to reach, and this file is 7,000 lines of
+branches. It reads the source, strips comments and `className` values (a CSS class like
+`btn-chase` is an internal name nobody reads), collects every string literal and JSX text
+node, and skips one-word all-lowercase tokens as internal keys. A word a human reads is
+either capitalised or has a space in it, so nothing visible escapes through that door. It
+found the last two live `Chase` strings on its first run.
+
+### Three things deliberately NOT built, reported in the card instead
+
+1. **There is no three-dot column to rename.** The card asks for "the three-dot column → no
+   header word at all; each dot gets its own small icon". `rowDotsOf()` computes the three
+   dots and **nothing renders it** — no component, no test. What the list has is a `Status`
+   column (internal key `dots`) showing the pipeline stage as a pill, and its tooltip
+   described the missing dots using the banned words "in progress". The tooltip was fixed
+   and the header word `Status` left alone, which is correct for a stage pill. Building the
+   dots is a feature for Jess; ACTION-FLOW Law 6 already specifies it. (C5's session found
+   the same dead code independently and filed it as a CF.)
+2. **`To book` is wider than its own predicate.** The `pending` tab selects in-pipeline
+   orders where NOT (stock ready AND customer confirmed), so an order whose customer HAS
+   confirmed but whose goods are not in also lands in `To book` — and for that row the word
+   is wrong. Live it cannot happen: **0 of 55 control rows carry a confirmed booking**
+   (`booking_stage='confirmed'` count = 0, `provisional` = 0, `logistic_eta` = 0). The
+   honest fix is a predicate change, not a word change, so the word Jess ruled shipped and
+   the predicate was left alone.
+3. **The drawer keeps its own `Scheduled`.** `PIPELINE_LABEL.scheduled` reads
+   `operation_stage = dispatched | ready_to_dispatch` — NOT the customer-confirmed booking
+   the list's tab now names. Renaming it would make two different states share one word,
+   which is the worse error. Its banned neighbour WAS renamed (`Pending` → `Goods not in`).
+
+### Fixed in passing, on lines the card was already rewriting
+
+- **A Chinese string in the bulk bar** — the Logistics ⋮ Remind hint read `before收货日`. The
+  UI is English only (PR 209).
+- **A column header that existed twice.** `ORDER_COL_DEFS` carries the label the Columns
+  popover renders, and the `<th>` hard-coded its own copy — which is exactly how `Manage`
+  survived in the header while the def already said something else. The `<th>` now reads
+  from the def.
+
+### Live data that shaped the work
+
+- **51 of 56 orders carry `ops_assigned_logistic`**, so the row line renders a real company
+  name almost everywhere; the five without it show `No logistics picked`.
+- **0 confirmed and 0 provisional bookings across 55 control rows**, so the delivery column's
+  confirmed/provisional fact strings never render today — every assigned order shows the new
+  action fact, which is precisely the string this card had to get right.
+
+### Merge with C5
+
+C5 (#447) landed on main mid-build and both cards touch the ladder. Resolved so each keeps
+the half it owns: the **number** comes from C5's shared `orderMoney` (the 🔒, the money dot,
+the journey strip's hold amount and the money pill all read it), the **word** from C1's
+shared `order-action-words` — so the same figure prints as `Collect RM 2,455 from John Tan`.
+Two of C5's own assertions pinned the label `Confirm`; they now pin `Confirm delivery`.
+Nothing about the money rule changed to make them pass.
+
+The `Waiting` contradiction C1 was about to report — COPY-STANDARD banning the word while its
+own receiving vocabulary ships `Waiting supplier reply` — **had already been ruled by a
+parallel line mid-build** (`Waiting <the exact thing>` is a legal state, the bare word is
+not), so the finding was deleted rather than shipped stale. Two doc mentions of the retired
+`Chase logistic` in C5's own note and in the index were corrected for the same reason: a
+reader would have hunted for a word that no longer exists.
+
+### Verification
+
+No migration. Suites at baseline: **shared 1726/1726 · api 3 pre-existing · web 16
+pre-existing**. New tests: shared 9 (the word module) + web 13 (the drawer guard);
+~45 existing assertions updated WITH the strings they pin. `tsc -p tsconfig.app.json` clean
+(the real gate — the default tsconfig is not it), `check:v4` clean, design lint clean, build
+clean.
+
+**The design lint earned its keep on a comment**: RULE A counted `#209` in a PR reference as
+a new hex literal. Reworded, not baselined.
+
+**Bundle proof, both directions** (downloaded to a file — a piped `curl | grep` on 4 MB
+truncates and reports a false 0): the live 4,417,871-byte bundle greps `SERVICE_ROLE` **0**,
+the retired words `Chase logistic` · `Chase supplier` · `Order PO` · `Unscheduled` ·
+`need booking` · `Not booked` · `For Jess` · `Call customer (stock delay)` all **0**, and the
+replacements are present — `confirm delivery date` ×4 · `Confirm ready date` · `Send PO to` ·
+`Assign logistics` · `Confirm delivery with` · `Collect RM` · `To book` ·
+`Customer confirmed` · `For manager review` · `No logistics picked` ×11 · `logistics said` ·
+`0 calls to make`. **On a rename card, grep BOTH directions**: the banned word at 0 proves
+only that nothing says it, not that anything says the new one.
+
+The remaining visible `Chase` strings in the bundle are all on **Purchase, Payments and the
+duty roster** — `Chase factories`, `Chased 3d ago`, `PO (Send + Chase)` — which is card
+**C4**'s named scope. The one word C1 reached into Payments for is the money pill
+(`Collect $` → `Collect RM …`), because rule 8 makes a half-renamed money word actively
+confusing; the rest of that page's vocabulary was left for C4.
+
+**Not visually smoke-tested**: this worktree has no `apps/web/.env.local`, so the dev server
+cannot reach Supabase and the Orders page is unreachable past the login screen. The evidence
+is the suites and the bundle grep.
+
+**The api deploy carried parallel lines, deliberately.** C1 changed no api file; the union
+tip's api (C5's money read, R4's claim-hold door, S4's deadline routes) shipped with it
+because **every migration file on the tip was confirmed applied first — the tracker tail is
+0299**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the
+`api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom
+domain returns 200.

@@ -26,13 +26,13 @@
 - The Next-action ladder is LIVE in `OperationOrdersControl.tsx` (~519-700) and already
   EVALUATES every rung — today it displays only the top one. The Dynamic Checklist is a
   PRESENTATION change over the same signals: no new state, no new engine.
-- T7 queues are LIVE with the OLD step-2 word (`Chase logistic`); T5's progress spine and
-  J1-J2 tabs live in the drawer. COPY-STANDARD (rewritten 2026-07-27) is the only word law.
+- T7 queues are LIVE and, since C1, speak the new words (step 2 = `Confirm delivery date`);
+  T5's progress spine and J1-J2 tabs live in the drawer. COPY-STANDARD is the only word law.
 - WhatsApp follow-up presets exist (wa-templates + drawer presets); Payments has
   "Ready-to-chase" queue wording; Purchase panel stages read Send · Chase · Receive.
 - Tests assert old strings — renames must update the assertions WITH the strings.
 
-## C1 · Orders + Delivery speak the new words
+## C1 · Orders + Delivery speak the new words — ✅ LIVE (PR #461)
 
 **Goal:** every visible label in the Orders list, queues and drawer follows
 verb + named party + measurable object, and the word Chase disappears:
@@ -79,6 +79,38 @@ drawer: every component guarded ITSELF and the badge sat outside all three.
 **No migration. Copy + label maps + tests.**
 **Done when:** grep of the web bundle for visible `Chase` = 0 on Orders/Delivery
 surfaces AND `Unscheduled` = 0; every renamed label carries a named party.
+
+**SHIPPED (PR #461).** The words live in ONE module — `packages/shared/src/order-action-words.ts`
+— and every surface asks it, so a queue and a row structurally cannot spell one action two
+ways. Each action carries **two** strings, and that split is the whole design: a **queue word**
+(party-free, because a queue holds many suppliers) and a **row line** (`Call Ohana — confirm
+ready date`). `nextActionOf` gained a stable `key`, so the queue counts, the `?tab`-style
+filter state and `data-next-action` keep keying on a word that never moves while the visible
+line names a real company. `delivery-queue.ts` now takes its four labels from that module.
+Three findings are recorded under **What C1 found** below — read them before C2/C3.
+
+### What C1 found — three things a later card has to decide (reported, not fixed)
+
+1. **There is no three-dot column to rename.** The card asks for "the three-dot column →
+   no header word at all; each dot gets its own small icon". `rowDotsOf()` computes the
+   three dots and **nothing renders it** — it is exported, used by no component and by no
+   test. What the list actually has is a `Status` column (internal key `dots`) showing the
+   pipeline stage as a pill. C1 therefore renamed that column's misleading tooltip (it
+   described the three dots, and used the banned words "in progress") and left the header
+   word `Status`, which is correct for a stage pill. **Building the three dots is a
+   feature, not a rename** — it needs Jess, and ACTION-FLOW Law 6 already specifies it.
+2. **`To book` is slightly wider than its own predicate.** The `pending` tab selects
+   in-pipeline orders where NOT (stock ready AND the customer confirmed), so an order whose
+   customer HAS confirmed but whose goods are not in also lands in `To book` — and for that
+   row the word is wrong. Live today it cannot happen: **0 of 55 control rows carry a
+   confirmed booking**, so every in-pipeline order genuinely has no date. The honest fix is
+   a predicate change (split the two conditions into two facts), not a word change, so C1
+   shipped the word Jess ruled and left the predicate alone.
+3. **The drawer keeps its own `Scheduled`, deliberately.** `PIPELINE_LABEL.scheduled` reads
+   `operation_stage = dispatched | ready_to_dispatch` — it is NOT the customer-confirmed
+   booking the list's tab now names, so renaming it to `Customer confirmed` would have made
+   two different states share one word. Its banned neighbour WAS renamed (`Pending` →
+   `Goods not in`). One word for two states is the worse error; this needs Jess's call.
 
 ## C2 · Split the ladder into TWO LAYERS + the drawer's action list
 
@@ -177,10 +209,10 @@ Leaving it would have made the drawer contradict its own row.
    it. In the fallback branch `paid` is therefore never netted against it a second time.
 3. **The 18 owing orders do NOT leave the Delivery board** (the index's "Expect after C5"
    note). All 55 control rows are `booking_stage='none'`, so the ladder returns
-   `Chase logistic` and never reaches the money rung — no row changes its action word
+   `Confirm delivery date` and never reaches the money rung — no row changes its action word
    today. What changes: the **Owing facet row appears for the first time** (`Owing · 18 ·
    RM 56,859` — it renders only when the count is above zero, and the count was always
-   zero), the `Collect $` pill finds those 18, the Payments collections queue fills with
+   zero), the `Collect RM …` pill finds those 18, the Payments collections queue fills with
    real figures, the drawer stops telling an operator that a paid-in-full order owes its
    whole value, and the booking gate's money answer is right.
 4. **`rowDotsOf` is dead code** — it is exported and unit-tested but nothing renders it
@@ -345,7 +377,7 @@ manager can release it; a release that does not waive leaves the money action op
 
 | Card | Status | PR |
 |---|---|---|
-| C1 | ⬜ after T8 | — |
+| C1 | ✅ LIVE 2026-07-27 | #461 |
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |

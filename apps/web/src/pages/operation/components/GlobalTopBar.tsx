@@ -140,11 +140,11 @@ export function TopBarIcons() {
                 empty="Nothing overdue"
               />
               <AlertGroup
-                title="Chase logistic — no ETA"
+                title="Confirm delivery date — no date yet"
                 tone="text-warning"
                 rows={alerts.chase}
                 onOpen={goOrders}
-                empty="All near deliveries have an ETA"
+                empty="Every near delivery has a date"
               />
               <button
                 type="button"
