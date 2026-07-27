@@ -2,16 +2,25 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   CASE_EVIDENCE_BUCKET,
+  caseCloseBlockerMessage,
   caseEvidenceExtension,
   caseEvidenceGapMessage,
   caseEvidenceGaps,
   caseEvidenceMimeFits,
   caseEvidenceSlot,
   caseEvidenceUploadedSchema,
+  caseFollowUpPlan,
+  caseOpenSteps,
+  caseStepDefinition,
+  caseStepDone,
   createServiceCaseInputSchema,
+  recordCaseStepInputSchema,
   signCaseEvidenceUploadInputSchema,
   updateServiceCaseInputSchema,
   type CaseEvidenceUploaded,
+  type CaseFollowUpInput,
+  type CaseProgressEntry,
+  type CaseWantKey,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -35,6 +44,7 @@ import type { AppEnv } from "../../types";
  *   PATCH  /:id                     — update
  *   GET    /:id/evidence            — S2: the ledger + signed view URLs
  *   POST   /:id/evidence            — S2: append a file to an existing case
+ *   POST   /:id/progress            — S3: record one follow-up step's outcome
  */
 
 const scRouter = new Hono<AppEnv>();
@@ -45,7 +55,7 @@ const scRouter = new Hono<AppEnv>();
  * costs one extra column per row.
  */
 const CASE_SELECT =
-  "*, service_case_types(label), service_case_statuses(label,is_closed), orders(so)";
+  "*, service_case_types(label), service_case_statuses(label,is_closed), orders(so), suppliers(name)";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /config — config-driven Case Type + Status (active only, sorted)
@@ -236,6 +246,69 @@ function shapeEvidence(raw: unknown): {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// S3 (0293) — the follow-ups. **The case drives them.**
+//
+// The STEPS are derived from the intake answers (`caseFollowUpPlan`), never
+// stored: there is no row to forget to create, none to delete, and none that can
+// drift from what the customer asked for. What IS stored is each step's OUTCOME
+// — the date it happened, stamped with who recorded it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Rows come back snake_case; the plan module reads camelCase. */
+function shapeProgress(raw: unknown): CaseProgressEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e) => {
+    const r = (e ?? {}) as Record<string, unknown>;
+    return {
+      step:   String(r.step ?? ""),
+      on:     String(r.on ?? ""),
+      at:     String(r.at ?? ""),
+      by:     String(r.by ?? ""),
+      byRole: String(r.by_role ?? ""),
+      note:   r.note == null ? null : String(r.note),
+    };
+  });
+}
+
+/** The parties whose names the chain's labels carry. */
+function followUpInput(r: {
+  customer_wants?: string[] | null;
+  customer_name?: string | null;
+  suppliers?: { name: string } | { name: string }[] | null;
+}): CaseFollowUpInput {
+  const sup = Array.isArray(r.suppliers) ? r.suppliers[0] : r.suppliers;
+  return {
+    customerWants: (r.customer_wants ?? []) as CaseWantKey[],
+    customerName:  r.customer_name ?? null,
+    supplierName:  sup?.name ?? null,
+  };
+}
+
+/**
+ * Which factory a case is about, from the SKU it named. Resolved SERVER-side and
+ * snapshotted (S1's law) — the client never says which supplier a complaint
+ * belongs to, and a case filed today keeps its answer if the catalog is
+ * re-pointed tomorrow.
+ *
+ * A failure here is not a failure of the case: the follow-up degrades to "the
+ * supplier" (COPY-STANDARD allows the role word where no name is stored) rather
+ * than refusing a complaint over a catalog lookup.
+ */
+async function resolveSupplierId(
+  sb: ReturnType<typeof userClient>,
+  sku: string | undefined,
+): Promise<string | null> {
+  if (!sku) return null;
+  const { data, error } = await sb
+    .from("product_skus")
+    .select("supplier_id")
+    .eq("sku", sku)
+    .limit(1);
+  if (error) return null;
+  return (data?.[0]?.supplier_id as string | null) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET / — list (filter ?state=ongoing|closed, derived from status.is_closed)
 // ─────────────────────────────────────────────────────────────────────────────
 scRouter.get("/", requireOperationOrPrincipal, async (c) => {
@@ -323,6 +396,9 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
     }
   }
 
+  // S3 — which factory this is about, so the follow-up can name it.
+  const supplierId = await resolveSupplierId(sb, parsed.productSku);
+
   const { data: caseNo, error: seqErr } = await sb.rpc("next_case_no");
   if (seqErr || !caseNo) {
     throw new HTTPException(500, { message: seqErr?.message ?? "Failed to generate case number" });
@@ -359,6 +435,11 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
 
       // S2 (0289) — the evidence, stamped server-side.
       evidence:         stampEvidence(evidence, c.var.auth.id, c.var.auth.role),
+
+      // S3 (0293) — the factory the follow-up will call, resolved from the SKU
+      // and snapshotted. `progress` is NOT here and must never be: a case is
+      // born with nothing done, and the ledger has exactly one writer.
+      supplier_id:      supplierId,
     })
     .select("id, case_no")
     .single();
@@ -391,6 +472,53 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   const id     = c.req.param("id");
   const parsed = await parseBody(c, updateServiceCaseInputSchema);
   const sb     = userClient(c.env, c.var.auth.jwt);
+
+  // ── S3 · the close gate ───────────────────────────────────────────────────
+  // The card's acceptance: **closing a case requires all its tasks closed +
+  // customer-confirmed.** The greyed-out status option is the courtesy; THIS is
+  // the rule, computed from the same shared plan the case view draws.
+  //
+  // Only the TRANSITION into a closed status is gated. A case that is already
+  // closed stays editable — the one live row on file is closed, and a gate that
+  // locked it would make its own history unfixable.
+  if (parsed.statusId) {
+    const { data: target } = await sb
+      .from("service_case_statuses")
+      .select("is_closed")
+      .eq("id", parsed.statusId)
+      .maybeSingle();
+
+    if (target?.is_closed) {
+      const { data: row, error: readErr } = await sb
+        .from("service_cases")
+        .select(CASE_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      if (readErr) throw new HTTPException(500, { message: readErr.message });
+      if (!row) throw new HTTPException(404, { message: "Service case not found" });
+
+      const cur = row as unknown as RawCase;
+      const alreadyClosed = cur.service_case_statuses?.is_closed ?? false;
+      if (!alreadyClosed) {
+        const open = caseOpenSteps(
+          caseFollowUpPlan(followUpInput(cur)),
+          shapeProgress(cur.progress),
+        );
+        if (open.length > 0) {
+          return c.json(
+            {
+              error: "invalid_input",
+              code: "case_steps_open",
+              // Rule 6 — the error gives the fix, by name.
+              message: `Cannot close this case yet. Still to do: ${caseCloseBlockerMessage(open)}`,
+              open: open.map((s) => ({ step: s.key, label: s.label })),
+            },
+            422,
+          );
+        }
+      }
+    }
+  }
 
   const patch: Record<string, unknown> = {};
   if (parsed.orderId         !== undefined) patch.order_id         = parsed.orderId;
@@ -499,6 +627,82 @@ scRouter.post("/:id/evidence", requireOperationOrPrincipal, async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /:id/progress — record ONE step's outcome.
+//
+// Append-only, exactly like the evidence ledger: there is no endpoint that
+// un-records a step, and the generic PATCH cannot touch `progress` (the update
+// schema never had the field). A step recorded by mistake is answered by the
+// case's own note, not by rewriting what the system was told happened.
+//
+// `at` / `by` / `by_role` are stamped HERE and nowhere else — a record of who
+// did what is worth nothing if the doer writes it (0293's CHECK refuses an entry
+// missing any of them, so a future write path cannot skip this either).
+// ─────────────────────────────────────────────────────────────────────────────
+scRouter.post("/:id/progress", requireOperationOrPrincipal, async (c) => {
+  const id     = c.req.param("id");
+  const parsed = await parseBody(c, recordCaseStepInputSchema);
+  const sb     = userClient(c.env, c.var.auth.jwt);
+
+  const { data: row, error: readErr } = await sb
+    .from("service_cases")
+    .select(CASE_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new HTTPException(500, { message: readErr.message });
+  if (!row) throw new HTTPException(404, { message: "Service case not found" });
+
+  const cur      = row as unknown as RawCase;
+  const progress = shapeProgress(cur.progress);
+
+  // One outcome per step. A second record would make "when did it happen"
+  // ambiguous, and every reader of the ledger takes the first answer.
+  if (caseStepDone(progress, parsed.step)) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "step_already_recorded",
+        message: "That step is already on file. Open the case to see what was recorded.",
+      },
+      422,
+    );
+  }
+
+  // The step is looked up in the CATALOGUE, not in this case's plan: editing the
+  // intake answers can shrink a plan, and refusing to record something that has
+  // physically happened would leave the case lying about itself. What the plan
+  // decides is which steps are still OWED — that is the close gate's question.
+  const def = caseStepDefinition(followUpInput(cur), parsed.step);
+  if (def?.noteRequired && !parsed.note) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "note_required",
+        message: `Write down what you found before recording "${def.label}".`,
+      },
+      422,
+    );
+  }
+
+  const entry: Record<string, unknown> = {
+    step:    parsed.step,
+    on:      parsed.on,
+    at:      new Date().toISOString(),
+    by:      c.var.auth.id,
+    by_role: c.var.auth.role,
+  };
+  if (parsed.note) entry.note = parsed.note;
+
+  const existing = Array.isArray(cur.progress) ? (cur.progress as unknown[]) : [];
+  const { error } = await sb
+    .from("service_cases")
+    .update({ progress: [...existing, entry] })
+    .eq("id", id);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  return c.json({ id, step: parsed.step }, 201);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -544,6 +748,11 @@ interface RawCase {
   customer_wants?: string[] | null;
   /** S2 (0289) — the evidence ledger. Optional for the same reason as above. */
   evidence?: unknown;
+  /** S3 (0293) — the follow-up chain's recorded outcomes, and the factory the
+   *  chain names. Optional for the same degrade-don't-crash reason. */
+  progress?: unknown;
+  supplier_id?: string | null;
+  suppliers?: { name: string } | { name: string }[] | null;
   service_case_types:    { label: string } | null;
   service_case_statuses: { label: string; is_closed: boolean } | null;
   /** J2 — embedded `orders(so)`. A to-one embed, but PostgREST has been seen
@@ -593,7 +802,22 @@ function shapeCase(r: RawCase) {
     // they expire in an hour and are only worth minting for the case actually
     // being looked at (GET /:id/evidence).
     evidence:        shapeEvidence(r.evidence),
+
+    // S3 — the recorded outcomes travel too, because the STEPS are derived from
+    // fields already on this row: the list can name every case's next step
+    // without a single extra query.
+    progress:        shapeProgress(r.progress),
+    supplierId:      r.supplier_id ?? null,
+    supplierName:    embeddedSupplier(r.suppliers),
   };
+}
+
+/** Unwrap the `suppliers(name)` embed. Null when the case names no product we
+ *  can trace to a factory — the follow-up then says "the supplier". */
+function embeddedSupplier(s: RawCase["suppliers"]): string | null {
+  if (!s) return null;
+  const row = Array.isArray(s) ? s[0] : s;
+  return row?.name ?? null;
 }
 
 /** Unwrap the `orders(so)` embed to a plain number. Null when the case has no

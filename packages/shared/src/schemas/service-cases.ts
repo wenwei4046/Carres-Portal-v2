@@ -10,6 +10,7 @@ import {
   CASE_EVIDENCE_MIME_TYPES,
   CASE_EVIDENCE_SLOT_KEYS,
 } from "../service-case-evidence";
+import { CASE_STEP_KEYS } from "../service-case-plan";
 
 /**
  * Service Cases (migration 0210) — the case / 病历 parent layer above Service
@@ -119,6 +120,45 @@ export const caseEvidenceUploadedSchema = z.object({
 });
 export type CaseEvidenceUploaded = z.infer<typeof caseEvidenceUploadedSchema>;
 
+// ── Follow-ups (S3, migration 0293) ──────────────────────────────────────────
+
+/**
+ * One recorded outcome on the chain. `at` / `by` / `byRole` are stamped by the
+ * SERVER and refused by 0293's CHECK if absent — the same law S2 applies to
+ * evidence: a record of who did what is worth nothing if the doer writes it.
+ *
+ * `step` is a plain string on the READ side (like an evidence `slot`): a step
+ * key that is later retired must stay readable in the history rather than
+ * disappear from it.
+ */
+export const caseProgressEntrySchema = z.object({
+  step:   z.string(),
+  /** The BUSINESS date — the day it happened, or the day the supplier promised. */
+  on:     z.string(),
+  at:     z.string(),
+  by:     z.string(),
+  byRole: z.string(),
+  note:   z.string().nullable().optional(),
+});
+export type CaseProgressEntryRecord = z.infer<typeof caseProgressEntrySchema>;
+
+/**
+ * Record one step's outcome. Deliberately three fields: the step, the date it
+ * happened on, and the note where the step has something to say. Everything
+ * else about the entry is the server's to write.
+ *
+ * The date is NOT range-checked. A supplier's promised date is in the future
+ * and a back-dated collection is in the past, and "no future dates" would
+ * refuse a legitimate same-day record between midnight and 8 AM MYT, where the
+ * browser's date is already tomorrow by the Worker's UTC clock.
+ */
+export const recordCaseStepInputSchema = z.object({
+  step: z.enum(CASE_STEP_KEYS),
+  on:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD"),
+  note: z.string().trim().max(500).optional(),
+});
+export type RecordCaseStepInput = z.infer<typeof recordCaseStepInputSchema>;
+
 // ── The case record ──────────────────────────────────────────────────────────
 
 export const serviceCaseSchema = z.object({
@@ -183,6 +223,23 @@ export const serviceCaseSchema = z.object({
    * degrade-don't-crash reason as the S1 fields above.
    */
   evidence:        z.array(caseEvidenceEntrySchema).optional(),
+
+  /**
+   * S3 — the follow-up chain (migration 0293).
+   *
+   * `progress` is the recorded half: what actually happened, and when. The
+   * STEPS themselves are not stored — they are derived from `customerWants` by
+   * `caseFollowUpPlan`, so there is no row to forget to create and none that can
+   * drift away from what the customer asked for.
+   *
+   * `supplierId` / `supplierName` are resolved from the item's SKU at intake and
+   * snapshotted, so the follow-up can NAME the factory it is about
+   * (`Call Ohana — confirm the repair date`) instead of saying "the supplier".
+   * Null on a case whose product cannot be traced to one.
+   */
+  progress:        z.array(caseProgressEntrySchema).optional(),
+  supplierId:      z.string().uuid().nullable().optional(),
+  supplierName:    z.string().nullable().optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 
