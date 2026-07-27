@@ -734,6 +734,9 @@ export {
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  // C9 — the manager's three outcomes
+  STORAGE_RELEASE_DECISIONS,
+  type StorageReleaseDecision,
   recordStorageExtensionInput,
   confirmBookingInput,
   type ConfirmBookingInput,
@@ -1570,6 +1573,11 @@ export {
   type OrderMoneyInput,
   type OrderMoney,
 } from "./order-money";
+export {
+  storageHold,
+  type StorageHoldInput,
+  type StorageHold,
+} from "./storage-hold";
 export {
   bookingConfirmGate,
   isSundayIso,

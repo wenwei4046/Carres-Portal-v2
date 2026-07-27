@@ -2818,6 +2818,13 @@ export interface opsRemarkEmbed {
    *  compute. All optional so pre-C2 fixtures keep typechecking. */
   balance?: number | string | null;
   payment_status?: string | null;
+  /** C9 — the ladder reads the storage fee through the ONE shared rule
+   *  (`storageHold`), which needs the operator's start date and the keyed
+   *  override, not just the Master-imported figures. Optional, so a browser on
+   *  this build against an older Worker degrades to the imported fee instead of
+   *  crashing. */
+  storage_from?: string | null;
+  storage_fee_override?: number | string | null;
   storage_fee_msbf?: number | string | null;
   storage_fee_sof?: number | string | null;
   storage_paid?: boolean | null;

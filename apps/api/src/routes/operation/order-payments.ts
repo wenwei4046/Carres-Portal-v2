@@ -8,6 +8,7 @@ import {
   decideStorageWaiverInput,
   recordStorageExtensionInput,
   deliveryReasonLabel,
+  storageHold,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -245,36 +246,67 @@ orderPaymentsRouter.post("/:id/storage/waiver/request", async (c) => {
   return c.json({ control: data });
 });
 
-// POST /:id/storage/waiver/decide — PRINCIPAL ONLY. Approve opens the gate;
-// reject closes it. Jess IS the principal, so this never gates him — it's the
-// guardrail that stops a junior operator self-approving a waiver. Defence in
-// depth: the migration-0184 RLS keeps writes to operation/principal, and this
-// route narrows the DECIDE to principal.
+// POST /:id/storage/waiver/decide — THE MANAGER ONLY (role `principal`).
+// Jess 2026-07-27 (card C9): an uncollected storage fee holds the goods, and
+// the only way past it is the manager — nobody else. Defence in depth: the
+// migration-0184 RLS keeps writes to operation/principal, and this route
+// narrows the DECIDE to principal.
+//
+// THREE outcomes, and the two releasing ones are separate because a release
+// must never quietly forgive money:
+//
+//   released → storage_waiver_status 'approved'. The hold lifts. The fee stays
+//              owed, so `Collect RM …` stays on the worklist.
+//   waived   → the same, PLUS storage_fee_override = 0 — the write-off
+//              instrument every storage reader already honours. The keyed
+//              `storage_fee_msbf` / `_sof` are untouched, so the figure that
+//              was written off is still on the record.
+//   rejected → 'rejected'. The hold stays; collect the fee.
+//
+// The amount is written into the order's activity as a sentence, because the
+// override alone cannot say what it replaced (the 0211 trigger does not watch
+// that column). FAIL-SOFT, like /storage/extend: an audit line must never undo
+// a decision the manager already made.
 orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Only a principal can decide a storage waiver" });
+    throw new HTTPException(403, {
+      message: "Only a manager can release a delivery held for a storage fee",
+    });
   }
 
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
 
   const parsed = await parseJsonBody(c, decideStorageWaiverInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const decision = parsed.data.decision;
 
   const sb = userClient(c.env, auth.jwt);
+
+  // Read the fee BEFORE the write, so the audit sentence can name what was
+  // released or written off. Best-effort: a read failure must not stop a
+  // decision the manager is entitled to make.
+  const fee = await storageFeeOf(sb, orderId);
+
+  const patch: Record<string, unknown> = {
+    storage_waiver_status: decision === "rejected" ? "rejected" : "approved",
+    storage_waiver_decided_by: auth.id,
+    storage_waiver_decided_at: new Date().toISOString(),
+    updated_by: auth.id,
+  };
+  // The write-off. Only on `waived` — `released` deliberately leaves the fee
+  // exactly where it was.
+  if (decision === "waived") patch.storage_fee_override = 0;
+
   // Update an existing overlay row only — there's nothing to decide if no
-  // waiver was ever requested. (note is accepted for API symmetry; there's no
+  // release was ever requested. (note is accepted for API symmetry; there's no
   // decision-note column yet — see the plan's approvals-inbox follow-up.)
   const { data, error } = await sb
     .from("ops_order_control")
-    .update({
-      storage_waiver_status: parsed.data.decision,
-      storage_waiver_decided_by: auth.id,
-      storage_waiver_decided_at: new Date().toISOString(),
-      updated_by: auth.id,
-    })
-    .eq("order_id", idCheck.data)
+    .update(patch)
+    .eq("order_id", orderId)
     .select(CONTROL_GATE_COLS)
     .maybeSingle();
   if (error) {
@@ -283,12 +315,67 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
   }
   if (!data) {
     return c.json(
-      { error: "not_found", code: "no_waiver", message: "No storage waiver to decide on this order" },
+      {
+        error: "not_found",
+        code: "no_waiver",
+        message: "No storage release to decide on this order",
+      },
       404,
     );
   }
-  return c.json({ control: data });
+
+  const amount = fee != null ? `RM ${fee.toLocaleString()}` : "the storage fee";
+  const line =
+    decision === "released"
+      ? `Delivery released by manager — ${amount} storage fee still owed`
+      : decision === "waived"
+        ? `Delivery released by manager — ${amount} storage fee written off`
+        : `Storage release refused — ${amount} to collect before delivery`;
+  await sb.rpc("operation_add_annotation", {
+    p_order_id: orderId,
+    p_content: line,
+    p_tag: null,
+  });
+
+  return c.json({ control: data, decision });
 });
+
+/** The chargeable storage fee on one order, through the ONE shared rule — used
+ *  only to write a truthful audit sentence. Returns null when it cannot be
+ *  read; the caller then says "the storage fee" rather than a wrong number. */
+async function storageFeeOf(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+): Promise<number | null> {
+  try {
+    const [ctrlRes, linesRes] = await Promise.all([
+      sb
+        .from("ops_order_control")
+        .select(
+          "storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
+        )
+        .eq("order_id", orderId)
+        .maybeSingle(),
+      sb.from("order_lines").select("sku").eq("order_id", orderId),
+    ]);
+    const ctrl = ctrlRes?.data ?? null;
+    if (!ctrl) return null;
+    return storageHold({
+      storageFrom: ctrl.storage_from ?? null,
+      override: ctrl.storage_fee_override ?? null,
+      importedMsbf: ctrl.storage_fee_msbf ?? null,
+      importedSof: ctrl.storage_fee_sof ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      skus: (linesRes?.data ?? []).map((l: any) => String(l.sku)),
+      asOf: new Date().toISOString().slice(0, 10),
+      collectedAt: ctrl.storage_collected_at ?? null,
+      waiverStatus: ctrl.storage_waiver_status ?? null,
+    }).fee;
+  } catch {
+    return null;
+  }
+}
 
 // ── Storage delivery-extension (the two Google Forms, Jess 2026-06-30) ───────
 const CONTROL_EXTENSION_COLS =
