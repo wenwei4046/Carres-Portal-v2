@@ -341,7 +341,7 @@ export function caseEvidenceGapMessage(gaps: readonly CaseEvidenceGap[]): string
 export const CASE_EVIDENCE_BUCKET = "service-case-evidence";
 
 /** Videos are big; a 20-second phone clip is tens of megabytes and cannot be
- *  re-encoded in the browser the way a photo can. The bucket cap (0288) is the
+ *  re-encoded in the browser the way a photo can. The bucket cap (0289) is the
  *  real limit — this mirrors it so the browser can refuse in plain words
  *  instead of surfacing a storage error. */
 export const CASE_EVIDENCE_MAX_BYTES = 25 * 1024 * 1024;

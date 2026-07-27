@@ -11,7 +11,7 @@ import { supabase } from "./supabase";
 import { shrinkImage } from "./image-shrink";
 
 /**
- * S2 evidence upload (migration 0288) — the repo's signed-upload-URL pattern
+ * S2 evidence upload (migration 0289) — the repo's signed-upload-URL pattern
  * (same shape as the T6 delivery photo and the model photos): the bytes go
  * browser → Supabase directly and never pass through the Worker.
  *

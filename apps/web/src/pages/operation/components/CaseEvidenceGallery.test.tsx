@@ -8,7 +8,7 @@ import CaseEvidenceGallery from "./CaseEvidenceGallery";
  * S2's second acceptance, exactly as the card words it: "each file shows its
  * uploader role in the case view."
  *
- * The stamp is the SERVER'S (0288 refuses an entry without it), so the job here
+ * The stamp is the SERVER'S (0289 refuses an entry without it), so the job here
  * is to report it — including for a case that predates S2 and has none.
  */
 

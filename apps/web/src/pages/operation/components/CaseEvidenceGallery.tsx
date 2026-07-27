@@ -19,7 +19,7 @@ import { attachCaseEvidence } from "@/lib/case-evidence-upload";
  *
  * The card's second half: "each file shows its uploader role in the case view."
  * The stamp is the server's (`by_role`, written at upload and refused if absent
- * by 0288's CHECK), so this screen reports it rather than deriving it.
+ * by 0289's CHECK), so this screen reports it rather than deriving it.
  *
  * Files can still be ADDED here — the customer often sends the photo the next
  * day — but never removed: the ledger is append-only in the API and the bucket
