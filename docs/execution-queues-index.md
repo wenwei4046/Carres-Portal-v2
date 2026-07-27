@@ -14,6 +14,8 @@
 > - Migration-bearing cards: check the remote tracker tail immediately before apply
 >   (guardrail #8). Two lines may take dual numbers the same day — cosmetic, the tracker
 >   keys on timestamp; never renumber applied files.
+> - **Business-rule documents may be edited only in a PLAN chat.** A BUILD chat implements
+>   the existing standards; it never redesigns them. (It still REPORTS problems — Law 0.)
 > - Deploys will occasionally collide: every chat already follows the union-tip rule
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
@@ -65,12 +67,20 @@ Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note 
 outside design conversation into cards) and a BUILD chat (do one card). Nothing else needs
 to be remembered.
 
+## Source of Truth Law
+
+Every rule exists in ONE place only. Business rules → the module's working flow · action
+engine → `docs/ACTION-FLOW-STANDARD.md` · UI wording → `docs/COPY-STANDARD.md` · execution
+queue → this file. **Never duplicate a rule into a second document.** When a rule changes,
+the source document is updated and nothing else — a copy elsewhere is how Delivery gets
+fixed and Purchasing is forgotten.
+
 ## The module working-flow files (one per module — the only home for its actions)
 
-| Module | File |
-|---|---|
-| Orders | `docs/ORDERS-WORKING-FLOW.md` |
-| Purchasing · Receiving · Service · Stock · Payments | same shape, written when the line starts |
+**Every module owns ONE working-flow file. Every working-flow file uses the same structure.
+Only the business content differs — the document structure never changes.** Orders' file
+(`docs/ORDERS-WORKING-FLOW.md`) is the template; each further module gets
+`docs/<MODULE>-WORKING-FLOW.md` when its line starts.
 
 ## The engine law (read before any C-card, and before any new module)
 
