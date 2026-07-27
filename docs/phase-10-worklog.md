@@ -3057,3 +3057,64 @@ because **every migration file on the tip was confirmed applied first — the tr
 0299**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the
 `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom
 domain returns 200.
+
+---
+
+## 2026-07-27 · Late interest, and paying the whole thing off early (0300)
+
+**PR #463** merged as `48262309`, migration **0300_rental_interest_and_settlement** applied, api Worker **`ea4889b3`** + web **`index-DNmwKQrc.js`** — **DEPLOYED**, 4 canonicals first poll. Worktree `rental-modular-sku`.
+
+Loo: *"先做罚息 + 买断结清，一个 PR."* — taken against my own advice to wait for a real signup first; he heard the reasoning and chose to build now.
+
+### What was actually there before
+
+Two empty shells. `rental_agreements` has carried `buyout_at`, `buyout_amount` and the `buyout_pending` status since **0249**; `rental_billings` has carried `late_interest` and `interest_charged_at` since **0281**. Measured before starting: **0 rows with a buyout, 0 with interest, 0 `interest_charged` events, 0 buyout/settle RPCs**, and `rentalLateInterest()` with **zero callers outside its own test file**. The columns were a promise nobody had kept.
+
+### The four decisions
+
+**1 · ACCRUED vs CHARGED — the distinction everything else follows from.** Interest owed grows every day, so a figure written down today is wrong tomorrow. That is exactly the trap `late` avoids by being derived on the read, and `Card declined` avoids by being derived from events. So:
+
+* **accrued** — a pure function of amount and days late, computed on the collections read, never stored, never stale.
+* **charged** — a human act at a moment: this figure, now, onto their account. THAT is what `late_interest` + `interest_charged_at` hold.
+
+The row can therefore say "+RM5.52 interest charged 21 Aug" or "+RM6.90 not charged yet", and the two can never silently disagree because only one of them is ever written.
+
+**2 · The one-writer law, honoured with a named seam.** 0281 made `rental_record_payment` the only writer of `rental_billings` and 0295 kept it. This did not break it:
+
+* `rental_charge_late_interest` touches **exactly two columns**, and the migration's own sanity block asserts by regex that it can never write `status` / `paid_amount` / the split columns.
+* `rental_settle_agreement` writes **nothing** in `rental_billings` itself — it **calls `rental_record_payment`** once per remaining month. That is not a workaround, it is the point: one split implementation, one history trail, and each month genuinely was paid, in one transfer instead of 83. Asserted both ways (must not write the table; must call the RPC).
+
+The writer count is now a tripwire: exactly three functions may write `rental_billings` (approve mints the schedule, record takes money, charge sets interest), and a fourth fails the migration.
+
+**3 · The split is on RENT, not on the penalty.** Loo's rates are "of every RM59 **collected**, 49% supplier / 20% sales". A late penalty is not rent, and handing a supplier 49% of a customer's punishment is a policy nobody has decided. So each settled month is recorded at its own `amount_due` — the split lands exactly as it always has — and the interest rides the settlement event as its own figure. `buyout_amount` is the sum, because that is what the customer paid. Verified live: settling RA-1003 collected RM5,796 (84 × 69) with a supplier share of RM2,840.04, exactly 49%.
+
+**4 · A discounted settlement is REFUSED, not guessed.** The locked rule is "pays the remaining term in one shot". Real settlements are often discounted and nobody has ruled how a discount spreads across 83 months and two payees. Rather than invent an allocation that quietly shorts a supplier, a mismatched amount is refused — **with the exact figure in the message**, because finance needs to see what it should have been. Filed as a CF rather than decided unilaterally.
+
+Plus **no document, no settlement** (Loo: the customer signs it first). Enforced in the RPC so the PostgREST door cannot route around it; server-generated object key; the blob is removed again if the RPC refuses. 0279's discipline, reused rather than re-argued.
+
+**And settling is not owning.** The money side closes (`completed`); the RU asset is deliberately untouched. Ownership transfers when the request-to-buy form is signed, which is still unbuilt.
+
+### Two defects caught in my own migration before it went near the DB
+
+1. The writer-count assertion expected **2** writers of `rental_billings` — it had forgotten that the new interest RPC is itself a (narrow, asserted) writer. Would have failed the apply.
+2. `rental_settle_agreement` looped `FOR ... IN SELECT ... WHERE status IN ('due','overdue')` while its own body flipped each row out of that predicate. How much of that a cursor snapshot sees is not a thing to leave to reasoning when the subject is money — the seqs are materialised into an array first.
+
+### Verification
+
+**21 assertions against live prod in a rolled-back transaction before apply**: showroom and BD refused on both actions (the gate is `rental_can_approve()`, narrower than `is_internal()` — a BD sells these) · not-late-yet refused · a collected month cannot grow a penalty · the figure is right (RM69 × 8%/mo × 30/30 = RM5.52) · same-day re-charge is a no-op with no second history line · **charging interest leaves every money-received column untouched** · the quote's arithmetic · four settlement refusals (no doc, wrong bucket, wrong amount, not active) · **a refused settlement moves no money** · after settling, 0 months owing, status `completed`, buyout stamped, the supplier share on all 84 months · exactly one `settled` event and 84 `payment_recorded` · audit read back **by ref, never by time** · settling twice refused.
+
+Post-apply the file was reconciled to live by `md5(prosrc)` — **all four functions byte-identical this time**, because the apply payload was the file rather than a hand-trimmed copy. That is the 0295 lesson applied.
+
+A functional smoke of the **deployed** RPCs then passed in its own rolled-back transaction (45 days → RM8.28; quote RM5,735.28; 84/84 collected; supplier RM2,840.04).
+
+### Not built, on purpose
+
+Pushing the penalty onto the next Stripe invoice as a one-off item. **No live agreement has a Stripe subscription** (measured: 0 of 1), so that path cannot be verified today, and 0281's own reasoning applies — recording a capability we cannot yet trigger is honest; shipping an unverifiable money path is not. The penalty is on the books and visible to finance, which is the substance. CF filed.
+
+### Deploy
+
+Tracker checked before numbering (0299 → mine is 0300) and again before applying. Before deploying, main's last migration file was 0300 and the tracker tail was 0300 — nothing ahead of the database. api Worker **`ea4889b3`** via `wrangler deploy --env production`, bindings receipt read (`PUBLIC_WEB_URL: https://pos.carresofficial.com` + the custom domain). web **`index-DNmwKQrc.js`** to carres-portal (`1c8cf0c0`) + carres-pos (`263e3d6d`), both `--branch=main`; **all 4 canonicals converged on the first poll**. Live bundle downloaded to a file then grepped: 4,423,947 bytes, `SERVICE_ROLE` **0**, four markers from mounted components present (`Settle early`, `not charged yet`, `Signed settlement document`, `Charge interest`).
+
+Suites at baseline: shared **1726/1726** · api **3** pre-existing · web **16** pre-existing. Tests added: api 11 (new `rental-money.test.ts`), web 9. web typecheck **0**; build, v4 guard and design-standard clean.
+
+**Note the api typecheck baseline moved again, downward**: the two `hr.ts` errors from #440 were fixed by that line, so it is back to **4** (all in `rental-sell.test.ts`).
