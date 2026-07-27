@@ -2153,7 +2153,7 @@ under each (the instruction IS the training), a count when more than one is aske
 have it" on the optional ones, one obvious Upload button. The case view gains
 `CaseEvidenceGallery`: thumbnails, the slot's name, and **`{role} · 27 Jul 26 · 15:14`** per
 file. Files can be ADDED there later (the customer sends the photo the next day) but never
-removed — no remove endpoint, and 0288 grants the bucket no delete policy. Evidence is evidence.
+removed — no remove endpoint, and 0289 grants the bucket no delete policy. Evidence is evidence.
 
 Bucket `service-case-evidence` is PRIVATE (a complaint photo shows a customer's home, and the
 video may carry their voice) at 25 MB, not 2 MB: the checklist asks for a 10–20 second video and
@@ -2232,12 +2232,17 @@ answer.
 ### Deploy note (worth remembering)
 
 Deployed **web only** from the main tip, deliberately. The union tip also carried two
-parallel lines' undeployed API code, and one of them (S2, `0288_service_case_evidence`) has
+parallel lines' undeployed API code, and one of them (S2, `0289_service_case_evidence` — numbered 0288 at the time) has
 **not been applied** to the database — `service_case_evidence_wellformed` does not exist in
 prod, while R2's `0288_supplier_claims` does. Shipping that Worker would have taken routes
 live against a missing migration. T10 needs zero API change, so the API was left alone.
 Two files both numbered `0288` sit on main; the tracker keys on timestamp, so the collision
 is cosmetic, but the unapplied one is not.
+
+> **Resolved same day (S2 session):** the collision is gone — the unapplied draft was renumbered
+> to `0289_service_case_evidence` (guardrail #8's "renumber an unapplied draft"), then applied and
+> its Worker deployed. `0288` now means `0288_supplier_claims` and nothing else. T10's call to hold
+> the API was the right one and is what kept the two apart.
 
 ### Evidence
 

@@ -47,13 +47,13 @@ export const serviceCaseConfigSchema = z.object({
 });
 export type ServiceCaseConfig = z.infer<typeof serviceCaseConfigSchema>;
 
-// ── Evidence (S2, migration 0288) ────────────────────────────────────────────
+// ── Evidence (S2, migration 0289) ────────────────────────────────────────────
 
 /**
  * One filed piece of evidence. `at` / `by` / `byRole` are stamped by the SERVER,
  * never sent by a client — the card's "every file is stamped who-uploaded +
  * when" is only worth anything if the stamp cannot be authored by the uploader.
- * (0288's CHECK makes them structurally non-optional in the row as well.)
+ * (0289's CHECK makes them structurally non-optional in the row as well.)
  *
  * `slot` is a plain string rather than the slot enum on the READ side: a file
  * filed under a slot key that is later retired must still be visible in the case
@@ -178,7 +178,7 @@ export const serviceCaseSchema = z.object({
   customerWants:   z.array(z.enum(CASE_WANT_KEYS)).optional(),
 
   /**
-   * S2 — the evidence ledger (migration 0288). Every file the case was filed
+   * S2 — the evidence ledger (migration 0289). Every file the case was filed
    * with, stamped with WHO uploaded it and WHEN. Optional for the same
    * degrade-don't-crash reason as the S1 fields above.
    */

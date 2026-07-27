@@ -619,7 +619,7 @@ export {
   caseLookupLineSchema,
   caseLookupOrderSchema,
   caseLookupResponseSchema,
-  // S2 (0288) — the evidence ledger.
+  // S2 (0289) — the evidence ledger.
   caseEvidenceEntrySchema,
   caseEvidenceListResponseSchema,
   caseEvidenceUploadedSchema,

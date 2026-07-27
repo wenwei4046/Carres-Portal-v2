@@ -1,8 +1,10 @@
--- 0288_service_case_evidence.sql
--- (Drafted as 0287; renumbered before apply — a parallel line applied
---  0287_ready_stock_plan to the shared prod database while this was being built.
---  Guardrail #8: check the tracker tail immediately before numbering AND again
---  before applying. The second check is the one that caught this.)
+-- 0289_service_case_evidence.sql
+-- (Drafted as 0287, renumbered TWICE before apply — parallel lines applied
+--  0287_ready_stock_plan and then 0288_supplier_claims to the shared prod
+--  database while this was being built. Guardrail #8: check the tracker tail
+--  immediately before numbering AND again before applying. Both catches came
+--  from the second check, and the second one landed after the PR had merged —
+--  so the rename is its own follow-up rather than an edit to an applied file.)
 --
 -- Service Case execution queue S2 — the evidence checklist. Locked with Jess
 -- 2026-07-27 (docs/service-case-execution-queue.md card S2):
@@ -86,7 +88,7 @@ as $$
 $$;
 
 comment on function public.service_case_evidence_wellformed(jsonb) is
-  'S2 (0288): every evidence entry must carry slot/path/kind/at/by/by_role. Makes "who uploaded it and when" structurally non-optional rather than trusted to the write path.';
+  'S2 (0289): every evidence entry must carry slot/path/kind/at/by/by_role. Makes "who uploaded it and when" structurally non-optional rather than trusted to the write path.';
 
 do $$
 begin
@@ -113,7 +115,7 @@ begin
 end $$;
 
 comment on column public.service_cases.evidence is
-  'S2 (0288): evidence ledger — jsonb array of {slot, path, kind, at, by, by_role}. slot = the checklist line answered (CASE_EVIDENCE_SLOTS, packages/shared/service-case-evidence.ts); path = object key in the private service-case-evidence bucket. Append-only: written by the case create + the evidence endpoints, never by the generic PATCH.';
+  'S2 (0289): evidence ledger — jsonb array of {slot, path, kind, at, by, by_role}. slot = the checklist line answered (CASE_EVIDENCE_SLOTS, packages/shared/service-case-evidence.ts); path = object key in the private service-case-evidence bucket. Append-only: written by the case create + the evidence endpoints, never by the generic PATCH.';
 
 -- ── the private evidence bucket ──────────────────────────────────────────────
 -- PRIVATE, like rental-agreements (0267) and unlike product photos (0173): a
@@ -160,7 +162,7 @@ begin
   -- A case with no issue type may hold an empty ledger (every case filed before
   -- S2, including the one real row).
   insert into public.service_cases (case_no, customer_name)
-  values ('SC-SANITY-0288', 'sanity') returning id into case_id;
+  values ('SC-SANITY-0289', 'sanity') returning id into case_id;
   if (select jsonb_array_length(evidence) from public.service_cases where id = case_id) <> 0 then
     raise exception 'S2 sanity: evidence must default to an empty array';
   end if;
