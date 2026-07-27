@@ -116,7 +116,8 @@ uploader role in the case view.
 
 **Done when:** closing a case requires all its tasks closed + customer-confirmed.
 
-> **SHIPPED 2026-07-27 (PR #431, migration 0293 applied).** Notes for the cards that follow:
+> **SHIPPED 2026-07-27 (PR #431, migration 0293 applied, Worker `ccc9616a` + web
+> `index-DEsBDZHt.js`).** Notes for the cards that follow:
 > - **The steps are DERIVED, not created.** `packages/shared/src/service-case-plan.ts`
 >   turns question 5 into the chain (`caseFollowUpPlan`), so there is no task row to
 >   forget to create, none to delete, and none that can drift from what the customer
