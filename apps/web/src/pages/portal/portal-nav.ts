@@ -147,7 +147,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Stock",
         icon: Boxes,
         tab: "stock-onhand",
-        activeFor: ["tab:stock-onhand", "tab:movements"],
+        activeFor: ["tab:stock-onhand", "tab:stock-plan", "tab:movements"],
       },
       { key: "payments", label: "Payments", icon: Wallet },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
