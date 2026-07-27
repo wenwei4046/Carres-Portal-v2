@@ -46,12 +46,10 @@ const PEOPLE = [{ id: "11111111-1111-4111-8111-111111111111", name: "Mayson" }];
 
 const BLOCKED = {
   run: null,
-  unattributed: 0,
   pendingAdjustments: 0,
   locked: false,
   checks: [
     check("rates", false, true, "Nobody has a commission rate"),
-    check("attribution", true, true, "Every sale has a salesperson"),
     check("month_over", false, false, "This month is still running"),
     check("no_run", true, true, "No run exists for this month yet"),
   ],
@@ -61,7 +59,6 @@ const READY = {
   ...BLOCKED,
   checks: [
     check("rates", true, true, "Everyone who sold has a rate"),
-    check("attribution", true, true, "Every sale has a salesperson"),
     check("month_over", false, false, "This month is still running"),
     check("no_run", true, true, "No run exists for this month yet"),
   ],
@@ -83,7 +80,11 @@ describe("the month close", () => {
     mockApi(BLOCKED);
     render(wrap(<HrCommissionRunPanel year={2026} month={7} people={PEOPLE} isPrincipal />));
     await screen.findByText("Nobody has a commission rate");
-    expect(screen.getByText("Every sale has a salesperson")).toBeInTheDocument();
+    // "Every sale has a salesperson" went with attribution (Loo 2026-07-27) —
+    // it could only ever pass, and its remedy screen no longer exists.
+    expect(
+      screen.queryByText("Every sale has a salesperson"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("This month is still running")).toBeInTheDocument();
     expect(screen.getByText("No run exists for this month yet")).toBeInTheDocument();
   });
@@ -147,8 +148,7 @@ describe("an approved month", () => {
       peopleCount: 2, totalPayable: 1454.43, totalCommission: 1454.43,
       totalAdjustments: 0, closedByName: "HR", approvedByName: "Loo",
     },
-    unattributed: 0,
-    pendingAdjustments: 0,
+      pendingAdjustments: 0,
     locked: true,
     checks: [],
   };
@@ -159,7 +159,7 @@ describe("an approved month", () => {
     expect(await screen.findByText(/approved and frozen/i)).toBeInTheDocument();
     expect(screen.getByText(/approved by Loo/)).toBeInTheDocument();
     expect(
-      screen.getByText(/Attribution and rate changes for this month are refused/i),
+      screen.getByText(/Salesperson and rate changes for this month are refused/i),
     ).toBeInTheDocument();
   });
 

@@ -72,9 +72,14 @@ function monthQuery(url: string) {
 /**
  * GET /api/hr/runs/state?year&month — the pre-flight.
  *
- * Two halves: what SQL knows (`commission_run_state`: existing run, unattributed
- * count, pending adjustments) and what only the engine knows (does everybody who
- * sold actually compute to a figure). Combined here by the shared pure function.
+ * Two halves: what SQL knows (`commission_run_state`: existing run, pending
+ * adjustments) and what only the engine knows (does everybody who sold actually
+ * compute to a figure). Combined here by the shared pure function.
+ *
+ * NOTE: `unattributed_orders` stays in the domain-error list above even though
+ * attribution was retired app-side (Loo 2026-07-27). `commission_close_month`
+ * still RAISES it in SQL — that gate is DDL and outlives this file — so the
+ * mapping is what turns it into a legible 422 instead of a 500.
  */
 hrRunsRouter.get("/state", requireHr, async (c) => {
   const { year, month, program } = monthQuery(c.req.url);
@@ -93,7 +98,6 @@ hrRunsRouter.get("/state", requireHr, async (c) => {
   const now = new Date();
   const checks: ReadinessCheck[] = commissionReadiness({
     report,
-    unattributed: dbState.unattributed,
     runStatus: dbState.run?.status ?? null,
     year,
     month,

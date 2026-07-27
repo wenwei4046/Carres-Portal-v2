@@ -195,11 +195,10 @@ describe("HrApp", () => {
     // RM 240.00 shows as Direct, TOTAL and the summary card
     expect(screen.getAllByText("RM 240.00").length).toBeGreaterThanOrEqual(2);
 
-    // under-count warning, with the assign worklist opened right below it
-    expect(
-      screen.getByText(/1 order this month has no salesperson/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Assign" })).toBeInTheDocument();
+    // Attribution retired whole (Loo 2026-07-27): even with an unattributed
+    // order in the payload, Earnings shows no warning and no assign control.
+    expect(screen.queryByText(/no salesperson/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
 
     // 0250 — the BD commission section renders the BD name + commission
     expect(
@@ -272,11 +271,12 @@ describe("HrApp", () => {
     // headline tiles read the month, not the commission basis
     expect(screen.getByText("RM 80,817.00")).toBeInTheDocument();
     expect(screen.getByText("18 orders")).toBeInTheDocument();
-    // the one real unattributed order IS a todo…
+    // an unattributed order is NOT a todo any more — nobody assigns one
     expect(
-      screen.getByText("1 order without a salesperson"),
-    ).toBeInTheDocument();
-    // …while imported archive is counted out loud, never as a todo
+      screen.queryByText(/without a salesperson/),
+    ).not.toBeInTheDocument();
+    // the archive footnote stays: it reconciles this page against the orders
+    // list, states a fact, and self-retires when those rows are deleted
     expect(
       screen.getByText(/37 imported archive orders are not counted here/),
     ).toBeInTheDocument();
@@ -325,32 +325,12 @@ describe("HrApp", () => {
     expect(screen.queryByText(/imported archive/)).not.toBeInTheDocument();
   });
 
-  // Attribution retired (Loo 2026-07-27). These three pin what replaced it:
-  // the worklist opens inside Earnings when — and ONLY when — an order is
-  // unassigned, which is also where the blocking close-check complains.
-  it("Earnings opens the assign worklist when an order has no salesperson", async () => {
+  // Attribution is GONE, not moved (Loo 2026-07-27): every order comes from
+  // the POS, which always stamps who sold it; the only rows without one are
+  // imported archive, due for deletion. Nothing assigns, so nothing asks.
+  it("no assign control exists anywhere, even with an unattributed order", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.startsWith("/api/hr/report")) return REPORT;
-      throw new Error(`unexpected fetch ${url}`);
-    });
-
-    render(wrap(<HrApp />, "/hr?tab=commission"));
-
-    await waitFor(() => {
-      expect(screen.getByText("SO-1201")).toBeInTheDocument();
-    });
-    expect(screen.getByText("Tan Mei Ling")).toBeInTheDocument();
-    expect(screen.getByText("RM 4,500.00")).toBeInTheDocument();
-    // same-store active staff appears in the assign select
-    expect(
-      screen.getByText("Aina Rahman · Main showroom"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
-  });
-
-  it("a healthy month shows no worklist at all — silence, not an all-clear card", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
-      if (url.startsWith("/api/hr/report")) return { ...REPORT, unattributed: [] };
       throw new Error(`unexpected fetch ${url}`);
     });
 
@@ -360,6 +340,7 @@ describe("HrApp", () => {
       expect(screen.getByText("Total commission")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
+    expect(screen.queryByText("SO-1201")).not.toBeInTheDocument();
     expect(screen.queryByText(/no salesperson/)).not.toBeInTheDocument();
   });
 
@@ -374,9 +355,8 @@ describe("HrApp", () => {
     await waitFor(() => {
       expect(screen.getByText("Needs a human")).toBeInTheDocument();
     });
-    // and the digest still routes the same todo — now to Commission
     expect(
-      screen.getByText("1 order without a salesperson").closest("a"),
-    ).toHaveAttribute("href", "/hr?tab=commission");
+      screen.queryByText(/without a salesperson/),
+    ).not.toBeInTheDocument();
   });
 });

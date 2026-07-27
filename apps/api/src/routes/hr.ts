@@ -299,34 +299,14 @@ hrRouter.post("/config/milestones", requireHr, async (c) => {
   return c.json({ ok: true });
 });
 
-/**
- * POST /api/hr/assign — attribute an unattributed order to a salesperson.
- * Attribution drives commission money, so it is the audited RPC
- * `hr_assign_salesperson` (order_history + audit_log rows), never a raw update.
+/*
+ * POST /api/hr/assign is GONE (Loo 2026-07-27). Attribution was retired whole:
+ * the POS stamps who sold every order it writes — live, 19 of 19 native orders
+ * carry a salesperson — and the only rows without one are imported archive,
+ * already excluded at the source by 0265 and due for deletion. With no work to
+ * do there is no endpoint. The `hr_assign_salesperson` RPC is still in the
+ * database (dropping it is DDL and needs its own approved migration); nothing
+ * calls it.
  */
-hrRouter.post("/assign", requireHr, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = hrAssignSalespersonInput.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(422, { message: parsed.error.issues[0]?.message ?? "invalid body" });
-  }
-
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb.rpc("hr_assign_salesperson", {
-    p_order_id: parsed.data.orderId,
-    p_salesperson_id: parsed.data.salespersonId,
-  });
-  if (error) {
-    if (error.code === "42501") throw new HTTPException(403, { message: "forbidden" });
-    if (error.message.includes("order_not_found")) {
-      throw new HTTPException(404, { message: "order not found" });
-    }
-    if (error.message.includes("salesperson_mismatch")) {
-      throw new HTTPException(422, { message: "salesperson not in this order's store" });
-    }
-    throw new HTTPException(500, { message: error.message });
-  }
-  return c.json({ ok: true });
-});
 
 export default hrRouter;

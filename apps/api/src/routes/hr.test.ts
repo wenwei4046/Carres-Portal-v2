@@ -167,38 +167,6 @@ describe("GET /api/hr/report", () => {
   });
 });
 
-describe("POST /api/hr/assign", () => {
-  it("calls the audited RPC with the order + salesperson", async () => {
-    const rpc = mockRpc({ data: null });
-    const res = await authed("/api/hr/assign", "hr", {
-      method: "POST",
-      body: JSON.stringify({ orderId: ORDER_1, salespersonId: SP_KAAN }),
-    });
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("hr_assign_salesperson", {
-      p_order_id: ORDER_1,
-      p_salesperson_id: SP_KAAN,
-    });
-  });
-
-  it("422 when the salesperson is not in the order's store", async () => {
-    mockRpc({ error: { message: "salesperson_mismatch" } });
-    const res = await authed("/api/hr/assign", "hr", {
-      method: "POST",
-      body: JSON.stringify({ orderId: ORDER_1, salespersonId: SP_KAAN }),
-    });
-    expect(res.status).toBe(422);
-  });
-
-  it("403 for a finance role (not in the HR gate)", async () => {
-    const res = await authed("/api/hr/assign", "finance", {
-      method: "POST",
-      body: JSON.stringify({ orderId: ORDER_1, salespersonId: SP_KAAN }),
-    });
-    expect(res.status).toBe(403);
-  });
-});
-
 describe("POST /api/hr/config/staff-rate", () => {
   it("upserts an effective-dated rate row", async () => {
     const upsert = vi.fn(async () => ({ error: null }));

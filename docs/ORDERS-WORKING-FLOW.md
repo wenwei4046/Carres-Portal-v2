@@ -93,12 +93,18 @@ Case Owner Decision Required                    Exception Closed
 - Completion: the case owner has chosen what happens to this order
 - Owner: the **Case Owner** — this is the one action that is never delegated
 
-**`Call {customer} — agree new delivery date`**
-- Trigger: the arrival date will miss the promise and the answer is known (a new arrival date, or the case owner's decision)
-- Checklist: explain the confirmed delay · give the proposed date or window · record the response · confirm the agreed new date · record who and when
-- Completion: the customer accepted a new date AND the outcome is recorded
-- Task Owner: the person named to make the call
-- **Never before the answer exists.** Nobody calls a customer able only to say "it will be late".
+**`Call {logistics} — arrange new delivery date`**
+- Trigger: the goods will miss the promised date **and the real ready date is known**
+- Checklist: give logistics the new ready date · logistics contacts the customer · record the date the customer accepted · record the time slot · record the outcome
+- Completion: a customer-confirmed new date AND slot are recorded
+- Task Owner: the module assigns it
+
+**THE RULE THAT GOVERNS THIS WHOLE SECTION (Jess, 2026-07-27).** Carres does not phone the
+customer about a delay. **Logistics does** — they are the ones who arrange every delivery
+appointment, so they carry this one too. And **nobody contacts the customer before the ready
+date is known**: a call that can only say "it will be late" and cannot answer "then when?"
+makes things worse. The order of the world is: we try to fix it → we get the real ready date
+→ we hand it to logistics → logistics agrees a new date with the customer.
 
 ### Payment
 
