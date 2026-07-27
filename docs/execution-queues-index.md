@@ -22,18 +22,20 @@
 
 | Line | Doc | Cards | State |
 |---|---|---|---|
-| ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1-T9 ✅ · T10 next · ENDS at T11 |
+| ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
 
-**State 2026-07-27:** ① T1-T9 ✅ (#363 #367 #370 #377 #382 #384 #386 #391 #398) ·
-② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅ —
-**14 of 38 shipped**.
+**State 2026-07-27:** ① **LINE COMPLETE** (#363 #367 #370 #377 #382 #384 #386 #391 #398
+#413 #425 — the Delivery menu item is live, and it is the only new one the plan ever gets) ·
+② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅.
 **Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → C7 → C8 → T11. R/S/K run in parallel throughout; C4 waits for a free R slot.
+C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot. T11 shipped
+AHEAD of that lane on Jess's instruction: it runs the Orders list's own ladder rather than a
+copy, so C1's rename and C2's two-layer rewrite reach the Delivery page for free.
 
 ## Sidebar map — where every line lands
 
@@ -44,7 +46,8 @@ existing door.**
 Dashboard
 Orders              ← ① T1-T6 live here · ② Order Journey button lives in its drawer
 Purchasing          ← ④ R1-R3 (Receiving tab exists; Claims becomes a sibling tab)
-Delivery            ← NEW at ① T11 only (the 3-pane module page)
+Delivery            ← ✅ LIVE (① T11, PR #425) — the 3-pane module page; reads only,
+                       every write hands back to the order drawer
 Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tabs
                        (On hand · Ready stock · In & out); "Inventory"/"Movements"
                        banned from UI — one warehouse, three questions

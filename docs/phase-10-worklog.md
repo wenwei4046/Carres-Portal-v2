@@ -2287,3 +2287,107 @@ session's deploy — the renumber only changed comments, which esbuild strips. T
 disabled. Nothing could be filed wrongly (the gate fails closed), but the wizard was unusable.
 T10's decision to hold the API back is exactly what kept a route from going live against a
 missing migration — the right call, and the reason this deploy is a fix as much as a ship.
+
+---
+
+## 2026-07-27 · Delivery T11 — the Delivery module page, and the line ENDS (PR #425 merge `__MERGE__`, Worker unchanged + web `__BUNDLE__` — DEPLOYED, no migration)
+
+Card **T11** of `docs/delivery-execution-queue.md` (promotes L5), the LAST card of line ①.
+The delivery line is now complete: **T1-T11 shipped in one day and a half.**
+
+### What was actually built
+
+The 3-pane module and **the ONE new sidebar item the whole build plan ever gets**. T11 is
+ASSEMBLY by definition — by now every signal, queue, word, reason, profile and calendar
+already ships — so the honest description of the work is *three panes and one ranking*:
+
+| Pane | Reads |
+|---|---|
+| facet | the four live delivery queues + their auto-overdue deadlines (T7) |
+| list | the SAME `nextActionOf` the Orders list runs — imported, never re-derived |
+| detail | booking (D1/T1) · groups (T8) · the logistics company's delivery rules (T9) · the photo ledger (T6) · the T5 spine component itself |
+| calendar | `bookingDayOf` (T10) — the one confirmed-vs-provisional rule |
+
+### The design call: the module writes NOTHING
+
+Every booking, reason and photo is entered through the order drawer, where the gates live
+(the server-side `bookingConfirmGate`, the T6 upload door). A module with its own confirm
+button would mean a second set of gates to keep in step with the server's, and the first
+time they diverged an operator would be handed a confirmation the API refuses. So the
+detail pane states facts and carries exactly ONE button, `Open order`, which mounts the
+same `OrderDetailDrawer` the Orders list mounts.
+
+This is also why the page needed no endpoint: every field already rides the orders list
+payload (T1 put the booking there, T7 the photo ledger) or `/api/operation/partners` (T9).
+The only server change in the card is one word added to a select list — `booking_groups`
+(0282), so the detail pane can name what THIS trip carries and what a second trip still owes.
+
+### Scope is decided by the ladder, not by a status column
+
+An order is delivery work exactly when the ladder says a delivery verb is next. That single
+choice buys three properties that would otherwise need policing:
+
+- the two pages **structurally cannot** name one order differently — there is one
+  `nextActionOf`, imported from `OperationOrdersControl` rather than reimplemented, so when
+  C2 rewrites the ladder into its two layers both surfaces move on the same commit;
+- a **money-held order (🔒 Confirm) is correctly absent** from the board without a rule
+  saying so — PayHold already decided it, and the board simply inherits the decision;
+- **queue-less orders are still built.** The calendar shows every booked truck, including
+  the held ones, and clicking one has to open a pane that says what the Orders list says
+  about it. A detail pane that could only address board rows would go blank on exactly the
+  orders an operator is most likely to click.
+
+### The one thing no earlier card produced: the RANKING
+
+The Orders list sorts by the order's overall slack — stock included. A delivery board sorted
+that way puts the wrong truck on top, because a mattress that has not been ordered outranks
+a confirmed delivery going out tomorrow. New pure `packages/shared/delivery-board.ts`
+(11 tests) is ACTION-FLOW Law 5 narrowed to delivery risk: **late first · nearest deadline ·
+nearest truck day · the promise · the SO.** Two details are load-bearing:
+
+- **A row with no anchor sorts LAST.** T7's law is that a step with nothing to measure from
+  can never be late; ranking it first because its date field is empty would be the same
+  false alarm in a different shape.
+- **The SO tail makes the order total**, so the list cannot reshuffle between renders — a row
+  that moves while it is being clicked is a bug an operator experiences as "I opened the
+  wrong one".
+
+`queue` was deliberately dropped from the shared row type: the comparator never reads it,
+and a field it ignores would read as though it were consulted.
+
+### Words — the module adds none, and fixed three at their source
+
+The queue names and action pills come from the shared constant. Inventing `Assign logistics`
+here while the Orders list still says `Assign logistic` would have been COPY-STANDARD rule 8's
+exact failure with its own menu item, and the copy law itself says the rename is C1's
+(*"the rename is free: C1 is already rewriting every one of those strings"*). So the page
+renders the constant, and C1's rename reaches it for free.
+
+What DID need fixing was T10's own three strings, which the 2026-07-27 copy rewrite banned
+after T10 shipped: `Carrier's date` → **`Logistics' date`**, `No carrier picked` → **`No
+logistics picked`** (fixed inside `delivery-calendar.ts`, so the right-rail calendar and this
+page share one definition), `Promised this day, needs a date` → **`…, no date yet`**. Leaving
+them would have meant two delivery surfaces spelling one fact two ways — the failure rule 8
+names. COPY-STANDARD gains only the four strings this page genuinely owns: `Queues · Calendar`
+· `{n} to do · {n} late` · `Nothing to do here.` · `Open order`.
+
+### Law 0 review
+
+- **Contradicts the code:** the card's ground truth says T9-T11 speak the NEW words; the live
+  labels are the old ones and the rename belongs to C1. Reported rather than forced.
+- **Would confuse a new hire:** `Delivery` has a menu item but its actions live in
+  `ORDERS-WORKING-FLOW.md` §3 — deliberate (they are the order's actions; Law 3 forbids two
+  homes). A `DELIVERY-WORKING-FLOW.md` would require the Orders file to lose that section:
+  Jess's call.
+- **Could not be built as written:** the proposal's prerequisite is the whole drawer lane
+  (C5 → … → C8), none of it shipped. Built on instruction; the exposure is wording, not
+  behaviour, precisely because the page runs the shared ladder.
+- **Not covered:** the board inherits C5's money bug harmlessly — `balance` is NULL on all 55
+  rows so nothing is held today, but when C5 makes the gate read `orders.paid`, ~18 owing
+  orders will leave the board at once. Correct, and it will look like a disappearance.
+
+### Evidence
+
+shared **1527/1527** (+11) · web **+16** · api untouched. Suites at the §17.7 baseline
+(api 3, web 16) — zero new failures. typecheck 0, build + `check:v4` + design-standard lint
+clean. No migration; the API change is one column added to an existing select.
