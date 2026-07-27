@@ -35,7 +35,7 @@ for ONE warehouse. **Fix:** merge the two sidebar items into ONE `Stock` entry w
 ```
 Stock
 ├─ On hand      what's here now        (existing OperationStockOnHand, unchanged)
-├─ Ready stock  how much to keep       (tab appears when K2 ships; hidden until then)
+├─ Ready stock  how much to keep       (shipped at K2 — OperationStockPlan)
 └─ In & out     when things moved      (existing Movements page — RENAMED; its own h1
                                         already says "Stock in & out history")
 ```
@@ -74,7 +74,7 @@ dashboard tile can never disagree. Notes the later cards need:
   door. Same shape for anything K2-K5 adds.
 - **Nothing seeded** — every accessory reads "Set a number" until the COO picks one.
 
-## K2 · Ready stock plan (propose → consolidate → approve → PO)
+## K2 · Ready stock plan (propose → consolidate → approve → PO) ✅ (PR #409)
 
 **Goal:** the monthly lane. Salesperson submits wanted qty per SKU; Sales Manager sees all
 proposals + system columns (30/90-day sales · weekend share · current · incoming ·
@@ -83,6 +83,37 @@ hands Operations a ready-to-create PO list. Over-suggestion warning
 (`⚠ well above 3-month average`) warns, never blocks.
 **Done when:** the whole chain is auditable — who asked, who cut, who approved, what was
 ordered.
+
+**Shipped 2026-07-27** (PR #409, migration **0287**). Ready stock is now the MIDDLE Stock
+tab, exactly where K0 reserved it. Two live findings reshaped the card, and both are load-
+bearing for K3-K5:
+
+- **The sales history the card asks for would have LIED.** All 37 `source_system='autocount'`
+  orders carry `placed_at = 2026-07-23` — the day they were IMPORTED — and every sales line
+  matching a warehouse SKU comes from them. A plain 30-day column prints "36 pillows" and
+  the 90-day column prints the same 36; that day being a **Thursday**, weekend share reads a
+  confident **0%** for every SKU. Real native history = 19 orders over **six days**. So the
+  engine excludes archive at the source (0265's law — no new flag) and **returns the excluded
+  count** so the screen says so out loud. **K3-K5 must read demand the same way.**
+- **Coverage gates the math, and it heals by itself.** No run rate / suggestion below
+  `MIN_HISTORY_DAYS_FOR_SUGGESTION` (14 real days); the `⚠ well above 3-month average`
+  warning cannot fire below `MIN_HISTORY_DAYS_FOR_BASELINE` (60). A warning that fires off a
+  fabricated average trains people to ignore warnings. Nothing to switch on later.
+- **The card's three job titles have ONE live actor.** All 5 active `salespersons` have
+  `user_id = null` (PIN sign-in, no `app_users` row), so they cannot authenticate to the ops
+  API at all — a salesperson-login lane would have had ZERO possible submitters. There is no
+  Sales Manager seat; only Jess (COO) holds any duty. The four STAGES are kept and gated on
+  duties that exist: propose = any operation login · consolidate = `ops_manager` · approve +
+  final qty = `stock_planner`. **K3's emergency lane should reuse these same two gates** —
+  hiring a Sales Manager splits the flow with no migration.
+- **ZERO new duty keys**, asserted in 0287's own sanity block so a later card cannot quietly
+  add one. K4's reserve levels still reuse `stock_planner` (0286's note stands).
+- **The PO list reads `approvedQty` and never falls back** to the consolidated or proposed
+  number — that is what makes "what was ordered" traceable. A line cut to 0 drops off.
+- 3 tables with a READ policy and **NO write policy at all**; the 5 audited DEFINER RPCs are
+  the only door (0286's shape). The first cut moves the cycle into review in the SAME act
+  that closes proposals, so the two can never disagree. `rejected` is terminal.
+- **Nothing seeded** — no cycle exists until someone opens a month.
 
 ## K3 · Emergency request lane
 
@@ -119,7 +150,7 @@ SKU rows.
 |---|---|---|
 | K0 | ✅ shipped 2026-07-27 | #376 |
 | K1 | ✅ shipped 2026-07-27 | #400 |
-| K2 | ⬜ | — |
+| K2 | ✅ shipped 2026-07-27 | #409 |
 | K3 | ⬜ | — |
 | K4 | ⬜ | — |
 | K5 | ⬜ | — |
