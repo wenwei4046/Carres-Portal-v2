@@ -345,12 +345,12 @@ names the carrier and ends in something the operator can do.
 T1 banned that word and fixed the LIST column; these two drawer copies were left behind.
 One-line fix to T1's `need booking`, flagged rather than touched.
 
-## T10 · Delivery calendar as single source (promotes L2) ✅ (PR #409)
+## T10 · Delivery calendar as single source (promotes L2) ✅ (PR #413)
 
 Today / Tomorrow / This week views reading the SAME booking fields — never a second store.
 Partner capacity from T9 shows on the day.
 
-**Shipped note (PR #409):** shared + web, **no migration, no API change** — every field
+**Shipped note (PR #413):** shared + web, **no migration, no API change** — every field
 the calendar needs already rides the orders list payload (T1 put `booking_stage` /
 `confirmed_date` / `confirmed_time_slot` there; T9 put the carrier rules on
 `/api/operation/partners`).
@@ -413,7 +413,7 @@ else is planned past T11 on purpose.
   deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
   before · delivery order 1 day before · photo same/next day) so a queue item can turn
   overdue BY ITSELF — no human watching required.
-- **L2 Delivery calendar → SHIPPED as T10 (PR #409)** — and the "second store" this entry
+- **L2 Delivery calendar → SHIPPED as T10 (PR #413)** — and the "second store" this entry
   warned about turned out to be the right-rail Calendar itself, which had been bucketing by
   the PROMISED date since 2026-07-23. It reads the booking now, through the same
   `bookingDayOf` rule the Orders list Delivery column reads.
@@ -463,5 +463,5 @@ else is planned past T11 on purpose.
 | T7 | ✅ shipped 2026-07-27 | #386 |
 | T8 | ✅ shipped 2026-07-27 | #391 |
 | T9 | ✅ shipped 2026-07-27 | #398 |
-| T10 | ✅ shipped 2026-07-27 | #409 |
+| T10 | ✅ shipped 2026-07-27 | #413 |
 | T11 | ⬜ delivery module page (FINAL) | — |
