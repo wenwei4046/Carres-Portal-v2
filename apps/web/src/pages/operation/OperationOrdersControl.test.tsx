@@ -966,6 +966,61 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.queryByTestId("filter-delivery")).toBeNull();
   });
 
+  // C2 — the `To book` predicate now matches its own word (found by C1).
+  // The old split also demanded stock be IN, so an order whose customer had
+  // already confirmed a date sat in `To book` with nothing left to book.
+  it("a customer-confirmed order sits in Customer confirmed even while its goods are out", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "t1",
+          so: 1451,
+          status: "proceed_order",
+          operation_stage: "in_production",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+          ops_order_control: {
+            booking_stage: "confirmed",
+            confirmed_date: relISO(6),
+            confirmed_time_slot: "Morning (9–11 AM)",
+          },
+        }),
+      ],
+    };
+    // A live stock snapshot that covers NONE of the order's SKUs → goods out.
+    stockHookState = { data: stockResponse([{ sku: "other", available: 0 }]) };
+    wrap(<OperationOrdersControl />);
+    clickStatus("Customer confirmed");
+    expect(rowsBySo()).toEqual(["1451"]);
+    clickStatus("To book");
+    expect(screen.queryAllByTestId("order-row")).toHaveLength(0);
+  });
+
+  it("a provisional logistics date is NOT a booking — that order stays in To book", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "t2",
+          so: 1452,
+          status: "proceed_order",
+          operation_stage: "in_production",
+          delivery_date: relISO(10),
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+          ops_order_control: {
+            booking_stage: "provisional",
+            logistic_eta: relISO(6),
+          },
+        }),
+      ],
+    };
+    stockHookState = { data: stockResponse([{ sku: "other", available: 0 }]) };
+    wrap(<OperationOrdersControl />);
+    clickStatus("To book");
+    expect(rowsBySo()).toEqual(["1452"]);
+  });
+
   it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
     wrap(<OperationOrdersControl />);

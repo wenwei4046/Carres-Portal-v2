@@ -185,8 +185,8 @@ const TAB_DESC: Record<SettledTab, string> = {
   placed: "New order, not processed yet (a salesperson placed it)",
   proceed: "Confirmed — being arranged. Every AutoCount-imported order starts here.",
   pending:
-    "The goods and/or the customer's delivery date are still outstanding — the Actions column says which",
-  scheduled: "Stock in AND the customer confirmed a delivery date + time slot",
+    "The customer has not confirmed a delivery date yet — the Actions column says who to call",
+  scheduled: "The customer confirmed a delivery date + time slot",
   completed: "Delivered and closed",
 };
 
@@ -216,18 +216,21 @@ function controlTabOf(
   // fall back to the old stage mapping (the param-less `=== "completed"`
   // callers).
   if (availableBySku) {
-    // Stock is READY when EITHER the live free-stock check says so OR the Master
-    // import marked every line ready (line_stock_status='ready', via stockEtaOf).
-    // Without the Master signal, AutoCount SKUs never match the catalog → the
-    // live check is always "awaiting" → NOTHING ever reached the confirmed tab
-    // (Jess 2026-07-19: "why scheduled no showing?"). Same fix as the ladder's.
-    const stockReady =
-      stockBucketOf(o, availableBySku) === "Ready" || stockEtaOf(o).state === "ready";
-    // T1 (0277): "a slot booked" = the CUSTOMER confirmed (booking_stage), not
-    // the logistics company's provisional logistic_eta — provisional rows stay
-    // in To book, so the tab counts agree with the drawer's booking chip.
-    const logisticBooked = bookingConfirmedOf(o);
-    return stockReady && logisticBooked ? "scheduled" : "pending";
+    // C2 (2026-07-27) — the predicate now matches the WORD. C1 renamed these
+    // tabs `To book` / `Customer confirmed` and correctly left the computation
+    // alone; this card owns it. The old split also required stock to be in, so
+    // an order whose customer HAD confirmed a date but whose goods were still
+    // out landed in `To book` — where the word is simply wrong, because there
+    // is nothing left to book. Goods and the booking are two independent facts
+    // (Law 1), and the goods one is already told by the Stock column and by the
+    // goods action; this tab answers only "has the customer confirmed?".
+    //
+    // T1 (0277): "confirmed" = the CUSTOMER's yes (booking_stage + a date), not
+    // the logistics company's provisional word — provisional rows stay in
+    // `To book`, so the tab agrees with the drawer's booking chip.
+    //
+    // Nothing moves today: 0 of 56 live control rows carry a confirmed booking.
+    return bookingConfirmedOf(o) ? "scheduled" : "pending";
   }
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
   if (s === "in_production") return "pending";
