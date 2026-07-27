@@ -31,9 +31,15 @@
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** — C4 · C6 · C7 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
+| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-27:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
-⑦ opened, nothing built yet.
+**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
+⑦ opened, nothing built yet · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
+
+**⑧ obeys the Orders lane rule** — T2 edited `OrderDetailDrawer.tsx`, so a ⑧ card that
+touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**
+(new components + a new `/ui` route only) and are safe beside anything; **D0.5c and D6 touch
+the Orders list and drawer** and are not.
 **Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
 **C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
 `Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
@@ -155,33 +161,24 @@ to be remembered.
 
 ## Frozen rulings waiting for their line (Jess 2026-07-27)
 
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
-| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** — C4 · C6 · C7 · C8 left |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
+> *(Repair 2026-07-28: a 22-line block sat here — the line table, the State
+> paragraph and the "Line ⑦ exists because…" note, all verbatim copies of the
+> section above, and the table had lost its header so it rendered as raw pipes.
+> A merge artifact. Deleted, not annotated. The index of "never duplicate a rule
+> into a second document" had duplicated itself, which is the same disease it
+> was written to name.)*
 
-**State 2026-07-27:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
-⑦ opened, nothing built yet.
-**Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
-**C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
-`Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
-**it IS an action**, the system produces the document and the operator presses one button.
-COPY-STANDARD now says so once.
-S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
-only ONE of those three at a time.**
-
-**Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
-specified a different purchasing module and none was authoritative, so every build chat
-picked a different one. They are DELETED. The single owner is
-`docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
-turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
-- **UI-KIT carries retired vocabulary and more than one version of some rules.** Jess flagged
-  it 2026-07-27: it is to be read top to toe, the old versions DELETED, and one final file
-  agreed with her. The banned action words were removed the same day; the rest is a
-  dedicated planning round, not a build card.
+- ~~**UI-KIT carries retired vocabulary and more than one version of some rules.**~~
+  **DONE 2026-07-28 — this became line ⑧.** The kit was rewritten top to toe as one file
+  (`ba7b7798`), the three doors that still taught the old law were shut (CLAUDE.md's own UI
+  paragraph, its "PROPOSE a superior redesign" instruction, and the invocable
+  `carres-design` skill), and the Information Hierarchy was frozen as §1.4 (`d83ecf98`).
+  What the measurement found: the problem was never the document. **274 of 285 pages
+  hand-roll their own page shell, 26 hand-roll a `<table>`, 63 a modal, 134 an `<input>`** —
+  a rule expressible as a CSS class survived (`.btn-*` 343 uses), a rule needing structure
+  did not. So the remaining work is Foundation Components, and it is carded in ⑧.
 
 ## Every rule's home (Law 0A, restated because it is what keeps failing)
 
