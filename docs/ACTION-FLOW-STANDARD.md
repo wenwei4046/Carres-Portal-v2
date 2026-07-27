@@ -26,6 +26,23 @@ needs a document to use the portal, the portal is wrong. (Jess, 2026-07-27.)
 4. It ticks itself and the next thing comes up.
 ```
 
+## Law 0 — follow the law, and say so when the law is wrong
+
+Following is not silent obedience. **A chat that spots a problem and says nothing has
+failed, even if it shipped the card perfectly.** (Jess, 2026-07-27.)
+
+- **Report, do not unilaterally change.** The laws and the module flow files are followed as
+  written. If one of them is wrong, contradicts the live code or data, or would confuse a
+  new hire, the chat SAYS SO to Jess — with the evidence — and Jess decides. It never edits
+  a law to suit the card it is building, and it never quietly does something different.
+- **Every chat ends with a review section, even when empty.** Four questions, always
+  answered: what in the flow contradicts the real code or data · what would confuse a
+  new hire · what could not be implemented exactly as written · what the flow does not
+  cover at all. "Nothing found" is a valid answer; silence is not.
+- **A blocking problem stops the work.** If building the card as written would ship
+  something wrong, the chat stops before building and asks. Shipping a known-wrong thing
+  because "the card said so" is the worst outcome available.
+
 ## Law 1 — TWO LAYERS, never one
 
 The old single ladder (`first matching rule wins`) is retired as a business rule. It hid

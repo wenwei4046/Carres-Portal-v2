@@ -23,6 +23,13 @@
 > **ONE CONCERN, ONE FILE.** When Jess re-rules something the old text is DELETED and
 > overwritten — never annotated "superseded", never two versions side by side. A word that
 > is not in COPY-STANDARD may not appear on screen: stop and ask her.
+>
+> **FOLLOWING IS NOT SILENT OBEDIENCE (Jess, 2026-07-27).** Follow the laws as written AND
+> tell her where they are wrong — with evidence — then let her decide; never edit a law to
+> suit the work. Every chat ends with the four review questions (what contradicts the real
+> code · what would confuse a new hire · what could not be built as written · what the flow
+> does not cover). "Nothing found" is a valid answer; **silence is a failure.** If building
+> as written would ship something wrong, stop before building and ask.
 
 > **⭐⭐ FOR ANY OPERATION-PORTAL / OPS-PANEL WORK, READ [`docs/OPS-BUILD-BRIEF.md`](docs/OPS-BUILD-BRIEF.md) FIRST.**
 > It is the single un-skippable entry point: the 3-track business model (货→送→钱), the
