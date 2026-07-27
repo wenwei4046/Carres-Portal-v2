@@ -105,6 +105,17 @@ no-paper rule. Every module uses it; no module invents its own action model.
 ## Standing laws (apply to every line)
 
 - One card = one chat = one PR = one deploy. Never two cards in one chat.
+- **Count the exits before you gate one.** If a card makes something require a reason, a
+  permission or a record, find EVERY path that reaches it first — a gated front door with an
+  open side door is worse than no gate, because the numbers now look complete. (K4 found a
+  third exit, `Takeout` on a free row, after gating the two obvious ones.)
+- **Leaving the old door open and filing a carry-forward looks disciplined and behaves like
+  a trap.** If the card's purpose is that something now has ONE way in, closing the other
+  ways is not the optional half of the job. Twice now a CF has been filed instead
+  (2026-07-26 care plans, 2026-07-27 K4) — the second time the chat caught itself.
+- **Claim a migration number at APPLY time, not at draft time.** Parallel lines take numbers
+  while you dry-run: `list_migrations` immediately before applying, and expect to renumber.
+  (K4 renumbered twice in one card.)
 - Never rebuild anything a doc marks ALREADY EXISTS.
 - Migration cards: check the remote tracker tail first (guardrail #8); drafts need Jess.
 - Copy law `docs/COPY-STANDARD.md` (plain words; POD banned → "delivery photo") ·
