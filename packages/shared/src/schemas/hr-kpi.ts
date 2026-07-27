@@ -317,9 +317,9 @@ export interface ScorecardInput {
 /**
  * Build the whole page's numbers in one pass.
  *
- * The line filter mirrors computeCommission's exactly (skip unattributed, skip a
- * salesperson who is not in `staff`) so the two surfaces cannot report different
- * sales for the same month.
+ * The line filter mirrors computeCommission's exactly (skip a line with no
+ * salesperson, skip a salesperson who is not in `staff`) so the two surfaces
+ * cannot report different sales for the same month.
  */
 export function computeScorecards(input: ScorecardInput): Scorecards {
   const { kpiKey, year, month, staff, lines, source } = input;
@@ -339,7 +339,7 @@ export function computeScorecards(input: ScorecardInput): Scorecards {
   let unscoredSold = 0;
 
   for (const line of lines) {
-    if (!line.salespersonId) continue; // unattributed — its own worklist
+    if (!line.salespersonId) continue; // pays nobody; 0296 makes it unwritable
     if (!staffIds.has(line.salespersonId)) continue; // not showroom staff
     if (!scoreableStoreIds.has(line.dealerId)) continue; // archive holder etc.
 

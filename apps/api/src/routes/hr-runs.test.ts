@@ -94,7 +94,7 @@ describe("GET /api/hr/runs/state — the pre-flight", () => {
   it("blocks the close when a seller computes to zero", async () => {
     // no rates configured -> engine returns total 0 on a real basis
     mockRpc({
-      commission_run_state: { data: { run: null, unattributed: 0, pendingAdjustments: 0, locked: false } },
+      commission_run_state: { data: { run: null, pendingAdjustments: 0, locked: false } },
       hr_commission_source: { data: { ...SOURCE_OK, config: { ...SOURCE_OK.config, rates: [] } } },
     });
     const res = await authed("/api/hr/runs/state?year=2026&month=7", "hr");
@@ -107,7 +107,7 @@ describe("GET /api/hr/runs/state — the pre-flight", () => {
 
   it("passes the rate check once a rate exists", async () => {
     mockRpc({
-      commission_run_state: { data: { run: null, unattributed: 0, pendingAdjustments: 0, locked: false } },
+      commission_run_state: { data: { run: null, pendingAdjustments: 0, locked: false } },
       hr_commission_source: { data: SOURCE_OK },
     });
     const res = await authed("/api/hr/runs/state?year=2026&month=7", "hr");

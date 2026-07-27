@@ -2659,3 +2659,45 @@ api Worker **`571ee2e3`** via `wrangler deploy --env production` — bindings re
 Live bundle downloaded to a file before grepping: **4,392,025 bytes**, `SERVICE_ROLE` **0**, three markers from MOUNTED components present (`Card declined`, `declined with no month to match`, `a refused card records`), and the deleted page's own `pos-rental-page` testid greps **0** — the delete shipped. Webhook trust boundary re-checked live: unsigned POST **400**, bad signature **400 `invalid_signature`**.
 
 Suites at baseline: shared **1582/1582** · api **3** pre-existing (partner/pickups ×1, supplier/pos ×2) · web **16** pre-existing (4 files). web typecheck **0**; api and shared typecheck at their pre-existing counts (4 and 3, both reproduced on clean origin/main before claiming so). Build + v4 guard + design-standard all clean.
+### 2026-07-27 (same session, tail) · the leftovers go too — 0297
+
+Reported at the end of the attribution ship and then cleaned on Loo's word: three
+remnants were still carrying a concept the portal no longer has.
+
+**`commission_run_state` was still counting.** Every pre-flight read computed an
+`unattributed` count and shipped it; nothing had read it since PR #435, the zod schema
+had already stopped describing it, and with `orders_salesperson_required` in force the
+number is provably 0 for every native showroom order. 0297 rewrites the function without
+it — `run`, `pendingAdjustments` and `locked` byte-identical, the hr/principal gate
+untouched, and **the STABLE marker kept** (CLAUDE.md §8 fix 3: dropping it defeats the
+planner's InitPlan caching, which is the whole reason this project does not have the HV
+Portal's 130-policy lag). The sanity block asserts all four.
+
+**`hr-runs.ts` was mapping a domain error nothing can raise.** `unattributed_orders` sat
+in the 422 list because `commission_close_month` used to raise it — 0296 removed that.
+Verified against live before deleting: **zero functions in the whole database mention
+`unattributed_orders`**, so the mapping was dead code pointing at a dead gate.
+
+**Three comments had started lying.** `commission.ts` said a salesperson-less line is
+"surfaced separately" and `hr-kpi.ts` said it has "its own worklist" — neither is true
+since #435. They now say what is actually the case: it pays nobody, and since 0296 the
+database refuses to write one for a native order. The `legacyUnattributed` doc comment
+was rewritten around the fact that it is the last surviving reader of the idea.
+
+Plus the plumbing: `GET /api/hr/report` stops forwarding the `unattributed` array,
+`HrSource` and `HrReportResponse` drop the field, and `HrUnattributedOrder` is deleted.
+An existing api test asserted the route DID forward it; it now asserts the route drops it
+while the RPC fixture still contains one, so it tests the route rather than the fixture.
+
+**Deliberately not touched, and why:** `hr_commission_source` still builds the
+`unattributed` ARRAY. Its `legacyUnattributed` sibling is still read (the Overview
+archive footnote), the array resolves to `'[]'` by construction now, and rewriting a
+6,647-character function that feeds every HR screen to delete a key that costs nothing is
+a worse trade than leaving it. Nothing carries it past the Worker.
+
+The HrApp test fixture keeps its `unattributed` payload on purpose: web and api deploy
+separately, so a browser on this build can meet a Worker that still sends the key. The
+assertions say the page renders nothing for it either way.
+
+Post-apply: `commission_run_state` exactly **1** copy, `md5(prosrc)`
+`1d9bdbbcc3ca8e308bdf69c9d3477873`, length 1722 → **1345**, `provolatile = 's'`.

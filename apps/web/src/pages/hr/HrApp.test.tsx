@@ -70,6 +70,10 @@ const REPORT = {
     totalCommission: 240,
     totalBasis: 12000,
   },
+  // Kept on purpose after 0297 stopped the API forwarding this key: web and
+  // api deploy separately, so a browser on this build can meet a Worker that
+  // still sends it. The assertions below say the page renders nothing for it
+  // either way.
   unattributed: [
     {
       orderId: "6a2f8a30-0000-4000-8000-00000000a001",
