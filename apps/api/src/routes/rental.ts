@@ -1569,6 +1569,22 @@ rentalRouter.post("/agreements", async (c) => {
     // error the store needs to read.
     await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
     const detail = (error as { details?: string | null }).details ?? "";
+    // 23514 = 0296's `orders_salesperson_required`. A rental mints a Sales
+    // Order (0275) and p_salesperson_id defaults to NULL, so this is the one
+    // live path that can reach the new constraint. Say it in words.
+    if (
+      error.code === "23514" &&
+      /orders_salesperson_required/.test(error.message ?? "")
+    ) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "salesperson_required",
+          message: "Pick who sold this rental before signing it.",
+        },
+        422,
+      );
+    }
     if (detail === "forbidden") {
       return c.json({ error: "forbidden", code: "forbidden", message: error.message }, 403);
     }
