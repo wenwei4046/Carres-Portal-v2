@@ -3164,3 +3164,125 @@ Tests added: shared **37** (the engine, incl. the card's own three-open-actions 
 **Four findings reported, two of them law problems** (full text in the card doc): (1) Law 6 still says "the column carries no header word", written when the dots were to OWN that column — Jess's later side-by-side ruling put the stage pill there, and a column holding a stage pill needs a word for it; the card's own text resolves it ("the dots need no header **of their own**"), which is what shipped, but **a chat reading only Law 6's older sentence would strip the header and leave the pill unlabelled**; (2) the card's stated width was stale (it says 9 units, C1 had already made it 11); (3) §7 gives the money dot no amber while goods and delivery each have three tones, so "owing but not yet due" cannot read differently from "owing and late" — not invented here; (4) the Stock and Delivery cells have said "the 货 dot carries the colour" since the §14 rebuild and render facts in ink/grey — C10 changed neither, the colour channel they were waiting for simply exists now.
 
 Closes carry-forward `row-dots-of-is-dead-code` — revived rather than deleted, which was the option Law 6 wanted. **No Worker deploy**: `git diff bc92e4cc..origin/main -- apps/api packages/shared supabase/migrations` is empty, so the live Worker `739d4be8` already carries the tip. Suites at baseline (web **16** pre-existing, 4 files; this file's suite 109 → **120**); `tsc -p tsconfig.app.json` 0, design-standard lint, `check:v4` and build clean; `SERVICE_ROLE` greps **0** in the live bundle (4,428,600 bytes).
+
+---
+
+## 2026-07-27 · Portal Core C9 — a storage fee holds the delivery, and only the manager releases it
+
+**PR #472** (merge `a12e8ff6`) · **no migration** · Worker `13c77a71` + web `index-hp2T-FN4.js`
+(carres-portal `e061cba9` + carres-pos `82b4dfec`, both `--branch=main`) — **DEPLOYED**, then
+superseded within minutes by PR #474's `index-CsnNUn76.js` from `b464257c`, which **contains
+C9** (`git merge-base --is-ancestor a12e8ff6 b464257c` passes — the containment proof the
+deploy rules ask for). All 4 canonicals converged on that hash; verified there.
+
+Jess's ruling, 2026-07-27: *an uncollected storage fee is the same as an unpaid balance — the
+goods do not go. If something must go out anyway, the manager approves it and nobody else.*
+
+**Not urgent, and the card said so: ZERO live orders carry a storage fee.** Every change here
+is invisible on an order without one. This decides the behaviour before the first appears
+rather than improvising when it does.
+
+### The split that closes the card is one line of arithmetic
+
+The gate now reads the ONE number — `lines + add-ons + chargeable storage − orders.paid` —
+with no softer path for storage. But a release has to lift the HOLD without forgiving the
+MONEY, so `orderMoney` gained `holding` beside `outstanding` and `holds` beside `owing`:
+**what is OWED and what still BLOCKS became two questions**, and a manager's release is the
+one thing that parts them. The 🔒 and the booking gate ask `holds`; the money action and the
+Owing facet ask `owing`. That is why a released order books **while `Collect RM …` stays on
+its row** — the card's own done-when, and the reason a release can never quietly forgive
+money. `order-actions.ts` took the same split as an OPTIONAL `moneyHolds` signal, so omitting
+it reproduces the pre-C9 lock exactly (asserted).
+
+### No migration — checked, as the card asked, and the answer was not obvious
+
+`storage_waiver_status` has four values and the outcomes need five states — but only if the
+write-off has to live in that column. It does not. `storage_fee_override = 0` already means
+"this order owes no storage fee", is already honoured by every storage reader, and is a
+DIFFERENT column from the Master-imported `storage_fee_msbf` / `_sof`, so **the figure that
+was written off stays on the record** instead of vanishing.
+
+| The manager's decision | `storage_waiver_status` | `storage_fee_override` |
+|---|---|---|
+| `Release, fee still owed` (default) | `approved` | untouched — the fee stays owed |
+| `Release and waive the fee` | `approved` | `0` — written off, with the reason |
+| `Reject` | `rejected` | untouched |
+
+**`approved` therefore means RELEASED, not forgiven** — the one meaning change, and what makes
+the ruling true rather than aspirational. `approved` is still accepted on the wire and reads
+as `waived`, which is exactly what the single old outcome did, so a browser left open across
+the deploy keeps working instead of 422-ing on a word it was built with.
+
+### The finding the card did not predict: the fee was read THREE ways
+
+The same drift C5 found for the goods balance, one card later and one column over.
+
+| Reader | What it read | What it missed |
+|---|---|---|
+| the Orders ladder's 🔒 | `storage_fee_msbf + _sof` | **`storage_fee_override`** — an order the operator had marked "No storage" still showed its fee |
+| the dispatch gate (`storageBlock`) | override + computed | **the Master-imported columns** — an order carrying Jess's own keyed fee and no `storage_from` dispatched with the money unpaid |
+| the drawer | all three, correctly | — |
+
+`packages/shared/storage-hold.ts` is now the ONE ladder (override incl. 0 → Master figure →
+computed) with four readers: the ladder, the booking gate, the dispatch gate and the decide
+route's audit line. **The list API had to start selecting `storage_from` and
+`storage_fee_override`** — without them the row cannot honour an override, and "one rule"
+would have been one rule the row could not ask.
+
+### "UNKNOWN never holds" survives, and it needed a decision
+
+Rule 4 of the card and §2 of the working flow are about the order VALUE, so `goodsOwing` stays
+0 on the 37 unpriced imports and holds nothing. A storage fee is the opposite case — a figure
+a human typed — so it DOES hold an unpriced order. Written as two tests that state the
+distinction, because the two readings look alike in the card's one sentence.
+
+### The audit is a sentence, not a column
+
+The 0211 activity trigger does not watch `storage_fee_override`, so a waive would otherwise be
+a silent zero. The decide route reads the fee through the shared rule BEFORE it writes and
+appends `Delivery released by manager — RM 150 storage fee still owed` / `… written off`
+through the same fail-soft annotation door `/storage/extend` uses — an audit line may never
+undo a decision the manager already made.
+
+**No alert engine, as ruled**: the release flips the row's own headline (the 🔒 comes off
+`Confirm delivery`) and the collection stays in the queue it was already in.
+
+### Reported, not fixed (Law 0)
+
+1. **`ORDERS-WORKING-FLOW.md` §5 puts the money gate on ISSUING the delivery order; the code
+   puts it on CONFIRMING the date.** §5: "Issuing the delivery order is the hard gate, not
+   agreeing a date… Agreeing the date still WARNS about the same three." Live, the only money
+   gate is `bookingConfirmGate`, which REFUSES a confirmation — C5 fixed it there and C9
+   widened it there, because moving a gate is not a bug-fix card's business. **C7 owns this**
+   and must decide whether the confirm gate drops to a warning when `Issue delivery order`
+   exists. Until then the card's "cannot issue its delivery order" is satisfied one step
+   earlier than the flow describes.
+2. **Nothing was measured live.** The Supabase MCP refused every call this session
+   (`You do not have permission to perform this action`), so the card's "ZERO live orders
+   carry a storage fee (measured 2026-07-27)" could not be re-checked — and no migration could
+   have been applied even if one had been needed. Bounded: every behaviour change here is
+   invisible on an order with no storage fee, so a stale figure changes nothing about what
+   ships. But the figure quoted above is the card's, not this chat's.
+3. **"The manager" is the `principal` role, and the card let that stand.** HR-P2 built duty
+   keys (`org_duties`) precisely so a permission can follow a POSITION, and Jess's word is
+   "manager", not "principal". The card said reuse the existing approval channel, so the gate
+   was left alone — but this is now a MONEY decision, and the only person who can make it is
+   whoever holds the principal login.
+4. **The release has no expiry and no scope** — once released, released forever and for every
+   trip, including a second trip booked weeks later under a fee that has kept accruing. A
+   release is currently a permanent property of the ORDER rather than of a delivery.
+5. **A rejected release can be re-asked with nothing telling the operator the fee has grown**
+   since the refusal. Small, and it belongs to whoever next touches the Storage panel.
+
+### Verification
+
+Suites at baseline on the union tip (shared **1788/1788** incl. +25 · api **3** pre-existing ·
+web **16** pre-existing); `tsc -p tsconfig.app.json` 0, api `tsc` 4 pre-existing in
+`rental-sell.test.ts`, build + `check:v4` + lint clean, `wrangler --dry-run --env production`
+clean. Tests +34 (shared 25 · api 7 · web 2 net). **Proved BOTH directions on the downloaded
+live bundle** (4,443,920 bytes, `SERVICE_ROLE` 0): the new strings are present
+(`Release, fee still owed` · `Release and waive the fee` · `Ask the manager to release` ·
+`Released by the manager` · `written off by the manager`) and the retired ones grep **0**
+(`Approve waiver` · `Waived by principal` · `Request waiver` · `Waiver requested` ·
+`pending principal approval`). The one surviving `Awaiting principal approval` is Finance
+Refunds' own >RM 1,000 line, a different feature.
