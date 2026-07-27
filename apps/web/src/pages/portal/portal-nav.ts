@@ -28,7 +28,6 @@ import {
   ShieldCheck,
   HandCoins,
   UserCheck,
-  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -267,9 +266,21 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     defaultTab: "overview",
     items: [
       { key: "overview", label: "Overview", icon: LayoutDashboard },
-      { key: "commission", label: "Commission", icon: HandCoins },
-      { key: "attribution", label: "Attribution", icon: UserCheck },
-      { key: "setup", label: "Commission Setup", icon: SlidersHorizontal },
+      // Commission is ONE entry (Loo 2026-07-27) — the month report and the
+      // rates that compute it are one subject, so "Commission Setup" stopped
+      // being a second rail item and became a sub-tab (`HrCommissionTabs`),
+      // the same merge Stock (K0) and Purchasing made. `activeFor` keeps the
+      // item lit on both `?tab=` values.
+      {
+        key: "commission",
+        label: "Commission",
+        icon: HandCoins,
+        activeFor: ["tab:commission", "tab:setup"],
+      },
+      // Attribution retired (Loo 2026-07-27, "no more use for me") — the
+      // unassigned-order worklist is empty on a healthy month, so it cost a
+      // permanent rail item to say "nothing to do". It renders inside
+      // Commission → Earnings now, only while an order is unassigned.
       // Team hierarchy (Loo 2026-07-25) — the org registry + THE account door:
       // every new user except dealers is minted here.
       { key: "team", label: "Team", icon: Users },
