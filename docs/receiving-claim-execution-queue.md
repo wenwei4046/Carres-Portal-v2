@@ -172,6 +172,52 @@ damage rate, claim rate, avg claim-resolution days. Lives on the Suppliers page.
 Feeds Purchase's promise-setting (short-delivery strategy already prices promises off
 real supplier performance).
 **Done when:** next supplier negotiation opens with numbers, not memory.
+**SHIPPED 2026-07-27 (PR #475, NO migration).** The scorecard sits on the
+supplier card and opens in full in the drawer. **R5 stores nothing** — it reads
+R1's three numbers on a PO line, R2/R3's claims and R4's quarantine, calls no
+RPC and adds no table (K5's shape: a review layer with its own state is a fifth
+number to keep in step with four). Notes the next cards need:
+- **The live finding is the whole design: 10 suppliers · 0 POs · 0 lines ·
+  0 claims.** Every rate this card asks for is 0/0, so built the obvious way the
+  screen opens ten negotiations with a percentage nobody earned — `0%` reads
+  "Ohana never delivers on time" and a defaulted `100%` reads "Ohana is
+  perfect". **A rate is either backed by records or it is not printed**, and the
+  four gates that follow all heal by themselves as real POs land: a score needs
+  `MIN_JUDGED_POS` (3) tested promises · a promise whose day has not come is not
+  a failure · a PO with no `eta_date` can never be scored and is counted BY NAME
+  (that one is ours, not the supplier's) · a PO that arrived complete with no
+  receipt date leaves the on-time denominator instead of being guessed into it.
+- **R4's carry-forward honoured, and where it is refused is reported not
+  hidden.** `purchase_orders.status` never reaches the score (a PO made good by
+  releasing held units stays `open` forever). But the CF also says on-time
+  should read the covering claim's `closed_at`, and the RATES deliberately do
+  not: a shortfall that was written off, or that the supplier refused, is a
+  shortfall — counting a closed claim as "delivered in full" would launder a
+  supplier failure into a pass. `closed_at` is used for the one number it
+  genuinely answers, settle time. **One branch changes it if Jess disagrees.**
+- **The card's "partial-delivery rate" ships as `In full`** — the same question
+  stated as the thing that went right, so the label needs no minus sign; and
+  "damage rate" ships as ONE `Damaged or wrong` figure over the units that
+  actually arrived, because R2's two counters are disjoint and a negotiation
+  asks "how many did I have to send back", not which box they came from.
+- **Nothing on this screen is coloured.** UI-KIT reserves colour for
+  action/selection/status/alert; a percentage is none of those until somebody
+  sets a target, and **nobody has** — painting 82% amber would be the portal
+  inventing a supplier policy Jess never ruled. It earns colour the day a target
+  exists.
+- **The open-claim count sits beside the settle-time average and is never folded
+  in.** R3 left no escape hatch for a supplier who never answers; without this,
+  one quick settlement plus five unanswered claims would read "settles in 2
+  days".
+- **NOT built, and reported rather than quietly dropped:** the card's "feeds
+  Purchase's promise-setting". Nothing consumes the scorecard yet — with 0 POs
+  there is no performance to price a promise off, and wiring a live lead-time
+  override is its own card with its own business decision (does a supplier's
+  record shorten the promise we give a customer, or only the one we expect from
+  the factory?).
+- Two words are new on screen and neither is in COPY-STANDARD's dictionary
+  (`On time` · `In full`). They are FACTS, not actions, so no verb rule applies
+  — but they are worth Jess's ruling before a second module reuses them.
 
 ## R6 · Warehouse login — the warehouse updates itself
 
@@ -231,6 +277,6 @@ auto-receives their own PO.
 | R2 | ✅ | [#412](https://github.com/wenwei4046/Carres-Portal-v2/pull/412) · 0288 |
 | R3 | ✅ | [#428](https://github.com/wenwei4046/Carres-Portal-v2/pull/428) · 0291 |
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
-| R5 | ⬜ | — |
+| R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ⬜ after R1-R2 · warehouse login | — |
 | R7 | ⬜ after R1 · GRN duty auto-assign | — |
