@@ -29,11 +29,16 @@ paymentsRouter.get("/", async (c) => {
     .from("orders")
     // ops_order_control is a 1:1 overlay (its order_id PK FKs orders.id); the
     // PostgREST embed comes back as an array — the FE takes [0].
-    // order_payments embed (0184) lets the FE net the ledger against the
-    // balance + show what's been collected; the extra control cols carry the
-    // due-date + storage-gate state for the overdue / collected badges.
+    // C5 (2026-07-27): GOODS money comes from `orders.paid` + the priced lines
+    // through the shared `orderMoney` — the desk used to net the balance
+    // against the `order_payments` ledger, and with that ledger empty and
+    // `balance` NULL on every live row the whole collections queue computed
+    // RM 0 owing. The ledger embed stays for STORAGE collections only
+    // (kind='storage'): storage has its own clock and its own flag, and
+    // `orders.paid` is goods money — dropping it would delete a working
+    // feature with nothing to replace it.
     .select(
-      "id, so, status, operation_stage, customer_name, customer_phone, customer_address, delivery_date, delivery_date_tbd, delivered_at, source_ref, order_lines(sku, qty), order_payments(amount, kind), ops_order_control(balance, payment_status, storage_from, storage_fee_override, balance_due_date, storage_collected_at, storage_waiver_status, extension_original_date, line_etas, line_stock_status, last_chased_at)",
+      "id, so, status, operation_stage, customer_name, customer_phone, customer_address, delivery_date, delivery_date_tbd, delivered_at, source_ref, paid, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), order_payments(amount, kind), ops_order_control(balance, payment_status, storage_from, storage_fee_override, balance_due_date, storage_collected_at, storage_waiver_status, extension_original_date, line_etas, line_stock_status, last_chased_at)",
     )
     .in("status", ["place", "proceed_order", "delivered"])
     .order("delivery_date", { ascending: true, nullsFirst: false })

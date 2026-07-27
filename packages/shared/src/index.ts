@@ -1505,6 +1505,11 @@ export {
   type CaseSlaRecordInput,
 } from "./service-case-sla";
 export {
+  orderMoney,
+  type OrderMoneyInput,
+  type OrderMoney,
+} from "./order-money";
+export {
   bookingConfirmGate,
   isSundayIso,
   type BookingGateInput,

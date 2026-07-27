@@ -16,6 +16,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   computeStorageFee,
+  orderMoney,
   summarizePayments,
   type OrderPaymentRow,
   type PaymentKind,
@@ -83,6 +84,12 @@ interface RawLedgerEntry {
 interface RawLine {
   sku: string;
   qty: number;
+  /** C5 — the priced value of the line; absent on AutoCount imports. */
+  unit_price?: number | string | null;
+}
+interface RawAddon {
+  qty: number;
+  unit_price?: number | string | null;
 }
 interface RawPaymentRow {
   id: string;
@@ -96,6 +103,11 @@ interface RawPaymentRow {
   delivered_at: string | null;
   source_ref: string[] | null;
   order_lines: RawLine[] | null;
+  /** C5 — `orders.paid` + the add-on sum: the goods money the desk chases.
+   *  Optional so a browser on this build against a pre-C5 Worker degrades to
+   *  "value unknown" rather than crashing. */
+  paid?: number | string | null;
+  order_addons?: RawAddon[] | null;
   order_payments: RawLedgerEntry[] | null;
   ops_order_control: RawCtrl[] | RawCtrl | null;
 }
@@ -374,9 +386,25 @@ export default function OperationPayments() {
         kind: p.kind,
       }));
       const sum = summarizePayments(ledger, balance ?? 0);
-      const goodsPaid = sum.byKind.payment + sum.byKind.deposit;
       const storageCollected = ctrl?.storage_collected_at != null;
-      const goodsOwing = balance != null ? Math.max(0, balance - goodsPaid) : 0;
+      // C5 (2026-07-27): GOODS money is the shared `orderMoney` — the priced
+      // lines against `orders.paid`, falling back to the hand-keyed balance for
+      // imported rows. The desk used to net `balance` against the
+      // `order_payments` ledger; that ledger holds 0 rows and `balance` is NULL
+      // on all 55 live control rows, so every row computed RM 0 owing and this
+      // whole collections queue was empty while 18 orders owed RM 56,859.
+      // The ledger is still read for STORAGE collections below — storage has
+      // its own clock and its own flag, and `orders.paid` is goods money.
+      const price = (x: { qty: number; unit_price?: number | string | null }) =>
+        Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+      const money = orderMoney({
+        lineSum: lines.reduce((s, l) => s + price(l), 0),
+        addonSum: (r.order_addons ?? []).reduce((s, a) => s + price(a), 0),
+        paid: r.paid,
+        controlBalance: ctrl?.balance ?? null,
+      });
+      const goodsPaid = money.paid;
+      const goodsOwing = money.goodsOwing;
       const storageOwing = storageCollected ? 0 : Math.max(0, effectiveStorage - sum.storageCollected);
       const dueDate = ctrl?.balance_due_date ?? null;
       const overdue = !!dueDate && dueDate < today && goodsOwing > 0;

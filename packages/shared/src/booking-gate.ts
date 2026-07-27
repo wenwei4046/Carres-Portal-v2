@@ -11,9 +11,16 @@
  * reserved to THIS SO cover the qty). Free shelf stock is "to reserve", NOT
  * ready — same as the badge (SO-1153 parity bug).
  *
- * balance ready — Outstanding (Total − Collected) is zero. Total-not-set ⇒
- * don't block, mirroring the drawer's Money rule (an AutoCount order with no
- * keyed balance can't owe a number nobody has entered).
+ * balance ready — Outstanding is zero. Total-not-set ⇒ don't block (an
+ * AutoCount order with no keyed balance can't owe a number nobody has
+ * entered).
+ *
+ * C5 (2026-07-27) — the money question moved out of this file into the shared
+ * `orderMoney`, because the gate and the Orders ladder were each computing
+ * outstanding from a different column and both were wrong: this gate summed an
+ * `order_payments` ledger that holds zero rows, so a fully-paid order (SO-1209,
+ * RM 7,248 paid of RM 7,248) was refused its booking for money. The gate no
+ * longer decides what "collected" means — it asks the one function that does.
  *
  * T8 (2026-07-27) — the gate learns DELIVERY GROUPS. Goods-ready stopped being
  * one all-or-nothing question about the whole order and became one question per
@@ -30,6 +37,7 @@ import {
   orderDeliveryGroups,
   type DeliveryGroupKey,
 } from "./delivery-groups";
+import { orderMoney, type OrderMoneyInput } from "./order-money";
 
 export interface BookingGateInput {
   /** Order lines (order_lines rows — sku + qty; service charges included, the
@@ -40,11 +48,11 @@ export interface BookingGateInput {
   /** Units reserved to THIS SO in ops_stock_items (status='reserved',
    *  reserved_ref='SO-<so>'), summed per stockMatchKey. */
   reservedQtyByKey: Record<string, number>;
-  /** Order total: Σ order_lines + order_addons (unit_price × qty); when the
-   *  lines carry no prices (AutoCount), the keyed ops_order_control.balance. */
-  orderTotal: number;
-  /** Σ order_payments of kind 'payment' | 'deposit'. */
-  collected: number;
+  /** The order's money, as the shared `orderMoney` rule reads it (C5): the
+   *  line + add-on sum, `orders.paid`, and the keyed balance for imported rows.
+   *  Storage is deliberately NOT part of this gate — it has its own collection
+   *  flag and its own warning; widening the booking gate is not C5's job. */
+  money: OrderMoneyInput;
   /** T8 — the delivery groups THIS trip carries (the customer's wait-vs-split
    *  answer). Omit / null / undefined = the whole order, the pre-T8 rule. An
    *  empty array is NOT "everything": it is an invalid scope, refused. */
@@ -86,8 +94,7 @@ export function bookingConfirmGate({
   lines,
   lineReceived,
   reservedQtyByKey,
-  orderTotal,
-  collected,
+  money,
   deliverGroups,
 }: BookingGateInput): BookingGateResult {
   const allGroups = orderDeliveryGroups(lines);
@@ -143,9 +150,11 @@ export function bookingConfirmGate({
     groups.some((g) => g.ready) &&
     groups.some((g) => !g.ready);
 
-  const totalSet = orderTotal > 0;
-  const outstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
-  const balanceReady = !totalSet || outstanding <= 0;
+  // Money: one function, shared with the ladder's 🔒, the drawer and the
+  // collections desk. An order whose value nobody has entered is not "owing
+  // everything" — it is unknown, and unknown never blocks a delivery.
+  const { outstanding } = orderMoney(money);
+  const balanceReady = outstanding <= 0;
   return {
     goodsReady,
     notReadySkus,

@@ -2744,8 +2744,23 @@ export interface operationOrderListRow {
   /** Inbox-triage LP (migration 0136), a delivery_partners.id resolved to a
    *  name client-side. Shown in the 物流 cell when no formal LP is set yet. */
   ops_assigned_logistic?: string | null;
-  /** Compact line embed for the 货品 items summary (control table only). */
-  order_lines?: { sku: string; qty: number; source_po?: string | null }[];
+  /** Compact line embed for the 货品 items summary (control table only).
+   *  `unit_price` (C5) lets the row compute what the order is worth. */
+  order_lines?: {
+    sku: string;
+    qty: number;
+    unit_price?: number | string | null;
+    source_po?: string | null;
+  }[];
+  /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
+   *  live payment path writes; with the add-on sum below and the line prices
+   *  above it feeds the shared `orderMoney`, so the row's 🔒, the drawer and
+   *  the booking gate all answer with the same number. BOTH are optional: a
+   *  browser on this build against a pre-C5 Worker reads them as absent, the
+   *  order's value is then UNKNOWN, and unknown holds nothing — which is
+   *  exactly what shipped before this card. */
+  paid?: number | string | null;
+  order_addons?: { qty: number; unit_price?: number | string | null }[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation

@@ -117,7 +117,7 @@ message bodies but their BUTTON labels follow the law.
 **Lane:** shares ④'s pages — not alongside an R-chat.
 **Done when:** visible `Chase` greps 0 across the whole web bundle.
 
-## C5 · The money gate reads the number that exists — ⚠️ HIGH, live false-block
+## C5 · The money gate reads the number that exists — ✅ SHIPPED (PR #447)
 
 **Verified against prod 2026-07-27 (every figure below is a live count, not an estimate):**
 
@@ -154,6 +154,50 @@ fact, not by accident).
 **Lane:** Orders list + drawer + API — the C/T/J lane. **No migration.**
 **Done when:** SO-1209 can be confirmed; the 18 genuinely-owing orders show 🔒; no reader
 of money touches `order_payments`.
+
+### What shipped (PR #447, 2026-07-27 — no migration)
+
+`packages/shared/order-money.ts` is the ONE rule, asked by **FOUR** readers, not three:
+the row's 🔒, the server's `bookingConfirmGate`, the collections desk — **and the order
+drawer**, which the card did not list and which is the surface an operator actually reads.
+It computed Outstanding from the same empty ledger, so SO-1209 showed
+`RM 7,248 outstanding · HOLD DELIVERY` while `orders.paid` said it was paid in full.
+Leaving it would have made the drawer contradict its own row.
+
+**Three corrections to the card's premises, each measured against prod, not assumed:**
+
+1. **`order_payments` is not writer-less — it is empty.** Two doors write it: the drawer's
+   Record-payment form (`POST /orders/:id/payments`) and the raw-create door, which posts
+   the at-creation deposit into **both** `orders.paid` and the ledger. That double-write is
+   the reason the two stores may never be summed — it would report a half-paid order as
+   settled, the dangerous direction. It also means the card's "the ledger stays empty by
+   fact" holds only while nobody presses Record payment; see the new carry-forward.
+2. **`ops_order_control.balance` means what the customer STILL OWES** (0165), not the order
+   total — and the booking gate was reading it as a total and subtracting collected from
+   it. In the fallback branch `paid` is therefore never netted against it a second time.
+3. **The 18 owing orders do NOT leave the Delivery board** (the index's "Expect after C5"
+   note). All 55 control rows are `booking_stage='none'`, so the ladder returns
+   `Chase logistic` and never reaches the money rung — no row changes its action word
+   today. What changes: the **Owing facet row appears for the first time** (`Owing · 18 ·
+   RM 56,859` — it renders only when the count is above zero, and the count was always
+   zero), the `Collect $` pill finds those 18, the Payments collections queue fills with
+   real figures, the drawer stops telling an operator that a paid-in-full order owes its
+   whole value, and the booking gate's money answer is right.
+4. **`rowDotsOf` is dead code** — it is exported and unit-tested but nothing renders it
+   (the Status column shows a stage-word pill; the three-dot design was replaced). Its
+   money branch was updated for consistency and it changes nothing on screen. Caught by
+   grepping the shipped bundle for its strings: zero hits. Filed as a carry-forward
+   rather than deleted — removing an exported function is Jess's call, not a build
+   chat's.
+
+**SO-1209's money gate passes — its booking is still refused for GOODS** (0 units reserved,
+`line_received` NULL). That is the goods half doing its job, and it is a separate question.
+
+**Verified live before building** (all figures re-counted, not taken from the card): 55
+control rows / `balance` NULL ×55 · `order_payments` 0 · `payments` 0 · 18 orders owing
+RM 56,859 · SO-1209 = RM 6,998 lines + RM 250 add-ons vs `orders.paid` RM 7,248.
+Suites at baseline (shared 1623/1623 incl. +14 · api 3 pre-existing · web 16 pre-existing);
+typecheck 0 new, build + v4 guard + lint clean, `SERVICE_ROLE` 0 in the bundle.
 
 ## C6 · Every action opens its checklist (from Jess's ChatGPT ACTION FLOW, 2026-07-27)
 
@@ -272,7 +316,7 @@ action.
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |
-| C5 | ⬜ **HIGH** — live false-block, do FIRST | — |
+| C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · two-step delay recovery (migration) | — |

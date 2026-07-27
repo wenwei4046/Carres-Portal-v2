@@ -14,8 +14,7 @@ describe("bookingConfirmGate", () => {
       lines: [{ sku: MATTRESS, qty: 1 }],
       lineReceived: { [MATTRESS]: 1 },
       reservedQtyByKey: {},
-      orderTotal: 2500,
-      collected: 2500,
+      money: { lineSum: 2500, paid: 2500 },
     });
     expect(r.ok).toBe(true);
     expect(r.goodsReady).toBe(true);
@@ -27,8 +26,7 @@ describe("bookingConfirmGate", () => {
       lines: [{ sku: MATTRESS, qty: 1 }],
       lineReceived: null,
       reservedQtyByKey: {},
-      orderTotal: 0,
-      collected: 0,
+      money: { lineSum: 0 },
     });
     expect(r.ok).toBe(false);
     expect(r.goodsReady).toBe(false);
@@ -40,8 +38,7 @@ describe("bookingConfirmGate", () => {
       lines: [{ sku: MATTRESS, qty: 2 }],
       lineReceived: { [MATTRESS]: 1 },
       reservedQtyByKey: { [stockMatchKey(MATTRESS)]: 2 },
-      orderTotal: 0,
-      collected: 0,
+      money: { lineSum: 0 },
     });
     expect(r.goodsReady).toBe(true);
   });
@@ -53,8 +50,7 @@ describe("bookingConfirmGate", () => {
       lines: [{ sku: MATTRESS, qty: 1 }],
       lineReceived: { [MATTRESS]: 0 },
       reservedQtyByKey: {},
-      orderTotal: 0,
-      collected: 0,
+      money: { lineSum: 0 },
     });
     expect(r.goodsReady).toBe(false);
   });
@@ -67,8 +63,7 @@ describe("bookingConfirmGate", () => {
       ],
       lineReceived: null,
       reservedQtyByKey: {},
-      orderTotal: 0,
-      collected: 0,
+      money: { lineSum: 0 },
     });
     expect(r.goodsReady).toBe(true);
   });
@@ -78,8 +73,7 @@ describe("bookingConfirmGate", () => {
       lines: [],
       lineReceived: null,
       reservedQtyByKey: {},
-      orderTotal: 3000,
-      collected: 1000,
+      money: { lineSum: 3000, paid: 1000 },
     });
     expect(r.balanceReady).toBe(false);
     expect(r.outstanding).toBe(2000);
@@ -91,11 +85,53 @@ describe("bookingConfirmGate", () => {
       lines: [],
       lineReceived: null,
       reservedQtyByKey: {},
-      orderTotal: 0,
-      collected: 0,
+      money: { lineSum: 0 },
     });
     expect(r.balanceReady).toBe(true);
     expect(r.ok).toBe(true);
+  });
+
+  // ── C5 · the money gate reads the number that exists ──────────────────────
+  // Until 2026-07-27 this gate summed `order_payments` — a table holding zero
+  // rows — so "collected" was RM 0 for everybody and every priced order was
+  // refused its booking for money. These pin the live shape that proved it.
+
+  it("SO-1209 (live): paid in full ⇒ the money gate passes", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      // Value RM 6,998 + RM 250 add-ons; orders.paid RM 7,248; balance NULL.
+      money: { lineSum: 6998, addonSum: 250, paid: 7248, controlBalance: null },
+    });
+    expect(r.outstanding).toBe(0);
+    expect(r.balanceReady).toBe(true);
+    expect(r.ok).toBe(true);
+  });
+
+  it("SO-1256 (live): a 50% deposit still blocks, and names the real number", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: { lineSum: 3998, addonSum: 250, paid: 2124 },
+    });
+    expect(r.outstanding).toBe(2124);
+    expect(r.balanceReady).toBe(false);
+    expect(r.ok).toBe(false);
+  });
+
+  it("an imported row's keyed balance blocks — and is not netted twice", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      // No line prices. 0165's balance IS the outstanding, so RM 1,300 already
+      // collected does not reduce it a second time.
+      money: { lineSum: 0, paid: 1300, controlBalance: 2000 },
+    });
+    expect(r.outstanding).toBe(2000);
+    expect(r.ok).toBe(false);
   });
 });
 
@@ -121,8 +157,7 @@ function gate(
     lines,
     lineReceived,
     reservedQtyByKey: {},
-    orderTotal: 0,
-    collected: 0,
+    money: { lineSum: 0 },
     deliverGroups,
   });
 }
@@ -210,8 +245,7 @@ describe("bookingConfirmGate · delivery groups (T8)", () => {
       ],
       lineReceived: { [MATTRESS]: 1, [SOFA]: 0 },
       reservedQtyByKey: {},
-      orderTotal: 5000,
-      collected: 1000,
+      money: { lineSum: 5000, paid: 1000 },
       deliverGroups: ["bed"],
     });
     expect(r.goodsReady).toBe(true);
@@ -224,8 +258,7 @@ describe("bookingConfirmGate · delivery groups (T8)", () => {
       lines: [{ sku: MATTRESS, qty: 1 }],
       lineReceived: { [MATTRESS]: 1 },
       reservedQtyByKey: {},
-      orderTotal: 2500,
-      collected: 2500,
+      money: { lineSum: 2500, paid: 2500 },
     });
     expect(r.ok).toBe(true);
     expect(r.scope).toEqual(["bed"]);

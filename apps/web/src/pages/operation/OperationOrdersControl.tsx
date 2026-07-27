@@ -56,6 +56,8 @@ import {
   deliveryQueueForLabel,
   deliveryStepOverdue,
   myHolidaySet,
+  orderMoney,
+  type OrderMoney,
   type DeliveryQueueKey,
   type OpsTask,
   type OpsTasksListResponse,
@@ -618,16 +620,16 @@ export function rowDotsOf(
   logi: LogisticState,
 ): [RowDot, RowDot, RowDot] {
   const completed = controlTabOf(o) === "completed";
-  const ovl = ovlOf(o);
-  const bal = ovl?.balance == null ? null : Number(ovl.balance);
   // 钱 — an owing balance stays RED even after delivery (§7: the owing customer
-  // is the one chase that survives Delivered).
-  const money: RowDot =
-    bal == null
-      ? { color: DOT_HEX.grey, title: "Money — no balance data" }
-      : bal > 0
-        ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(bal)} outstanding` }
-        : { color: DOT_HEX.green, title: "Money — settled" };
+  // is the one chase that survives Delivered). C5: the number comes from the
+  // shared rule, so this dot and the row's 🔒 can never disagree. Grey stays
+  // reserved for genuinely UNKNOWN money — an order nobody has priced.
+  const m = moneyOf(o);
+  const money: RowDot = !m.known
+    ? { color: DOT_HEX.grey, title: "Money — no order value on record" }
+    : m.owing
+      ? { color: DOT_HEX.red, title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
+      : { color: DOT_HEX.green, title: "Money — settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
   if (completed) goods = { color: DOT_HEX.green, title: "Stock — done (delivered)" };
@@ -683,6 +685,39 @@ function staffInitials(m: OpsStaffMember): string {
 
 function ovlOf(o: operationOrderListRow) {
   return orderControlOf(o);
+}
+
+// ─── Money (C5, 2026-07-27) ──────────────────────────────────────────────────
+// ONE reading of what an order still owes, shared with the booking gate, the
+// drawer and the collections desk (`orderMoney`, packages/shared). Before this
+// card every money surface here read `ops_order_control.balance` — NULL on all
+// 55 live control rows — so the 🔒, the Owing facet row and the Collect $ pill
+// were all permanently silent while 18 orders owed RM 56,859. (The money DOT
+// reads this too, but `rowDotsOf` is dead code — nothing renders it; the
+// Status column shows a stage-word pill. Its strings grep 0 in the bundle.)
+//
+// STORAGE is folded in here, not inside the shared rule: its clock and its
+// collected/waived flags are this page's own signals, and the shared function
+// only carries the number it is handed.
+export function moneyOf(o: operationOrderListRow): OrderMoney {
+  const ovl = ovlOf(o);
+  const storageFee =
+    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
+  const storageOwing =
+    storageFee > 0 &&
+    !ovl?.storage_collected_at &&
+    ovl?.storage_waiver_status !== "approved"
+      ? storageFee
+      : 0;
+  const price = (r: { qty: number; unit_price?: number | string | null }) =>
+    Number(r.unit_price ?? 0) * Number(r.qty ?? 0);
+  return orderMoney({
+    lineSum: (o.order_lines ?? []).reduce((s, l) => s + price(l), 0),
+    addonSum: (o.order_addons ?? []).reduce((s, a) => s + price(a), 0),
+    paid: o.paid,
+    controlBalance: ovl?.balance ?? null,
+    storageOwing,
+  });
 }
 
 /** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
@@ -785,14 +820,14 @@ export function nextActionOf(
     return { label: "Assign logistic", tone: "info" };
   if (!bookingConfirmedOf(o)) return { label: "Chase logistic", tone: "info" };
 
-  // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate action).
+  // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate
+  // action). C5 (2026-07-27): the hold reads the shared `orderMoney` — goods
+  // money from `orders.paid` against the priced lines, plus any storage still
+  // owed. It used to read `ops_order_control.balance`, NULL on every live row,
+  // so this 🔒 had never fired for a single order while 18 of them owed
+  // RM 56,859. An order nobody has priced stays UNKNOWN and is never held.
   const ovl = ovlOf(o);
-  const owingBalance = Number(ovl?.balance ?? 0) > 0;
-  const storageFee =
-    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
-  const owingStorage =
-    storageFee > 0 && !ovl?.storage_collected_at && ovl?.storage_waiver_status !== "approved";
-  if (owingBalance || owingStorage)
+  if (moneyOf(o).owing)
     return { label: "Confirm", tone: "warning", locked: true };
 
   // T7 (Jess 2026-07-27): the CUSTOMER's confirmed date is itself a deadline, so
@@ -1589,10 +1624,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     let n = 0;
     let rm = 0;
     for (const o of orders) {
-      const b = Number(ovlOf(o)?.balance ?? 0);
-      if (b > 0) {
+      const m = moneyOf(o);
+      if (m.owing) {
         n += 1;
-        rm += b;
+        rm += m.outstanding;
       }
     }
     return { n, rm };
@@ -1624,21 +1659,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const stock = stockReadiness(o, availableBySku);
     const ovl = ovlOf(o);
     const photos = ovl?.delivery_photos;
-    // The ladder's own 🔒 inputs, read the same way nextActionOf reads them:
-    // an owing balance plus any storage fee that is neither collected nor
-    // waived. `null` when no balance is on record — not "settled".
-    const storageFee =
-      (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
-    const owingStorage =
-      storageFee > 0 &&
-      !ovl?.storage_collected_at &&
-      ovl?.storage_waiver_status !== "approved"
-        ? storageFee
-        : 0;
-    const holdAmount =
-      ovl?.balance == null && owingStorage === 0
-        ? null
-        : Number(ovl?.balance ?? 0) + owingStorage;
+    // The ladder's own 🔒 input, read the same way nextActionOf reads it (C5:
+    // ONE shared computation). `null` when nothing on record says what the
+    // order is worth — that is "we do not know", never "settled".
+    const money = moneyOf(o);
+    const holdAmount = money.known ? money.outstanding : null;
     return {
       next: nextActionOf(o, stock, o.order_lines ?? []),
       // The same test the ladder's RUNG 1 makes: goods with no purchase order
@@ -1947,7 +1972,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) =>
         staffFilter === NO_STAFF ? !ownerOf(o) : ownerOf(o) === staffFilter,
       );
-    if (owingOnly) r = r.filter((o) => Number(ovlOf(o)?.balance ?? 0) > 0);
+    if (owingOnly) r = r.filter((o) => moneyOf(o).owing);
     if (categoryFilter.size > 0) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
@@ -4318,7 +4343,7 @@ function OrderRow({
           // shown as a secondary "Collect $" pill (max two pills). Hidden once
           // the order is closed. `Confirm 🔒` already means "money-held", so the
           // pill isn't doubled up there.
-          const owing = !completed && Number(ovlOf(o)?.balance ?? 0) > 0;
+          const owing = !completed && moneyOf(o).owing;
           const showMoney = owing && na.label !== "Confirm";
           return (
             <div className="flex items-center gap-1.5 max-w-full">
