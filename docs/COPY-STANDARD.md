@@ -288,7 +288,18 @@ stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-Four verbs, four meanings. Every module uses these; no module invents a fifth.
+Five verbs, five meanings. Every module uses these; no module invents a sixth.
+
+**They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
+you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
+never appear in a queue, and they need no verb from this table.
+
+**The CHANNEL is not the action.** `Call {supplier} — confirm what happens next` is the same
+action whether it is done by phone, by WhatsApp or in person: outward communication whose
+outcome is recorded. A button that opens the WhatsApp group or copies the message is HOW,
+not WHAT — label it `Open WhatsApp group` / `Copy message`, never as a second action.
+**`Send` stays pinned to raising a purchase order to a factory** and is never reused for
+"this message leaves our company" (rule 8).
 
 | Verb | Means | Completion is |
 |---|---|---|
@@ -296,6 +307,7 @@ Four verbs, four meanings. Every module uses these; no module invents a fifth.
 | **Call** | OUTWARD communication — we ask someone for information | the information is obtained **and recorded in the system**. A call with nothing recorded is not complete |
 | **Issue** | the SYSTEM produces a formal document | the document exists |
 | **Upload** | evidence is attached | the file exists |
+| **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 
 Examples: `Assign logistic` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
