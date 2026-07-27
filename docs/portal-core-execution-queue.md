@@ -185,7 +185,7 @@ ticked/done rows — the journey strip directly above already renders ✓ per st
 ticked list would say the same thing twice. The list holds what is OPEN, and its empty state
 teaches that a new action appears by itself.
 
-## C3 · The Actions column shows the whole truth — ✅ LIVE (PR #PENDING)
+## C3 · The Actions column shows the whole truth — ✅ LIVE (PR #479)
 
 **Goal:** the column (renamed `Actions` in C1) renders the top action from Layer 2 plus
 `+N` when more are open: `Call Ohana — confirm ready date  +2`. Click opens the drawer's
@@ -207,7 +207,7 @@ is acceptable with its tooltip (Jess deferred this to C3 rather than tuning one 
 **Done when:** a row with one action shows no `+N`; the count always equals C2's row count;
 no row in the drawer shows an action with no way to complete it.
 
-**SHIPPED (PR #PENDING).** The `+N` **replaces the secondary `Collect RM …` pill**, and that
+**SHIPPED (PR #479).** The `+N` **replaces the secondary `Collect RM …` pill**, and that
 is the one thing on screen this card takes away: a cell may have exactly ONE way of saying
 "there is more", and the `+N` covers all three tracks where the money pill covered one — the
 one Law 4 displays LAST. The figure is not lost: the `+N` tooltip names every hidden action
@@ -550,7 +550,7 @@ while it may show red money.
 |---|---|---|
 | C1 | ✅ LIVE 2026-07-27 | #461 |
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
-| C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #PENDING |
+| C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
