@@ -60,7 +60,7 @@ export const ADJUSTMENT_REASON_LABEL: Record<AdjustmentReason, string> = {
 
 // ── the pre-flight ───────────────────────────────────────────────────────────
 
-export const READINESS_KEYS = ["rates", "attribution", "month_over", "no_run"] as const;
+export const READINESS_KEYS = ["rates", "month_over", "no_run"] as const;
 export type ReadinessKey = (typeof READINESS_KEYS)[number];
 
 export interface ReadinessCheck {
@@ -76,8 +76,6 @@ export interface ReadinessInput {
   /** The engine's own output for the month — the only thing that knows about rates. */
   report: Pick<CommissionReport, "perStaff">;
   /** Facts only the DB knows (commission_run_state). */
-  unattributed: number;
-  legacyUnattributed?: number;
   runStatus: CommissionRunStatus | null;
   year: number;
   month: number;
@@ -86,7 +84,14 @@ export interface ReadinessInput {
 }
 
 /**
- * The four checks, in the order the operator reads them.
+ * The three checks, in the order the operator reads them.
+ *
+ * There were four. The `attribution` check — "every sale has a salesperson" —
+ * went with the rest of attribution (Loo 2026-07-27): the POS stamps who sold
+ * every order it writes, and imported archive rows are excluded at the source
+ * by 0265, so it could only ever pass. Keeping a BLOCKING gate whose remedy
+ * screen has been deleted is worse than not having the gate: it would refuse a
+ * close with nothing on screen able to clear it.
  *
  * `rates` is the one that matters on day one: a person who sold and computes to zero
  * has no rate configured. Freezing that would write "you earned nothing" into a
@@ -94,7 +99,7 @@ export interface ReadinessInput {
  * what a month-lock is supposed to prevent, pointed the wrong way.
  */
 export function commissionReadiness(input: ReadinessInput): ReadinessCheck[] {
-  const { report, unattributed, runStatus, year, month, today } = input;
+  const { report, runStatus, year, month, today } = input;
 
   const sellers = report.perStaff.filter((s) => s.basis > 0);
   const unpaid = sellers.filter((s) => s.total === 0);
@@ -119,21 +124,6 @@ export function commissionReadiness(input: ReadinessInput): ReadinessCheck[] {
         unpaid.length === 0
           ? `${sellers.length} ${sellers.length === 1 ? "person" : "people"} sold this month and all of them compute to a figure.`
           : `${unpaid.length} of ${sellers.length} people who sold this month have no rate configured. Their statement would read RM 0.`,
-    },
-    {
-      key: "attribution",
-      passed: unattributed === 0,
-      blocking: true,
-      title:
-        unattributed === 0
-          ? "Every sale has a salesperson"
-          : `${unattributed} ${unattributed === 1 ? "sale has" : "sales have"} no salesperson`,
-      detail:
-        unattributed === 0
-          ? "Nothing would be paid to nobody. Imported archive rows are excluded — they have nobody to pay."
-          // The Attribution tab was retired (Loo 2026-07-27) — the worklist now
-          // appears on this page whenever it is non-empty, so the fix is here.
-          : "Assign them below first, or their commission goes to nobody.",
     },
     {
       key: "month_over",
@@ -227,7 +217,6 @@ export type CommissionRunDetail = z.infer<typeof commissionRunDetailSchema>;
 /** commission_run_state — the DB half of the pre-flight. */
 export const commissionRunStateSchema = z.object({
   run: commissionRunSummarySchema.nullable(),
-  unattributed: z.number(),
   pendingAdjustments: z.coerce.number(),
   locked: z.boolean(),
 });

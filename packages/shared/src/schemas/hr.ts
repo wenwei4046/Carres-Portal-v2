@@ -71,13 +71,6 @@ export const setMilestonesInput = z.object({
 });
 export type SetMilestonesInput = z.infer<typeof setMilestonesInput>;
 
-/** hr_assign_salesperson — attribution drives money, so it is RPC-audited. */
-export const hrAssignSalespersonInput = z.object({
-  orderId: z.string().uuid(),
-  salespersonId: z.string().uuid(),
-});
-export type HrAssignSalespersonInput = z.infer<typeof hrAssignSalespersonInput>;
-
 // ── 0250 — BD commission (paid by what their dealers sell) ───────────────────
 
 export const setBdRateInput = z.object({

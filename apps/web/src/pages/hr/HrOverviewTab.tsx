@@ -73,10 +73,10 @@ export default function HrOverviewTab({
     return <div className="py-12 text-[13px] text-base-500">Loading overview…</div>;
   }
 
-  const { report, bdReport, unattributed, staff, config } = data;
-  // Both keys arrived with 0265; a Worker that predates it simply omits them.
-  // Falling back to the report's own basis keeps the tile honest rather than
-  // showing RM 0 as if nothing sold.
+  const { report, bdReport, staff, config } = data;
+  // Arrived with 0265; a Worker that predates it simply omits it. Falling back
+  // to the report's own basis keeps the tile honest rather than showing RM 0 as
+  // if nothing sold.
   const legacyUnattributed = data.legacyUnattributed ?? 0;
   const monthSold = data.monthSold ?? {
     amount: report.totalBasis,
@@ -90,15 +90,11 @@ export default function HrOverviewTab({
 
   // Everything that genuinely needs a person. Each row is actionable — if it
   // cannot be acted on it does not belong here (see the header note).
+  // Attribution retired whole (Loo 2026-07-27): the POS stamps who sold every
+  // order it writes, so "assign a salesperson" is not work anybody does. The
+  // only rows without one are the imported archive, excluded at the source by
+  // 0265 and due for deletion — so this is no longer a todo, here or anywhere.
   const todos: { text: string; to: string }[] = [];
-  if (unattributed.length > 0) {
-    todos.push({
-      text: `${unattributed.length} order${unattributed.length === 1 ? "" : "s"} without a salesperson`,
-      // Attribution retired 2026-07-27 — the worklist opens on Commission →
-      // Earnings, under the warning it belongs to.
-      to: "/hr?tab=commission",
-    });
-  }
   if (commissionTotal === 0 && staffWithoutRate.length === activeStaff.length && activeStaff.length > 0) {
     todos.push({
       text: "No commission rates set up yet — everyone earns RM 0",
@@ -155,12 +151,15 @@ export default function HrOverviewTab({
             </div>
           )}
 
+          {/* Kept deliberately while the archive exists: it is the only line
+              that reconciles this page against the orders list (55 orders on
+              file, 19 counted). It states a fact, asks for nothing, and
+              disappears by itself the day the imported rows are deleted. */}
           {legacyUnattributed > 0 && (
             <p className="t-tiny text-base-500 px-2 pt-2 border-t border-base-200 mt-2">
               {legacyUnattributed} imported archive order
               {legacyUnattributed === 1 ? " is" : "s are"} not counted here — they
-              came from the old system and never had a salesperson, so there is
-              nothing to assign.
+              came from the old system, before the portal recorded sales.
             </p>
           )}
         </div>
