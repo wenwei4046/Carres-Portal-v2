@@ -17,6 +17,7 @@ import {
   type ServiceCaseListResponse,
 } from "@carres/shared";
 import ServiceCaseModal from "./components/ServiceCaseModal";
+import ServiceCaseNumbersPanel from "./components/ServiceCaseNumbersPanel";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
 
@@ -38,6 +39,17 @@ export default function OperationServiceCases() {
   // lands on the plain list.
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkCase = searchParams.get("case");
+
+  // S5 — the Numbers tab. `?tab=numbers` is a real deep link (the Stock K0
+  // shape): the no-tab default is unchanged, so every existing link still
+  // lands on the case list.
+  const tab = searchParams.get("tab") === "numbers" ? "numbers" : "cases";
+  const setTab = (next: "cases" | "numbers") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "cases") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  };
   useEffect(() => {
     if (!deepLinkCase) return;
     setEditId(deepLinkCase);
@@ -55,6 +67,9 @@ export default function OperationServiceCases() {
       return apiFetch(`/api/ops/service-cases?${params}`);
     },
     refetchInterval: 30_000,
+    // The list is the Cases tab's data. The Numbers tab reads its own endpoint,
+    // so there is no reason to keep polling every case behind it.
+    enabled: tab === "cases",
   });
 
   const rows: ServiceCase[] = listQ.data?.items ?? [];
@@ -75,6 +90,31 @@ export default function OperationServiceCases() {
         </p>
       </div>
 
+      {/* S5 — the module's two doors. The card asks for "a small Numbers tab
+          ON THE MODULE": one page, one sidebar item, two views. */}
+      <div className="flex items-center gap-4 border-b border-base-200 mb-4">
+        {(["cases", "numbers"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            aria-pressed={tab === t}
+            data-testid={`case-tab-${t}`}
+            className={`-mb-px border-b-2 px-1 py-2 text-sm font-medium ${
+              tab === t
+                ? "border-primary text-base-900"
+                : "border-transparent text-base-500 hover:text-base-700"
+            }`}
+          >
+            {t === "cases" ? "Cases" : "Numbers"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "numbers" ? (
+        <ServiceCaseNumbersPanel />
+      ) : (
+      <>
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex rounded border border-base-200 overflow-hidden text-sm">
@@ -216,6 +256,8 @@ export default function OperationServiceCases() {
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
 
       {/* S1 — "+ New Case" now opens the guided wizard instead of the

@@ -669,6 +669,9 @@ export {
   // S4 (0298) — the deadline's recorded events.
   caseSlaEventSchema,
   recordCaseSlaInputSchema,
+  // S5 (no migration) — the Numbers tab's whole answer.
+  serviceCaseNumbersResponseSchema,
+  type ServiceCaseNumbersResponse,
   type CaseProgressEntryRecord,
   type RecordCaseStepInput,
   type CaseSlaEventRecord,
@@ -1568,6 +1571,33 @@ export {
   type CaseSlaClock,
   type CaseSlaRecordInput,
 } from "./service-case-sla";
+// S5 — the monthly numbers. NO migration and no new table: the day a case ended
+// is the `customer_confirmed` entry S3's own close gate already demands, so the
+// review layer reads the cases exactly as the card asked.
+export {
+  CASE_NUMBERS_MONTHS,
+  CASE_NUMBERS_CATEGORIES,
+  CASE_UNCLASSIFIED,
+  CASE_UNCLASSIFIED_LABEL,
+  CASE_SUPPLIER_UNKNOWN_LABEL,
+  caseNumbersMonths,
+  caseCategoryBucketLabel,
+  caseIssueBucketLabel,
+  caseFinishedOn,
+  caseNumbersHeadline,
+  computeCaseNumbers,
+  type CaseCategoryBucket,
+  type CaseNumbersCase,
+  type CaseNumbersInput,
+  type CaseNumbers,
+  type CaseMonthRow,
+  type CaseIssueRow,
+  type CaseSupplierRow,
+  type CaseCoverage,
+  type CaseFinishReport,
+  type CaseOnTimeReport,
+  type CaseResponsibilityCounts,
+} from "./service-case-numbers";
 export {
   orderMoney,
   type OrderMoneyInput,
