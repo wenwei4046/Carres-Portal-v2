@@ -139,6 +139,11 @@ open on the same record at the same time.
      Collect RM {amount} from {customer}
 ```
 
+**Rung 2 never names the customer.** Carres does not phone a customer about a delay —
+logistics carries that conversation, and the action in this portal is the call to
+logistics. Any surface that opens a customer call about a delay is wrong.
+(Jess, 2026-07-27; the flow is `docs/ORDERS-WORKING-FLOW.md` §3.)
+
 **Money displays last on purpose and this is not a demotion.** It matches the existing
 collections rule — 催钱前先看货, you do not chase a payment for goods you cannot deliver —
 and the action is always present in the checklist and in the Owing filter. (Jess confirmed
@@ -177,6 +182,12 @@ A delivered order never alarms on goods or delivery, and may still show a red mo
 with an open payment action. Delivered is not paid.
 
 Tones live in `docs/ORDERS-WORKING-FLOW.md` §7 — one home (Law 0A).
+
+**NOT BUILT YET — this is a specification, not a description of the screen.** `rowDotsOf()`
+computes the three dots and nothing renders them; the Orders list shows a single stage pill
+in a `Status` column instead. Jess ruled 2026-07-27 that the three dots REPLACE that pill.
+Card **C10** builds it. Until C10 ships, a chat reading this law must not assume the column
+exists.
 
 ## What this replaces
 

@@ -144,11 +144,15 @@ two versions side by side. Deleted into this file on 2026-07-27:
 
 `docs/DESIGN-STANDARD.md` · `docs/LIST-TEMPLATE-SPEC.md` ·
 `CARRES_*_UI_KIT_CURRENT.md` · the design sections of
-`CARRES_SYSTEM_MASTERPLAN.md`, `CARRES_ORDER_PORTAL_SPEC.md`,
-`CHECKPOINT-order-detail-v4`, `CHECKPOINT-purchase-cockpit`,
-`CHECKPOINT-purchase-v2` · `BACKLOG_DESIGN.md` · `CLAUDE.md §10`
-(replaced by a one-line pointer) · the `.claude/skills/carres-design/` css +
-md (now points here).
+`CARRES_SYSTEM_MASTERPLAN.md` and `CARRES_ORDER_PORTAL_SPEC.md` ·
+`CHECKPOINT-order-detail-v4` · `BACKLOG_DESIGN.md` · **`CLAUDE.md §10`**
+(now deliberately empty — its v17 tokens were how a chat could follow CLAUDE.md
+faithfully and still build the wrong thing) · the `.claude/skills/carres-design/`
+skill (marked SUPERSEDED, `user-invocable: false`, kept only as an asset store).
+
+*(`CHECKPOINT-purchase-cockpit` and `CHECKPOINT-purchase-v2` were deleted the
+same day by the parallel Purchasing line for its own reason — seven purchasing
+docs, none authoritative. Same disease, same cure, arrived at independently.)*
 
 ## §0.3 Change control
 
@@ -391,11 +395,35 @@ The Carres flame `#C44D2B` survives in **exactly one place: the logo.**
 | Underline tab hover | darken the text, not the background |
 | Colour-filled pill hover | `brightness-95` — keep its own colour |
 
+## §3.6 Action tone — carried forward from the parallel Purchasing line (LOCKED 2026-07-27)
+
+A row's actions live in a column named **`Actions`** (plural — a row can carry
+several) and are ALWAYS pills, never a plain-text verb sitting beside a pill.
+
+**This file never spells an action word.** Every label comes from the dictionary
+in [`COPY-STANDARD.md`](COPY-STANDARD.md), mirrored in
+`packages/shared/order-action-words.ts`. What this file locks is the **tone**,
+and the tone is chosen by a **condition**, never by which verb it is:
+
+| Tone | Pill | When |
+|---|---|---|
+| danger (red) | `pill-overdue` | the action's due date has passed |
+| warning (amber) | `pill-warning` | due soon, or held (🔒) |
+| info (blue) | `pill-sent` | open and not yet due |
+| success (green) | `pill-confirmed` | can be completed right now |
+| neutral (grey) | `pill-neutral` | terminal fact (`Done`) |
+| money (indigo) | `pill-collected` | the money action — an independent track, shown as a SECOND pill (max two pills per row) |
+
+> Tone by CONDITION is what makes this survive a rename. The old table mapped
+> tone to specific verbs, so `Chase logistic → Chase logistic` appeared under
+> two different tones and every renamed verb needed the table edited again.
+
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | No raw hex | Build Guard A (ratchet) | ✅ live | `check-design-standard.mjs` |
 | Status is always a pill | Component API — `<StatusPill>` is the only renderer | ⏳ D0.5a | `StatusPill.tsx` |
 | Flame only in the logo | Build Guard B | ⏳ D1 | `check-design.mjs` |
+| Action tone comes from a condition, not a verb | Component API — the tone is computed, never passed | ⏳ D0.5a | `order-actions.ts` |
 | Max 2 reds per screen | **Human Review** — not statically measurable | ⚠ **debt** | `/ui` screenshot |
 
 ---
@@ -645,6 +673,47 @@ width · minimum supported screen · responsive rules · **form layout** (label
 position, field spacing, required marker, error placement, one vs two columns —
 which has no home at all today).
 
+## §8.2 Interaction law (LOCKED 2026-07-27)
+
+Every list page in the portal behaves **identically**, so a new hire learns it
+once and it is true everywhere:
+
+```
+Click a queue tile     →  the table filters to that queue; the tile shows selected
+Click it again / ✕     →  the filter clears and every row comes back
+Two tiles picked       →  both queues show; each pick is one ✕-able chip
+Click a row            →  the drawer opens on its FIRST tab, never a deep tab
+Close the drawer       →  the table keeps its filter AND its scroll position
+```
+
+**A module never invents its own click behaviour.** If a module needs a
+different one, that is a change to THIS law, decided by Jess — never a local
+exception.
+
+## §8.3 Module-tab law (LOCKED 2026-07-22)
+
+When a page sits under a module tab bar (Purchasing's
+`To Order / Purchase Orders / Receiving / Claims / Settings`), the page does NOT
+render the shell's breadcrumb slot or the big title — they duplicate the active
+tab and burn ~80px, and §1.3 is a height budget. The freshness stamp and the
+refresh icon move to the RIGHT of the tab bar; content starts immediately below.
+
+**Stand-alone pages (Orders, Stock, Payments) keep the two-row header.** This is
+an exception for module-tabbed pages only — and once `PageShell` lands it stops
+being an exception at all: it is `variant`, not a rule somebody has to remember.
+
+## §8.4 Facet rail order
+
+`SUMMARY` → **the module's own queue names, the danger group first** → `STOCK` →
+`LOGISTICS` → `REGION` → `CATEGORY`. Queue names come from
+[`COPY-STANDARD.md`](COPY-STANDARD.md), never invented here.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| One interaction model for every list page | Component API — behaviour lives in `PageShell` / `DataTable`, not in the page | ⏳ D0.5c | `PageShell.tsx` |
+| A module-tabbed page has no breadcrumb/title | Type System — `variant` decides | ⏳ D0.5c | `PageShell.tsx` |
+| Facet group order | **Human Review** | ⚠ **debt** | — |
+
 ---
 
 # §9 UI States
@@ -800,22 +869,22 @@ document.
 ```
                          enforced / total
   Typography    ░░░░░░░░░░    0%      0 / 3
-  Colour        ██▌░░░░░░░    25%     1 / 4
+  Colour        ██░░░░░░░░    20%     1 / 5
   Spacing       ░░░░░░░░░░    0%      0 / 4
   Icons         ██▌░░░░░░░    25%     1 / 4
   Components    ░░░░░░░░░░    0%      0 / 6
-  Layout        ░░░░░░░░░░    0%      0 / 3
+  Layout        ░░░░░░░░░░    0%      0 / 6
   ──────────────────────────────────────────
-  TOTAL         ▊░░░░░░░░░    8%      2 / 24
+  TOTAL         ▋░░░░░░░░░    7%      2 / 28
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **24** | design rules stated in §1–§6 |
+| Rules | **28** | design rules stated in §1–§8 |
 | **Enforced** | **2** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 17 | a card exists (D0.5–D5) |
+| Scheduled | 20 | a card exists (D0.5–D5) |
 | **Blocked on a decision** | 3 | Q1 spacing · Q3 weight · Q4 stroke — see PENDING REGISTER |
-| **Human Review debt** | 2 | `fmtDate()` · "max 2 reds per screen" — nobody has found a mechanism |
+| **Human Review debt** | 3 | `fmtDate()` · "max 2 reds per screen" · facet group order — nobody has found a mechanism |
 
 **Two health rules:**
 

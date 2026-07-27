@@ -24,12 +24,12 @@
 |---|---|---|---|
 | 1 | Orders — **List** redesign | 🟡 in progress | `ORDERS_LIST_SPEC.md` |
 | 2 | Orders — **Detail** panel/drawer | 🟡 in progress | `docs/superpowers/plans/2026-07-10-order-panel-v3-spec.md` + `docs/CHECKPOINT-order-detail-v4-2026-07-16.md` |
-| 3 | **Purchasing / Procurement** cockpit | 🔵 proposal (engine WIP) | `docs/purchase-procurement-plan.md` |
+| 3 | **Purchasing / Procurement** | ✅ flow locked 2026-07-27 | `docs/PURCHASING-WORKING-FLOW.md` |
 | 4 | **Payments / Collections** desk | 🟢 shipped, extensions pending | `docs/master-sheet-operating-model.md` |
 | 5 | **Catalog** (Product & Maintenance, 9-tab) | 🟢 shipped | `docs/superpowers/plans/2026-06-25-2990s-products-9tab-parity-roadmap.md` |
 | 6 | **POS** (dealer/showroom) | 🟢 shipped | `docs/superpowers/plans/2026-06-20-pos-2990s-alignment.md` |
 | 7 | **Stock / on-hand** | 🔵 dependency (spec'd, not a panel yet) | (cross-team section in #3) |
-| — | Cross-cutting: combined-ref split, order-activity log, doc numbering | 🔵/🟡 | `docs/2026-07-19-combined-ref-split-by-lead.md` |
+| — | Cross-cutting: order-activity log, doc numbering | 🔵/🟡 | `docs/execution-queues-index.md` |
 
 ---
 
@@ -101,7 +101,7 @@ The order detail is the **hub** — every other module (stock, payments, procure
 
 ## 3. Purchasing / Procurement Cockpit  🔵 (the highest-value review target — engine WIP, UI not built)
 
-**Full spec:** `docs/purchase-procurement-plan.md`. Branch `feat/purchase-mrp`. Logic ported from the sister company's "2990s ERP", rebuilt in Carres's UI-KIT.
+**Full spec:** `docs/PURCHASING-WORKING-FLOW.md` (the ONE file; seven older purchasing docs were deleted 2026-07-27). Logic ported from the sister company's "2990s ERP", rebuilt in Carres's UI-KIT.
 
 ### Business problem
 Operations must buy the right goods, from the right supplier, early enough to hit each customer's deadline — without over-buying (money tied up) or under-buying (missed deadline). The business's real pain: **staff pad lead times "to be safe", producing the longest promised date = lost sales.**
@@ -197,7 +197,7 @@ There is no standalone stock panel proposal yet, but the **Purchasing cockpit (#
 ## Cross-cutting proposals
 
 ### A. Combined-Ref split by lead token  🟡 (spec + dormant helper; not wired)
-**Full spec:** `docs/2026-07-19-combined-ref-split-by-lead.md`.
+**Full spec:** deleted 2026-07-27 — the live rule is `docs/PURCHASING-WORKING-FLOW.md`.
 
 **The rule:** one customer holds several Ref numbers; the prefix names the goods (`CR…` vs `TCF…` = different products). The **lead (first) token** of a combined Ref identifies the order; trailing tokens are "delivered-with" cross-refs. So `CR1127+TCF0477` and `TCF0477+CR1127` are **two different orders**, not one.
 
