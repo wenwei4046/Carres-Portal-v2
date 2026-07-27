@@ -269,7 +269,7 @@ delivery queue and still never reaches the Delivery board (asserted).
 5. **No action has a Task Owner** (C2's finding #5, unchanged). Law 2 requires one; the portal
    stores `assigned_staff` per ORDER. **C6 needs it and it is still not built.**
 
-## C4 · Purchase + Payments sweep
+## C4 · Purchase + Payments sweep — ✅ LIVE (PR #484)
 
 **Goal:** the remaining Chase surfaces: Purchase stages `Send · Chase · Receive` →
 `Send · Confirm ready date · Receive`; Payments `Ready-to-chase` → `Call to collect`
@@ -277,6 +277,68 @@ delivery queue and still never reaches the Delivery board (asserted).
 message bodies but their BUTTON labels follow the law.
 **Lane:** shares ④'s pages — not alongside an R-chat.
 **Done when:** visible `Chase` greps 0 across the whole web bundle.
+
+**SHIPPED (PR #484) — no migration, web only.** Both pages read their action words
+from `packages/shared/order-action-words.ts`, the module C1 built so a queue and a
+row **structurally cannot** spell one action two ways. Purchase's stage ② is
+`Confirm ready date` on the facet, the list header and the calendar lens C1 had
+already renamed; its detail pane's title becomes the action with the factory in it
+(`Call Ohana — confirm ready date`) and the footer button drops to **`Open
+WhatsApp`** — COPY-STANDARD's verb table says the CHANNEL is not the action, so the
+button says HOW and the header says WHAT. Payments' queue is `Collect`, and every
+place one order is on screen reads `Collect RM 2,455 from John Tan`; the
+last-touched stamp becomes `Last message …` (what is stamped is a message being
+sent) and the two tones become `Remind` / `Call`, the drawer's own words.
+
+**The card's own wording lost to the law, and this needs Jess's pen.** C4 asked for
+`Call to collect` with the row line `Call {customer} — collect balance RM X`.
+COPY-STANDARD's audit table already spells the money action
+`Collect RM {amount} from {customer}`, Law 4 rung 5 repeats it, and C1/C3 shipped
+exactly that from one module — so building the card's words would have **forked the
+money action across Orders and Payments**, the precise failure this card exists to
+end. The four laws outrank a card, so the law's words shipped and the card's are
+reported here rather than quietly followed or quietly dropped.
+
+**Two defects found ON the lines being rewritten, fixed here rather than filed.**
+(1) The desk printed **`Collect RM RM 2,455.00`** — every call site passed `rm()`,
+which already carries the currency word and two decimals, into a module that adds
+`RM ` itself, so the SAME order read one way on its row and another on this desk;
+`rmPlain()` now hands over the bare amount. (2) **`Last chased {date}` survived in
+the order drawer**, under a guard whose banned list already held `/chase[ds]?/` —
+C1's JSX matcher was `>([^<>{}]{2,})<`, so a text node containing an interpolation
+was skipped WHOLE, and party-named labels are exactly the ones that carry an
+interpolation.
+
+**The scanner moved and the pages that needed it most had none.** It lives in
+`apps/web/src/test/banned-words.ts` with that hole closed, and Purchase + Payments
+— which **had no test file at all**, which is why nine visible `Chase` strings lived
+on them — ship the same guard the drawer has. Negative control: restoring
+`Last chased` and `"Ready to chase"` fails 4 tests.
+
+### What C4 found — read before any new panel, and before C6/C7
+
+1. **`docs/UI-KIT.md` §A0's Action-law table is stale and will re-seed the banned
+   words.** It still maps tones to the verbs `Chase supplier` · `Chase logistic` ·
+   `Confirm` · `Collect $`, and its new-panel checklist still says "verbs from the
+   C-vocab set (Order PO · Chase supplier · Assign logistic · Chase logistic ·
+   Confirm · Collect $)". **A new panel built from that checklist would reintroduce
+   every word C1–C4 removed.** A PLAN chat owns the edit; a build chat may not.
+2. **COPY-STANDARD's audit table still tells a chat to build
+   `Confirm delivery with {customer}`** — C3 reported it, unchanged.
+3. **`GRN` is on screen** in the duty-rotation sheet (`GRN (Receive)` · "GRN duty =
+   next month's holder") while COPY-STANDARD rule 9 lists GRN as jargon and the
+   vocabulary table gives `Check in`. Not a `Chase` surface, so out of this card —
+   but it is the banned-jargon rule broken in the same grid row C4 rewrote, and
+   fixing it touches a duty concept, not a word.
+4. **Purchase says "factory" and Payments says "supplier"** for the same party, on
+   two pages a new hire uses in the same hour. Rule 8 wants one word. Both ship
+   today and neither is banned, so nothing was changed on a guess.
+5. **`Confirm ready date` is now BOTH a Purchase stage and an Orders queue**, and
+   they hold different things: the Purchase facet counts open POs past their
+   promised ready date, the Orders queue counts orders whose supplier has not given
+   one. Same words, one module, two populations — correct today (the action is the
+   same action) but the counts will never agree, and nothing on either screen says
+   why.
 
 ## C5 · The money gate reads the number that exists — ✅ SHIPPED (PR #447)
 
@@ -691,7 +753,7 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C1 | ✅ LIVE 2026-07-27 | #461 |
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
-| C4 | ⬜ any time, not alongside R | — |
+| C4 | ✅ **LIVE** 2026-07-27 — Purchase + Payments stop saying Chase | #484 |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |

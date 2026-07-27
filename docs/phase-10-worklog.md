@@ -3286,3 +3286,106 @@ live bundle** (4,443,920 bytes, `SERVICE_ROLE` 0): the new strings are present
 (`Approve waiver` · `Waived by principal` · `Request waiver` · `Waiver requested` ·
 `pending principal approval`). The one surviving `Awaiting principal approval` is Finance
 Refunds' own >RM 1,000 line, a different feature.
+
+## 2026-07-27 · Portal Core C4 — Purchase and Payments stop saying Chase
+
+**PR #484** · **no migration** · **web only** — `git diff main -- apps/api packages/shared
+supabase/migrations` is empty, so no Worker deploy (the C3/C10 shape).
+
+Card C4 of `docs/portal-core-execution-queue.md`: the last two surfaces still carrying the
+word Jess banned on 2026-07-27. Purchase's three stages read `Send · Chase · Receive`; the
+collections desk's first queue read `Ready to chase`, and seven more strings around it.
+
+### Both pages now ask the module instead of typing the word
+
+C1 built `packages/shared/order-action-words.ts` so a queue and a row **structurally cannot**
+spell one action two ways: a party-free QUEUE word (a queue holds many suppliers) and a
+party-named ROW line (one order is on screen, so it may name the company). C4 is that module
+reaching the two pages it had not.
+
+**Purchase cockpit.** Stage ② is `orderActionQueue("confirm_ready_date")` on the facet row
+and on the middle-list header — the same string the right-rail calendar lens has read since
+C1, so the three surfaces cannot drift. The detail pane's title becomes the ACTION with the
+factory in it, `Call Ohana — confirm ready date`, and the footer button drops from
+`Chase on WhatsApp` to **`Open WhatsApp`**: COPY-STANDARD's verb table rules that **the
+CHANNEL is not the action** — "a button that opens the WhatsApp group or copies the message
+is HOW, not WHAT" — so the header says what is being done and the button says how. The
+tooltip stops repeating the label and says what pressing it does. The duty-rotation sheet
+follows (`PO (Send + Confirm ready date)`).
+
+**Payments collections desk.** The queue is `Collect`; wherever one order is on screen the
+line is `Collect RM 2,455 from John Tan`, built by the same call the Orders row makes. The
+last-touched stamp becomes `Last message today / 3d ago` with `No message sent yet` — the
+drawer's own words since C1, and the honest ones: **what is stamped is a message being
+sent**, not a mood. The two message tones become `Remind` / `Call`, matching the drawer and
+both bulk-bar review sheets. Three queue descriptions, the promise-to-pay hint and the stock
+note lose the verb (`Supplier late — call the supplier first, not the customer`).
+
+### The card's own wording lost to the law, and that is the interesting part
+
+C4 asked for the Payments queue to read **`Call to collect`**, row line
+`Call {customer} — collect balance RM X`. COPY-STANDARD's audit table already spells the
+money action `Collect RM {amount} from {customer}`, Law 4 rung 5 repeats it, and C1/C3
+shipped exactly that from one module read by the Orders row, the drawer and the Delivery
+page. Building the card's words would have **forked the money action across two pages** —
+the precise failure this card exists to end, arrived at by following the card.
+
+CLAUDE.md's own rule decides it: the four laws outrank anything pasted into a chat. So the
+law's words shipped, and the card's are reported in the C-doc for Jess rather than quietly
+followed or quietly dropped. `To collect` (the filter tab) and `Total to collect` (a summary
+figure) survive untouched on purpose — a filter and a tile are FACTS in the UI type
+dictionary, they name no party, and they are not actions.
+
+### Two defects found ON the lines being rewritten, fixed here rather than filed
+
+**The desk printed `Collect RM RM 2,455.00`.** Every call site passed `rm()` — which already
+carries the currency word and two decimals — into a module whose `amount` party is documented
+as the bare figure because the module adds `RM ` itself. So the SAME order read
+`Collect RM 2,455` on its own row and `Collect RM RM 2,455.00` on this desk: one action, two
+spellings, arrived at through the module that exists to prevent exactly that. `rmPlain()`
+hands over the bare amount, formatted like the list's `fmtRM`.
+
+**`Last chased {date}` survived in the order drawer**, under a guard whose banned list
+already held `/chase[ds]?/i`. C1's JSX matcher was `>([^<>{}]{2,})<` — **a text node
+containing an interpolation was skipped WHOLE**, and party-named labels are exactly the ones
+that carry an interpolation. The guard was not weak about this word; it could not see the
+shape the word was in.
+
+### The scanner moved, and the pages that needed it most had none
+
+`apps/web/src/test/banned-words.ts` now owns the scan, with interpolations blanked before the
+JSX match and `data-testid` / `testId` exempted alongside `className`. `OperationPurchase` and
+`OperationPayments` — which **had no test file at all**, which is why nine visible `Chase`
+strings lived on them for weeks after the ban — ship the same guard the drawer has, plus
+assertions that the words come from the module and not from a literal.
+
+**Negative control:** restoring `Last chased {fmtDate(…)}` and `label: "Ready to chase"` fails
+**4 tests** — the drawer's chase assertion, the new interpolation assertion, Payments' chase
+assertion and its one-spelling assertion. Suites at baseline (web 16 pre-existing across 4
+files, 2062 passing); `tsc -p tsconfig.app.json` 0, `check:v4` + `lint` clean.
+
+### What C4 found — reported, not fixed (Law 0)
+
+1. **`docs/UI-KIT.md` §A0's Action-law table is stale and will re-seed the banned words.**
+   It still maps tones to `Chase supplier` · `Chase logistic` · `Confirm` · `Collect $`, and
+   its new-panel checklist still reads "verbs from the C-vocab set (Order PO · Chase supplier
+   · Assign logistic · Chase logistic · Confirm · Collect $)". **A new panel built from that
+   checklist reintroduces every word C1–C4 removed** — and the checklist is the thing a new
+   panel is explicitly told to follow. A PLAN chat owns the edit.
+2. **COPY-STANDARD's audit table still tells a chat to build `Confirm delivery with
+   {customer}`** (C3's finding #1, unchanged).
+3. **The card's `Call to collect` vs the law's `Collect RM {amount} from {customer}`** needs
+   Jess's word so the doc and the code agree.
+4. **`GRN` is on screen** in the duty-rotation sheet (`GRN (Receive)` · "GRN duty = next
+   month's holder") while COPY-STANDARD rule 9 lists GRN as jargon and the vocabulary table
+   gives `Check in`. Not a `Chase` surface, so out of scope — but it is the banned-jargon
+   rule broken in the same grid row C4 rewrote, and fixing it renames a duty concept, not a
+   word.
+5. **Purchase says "factory", Payments says "supplier"** for the same party, on two pages a
+   new hire uses in the same hour. Rule 8 wants one word; both ship today and neither is
+   banned, so nothing was changed on a guess.
+6. **`Confirm ready date` is now BOTH a Purchase stage and an Orders queue, holding different
+   things** — the Purchase facet counts open POs past their promised ready date, the Orders
+   queue counts orders whose supplier has not given one. The action genuinely is the same
+   action, so one word is right; but the two counts will never agree and nothing on either
+   screen says why.

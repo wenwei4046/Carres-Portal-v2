@@ -29,18 +29,32 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C4 ✅ #484 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
 ③ **LINE COMPLETE** (S1-S5, the last being #474 — the Numbers tab, and the finding that
 S5 needs no `closed_at` column because S3's own close gate already stores the day the
 customer confirmed) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471**.
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C4 ✅ #484 · C5 ✅ #447 ·
+C9 ✅ #472 · C10 ✅ #471**.
 **Drawer lane, in this order:** C6 → C7 → C8. **C10 shipped**: Jess's one call was
 already answered inside the card (side by side, the stage pill untouched), so the three dots
-Law 6 describes are finally on screen.
-R/S/K run in parallel throughout; C4 waits for a free R slot.
+Law 6 describes are finally on screen. **C4 shipped**, so no C-card is waiting on a lane —
+R/S/K run in parallel throughout.
+
+**What C4 changed (2026-07-27, PR #484) — web only, no migration.** The two pages the
+word `Chase` still lived on now read their action words from the same shared module the
+Orders list uses. Purchase's stage ② is `Confirm ready date`, its detail pane names the
+factory (`Call Ohana — confirm ready date`) and its footer button drops to `Open WhatsApp`
+— the CHANNEL is not the action. Payments' queue is `Collect`, one order reads
+`Collect RM 2,455 from John Tan`, the last-touched stamp says `Last message …` and the two
+tones are `Remind` / `Call`. **The card's own `Call to collect` was NOT built**: the money
+action already has one spelling in COPY-STANDARD, Law 4 and the shipped module, and a
+second one would fork it across two pages — the laws outrank the card, and Jess's pen is
+asked for in the C-doc. It also fixed the desk printing **`Collect RM RM 2,455.00`** and
+`Last chased` surviving in the drawer under a guard that skipped any label carrying an
+interpolation. Purchase and Payments **had no test file at all**; they have the guard now.
 
 **What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
 describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status
