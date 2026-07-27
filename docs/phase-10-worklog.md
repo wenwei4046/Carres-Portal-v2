@@ -2727,3 +2727,49 @@ Post-apply: `commission_run_state` exactly **1** copy, `md5(prosrc)`
 - **Nothing sends anything.** S1 ruled "notify manager" a visible flag because no message channel exists anywhere in `apps/api`; the same holds here. There is no cron and no message — the row turns by itself, on read, which is why "no case silently passes day 14" is true without anybody subscribing to anything.
 
 - Suites at baseline (shared **1665/1665** · api **3 pre-existing** · web **16 pre-existing**), `tsc -p tsconfig.app.json` clean, build + `check:v4` + lint clean, `SERVICE_ROLE` greps 0 in the downloaded live bundle. **Deploy note**: `wrangler` is a dependency of `apps/api`, not `apps/web`, and two Cloudflare accounts are authorised — Pages deploys run from `apps/api` with `CLOUDFLARE_ACCOUNT_ID` set, or wrangler stops and asks. Three canonicals converged on the first poll, `erp.carresofficial.com` on the second. **A composed string greps 0 as a whole sentence**: `4 working days left` is built from a template, so the marker has to be the literal fragment (`" working "` … `" late"` / `Due today`), not the rendered sentence.
+
+---
+
+## 2026-07-27 · The webhook was reading the wrong invoice shape (PR #457)
+
+**PR #457** merged as `9b73fb17`, no migration, api Worker **`2a0b5707`** — **DEPLOYED** (api only). Worktree `rental-modular-sku`.
+
+Found with Loo, in the Stripe dashboard, minutes after 0295 shipped. He opened the endpoint page to check the event subscription and the page answered a question nobody had asked: **API version `2025-02-24.acacia`**.
+
+### The bug
+
+Stripe shapes a webhook payload to the **endpoint's** pinned API version, not to the SDK's. Our SDK is v22 (Basil-era), and **Basil is where `invoice.subscription` was replaced by `parent.subscription_details.subscription`**.
+
+Both `recordRentalInvoice` (0281, `invoice.paid`) and `recordRentalInvoiceFailure` (0295, `invoice.payment_failed`) read only the new field. Against an acacia-shaped payload `invoice.parent` is `undefined`, so **every real rental invoice — paid or refused — resolved to `not_a_subscription_invoice`, was acknowledged with a cheerful 200, and dropped.**
+
+0281's own code comment was confidently wrong in an instructive way: *"SDK v22 moved this: `invoice.subscription` is gone."* True of the SDK's **types**. Not true of the **wire payload**, which follows the endpoint.
+
+### The fix
+
+`subscriptionIdOf()` reads the new field, falls back to the legacy one, and accepts either an id string or an expanded object. **Deliberately not "work out which release moved it and code to that answer"** — reading both is correct under either version and survives the endpoint being upgraded later, for the price of one fallback.
+
+### Why it survived to production
+
+**0281 shipped its webhook branch with no test at all.** That is the whole story. Coverage added for both events under both shapes, plus the neither-shape case (still ignored, never guessed).
+
+**Negative control run, because a test that passes before and after proves nothing**: with the fallback removed, exactly the 3 legacy-shape tests fail; with it, 29/29 pass.
+
+### What else the Stripe account turned out to hold
+
+Pulled the live invoice and subscription lists while diagnosing. The CARRESS Stripe account is **shared with the old carressglobal system, and those subscriptions are still live and still collecting** — e.g. `SO-00000011`, RM 29/month, contract to 2030-05-20; `SO-00000007`, RM 129/month, to 2032-05-20; `livemode: true`, recent successful charges.
+
+This is safe by construction: our handler looks the subscription up in `rental_agreements`, finds nothing, and returns `ignored: unknown_subscription`. 0281 anticipated exactly this. But it means that **the moment `invoice.paid` is subscribed, the Worker starts receiving the old system's traffic** — expected, and correctly ignored.
+
+### Still not done, and it is not code
+
+The endpoint says **"Listening to 3 events"** and our code handles **5**. The three are almost certainly the `checkout.session` trio from 0223; `invoice.paid` was added by 0281 on 07-26 and nothing in that worklog entry mentions returning to the Stripe dashboard. If that reading is right, **the collection engine has never fired once** — which is exactly what `rental_billing_events` holding a single hand-entered row says. Both `invoice.paid` and `invoice.payment_failed` need ticking. CF `rental-payment-failed-event-not-subscribed` covers it.
+
+### Note on the api typecheck baseline
+
+It moved **4 → 6 before this branch**: PR #440 left `hr.ts` importing `hrAssignSalespersonInput`, which `@carres/shared` no longer exports. Verified by restoring clean `origin/main` versions of my two files and re-counting — **not stash**, after that trap already cost a round this session. Harmless at runtime (unused import, esbuild drops it; `wrangler --dry-run` bundles clean) but it should be tidied by that line. New CF.
+
+### Deploy
+
+Tracker checked first: tail **0298**, and main's last migration file is 0298, so the union tip was not ahead of the database. `wrangler deploy --env production` — bindings receipt read: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + `api.carresofficial.com (custom domain)`. Webhook re-verified live: unsigned **400**, bad signature **400 `invalid_signature`**; `/api/rental/agreements` unauth **401**.
+
+**api-only deploy.** A parallel line had deployed web in the meantime (`index-CKQhEuFh.js`), so rather than assume, the live bundle was downloaded and checked: 4,410,666 bytes, `SERVICE_ROLE` **0**, all three 0295 markers present and the deleted page's `pos-rental-page` testid still **0** — their deploy contained this line's work.
