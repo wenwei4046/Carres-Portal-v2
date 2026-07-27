@@ -15,6 +15,11 @@
 > [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — every line and card,
 > what is shipped, the lane rules.
 >
+> **PLUS the ONE working-flow file of the module being touched** — e.g.
+> [`docs/ORDERS-WORKING-FLOW.md`](docs/ORDERS-WORKING-FLOW.md): every action of that module
+> with its trigger, checklist, completion, due and owner; which one shows first; the gates;
+> what is deliberately not an action. One module = one file, overwritten in place.
+>
 > **ONE CONCERN, ONE FILE.** When Jess re-rules something the old text is DELETED and
 > overwritten — never annotated "superseded", never two versions side by side. A word that
 > is not in COPY-STANDARD may not appear on screen: stop and ask her.

@@ -62,26 +62,25 @@ finished — do not build it.
 Where a FORM already collects the inputs, that form IS the checklist — never a second row
 of ticks beside it.
 
-## Law 3 — the tracks (they run in parallel)
+## Law 3 — every module has ONE working-flow file, and it is the only place its actions live
 
-| Track | Action | Trigger | Completion |
-|---|---|---|---|
-| **Purchasing** | `Send PO to {supplier}` | goods line needs buying, no PO | PO number exists AND supplier ready date exists |
-| | `Call {supplier} — confirm ready date` | ready date missing · due for re-confirm · passed with no goods · later than the customer's date · changed by the supplier | latest ready date recorded AND call outcome recorded |
-| **Recovery** | `Confirm recovery plan` (internal) | latest supplier ready date is LATER than the customer's promised date | a proposed new date exists AND a communication owner is named |
-| | `Call {customer} — agree new delivery date` | a recovery plan exists and the original date still cannot be met | customer accepted a new date AND the outcome is recorded |
-| **Payment** | `Collect RM {amount} from {customer}` | outstanding > RM 0 | outstanding = RM 0 |
-| **Delivery** | `Assign logistics` | delivery needed, no logistics company chosen | a logistics company is recorded. **NEVER "they accepted"** |
-| | `Call {logistics} — confirm delivery date` | assigned, but the customer has not confirmed BOTH date and slot | customer-confirmed date AND slot recorded |
-| | `Issue delivery order` | the customer-confirmed date exists | the delivery order document exists for this trip |
-| | `Deliver today` | customer-confirmed date is today, not yet delivered | delivered, OR a specific named problem recorded |
-| | `Upload delivery photo` | delivered, no photo | at least one photo exists |
+A module's actions are NOT listed here. They live in one file per module, overwritten in
+place, never duplicated:
 
-**Two rules that keep this honest:**
+| Module | Its one file |
+|---|---|
+| Orders | `docs/ORDERS-WORKING-FLOW.md` |
+| Purchasing | `docs/PURCHASING-WORKING-FLOW.md` (written when that line starts) |
+| Receiving & claims · Service · Stock · Payments | same shape, same naming |
 
-- A logistics-proposed date is a FACT, never a confirmation.
-- Payment, purchasing and delivery actions may all be open at the same time. Being
-  further down the display order never means an action is gone.
+**The shape is fixed** so every module reads the same way, and a chat can be pointed at one
+file: (1) what the module is · (2) what the flow reads, naming the real column for every
+signal · (3) the actions, each with the six things · (4) which shows first · (5) gates,
+stated as separate from display order · (6) row order · (7) the facts on screen ·
+(8) what is deliberately NOT an action.
+
+Tracks inside a module run in PARALLEL: purchasing, payment and delivery actions may all be
+open on the same record at the same time.
 
 ## Law 4 — display priority (which one shows first)
 

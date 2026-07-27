@@ -62,6 +62,13 @@ Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note 
 outside design conversation into cards) and a BUILD chat (do one card). Nothing else needs
 to be remembered.
 
+## The module working-flow files (one per module — the only home for its actions)
+
+| Module | File |
+|---|---|
+| Orders | `docs/ORDERS-WORKING-FLOW.md` |
+| Purchasing · Receiving · Service · Stock · Payments | same shape, written when the line starts |
+
 ## The engine law (read before any C-card, and before any new module)
 
 `docs/ACTION-FLOW-STANDARD.md` — two layers (compute every track · display picks one),
