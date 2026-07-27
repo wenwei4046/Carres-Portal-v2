@@ -39,9 +39,22 @@ verb + named party + measurable object, and the word Chase disappears:
   delivery date` · `Call customer (stock delay)` → `Call {name} — stock delay`
 - the party is the REAL name when known (supplier/carrier/customer), role word otherwise
 
+**Also in this card — the T1 leftover (found by the J3 chat, deliberately left for C1):**
+`OrderDetailDrawer.tsx` still renders the banned word **`Unscheduled`** in TWO places —
+line ~3814 (the header MiniBadge, carrier assigned + no date) and ~3853 (`statusWord` in
+the delivery card). T1 banned the word and fixed the LIST; these two survived, and the
+live bundle greps 1. Fix = the word T1 locked for exactly this state: **`need booking`**.
+Its neighbours in both spots are already correct (`Confirmed` · `not confirmed · carrier
+said {date}` · `No carrier`) — change only the two strings, and delete the stale word
+"Unscheduled" from the comment block above 3837 so no future chat reads it as intended.
+**Add a banned-word guard to the drawer's own test file** (`POD` / `Proof of Delivery` /
+`Unscheduled` / `Not booked` / `Chase`) — `OrderDocuments`, `BookingSpine` and
+`OrderJourneyHeader` each ship one already, which is precisely why nobody caught the
+drawer: every component guarded ITSELF and the badge sat outside all three.
+
 **No migration. Copy + label maps + tests.**
 **Done when:** grep of the web bundle for visible `Chase` = 0 on Orders/Delivery
-surfaces; every renamed label carries a named party.
+surfaces AND `Unscheduled` = 0; every renamed label carries a named party.
 
 ## C2 · Dynamic Checklist in the drawer
 
