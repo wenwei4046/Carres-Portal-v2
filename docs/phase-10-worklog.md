@@ -2290,7 +2290,7 @@ missing migration — the right call, and the reason this deploy is a fix as muc
 
 ---
 
-## 2026-07-27 · Delivery T11 — the Delivery module page, and the line ENDS (PR #425 merge `__MERGE__`, Worker unchanged + web `__BUNDLE__` — DEPLOYED, no migration)
+## 2026-07-27 · Delivery T11 — the Delivery module page, and the line ENDS (PR #425 merge `61d93c20`, Worker `e98f507f` + web `index-DiH5MOAK.js` — DEPLOYED, no migration)
 
 Card **T11** of `docs/delivery-execution-queue.md` (promotes L5), the LAST card of line ①.
 The delivery line is now complete: **T1-T11 shipped in one day and a half.**
@@ -2391,6 +2391,25 @@ names. COPY-STANDARD gains only the four strings this page genuinely owns: `Queu
 shared **1527/1527** (+11) · web **+16** · api untouched. Suites at the §17.7 baseline
 (api 3, web 16) — zero new failures. typecheck 0, build + `check:v4` + design-standard lint
 clean. No migration; the API change is one column added to an existing select.
+
+### Ship
+
+PR **#425** merged as `61d93c20`. Deployed from the MAIN TIP, not the feature branch
+(`git log HEAD..origin/main` empty first). Migration tracker checked before the api deploy:
+tail is **0290** (K3's `ready_stock_urgent_lane`, applied) — so the union tip's API had no
+unapplied migration behind it, which is what made deploying it safe. T11 itself needs none.
+
+api Worker **`e98f507f`** via `wrangler deploy --env production` — bindings receipt read:
+`PUBLIC_WEB_URL=https://pos.carresofficial.com` and `api.carresofficial.com` routed (not the
+default env's localhost). web **`index-DiH5MOAK.js`** to carres-portal + carres-pos, both
+`--branch=main`. **All 4 canonicals converged on the first poll.**
+
+Live bundle downloaded to a file before grepping (a piped grep on 4 MB truncates and reports
+a false 0): **4,361,903 bytes**, byte-identical to the local build, `SERVICE_ROLE` **0**, and
+five markers from MOUNTED components present — `Pick a row on the left to see the delivery`,
+`Nothing to do here.`, `No logistics picked`, `Logistics' date`, `Promised this day, no date
+yet`. The last three are the T10 strings this card fixed at their source, so their presence
+proves both surfaces now speak the ruled words.
 
 ---
 

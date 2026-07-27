@@ -3,18 +3,19 @@
 // module-tabbed page must NOT render ListPageShell's breadcrumb + big title:
 // they duplicate the active tab and burn ~80px Jess does not have. Same shape
 // as its sibling Receiving. Stand-alone list pages still use the shell.
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   supplierClaimTypeLabel,
   supplierClaimStatusLabel,
+  supplierClaimRequestLabel,
+  supplierClaimResponseLabel,
+  claimMoveOwnerLabel,
   SUPPLIER_CLAIM_LATE,
 } from "@carres/shared";
-import {
-  useOperationSupplierClaims,
-  useOperationSupplierClaimPhotos,
-} from "@/lib/queries";
+import { useOperationSupplierClaims, useOperationSuppliers } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PurchasingTabs from "./PurchasingTabs";
+import SupplierClaimPanel from "./components/SupplierClaimPanel";
 
 /**
  * OperationSupplierClaims — R2 of the receiving & claim queue
@@ -29,10 +30,11 @@ import PurchasingTabs from "./PurchasingTabs";
  * module (the queue doc's rule: "no new menu item"), sitting beside Receiving
  * because a claim is what a receiving produces.
  *
- * What this page deliberately does NOT do: resolve anything. What we asked
- * versus what the supplier answered, the WhatsApp follow-up and the close are
- * R3's card — shipping half of R3 here would mean R3 has to unpick it. So the
- * row states facts and nothing more.
+ * R3 gives the row its LIFE. Every open claim now ends in the one thing the
+ * card asks for — **who owes the next move** — computed by `claimNextMove` in
+ * the shared module, so the sentence in the column and the buttons in the panel
+ * can never describe different steps. Opening a row is where the two sides are
+ * recorded: what WE asked, what the SUPPLIER answered, then the close.
  */
 
 type Tab = "open" | "closed" | "all";
@@ -56,7 +58,19 @@ export default function OperationSupplierClaims() {
 
   const { data, isLoading, isError, error, refetch } =
     useOperationSupplierClaims(tab);
-  const photosQ = useOperationSupplierClaimPhotos(openClaimId);
+  // The WhatsApp GROUP link per supplier (0239) — the follow-up door the card
+  // names. Cached 5 minutes and shared with the rest of the operation portal.
+  const suppliersQ = useOperationSuppliers();
+  const groupUrlBySupplier = useMemo(
+    () =>
+      new Map(
+        (suppliersQ.data?.suppliers ?? []).map((s) => [
+          s.id,
+          s.whatsapp_group_url ?? null,
+        ]),
+      ),
+    [suppliersQ.data],
+  );
 
   const claims = data?.claims ?? [];
   const counts = data?.counts ?? { open: 0, closed: 0, all: 0 };
@@ -141,7 +155,7 @@ export default function OperationSupplierClaims() {
           <div className="bg-white border border-base-200 rounded overflow-auto">
             <table
               className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
-              style={{ minWidth: 940 }}
+              style={{ minWidth: 1120 }}
             >
               <thead className="bg-base-700 border-b-2 border-primary text-white">
                 <tr>
@@ -151,14 +165,17 @@ export default function OperationSupplierClaims() {
                   <Th>Problem</Th>
                   <Th>PO</Th>
                   <Th>Reported</Th>
-                  <Th>Evidence</Th>
+                  {/* The card's done-when, as a column. */}
+                  <Th>Next move</Th>
+                  {/* The Open button — no header word; it is not a fact. */}
+                  <Th> </Th>
                 </tr>
               </thead>
               <tbody>
                 {claims.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="p-12 text-center text-[12px] text-base-500"
                     >
                       {/* An empty state that is a real answer, not a shrug. */}
@@ -225,62 +242,59 @@ export default function OperationSupplierClaims() {
                             {c.reported_by_name ?? "System"}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">
-                          {c.photo_count > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenClaimId(expanded ? null : c.id)
-                              }
-                              className="btn-secondary text-[11px] py-1.5 px-3"
-                              data-testid={`claim-photos-${c.claim_no}`}
-                            >
-                              {expanded ? "Hide" : `${c.photo_count} photo${c.photo_count === 1 ? "" : "s"}`}
-                            </button>
+                        <td className="px-4 py-3">
+                          {c.status === "closed" ? (
+                            // A closed claim keeps BOTH sides on the row — the
+                            // card's done-when, readable without opening it.
+                            <div className="text-[12px] text-base-600">
+                              Asked {supplierClaimRequestLabel(c.requested_action)}{" "}
+                              → got {supplierClaimResponseLabel(c.supplier_response)}
+                            </div>
                           ) : (
-                            <span className="text-[11px] text-base-500">—</span>
+                            <div className="flex items-start gap-2">
+                              <span
+                                className={`pill ${c.next_move.owner === "carres" ? "pill-overdue" : "pill-warning"} shrink-0`}
+                                data-testid={`claim-owner-${c.claim_no}`}
+                              >
+                                {claimMoveOwnerLabel(
+                                  c.next_move.owner,
+                                  c.supplier_name,
+                                )}
+                              </span>
+                              <span
+                                className="text-[12px] text-base-800"
+                                data-testid={`claim-next-move-${c.claim_no}`}
+                              >
+                                {c.next_move.label}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <button
+                            type="button"
+                            onClick={() => setOpenClaimId(expanded ? null : c.id)}
+                            className="btn-secondary text-[11px] py-1.5 px-3"
+                            data-testid={`claim-open-${c.claim_no}`}
+                          >
+                            {expanded ? "Hide" : "Open"}
+                          </button>
+                          {c.photo_count > 0 && !expanded && (
+                            <div className="text-[10.5px] text-base-500 mt-1">
+                              {c.photo_count} photo{c.photo_count === 1 ? "" : "s"}
+                            </div>
                           )}
                         </td>
                       </tr>
                       {expanded && (
                         <tr className="bg-base-50">
-                          <td colSpan={7} className="px-4 py-3">
-                            {photosQ.isLoading && (
-                              <div className="text-[12px] text-base-500">
-                                Loading photos…
-                              </div>
-                            )}
-                            {photosQ.isError && (
-                              <div className="text-[12px] text-danger">
-                                Couldn&rsquo;t load the photos.
-                              </div>
-                            )}
-                            <div className="flex gap-3 flex-wrap">
-                              {(photosQ.data?.photos ?? []).map((p) =>
-                                p.url ? (
-                                  <a
-                                    key={p.path}
-                                    href={p.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="block"
-                                  >
-                                    <img
-                                      src={p.url}
-                                      alt={`Claim evidence ${p.path}`}
-                                      className="h-28 w-auto rounded border border-base-200"
-                                    />
-                                  </a>
-                                ) : (
-                                  <span
-                                    key={p.path}
-                                    className="text-[11px] text-base-500"
-                                  >
-                                    {p.path} (unavailable)
-                                  </span>
-                                ),
-                              )}
-                            </div>
+                          <td colSpan={8} className="px-4 py-4">
+                            <SupplierClaimPanel
+                              claim={c}
+                              supplierGroupUrl={
+                                groupUrlBySupplier.get(c.supplier_id) ?? null
+                              }
+                            />
                           </td>
                         </tr>
                       )}

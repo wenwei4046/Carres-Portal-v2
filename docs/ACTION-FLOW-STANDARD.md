@@ -20,11 +20,13 @@ needs a document to use the portal, the portal is wrong. (Jess, 2026-07-27.)
 **A new hire's whole training is four lines:**
 
 ```
-1. Open Orders and pick your own name.
+1. Open My Work.
 2. Start from the top row.
-3. Open the action and follow it — fill in what it asks for.
-4. It ticks itself and the next thing comes up.
+3. Open the action and complete it.
+4. The system closes it and shows the next action.
 ```
+
+Work is assigned automatically — nobody hunts for their own name in a filter.
 
 ## Law 0 — follow the law, and say so when the law is wrong
 
@@ -42,6 +44,21 @@ failed, even if it shipped the card perfectly.** (Jess, 2026-07-27.)
 - **A blocking problem stops the work.** If building the card as written would ship
   something wrong, the chat stops before building and asks. Shipping a known-wrong thing
   because "the card said so" is the worst outcome available.
+
+## Law 0A — Source of Truth
+
+Every rule exists in ONE document only.
+
+| Rule | Its only home |
+|---|---|
+| Action engine | `docs/ACTION-FLOW-STANDARD.md` |
+| UI wording | `docs/COPY-STANDARD.md` |
+| A module's working flow | `docs/<MODULE>-WORKING-FLOW.md` |
+| Execution queue | `docs/execution-queues-index.md` |
+
+Never duplicate a rule into a second document. When a rule changes, the source document is
+updated and nothing else — a copy elsewhere is how Delivery gets fixed and Purchasing is
+forgotten.
 
 ## Law 1 — TWO LAYERS, never one
 
@@ -69,11 +86,19 @@ finished — do not build it.
 | | |
 |---|---|
 | **Trigger** | the condition that makes it appear, computed from stored data |
-| **Label** | verb + named party + measurable object (COPY-STANDARD) |
+| **Label** | verb + clear object; name the party whenever an outside party is involved (COPY-STANDARD) |
 | **Checklist** | the steps that close it — each one DERIVED from a stored signal or an INPUT the system stores |
 | **Completion** | a condition the SYSTEM measures. Never "someone says they did it" |
-| **Due** | when it turns late (working days — Mon–Sat, MY public holidays skipped) |
-| **Owner** | who is responsible (PIC, or the duty holder for shared work) |
+| **Due** | when it turns late, in **working days** |
+| **Task Owner** | assigned automatically by the module that raised the action; it may change hands |
+
+**Case Owner** is separate and is never written on an action: one person owns the customer's
+case from start to finish and never changes, while task owners come and go.
+
+**Working days, one definition for every module:** Monday–Saturday · Sunday excluded ·
+Malaysian public holidays excluded (the live calendar is the Selangor observance set, since
+the warehouse is in Selangor) · a due date landing on a non-working day moves automatically
+to the next working day.
 
 **The no-decorative-checkbox law:** a tick-box that only records an assertion is banned.
 Where a FORM already collects the inputs, that form IS the checklist — never a second row
@@ -84,11 +109,10 @@ of ticks beside it.
 A module's actions are NOT listed here. They live in one file per module, overwritten in
 place, never duplicated:
 
-| Module | Its one file |
-|---|---|
-| Orders | `docs/ORDERS-WORKING-FLOW.md` |
-| Purchasing | `docs/PURCHASING-WORKING-FLOW.md` (written when that line starts) |
-| Receiving & claims · Service · Stock · Payments | same shape, same naming |
+**Every module owns ONE working-flow file. Every working-flow file uses the SAME structure.
+Only the business content differs — the document structure never changes.**
+Orders' file (`docs/ORDERS-WORKING-FLOW.md`) is the template; a module's file is named
+`docs/<MODULE>-WORKING-FLOW.md` and is written when that line starts.
 
 **The shape is fixed** so every module reads the same way, and a chat can be pointed at one
 file: (1) what the module is · (2) what the flow reads, naming the real column for every

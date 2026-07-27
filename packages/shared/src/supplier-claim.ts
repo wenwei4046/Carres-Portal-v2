@@ -118,9 +118,9 @@ export function claimNeedsEvidence(type: string | null | undefined): boolean {
 
 // ── The claim's own state ────────────────────────────────────────────────────
 
-/** R2 gives a claim a birth and a queue. The ASK / ANSWER pair and the
- *  resolution flow are R3's card — this stays deliberately two-valued so R3 can
- *  grow it without unpicking anything. */
+/** R2 gave a claim a birth and a queue; R3 gives it an end. Still two-valued:
+ *  a claim is either being chased or it is settled. Everything about HOW it was
+ *  settled lives in the ask/answer pair below, never in a third status word. */
 export type SupplierClaimStatus = "open" | "closed";
 
 export const SUPPLIER_CLAIM_STATUSES = [
@@ -132,6 +132,305 @@ export function supplierClaimStatusLabel(key: string | null | undefined): string
   if (!key) return "—";
   return SUPPLIER_CLAIM_STATUSES.find((s) => s.key === key)?.label ?? key;
 }
+
+// ── R3 · what WE ask, and what the SUPPLIER answered ─────────────────────────
+//
+// Two separate fields, on purpose (the card's own words): "so 'what we wanted
+// vs what we got' is analysable". One field would collapse the two into a
+// single settled/not-settled bit and R5's scorecard could never ask the
+// interesting question — which suppliers do what we ask, and which negotiate.
+//
+// Both lists are CLOSED. Free text exists only as a note beside them, never
+// instead of them (S1's law: prose is a render of structured answers, and a
+// typed sentence cannot be counted).
+
+/** What we ask the supplier to do. Jess's list, verbatim, plus the one thing
+ *  her list could not cover — see `SUPPLIER_CLAIM_REQUEST_REMAINING`. */
+export type SupplierClaimRequest =
+  | "replace"
+  | "deliver_missing_parts"
+  | "deliver_correct_item"
+  | "repair"
+  | "return_for_inspection"
+  | "deliver_remaining";
+
+/**
+ * The ask for goods that never arrived.
+ *
+ * Jess's ask list covers the five things you do about goods you are HOLDING —
+ * every one of them is meaningless for a `late_delivery` claim, where nothing
+ * arrived to replace, repair or return. That claim type is minted automatically
+ * by the nightly sweep, so a late claim with no legal ask would sit in the
+ * queue forever with nothing anyone could pick: the queue would jam on the one
+ * claim type nobody files by hand.
+ *
+ * So a late claim is BORN with this ask already stamped — it is the only thing
+ * a late claim can ever ask for ("send the goods you owe us"), there is nothing
+ * for a human to decide, and the word is the one the supplier's own answer list
+ * already uses (`Deliver remaining`), not a sixth invented one. It is never
+ * offered in the picker: see `requestedActionsFor`.
+ *
+ * REPORTED TO JESS, not decided quietly — the card's ask list has a gap and
+ * this is how it was closed.
+ */
+export const SUPPLIER_CLAIM_REQUEST_REMAINING = "deliver_remaining" as const;
+
+export const SUPPLIER_CLAIM_REQUESTS = [
+  { key: "replace", label: "Replace" },
+  { key: "deliver_missing_parts", label: "Deliver missing parts" },
+  { key: "deliver_correct_item", label: "Deliver correct item" },
+  { key: "repair", label: "Repair" },
+  { key: "return_for_inspection", label: "Return for inspection" },
+  { key: SUPPLIER_CLAIM_REQUEST_REMAINING, label: "Deliver remaining" },
+] as const satisfies readonly CaseOption<SupplierClaimRequest>[];
+
+export const SUPPLIER_CLAIM_REQUEST_KEYS = SUPPLIER_CLAIM_REQUESTS.map((r) => r.key) as [
+  SupplierClaimRequest,
+  ...SupplierClaimRequest[],
+];
+
+export function supplierClaimRequestLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return SUPPLIER_CLAIM_REQUESTS.find((r) => r.key === key)?.label ?? key;
+}
+
+/** What the supplier came back with. Jess's list, verbatim and unchanged — the
+ *  supplier's mouth is not narrowed by what we asked for: they may offer
+ *  something else entirely, or refuse. */
+export type SupplierClaimResponse =
+  | "replacement"
+  | "deliver_remaining"
+  | "repair"
+  | "return_and_replace"
+  | "reject"
+  | "other_agreement";
+
+export const SUPPLIER_CLAIM_RESPONSES = [
+  { key: "replacement", label: "Replacement" },
+  { key: "deliver_remaining", label: "Deliver remaining" },
+  { key: "repair", label: "Repair" },
+  { key: "return_and_replace", label: "Return & replace" },
+  { key: "reject", label: "Reject" },
+  { key: "other_agreement", label: "Other agreement" },
+] as const satisfies readonly CaseOption<SupplierClaimResponse>[];
+
+export const SUPPLIER_CLAIM_RESPONSE_KEYS = SUPPLIER_CLAIM_RESPONSES.map((r) => r.key) as [
+  SupplierClaimResponse,
+  ...SupplierClaimResponse[],
+];
+
+export function supplierClaimResponseLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return SUPPLIER_CLAIM_RESPONSES.find((r) => r.key === key)?.label ?? key;
+}
+
+/**
+ * Which asks the picker offers for this claim type.
+ *
+ * TWO buckets, split by one physical fact: did the goods arrive?
+ *
+ *   - `late_delivery` → nothing arrived, so nothing can be replaced, repaired
+ *     or returned. Its ask is stamped at birth and there is nothing to pick.
+ *   - everything else → the goods are in our warehouse and all five of Jess's
+ *     asks are live.
+ *
+ * The split is deliberately no finer than that. Narrowing "damaged" to
+ * `replace | repair` would be us guessing furniture policy, and R2 already
+ * learned the cost of an over-narrow list: a blocked receiving is worse than a
+ * loosely-typed claim. The operator knows their supplier; the system knows only
+ * whether the goods are here.
+ */
+export function requestedActionsFor(
+  claimType: string | null | undefined,
+): CaseOption<SupplierClaimRequest>[] {
+  if (claimType === SUPPLIER_CLAIM_LATE) return [];
+  return SUPPLIER_CLAIM_REQUESTS.filter(
+    (r) => r.key !== SUPPLIER_CLAIM_REQUEST_REMAINING,
+  );
+}
+
+/** Is `action` a legal ask for a claim of this type? Mirrored by
+ *  `supplier_claim_request_allowed` in 0291 — client and server must not
+ *  disagree about what the picker offered. */
+export function isRequestedActionFor(
+  claimType: string | null | undefined,
+  action: string | null | undefined,
+): boolean {
+  if (!action || !claimType) return false;
+  if (claimType === SUPPLIER_CLAIM_LATE)
+    return action === SUPPLIER_CLAIM_REQUEST_REMAINING;
+  return requestedActionsFor(claimType).some((r) => r.key === action);
+}
+
+/**
+ * Which answers must carry a note.
+ *
+ * A refusal with no reason and an "other agreement" with no agreement are both
+ * records that say nothing — R5 would count them and learn nothing, and the
+ * next person to open the claim cannot tell what was settled. Every other
+ * answer names itself.
+ */
+export function responseNeedsNote(response: string | null | undefined): boolean {
+  return response === "reject" || response === "other_agreement";
+}
+
+// ── Who owes the next move ───────────────────────────────────────────────────
+//
+// The card's test: "every open claim shows who owes the next move". It is
+// DERIVED, never stored — a stored owner is a second copy of the ask/answer
+// pair and drifts from it the moment anything is recorded.
+
+export type SupplierClaimMoveOwner = "carres" | "supplier";
+
+export interface SupplierClaimMove {
+  /** Which step of the lifecycle is open. `done` = the claim is closed. */
+  key: "ask" | "answer" | "close" | "done";
+  /** null only when the claim is closed — nobody owes anything. */
+  owner: SupplierClaimMoveOwner | null;
+  /** The action line: verb + named party + measurable object (COPY-STANDARD).
+   *  Empty for a closed claim: a closed claim shows a FACT, not an action. */
+  label: string;
+}
+
+export interface SupplierClaimMoveInput {
+  claim_no: string;
+  status: string;
+  claim_type: string;
+  requested_action: string | null;
+  supplier_response: string | null;
+  supplier_name?: string | null;
+  /**
+   * Does the PO line this claim came off still owe us units?
+   *
+   * Only consulted for a `late_delivery` claim, and only to answer one
+   * question: did the goods turn up? A late claim whose goods have since
+   * arrived must stop saying the supplier owes the next move — that is the
+   * "crying wolf" failure, and it would hit the ONE claim type that is minted
+   * automatically every night.
+   *
+   * `null` = we could not tell (the PO line was deleted — `po_line_id` is ON
+   * DELETE SET NULL). Unknown counts as STILL PENDING: the safe answer keeps
+   * chasing a supplier who may owe us goods, rather than inventing a delivery
+   * that may not have happened.
+   */
+  line_pending?: boolean | null;
+}
+
+/** The supplier's name, or the role word when nothing is stored. COPY-STANDARD:
+ *  name the party when the system knows it — the role word is the honest
+ *  fallback, never a blank. */
+function party(name: string | null | undefined): string {
+  return name && name.trim() ? name.trim() : "supplier";
+}
+
+/**
+ * Who owes the next move on this claim, and what that move is.
+ *
+ * ONE function, read by the queue column, the row's action button and the
+ * tests — so the sentence on screen and the button underneath it can never
+ * describe different steps.
+ *
+ * `Close` is the only verb here outside COPY-STANDARD's four-verb dictionary
+ * (Assign · Call · Issue · Upload). The dictionary has no verb for ending a
+ * case, and a claim needs one: the goods came back and the matter is settled.
+ * FLAGGED for Jess rather than silently adopted.
+ */
+export function claimNextMove(c: SupplierClaimMoveInput): SupplierClaimMove {
+  if (c.status === "closed") return { key: "done", owner: null, label: "" };
+
+  const who = party(c.supplier_name);
+  const late = c.claim_type === SUPPLIER_CLAIM_LATE;
+  // Unknown counts as pending — see `line_pending` above.
+  const stillPending = c.line_pending !== false;
+
+  if (!c.requested_action) {
+    // A late claim is born with its ask stamped, so this branch is the
+    // arrived-goods case: somebody must decide what we want done about it.
+    return {
+      key: "ask",
+      owner: "carres",
+      label: `Call ${who} — agree the fix`,
+    };
+  }
+
+  if (!c.supplier_response) {
+    if (late && !stillPending) {
+      // They never answered — they just delivered. Ours to record and close.
+      return {
+        key: "close",
+        owner: "carres",
+        label: `Close ${c.claim_no} — ${who} delivered the rest`,
+      };
+    }
+    return {
+      key: "answer",
+      owner: "supplier",
+      label: late
+        ? `Call ${who} — confirm the new delivery date`
+        : `Call ${who} — confirm what they will do`,
+    };
+  }
+
+  return {
+    key: "close",
+    owner: "carres",
+    label:
+      c.supplier_response === "reject"
+        ? `Close ${c.claim_no} — ${who} refused`
+        : `Close ${c.claim_no} — ${who} agreed: ${supplierClaimResponseLabel(
+            c.supplier_response,
+          )}`,
+  };
+}
+
+/** The word on the owner chip. "Carres" is the company, never "us"/"me" — the
+ *  reader may be any of nine roles. */
+export function claimMoveOwnerLabel(
+  owner: SupplierClaimMoveOwner | null,
+  supplierName?: string | null,
+): string {
+  if (owner === null) return "—";
+  return owner === "carres" ? "Carres" : party(supplierName);
+}
+
+/**
+ * May this claim be closed?
+ *
+ * The card's done-when: "closed claims keep both sides." A claim closed with
+ * one side blank is a claim nobody can learn from, so both the ask and the
+ * answer must be on file first — enforced here, in the RPC and by a CHECK
+ * constraint (0291).
+ *
+ * There is deliberately NO escape hatch for a supplier who never answers. That
+ * claim stays open and keeps naming them, which is exactly what R5's
+ * "avg claim-resolution days" needs to see.
+ */
+export type SupplierClaimCloseProblem =
+  | "already_closed"
+  | "request_required"
+  | "response_required";
+
+export function claimCloseProblems(c: {
+  status: string;
+  requested_action: string | null;
+  supplier_response: string | null;
+}): SupplierClaimCloseProblem[] {
+  const out: SupplierClaimCloseProblem[] = [];
+  if (c.status === "closed") out.push("already_closed");
+  if (!c.requested_action) out.push("request_required");
+  if (!c.supplier_response) out.push("response_required");
+  return out;
+}
+
+/** Plain words for the operator — the copy law: an error gives the fix. */
+export const SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT: Record<
+  SupplierClaimCloseProblem,
+  string
+> = {
+  already_closed: "This claim is already closed.",
+  request_required: "Say what we asked the supplier to do.",
+  response_required: "Record what the supplier answered.",
+};
 
 // ── What the receive form must satisfy before it may be submitted ────────────
 
@@ -217,6 +516,14 @@ export interface SupplierClaimRow {
   note: string | null;
   reported_by_name: string | null;
   reported_at: string;
+  // R3 — the two sides, kept apart.
+  requested_action: SupplierClaimRequest | null;
+  requested_at: string | null;
+  supplier_response: SupplierClaimResponse | null;
+  supplier_response_note: string | null;
+  responded_at: string | null;
+  closed_at: string | null;
+  close_note: string | null;
 }
 
 /** The one-line sentence a claim row shows — "3 units · Damaged · MS01-K".

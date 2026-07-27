@@ -1,7 +1,6 @@
-// design-standard: not-a-list-page — unattributed-orders worklist inside the
-// HR tabbed shell; the page header (title + month stepper) lives in HrApp.
+// design-standard: not-a-list-page — unattributed-orders worklist rendered
+// inside the Commission page; the page header lives in HrApp.
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Btn from "@/components/Btn";
 import { fieldCls } from "@/components/Field";
@@ -10,11 +9,20 @@ import { rm } from "@/lib/format-currency";
 import { useHrAssignSalesperson, useHrReport } from "@/lib/queries";
 
 /**
- * Attribution tab — the month's orders that have NO salesperson (0244/0245).
+ * The month's orders that have NO salesperson (0244/0245).
  * Assigning is the audited hr_assign_salesperson RPC; on success the whole
  * ["hr"] cache invalidates so the commission report re-derives.
+ *
+ * Was its own Attribution tab until Loo retired it (2026-07-27): the list is
+ * empty on a healthy month, so a permanent rail item cost a click every day to
+ * say "nothing to do". It now renders INSIDE Commission → Earnings, directly
+ * under the under-count warning, and only while something is unassigned —
+ * which is also where the blocking `attribution` close-check complains, so the
+ * problem and its fix are on one screen. Deleting it outright would have left
+ * that check with no UI at all: it refuses the month close, and nothing else
+ * in the app calls `hr_assign_salesperson`.
  */
-export default function HrAttributionTab({
+export default function HrUnattributedWorklist({
   year,
   month,
 }: {
@@ -29,47 +37,22 @@ export default function HrAttributionTab({
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
   if (isLoading) {
-    return <div className="py-12 text-[13px] text-base-500">Loading unattributed orders…</div>;
+    return <div className="py-12 text-[13px] text-base-500">Loading orders without a salesperson…</div>;
   }
   if (isError || !data) {
     return (
       <div className="py-12 text-[13px] text-danger">
-        Failed to load the attribution worklist. Refresh to retry.
+        Failed to load the orders without a salesperson. Refresh to retry.
       </div>
     );
   }
 
   const { unattributed, staff } = data;
-  // `?? 0` = "a pre-0265 Worker didn't tell us", which correctly renders no
-  // note at all rather than claiming zero archive orders exist.
-  const legacyUnattributed = data.legacyUnattributed ?? 0;
 
-  // 0265: imported archive orders are excluded upstream — an archive row was
-  // never sold by anyone here, so there is no salesperson to assign. Said out
-  // loud rather than silently filtered, so the number still reconciles for
-  // anyone comparing this screen against the orders list.
-  const archiveNote =
-    legacyUnattributed > 0 ? (
-      <p className="t-tiny text-base-500 mt-3 text-center">
-        {legacyUnattributed} imported archive order
-        {legacyUnattributed === 1 ? "" : "s"} from the old system {legacyUnattributed === 1 ? "is" : "are"}{" "}
-        not listed — they never had a salesperson, so there is nothing to assign.
-      </p>
-    ) : null;
-
-  if (unattributed.length === 0) {
-    return (
-      <>
-        <div className="bg-white border border-base-200 rounded-[12px] px-6 py-12 flex flex-col items-center gap-2 text-center">
-          <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
-          <div className="text-[13px] text-base-700">
-            Every order this month has a salesperson. Commission is complete.
-          </div>
-        </div>
-        {archiveNote}
-      </>
-    );
-  }
+  // Nothing to assign = nothing to say. The old tab printed a green "all clear"
+  // card because a rail item always had to render something; inside Commission
+  // the healthy month is simply silent — the page above already reports it.
+  if (unattributed.length === 0) return null;
 
   const handleAssign = (orderId: string, so: number) => {
     const salespersonId = picked[orderId];

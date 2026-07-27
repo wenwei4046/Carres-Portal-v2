@@ -131,7 +131,9 @@ export function commissionReadiness(input: ReadinessInput): ReadinessCheck[] {
       detail:
         unattributed === 0
           ? "Nothing would be paid to nobody. Imported archive rows are excluded — they have nobody to pay."
-          : "Assign them in the Attribution tab first, or their commission goes to nobody.",
+          // The Attribution tab was retired (Loo 2026-07-27) — the worklist now
+          // appears on this page whenever it is non-empty, so the fix is here.
+          : "Assign them below first, or their commission goes to nobody.",
     },
     {
       key: "month_over",

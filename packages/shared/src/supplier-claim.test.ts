@@ -11,7 +11,21 @@ import {
   receiveLineClaimProblems,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
   supplierClaimSummary,
+  SUPPLIER_CLAIM_REQUEST_KEYS,
+  SUPPLIER_CLAIM_REQUEST_REMAINING,
+  SUPPLIER_CLAIM_RESPONSES,
+  SUPPLIER_CLAIM_RESPONSE_KEYS,
+  SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT,
+  supplierClaimRequestLabel,
+  supplierClaimResponseLabel,
+  requestedActionsFor,
+  isRequestedActionFor,
+  responseNeedsNote,
+  claimNextMove,
+  claimMoveOwnerLabel,
+  claimCloseProblems,
   type ReceiveLineClaimDraft,
+  type SupplierClaimMoveInput,
 } from "./supplier-claim";
 import { CASE_ISSUE_KEYS, caseIssuesFor } from "./service-case-intake";
 
@@ -213,5 +227,293 @@ describe("supplierClaimSummary", () => {
     expect(
       supplierClaimSummary({ qty: 1, claim_type: SUPPLIER_CLAIM_LATE, sku: "BF02-Q" }),
     ).toBe("1 unit · Late delivery · BF02-Q");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3 · the lifecycle — what we asked, what they answered, who moves next
+// ═══════════════════════════════════════════════════════════════════════════
+
+function move(over: Partial<SupplierClaimMoveInput> = {}): SupplierClaimMoveInput {
+  return {
+    claim_no: "SC-1001",
+    status: "open",
+    claim_type: "damaged",
+    requested_action: null,
+    supplier_response: null,
+    supplier_name: "Ohana",
+    ...over,
+  };
+}
+
+describe("the ask and the answer are two separate closed lists", () => {
+  it("offers Jess's five asks for goods that arrived", () => {
+    expect(requestedActionsFor("damaged").map((r) => r.label)).toEqual([
+      "Replace",
+      "Deliver missing parts",
+      "Deliver correct item",
+      "Repair",
+      "Return for inspection",
+    ]);
+  });
+
+  it("offers NOTHING to pick on a late claim — its ask is stamped at birth", () => {
+    expect(requestedActionsFor(SUPPLIER_CLAIM_LATE)).toEqual([]);
+    expect(
+      isRequestedActionFor(SUPPLIER_CLAIM_LATE, SUPPLIER_CLAIM_REQUEST_REMAINING),
+    ).toBe(true);
+  });
+
+  it("never offers `Deliver remaining` for goods that are already here", () => {
+    for (const t of SUPPLIER_CLAIM_TYPE_KEYS.filter((k) => k !== SUPPLIER_CLAIM_LATE)) {
+      expect(requestedActionsFor(t).map((r) => r.key)).not.toContain(
+        SUPPLIER_CLAIM_REQUEST_REMAINING,
+      );
+      expect(isRequestedActionFor(t, SUPPLIER_CLAIM_REQUEST_REMAINING)).toBe(false);
+    }
+  });
+
+  it("refuses an arrived-goods ask on a late claim — nothing arrived to repair", () => {
+    for (const a of ["replace", "repair", "return_for_inspection"]) {
+      expect(isRequestedActionFor(SUPPLIER_CLAIM_LATE, a)).toBe(false);
+    }
+  });
+
+  it("refuses junk and blanks on both sides", () => {
+    expect(isRequestedActionFor("damaged", "please_fix_it")).toBe(false);
+    expect(isRequestedActionFor("damaged", null)).toBe(false);
+    expect(isRequestedActionFor(null, "replace")).toBe(false);
+    expect(supplierClaimRequestLabel(null)).toBe("—");
+    expect(supplierClaimResponseLabel(null)).toBe("—");
+  });
+
+  it("keeps the supplier's answer list wide — they may offer anything, or refuse", () => {
+    expect(SUPPLIER_CLAIM_RESPONSES.map((r) => r.label)).toEqual([
+      "Replacement",
+      "Deliver remaining",
+      "Repair",
+      "Return & replace",
+      "Reject",
+      "Other agreement",
+    ]);
+  });
+
+  it("demands a note for the two answers that say nothing by themselves", () => {
+    expect(responseNeedsNote("reject")).toBe(true);
+    expect(responseNeedsNote("other_agreement")).toBe(true);
+    for (const r of ["replacement", "deliver_remaining", "repair", "return_and_replace"]) {
+      expect(responseNeedsNote(r)).toBe(false);
+    }
+  });
+
+  it("labels every key — no raw snake_case ever reaches the screen", () => {
+    for (const k of SUPPLIER_CLAIM_REQUEST_KEYS)
+      expect(supplierClaimRequestLabel(k)).not.toMatch(/_/);
+    for (const k of SUPPLIER_CLAIM_RESPONSE_KEYS)
+      expect(supplierClaimResponseLabel(k)).not.toMatch(/_/);
+  });
+});
+
+describe("claimNextMove — who owes the next move", () => {
+  it("a fresh damage claim is OURS: nobody has said what we want", () => {
+    expect(claimNextMove(move())).toEqual({
+      key: "ask",
+      owner: "carres",
+      label: "Call Ohana — agree the fix",
+    });
+  });
+
+  it("once we have asked, the SUPPLIER owes the answer", () => {
+    expect(claimNextMove(move({ requested_action: "replace" }))).toEqual({
+      key: "answer",
+      owner: "supplier",
+      label: "Call Ohana — confirm what they will do",
+    });
+  });
+
+  it("a late claim asks for a DATE, not for a decision about goods", () => {
+    expect(
+      claimNextMove(
+        move({
+          claim_type: SUPPLIER_CLAIM_LATE,
+          requested_action: SUPPLIER_CLAIM_REQUEST_REMAINING,
+        }),
+      ),
+    ).toEqual({
+      key: "answer",
+      owner: "supplier",
+      label: "Call Ohana — confirm the new delivery date",
+    });
+  });
+
+  it("a late claim whose goods HAVE arrived stops blaming the supplier", () => {
+    // The crying-wolf trap: late claims are minted every night by the sweep,
+    // and the sweep never closes one.
+    expect(
+      claimNextMove(
+        move({
+          claim_type: SUPPLIER_CLAIM_LATE,
+          requested_action: SUPPLIER_CLAIM_REQUEST_REMAINING,
+          line_pending: false,
+        }),
+      ),
+    ).toEqual({
+      key: "close",
+      owner: "carres",
+      label: "Close SC-1001 — Ohana delivered the rest",
+    });
+  });
+
+  it("treats an unknown line as STILL pending — never invents a delivery", () => {
+    for (const p of [null, undefined, true]) {
+      expect(
+        claimNextMove(
+          move({
+            claim_type: SUPPLIER_CLAIM_LATE,
+            requested_action: SUPPLIER_CLAIM_REQUEST_REMAINING,
+            line_pending: p,
+          }),
+        ).owner,
+      ).toBe("supplier");
+    }
+  });
+
+  it("only a LATE claim reads the line — arrived goods are already here", () => {
+    expect(
+      claimNextMove(move({ requested_action: "replace", line_pending: false })).owner,
+    ).toBe("supplier");
+  });
+
+  it("an answered claim comes back to us to close, and names what they agreed", () => {
+    expect(
+      claimNextMove(
+        move({ requested_action: "replace", supplier_response: "replacement" }),
+      ),
+    ).toEqual({
+      key: "close",
+      owner: "carres",
+      label: "Close SC-1001 — Ohana agreed: Replacement",
+    });
+  });
+
+  it("says `refused`, never `agreed: Reject`", () => {
+    expect(
+      claimNextMove(
+        move({ requested_action: "replace", supplier_response: "reject" }),
+      ).label,
+    ).toBe("Close SC-1001 — Ohana refused");
+  });
+
+  it("a closed claim owes nobody anything and shows no action", () => {
+    expect(
+      claimNextMove(
+        move({
+          status: "closed",
+          requested_action: "replace",
+          supplier_response: "replacement",
+        }),
+      ),
+    ).toEqual({ key: "done", owner: null, label: "" });
+  });
+
+  it("falls back to the role word when the supplier has no name on file", () => {
+    for (const n of [null, "", "   "]) {
+      expect(claimNextMove(move({ supplier_name: n })).label).toBe(
+        "Call supplier — agree the fix",
+      );
+    }
+  });
+
+  it("every open action names a party and stays under 10 words", () => {
+    const states: Partial<SupplierClaimMoveInput>[] = [
+      {},
+      { requested_action: "replace" },
+      { requested_action: "replace", supplier_response: "repair" },
+      { requested_action: "replace", supplier_response: "reject" },
+      {
+        claim_type: SUPPLIER_CLAIM_LATE,
+        requested_action: SUPPLIER_CLAIM_REQUEST_REMAINING,
+      },
+      {
+        claim_type: SUPPLIER_CLAIM_LATE,
+        requested_action: SUPPLIER_CLAIM_REQUEST_REMAINING,
+        line_pending: false,
+      },
+    ];
+    for (const s of states) {
+      const m = claimNextMove(move(s));
+      expect(m.owner).not.toBeNull();
+      expect(m.label).toContain("Ohana");
+      expect(m.label.split(/\s+/).length).toBeLessThanOrEqual(10);
+      // COPY-STANDARD banned words must never reach a label.
+      expect(m.label.toLowerCase()).not.toMatch(
+        /chase|pending|waiting|at risk|attention|processing/,
+      );
+    }
+  });
+
+  it("names the owner in words a reader of any role understands", () => {
+    expect(claimMoveOwnerLabel("carres")).toBe("Carres");
+    expect(claimMoveOwnerLabel("supplier", "Ohana")).toBe("Ohana");
+    expect(claimMoveOwnerLabel("supplier", null)).toBe("supplier");
+    expect(claimMoveOwnerLabel(null)).toBe("—");
+  });
+});
+
+describe("claimCloseProblems — a closed claim keeps both sides", () => {
+  it("lets a fully-recorded open claim close", () => {
+    expect(
+      claimCloseProblems({
+        status: "open",
+        requested_action: "replace",
+        supplier_response: "replacement",
+      }),
+    ).toEqual([]);
+  });
+
+  it("refuses to close with either side blank", () => {
+    expect(
+      claimCloseProblems({
+        status: "open",
+        requested_action: null,
+        supplier_response: "replacement",
+      }),
+    ).toEqual(["request_required"]);
+    expect(
+      claimCloseProblems({
+        status: "open",
+        requested_action: "replace",
+        supplier_response: null,
+      }),
+    ).toEqual(["response_required"]);
+    expect(
+      claimCloseProblems({
+        status: "open",
+        requested_action: null,
+        supplier_response: null,
+      }),
+    ).toEqual(["request_required", "response_required"]);
+  });
+
+  it("refuses to close a claim twice", () => {
+    expect(
+      claimCloseProblems({
+        status: "closed",
+        requested_action: "replace",
+        supplier_response: "replacement",
+      }),
+    ).toEqual(["already_closed"]);
+  });
+
+  it("gives the operator the fix in plain words", () => {
+    const all = claimCloseProblems({
+      status: "closed",
+      requested_action: null,
+      supplier_response: null,
+    });
+    for (const p of all) {
+      expect(SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT[p]).toBeTruthy();
+      expect(SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT[p]).not.toMatch(/_/);
+    }
   });
 });

@@ -153,3 +153,34 @@ describe("PortalSidebar — catalog split into two doors (2026-07-25)", () => {
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
   });
 });
+
+describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+  });
+
+  function commissionLink() {
+    return screen.getByText("Commission").closest("a") as HTMLAnchorElement;
+  }
+
+  it("the rail no longer carries a second Commission Setup item", () => {
+    renderAt("/hr?tab=commission");
+    expect(commissionLink()).toHaveAttribute("href", "/hr?tab=commission");
+    expect(screen.queryByText("Commission Setup")).not.toBeInTheDocument();
+  });
+
+  it("Attribution is gone from the rail (retired 2026-07-27)", () => {
+    renderAt("/hr?tab=commission");
+    expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
+  });
+
+  it("stays lit on the Setup sub-tab (?tab=setup)", () => {
+    renderAt("/hr?tab=setup");
+    expect(commissionLink().className).toContain("font-semibold");
+  });
+
+  it("is NOT lit on another HR tab (?tab=team)", () => {
+    renderAt("/hr?tab=team");
+    expect(commissionLink().className).not.toContain("font-semibold");
+  });
+});
