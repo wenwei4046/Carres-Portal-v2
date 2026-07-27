@@ -22,6 +22,15 @@
  * RM 7,248 paid of RM 7,248) was refused its booking for money. The gate no
  * longer decides what "collected" means — it asks the one function that does.
  *
+ * C9 (2026-07-27) — the gate stops having a softer rule for storage. Jess: an
+ * uncollected storage fee is the same as an unpaid balance, so the money
+ * question is ONE number — lines + add-ons + chargeable storage − `orders.paid`
+ * — and the caller passes the storage part in through `money.storageOwing`
+ * (`storageHold` computes it). The gate reads `holding`, not `outstanding`: a
+ * manager may RELEASE a delivery over an uncollected fee, which lifts the hold
+ * and leaves the money owed, so a released order books while its collection
+ * stays on the worklist.
+ *
  * T8 (2026-07-27) — the gate learns DELIVERY GROUPS. Goods-ready stopped being
  * one all-or-nothing question about the whole order and became one question per
  * group (`delivery-groups.ts`): the bed set is ONE atom, the sofa is another,
@@ -49,9 +58,9 @@ export interface BookingGateInput {
    *  reserved_ref='SO-<so>'), summed per stockMatchKey. */
   reservedQtyByKey: Record<string, number>;
   /** The order's money, as the shared `orderMoney` rule reads it (C5): the
-   *  line + add-on sum, `orders.paid`, and the keyed balance for imported rows.
-   *  Storage is deliberately NOT part of this gate — it has its own collection
-   *  flag and its own warning; widening the booking gate is not C5's job. */
+   *  line + add-on sum, `orders.paid`, and the keyed balance for imported rows
+   *  — plus, since C9, the chargeable storage fee and whether a manager has
+   *  released it. There is no second, softer rule for storage. */
   money: OrderMoneyInput;
   /** T8 — the delivery groups THIS trip carries (the customer's wait-vs-split
    *  answer). Omit / null / undefined = the whole order, the pre-T8 rule. An
@@ -73,7 +82,17 @@ export interface BookingGateResult {
   /** In-scope goods lines still not reserved-to-this-SO (for the 422 message). */
   notReadySkus: string[];
   balanceReady: boolean;
+  /** Everything still owed — goods AND storage, released or not. This is the
+   *  figure a message quotes, because the customer still owes it. */
   outstanding: number;
+  /** The part of it that still HOLDS this booking (C9). Lower than
+   *  `outstanding` only on an order whose storage fee a manager released. */
+  holding: number;
+  /** Storage money still owed on this order — named separately so the 422 can
+   *  say WHICH money is missing instead of one lump sum. */
+  storageOwing: number;
+  /** A manager released the delivery over an uncollected storage fee. */
+  storageReleased: boolean;
   /** Both gates open. */
   ok: boolean;
   /** T8 — every delivery group ON THE ORDER with its own readiness, in trip
@@ -153,13 +172,17 @@ export function bookingConfirmGate({
   // Money: one function, shared with the ladder's 🔒, the drawer and the
   // collections desk. An order whose value nobody has entered is not "owing
   // everything" — it is unknown, and unknown never blocks a delivery.
-  const { outstanding } = orderMoney(money);
-  const balanceReady = outstanding <= 0;
+  // C9: `holds`, not `owing` — a released storage fee is owed and does not hold.
+  const { outstanding, holding, storageOwing, holds } = orderMoney(money);
+  const balanceReady = !holds;
   return {
     goodsReady,
     notReadySkus,
     balanceReady,
     outstanding,
+    holding,
+    storageOwing,
+    storageReleased: money.storageReleased === true,
     ok: goodsReady && balanceReady,
     groups,
     scope,

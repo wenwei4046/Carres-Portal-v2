@@ -737,6 +737,9 @@ export {
   receiveLineInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  // C9 — the manager's three outcomes
+  STORAGE_RELEASE_DECISIONS,
+  type StorageReleaseDecision,
   recordStorageExtensionInput,
   confirmBookingInput,
   type ConfirmBookingInput,
@@ -1601,6 +1604,11 @@ export {
   type OrderMoney,
 } from "./order-money";
 export {
+  storageHold,
+  type StorageHoldInput,
+  type StorageHold,
+} from "./storage-hold";
+export {
   bookingConfirmGate,
   isSundayIso,
   type BookingGateInput,
@@ -1751,6 +1759,28 @@ export {
   type AccuracyWithheld,
   type MonthAccuracy,
 } from "./stock-health";
+// R5 · the supplier scorecard — the review layer of the receiving & claim line.
+// NO migration: it reads R1's three numbers on a PO line, R2/R3's claims and
+// R4's quarantine, and stores nothing. Its withholding gates are load-bearing,
+// not cosmetic: live prod holds 10 suppliers and ZERO purchase orders, so the
+// naive build of this card opens every negotiation with a percentage nobody
+// earned. See the module header.
+export {
+  MIN_JUDGED_POS,
+  SCORECARD_UNKNOWN_TEXT,
+  poVerdict,
+  computeSupplierScorecard,
+  scorecardHeadline,
+  type ScorecardPo,
+  type ScorecardLine,
+  type ScorecardClaim,
+  type ScorecardRate,
+  type ScorecardUnknownReason,
+  type ScorecardCoverage,
+  type ScorecardClaimStats,
+  type SupplierScorecard,
+  type PoVerdict,
+} from "./supplier-scorecard";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

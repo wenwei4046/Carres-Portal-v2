@@ -221,6 +221,29 @@ describe("delivery track", () => {
     expect(first(s)).toBe("confirm_delivery");
   });
 
+  // C9 — the lock and the money action stop being the same question.
+  it("a RELEASED order unlocks the delivery and keeps its Collect action", () => {
+    // The manager let the goods go over an uncollected storage fee. The 🔒
+    // comes off; the money is still ours, so the money track is untouched.
+    const s = sig({ moneyOwing: true, moneyHolds: false });
+    const list = openOrderActions(s);
+    expect(list.find((a) => a.track === "delivery")).toMatchObject({
+      key: "confirm_delivery",
+      tone: "success",
+    });
+    expect(list.find((a) => a.track === "delivery")?.locked).toBeUndefined();
+    expect(list.find((a) => a.track === "money")).toMatchObject({ key: "collect" });
+  });
+
+  it("omitting moneyHolds reproduces the pre-C9 lock exactly", () => {
+    const s = sig({ moneyOwing: true });
+    expect(s.moneyHolds).toBeUndefined();
+    expect(openOrderActions(s)[0]).toMatchObject({
+      key: "confirm_delivery",
+      locked: true,
+    });
+  });
+
   it("booked for a future day while the goods are still out → no Confirm delivery", () => {
     // "Everything ready, confirm" may not be said over goods that are not in.
     // The goods action is what is open, and it is still listed.

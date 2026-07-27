@@ -273,6 +273,60 @@ describe("bookingConfirmGate · delivery groups (T8)", () => {
   });
 });
 
+// ── C9 · storage holds the delivery, and only the manager releases it ────────
+describe("bookingConfirmGate — the storage fee is part of the ONE number", () => {
+  const paidInFull = {
+    lines: [{ sku: MATTRESS, qty: 1 }],
+    lineReceived: { [MATTRESS]: 1 },
+    reservedQtyByKey: {},
+  };
+
+  it("an uncollected storage fee refuses the booking, even on a fully-paid order", () => {
+    // Jess 2026-07-27: an uncollected storage fee is the same as an unpaid
+    // balance — the goods do not go. Before C9 this gate ignored storage while
+    // the Orders row's 🔒 counted it; that split is what the card removes.
+    const r = bookingConfirmGate({
+      ...paidInFull,
+      money: { lineSum: 2500, paid: 2500, storageOwing: 150 },
+    });
+    expect(r.goodsReady).toBe(true);
+    expect(r.balanceReady).toBe(false);
+    expect(r.ok).toBe(false);
+    expect(r.storageOwing).toBe(150);
+    expect(r.holding).toBe(150);
+  });
+
+  it("the manager's release lets it book, and the money is still reported", () => {
+    const r = bookingConfirmGate({
+      ...paidInFull,
+      money: { lineSum: 2500, paid: 2500, storageOwing: 150, storageReleased: true },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.balanceReady).toBe(true);
+    expect(r.holding).toBe(0);
+    // Still owed — the 422 never fires, but the figure is not erased.
+    expect(r.outstanding).toBe(150);
+    expect(r.storageReleased).toBe(true);
+  });
+
+  it("a release does not open the gate for an unpaid balance", () => {
+    const r = bookingConfirmGate({
+      ...paidInFull,
+      money: { lineSum: 2500, paid: 0, storageOwing: 150, storageReleased: true },
+    });
+    expect(r.ok).toBe(false);
+    expect(r.holding).toBe(2500);
+  });
+
+  it("no storage on the order ⇒ byte-identical to the pre-C9 answer", () => {
+    const r = bookingConfirmGate({ ...paidInFull, money: { lineSum: 2500, paid: 2500 } });
+    expect(r.ok).toBe(true);
+    expect(r.storageOwing).toBe(0);
+    expect(r.holding).toBe(r.outstanding);
+    expect(r.storageReleased).toBe(false);
+  });
+});
+
 describe("isSundayIso", () => {
   it("flags a Sunday and passes the rest of the week", () => {
     expect(isSundayIso("2026-08-23")).toBe(true); // Sun

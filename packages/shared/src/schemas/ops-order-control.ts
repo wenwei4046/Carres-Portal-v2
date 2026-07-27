@@ -71,10 +71,18 @@ export const DELIVERY_TIME_SLOTS = [
   "Anytime",
 ] as const;
 
-/** Storage-waiver lifecycle (migration 0184). A storage fee can be waived
- *  instead of collected, but only once a PRINCIPAL approves: operator requests
- *  → 'requested', principal decides → 'approved' | 'rejected'. The delivery gate
- *  opens on 'approved' (or once collected). */
+/** Storage-waiver lifecycle (migration 0184). A held delivery can be released
+ *  instead of collected, but only once the MANAGER (principal) decides:
+ *  operator requests → 'requested', manager decides → 'approved' | 'rejected'.
+ *  The delivery gate opens on 'approved' (or once collected).
+ *
+ *  **C9 (Jess 2026-07-27): `approved` means RELEASED, not forgiven.** The
+ *  manager picks one of two outcomes out loud, and they ride these same columns
+ *  — `released, fee still owed` leaves `storage_fee_override` alone, so the
+ *  money action stays open; `released and waived` writes the override to 0,
+ *  which is the write-off instrument every storage reader already honours. No
+ *  fifth status value, so no migration. See `storage-hold.ts` for the one rule
+ *  that reads them. */
 export const STORAGE_WAIVER_STATUSES = [
   "none",
   "requested",
@@ -634,10 +642,27 @@ export const requestStorageWaiverInput = z.object({
 });
 export type RequestStorageWaiverInput = z.infer<typeof requestStorageWaiverInput>;
 
-/** Principal decides a pending waiver. POST /:id/storage/waiver/decide —
- *  principal-only (enforced at the route). */
+/**
+ * The manager decides a pending release. POST /:id/storage/waiver/decide —
+ * principal-only (enforced at the route). **C9: three outcomes, not two**, and
+ * the two releasing ones are named apart because Jess ruled the manager must
+ * pick out loud (an override never silently forgives money):
+ *
+ *   `released` — the goods go, the fee is STILL OWED and its action stays open
+ *   `waived`   — the goods go and the fee is written off, with a reason
+ *   `rejected` — refused; the hold stays and the fee must be collected
+ *
+ * `approved` is still accepted and reads as `waived`: that is exactly what the
+ * single old outcome did (the fee stopped counting the moment it was approved),
+ * so a browser left open across the deploy keeps working instead of 422-ing.
+ */
+export const STORAGE_RELEASE_DECISIONS = ["released", "waived", "rejected"] as const;
+export type StorageReleaseDecision = (typeof STORAGE_RELEASE_DECISIONS)[number];
+
 export const decideStorageWaiverInput = z.object({
-  decision: z.enum(["approved", "rejected"]),
+  decision: z
+    .enum(["released", "waived", "rejected", "approved"])
+    .transform((d): StorageReleaseDecision => (d === "approved" ? "waived" : d)),
   note: z.string().trim().max(500).nullish(),
 });
 export type DecideStorageWaiverInput = z.infer<typeof decideStorageWaiverInput>;
