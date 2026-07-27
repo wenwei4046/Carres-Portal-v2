@@ -224,7 +224,6 @@ import {
   type SetModelRateInput,
   type SetModelTiersInput,
   type SetMilestonesInput,
-  type HrAssignSalespersonInput,
   // 0250 — BD commission (paid by what their assigned dealers sell).
   type BdCommissionReport,
   type BdUser,
@@ -8225,19 +8224,6 @@ export function useHrSetMilestones() {
   return useMutation<{ ok: true }, ApiError, SetMilestonesInput>({
     mutationFn: (input) =>
       apiFetch<{ ok: true }>("/api/hr/config/milestones", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    onSuccess: invalidate,
-  });
-}
-
-/** Attribute an unattributed order to a salesperson (audited RPC). */
-export function useHrAssignSalesperson() {
-  const invalidate = useHrInvalidate();
-  return useMutation<{ ok: true }, ApiError, HrAssignSalespersonInput>({
-    mutationFn: (input) =>
-      apiFetch<{ ok: true }>("/api/hr/assign", {
         method: "POST",
         body: JSON.stringify(input),
       }),

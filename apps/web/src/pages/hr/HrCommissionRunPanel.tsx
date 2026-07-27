@@ -286,7 +286,10 @@ export default function HrCommissionRunPanel({
       sub =
         `${run.peopleCount} ${run.peopleCount === 1 ? "person" : "people"} · ${rm(run.totalPayable)}` +
         (run.approvedByName ? ` · approved by ${run.approvedByName}` : "") +
-        ". Attribution and rate changes for this month are refused while it is locked.";
+        // "Attribution" was the last visible use of a word that now names
+        // nothing in the portal (retired 2026-07-27) — say what the lock
+        // actually refuses instead.
+        ". Salesperson and rate changes for this month are refused while it is locked.";
     } else {
       tone = "border-l-warning";
       icon = <CircleDot size={19} />;

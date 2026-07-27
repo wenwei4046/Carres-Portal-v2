@@ -1947,7 +1947,6 @@ export {
   setModelRateInput,
   setModelTiersInput,
   setMilestonesInput,
-  hrAssignSalespersonInput,
   setBdRateInput,
   assignDealerBdInput,
   commissionProgramSchema,
@@ -1964,6 +1963,5 @@ export {
   type SetModelRateInput,
   type SetModelTiersInput,
   type SetMilestonesInput,
-  type HrAssignSalespersonInput,
 } from "./schemas/hr";
 export * from "./schemas/hr-team";

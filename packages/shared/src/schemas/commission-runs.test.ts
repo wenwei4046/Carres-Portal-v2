@@ -19,7 +19,6 @@ const seller = (basis: number, total: number) =>
 const today = { year: 2026, month: 7 };
 const base: ReadinessInput = {
   report: { perStaff: [seller(30480, 0), seller(21601, 0)] },
-  unattributed: 0,
   runStatus: null,
   year: 2026,
   month: 7,
@@ -59,14 +58,13 @@ describe("the pre-flight", () => {
     expect(canClose(checks)).toBe(true);
   });
 
-  it("blocks on an unattributed sale — money would go to nobody", () => {
-    const checks = commissionReadiness({
-      ...base,
-      report: { perStaff: [seller(30480, 914.4)] },
-      unattributed: 3,
-    });
-    expect(canClose(checks)).toBe(false);
-    expect(blockingFailures(checks).map((c) => c.key)).toEqual(["attribution"]);
+  // The old "blocks on an unattributed sale" case went with attribution
+  // itself (Loo 2026-07-27). The gate that still matters lives in SQL:
+  // commission_close_month RAISES unattributed_orders. This asserts the pure
+  // function no longer claims a check it cannot offer a remedy for.
+  it("no longer carries an attribution check", () => {
+    const checks = commissionReadiness({ ...base });
+    expect(checks.map((c) => c.key)).toEqual(["rates", "month_over", "no_run"]);
   });
 
   it("warns about an unfinished month WITHOUT blocking it", () => {
