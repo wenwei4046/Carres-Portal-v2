@@ -1980,6 +1980,10 @@ export {
   rentalContractValue,
   rentalMonthlySplit,
   type RentalMonthlySplit,
+  // 0281 landed the arithmetic and fired it nowhere; 0300 gave it a caller.
+  // The SQL mirror `rental_late_interest()` asserts the same worked examples.
+  rentalLateInterest,
+  RENTAL_LATE_INTEREST_PCT_PER_MONTH,
   // 0264 — the offer layer: service SKU codes + the pick → money resolver
   // (shared by the P&M previews, the POS lanes and the signing recompute).
   serviceSkuCode,

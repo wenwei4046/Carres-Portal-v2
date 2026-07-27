@@ -242,6 +242,48 @@ export const recordRentalPaymentInputSchema = z
   .strict();
 export type RecordRentalPaymentInput = z.infer<typeof recordRentalPaymentInputSchema>;
 
+/**
+ * Charge the 8%/month penalty on one overdue instalment (0300).
+ *
+ * There is no `amount`, deliberately. The figure is a function of the
+ * instalment and the date, and the server owns it — a client that could name
+ * the penalty could name any penalty.
+ */
+export const chargeRentalInterestInputSchema = z
+  .object({
+    /** ISO date. Omit for today; a past date charges only to that day. */
+    asOf: z.string().date().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+export type ChargeRentalInterestInput = z.infer<typeof chargeRentalInterestInputSchema>;
+
+/**
+ * Settle a rental early — the customer pays the remaining term in one go (0300).
+ *
+ * `amount` is required and is checked against the server's own quote rather
+ * than trusted: it is a confirmation that finance and the system agree on the
+ * figure, not an instruction. A mismatch is refused with the real number.
+ *
+ * The document is required because Loo's rule is "the customer signs it first,
+ * then it is attached" — so there is no settlement without one.
+ */
+export const settleRentalAgreementInputSchema = z
+  .object({
+    amount: z.number().positive().max(10_000_000),
+    /** base64 data URL — pdf, png or jpeg. The scan of what the customer signed. */
+    documentDataUrl: z
+      .string()
+      .regex(
+        /^data:(application\/pdf|image\/(png|jpeg));base64,[A-Za-z0-9+/=]+$/,
+        "must be a base64 pdf/png/jpeg data URL",
+      ),
+    reference: z.string().trim().max(120).nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+export type SettleRentalAgreementInput = z.infer<typeof settleRentalAgreementInputSchema>;
+
 export const RENTAL_AGREEMENT_DOC_KEY = "rent_to_own" as const;
 
 /**
