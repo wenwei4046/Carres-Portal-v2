@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import {
   SignJWT,
   createLocalJWKSet,
@@ -914,6 +914,267 @@ describe("S3 — the case drives the follow-ups", () => {
 
     expect(body.items[0].progress).toEqual([]);
     expect(body.items[0].supplierName).toBeNull();
+  });
+});
+
+describe("S4 — the deadline", () => {
+  /**
+   * A case reported Monday 6 Jul 2026: 14 working days later is Wed 22 Jul,
+   * and Fri 17 Jul is day 10 — the day the call becomes owed. The clock is
+   * FROZEN there, so this file does not quietly start testing a different rung
+   * once the calendar moves past it.
+   */
+  const SLA_CASE = {
+    ...CASE_ROW,
+    opened_at: "2026-07-06",
+    customer_name: "Ryan Chong",
+    sla_events: [],
+  };
+
+  beforeEach(() => {
+    // Only Date — faking the timers themselves would strand the route's awaits.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-07-17T02:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  async function sla(id: string, body: unknown, sb: unknown, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return app.request(
+      `/api/ops/service-cases/${id}/sla`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  it("stamps who called, when, and WHICH deadline it was about", async () => {
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+    const res = await sla(
+      "c1",
+      {
+        kind: "customer_told",
+        on: "2026-07-17",
+        reason: "supplier_no_date",
+        // A client trying to forge the recorder and the deadline: neither is in
+        // the schema, so both are stripped and the server's own stamp lands.
+        by: "somebody-else",
+        by_role: "principal",
+        due: "2099-01-01",
+      },
+      sb,
+    );
+
+    expect(res.status).toBe(201);
+    const entries = (updates[0].sla_events as Record<string, string>[]) ?? [];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "customer_told",
+      on: "2026-07-17",
+      reason: "supplier_no_date",
+      // The deadline the call was about — derived here, never sent.
+      due: "2026-07-22",
+      by: "11111111-1111-1111-1111-000000000999", // the JWT's subject
+      by_role: "operation",
+    });
+    expect(Number.isNaN(Date.parse(entries[0].at))).toBe(false);
+  });
+
+  it("appends rather than replaces — the ledger is a history", async () => {
+    const first = {
+      kind: "customer_told",
+      on: "2026-07-15",
+      reason: "no_stock",
+      due: "2026-07-22",
+      at: "2026-07-15T02:00:00Z",
+      by: "u1",
+      by_role: "operation",
+    };
+    const { sb, updates } = buildCaseSb({ ...SLA_CASE, sla_events: [first] });
+    await sla("c1", { kind: "customer_told", on: "2026-07-17", reason: "logistics" }, sb);
+
+    const entries = updates[0].sla_events as Record<string, string>[];
+    expect(entries.map((e) => e.reason)).toEqual(["no_stock", "logistics"]);
+  });
+
+  it("refuses a reason nobody can read back", async () => {
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+    const bad = await sla("c1", { kind: "customer_told", on: "2026-07-17", reason: "busy" }, sb);
+    expect(bad.status).toBe(400);
+
+    const other = await sla("c1", { kind: "customer_told", on: "2026-07-17", reason: "other" }, sb);
+    expect(other.status).toBe(422);
+    const body = (await other.json()) as { code: string; message: string };
+    expect(body.code).toBe("sla_record_refused");
+    expect(body.message).toBe("Say what the reason is");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("moves the deadline once — and never twice", async () => {
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+    const first = await sla(
+      "c1",
+      {
+        kind: "extension",
+        on: "2026-07-17",
+        reason: "supplier_special_order",
+        until: "2026-07-31",
+      },
+      sb,
+    );
+    expect(first.status).toBe(201);
+    expect((updates[0].sla_events as Record<string, string>[])[0]).toMatchObject({
+      kind: "extension",
+      until: "2026-07-31",
+      due: "2026-07-22",
+    });
+
+    const used = buildCaseSb({
+      ...SLA_CASE,
+      sla_events: [
+        {
+          kind: "extension",
+          on: "2026-07-17",
+          reason: "supplier_special_order",
+          until: "2026-07-31",
+          due: "2026-07-22",
+          at: "2026-07-17T02:00:00Z",
+          by: "u1",
+          by_role: "operation",
+        },
+      ],
+    });
+    const second = await sla(
+      "c1",
+      {
+        kind: "extension",
+        on: "2026-07-29",
+        reason: "supplier_special_order",
+        until: "2026-08-05",
+      },
+      used.sb,
+    );
+    expect(second.status).toBe(422);
+    expect(((await second.json()) as { code: string }).code).toBe("sla_extension_used");
+    expect(used.updates).toHaveLength(0);
+  });
+
+  it("refuses a deadline that goes backwards, or reaches past one more period", async () => {
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+
+    const back = await sla(
+      "c1",
+      { kind: "extension", on: "2026-07-17", reason: "supplier_special_order", until: "2026-07-20" },
+      sb,
+    );
+    expect(back.status).toBe(422);
+    expect(((await back.json()) as { message: string }).message).toContain(
+      "must be after the one it replaces",
+    );
+
+    const far = await sla(
+      "c1",
+      { kind: "extension", on: "2026-07-17", reason: "supplier_special_order", until: "2026-09-30" },
+      sb,
+    );
+    expect(far.status).toBe(422);
+    // Rule 6 — the refusal names the furthest date that WOULD be accepted.
+    expect(((await far.json()) as { message: string }).message).toContain("2026-08-07");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("moves a deadline landing on a Sunday to the next working day", async () => {
+    // Nobody works to a Sunday deadline, and the law says a due date landing on
+    // a non-working day moves forward. 26 Jul 2026 is a Sunday.
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+    const res = await sla(
+      "c1",
+      { kind: "extension", on: "2026-07-17", reason: "supplier_special_order", until: "2026-07-26" },
+      sb,
+    );
+
+    expect(res.status).toBe(201);
+    expect((updates[0].sla_events as Record<string, string>[])[0].until).toBe("2026-07-27");
+    expect((await res.json()) as { due: string }).toMatchObject({ due: "2026-07-27" });
+  });
+
+  it("refuses an extension with no new deadline on it", async () => {
+    const { sb, updates } = buildCaseSb(SLA_CASE);
+    const res = await sla(
+      "c1",
+      { kind: "extension", on: "2026-07-17", reason: "supplier_special_order" },
+      sb,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain(
+      "Give the new deadline",
+    );
+    expect(updates).toHaveLength(0);
+  });
+
+  it("says so plainly when a case has no report date to count from", async () => {
+    // `opened_at` is NOT NULL in the database, so this is the malformed-value
+    // path rather than a state the portal can reach — it degrades instead of
+    // writing an event that points at no deadline.
+    const { sb, updates } = buildCaseSb({ ...SLA_CASE, opened_at: null });
+    const res = await sla("c1", { kind: "customer_told", on: "2026-07-17", reason: "no_stock" }, sb);
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("no_deadline");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("carries the events back on the list read", async () => {
+    const { sb } = buildSb([
+      {
+        ...SLA_CASE,
+        sla_events: [
+          {
+            kind: "customer_told",
+            on: "2026-07-17",
+            reason: "supplier_no_date",
+            due: "2026-07-22",
+            at: "2026-07-17T02:00:00Z",
+            by: "u1",
+            by_role: "operation",
+          },
+        ],
+      },
+    ]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as {
+      items: { slaEvents: { kind: string; due: string; byRole: string }[] }[];
+    };
+
+    expect(body.items[0].slaEvents[0]).toMatchObject({
+      kind: "customer_told",
+      due: "2026-07-22",
+      byRole: "operation",
+    });
+  });
+
+  it("reports an empty ledger for a case that predates S4 rather than crashing", async () => {
+    const { sb } = buildSb([CASE_ROW]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as { items: { slaEvents: unknown[] }[] };
+    expect(body.items[0].slaEvents).toEqual([]);
+  });
+
+  it("still refuses a dealer — the deadline opens no new door", async () => {
+    const { sb } = buildCaseSb(SLA_CASE);
+    const res = await sla(
+      "c1",
+      { kind: "customer_told", on: "2026-07-17", reason: "no_stock" },
+      sb,
+      "dealer",
+    );
+    expect(res.status).toBe(403);
   });
 });
 

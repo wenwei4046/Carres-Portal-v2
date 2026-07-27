@@ -11,15 +11,21 @@ import {
   caseEvidenceUploadedSchema,
   caseFollowUpPlan,
   caseOpenSteps,
+  caseSlaClock,
+  caseSlaRecordProblem,
+  caseSlaWorkingDay,
   caseStepDefinition,
   caseStepDone,
   createServiceCaseInputSchema,
+  myHolidaySet,
+  recordCaseSlaInputSchema,
   recordCaseStepInputSchema,
   signCaseEvidenceUploadInputSchema,
   updateServiceCaseInputSchema,
   type CaseEvidenceUploaded,
   type CaseFollowUpInput,
   type CaseProgressEntry,
+  type CaseSlaEvent,
   type CaseWantKey,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
@@ -45,6 +51,7 @@ import type { AppEnv } from "../../types";
  *   GET    /:id/evidence            — S2: the ledger + signed view URLs
  *   POST   /:id/evidence            — S2: append a file to an existing case
  *   POST   /:id/progress            — S3: record one follow-up step's outcome
+ *   POST   /:id/sla                 — S4: record a deadline event (call | extension)
  */
 
 const scRouter = new Hono<AppEnv>();
@@ -703,8 +710,135 @@ scRouter.post("/:id/progress", requireOperationOrPrincipal, async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /:id/sla — record ONE deadline event: the call telling the customer why
+// it is taking longer, or the one allowed move of the deadline.
+//
+// Append-only, exactly like the evidence and progress ledgers: there is no
+// endpoint that un-records a call, and the generic PATCH cannot touch
+// `sla_events` (the update schema never had the field).
+//
+// `at` / `by` / `by_role` are stamped HERE and nowhere else — and so is `due`,
+// the deadline the event was made against. That one is not a convenience: it is
+// what makes "the customer has been told" a statement about a PARTICULAR
+// deadline, so moving the deadline asks for the second call instead of
+// inheriting the first one's silence. A client that could author it could mark
+// a deadline explained that nobody had explained.
+// ─────────────────────────────────────────────────────────────────────────────
+scRouter.post("/:id/sla", requireOperationOrPrincipal, async (c) => {
+  const id     = c.req.param("id");
+  const parsed = await parseBody(c, recordCaseSlaInputSchema);
+  const sb     = userClient(c.env, c.var.auth.jwt);
+
+  const { data: row, error: readErr } = await sb
+    .from("service_cases")
+    .select(CASE_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new HTTPException(500, { message: readErr.message });
+  if (!row) throw new HTTPException(404, { message: "Service case not found" });
+
+  const cur  = row as unknown as RawCase;
+  const opts = { holidays: myHolidaySet() };
+
+  const clock = caseSlaClock(
+    {
+      openedAt:     cur.opened_at,
+      todayIso:     todayIsoMYT(),
+      events:       shapeSlaEvents(cur.sla_events),
+      closed:       cur.service_case_statuses?.is_closed ?? false,
+      customerName: cur.customer_name,
+    },
+    opts,
+  );
+
+  if (!clock.dueIso || !clock.baseDueIso) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "no_deadline",
+        message: "This case has no report date, so it has no deadline to talk about.",
+      },
+      422,
+    );
+  }
+
+  // A Sunday or a public holiday is not a deadline anybody works to — the law's
+  // "a due date landing on a non-working day moves to the next working day",
+  // applied before the bounds are checked so the bound is measured against what
+  // will actually be stored.
+  const until =
+    parsed.kind === "extension" && parsed.until
+      ? caseSlaWorkingDay(parsed.until, opts)
+      : null;
+
+  const problem = caseSlaRecordProblem({ ...parsed, until }, clock, opts);
+  if (problem) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code:
+          parsed.kind === "extension" && !clock.mayExtend
+            ? "sla_extension_used"
+            : "sla_record_refused",
+        // Rule 6 — the error gives the fix, by name. It is the same sentence the
+        // disabled button shows, from the same function.
+        message: problem,
+      },
+      422,
+    );
+  }
+
+  const entry: Record<string, unknown> = {
+    kind:    parsed.kind,
+    on:      parsed.on,
+    reason:  parsed.reason,
+    due:     clock.dueIso,
+    at:      new Date().toISOString(),
+    by:      c.var.auth.id,
+    by_role: c.var.auth.role,
+  };
+  if (parsed.note) entry.note = parsed.note;
+  if (until) entry.until = until;
+
+  const existing = Array.isArray(cur.sla_events) ? (cur.sla_events as unknown[]) : [];
+  const { error } = await sb
+    .from("service_cases")
+    .update({ sla_events: [...existing, entry] })
+    .eq("id", id);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  return c.json({ id, kind: parsed.kind, due: until ?? clock.dueIso }, 201);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
+ *  is already tomorrow in Klang, and a deadline must not turn late a day early
+ *  (or a day late) because of it. */
+function todayIsoMYT(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** Rows come back snake_case from the database; the clock reads camelCase. */
+function shapeSlaEvents(raw: unknown): CaseSlaEvent[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e) => {
+    const r = (e ?? {}) as Record<string, unknown>;
+    return {
+      kind:   String(r.kind ?? ""),
+      on:     String(r.on ?? ""),
+      reason: String(r.reason ?? ""),
+      note:   r.note  == null ? null : String(r.note),
+      until:  r.until == null ? null : String(r.until),
+      due:    r.due   == null ? null : String(r.due),
+      at:     String(r.at ?? ""),
+      by:     String(r.by ?? ""),
+      byRole: String(r.by_role ?? ""),
+    };
+  });
+}
 
 interface OrderRow {
   id: string;
@@ -751,6 +885,9 @@ interface RawCase {
   /** S3 (0293) — the follow-up chain's recorded outcomes, and the factory the
    *  chain names. Optional for the same degrade-don't-crash reason. */
   progress?: unknown;
+  /** S4 (0298) — the deadline's recorded events. Optional for the same
+   *  degrade-don't-crash reason as above. */
+  sla_events?: unknown;
   supplier_id?: string | null;
   suppliers?: { name: string } | { name: string }[] | null;
   service_case_types:    { label: string } | null;
@@ -809,6 +946,11 @@ function shapeCase(r: RawCase) {
     progress:        shapeProgress(r.progress),
     supplierId:      r.supplier_id ?? null,
     supplierName:    embeddedSupplier(r.suppliers),
+
+    // S4 — the deadline's events. The DEADLINE itself is not sent: it is 14
+    // working days after `openedAt` and both sides derive it from the same
+    // shared clock, so there is no number to go stale between them.
+    slaEvents:       shapeSlaEvents(r.sla_events),
   };
 }
 

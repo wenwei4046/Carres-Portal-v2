@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -7,7 +7,12 @@ import {
   caseFollowUpPlan,
   caseNeedsManager,
   caseOpenSteps,
+  caseSlaAction,
+  caseSlaClock,
+  caseSlaCountLabel,
+  myHolidaySet,
   type CasePriority,
+  type CaseSlaClock,
   type ServiceCase,
   type ServiceCaseListResponse,
 } from "@carres/shared";
@@ -53,6 +58,11 @@ export default function OperationServiceCases() {
   });
 
   const rows: ServiceCase[] = listQ.data?.items ?? [];
+
+  // S4 — the deadline is counted in WORKING days, so the holiday calendar is
+  // injected once for the whole table rather than rebuilt per row.
+  const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  const todayIso = new Date().toLocaleDateString("en-CA");
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -125,11 +135,26 @@ export default function OperationServiceCases() {
                 <th className="text-left px-3 py-2 font-medium">Next step</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
                 <th className="text-left px-3 py-2 font-medium">Opened</th>
+                {/* S4 — 14 working days from the day it was reported. Derived
+                    from the same clock the case view and the server read, so
+                    no row can carry a deadline that disagrees with the rule. */}
+                <th className="text-left px-3 py-2 font-medium">Deadline</th>
                 <th className="text-right px-3 py-2 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {rows.map((r) => {
+                const clock = caseSlaClock(
+                  {
+                    openedAt:     r.openedAt,
+                    todayIso,
+                    events:       r.slaEvents ?? [],
+                    closed:       r.statusIsClosed,
+                    customerName: r.customerName,
+                  },
+                  holidayOpts,
+                );
+                return (
                 <tr
                   key={r.id}
                   className="border-t border-base-200 hover:bg-base-50 cursor-pointer"
@@ -163,7 +188,7 @@ export default function OperationServiceCases() {
                     </p>
                   </td>
                   <td className="px-3 py-2 max-w-[15rem]">
-                    <NextStepCell row={r} />
+                    <NextStepCell row={r} clock={clock} />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`pill ${r.statusIsClosed ? "pill-confirmed" : "pill-neutral"}`}>
@@ -172,6 +197,9 @@ export default function OperationServiceCases() {
                   </td>
                   <td className="px-3 py-2 text-xs text-base-500 whitespace-nowrap">
                     {fmtDate(r.openedAt)}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <DeadlineCell clock={clock} />
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button
@@ -183,7 +211,8 @@ export default function OperationServiceCases() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -210,7 +239,7 @@ export default function OperationServiceCases() {
  * A closed case shows the terminal fact instead of an action — there is nothing
  * to do on it, and "Done" is a fact, not a to-do word.
  */
-function NextStepCell({ row }: { row: ServiceCase }) {
+function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock }) {
   if (row.statusIsClosed) return <span className="text-xs text-base-500">Done</span>;
 
   const open = caseOpenSteps(
@@ -220,8 +249,17 @@ function NextStepCell({ row }: { row: ServiceCase }) {
       supplierName:  row.supplierName ?? null,
     }),
     row.progress ?? [],
-  );
-  if (open.length === 0) {
+  ).map((s) => s.label);
+
+  // S4 — the deadline is its own TRACK, computed independently of the chain
+  // (ACTION-FLOW-STANDARD Law 1: one track may never suppress another's
+  // action). It goes FIRST because Law 4 ranks "the customer must be told
+  // something" above every goods step — the chain's own work is unaffected and
+  // rides behind it.
+  const slaAction = caseSlaAction(clock, row.customerName);
+  const actions = slaAction ? [slaAction, ...open] : open;
+
+  if (actions.length === 0) {
     return (
       <span className="text-sm text-base-700">Everything done — close this case.</span>
     );
@@ -229,9 +267,40 @@ function NextStepCell({ row }: { row: ServiceCase }) {
 
   return (
     <span className="block">
-      <span className="block text-sm text-base-900">{open[0].label}</span>
-      {open.length > 1 && (
-        <span className="t-tiny text-base-500">+{open.length - 1} more</span>
+      <span className="block text-sm text-base-900">{actions[0]}</span>
+      {actions.length > 1 && (
+        <span className="t-tiny text-base-500">+{actions.length - 1} more</span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * S4 — the deadline, as a FACT: the date, and how the clock stands against it.
+ * Never a to-do word (COPY-STANDARD) — the thing to DO about a deadline is in
+ * the Next step column, where every other action lives.
+ *
+ * A closed case shows only the date it was working to: its clock is off, and a
+ * count on a finished case would be a number nobody can act on.
+ */
+function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
+  if (!clock.dueIso) return <span className="text-base-400 text-xs">—</span>;
+  const count = caseSlaCountLabel(clock);
+
+  return (
+    <span className="block">
+      <span className="block text-sm text-base-900 tabular-nums">{fmtDate(clock.dueIso)}</span>
+      {count && (
+        <span
+          className={`t-tiny block tabular-nums ${
+            clock.state === "late" ? "text-error-700" : "text-base-500"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+      {clock.extendedToIso && (
+        <span className="t-tiny block text-base-500">Moved once</span>
       )}
     </span>
   );
