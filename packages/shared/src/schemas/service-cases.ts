@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  CASE_ISSUE_KEYS,
+  CASE_PRODUCT_CATEGORY_KEYS,
+  CASE_REPORTER_KEYS,
+  CASE_USABLE_KEYS,
+  CASE_WANT_KEYS,
+} from "../service-case-intake";
 
 /**
  * Service Cases (migration 0210) — the case / 病历 parent layer above Service
@@ -74,6 +81,25 @@ export const serviceCaseSchema = z.object({
    *   - null      → the case genuinely has no linked order
    */
   so:                  z.number().int().nullable().optional(),
+
+  /**
+   * S1 — the guided intake (migration 0285). The wizard's five answers, stored
+   * as keys instead of prose. All OPTIONAL for the same reason `so` is: a web
+   * build newer than the Worker must degrade to "the wizard block is not
+   * shown", never crash. `null` means a case filed before the wizard existed
+   * (or through the edit modal, which still writes prose only).
+   *
+   * `priority` is READ-ONLY here — a generated column in the database. Staff
+   * never pick it and no client may send it; it follows `usable` by law.
+   */
+  reportedBy:      z.enum(CASE_REPORTER_KEYS).nullable().optional(),
+  orderLineId:     z.string().uuid().nullable().optional(),
+  productSku:      z.string().nullable().optional(),
+  productCategory: z.enum(CASE_PRODUCT_CATEGORY_KEYS).nullable().optional(),
+  issueType:       z.enum(CASE_ISSUE_KEYS).nullable().optional(),
+  usable:          z.enum(CASE_USABLE_KEYS).nullable().optional(),
+  priority:        z.enum(["low", "normal", "high"]).nullable().optional(),
+  customerWants:   z.array(z.enum(CASE_WANT_KEYS)).optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 
@@ -98,6 +124,16 @@ export const createServiceCaseInputSchema = z.object({
   whatAffected:    z.string().trim().optional(),
   incurredCharges: z.string().trim().optional(),
   openedAt:        z.string().optional(),
+
+  // S1 — the wizard's answers. `priority` is deliberately ABSENT: it is a
+  // generated column, so there is no input for it to arrive through.
+  reportedBy:      z.enum(CASE_REPORTER_KEYS).optional(),
+  orderLineId:     z.string().uuid().optional(),
+  productSku:      z.string().trim().optional(),
+  productCategory: z.enum(CASE_PRODUCT_CATEGORY_KEYS).optional(),
+  issueType:       z.enum(CASE_ISSUE_KEYS).optional(),
+  usable:          z.enum(CASE_USABLE_KEYS).optional(),
+  customerWants:   z.array(z.enum(CASE_WANT_KEYS)).optional(),
 });
 export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema>;
 

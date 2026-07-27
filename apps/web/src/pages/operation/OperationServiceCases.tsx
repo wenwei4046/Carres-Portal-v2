@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import type { ServiceCase, ServiceCaseListResponse } from "@carres/shared";
+import {
+  caseNeedsManager,
+  type CasePriority,
+  type ServiceCase,
+  type ServiceCaseListResponse,
+} from "@carres/shared";
 import ServiceCaseModal from "./components/ServiceCaseModal";
+import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
 
 /**
@@ -104,6 +110,10 @@ export default function OperationServiceCases() {
                 {/* J2 — the case→order link gets its own column: it is the
                     answer to "which order is this about", not a footnote. */}
                 <th className="text-left px-3 py-2 font-medium">Sales order</th>
+                {/* S1 — urgency is DERIVED from "can the customer still use
+                    it"; nobody types it, so it is the same answer on every
+                    row. High = a manager has to be told. */}
+                <th className="text-left px-3 py-2 font-medium">Urgency</th>
                 <th className="text-left px-3 py-2 font-medium">Type</th>
                 <th className="text-left px-3 py-2 font-medium">Customer / Ref</th>
                 <th className="text-left px-3 py-2 font-medium">What Happened</th>
@@ -124,6 +134,9 @@ export default function OperationServiceCases() {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <CaseOrderLink orderId={r.orderId} so={r.so} compact />
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <PriorityCell priority={r.priority ?? null} />
                   </td>
                   <td className="px-3 py-2">
                     {r.caseTypeLabel ? (
@@ -167,12 +180,35 @@ export default function OperationServiceCases() {
         </div>
       )}
 
+      {/* S1 — "+ New Case" now opens the guided wizard instead of the
+          free-form modal. The modal stays for EDIT: the wizard replaces the
+          ENTRY, not the case, the statuses or the Service Note. */}
       {showCreate && (
-        <ServiceCaseModal mode="create" onClose={() => setShowCreate(false)} onSaved={() => setShowCreate(false)} />
+        <ServiceCaseWizard onClose={() => setShowCreate(false)} onSaved={() => setShowCreate(false)} />
       )}
       {editId && (
         <ServiceCaseModal mode="edit" id={editId} onClose={() => setEditId(null)} onSaved={() => setEditId(null)} />
       )}
     </div>
+  );
+}
+
+/** Urgency, derived — never typed. A case filed before the wizard (or through
+ *  the edit modal, which asks no usability question) has none, and says so
+ *  rather than inventing a middle value. */
+function PriorityCell({ priority }: { priority: CasePriority | null }) {
+  if (!priority) return <span className="text-base-400 text-xs">—</span>;
+  if (priority === "high") {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="pill pill-overdue">Urgent</span>
+        {caseNeedsManager(priority) && (
+          <span className="text-xs text-base-600">tell manager</span>
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="pill pill-neutral">{priority === "normal" ? "Normal" : "Low"}</span>
   );
 }
