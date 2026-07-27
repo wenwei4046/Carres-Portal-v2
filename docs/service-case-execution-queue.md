@@ -40,6 +40,22 @@ Wizard writes the SAME case row the modal writes today (issue fields land in str
 columns/attrs, not prose). **Done when:** a new hire can file a complete case without
 typing a sentence.
 
+> **SHIPPED 2026-07-27 (PR #397, migration 0285 applied, Worker `290f91f6` + web
+> `index-oX_Va0XG.js`).** Notes for the cards that follow:
+> - `priority` is a **GENERATED column** derived from `usable` — staff never pick it and
+>   no write path is given the ability to. The rule lives twice (SQL + `casePriorityFor`
+>   in shared) because the DB cannot import TS; both assert the same three rungs.
+> - `what_happened` is **composed** from the five answers (`composeCaseSummary`), so the
+>   list column and the printable Service Note kept working untouched. Prose is a render
+>   of the structured answers now — do not reintroduce it as a source of truth.
+> - The option lists are ONE shared constant (`packages/shared/src/service-case-intake.ts`)
+>   mirrored by CHECKs. **S2's evidence checklists key off `issue_type` from that file.**
+> - `order_line_id` is ON DELETE **SET NULL** (an ordinary item edit deletes lines);
+>   `product_sku` + `product_category` are snapshots so an old case never re-derives.
+> - "Notify manager" is a **visible flag**, not a send — no message channel exists in the
+>   API yet. S3/S4 must not assume one either.
+> - The wizard replaces **CREATE only**; the edit modal shows the intake read-only.
+
 ## S2 · Evidence checklist per issue type — no evidence, no case
 
 **Goal:** step 3's answer decides the REQUIRED uploads, shown as a tick-list with plain
@@ -88,7 +104,7 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 
 | Card | Status | PR |
 |---|---|---|
-| S1 | ⬜ | — |
+| S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
 | S2 | ⬜ | — |
 | S3 | ⬜ | — |
 | S4 | ⬜ | — |
