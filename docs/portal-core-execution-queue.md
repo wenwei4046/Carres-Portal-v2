@@ -308,6 +308,39 @@ check the tracker tail immediately before applying. **Depends on C2.**
 loses its original promised date; one that cannot be solved opens exactly one logistics
 action.
 
+## C9 · Storage fee holds the delivery, and only the manager can release it (Jess 2026-07-27)
+
+**The ruling:** an uncollected storage fee is the same as an unpaid balance — the goods do
+not go. If something must go out anyway, **the manager approves it and nobody else**, and
+operations learns of it through the work.
+
+**Not urgent, and say so in the PR: ZERO live orders carry a storage fee today** (measured
+2026-07-27). This card decides the behaviour before the first one appears, rather than
+improvising when it does.
+
+**Today's split, which this card removes:** the ladder's 🔒 counts an uncollected storage
+fee; the booking gate does not. C5 deliberately did not widen the gate — a bug-fix card must
+not loosen or tighten a gate on the way past — so the split is still there.
+
+**Build:**
+1. The shared money rule (`packages/shared/order-money.ts`) already carries the storage fee
+   as its own field. The gate reads the ONE number: lines + add-ons + chargeable storage −
+   `orders.paid`. No second rule, no softer path for storage.
+2. **The override.** Request and decision live on the order and reuse the existing approval
+   channel and the existing columns (`storage_waiver_*` carry requester, decider, time and
+   reason). Two outcomes the approver picks explicitly:
+   `released, fee still owed` (default — an override never silently forgives money) and
+   `released and waived`.
+3. **No alert engine.** Approval flips the order's top action from collecting to delivering,
+   so it arrives in the operator's queue the way every action does.
+4. `UNKNOWN order value never holds` still wins over all of this — a number nobody knows may
+   not stand between a customer and their goods.
+
+**Migration only if the two outcomes cannot ride the existing waiver columns** — check
+first; draft to Jess before applying. **Depends on C5** (shipped).
+**Done when:** an order with an uncollected storage fee cannot issue its delivery order; the
+manager can release it; a release that does not waive leaves the money action open.
+
 ## Status
 
 | Card | Status | PR |
@@ -319,4 +352,5 @@ action.
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
-| C8 | ⬜ after C2 · two-step delay recovery (migration) | — |
+| C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
+| C9 | ⬜ storage fee holds delivery · manager override | — |
