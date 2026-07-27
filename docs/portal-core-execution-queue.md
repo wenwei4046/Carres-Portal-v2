@@ -4,6 +4,11 @@
 > "Read `docs/portal-core-execution-queue.md`. Do card C<n> ONLY. Do not touch any other
 > card. Do not redesign anything marked ALREADY EXISTS."
 >
+> **THE ENGINE LAW IS `docs/ACTION-FLOW-STANDARD.md`** (locked with Jess 2026-07-27) —
+> two layers (compute every track independently · display picks one), the six things every
+> action must carry, the parallel tracks, the display priority, no paper SOP. Read it before
+> any C-card. This file says WHAT to build; that file says HOW the model works.
+>
 > **Source — two rulings by Jess, 2026-07-27 (they supersede every older word law):**
 > 1. **Dynamic Checklist** — an order shows ALL open actions at once, not one suggestion.
 > 2. **"Chase" is banned** — every action label = verb + named party + measurable object
@@ -42,10 +47,15 @@ every visible word, audited") — build from that table, not from memory.** In t
 - `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
 - `Confirm` (bare) → `Confirm delivery with {customer}`
 - delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
-- `Pending` filter → **rename to the state it selects — read the predicate first**; if it
-  selects "proceeded but not yet confirmed for delivery", the word is `To book`
-- column header `Manage` → **`Next`** (the card's own vocabulary; one word, not two)
-- facet chip `For Jess` → **`For manager`** (a product must not hard-code a person's name)
+- `Pending` filter → **`To book`** (it selects orders past placement whose delivery date the
+  customer has not confirmed — read the predicate to confirm before renaming)
+- `Scheduled` filter → **`Customer confirmed`** (a logistics-proposed date is not a booking)
+- column header `Manage` → **`Actions`** (plural — an order can have several; Jess 2026-07-27)
+- the three-dot column → **no header word at all**; each dot gets its own small icon
+  (goods · delivery · money) from the portal icon set, never emoji
+- facet chip `For Jess` → **`For manager review`** (a product must not hard-code a person)
+- `logistic` → **`Logistics`** everywhere (Jess decided it for the team: correct English and
+  it reads with the company names they say — `NETS Logistics`)
 - keep untouched: `Assign logistic` · `Deliver today` · `Upload delivery photo` · `Done` ·
   `No carrier` · the two confirmed/provisional fact strings
 - the party is the REAL name when known (supplier/carrier/customer), role word otherwise
@@ -70,23 +80,33 @@ drawer: every component guarded ITSELF and the badge sat outside all three.
 **Done when:** grep of the web bundle for visible `Chase` = 0 on Orders/Delivery
 surfaces AND `Unscheduled` = 0; every renamed label carries a named party.
 
-## C2 · Dynamic Checklist in the drawer
+## C2 · Split the ladder into TWO LAYERS + the drawer's action list
 
-**Goal:** a `Dynamic Checklist` block in the drawer: ALL currently-firing actions,
-one row each (verb + named party + measurable object), ladder priority order
-(money first), each row ticking itself when its signal clears. Staff never add,
-reorder, or manually tick.
-**ALREADY EXISTS:** the ladder computes every signal; T5's spine shows delivery
-progress (keep it — progress ≠ actions); this block is the ACTIONS view.
-**No migration expected. Web (+ api only if a signal doesn't ride the payload).**
-**Done when:** an order with 3 open actions shows 3 rows; closing one signal removes
-exactly that row; the drawer never contradicts the list's NEXT column.
+**This is the structural card. Read `docs/ACTION-FLOW-STANDARD.md` first.**
 
-## C3 · List NEXT column shows the whole truth
+**Layer 1 — compute.** `nextActionOf` today is `first matching rule wins`, which HIDES real
+work (no PO + RM 2,000 owing + no logistics shows only `Order PO`). Replace it with a
+function that returns **every open action** — each track evaluated independently, no track
+suppressing another. Same signals, no new state, no new engine.
 
-**Goal:** the NEXT column renders the TOP checklist item + `+N` when more are open:
-`Call Ohana — confirm ready date  +2`. Click still opens the drawer (C2's checklist).
-**Done when:** a row with one action shows no `+N`; counts always equal C2's row count.
+**Layer 2 — display.** A separate pure function picks which one goes first, using the
+priority in the standard (broken commitment / today → customer must be told → goods →
+delivery preparation → money). The old ladder's ordering is INPUT here, not law.
+
+**Drawer:** the full list, one row per open action, each ticking itself when its signal
+clears. Staff never add, reorder or tick.
+**Keep:** T5's booking spine (progress ≠ actions) and the money LOCK on confirming a
+delivery — display order is not gating.
+**No migration expected.**
+**Done when:** an order with three open actions shows three rows; no action can be hidden
+by another; the drawer and the row can never disagree.
+
+## C3 · The Actions column shows the whole truth
+
+**Goal:** the column (renamed `Actions` in C1) renders the top action from Layer 2 plus
+`+N` when more are open: `Call Ohana — confirm ready date  +2`. Click opens the drawer's
+full list (C2). **Depends on C2.**
+**Done when:** a row with one action shows no `+N`; the count always equals C2's row count.
 
 ## C4 · Purchase + Payments sweep
 
@@ -183,9 +203,60 @@ lies.
 
 **Where a form already collects the inputs, the form IS the checklist** — the PO form and
 the confirm-booking form are not to be duplicated as tick lists beside themselves.
+
+**ONE output only: the screen.** No printable action cards, no wall chart, no SOP document
+(Jess 2026-07-27: "我就是要用 system … portal lead to do"). The registry feeds the UI and
+nothing else; a staff member who needs paper means the screen failed.
 **Depends on C2 (the action list) and C5 (the money rule). No migration.**
 **Done when:** every built action closes itself from a real signal; no tick-box in the
 portal records only an assertion.
+
+## C7 · The delivery order prints itself (Jess ruling 2026-07-27)
+
+**Today, by hand:** logistics phones to say they are delivering tomorrow, and an operator
+has to produce a delivery order and send it to them. Jess: the system should do that —
+**once the customer-confirmed date exists, a button issues the DO; nobody creates one.**
+
+**Verb law fit:** `Issue` = the SYSTEM produces the document. So the action is real, and the
+human part is one press, not authoring.
+
+**ALREADY EXISTS:** `orders.do_number` and a printable delivery-order PDF the drawer can
+already render. **The one real change — read carefully:** the number is stamped by a DB
+trigger on the DISPATCH transition (0098), i.e. it is born too LATE to hand to logistics the
+day before. C7 must mint it (or issue the document against it) **at customer confirmation**
+instead, without breaking dispatch for orders that never take this path. Touching an
+existing trigger = draft the migration to Jess first (guardrail #8) and dry-run it in a
+rolled-back transaction on prod before applying.
+
+**Trigger:** `booking_stage='confirmed'` with a date · **Completion:** the delivery order
+document exists for this trip (and, once logistics have their own portal, has been sent).
+**Done when:** an operator never types a DO again; the document is available the moment the
+customer's date is confirmed.
+
+## C8 · Stock delay becomes TWO steps (Jess ruling 2026-07-27)
+
+**The problem with what shipped in T3:** the moment the latest supplier date overshoots the
+promise, the row says `Call {customer} — agree new delivery date`. A staff member then rings
+the customer with nothing but "it will be late" — and cannot answer "so when?".
+
+**New shape (Jess: "yes need to do"):** the delay first opens an INTERNAL action —
+
+`Confirm recovery plan` · checklist:
+```
+□ Confirm the latest ready date with {supplier}
+□ Check available dates with {logistics}
+□ Decide the date or window to propose
+□ Name who calls the customer
+```
+Completion: a proposed date exists AND a communication owner is named.
+
+**Only then** does `Call {customer} — agree new delivery date` open, and the operator picks
+up the phone already knowing the answer.
+
+**Needs a small additive migration** (proposed date · communication owner) — draft to Jess
+first. Reuse T4's `DELIVERY_REASONS`; **do not create a second reason list.**
+**Depends on C2** (both actions must be able to be open at once).
+**Done when:** nobody can reach the customer-call step without a proposal recorded.
 
 ## Status
 
@@ -197,3 +268,5 @@ portal records only an assertion.
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ⬜ **HIGH** — live false-block, do FIRST | — |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
+| C7 | ⬜ after C6 · DO issues itself (migration) | — |
+| C8 | ⬜ after C2 · two-step delay recovery (migration) | — |

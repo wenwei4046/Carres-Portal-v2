@@ -27,13 +27,13 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C6 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
 
 **State 2026-07-27:** ① T1-T9 ✅ (#363 #367 #370 #377 #382 #384 #386 #391 #398) ·
 ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅ —
 **14 of 38 shipped**.
 **Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → T10 → T11. R/S/K run in parallel throughout; C4 waits for a free R slot.
+C3 → C6 → C7 → C8 → T11. R/S/K run in parallel throughout; C4 waits for a free R slot.
 
 ## Sidebar map — where every line lands
 
@@ -55,6 +55,12 @@ Suppliers           ← ④ R5 supplier scorecard lands here
                         portals — a portal shell, not a sidebar item here)
 Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note stay)
 ```
+
+## The engine law (read before any C-card, and before any new module)
+
+`docs/ACTION-FLOW-STANDARD.md` — two layers (compute every track · display picks one),
+the six things every action must carry, the parallel tracks, the display priority, and the
+no-paper rule. Every module uses it; no module invents its own action model.
 
 ## Standing laws (apply to every line)
 

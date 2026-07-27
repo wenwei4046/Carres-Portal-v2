@@ -372,6 +372,7 @@ doubt, grep the codebase and match what already ships.
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
+| The delivery company (any page/label) | **Logistics** (with s) · a named one reads `NETS Logistics` | Logistic · Carrier · Partner · Delivery partner |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
 | A carrier's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
@@ -411,6 +412,19 @@ warning that only states a fact ("capacity exceeded") tells a new hire nothing
 about the next second. Sunday never appears in a carrier's rules: it is refused
 for everyone, and a per-partner Sunday line would read as though a phone call
 could buy one.
+
+**The Logistics word law (Jess 2026-07-27).** Jess: "our english bad — logistic & logistics
+we don't see different", so this was decided rather than asked again. **`Logistics`, always
+with the s** — it is the correct English noun and it reads naturally with the company names
+staff already say (`NETS Logistics`). `Carrier`, `Partner` and `Delivery partner` are banned
+UI words (DB table names keep theirs). The rename is free: C1 is already rewriting every one
+of those strings.
+
+**The three-dot column has NO header (Jess 2026-07-27).** The dots are three independent
+facts, not one status. `Status` is wrong and `Checks` reads as "cheques" beside money — so
+the column carries no header word, and each dot is labelled by its own small icon (goods ·
+delivery · money) from the portal icon set, never emoji (UI-KIT). The actions column IS
+headed, and its word is **`Actions`** — plural, because an order can have several.
 
 **The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
