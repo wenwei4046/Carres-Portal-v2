@@ -8,7 +8,8 @@
  * — the tab bar IS the title, so `<ListPageShell>` gets no breadcrumb / title.
  *
  * ROUND-2 REFINEMENTS (Jess 2026-07-22, all agreed):
- *  - Stage TABS replace KPI cards (① Send · ② Chase · ③ Receive with the same
+ *  - Stage TABS replace KPI cards (① Send · ② Confirm ready date · ③ Receive
+ *    with the same
  *    ①/②/③ badge that appears in the facet + middle-list header — three panels,
  *    one visual token).
  *  - "This week's plan" panel MERGED into the days-to-order strip; the strip
@@ -31,19 +32,24 @@
  *    stage, saves ~50px of vertical space.
  *  - Per-stage WhatToDo copy, correctly scoped:
  *      ① SEND    : WhatsApp → Paste SKU list → Click Send PO here     (3 steps)
- *      ② CHASE   : WhatsApp → Ask/update ready date → Arrange NETS → Update ETA (4)
+ *      ② CONFIRM : WhatsApp → Ask/update ready date → Arrange NETS → Update ETA (4)
  *      ③ RECEIVE : Count → Photograph DO → Book into Klg → Reserve   (4 steps)
  *    Send stage does NOT wait for supplier confirmation before sending — that
- *    conversation happens in Chase (SAP MM's requested-vs-confirmed pattern).
+ *    conversation happens in stage ② (SAP MM's requested-vs-confirmed pattern).
  *  - `Something wrong?` KEPT so it's not forgotten (Jess 2026-07-22) but with
  *    `(soon)` marker + popup top note stating the options record intent but
  *    don't act yet. Will be un-marked when the escape-hatch write path lands.
  *
- * VOCAB: ① Send · ② Chase · ③ Receive. Internal stage key stays `"place"` to
- *        preserve URL param + wire compat; all user-facing labels say Send. See
- *        COPY-STANDARD §Vocabulary for why Send ≠ Place.
+ * VOCAB (C4, Jess 2026-07-27): ① Send · ② Confirm ready date · ③ Receive.
+ *        `Chase` is a banned word — it names a mood, not an outcome — so stage ②
+ *        reads with the queue word every other surface uses, and one order's row
+ *        names the factory (`Call Ohana — confirm ready date`). Both strings come
+ *        from `@carres/shared`'s `order-action-words`, never typed here.
+ *        Internal stage keys stay `"place"` / `"chase"` to preserve URL param +
+ *        wire compat; only what a human reads changed. See COPY-STANDARD
+ *        §Vocabulary for why Send ≠ Place.
  *
- * Read-only: every write affordance (Send PO / Chase on WhatsApp / Check-in /
+ * Read-only: every write affordance (Send PO / Open WhatsApp / Check-in /
  * Something wrong) is a STUB. Actually raising a PO / booking a GRN is a later
  * unit (see handoff §6 LATER UNITS). No order-write path is touched.
  *
@@ -68,6 +74,8 @@ import {
   UserRound,
 } from "lucide-react";
 import {
+  orderActionLine,
+  orderActionQueue,
   type ProductCategory,
   type PurchaseChase,
   type PurchasePlaceGroup,
@@ -470,8 +478,8 @@ export default function OperationPurchase() {
   const pushLines = usePurchasePushLines();
   const snoozeSupplier = usePurchaseSnoozeSupplier();
   // v2 (Jess 2026-07-23): the master-detail preview needs the duty holder for
-  // the "prepared by" line + the "on PO duty" badge next to Send PO. Send +
-  // Chase are the PO-duty holder (one voice to suppliers); Receive/GRN is
+  // the "prepared by" line + the "on PO duty" badge next to Send PO. Stages ①
+  // and ② are the PO-duty holder (one voice to suppliers); Receive/GRN is
   // OFFSET by one month (next month's holder) so SOD is achieved without a
   // warehouse team — same 3-person office ops crew, different owner per stage.
   const dutyQ = useOperationPoDuty();
@@ -903,7 +911,7 @@ export default function OperationPurchase() {
 
                   <FacetRow
                     leadingChip={poDutyChip}
-                    label="Chase factory"
+                    label={orderActionQueue("confirm_ready_date")}
                     count={chaseCount}
                     tone={chaseCount > 0 ? "danger" : "muted"}
                     active={stage === "chase"}
@@ -953,7 +961,7 @@ export default function OperationPurchase() {
             {/* Jess 2026-07-23 — the 3-pill StageTabs row + top DaysToOrder
                 strip both removed. StageTabs duplicated the facet rail; the
                 strip is now the RIGHT-RAIL Calendar (full-month, tab-filtered
-                by Send / Chase / Receive / Deliveries — one place for all
+                by Send / Confirm ready date / Receive / Deliveries — one place for all
                 dates). Stage switch stays on the facet rail. */}
 
             {/* ── Data guard — un-plannable orders (① Send stage only) ────── */}
@@ -978,7 +986,7 @@ export default function OperationPurchase() {
                 LIST is DELETED; POs are folded into the facet tree under
                 Send POs (category grouped). This body column now shows ONLY
                 the PREVIEW (PDF-style doc + SOs covered + WhatsApp draft +
-                Send flame). Chase / Receive keep the 2-column split for now
+                Send flame). Stages ② / ③ keep the 2-column split for now
                 — their tree fold is a follow-up. */}
             {stage === "place" ? (
               <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden p-3 flex-1">
@@ -1056,7 +1064,7 @@ export default function OperationPurchase() {
               </div>
             ) : (
               <div className="flex-1 min-h-0 grid grid-cols-[minmax(360px,420px)_1fr] gap-4">
-                {/* MIDDLE — the compact list (Chase / Receive) */}
+                {/* MIDDLE — the compact list (Confirm ready date / Receive) */}
                 <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
                   <MiddleListHeader
                     stage={stage}
@@ -1071,7 +1079,7 @@ export default function OperationPurchase() {
                     ) : stage === "chase" ? (
                       chaseShown.length === 0 ? (
                         <EmptyDone
-                          text="Nothing to chase here"
+                          text="No ready dates to confirm"
                           sub="No factory is past its promised ready date."
                         />
                       ) : (
@@ -1149,7 +1157,7 @@ export default function OperationPurchase() {
                   </div>
                 </div>
 
-                {/* DETAIL — the selected Chase / Receive row */}
+                {/* DETAIL — the selected Confirm-ready-date / Receive row */}
                 <div className="min-h-0 flex flex-col bg-white rounded-[12px] border border-base-200 shadow-sm overflow-hidden">
                   {selectedChase ? (
                     <ChaseDetail
@@ -1295,7 +1303,7 @@ function TodayRefresh({
 // StageTabs removed 2026-07-23 (Jess) — the 3-pill switcher row duplicated
 // the facet rail's Today's work group and burned ~60px of vertical space.
 // DaysToOrderStrip removed 2026-07-23 (Jess) — the right-rail Calendar owns
-// all date navigation now (full month, tab-filtered by Send/Chase/Receive).
+// all date navigation now (full month, tab-filtered by the three stages).
 
 
 
@@ -1314,7 +1322,7 @@ function MiddleListHeader({
     stage === "place"
       ? "Send POs"
       : stage === "chase"
-        ? "Chase factories"
+        ? orderActionQueue("confirm_ready_date")
         : "Receive deliveries";
   const badge =
     shownCount === totalCount
@@ -1342,7 +1350,7 @@ function DetailEmpty({ stage }: { stage: Stage }) {
     stage === "place"
       ? "Select a factory on the left to see the SKU list."
       : stage === "chase"
-        ? "Select a PO on the left to see the items to chase."
+        ? "Select a PO on the left to see what the factory still owes."
         : "Select a PO on the left to see the items to check in.";
   return (
     <div className="flex-1 min-h-0 grid place-items-center px-6 py-10">
@@ -1357,7 +1365,7 @@ function DetailEmpty({ stage }: { stage: Stage }) {
 }
 
 
-// ── ② Chase — Detail pane ────────────────────────────────────────────────────
+// ── ② Confirm ready date — Detail pane ───────────────────────────────────────
 
 function ChaseDetail({
   row,
@@ -1402,7 +1410,11 @@ function ChaseDetail({
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
         <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
           <Factory size={18} className="text-base-500 shrink-0" />
-          <span className="truncate">Chase {supplierName}</span>
+          {/* C4 — the pane's title IS the action, named party and all, from the
+              one shared word module: `Call Ohana — confirm ready date`. */}
+          <span className="truncate">
+            {orderActionLine("confirm_ready_date", { supplier: supplierName })}
+          </span>
           <span className="pill pill-overdue shrink-0 ml-auto">
             <AlertCircle />
             {row.daysLate}d late
@@ -1454,7 +1466,10 @@ function ChaseDetail({
         ]}
       />
 
-      {/* footer */}
+      {/* footer — the CHANNEL is not the action (COPY-STANDARD verb table): the
+          action is the Call named in the header above, and this button only says
+          how it is made. So the label is `Open WhatsApp` and the tooltip says
+          what opening it does, never repeating the label. */}
       <div className="shrink-0 border-t border-base-200 px-4 py-2.5 flex items-center justify-end gap-3 bg-base-50">
         <Btn
           variant="hero"
@@ -1463,12 +1478,12 @@ function ChaseDetail({
           disabled={!canChase}
           title={
             canChase
-              ? `Chase ${supplierName} on WhatsApp.`
+              ? `Opens WhatsApp to ${supplierName} with the ready-date message ready to send.`
               : "No WhatsApp contact on file for this factory."
           }
           onClick={onChase}
         >
-          Chase on WhatsApp
+          Open WhatsApp
         </Btn>
       </div>
     </div>

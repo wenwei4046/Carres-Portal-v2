@@ -260,7 +260,7 @@ export function PurchaseSettingsSheet({
           </SectionCard>
 
           {/* 4. DUTY ROTATION — PO + GRN offset-1 (Jess 2026-07-23):
-                 Send + Chase = PO duty (one voice to suppliers); Receive =
+                 Send + Confirm ready date = PO duty (one voice to suppliers); Receive =
                  GRN duty on the NEXT month's holder. Table read-only; the
                  roster edit lives on the right-rail Team card. */}
           <SectionCard>
@@ -287,7 +287,7 @@ export function PurchaseSettingsSheet({
                   <div className="mt-2">
                     <div className="grid grid-cols-[50px_1fr_1fr] gap-x-2 px-2.5 h-6 items-center text-[10px] uppercase tracking-[0.05em] text-base-500">
                       <span>Month</span>
-                      <span>PO (Send + Chase)</span>
+                      <span>PO (Send + Confirm ready date)</span>
                       <span>GRN (Receive)</span>
                     </div>
                     {rotationRows.map((r) => (
@@ -307,7 +307,7 @@ export function PurchaseSettingsSheet({
                   </div>
                 )}
                 <div className="px-2.5 pt-2 pb-1 text-[11px] text-base-500 leading-snug">
-                  PO duty = one voice to suppliers (Send + Chase). GRN duty =
+                  PO duty = one voice to suppliers (Send + Confirm ready date). GRN duty =
                   next month's holder — different person signs off received
                   goods (segregation of duties, same 3-person crew).
                 </div>

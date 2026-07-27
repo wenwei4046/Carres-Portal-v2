@@ -18,6 +18,7 @@ import {
   collectPillLabel,
   computeStorageFee,
   orderActionLine,
+  orderActionQueue,
   orderMoney,
   summarizePayments,
   type OrderPaymentRow,
@@ -46,15 +47,22 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
  * OperationPayments — the Master Sheet "Balance" tab, rebuilt 2026-07-19 (Jess)
  * as the LOOSE, stock-aware Collections Desk (§A0 golden reference).
  *
- * The critical business rule baked in: **you chase the customer's money only
+ * The critical business rule baked in: **you call the customer for money only
  * once you can answer "when's my delivery?"** — so every row carries the STOCK
  * & delivery signal (goods in / waiting ETA / supplier late) beside the money.
- * The money worklist QUEUES are stock-aware: "Ready to chase" = owing AND goods
- * in (safe to call); "Waiting stock" = owing but goods not in yet (hold the
- * call). Chasing opens a WhatsApp popover with a pre-call brief (stock + the
- * delivery window + "logistics contacts 1-3 days before") — the operator's
- * verbal script — while the WhatsApp text stays date-free per the locked
- * wa-templates rule.
+ * The money worklist QUEUES are stock-aware: "Collect" = owing AND goods in
+ * (safe to call); "Waiting stock" = owing but goods not in yet (hold the call).
+ *
+ * C4 (Jess 2026-07-27) — `Chase` is a banned word, and the money action has ONE
+ * spelling portal-wide: the queue is `orderActionQueue("collect")` and a row is
+ * `orderActionLine("collect", …)` → `Collect RM 2,455 from John Tan`. Both come
+ * from `@carres/shared`'s `order-action-words`, which is the same module the
+ * Orders list, its drawer and the Delivery module read — so this desk and an
+ * order's row structurally cannot spell the same action two ways.
+ *
+ * Calling opens a WhatsApp popover with a pre-call brief (stock + the delivery
+ * window + "logistics contacts 1-3 days before") — the operator's verbal script
+ * — while the WhatsApp text stays date-free per the locked wa-templates rule.
  *
  * Loose layout: full-width white table, 52px rows, generous padding, no
  * truncation of the customer, two-line cells. Facets are multi-select Sets with
@@ -139,6 +147,16 @@ function rm(n: number): string {
   return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** The amount WITHOUT the currency word, whole ringgit — the shape
+ *  `order-action-words` documents for its `amount` party, because the module
+ *  adds `RM ` itself. Passing `rm()` there printed `Collect RM RM 2,455.00`
+ *  on this desk while an order's own row read `Collect RM 2,455` (C4 found it
+ *  on the lines it was rewriting). Same formatting as the Orders list's
+ *  `fmtRM`, kept local so this page does not import the 5k-line list module. */
+function rmPlain(n: number): string {
+  return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
+}
+
 /** Render + open a receipt PDF for one ledger entry (client-side, self-contained
  *  — needs only the ledger row + customer/SO, no order-total derivation). Mirrors
  *  OrderControlPanel.printReceipt. */
@@ -162,16 +180,18 @@ async function printReceipt(row: OrderPaymentRow, orderCode: string, customerNam
   }
 }
 
-/** "Chased today / 3d ago" — collections must show when a debtor was last
- *  touched so it isn't over-chased or left to go cold. */
-function chasedAgo(iso: string | null): string | null {
+/** "Last message today / 3d ago" — collections must show when a debtor was last
+ *  spoken to, so nobody is called twice in a day or left to go cold. The words
+ *  are the drawer's (C1): what is stamped is a MESSAGE being sent, and the
+ *  banned word named a mood instead. */
+function lastMessageAgo(iso: string | null): string | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
   if (isNaN(then)) return null;
   const days = Math.floor((Date.now() - then) / 86_400_000);
-  if (days <= 0) return "Chased today";
-  if (days === 1) return "Chased 1d ago";
-  return `Chased ${days}d ago`;
+  if (days <= 0) return "Last message today";
+  if (days === 1) return "Last message 1d ago";
+  return `Last message ${days}d ago`;
 }
 
 /** Phone → wa.me base link (MY-aware). Local copy of OrderDetailDrawer.waLink so
@@ -257,7 +277,9 @@ function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
 const QUEUES = [
   {
     key: "ready",
-    label: "Ready to chase",
+    // The queue word for the money action, from the one shared module — a queue
+    // holds many customers, so it carries no name and no amount; the row does.
+    label: orderActionQueue("collect"),
     dot: "bg-success",
     desc: "Owing + goods in — safe to call (you can answer the delivery question)",
   },
@@ -265,13 +287,13 @@ const QUEUES = [
     key: "waiting",
     label: "Waiting stock",
     dot: "bg-warning",
-    desc: "Owing but goods not in yet — hold the call, or chase supplier first",
+    desc: "Owing but goods not in yet — hold the call, or call the factory for a ready date first",
   },
   {
     key: "late",
     label: "Stock late",
     dot: "bg-danger",
-    desc: "Owing + supplier missed the ETA — chase the supplier, not the customer",
+    desc: "Owing + supplier missed the ETA — call the supplier, not the customer",
   },
   {
     key: "storage",
@@ -871,23 +893,27 @@ function PaymentRow({
                   title={
                     r.held
                       ? orderActionLine("collect", {
-                          amount: rm(r.owing),
+                          amount: rmPlain(r.owing),
                           customer: r.customer,
                         }) + " — delivery is held until it is paid"
                       : orderActionLine("collect", {
-                          amount: rm(r.owing),
+                          amount: rmPlain(r.owing),
                           customer: r.customer,
                         })
                   }
                 >
                   {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
-                  {collectPillLabel(rm(r.owing))}
+                  {collectPillLabel(rmPlain(r.owing))}
                 </button>
                 <div
                   className="mt-1.5 text-[11px] text-base-400"
-                  title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
+                  title={
+                    r.lastChasedAt
+                      ? `Last message sent ${fmtDate(r.lastChasedAt, { time: true })}`
+                      : undefined
+                  }
                 >
-                  {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
+                  {lastMessageAgo(r.lastChasedAt) ?? "No message sent yet"}
                   {r.dueDate && (
                     <span className={r.overdue ? "text-danger font-semibold" : "text-base-500"}>
                       {" · "}
@@ -1135,16 +1161,16 @@ function OrderMoneyDetail({
         <div className="mt-2 text-[11px] text-base-400 leading-snug">
           {r.dueDate
             ? r.overdue
-              ? `Overdue since ${fmtDate(r.dueDate)} — chase now.`
+              ? `Overdue since ${fmtDate(r.dueDate)} — call ${r.customer} today.`
               : `Snoozed until ${fmtDate(r.dueDate)}.`
-            : "Set the date the customer promised to pay — it sinks off the chase queue until then."}
+            : "Set the date the customer promised to pay — it sinks off the collection queue until then."}
         </div>
       </div>
     </div>
   );
 }
 
-/** Stock badge + delivery window (the "safe to chase / what to tell them" cell). */
+/** Stock badge + delivery window (the "safe to call / what to tell them" cell). */
 function StockCell({ r }: { r: Row }) {
   const s = r.stock;
   const badge =
@@ -1160,7 +1186,7 @@ function StockCell({ r }: { r: Row }) {
 
   const windowNote =
     s.state === "late"
-      ? "Supplier late — chase the goods first, not the customer"
+      ? "Supplier late — call the supplier first, not the customer"
       : s.state === "waiting" || s.state === "no_eta"
         ? "Goods not in — quote a window, don't promise a fixed date"
         : r.etaTbd
@@ -1205,7 +1231,16 @@ function StatusSelect({
   );
 }
 
-// ─── Chase popover (WhatsApp + pre-call brief) ───────────────────────────────
+// ─── Collect popover (WhatsApp + pre-call brief) ─────────────────────────────
+/** The two message TONES in the canonical words (C1's drawer + the bulk-bar
+ *  reviews use exactly these): `Remind` is the pre-deadline follow-up, `Call`
+ *  the firm one. The internal keys keep their old spelling — they are wire
+ *  values for `wa-templates`, and COPY-STANDARD exempts internal keys. */
+const TONE_LABEL: Record<"reminder" | "chase", string> = {
+  reminder: "Remind",
+  chase: "Call",
+};
+
 function ChasePopover({
   r,
   onClose,
@@ -1215,8 +1250,8 @@ function ChasePopover({
   onClose: () => void;
   onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
 }) {
-  // Default tone: goods delivered/held or supplier late → firmer Chase; else a
-  // gentle Reminder.
+  // Default tone: goods delivered/held or supplier late → the firmer Call; else
+  // a gentle Remind.
   const [tone, setTone] = useState<"reminder" | "chase">(r.delivered || r.held ? "chase" : "reminder");
   const salutation = salutationOf(null, r.customer);
   const outstanding = rmAmount(r.owing);
@@ -1244,7 +1279,7 @@ function ChasePopover({
     r.stock.state === "ready"
       ? "In stock ✓ ready to deliver"
       : r.stock.state === "late"
-        ? `Supplier late (ETA ${fmtDate(r.stock.etaIso)} passed) — chase goods first`
+        ? `Supplier late (ETA ${fmtDate(r.stock.etaIso)} passed) — call the supplier first`
         : r.stock.state === "waiting" || r.stock.state === "no_eta"
           ? `Not in yet · ETA ${fmtDate(r.stock.etaIso)}`
           : "Not tracked";
@@ -1262,8 +1297,14 @@ function ChasePopover({
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-base-100">
           <MessageCircle size={16} className="text-success" strokeWidth={2.5} />
+          {/* The popover's title IS the action — verb + amount + named party —
+              with the number the operator will actually dial after it. */}
           <span className="text-[13px] font-bold text-base-900">
-            Chase · {r.customer} · {r.phone ?? "no phone"}
+            {orderActionLine("collect", {
+              amount: rmPlain(r.owing),
+              customer: r.customer,
+            })}{" "}
+            · {r.phone ?? "no phone"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex bg-base-100 rounded-full p-0.5">
@@ -1272,11 +1313,11 @@ function ChasePopover({
                   key={t}
                   type="button"
                   onClick={() => setTone(t)}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold capitalize transition-colors ${
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-colors ${
                     tone === t ? "bg-white text-base-900 shadow-sm" : "text-base-500"
                   }`}
                 >
-                  {t}
+                  {TONE_LABEL[t]}
                 </button>
               ))}
             </div>

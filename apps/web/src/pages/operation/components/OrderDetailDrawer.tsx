@@ -6932,7 +6932,9 @@ function MoneyCard({
         </div>
         {lastChasedAt && (
           <div className="text-[12px] text-base-400">
-            Last chased {fmtDate(lastChasedAt)}
+            {/* C4 — the same words the Actions panel uses above (C1): what the
+                stamp records is a message being sent. `chased` is banned. */}
+            Last message {fmtDate(lastChasedAt)}
           </div>
         )}
       </div>
