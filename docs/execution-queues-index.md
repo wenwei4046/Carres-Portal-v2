@@ -26,7 +26,7 @@
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
-| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 |
+| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C4 | Jess rulings 2026-07-27: Dynamic Checklist + Chase banned |
 
 **State 2026-07-27:** ① T1-T7 ✅ (T8 running) · ② J1-J2 ✅ · ⑤ K0 ✅ — 10 of 31 shipped.

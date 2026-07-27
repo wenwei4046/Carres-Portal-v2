@@ -48,13 +48,31 @@ inside. **No migration. Nav-only.** Keep old tab keys working (kept-mounted page
 already exists there — follow it).
 **Done when:** the sidebar has ONE stock entry; no visible "Movements"/"Inventory" string.
 
-## K1 · Reorder alert for import accessories
+## K1 · Reorder alert for import accessories ✅ (PR #400)
 
 **Goal:** pillow / mattress protector rows show `current · reorder point · incoming` and
 raise `Reorder stock` into the ops worklist when current+incoming ≤ reorder point
 (2-month China lead = the alert must fire early, math from the MRP engine).
 Reorder points editable by COO only.
 **Done when:** the <200 case can never be discovered by hitting zero.
+
+**Shipped 2026-07-27** (PR #400, migration **0286**). The card was real: prod held
+pillow 555 · protector-Q 319 · **protector-K 15**, and no screen said so.
+`packages/shared/reorder-alert.ts` is the one engine (three states — `reorder` · `ok` ·
+`unset`); `GET/PUT /api/ops/stock/reorder` decides server-side so the band and the
+dashboard tile can never disagree. Notes the later cards need:
+- **Current reads `ops_stock_items` summing `qty`, NOT `stock_balances`** — that rollup
+  is `count(*)`-based (pre-0218), so the 555-unit pillow row reads as 1. K2-K5 must read
+  the same register. 0018's table + RPC left untouched.
+- **The point is keyed on the stock SKU STRING** — all 49 live stock SKUs join to ZERO
+  `product_skus` rows (free-text Klg-sheet names). Do not add a catalog FK in K2.
+- **`unset` is a first-class state** — "Set a number", never a reassuring "Enough". A
+  quiet screen must mean "watched and fine", never "nobody has looked".
+- **`stock_planner` duty** (seeded from live holders → the COO seat only, no legacy email
+  fallback). **K4's reserve levels reuse this same key** — do not mint a second one.
+- `ops_reorder_points` has **no write policy at all**; the audited DEFINER RPC is the only
+  door. Same shape for anything K2-K5 adds.
+- **Nothing seeded** — every accessory reads "Set a number" until the COO picks one.
 
 ## K2 · Ready stock plan (propose → consolidate → approve → PO)
 
@@ -100,7 +118,7 @@ SKU rows.
 | Card | Status | PR |
 |---|---|---|
 | K0 | ✅ shipped 2026-07-27 | #376 |
-| K1 | ⬜ | — |
+| K1 | ✅ shipped 2026-07-27 | #400 |
 | K2 | ⬜ | — |
 | K3 | ⬜ | — |
 | K4 | ⬜ | — |
