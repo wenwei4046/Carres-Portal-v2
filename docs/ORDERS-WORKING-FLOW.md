@@ -323,3 +323,10 @@ A delivered order never alarms on goods or delivery. Delivered is not paid.
 - **Waiting states are not actions.** `Waiting Supplier Reply` · `Waiting Goods Arrival` are
   monitoring states: nobody does anything while they are true. They become an action only
   when the wait EXPIRES or a human decision is required.
+- **"Everything is ready, the day has not come" is not an action either** (Jess ruled
+  2026-07-27). Goods in · logistics assigned · the customer's date confirmed · that date
+  still ahead — there is nothing for a human to do, which is exactly why the old
+  `Confirm delivery with {customer}` was the one row in the drawer with no button that
+  could close it. A row with no button teaches a new hire that they have missed something.
+  It becomes a FACT — `Delivering 27 Jul · 9–11 AM`, quiet tone, never red — and
+  `Deliver today` takes over on the day.

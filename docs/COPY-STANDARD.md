@@ -264,6 +264,7 @@ If the sentence is about a gap, write the ACTION that closes it.
 | `Chase logistic` | banned word + banned party word | `Call {logistics} — confirm delivery date` |
 | `Call customer (stock delay)` | party is a role · object not measurable | `Call {customer} — agree new delivery date` |
 | `Assign logistics` | ✅ keep | (the party is what you are choosing — it cannot be named yet) |
+| `Delivering {date} · {slot}` | ✅ the quiet fact that replaces the old `Confirm` action | (no verb — nobody is doing anything until the day) |
 | `Deliver today` | ✅ keep | (verb + when; the truck is the party) |
 | `Upload delivery photo` | ✅ keep | (nobody else is involved) |
 | `Collect $` | no amount, no party | `Collect RM {amount} from {customer}` (pill: `Collect RM 2,455`) |
