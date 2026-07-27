@@ -270,6 +270,31 @@ doubt, grep the codebase and match what already ships.
 | A date a carrier is closed | **not running on** | Blackout · Unavailable · Out of service |
 | Most drops a carrier takes in a day | **deliveries a day** | Capacity · Max load · Slots |
 
+## The delivery calendar words (T10, locked with Jess 2026-07-27)
+
+A calendar day answers ONE question: **which trucks move that day.** A day is
+therefore filled by the BOOKING, never by the date we promised the customer —
+those two dates diverge the moment anything is rescheduled, which is why D1
+split them.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The three calendar views | **Today · Tomorrow · This week** | Next 7 days · Week view · Upcoming |
+| The customer said yes to this date | **Confirmed** (+ the slot, e.g. `12pm–3pm`) | Booked · Locked · Scheduled |
+| Only the carrier has named this date | **Carrier's date** | Provisional · Tentative · ETA · Pencilled in |
+| Promised on this day, no booking yet | **Promised this day, needs a date** | Unscheduled · Not booked · Unbooked · Pending |
+| No carrier picked yet | **No carrier picked** | Unassigned · TBD · — |
+| Nothing booked on a day | **No deliveries booked this day.** | Empty · Free · Nothing |
+
+- **"This week" means the REST of this week** — today through Saturday. Sunday
+  is never in a delivery range: it is refused for every carrier.
+- A promised-but-unbooked order is never COUNTED as a delivery. It is listed
+  under its own heading with the call that fixes it
+  (`Call {customer} — book delivery date`), so a day never reads as empty when
+  work is sitting on it, and never reads as booked when nothing is.
+- Confirmed is the ONLY green on the calendar, exactly as in the Orders list's
+  Delivery column (T1). The carrier's own date is amber, always.
+
 **The carrier-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the carrier and
 end in something the operator can do — "call them" or "pick another day". A

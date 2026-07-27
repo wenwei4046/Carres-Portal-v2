@@ -30,6 +30,7 @@ import {
   lineKind,
 } from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
+import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
@@ -509,14 +510,10 @@ function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
 // (Follow-up + Escalate-to-Jess now live in ops_tasks, keyed per order — see
 //  openTaskOf / taskUrgency above + the tasksByOrder map in the component.)
 
-/** The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180) —
- *  distinct from the customer `delivery_date` deadline. Since 0277 (D1) this is
- *  the Stage-1 PROVISIONAL date: the carrier's word, not the customer's yes. */
-function logisticEtaOf(o: operationOrderListRow): string | null {
-  const raw = o.ops_order_control;
-  const ovl = Array.isArray(raw) ? raw[0] : raw;
-  return ovl?.logistic_eta ?? null;
-}
+// The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180)
+// used to be read here. Since T10 it is read as the PROVISIONAL half of the
+// booking, inside `orderBookingRead` (@/lib/order-booking) — one adapter, so the
+// Delivery column and the delivery calendar cannot read different columns.
 
 /** D1 two-stage booking (0277, T1) — TRUE only when the CUSTOMER confirmed the
  *  delivery: booking_stage='confirmed' AND a confirmed_date (invariant #1 —
@@ -684,8 +681,7 @@ function staffInitials(m: OpsStaffMember): string {
 }
 
 function ovlOf(o: operationOrderListRow) {
-  const raw = o.ops_order_control;
-  return Array.isArray(raw) ? raw[0] : raw;
+  return orderControlOf(o);
 }
 
 /** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
@@ -888,16 +884,14 @@ export function logisticStateOf(
   const partner = logisticOf(o, partnerName);
   if (controlTabOf(o) === "completed")
     return { key: "delivered", partner, date: null, slot: null };
-  const ovl = ovlOf(o);
-  if (ovl?.booking_stage === "confirmed" && ovl.confirmed_date)
-    return {
-      key: "confirmed",
-      partner,
-      date: ovl.confirmed_date,
-      slot: ovl.confirmed_time_slot ?? null,
-    };
-  const eta = logisticEtaOf(o);
-  if (eta) return { key: "provisional", partner, date: eta, slot: null };
+  // T10: the confirmed-vs-provisional decision is ONE rule (`bookingDayOf` in
+  // packages/shared), shared with the delivery calendar. This column and that
+  // calendar cannot put the same order on two different days.
+  const booking = orderBookingDay(o);
+  if (booking.kind === "confirmed")
+    return { key: "confirmed", partner, date: booking.date, slot: booking.slot };
+  if (booking.kind === "provisional")
+    return { key: "provisional", partner, date: booking.date, slot: null };
   if (!partner) return { key: "unassigned", partner: null, date: null, slot: null };
   return { key: "need_booking", partner, date: null, slot: null };
 }

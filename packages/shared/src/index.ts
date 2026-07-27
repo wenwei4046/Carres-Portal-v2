@@ -753,6 +753,28 @@ export {
   type PartnerBookingCheckResponse,
 } from "./schemas/delivery-partner-rules";
 
+// T10 · Delivery calendar — the ONE rule that decides which day an order's
+// truck sits on (the D1 booking, never the promised date), the Today /
+// Tomorrow / This week ranges, and the carrier's load on a day (T9 rules).
+export {
+  bookingDayOf,
+  carrierDayLoads,
+  carrierDayNote,
+  daysInRange,
+  dayWord,
+  deliveryRange,
+  DELIVERY_RANGE_KEYS,
+  inRange,
+  shiftDays,
+  type BookingDay,
+  type BookingKind,
+  type BookingRead,
+  type CarrierDayLoad,
+  type DayBooking,
+  type DeliveryRange,
+  type DeliveryRangeKey,
+} from "./delivery-calendar";
+
 export {
   monthKeyMYT,
   isPoDayMYT,
