@@ -32,7 +32,7 @@
   "Ready-to-chase" queue wording; Purchase panel stages read Send · Chase · Receive.
 - Tests assert old strings — renames must update the assertions WITH the strings.
 
-## C1 · Orders + Delivery speak the new words — ✅ LIVE (PR #461)
+## C1 · Orders + Delivery speak the new words ✅ (PR #461) — ✅ LIVE (PR #461)
 
 **Goal:** every visible label in the Orders list, queues and drawer follows
 verb + named party + measurable object, and the word Chase disappears:
@@ -124,6 +124,13 @@ suppressing another. Same signals, no new state, no new engine.
 **Layer 2 — display.** A separate pure function picks which one goes first, using the
 priority in the standard (broken commitment / today → customer must be told → goods →
 delivery preparation → money). The old ladder's ordering is INPUT here, not law.
+
+**Also fix the `To book` filter here** (C1 found it): the predicate selects
+`NOT(goods in AND customer confirmed)`, so an order whose customer HAS confirmed but whose
+goods are not in falls into `To book` — where the word is wrong. C1 correctly changed the
+word and left the predicate, because the fix is a behaviour change and this card owns the
+computation. Live it cannot happen yet (0 of 55 control rows carry a confirmed booking), so
+it is a correctness fix, not a visible bug.
 
 **Drawer:** the full list, one row per open action, each ticking itself when its signal
 clears. Staff never add, reorder or tick.
@@ -373,6 +380,25 @@ first; draft to Jess before applying. **Depends on C5** (shipped).
 **Done when:** an order with an uncollected storage fee cannot issue its delivery order; the
 manager can release it; a release that does not waive leaves the money action open.
 
+## C10 · The three dots become real (found by C1)
+
+**`rowDotsOf()` computes goods · delivery · money, is unit tested, and NOTHING RENDERS IT.**
+The list's `Status` column shows a stage pill; its tooltip was even describing the three
+dots that were never there (C1 fixed the tooltip). So Law 6 of the engine standard —
+Jess's own design, no header word, one small icon per dot — describes a screen that does
+not exist.
+
+**Build:** render the three dots in that column, each with its own icon from the portal icon
+set (goods · delivery · money — never emoji), no header word. Red/amber/green per
+`docs/ORDERS-WORKING-FLOW.md` §7. A delivered order never alarms on goods or delivery and
+may still show red money.
+
+**Decide first (Jess):** the column currently shows the STAGE PILL. Do the dots REPLACE it,
+or sit beside it? Replacing loses the stage word from the list; keeping both spends width on
+a column that is 9 units wide today.
+
+**No migration. Web-only.** **Done when:** `rowDotsOf` has a renderer, or is deleted.
+
 ## Status
 
 | Card | Status | PR |
@@ -386,3 +412,4 @@ manager can release it; a release that does not waive leaves the money action op
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ⬜ storage fee holds delivery · manager override | — |
+| C10 | ⬜ the three dots become real (needs one Jess call) | — |
