@@ -26,14 +26,16 @@
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447**.
+③ **LINE COMPLETE** (S1-S5, the last being #474 — the Numbers tab, and the finding that
+S5 needs no `closed_at` column because S3's own close gate already stores the day the
+customer confirmed) · ⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447**.
 **Drawer lane, in this order:** C3 → C6 → C7 → C8 (C9 any time after C5; C10 needs one Jess call).
 R/S/K run in parallel throughout; C4 waits for a free R slot.
 
