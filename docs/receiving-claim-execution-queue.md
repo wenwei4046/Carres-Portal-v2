@@ -219,6 +219,14 @@ number to keep in step with four). Notes the next cards need:
   (`On time` · `In full`). They are FACTS, not actions, so no verb rule applies
   — but they are worth Jess's ruling before a second module reuses them.
 
+### The on-time rule R5 locked (confirmed 2026-07-27 — do not undo it)
+
+R4's carry-forward asked the scorecard to read the covering claim's `closed_at`. **It does
+not, deliberately, and that stands.** A shortfall the supplier wrote off, or refused, is
+still a shortfall. Counting a closed claim as "delivered in full" would launder a supplier
+failure into a pass — which is the exact thing this scorecard exists to catch. `closed_at`
+still matters for **how long a claim took to settle**; it never turns a miss into a hit.
+
 ## R6 · Warehouse login — the warehouse updates itself
 
 **Concept (Jess, 2026-07-27):** the third-party warehouse stops reporting by WhatsApp;
