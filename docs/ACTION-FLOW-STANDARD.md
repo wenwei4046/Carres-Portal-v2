@@ -171,6 +171,10 @@ John Tan        🟢 🟡 🔴       Call Ohana — confirm ready date  +2
 A delivered order may still show a red money dot and keep an open payment action.
 Delivered is not paid.
 
+**They sit BESIDE the stage pill, never replacing it** (Jess 2026-07-27). The pill is the
+order's overall progress summary — where this order is; the dots are which part has trouble.
+Different questions, both kept.
+
 **Nothing on screen does this today.** `rowDotsOf()` computes the three dots, is unit
 tested, and **is rendered nowhere**; the list's `Status` column shows a stage pill instead.
 C1 found this while trying to rename a header that does not exist. Building the dots is a
