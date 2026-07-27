@@ -190,7 +190,22 @@ teaches that a new action appears by itself.
 **Goal:** the column (renamed `Actions` in C1) renders the top action from Layer 2 plus
 `+N` when more are open: `Call Ohana — confirm ready date  +2`. Click opens the drawer's
 full list (C2). **Depends on C2.**
-**Done when:** a row with one action shows no `+N`; the count always equals C2's row count.
+**Also in this card (Jess ruled 2026-07-27):** `Confirm delivery with {customer}` stops being
+an action. It fires when goods are in, logistics is assigned, the customer's date is
+confirmed and that date is still ahead — nothing for a human to do, which is why it was the
+only row in the drawer with no button that could close it. It becomes the FACT
+`Delivering 27 Jul · 9–11 AM`, quiet tone, never red; `Deliver today` takes over on the day,
+and the drawer list shows one fewer row rather than a row nobody can act on.
+**Watch for duplication:** the Delivery column already carries that date and slot. If the two
+cells would print the same thing, shorten this one — C1 hit the same trap in the delivery
+badge and solved it by dropping the verb. You own this column; decide with the real widths in
+front of you, and say what you chose.
+
+**Also decide here:** whether the Actions cell truncating `Call NETS — confirm delivery date`
+is acceptable with its tooltip (Jess deferred this to C3 rather than tuning one column twice).
+
+**Done when:** a row with one action shows no `+N`; the count always equals C2's row count;
+no row in the drawer shows an action with no way to complete it.
 
 ## C4 · Purchase + Payments sweep
 
