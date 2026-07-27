@@ -82,6 +82,7 @@ import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
+import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
 import snRouter from "./routes/ops/service-notes";
 // Migration 0210 — Service Cases (case parent layer above Service Notes).
@@ -227,6 +228,9 @@ api.route("/ops/stock", opsStockRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
 // K1 reorder routes on that router keep their paths unchanged.
 api.route("/ops/stock-plan", opsStockPlanRouter);
+// K3 (0290) — the urgent lane. Its OWN router and its own tables: the card's
+// "never mixes into the monthly plan's numbers" is structural, not a filter.
+api.route("/ops/stock-emergency", opsStockEmergencyRouter);
 api.route("/ops/service-notes", snRouter);
 api.route("/ops/service-cases", scRouter);
 api.route("/ops/notes", opsNotesRouter);

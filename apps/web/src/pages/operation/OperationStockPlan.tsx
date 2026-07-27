@@ -15,6 +15,7 @@ import {
   useDecideStockPlan,
 } from "@/lib/queries";
 import StockTabs from "./StockTabs";
+import UrgentRestockPanel from "./components/UrgentRestockPanel";
 
 /**
  * Ready stock — the monthly plan (card K2, migration 0287).
@@ -143,6 +144,12 @@ export default function OperationStockPlan() {
             {status === "approved" ? <PoList rows={data.poList} /> : null}
           </>
         )}
+
+        {/* K3 — the urgent lane. Rendered OUTSIDE the monthly plan's loading
+            and error branches on purpose: an emergency must be reachable even
+            on a day the monthly cycle fails to load, which is exactly the kind
+            of day somebody needs it. */}
+        <UrgentRestockPanel />
       </div>
     </>
   );

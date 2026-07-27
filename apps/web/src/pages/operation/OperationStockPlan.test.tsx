@@ -96,8 +96,27 @@ beforeEach(() => {
   vi.mocked(apiFetch).mockReset();
 });
 
+/**
+ * The page mounts TWO independent lanes (K2's monthly plan and K3's urgent
+ * panel), so the double answers per path. A blanket `mockResolvedValue` would
+ * hand the plan's payload to the urgent lane as well — harmless on screen, but
+ * it would let a K3 regression hide inside a K2 run.
+ */
 function serve(res: OpsStockPlanResponse) {
-  vi.mocked(apiFetch).mockResolvedValue(res as never);
+  vi.mocked(apiFetch).mockImplementation(async (path: string) =>
+    path.startsWith("/api/ops/stock-emergency")
+      ? ({
+          rows: [],
+          pendingCount: 0,
+          poList: [],
+          skus: [],
+          canRaise: true,
+          canDecide: false,
+          canMarkOrdered: false,
+          meId: "me",
+        } as never)
+      : (res as never),
+  );
 }
 
 // ---------------------------------------------------------------------------
