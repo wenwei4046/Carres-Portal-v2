@@ -8,7 +8,7 @@ import CaseEvidenceGallery from "./CaseEvidenceGallery";
  * S2's second acceptance, exactly as the card words it: "each file shows its
  * uploader role in the case view."
  *
- * The stamp is the SERVER'S (0287 refuses an entry without it), so the job here
+ * The stamp is the SERVER'S (0288 refuses an entry without it), so the job here
  * is to report it — including for a case that predates S2 and has none.
  */
 
@@ -78,12 +78,12 @@ describe("CaseEvidenceGallery", () => {
     expect(screen.getAllByRole("img")).toHaveLength(1);
   });
 
-  it("tells the truth about a case filed before photos were required", async () => {
+  it("tells the truth about a case filed before photos were part of it", async () => {
     apiFetchMock.mockResolvedValue({ evidence: [] });
     render(wrap(<CaseEvidenceGallery caseId="c1" issueType={null} reportedBy={null} />));
 
     // Rule 5 — the empty state teaches instead of saying "no results".
-    expect(await screen.findByText(/filed before photos were required/)).toBeInTheDocument();
+    expect(await screen.findByText(/filed before photos became part of opening one/)).toBeInTheDocument();
   });
 
   it("still lists a file whose signed url could not be minted", async () => {

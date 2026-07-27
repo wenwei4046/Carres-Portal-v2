@@ -66,7 +66,7 @@ Checklists live as ONE shared constant (like T4's reasons) — NOT a config tabl
 **Done when:** submitting without required evidence is impossible; each file shows its
 uploader role in the case view.
 
-> **SHIPPED 2026-07-27 (PR __PR__, migration 0287 applied, Worker __WORKER__ + web
+> **SHIPPED 2026-07-27 (PR __PR__, migration 0288 applied, Worker __WORKER__ + web
 > __BUNDLE__).** Notes for the cards that follow:
 > - The checklist is `packages/shared/src/service-case-evidence.ts` — a global slot
 >   registry (`CASE_EVIDENCE_SLOTS`: what a piece of evidence IS) plus
@@ -88,7 +88,7 @@ uploader role in the case view.
 >   client gate is the only one.
 > - **The stamp is server-side and structurally non-optional**: `at`/`by`/`by_role` are
 >   written by the API only, `kind` is derived from the slot registry (never taken from
->   the client), and 0287's `sc_evidence_wellformed` CHECK refuses an entry missing any
+>   the client), and 0288's `sc_evidence_wellformed` CHECK refuses an entry missing any
 >   of them. The DB also holds a FLOOR (`issue_type is not null` ⇒ at least one file)
 >   that is strictly weaker than the API checklist, so it can never refuse something the
 >   API allows.
@@ -143,7 +143,7 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 | Card | Status | PR |
 |---|---|---|
 | S1 | ✅ | [#397](https://github.com/wenwei4046/Carres-Portal-v2/pull/397) · migration **0285** |
-| S2 | ✅ | __PRLINK__ · migration **0287** |
+| S2 | ✅ | __PRLINK__ · migration **0288** |
 | S3 | ⬜ | — |
 | S4 | ⬜ | — |
 | S5 | ⬜ | — |

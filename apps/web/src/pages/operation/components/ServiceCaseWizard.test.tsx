@@ -274,7 +274,7 @@ describe("ServiceCaseWizard — no evidence, no case (S2)", () => {
     expect(create()).toBeDisabled();
 
     // The checklist names what is missing while it is missing (rule 6).
-    expect(screen.getByText(/Still needed:/)).toBeInTheDocument();
+    expect(screen.getByText(/Take these first:/)).toBeInTheDocument();
 
     await upload("Screenshot of the customer's message");
     await upload("Photo of the whole item");
@@ -288,7 +288,7 @@ describe("ServiceCaseWizard — no evidence, no case (S2)", () => {
 
     await upload("Close-up of the problem", "close-2.jpg");
     expect(create()).toBeEnabled();
-    expect(screen.queryByText(/Still needed:/)).toBeNull();
+    expect(screen.queryByText(/Take these first:/)).toBeNull();
   });
 
   it("sends the uploaded paths with the draft they were uploaded against", async () => {

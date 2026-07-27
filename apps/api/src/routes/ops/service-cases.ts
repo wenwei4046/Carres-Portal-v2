@@ -136,7 +136,7 @@ scRouter.get("/lookup", requireOperationOrPrincipal, async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// S2 (0287) — evidence. **No evidence, no service case.**
+// S2 (0288) — evidence. **No evidence, no service case.**
 //
 // The files must be uploadable BEFORE the case exists, because the case may not
 // be created without them: the wizard mints a `draftId`, uploads against it, and
@@ -193,7 +193,7 @@ scRouter.post("/evidence/sign-upload", requireOperationOrPrincipal, async (c) =>
 
 /** The stored entry. `at` / `by` / `by_role` are stamped HERE and nowhere else —
  *  the card's "every file is stamped who-uploaded + when" is only worth anything
- *  if the stamp cannot be authored by the uploader. (0287's CHECK refuses an
+ *  if the stamp cannot be authored by the uploader. (0288's CHECK refuses an
  *  entry missing any of them, so a future write path cannot skip this either.) */
 function stampEvidence(
   files: readonly CaseEvidenceUploaded[],
@@ -315,7 +315,7 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
           error: "invalid_input",
           code: "evidence_missing",
           // Rule 6 — the error gives the fix, by name.
-          message: `Still needed before this case can be filed: ${caseEvidenceGapMessage(gaps)}`,
+          message: `Cannot open the case yet. Take these first: ${caseEvidenceGapMessage(gaps)}`,
           missing: gaps,
         },
         422,
@@ -357,7 +357,7 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
       usable:           parsed.usable          ?? null,
       customer_wants:   parsed.customerWants   ?? [],
 
-      // S2 (0287) — the evidence, stamped server-side.
+      // S2 (0288) — the evidence, stamped server-side.
       evidence:         stampEvidence(evidence, c.var.auth.id, c.var.auth.role),
     })
     .select("id, case_no")
@@ -458,7 +458,7 @@ scRouter.get("/:id/evidence", requireOperationOrPrincipal, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /:id/evidence — append a file to a case already on file (the customer
 // sends the photo the next day). Append-only read-modify-write: there is no
-// endpoint that removes a file, and 0287 grants the bucket no delete policy.
+// endpoint that removes a file, and 0288 grants the bucket no delete policy.
 // ─────────────────────────────────────────────────────────────────────────────
 scRouter.post("/:id/evidence", requireOperationOrPrincipal, async (c) => {
   const id     = c.req.param("id");
@@ -542,7 +542,7 @@ interface RawCase {
   usable?: string | null;
   priority?: string | null;
   customer_wants?: string[] | null;
-  /** S2 (0287) — the evidence ledger. Optional for the same reason as above. */
+  /** S2 (0288) — the evidence ledger. Optional for the same reason as above. */
   evidence?: unknown;
   service_case_types:    { label: string } | null;
   service_case_statuses: { label: string; is_closed: boolean } | null;

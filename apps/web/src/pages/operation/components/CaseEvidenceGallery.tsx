@@ -19,7 +19,7 @@ import { attachCaseEvidence } from "@/lib/case-evidence-upload";
  *
  * The card's second half: "each file shows its uploader role in the case view."
  * The stamp is the server's (`by_role`, written at upload and refused if absent
- * by 0287's CHECK), so this screen reports it rather than deriving it.
+ * by 0288's CHECK), so this screen reports it rather than deriving it.
  *
  * Files can still be ADDED here — the customer often sends the photo the next
  * day — but never removed: the ledger is append-only in the API and the bucket
@@ -86,7 +86,7 @@ export default function CaseEvidenceGallery({
         <p className="mt-2 text-sm text-base-500">Loading…</p>
       ) : files.length === 0 ? (
         <p className="mt-2 text-sm text-base-600">
-          No photos on this case. It was filed before photos were required.
+          No photos on this case. It was filed before photos became part of opening one.
         </p>
       ) : (
         <ul className="mt-2 space-y-1.5">
@@ -145,7 +145,7 @@ export default function CaseEvidenceGallery({
             disabled={!addSlot || busy}
             className="btn-secondary py-1 text-[12px] disabled:opacity-40"
           >
-            {busy ? "Uploading…" : "Upload"}
+            {busy ? "Uploading…" : `Upload ${addSlot ? (caseEvidenceSlot(addSlot)?.kind ?? "photo") : "photo"}`}
           </button>
           <input
             ref={inputRef}

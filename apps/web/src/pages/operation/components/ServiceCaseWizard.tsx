@@ -512,10 +512,12 @@ export default function ServiceCaseWizard({
                 )}
               </div>
 
-              {/* Rule 6 — the disabled button says WHY, by name. */}
+              {/* Rule 6 — the disabled button says WHY, by name. Phrased as the
+                  ACTION that closes the gap, not as a to-do word dressed up as a
+                  fact ("still needed") — COPY-STANDARD dictionary, 2026-07-27. */}
               {evidenceGaps.length > 0 && (
                 <p className="t-tiny text-base-700">
-                  Still needed: {caseEvidenceGapMessage(evidenceGaps)}
+                  Take these first: {caseEvidenceGapMessage(evidenceGaps)}
                 </p>
               )}
 

@@ -48,7 +48,7 @@ export default function CaseEvidenceChecklist({
   if (checklist.length === 0) {
     return (
       <p className="text-sm text-base-500">
-        Answer what is wrong first — the photos needed depend on it.
+        Answer what is wrong first — it decides which photos to take.
       </p>
     );
   }
@@ -142,7 +142,7 @@ function EvidenceRow({
           className="btn-secondary flex shrink-0 items-center gap-1 py-1 text-[12px] disabled:opacity-40"
         >
           {req.kind === "video" ? <Video size={13} /> : <Camera size={13} />}
-          {busy ? "Uploading…" : done ? "Add another" : "Upload"}
+          {busy ? "Uploading…" : `${done ? "Add another" : "Upload"} ${req.kind}`}
         </button>
       </div>
 

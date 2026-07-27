@@ -2153,7 +2153,7 @@ under each (the instruction IS the training), a count when more than one is aske
 have it" on the optional ones, one obvious Upload button. The case view gains
 `CaseEvidenceGallery`: thumbnails, the slot's name, and **`{role} · 27 Jul 26 · 15:14`** per
 file. Files can be ADDED there later (the customer sends the photo the next day) but never
-removed — no remove endpoint, and 0287 grants the bucket no delete policy. Evidence is evidence.
+removed — no remove endpoint, and 0288 grants the bucket no delete policy. Evidence is evidence.
 
 Bucket `service-case-evidence` is PRIVATE (a complaint photo shows a customer's home, and the
 video may carry their voice) at 25 MB, not 2 MB: the checklist asks for a 10–20 second video and
