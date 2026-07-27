@@ -264,6 +264,10 @@ cannot deliver. It never disappears: it is always in the drawer list and the Owi
 
 A gate REFUSES an action. Display order only decides what is read first.
 
+**TODAY the money gate sits on CONFIRMING the date, not on issuing** — `bookingConfirmGate`
+is the only live money gate. **C7 moves it** to where this section says it belongs. Until
+C7 ships, read the paragraph below as the target, not the screen.
+
 **Issuing the delivery order is the hard gate**, not agreeing a date: a date can be agreed
 with a customer while the goods and the money are still coming. Issuing is refused unless
 every goods line is reserved to this order (accessories pass automatically), **the money is
@@ -305,15 +309,21 @@ outranks a small one going out tomorrow.
 
 ## 7 · The three dots
 
-Three independent facts, so the column has no header; each dot carries its own small icon.
+Three independent facts. Each dot carries its own small icon, so the dots need no header of
+their own; the column's `Status` header belongs to the stage pill beside them.
 
 | | green | amber | red |
 |---|---|---|---|
 | goods | all in | Waiting Goods Arrival | no PO raised, or the supplier's date is late against the deadline |
 | delivery | the CUSTOMER confirmed | logistics gave a date, customer has not confirmed | past the deadline and still unconfirmed |
-| money | settled | — | still owing (stays red after delivery) |
+| money | settled | still owing, and the money is not late yet | still owing AND late — the balance due date has passed, or the goods have been delivered |
 
-A delivered order never alarms on goods or delivery. Delivered is not paid.
+A delivered order never alarms on goods or delivery. Delivered is not paid — and once the
+goods are out, owing money is always RED: there is nothing left to wait for.
+
+**The money dot had no amber until C10 reported it** — every other track has three tones, so
+"owing but not due yet" could not read differently from "owing and late", and the loudest
+colour was spent on both. The rule above uses the balance due date the system already keeps.
 
 ## 8 · What is deliberately NOT an action here
 
