@@ -6,7 +6,7 @@ import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PageHeader from "@/components/PageHeader";
 import HrOverviewTab from "./HrOverviewTab";
 import HrCommissionTab from "./HrCommissionTab";
-import HrAttributionTab from "./HrAttributionTab";
+import HrCommissionTabs from "./HrCommissionTabs";
 import HrSetupTab from "./HrSetupTab";
 import HrTeamTab from "./HrTeamTab";
 import HrPeopleTab from "./HrPeopleTab";
@@ -18,7 +18,16 @@ import HrPeopleCostTab from "./HrPeopleCostTab";
  * (0244/0245, 2026-07-25). Commission calculation for Carres' OWN sales
  * executives — no base payroll.
  *
- * Tabs (portal-nav.ts "hr" group): commission | attribution | setup.
+ * Tabs (portal-nav.ts "hr" group): commission | setup.
+ * `commission` and `setup` are ONE sidebar entry (Loo 2026-07-27) — the month
+ * report and the rates that compute it are one subject, split by the
+ * `HrCommissionTabs` sub-tab bar. Both `?tab=` values are unchanged, so every
+ * existing deep link still lands where it did.
+ *
+ * `attribution` was retired the same day (Loo: "no more use for me"). Its
+ * worklist lives inside Commission → Earnings now and only renders while an
+ * order is unassigned; an old `?tab=attribution` bookmark falls through to
+ * Overview like any other unknown tab.
  * URL-driven like OperationApp: PortalSidebar links to `/hr?tab=<key>`, and
  * this shell reads the param directly (HR has no path-driven sections, so no
  * local tab state is needed — the URL IS the tab).
@@ -89,7 +98,6 @@ export default function HrApp() {
   // today", not straight into the commission table. Existing `?tab=` deep
   // links keep working unchanged; only the no-tab default moved.
   const tab =
-    rawTab === "attribution" ||
     rawTab === "setup" ||
     rawTab === "team" ||
     rawTab === "people" ||
@@ -114,12 +122,17 @@ export default function HrApp() {
       : tab === "people-cost"
         ? `People cost · ${monthLabel(ym)}`
       : tab === "setup"
-        ? "Commission Setup"
-        : tab === "attribution"
-          ? `Attribution · ${monthLabel(ym)}`
-          : tab === "overview"
-            ? `Overview · ${monthLabel(ym)}`
-            : `Commission · ${monthLabel(ym)}`;
+        // Under the sub-tab bar the page must not repeat the active tab
+        // (COPY-STANDARD module-tab law) — the bar says "Setup". No month
+        // either: a rate takes effect from today, it is not month-scoped.
+        ? "Commission"
+        : tab === "overview"
+          ? `Overview · ${monthLabel(ym)}`
+          : `Commission · ${monthLabel(ym)}`;
+
+  // The Commission module = two sub-tabs behind ONE sidebar entry. Its own bar
+  // carries the hairline, so the header drops its border (no double line).
+  const inCommission = tab === "commission" || tab === "setup";
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -131,21 +144,22 @@ export default function HrApp() {
           <PageHeader
             kicker="HR"
             title={title}
-            className="mb-4"
+            noBorder={inCommission}
+            className={inCommission ? "" : "mb-4"}
             actions={
               tab !== "setup" && tab !== "team" && tab !== "people" ? (
                 <MonthStepper value={ym} onChange={setYm} />
               ) : undefined
             }
           />
+          {inCommission && (
+            <HrCommissionTabs active={tab === "setup" ? "setup" : "commission"} />
+          )}
           {tab === "overview" && (
             <HrOverviewTab year={ym.year} month={ym.month} />
           )}
           {tab === "commission" && (
             <HrCommissionTab year={ym.year} month={ym.month} />
-          )}
-          {tab === "attribution" && (
-            <HrAttributionTab year={ym.year} month={ym.month} />
           )}
           {tab === "setup" && <HrSetupTab year={ym.year} month={ym.month} />}
           {tab === "team" && <HrTeamTab />}

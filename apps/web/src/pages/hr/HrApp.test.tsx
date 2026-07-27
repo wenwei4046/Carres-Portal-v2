@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import HrApp from "./HrApp";
@@ -183,20 +183,23 @@ describe("HrApp", () => {
     });
     expect(screen.getByText("Total sales basis")).toBeInTheDocument();
 
-    // per-staff row: name + role pill + store line + bold total
+    // per-staff row: name + role pill + store line + bold total. The pill is
+    // matched INSIDE its own row — since the worklist moved onto this page its
+    // "Salesperson" column header is a second match for a bare getByText.
     expect(screen.getByText("Aina Rahman")).toBeInTheDocument();
-    expect(screen.getByText("Salesperson")).toBeInTheDocument();
+    const ainaRow = screen.getByText("Aina Rahman").closest("tr") as HTMLElement;
+    expect(within(ainaRow).getByText("Salesperson")).toBeInTheDocument();
     expect(
       screen.getByText("Carres Klang · Main showroom"),
     ).toBeInTheDocument();
     // RM 240.00 shows as Direct, TOTAL and the summary card
     expect(screen.getAllByText("RM 240.00").length).toBeGreaterThanOrEqual(2);
 
-    // unattributed warning banner links to the attribution worklist
+    // under-count warning, with the assign worklist opened right below it
     expect(
       screen.getByText(/1 order this month has no salesperson/),
     ).toBeInTheDocument();
-    expect(screen.getByText("Assign now")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assign" })).toBeInTheDocument();
 
     // 0250 — the BD commission section renders the BD name + commission
     expect(
@@ -207,6 +210,52 @@ describe("HrApp", () => {
     // 0251 — the method shows under the section title + the CBO position pill
     expect(screen.getByText("% of dealer sales")).toBeInTheDocument();
     expect(screen.getByText("CBO")).toBeInTheDocument();
+  });
+
+  // Loo 2026-07-27 — Commission Setup left the rail and became a sub-tab of
+  // Commission. These two pin the merge: one entry, two sub-tabs, and every
+  // `?tab=setup` deep link (Overview card, "Assign in Setup") still lands.
+  it("Commission carries a sub-tab bar with Earnings selected", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) return REPORT;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />, "/hr?tab=commission"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hr-commission-tabs")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("hr-commission-tab-commission")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const setupTab = screen.getByTestId("hr-commission-tab-setup");
+    expect(setupTab).toHaveAttribute("href", "/hr?tab=setup");
+    expect(setupTab).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("?tab=setup still opens the rate config — now under the Commission module", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) return REPORT;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />, "/hr?tab=setup"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Commission method per store")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Staff rates (% of sales method)")).toBeInTheDocument();
+    expect(screen.getByTestId("hr-commission-tab-setup")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // The bar says "Setup", so the header must not repeat it (module-tab law)
+    // and must not stamp a month onto rates that take effect from today.
+    expect(
+      screen.getByRole("heading", { level: 1 }),
+    ).toHaveTextContent(/^Commission$/);
   });
 
   it("lands on the Overview digest when no tab is given", async () => {
@@ -276,13 +325,16 @@ describe("HrApp", () => {
     expect(screen.queryByText(/imported archive/)).not.toBeInTheDocument();
   });
 
-  it("renders the attribution worklist on ?tab=attribution", async () => {
+  // Attribution retired (Loo 2026-07-27). These three pin what replaced it:
+  // the worklist opens inside Earnings when — and ONLY when — an order is
+  // unassigned, which is also where the blocking close-check complains.
+  it("Earnings opens the assign worklist when an order has no salesperson", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.startsWith("/api/hr/report")) return REPORT;
       throw new Error(`unexpected fetch ${url}`);
     });
 
-    render(wrap(<HrApp />, "/hr?tab=attribution"));
+    render(wrap(<HrApp />, "/hr?tab=commission"));
 
     await waitFor(() => {
       expect(screen.getByText("SO-1201")).toBeInTheDocument();
@@ -296,20 +348,35 @@ describe("HrApp", () => {
     expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
   });
 
-  it("shows the all-assigned empty state when nothing is unattributed", async () => {
+  it("a healthy month shows no worklist at all — silence, not an all-clear card", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.startsWith("/api/hr/report")) return { ...REPORT, unattributed: [] };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<HrApp />, "/hr?tab=commission"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Total commission")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/no salesperson/)).not.toBeInTheDocument();
+  });
+
+  it("an old ?tab=attribution bookmark falls through to Overview", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) return REPORT;
       throw new Error(`unexpected fetch ${url}`);
     });
 
     render(wrap(<HrApp />, "/hr?tab=attribution"));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          "Every order this month has a salesperson. Commission is complete.",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Needs a human")).toBeInTheDocument();
     });
+    // and the digest still routes the same todo — now to Commission
+    expect(
+      screen.getByText("1 order without a salesperson").closest("a"),
+    ).toHaveAttribute("href", "/hr?tab=commission");
   });
 });

@@ -7,6 +7,7 @@ import { STAFF_TIER_LABEL, type BdCommissionResult, type StaffCommissionResult }
 import { useHrReport } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import HrCommissionRunPanel from "./HrCommissionRunPanel";
+import HrUnattributedWorklist from "./HrUnattributedWorklist";
 import { rm } from "@/lib/format-currency";
 
 /**
@@ -297,21 +298,20 @@ export default function HrCommissionTab({
       </div>
 
       {/* Under-count warning — commission money is wrong until every order
-          carries a salesperson, so this is loud + links to the worklist. */}
+          carries a salesperson. The Attribution tab was retired (Loo
+          2026-07-27), so the worklist itself opens right here: the warning and
+          the fix are one block, and neither exists on a healthy month. */}
       {unattributed.length > 0 && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-2.5">
-          <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
-          <div className="flex-1 text-[13px] text-base-900">
-            {unattributed.length} order{unattributed.length === 1 ? "" : "s"}{" "}
-            this month {unattributed.length === 1 ? "has" : "have"} no
-            salesperson — commission is under-counted.
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-2.5">
+            <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
+            <div className="flex-1 text-[13px] text-base-900">
+              {unattributed.length} order{unattributed.length === 1 ? "" : "s"}{" "}
+              this month {unattributed.length === 1 ? "has" : "have"} no
+              salesperson — commission is under-counted. Pick who sold each one.
+            </div>
           </div>
-          <Link
-            to="/hr?tab=attribution"
-            className="shrink-0 inline-flex items-center h-8 px-4 rounded-full text-[13px] font-semibold bg-base-100 text-base-900 hover:bg-base-200"
-          >
-            Assign now
-          </Link>
+          <HrUnattributedWorklist year={year} month={month} />
         </div>
       )}
 
