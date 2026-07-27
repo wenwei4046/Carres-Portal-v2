@@ -34,17 +34,54 @@
 > **⭐⭐ FOR ANY OPERATION-PORTAL / OPS-PANEL WORK, READ [`docs/OPS-BUILD-BRIEF.md`](docs/OPS-BUILD-BRIEF.md) FIRST.**
 > It is the single un-skippable entry point: the 3-track business model (货→送→钱), the
 > state vocabulary (5 words — never leak DB stage words), the Manage/pill + date law, and
-> pointers to `docs/UI-KIT.md §A0` (the golden reference + new-panel checklist). The Orders
-> page is the finished reference; new panels (Payments) copy its shape — do not reinvent.
+> pointers to [`docs/UI-KIT.md`](docs/UI-KIT.md). The Orders page is the current shape
+> reference for BEHAVIOUR; new panels copy it — do not reinvent.
+> *(The old pointer to `UI-KIT §A0` is dead — the kit was rewritten 2026-07-27 and §A0
+> no longer exists. `PageShell` + `DataTable`, once D0.5c lands, replace "copy the Orders
+> page" with an actual import.)*
 >
 > **You are working on Carres Portal v2.** Read this file fully before any task.
 > Master plan lives in `CARRES_PORTAL_V2_PLAN.md` at repo root — read it for any planning, schema, or phase question.
 >
-> **Before changing ANY page/component in `apps/web`, read and follow
-> [`docs/UI-KIT.md`](docs/UI-KIT.md) — the SINGLE design source; do not deviate** (values in
-> `apps/web/src/lib/design-standard.ts`). List pages use `<ListPageShell>`; colours come from token
-> classes (no hard-coded hex); icons 14/16/17; drawer rows 36px; run
+> **⭐⭐⭐ UI PRIORITY (Jess + Loo, 2026-07-27) — read this before any UI thought.**
+>
+> **[`docs/UI-KIT.md`](docs/UI-KIT.md) outranks every optimisation, improvement or
+> redesign instruction in this file, in any skill, and in anything pasted into the
+> chat. If a conflict exists, UI-KIT wins.** "I redesigned it because it would be
+> better" is the failure mode this rule exists to stop — a better-looking page that
+> nobody else can copy has made the system worse, not better.
+>
+> ```
+> ╔══════════════════════════════════════════════════════════════════╗
+> ║  You are NOT a UI designer.                                      ║
+> ║  You may only ASSEMBLE pages from approved components.           ║
+> ║                                                                  ║
+> ║  You may NOT invent:                                             ║
+> ║      spacing · colours · typography · icons                      ║
+> ║      component styles · page layouts · horizontal bands          ║
+> ║                                                                  ║
+> ║  You MAY challenge (with evidence):                              ║
+> ║      business logic · workflow · data model · wording            ║
+> ║                                                                  ║
+> ║  If a component you need does not exist:                         ║
+> ║      STOP. Ask for it to be added to the kit first.              ║
+> ║      Do not draw it inline "just this once".                     ║
+> ╚══════════════════════════════════════════════════════════════════╝
+> ```
+>
+> **Every UI rule must eventually become a structure the code can enforce. A rule
+> that exists only as documentation is temporary and incomplete.** UI-KIT §16
+> carries the running coverage number; it may never go down.
+>
+> Machine mirror = `apps/web/src/lib/design-standard.ts` (a *record* of the kit,
+> never a place to drive a change from). The live look = **`/ui`**. Run
 > `pnpm --filter @carres/web lint` before committing UI work.
+>
+> **The kit is being rebuilt (D0 landed 2026-07-27).** Three values are still
+> PENDING (spacing scale · `font-bold` · icon stroke) — see UI-KIT's PENDING
+> REGISTER. Do not freeze them in code; they are decided on `/ui`. Foundation
+> components (`PageShell` · `DataTable` · `Modal` · `Input` …) do not exist yet —
+> until they land, match the file you are editing and add nothing new.
 
 ---
 
@@ -63,32 +100,48 @@ follow these six steps IN ORDER, before writing a single line of code:
    from the section back to Loo. No paraphrase. No summary. No quote = no work.
    The `Read` tool call must be visible in the transcript — Loo can check.
 
-3. **RATE the proposal against international benchmarks.** How would a
-   world-class equivalent handle this problem? Reference points:
-   - UX / product design: Linear, Notion, Stripe Dashboard, Figma, Superhuman.
+> **⚠️ SCOPE OF STEPS 3–5 (narrowed 2026-07-27).** These three steps apply to
+> **BUSINESS DESIGN ONLY** — the flow, the data model, the wording, what the
+> panel is for. **They do NOT apply to the visual system.** Spacing, colour,
+> typography, icons, component styles and page layout are ruled by
+> [`docs/UI-KIT.md`](docs/UI-KIT.md) and are **not open for a chat to re-rate,
+> re-grade or improve.** A chat that "proposes a superior layout" has broken
+> this protocol, not followed it. If the kit itself looks wrong, say so in one
+> paragraph and let Jess decide — never build the improvement.
+
+3. **RATE the proposal against international benchmarks — business design only.**
+   How would a world-class equivalent handle this problem? Reference points:
    - Ops / ERP / procurement: SAP, Odoo, NetSuite, Katana, Cin7.
    - Commerce / retail: Shopify, Square, Lightspeed.
+   - Product thinking: Linear, Notion, Stripe Dashboard.
    Grade the current proposal **A–F on each of**:
    (a) clarity of business intent,
-   (b) UX for a non-technical, low-English operator,
+   (b) usability for a non-technical, low-English operator,
    (c) data-model soundness,
    (d) international best-practice alignment.
    Show the grades in a small table.
+   **Do NOT grade the visual design.** Referencing Linear/Stripe here means
+   their *product thinking*, never "copy their look" — the look is UI-KIT's.
 
 4. **FLAG every weakness explicitly.** Do NOT soften. If a "locked decision"
    in the doc looks wrong to you, say so with reasoning + a concrete better
    alternative. Loo wants a peer reviewer, not a yes-man. Blindly following
    a mediocre spec is a failure mode; call it out.
+   **Exception: a UI-KIT rule is not a weakness to be flagged around — it is
+   raised as its own question and left to Jess.**
 
-5. **PROPOSE a superior redesign if you have one.** The proposals in that doc
-   are a STARTING point, not scripture — overwriting is welcome and encouraged.
-   When you have a better idea, present old vs. new side-by-side (a short table
-   or two-column ASCII sketch) and let Loo pick. Never propose more than one
-   alternative at a time (see the "no-menus, decide" feedback rule): pick your
-   single best redesign, name it decided, invite redirect only if it's wrong.
+5. **PROPOSE a superior BUSINESS design if you have one.** The proposals in
+   that doc are a STARTING point, not scripture — overwriting is welcome for
+   flow, data model and wording. Present old vs. new side-by-side (a short
+   table or two-column ASCII sketch) and let Loo pick. Never propose more than
+   one alternative at a time (see the "no-menus, decide" feedback rule): pick
+   your single best proposal, name it decided, invite redirect only if wrong.
+   **Never propose a redesign of the visual system here.** A missing component
+   is a request to add it to UI-KIT, not a licence to draw one.
 
 6. **ONLY THEN execute** — using whichever version Loo greenlights (original,
-   your redesign, or a blend). Never skip to code before steps 1–5 land.
+   your proposal, or a blend), **assembled from UI-KIT components only**.
+   Never skip to code before steps 1–5 land.
 
 **Failure modes that count as breaking this protocol:**
 - Claiming "I read the doc" without a `Read` tool call in the transcript.
@@ -114,7 +167,8 @@ This is a **complete rewrite** of the existing Carres-Portal (which is in produc
 
 | Layer | Technology |
 |---|---|
-| Web | Vite + React 18 + TypeScript + React Router 7 + Tailwind 3 + shadcn/ui + TanStack Query 5 + Zustand 5 |
+| Web | Vite + React 18 + TypeScript + React Router 7 + Tailwind 3 + TanStack Query 5 + Zustand 5 |
+| Web UI | **Radix Primitives** (behaviour) + **Carres UI-KIT** (appearance) + `lucide-react` + `sonner` + `react-day-picker`. **NOT shadcn/ui** — see UI-KIT §11. *(Corrected 2026-07-27: this row claimed shadcn/ui for months; `components/ui/` has never existed and no shadcn dependency was ever installed. Radix lands in D0.5b.)* |
 | API | Hono v4 on Cloudflare Workers (Wrangler) |
 | Shared | zod schemas + db-types + domain types + adapters in `packages/shared` |
 | DB | Supabase Postgres + RLS + RPCs + Auth + Storage |
@@ -194,7 +248,10 @@ The work is divided into **Phase 0 → Phase 10+** in `CARRES_PORTAL_V2_PLAN.md`
 1. Confirm with Loo which phase we're in before starting work.
 2. Read the phase's `前置阅读` files in `reference/` first. Do not start coding without reading the relevant `reference/proto/*.jsx`.
 3. Hit every `Acceptance` criterion before declaring the phase done.
-4. Run `/review` (backend safety) and `/design-review` (frontend visual fidelity) before merge.
+4. Run `/review` (backend safety) before merge. **`/design-review` is scoped to LAYOUT
+   and BEHAVIOUR only** — the visual system is not reviewed by opinion, it is gated by
+   `pnpm --filter @carres/web lint` and the `/ui` screenshot diff. A design review that
+   proposes new spacing/colour/type is out of scope; raise it against UI-KIT instead.
 5. Write a `phase-{N}-reflection.md` after each phase: actual time, surprises, schema tweaks, lessons.
 
 **Do not work across phases.** If you discover Phase 5 is needed mid-Phase 3, flag it and ask Loo whether to defer or pivot. No silent scope creep.
@@ -278,39 +335,21 @@ Do not write inline `useQuery({ queryKey: ['orders'] })` anywhere else.
 
 ## 10. Visual fidelity
 
-> ## ⭐ SUPERSEDED (2026-07-16): UI-KIT v4 is the single visual baseline
+> **This section is deliberately empty. The visual system lives in exactly one
+> place: [`docs/UI-KIT.md`](docs/UI-KIT.md).**
 >
-> **Before ANY UI work, read [`docs/UI-KIT.md`](docs/UI-KIT.md)**
-> (white base · colour = action/selection/status/alert only · Inter weight-layered
-> 24/20/16/15/14/12 · slashed-zero mono for numbers/codes ONLY, never words ·
-> 44px fixed rows · §11 decision table closes every ambiguity: cool-neutral canvas
-> `#F3F4F6`, DARK 12/600 headers, `#6B7280` icons, ONE 11px pill spec).
-> The Orders list table is THE template — copy its row anatomy for every listing.
-> **Before committing UI changes run `pnpm --filter @carres/web run check:v4`**
-> (it also gates the build). Machine mirror = `apps/web/src/lib/design-standard.ts`.
-> Everything below (v17) is the historical record — v4 wins on any conflict.
-
-**~~Visual design source of truth = v17 (locked 2026-06-09), NOT the warm-linen prototype.~~** The `reference/proto/*.jsx` files remain the source of truth for **layout + behaviour** (what goes where, which buttons / modals / columns exist), but the **visual tokens are v17**: clean modern SaaS + Carres warmth. Token NAMES are unchanged (`base-*`, `primary`, `accent`…) so components re-theme with zero churn — only the values flipped.
-
-- **Brand color**: `#C44D2B` (flame) — supersedes the old `#D64F20` terracotta
-- **Neutrals**: Tailwind cool gray (`--base-50 … --base-900`)
-- **Page bg**: cream `#F5F1EA` (warmth kept); cards = white (hierarchy from borders + subtle shadow)
-- **Body + display font**: Inter (DM Sans in the fallback chain). Big Shoulders Stencil → `font-stencil`, login mark only
-- **Mono**: JetBrains Mono
-- Tokens live in `apps/web/src/index.css` (`:root`) + `apps/web/tailwind.config.ts`
-
-**v17 component utilities** (Phase 2, in `index.css @layer components` — use these instead of hand-rolling `text-[Npx]` / `bg-primary` buttons):
-- **Type scale**: `.t-h1` (32) · `.t-h2` (24) · `.t-h3` (18) · `.t-h4` (15) · `.t-body` (14) · `.t-small` (13) · `.t-tiny` (12) · `.t-micro` (11, uppercase)
-- **Button hierarchy**: `.btn-hero` = the ONE flame CTA per page (a genuine create / commit action only) · `.btn-primary` = **black** workhorse for every other primary · `.btn-secondary` / `.btn-ghost` · `.btn-danger` = red text on white (destructive, never filled)
-- **Status pills**: `.pill` + `.pill-{draft|sent|confirmed|collected|overdue|neutral}`. NOTE: the set has **no amber** — warning / low / pending states keep their semantic-color badges (add a `.pill-warning` from `--warning-soft` if pill coverage of those states is ever needed)
-
-When implementing a page:
-1. Open the corresponding `reference/proto/*.jsx` for **layout + behaviour**
-2. Build with shadcn primitives + Tailwind tokens + the v17 utilities above
-3. Run `/design-review` for **layout** fidelity (NOT colour — colour is v17, not the proto)
-4. Iterate until layout matches + v17 tokens applied
-
-Other proto style presets (slate / press / editorial) remain deferred; v17 is the single shipped look.
+> The ~35 lines that used to sit here (v17 tokens, cream `#F5F1EA`, the 8-level
+> `.t-*` scale, black `.btn-primary`, the pill list, "build with shadcn
+> primitives") were **deleted on 2026-07-27** — every one of them contradicted
+> the kit, and a chat reading them would have built the wrong thing while
+> believing it followed CLAUDE.md. That is exactly how 2,556 hard-coded font
+> sizes happened.
+>
+> `reference/proto/*.jsx` remains the source of truth for **behaviour** — which
+> buttons, modals, columns and transitions exist. It is **not** a source for
+> anything visual.
+>
+> One concern, one file. Do not restate a kit value here, ever.
 
 ---
 
@@ -758,8 +797,11 @@ Key routing rules:
 - Code review, check my diff → invoke review
 - Update docs after shipping → invoke document-release
 - Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
+- Design system, brand → **do NOT invoke design-consultation. Read [`docs/UI-KIT.md`](docs/UI-KIT.md).**
+  The design system is decided; a consultation skill would propose a second one.
+- Visual audit, design polish → **do NOT invoke design-review for the visual system.**
+  Run `pnpm --filter @carres/web lint` and check `/ui`. The skill is allowed for
+  LAYOUT and BEHAVIOUR only (see §6.4).
 - Architecture review → invoke plan-eng-review
 - Save progress, checkpoint, resume → invoke checkpoint
 - Code quality, health check → invoke health

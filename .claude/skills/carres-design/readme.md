@@ -1,4 +1,15 @@
-# Carres ERP — UI-KIT v4 Design System
+> # ⛔ SUPERSEDED — 2026-07-27
+>
+> **This is the RETIRED v4 law. It contradicts the current one.**
+> **Read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md) instead — take nothing from here.**
+>
+> Contradicts on: row height · text sizes · canvas colour · type class names ·
+> where the flame may appear · icon stroke. See `SKILL.md` for the table.
+> Kept only as an asset store (logo, old screenshots) until card D0.3.
+
+---
+
+# Carres ERP — UI-KIT v4 Design System (RETIRED)
 
 The single visual rulebook for **Carres Portal**, the internal ERP that runs a
 Malaysian mattress & furniture business (~1,000 orders/month). Hand this system

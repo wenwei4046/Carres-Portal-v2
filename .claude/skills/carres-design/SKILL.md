@@ -1,15 +1,44 @@
 ---
 name: carres-design
-description: Use this skill to generate well-branded, consistent interfaces for the Carres ERP (Carres Portal), either for production code or throwaway prototypes/mocks. Contains the UI-KIT v4 design law, colour/type/spacing tokens, the flame-heart logo, and reusable UI components (Button, StatusPill, SectionCard, TextInput, Checkbox, ListRow) plus full-screen recreations of the Orders list and Order detail pages.
-user-invocable: true
+description: "SUPERSEDED 2026-07-27 — DO NOT USE FOR DESIGN DECISIONS. This skill holds the RETIRED UI-KIT v4 law, whose tokens (44px rows, 14-15px text, #F3F4F6 canvas, .t4-* classes, flame in the nav) now contradict the rewritten docs/UI-KIT.md. Read docs/UI-KIT.md instead. Kept only as a historical asset store (logo files, old screenshots) until the /ui showcase replaces it in card D0.5."
+user-invocable: false
 ---
 
-# Carres UI-KIT v4
+# ⛔ SUPERSEDED — 2026-07-27
 
-> **Precedence:** `docs/UI-KIT.md` in the repo is the LAW. This skill mirrors it
-> for generation; if they ever disagree, UI-KIT.md wins (adopted 2026-07-17;
-> contradictions resolved: canvas #F3F4F6 · stroke 2 · grey-soft workhorse, no
-> black · radius-panel 18 · icons 14/16/18 · rows 44 FIXED).
+> **This skill's design law is the OLD kit and it CONTRADICTS the current law.**
+> **Read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md). Take nothing from this file.**
+>
+> Do NOT take from here: spacing · colour · typography · row height · icon
+> stroke · component specs · page templates · `styles.css` · `components.css` ·
+> `tokens/` · `ui_kits/` · `guidelines/`.
+>
+> **Known contradictions with the current law** (this is why it is closed, not
+> merely "older"):
+>
+> | This skill says | The current law says |
+> |---|---|
+> | rows **44px FIXED** | row height is **PENDING** — decided in card D0.5c |
+> | "almost all text **14–15px**" | **13px** is the body default; 14 and 16 do not exist |
+> | `.t4-*` type classes | `t-page / t-title / t-strong / t-body / t-meta / t-label` |
+> | canvas `#F3F4F6` | Radix **`slate-3`** (`#F0F0F3`) |
+> | flame `#C44D2B` **in the left nav** + one action per block | flame appears in **the logo only** |
+> | its own hex table | **`@radix-ui/colors`** — the law names the STEP, never the hex |
+> | icon stroke **2** | **PENDING Q4** — decided on `/ui` |
+>
+> The replacement for "show me what it looks like" is the live **`/ui`** route
+> (card D0.5), which renders the real components and therefore cannot go stale
+> the way this folder did.
+>
+> **Not deleted on purpose.** The logo assets and the old screenshots are still
+> the only copies. Deleting is card D0.3, after the new kit is proven.
+
+---
+
+<details>
+<summary>Retired content below — historical record only, do not follow</summary>
+
+# Carres UI-KIT v4 (RETIRED)
 
 Read `README.md` first — it holds the 4 rules, content fundamentals, and visual
 foundations. Then explore the other files. **Never freely design: use only the
@@ -48,3 +77,10 @@ tokens and components defined here.**
 If invoked with no other guidance, ask what they want to build, ask a few
 questions, then act as an expert Carres designer — output HTML artifacts for
 mocks, or production-shaped React for real code.
+
+</details>
+
+---
+
+⛔ **End of retired content.** Everything above the `<details>` line is the only
+part still in force: read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md).
