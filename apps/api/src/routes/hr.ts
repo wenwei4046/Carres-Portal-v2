@@ -4,7 +4,6 @@ import {
   assignDealerBdInput,
   setBdMethodInput,
   setBdPositionInput,
-  hrAssignSalespersonInput,
   hrReportQuerySchema,
   setBdRateInput,
   setCommissionSchemeInput,
