@@ -789,6 +789,27 @@ export {
   type SupplierClaimPhoto,
   type ReceiveLineClaimDraft,
   type ReceiveLineClaimProblem,
+  // R3 · the lifecycle — what we asked, what they answered, who moves next
+  SUPPLIER_CLAIM_REQUESTS,
+  SUPPLIER_CLAIM_REQUEST_KEYS,
+  SUPPLIER_CLAIM_REQUEST_REMAINING,
+  SUPPLIER_CLAIM_RESPONSES,
+  SUPPLIER_CLAIM_RESPONSE_KEYS,
+  SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT,
+  supplierClaimRequestLabel,
+  supplierClaimResponseLabel,
+  requestedActionsFor,
+  isRequestedActionFor,
+  responseNeedsNote,
+  claimNextMove,
+  claimMoveOwnerLabel,
+  claimCloseProblems,
+  type SupplierClaimRequest,
+  type SupplierClaimResponse,
+  type SupplierClaimMove,
+  type SupplierClaimMoveInput,
+  type SupplierClaimMoveOwner,
+  type SupplierClaimCloseProblem,
 } from "./supplier-claim";
 
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip

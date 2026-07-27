@@ -249,6 +249,51 @@ export function buildSupplierGroupMessage(
   return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
 }
 
+// ── SUPPLIER CLAIM (R3) — one message per claim, and the ASK is the point ────
+//
+// The follow-up on a receiving problem is a different conversation from the
+// ready-date chase above: the goods have already been counted, so the message
+// carries what we FOUND and what we WANT, and nothing else. Two rules shape it:
+//
+//  - **Lead with the DO number.** The queue-doc memory says suppliers speak the
+//    CR/TCF ref, not the SO — but a claim is about a specific delivery, and the
+//    delivery note is the supplier's OWN document. They recognise it instantly.
+//    The PO rides along in the same line for the sofa/bedframe suppliers who
+//    key off it.
+//  - **The ask is a sentence, not a code.** `deliver_correct_item` never
+//    reaches WhatsApp; the label does.
+//
+// Photos cannot ride along: a WhatsApp GROUP invite link accepts no attachment
+// and no `?text=` prefill, so the operator pastes the message and adds the
+// photos from the claim row. The UI says exactly that rather than pretending.
+export interface SupplierClaimMessageInput {
+  supplierName: string;
+  claimNo: string;
+  /** The delivery the problem came in on. Absent on a late-delivery claim —
+   *  nothing was delivered, so there is no delivery note. */
+  doNumber?: string | null;
+  poId: string;
+  sku: string;
+  qty: number;
+  /** Plain-words problem, e.g. "Damaged" — never the stored key. */
+  problemLabel: string;
+  /** Plain-words ask, e.g. "Deliver correct item" — never the stored key. */
+  requestLabel: string;
+}
+
+export function buildSupplierClaimMessage(i: SupplierClaimMessageInput): string {
+  const units = `${i.qty} unit${i.qty === 1 ? "" : "s"}`;
+  const doc = i.doNumber ? `DO ${i.doNumber} (PO ${i.poId})` : `PO ${i.poId}`;
+  return [
+    `Hi ${i.supplierName} 👋 we have a problem with ${doc}:`,
+    ``,
+    `*${i.sku}* ×${i.qty} — ${i.problemLabel}`,
+    ``,
+    `Please *${i.requestLabel.toLowerCase()}* for the ${units}.`,
+    `Photos are attached. Kindly confirm what you will do and by when. Thank you!`,
+  ].join("\n");
+}
+
 // ── LOGISTIC GROUP — ONE message per partner, covering many deliveries ───────
 // Mirrors the supplier group message, but a delivery is DISTINCT per customer
 // (different address + date), so we DON'T aggregate by SKU across orders — each
