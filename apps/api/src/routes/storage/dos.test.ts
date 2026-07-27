@@ -85,6 +85,56 @@ describe("POST /api/storage/dos/sign-upload", () => {
     expect(userClient).toHaveBeenCalled();
   });
 
+  it("R2 — kind:claim names the object a claim photo, in the same per-PO prefix", async () => {
+    const createSignedUploadUrl = vi.fn().mockResolvedValue({
+      data: { token: "tok", path: "PO-100/abc-claim-DO-1.jpg" },
+      error: null,
+    });
+    const sb = { storage: { from: vi.fn(() => ({ createSignedUploadUrl })) } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          po_id: "PO-100",
+          do_number: "DO-1",
+          mime_type: "image/jpeg",
+          size_bytes: 2048,
+          kind: "claim",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // Same bucket, same `<po_id>/` prefix — so migration 0042's RLS still
+    // scopes the write — with `claim-` in the name saying what it is.
+    const key = createSignedUploadUrl.mock.calls[0][0] as string;
+    expect(key).toMatch(/^PO-100\/[0-9a-f-]+-claim-DO-1\.jpg$/);
+  });
+
+  it("R2 — an unknown kind is refused rather than silently treated as a DO", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          po_id: "PO-100",
+          do_number: "DO-1",
+          mime_type: "image/jpeg",
+          size_bytes: 2048,
+          kind: "invoice",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
   it("rejects mime not in allowlist", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(

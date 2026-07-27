@@ -128,12 +128,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // Its click target is the default tab, To Order (`?tab=purchase`); the
       // shared PurchasingTabs bar at the top of each page switches between the
       // three. `activeFor` keeps the item lit across all three routes.
+      // R2 (2026-07-27) added a FOURTH tab — Claims (what the supplier still
+      // owes us). Still no new sidebar item: the receiving & claim queue's own
+      // rule, and a claim is what a receiving produces.
       {
         key: "purchasing",
         label: "Purchasing",
         icon: ClipboardCheck,
         tab: "purchase",
-        activeFor: ["tab:purchase", "tab:receiving", "path:/operation/procurement"],
+        activeFor: [
+          "tab:purchase",
+          "tab:receiving",
+          "tab:claims",
+          "path:/operation/procurement",
+        ],
       },
       // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
       // entry, same shape as the Purchasing merge above: one warehouse, three

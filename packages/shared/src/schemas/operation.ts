@@ -88,7 +88,18 @@ export type AttachDoInput = z.infer<typeof attachDoInput>;
  * running counters, unlike `receivedQty` which stays a new total. They are
  * NOT received: a damaged unit never enters stock and its qty stays Pending
  * delivery, because the supplier still owes a good one.
+ *
+ * R2 (0288): every reported issue BECOMES a supplier claim, so the line also
+ * carries the claim's evidence — `damagedPhotos` / `wrongItemPhotos` (storage
+ * object keys already uploaded to the `delivery-orders` bucket) and
+ * `wrongItemClaimType` (WHICH kind of wrong, narrowed by the line's product
+ * category). The RPC refuses a damaged/wrong report without them
+ * (`claim_evidence_required` / `claim_type_required`), and a DB trigger refuses
+ * ANY door that raises the counters without a covering claim. Photo paths are
+ * capped so a malformed client cannot write an unbounded jsonb array.
  */
+const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
+
 export const receivePoWithDoInput = z.object({
   doNumber: z.string().min(3),
   doFilePath: z.string().min(1),
@@ -104,6 +115,11 @@ export const receivePoWithDoInput = z.object({
     // The RPC refuses received + damaged + wrong > ordered on one DO.
     damagedQty: z.number().int().nonnegative().optional(),
     wrongItemQty: z.number().int().nonnegative().optional(),
+    // R2: the claim's evidence. Optional for the same reason — a clean
+    // delivery sends the payload it always did.
+    damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
+    wrongItemClaimType: z.string().min(1).max(40).optional(),
+    wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
   })).min(1),
 }).strict();
 export type ReceivePoWithDoInput = z.infer<typeof receivePoWithDoInput>;

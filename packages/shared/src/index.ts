@@ -753,6 +753,28 @@ export {
   type PoReceivingState,
 } from "./po-receiving";
 
+// R2 · A receiving issue auto-becomes a supplier claim (S1's words + one)
+export {
+  SUPPLIER_CLAIM_TYPES,
+  SUPPLIER_CLAIM_TYPE_KEYS,
+  SUPPLIER_CLAIM_LATE,
+  SUPPLIER_CLAIM_STATUSES,
+  supplierClaimTypeLabel,
+  supplierClaimStatusLabel,
+  supplierClaimSummary,
+  wrongItemClaimTypesFor,
+  isWrongItemClaimTypeFor,
+  claimNeedsEvidence,
+  receiveLineClaimProblems,
+  RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
+  type SupplierClaimType,
+  type SupplierClaimStatus,
+  type SupplierClaimRow,
+  type SupplierClaimPhoto,
+  type ReceiveLineClaimDraft,
+  type ReceiveLineClaimProblem,
+} from "./supplier-claim";
+
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
 export {
   DELIVERY_GROUPS,

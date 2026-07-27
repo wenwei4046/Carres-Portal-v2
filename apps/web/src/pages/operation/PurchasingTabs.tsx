@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "lucide-react";
+import {
+  ClipboardCheck,
+  ShoppingCart,
+  PackageCheck,
+  AlertTriangle,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * PurchasingTabs — the shared top tab bar for the merged Purchasing module
@@ -13,6 +19,11 @@ import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "luc
  *   • To Order        → `/operation?tab=purchase`   (OperationPurchase)
  *   • Purchase Orders → `/operation/procurement`    (TabbedProcurementShell)
  *   • Receiving       → `/operation?tab=receiving`  (OperationReceiving)
+ *   • Claims          → `/operation?tab=claims`     (OperationSupplierClaims)
+ *
+ * R2 (2026-07-27) added Claims as a SIBLING tab rather than a sidebar entry —
+ * the receiving & claim queue doc's rule is "no new menu item", and a claim is
+ * what a receiving produces, so it belongs next to it.
  *
  * The active tab is derived from the current location: the Purchase Orders path
  * wins first (a nested route), otherwise the `?tab=` value selects To Order vs
@@ -28,7 +39,7 @@ import { ClipboardCheck, ShoppingCart, PackageCheck, type LucideIcon } from "luc
  * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
  */
 
-type PurchasingTab = "to-order" | "purchase-orders" | "receiving";
+type PurchasingTab = "to-order" | "purchase-orders" | "receiving" | "claims";
 
 interface TabDef {
   key: PurchasingTab;
@@ -41,6 +52,7 @@ const TABS: TabDef[] = [
   { key: "to-order", label: "To Order", to: "/operation?tab=purchase", icon: ClipboardCheck },
   { key: "purchase-orders", label: "Purchase Orders", to: "/operation/procurement", icon: ShoppingCart },
   { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
+  { key: "claims", label: "Claims", to: "/operation?tab=claims", icon: AlertTriangle },
 ];
 
 export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
@@ -51,7 +63,9 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
     ? "purchase-orders"
     : tabParam === "receiving"
       ? "receiving"
-      : "to-order";
+      : tabParam === "claims"
+        ? "claims"
+        : "to-order";
 
   return (
     <div

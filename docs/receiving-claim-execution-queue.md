@@ -53,6 +53,27 @@ promise) auto-creates a **Supplier claim case**: PO · supplier · SKU · qty ·
 Claim types DEPEND on category (same lists as S1: bed frame/sofa get Missing parts /
 Wrong spec / Wrong colour / Colour uneven; mattress gets Wrong SKU / Damaged).
 **Done when:** a receiving problem cannot exist without a case row chasing it.
+**SHIPPED 2026-07-27 (PR #412, migration 0288).** The law is a TRIGGER, not a
+habit: `po_line_issue_requires_claim` refuses any door that raises a line's
+damaged/wrong counter without a covering claim, so a hand-run UPDATE — or a
+future RPC nobody has written yet — is refused too. Notes the next cards need:
+- **The claim-type vocabulary is S1's, plus exactly one word** (`late_delivery`).
+  `packages/shared/src/supplier-claim.ts` builds on `CASE_ISSUES`; the DB mirrors
+  it in `supplier_claim_type_allowed()`. Do not fork it.
+- **The damaged / wrong-item domains are DISJOINT and the guard depends on it**:
+  a claim typed `damaged` covers `damaged_qty`, every other non-late type covers
+  `wrong_item_qty`. That is why the wrong-item picker never offers `damaged`.
+- **Evidence is a CHECK.** A damaged/wrong claim with no photo cannot be stored;
+  `late_delivery` is exempt (nothing to photograph). Photos live in the existing
+  private `delivery-orders` bucket under `<po_id>/` — no new bucket, no new
+  storage policy.
+- **`status` is only open/closed and nothing closes a claim yet — R3 owns that.**
+  The queue page deliberately offers nothing to click, so R3 unpicks nothing.
+- Late-delivery claims are minted by `supplier_claim_sweep_overdue()` on the
+  daily 09:00-MYT cron, `service_role` only. R5's "avg claim-resolution days"
+  needs a close timestamp that R3 must add.
+- Live state at ship: **0 POs / 0 PO lines in prod**, so nothing was backfilled
+  and the Claims tab reads empty until the first PO is received.
 
 ## R3 · Claim lifecycle + supplier resolution
 
@@ -136,7 +157,7 @@ auto-receives their own PO.
 | Card | Status | PR |
 |---|---|---|
 | R1 | ✅ | [#401](https://github.com/wenwei4046/Carres-Portal-v2/pull/401) · 0284 |
-| R2 | ⬜ | — |
+| R2 | ✅ | [#412](https://github.com/wenwei4046/Carres-Portal-v2/pull/412) · 0288 |
 | R3 | ⬜ | — |
 | R4 | ⬜ | — |
 | R5 | ⬜ | — |

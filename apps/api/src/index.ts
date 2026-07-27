@@ -25,6 +25,8 @@ import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
+// R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
+import supplierClaimsRouter from "./routes/operation/supplier-claims";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
@@ -97,6 +99,7 @@ import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runPoDutyCron } from "./cron/po-duty";
+import { runSupplierClaimSweepCron } from "./cron/supplier-claim-sweep";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -228,6 +231,7 @@ api.route("/ops/service-notes", snRouter);
 api.route("/ops/service-cases", scRouter);
 api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
+api.route("/operation/supplier-claims", supplierClaimsRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);
@@ -249,6 +253,11 @@ export default {
         // other days and on a pre-0236 DB.
         await runPoDutyCron(env).catch((e) =>
           console.error("po-duty cron failed:", (e as Error).message),
+        );
+        // R2 (0288) — an ETA that has passed with units still owed becomes a
+        // late-delivery claim. Idempotent, so a retry costs nothing.
+        await runSupplierClaimSweepCron(env).catch((e) =>
+          console.error("supplier-claim sweep failed:", (e as Error).message),
         );
       })(),
     );

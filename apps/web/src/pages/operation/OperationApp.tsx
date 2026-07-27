@@ -27,6 +27,8 @@ import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
+// R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
+import OperationSupplierClaims from "./OperationSupplierClaims";
 // 0226 — the operation-facing COSTING catalog (SKU Master / Modular / Fabric).
 import OperationCatalogPage from "@/pages/catalog/OperationCatalogPage";
 import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
@@ -244,7 +246,8 @@ export default function OperationApp() {
         {!isOrdersUrl &&
           !isProcurementUrl &&
           tab !== "purchase" &&
-          tab !== "receiving" && <GlobalTopBar />}
+          tab !== "receiving" &&
+          tab !== "claims" && <GlobalTopBar />}
         <div className="flex-1 min-h-0 overflow-auto">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
@@ -314,6 +317,10 @@ export default function OperationApp() {
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* R2 — the supplier-claim queue: what receiving found wrong, and
+                what an unkept ETA turned into. Fourth Purchasing tab, no new
+                sidebar entry. */}
+            {tab === "claims" && <OperationSupplierClaims />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}

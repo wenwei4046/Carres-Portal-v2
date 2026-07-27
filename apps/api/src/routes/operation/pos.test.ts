@@ -536,8 +536,19 @@ describe("POST /api/operation/pos/:id/receive", () => {
       // R1 (0284): the two inspection counters ride every line explicitly —
       // a clean delivery states "nothing was wrong" rather than staying
       // silent about it. The RPC would read an absent key as 0 either way.
+      // R2 (0288): the claim's evidence rides with the report. A clean line
+      // states "nothing wrong, nothing to prove" explicitly — the RPC only
+      // demands photos for a line that actually reported a problem.
       p_lines: [
-        { id: LINE_ID, received_qty: 2, damaged_qty: 0, wrong_item_qty: 0 },
+        {
+          id: LINE_ID,
+          received_qty: 2,
+          damaged_qty: 0,
+          wrong_item_qty: 0,
+          damaged_photos: [],
+          wrong_item_claim_type: null,
+          wrong_item_photos: [],
+        },
       ],
     });
     assertRpcCallShape(rpc, "operation_receive_po_with_do", [
@@ -682,7 +693,15 @@ describe("POST /api/operation/pos/:id/receive", () => {
       "operation_receive_po_with_do",
       expect.objectContaining({
         p_lines: [
-          { id: LINE_ID, received_qty: 2, damaged_qty: 1, wrong_item_qty: 2 },
+          {
+            id: LINE_ID,
+            received_qty: 2,
+            damaged_qty: 1,
+            wrong_item_qty: 2,
+            damaged_photos: [],
+            wrong_item_claim_type: null,
+            wrong_item_photos: [],
+          },
         ],
       }),
     );
@@ -700,6 +719,112 @@ describe("POST /api/operation/pos/:id/receive", () => {
         body: JSON.stringify({
           ...VALID_BODY,
           lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: -1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  // --- R2 (0288): the problem becomes a supplier claim -----------------------
+
+  it("R2 — forwards the claim's evidence (photos + kind) to the RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { po_id: PO_ID, po_status: "open", claims_created: 2 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [
+            {
+              id: LINE_ID,
+              receivedQty: 2,
+              damagedQty: 1,
+              damagedPhotos: ["PO-1/a-claim-DO-1.jpg"],
+              wrongItemQty: 1,
+              wrongItemClaimType: "wrong_colour",
+              wrongItemPhotos: ["PO-1/b-claim-DO-1.jpg"],
+            },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(
+      "operation_receive_po_with_do",
+      expect.objectContaining({
+        p_lines: [
+          {
+            id: LINE_ID,
+            received_qty: 2,
+            damaged_qty: 1,
+            wrong_item_qty: 1,
+            damaged_photos: ["PO-1/a-claim-DO-1.jpg"],
+            wrong_item_claim_type: "wrong_colour",
+            wrong_item_photos: ["PO-1/b-claim-DO-1.jpg"],
+          },
+        ],
+      }),
+    );
+  });
+
+  it("R2 — surfaces the RPC's evidence refusal as a 422 the operator can read", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "damaged units on MS01-K need at least one photo",
+        details: "claim_evidence_required",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("claim_evidence_required");
+  });
+
+  it("R2 — refuses an absurd number of photo paths before it reaches the DB", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [
+            {
+              id: LINE_ID,
+              receivedQty: 2,
+              damagedQty: 1,
+              damagedPhotos: Array.from({ length: 13 }, (_, i) => `PO-1/${i}.jpg`),
+            },
+          ],
         }),
       }),
       env,
