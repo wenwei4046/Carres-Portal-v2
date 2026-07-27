@@ -175,6 +175,131 @@ describe("StockAlertsTile", () => {
     expect(screen.getAllByText(/Loading/).length).toBeGreaterThan(0);
   });
 
+  // ── K1: the tile is also the `Reorder stock` worklist raise ────────────────
+  // The reorder feed is a SECOND endpoint, so these tests dispatch by path.
+  // Everything above keeps the blanket mock deliberately: a reorder payload
+  // shaped like the threshold one must degrade to "no reorders", never crash.
+  function mockBoth(
+    alerts: operationStockAlertsResponse,
+    reorder: {
+      rows: {
+        sku: string;
+        onHand: number;
+        incoming: number;
+        reorderPoint: number | null;
+        state: string;
+      }[];
+      alertCount: number;
+    },
+  ) {
+    vi.mocked(apiFetch).mockImplementation((async (path: string) =>
+      path.includes("/reorder") ? reorder : alerts) as never);
+  }
+
+  it("raises Reorder stock onto the dashboard, worst first", async () => {
+    mockBoth({ alerts: [] }, {
+      rows: [
+        {
+          sku: "Microfiber Waterproof Mattress Protector-K",
+          onHand: 15,
+          incoming: 0,
+          reorderPoint: 200,
+          state: "reorder",
+        },
+      ],
+      alertCount: 1,
+    });
+    render(wrap(<StockAlertsTile />));
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId(
+          "stock-alerts-reorder-Microfiber Waterproof Mattress Protector-K",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("stock-alerts-count").textContent).toMatch(/1/);
+    expect(screen.getByText(/1 SKU to reorder/)).toBeInTheDocument();
+    // The empty state must be gone — a reorder IS an alert.
+    expect(screen.queryByTestId("stock-alerts-empty")).not.toBeInTheDocument();
+  });
+
+  it("lands the operator on the Stock door, where the point is set", async () => {
+    mockBoth({ alerts: [] }, {
+      rows: [
+        { sku: "X", onHand: 1, incoming: 0, reorderPoint: 200, state: "reorder" },
+      ],
+      alertCount: 1,
+    });
+    const onJumpToStock = vi.fn();
+    const onJumpToWarehouse = vi.fn();
+    render(
+      wrap(
+        <StockAlertsTile
+          onJumpToStock={onJumpToStock}
+          onJumpToWarehouse={onJumpToWarehouse}
+        />,
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("stock-alerts-reorder-X")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("stock-alerts-open"));
+    expect(onJumpToStock).toHaveBeenCalledTimes(1);
+    expect(onJumpToWarehouse).not.toHaveBeenCalled();
+  });
+
+  it("keeps the shipped warehouse jump when nothing needs reordering", async () => {
+    mockBoth({ alerts: [] }, { rows: [], alertCount: 0 });
+    const onJumpToStock = vi.fn();
+    const onJumpToWarehouse = vi.fn();
+    render(
+      wrap(
+        <StockAlertsTile
+          onJumpToStock={onJumpToStock}
+          onJumpToWarehouse={onJumpToWarehouse}
+        />,
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("stock-alerts-empty")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("stock-alerts-open"));
+    expect(onJumpToWarehouse).toHaveBeenCalledTimes(1);
+    expect(onJumpToStock).not.toHaveBeenCalled();
+  });
+
+  it("a healthy SKU never reaches the tile", async () => {
+    mockBoth({ alerts: [] }, {
+      rows: [
+        { sku: "Fine", onHand: 555, incoming: 0, reorderPoint: 200, state: "ok" },
+      ],
+      alertCount: 0,
+    });
+    render(wrap(<StockAlertsTile />));
+    await waitFor(() =>
+      expect(screen.getByTestId("stock-alerts-empty")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("stock-alerts-reorder-Fine")).not.toBeInTheDocument();
+  });
+
+  it("counts BOTH sources when a threshold alert exists too", async () => {
+    mockBoth(makeAlerts(2), {
+      rows: [
+        { sku: "Y", onHand: 5, incoming: 0, reorderPoint: 200, state: "reorder" },
+      ],
+      alertCount: 1,
+    });
+    render(wrap(<StockAlertsTile />));
+    await waitFor(() =>
+      expect(screen.getByTestId("stock-alerts-count")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/3 SKUs to reorder/)).toBeInTheDocument();
+    expect(screen.getByTestId("stock-alerts-reorder-Y")).toBeInTheDocument();
+  });
+
   it("renders the error state when the fetch rejects", async () => {
     vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
     render(wrap(<StockAlertsTile />));

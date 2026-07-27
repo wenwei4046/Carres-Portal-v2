@@ -1,4 +1,4 @@
-import { useStockAlerts } from "@/lib/queries";
+import { useStockAlerts, useReorderStock } from "@/lib/queries";
 
 /**
  * StockAlertsTile — Phase 4.5 Chunk 2 Sprint D Task 21.
@@ -35,26 +35,52 @@ import { useStockAlerts } from "@/lib/queries";
  * is the right reassurance signal at zero. The proto convention for empty
  * side cards (`LowStockCard` line 46-47) is the same.
  */
+/**
+ * K1 ADDITION (2026-07-27) — the tile also raises `Reorder stock`.
+ *
+ * The threshold source above (`stock_balances.low_threshold`, 0054) has never
+ * had a single row configured and no screen to configure one, so this tile has
+ * shown "No alerts" since the day it shipped. K1's reorder points are the
+ * thing operators actually set, so they are ADDED here (not swapped in): the
+ * old rows keep working the day someone sets a threshold, and the new ones
+ * lead because they carry a verb. This is the "into the ops worklist" half of
+ * card K1 — without it, a low pillow is only discoverable by opening Stock.
+ */
 const MAX_ROWS = 3;
 
 interface Props {
   onJumpToWarehouse?: () => void;
+  /** Land on Stock → On hand, where the reorder points live. Falls back to the
+   *  warehouse jump when the shell didn't wire it (tests in isolation). */
+  onJumpToStock?: () => void;
 }
 
-export default function StockAlertsTile({ onJumpToWarehouse }: Props = {}) {
+export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Props = {}) {
   const { data, isLoading, isError } = useStockAlerts();
+  const reorderQ = useReorderStock();
+
+  // Same degrade-don't-crash contract as ReorderStockCard: a Worker that
+  // predates the /reorder route answers with a different shape, and the
+  // shipped threshold tile must keep working around it.
+  const reorderRows = Array.isArray(reorderQ.data?.rows)
+    ? reorderQ.data.rows.filter((r) => r?.state === "reorder")
+    : [];
+  const reorderCount = Array.isArray(reorderQ.data?.rows)
+    ? (reorderQ.data.alertCount ?? reorderRows.length)
+    : 0;
 
   const handleOpen = () => {
-    // Tab-state only — see the routing note above. The parent's
-    // `onJumpToWarehouse` lands the user on the warehouse "Alerts" view; we
-    // deliberately do NOT write a URL (the operation shell is tab-state-driven,
-    // so a URL write would only desync from the rendered tab).
-    onJumpToWarehouse?.();
+    // Tab-state only — see the routing note above. When there is a reorder to
+    // raise, the useful destination is the Stock door (that is where the point
+    // is set); otherwise keep the shipped warehouse jump.
+    if (reorderCount > 0 && onJumpToStock) onJumpToStock();
+    else onJumpToWarehouse?.();
   };
 
   const alerts = data?.alerts ?? [];
-  const top = alerts.slice(0, MAX_ROWS);
-  const count = alerts.length;
+  const top = alerts.slice(0, Math.max(0, MAX_ROWS - reorderRows.length));
+  const topReorder = reorderRows.slice(0, MAX_ROWS);
+  const count = alerts.length + reorderCount;
 
   // Outer wrapper kept identical to OpenPOsCard / LowStockCard so the side-card
   // grid stays visually consistent. The whole tile is clickable, but only via
@@ -78,7 +104,9 @@ export default function StockAlertsTile({ onJumpToWarehouse }: Props = {}) {
                 ? "Couldn’t load alerts"
                 : count === 0
                   ? "No alerts — all SKUs above threshold"
-                  : `${count} SKU${count === 1 ? "" : "s"} below threshold`}
+                  : reorderCount > 0
+                    ? `${count} SKU${count === 1 ? "" : "s"} to reorder`
+                    : `${count} SKU${count === 1 ? "" : "s"} below threshold`}
           </div>
         </div>
         <button
@@ -124,9 +152,30 @@ export default function StockAlertsTile({ onJumpToWarehouse }: Props = {}) {
                 {count}
               </span>
               <span className="text-[11px] text-base-500">
-                below threshold
+                {reorderCount > 0 ? "need ordering" : "below threshold"}
               </span>
             </div>
+            {topReorder.map((row) => (
+              <div
+                key={`reorder-${row.sku}`}
+                data-testid={`stock-alerts-reorder-${row.sku}`}
+                className="grid items-center gap-3 py-2.5 border-t border-base-100"
+                style={{ gridTemplateColumns: "1fr auto" }}
+              >
+                <div className="min-w-0">
+                  <div className="text-[12px] text-base-900 truncate">
+                    {row.sku}
+                  </div>
+                  <div className="text-[11px] text-base-500 truncate">
+                    Reorder stock · {row.onHand} left
+                    {row.incoming > 0 ? `, ${row.incoming} coming` : ""}
+                  </div>
+                </div>
+                <span className="font-mono text-[11px] font-semibold text-danger whitespace-nowrap">
+                  {row.reorderPoint} point
+                </span>
+              </div>
+            ))}
             {top.map((row) => (
               <div
                 key={`${row.sku}-${row.warehouse_id}`}

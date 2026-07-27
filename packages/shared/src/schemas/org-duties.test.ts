@@ -7,6 +7,7 @@ import {
   isOpsManager,
   isPoDutyEditor,
   isOpsManagerRow,
+  isStockPlanner,
 } from "./org-duties";
 
 const JESS = "jess@carres.com";
@@ -14,13 +15,17 @@ const SHARED_OPS = "operation@carres.com";
 const NOBODY = "liching@carres.com";
 
 describe("DUTY_KEYS", () => {
-  it("is the closed 5-key vocabulary", () => {
+  it("is the closed 6-key vocabulary", () => {
+    // Kept as an exact list on purpose: adding a key must be a decision
+    // someone makes here, not a side effect. `stock_planner` joined for
+    // Ready Stock K1 (0286) — "only the COO edits reorder points".
     expect([...DUTY_KEYS]).toEqual([
       "ops_manager",
       "po_duty_editor",
       "account_creator",
       "finance_approver",
       "roster_editor",
+      "stock_planner",
     ]);
   });
 
@@ -81,6 +86,30 @@ describe("checkDuty — fail-closed on missing data", () => {
       expect(checkDuty(key, "operation", JESS, []).allowed).toBe(false);
       expect(checkDuty(key, "operation", JESS, [key]).via).toBe("duty");
     }
+  });
+});
+
+describe("isStockPlanner — K1's COO-only reorder points", () => {
+  it("needs the SEAT, not an email — no legacy widening", () => {
+    // Jess passes because 0286 grants the COO seat the key, and that is the
+    // ONLY route. Hard-coding her email here would be exactly the pattern
+    // HR-P2 spent a release retiring.
+    expect(isStockPlanner("operation", JESS, [])).toBe(false);
+    expect(isStockPlanner("operation", JESS, ["stock_planner"])).toBe(true);
+  });
+
+  it("an ordinary operation login cannot set a reorder point", () => {
+    expect(isStockPlanner("operation", NOBODY, [])).toBe(false);
+    expect(isStockPlanner("operation", SHARED_OPS, ["ops_manager"])).toBe(false);
+  });
+
+  it("principal passes by role, as on every gate", () => {
+    expect(isStockPlanner("principal", null, [])).toBe(true);
+  });
+
+  it("never grants while the duties are still loading", () => {
+    expect(isStockPlanner("operation", JESS, undefined)).toBe(false);
+    expect(isStockPlanner("operation", JESS, null)).toBe(false);
   });
 });
 

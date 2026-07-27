@@ -153,3 +153,48 @@ export const opsStockListResponseSchema = z.object({
   total: z.number().int(),
 });
 export type OpsStockListResponse = z.infer<typeof opsStockListResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Reorder points — Ready Stock card K1 (migration 0286)
+// ---------------------------------------------------------------------------
+
+/** PUT /api/ops/stock/reorder — set (or switch off) one SKU's reorder point.
+ *  `reorderPoint: 0` is the documented OFF switch, so there is no delete verb
+ *  and no way to end up with a row nobody can see. */
+export const opsReorderPointInputSchema = z.object({
+  sku: z.string().trim().min(1),
+  reorderPoint: z.coerce.number().int().min(0).max(100000),
+  /** Supplier lead in CALENDAR days — a China container is ~60. */
+  leadDays: z.coerce.number().int().min(0).max(365).nullish(),
+  note: z.string().trim().max(200).nullish(),
+});
+export type OpsReorderPointInput = z.infer<typeof opsReorderPointInputSchema>;
+
+export const opsReorderStateSchema = z.enum(["reorder", "ok", "unset"]);
+
+/** One row of GET /api/ops/stock/reorder — the shape `computeReorderRows`
+ *  returns, so the browser never recomputes what the server already decided. */
+export const opsReorderRowSchema = z.object({
+  sku: z.string(),
+  kind: z.string().nullable(),
+  onHand: z.number().int(),
+  reserved: z.number().int(),
+  incoming: z.number().int(),
+  cover: z.number().int(),
+  reorderPoint: z.number().int().nullable(),
+  leadDays: z.number().int().nullable(),
+  state: opsReorderStateSchema,
+  shortfall: z.number().int(),
+});
+export type OpsReorderRow = z.infer<typeof opsReorderRowSchema>;
+
+export const opsReorderResponseSchema = z.object({
+  rows: z.array(opsReorderRowSchema),
+  /** SKUs at or below their point — the `Reorder stock` worklist count. */
+  alertCount: z.number().int(),
+  /** Import accessories still waiting for a number. */
+  unsetCount: z.number().int(),
+  /** May THIS caller edit the points? (COO duty / principal.) */
+  canEdit: z.boolean(),
+});
+export type OpsReorderResponse = z.infer<typeof opsReorderResponseSchema>;
