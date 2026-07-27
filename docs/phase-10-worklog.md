@@ -2773,3 +2773,112 @@ It moved **4 → 6 before this branch**: PR #440 left `hr.ts` importing `hrAssig
 Tracker checked first: tail **0298**, and main's last migration file is 0298, so the union tip was not ahead of the database. `wrangler deploy --env production` — bindings receipt read: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + `api.carresofficial.com (custom domain)`. Webhook re-verified live: unsigned **400**, bad signature **400 `invalid_signature`**; `/api/rental/agreements` unauth **401**.
 
 **api-only deploy.** A parallel line had deployed web in the meantime (`index-CKQhEuFh.js`), so rather than assume, the live bundle was downloaded and checked: 4,410,666 bytes, `SERVICE_ROLE` **0**, all three 0295 markers present and the deleted page's `pos-rental-page` testid still **0** — their deploy contained this line's work.
+
+---
+
+## 2026-07-27 · Receiving R4 — problem stock is quarantined
+
+**PR [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454)** · merge `b059e2a5` ·
+migration **0299_problem_stock_is_quarantined** applied ·
+Worker `19a94f44` + web `index-CyW_vWlS.js` from main tip `b315b03f` — **DEPLOYED**,
+4 canonicals converged on the first poll.
+
+Card R4 of `docs/receiving-claim-execution-queue.md`: damaged/wrong units flip to
+`on_hold` with a reason, goods sent back flip to `returned_to_supplier`, claim resolution
+flips them back to free or writes them off. **Done when: a held unit is invisible to every
+sell/reserve/deliver path, provably.**
+
+### What was actually wrong — R1's leftover was worse than invisible
+
+A PO mints one `incoming` unit per ordered piece (0153/0154) and the receive flips the good
+ones to `free`. R1 (0284) deliberately did not *receive* a damaged unit — "that is also why
+R4 will have something to quarantine and nothing to un-book". What it left behind is a unit
+stuck at `incoming` **forever**, and `incoming` is not a neutral parking space:
+`reorder-alert.ts` and `ready-stock-plan.ts` both read it as *ordered, on the way*. A unit
+sitting broken in our own warehouse was being counted as a future arrival that will never
+come, and the reorder engine under-ordered by exactly that many.
+
+### The guard asks WHERE, never WHO — and that is the whole design
+
+`ops_stock_items` carries a blanket `FOR ALL TO authenticated USING (is_internal())` policy,
+and live code updates `status` through PostgREST in **three** places (the sofa-loan claim,
+its rollback, the loan return). A rule that only lived inside an RPC would be a rule one
+PostgREST call walks around. Column-level `revoke update (status)` **would** have been a real
+lock — and would have broken the sofa-loan lane, which is a different card's machinery.
+
+So the trigger never asks who is writing. It constrains where a held unit may go: `free`,
+`returned_to_supplier` or `written_off`. The three states every sell / reserve / deliver path
+actually writes — `reserved`, `sold`, `transferred` — are unreachable from `on_hold` no
+matter who tries or through which door. **The read side needed no change at all**: every
+pick already filters `status='free'` (takeout also accepts `reserved`, a unit already drawn
+from this same pool), and `ops_rollup_stock_balances` counts only free+reserved, so a held
+unit is absent from the aggregate ledger the whole logistics reserve machine runs on.
+`SELLABLE_STOCK_STATUSES` in the shared module states the same fact as data, asserted as an
+**equality** rather than a membership check so a future widening has to argue for itself.
+
+### The bug holding the units caused, and had to fix in the same change
+
+With the damaged units held rather than left `incoming`, a **replacement DO has nothing left
+to flip**: `update … where status='incoming' limit v_delta` moves 0 rows while
+`stock_balances` gains 2, and the next rollup takes them straight back off. So the receive
+now mints the shortfall as new free units — own warehouses only, the same `kind = 'own'`
+condition the PO mint uses, so a partner warehouse keeps having no per-unit register rather
+than growing one by accident. *Before R4 the same line did something worse but
+count-correct: it freed the **broken** units, because they were the only `incoming` ones
+left.*
+
+Two smaller truths fixed while in there: the On-hand group header computed `ready` by
+subtraction (`rs.length - reserved - repair`), which called every other status ready — a
+held unit would have been advertised as available in the one number a picker reads at a
+glance; and the register printed the raw column value, which is how `written_off` would have
+reached the screen reading `written_off`.
+
+### Decisions that are load-bearing
+
+- **A hold is created by RECEIVING and nothing else** (the guard allows only
+  `incoming → on_hold`). A pool unit later found damaged has its own machine (`needs_repair`
+  + the Defective view). A second quarantine concept would give the warehouse two ways to say
+  one thing — and worse, `/refurbish-complete` is a direct PostgREST update gated only on
+  `needs_repair`, so it would hand a "held" unit back to the pool with the claim unanswered.
+- **`returned_to_supplier` and `written_off` are terminal**, and **a held unit cannot be
+  DELETED** — the hard-delete door is for a mis-keyed row, and on a held unit it would erase
+  the physical evidence an open claim is chasing.
+- **Only a write-off must carry a note** — it is the one outcome that leaves no other trace
+  of why. 0291's rule, same reasoning: a box the other two must fill to proceed gets ".".
+- **`back_to_stock` does NOT touch the PO line.** `received_qty` means "good units this
+  supplier delivered", and a unit we quarantined and then kept was not delivered good —
+  `damaged_qty` records it and the CLAIM's answer settles whether the supplier still owes us.
+  It does write a `stock_movements` row and re-roll `stock_balances`, because the goods
+  genuinely enter sellable stock at that moment. **Reported, not hidden**: a PO made good by a
+  release rather than a replacement stays `open`; that is pre-existing R1 shape (only the
+  receive RPC ever closes a PO) and duplicating its close + thread-advance + reserve loop
+  inside a stock RPC would put two copies one edit apart from disagreeing. CF filed, and R5
+  is told to read the claim's `closed_at`, never `purchase_orders.status`.
+- **The resolution is per claim, not per unit, and is not gated on the claim closing** —
+  goods and paperwork move on different days; tying them would teach people to close a claim
+  early just to clear a shelf.
+- **The units moved are taken from the UPDATE's own `RETURNING`**, not re-read afterwards: a
+  re-read of "the claim's free units" would sweep up units an earlier release had already put
+  back and count them into stock twice.
+
+### Verification
+
+18 assertions passed against live prod in a rolled-back transaction **before** apply: the
+register lands 1 free / 2 on hold / 0 incoming · a held unit refuses `reserved`, `sold`,
+`transferred` and `DELETE` · `ops_stock_pool_draw` returns nothing for it · `stock_balances`
+never counts it · a free unit cannot be quarantined · a write-off with no words is refused ·
+back-to-stock frees, stamps and writes the movement · a second release finds nothing ·
+returned is terminal · the replacement DO mints 2 · the line keeps its damage history.
+Complete rollback re-verified afterwards (0 columns, 0 triggers, 87 units untouched). Live
+at ship: **87 units all `free`, 0 POs, 0 PO lines, 0 claims** — nothing backfilled.
+
+**Guardrail #8 fired**: drafted as 0298, renumbered to **0299** when a parallel line applied
+`0298_service_case_deadline` mid-build. The live receive RPC was re-hashed before apply
+(12,785 chars, unchanged) to confirm the dry run still described reality. The
+**md5(prosrc) + length reconcile matched byte-for-byte on all three functions** — no comment
+stripping this time.
+
+Suites at baseline: api **3** pre-existing · web **16** pre-existing · shared **1716/1716**.
+New tests: shared 22 · api 8 · web 6. typecheck 0 new (api 6 / shared 3 pre-existing,
+verified identical on a stashed tree), build + v4 guard + design lint clean, `SERVICE_ROLE`
+grep **0** in the live 4,414,341-byte bundle.
