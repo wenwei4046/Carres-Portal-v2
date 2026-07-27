@@ -10,9 +10,12 @@
 
 ## 1 · What the module is
 
-One table. One row = one customer order. Nothing is stored as a "status": every signal is
-computed at read time from orders, order lines, purchase orders, stock, and the operations
-overlay (`ops_order_control`).
+One table. One row = one customer order.
+
+**There is no single overall Order Status.** Business facts, actions, module stages and
+exceptions are stored independently — `booking_stage`, `line_received`, `delivery_photos`
+each record their own thing. The Order view is COMPUTED from those records at read time;
+no row carries one word that claims to summarise it.
 
 An order can have **several open actions at once**. They are computed independently — one
 action never hides another. The row shows the highest-priority one plus `+N`; the drawer
@@ -36,6 +39,11 @@ shows them all.
 Every action carries six things (the model file explains why). `{party}` is the real name
 when the system knows it, the role word only when it does not.
 
+**Ownership is two different things, and only the Task Owner is written per action:**
+**Task Owner** = assigned automatically by the module that raised the action; it may change
+hands. **Case Owner** = the one person responsible for this customer's case from start to
+finish; it never changes and is never repeated on an action.
+
 ### Purchasing
 
 **`Send PO to {supplier}`**
@@ -43,28 +51,46 @@ when the system knows it, the role word only when it does not.
 - Checklist: supplier · items · quantity · purchase price · send · record PO number · record supplier ready date
 - Completion: PO number exists AND supplier ready date exists
 - Due: the customer's date minus the supplier's lead time minus the internal buffer
-- Owner: the PO-duty holder (`org_duties`)
+- Task Owner: the Purchasing task owner (today the PO-duty holder, `org_duties`)
 
 **`Call {supplier} — confirm ready date`**
 - Trigger: ready date missing · due for re-confirmation · passed with no goods in · later than the customer's date · changed by the supplier
 - Checklist: production status · ready date · ready quantity · any delayed item · record the latest ready date · record the outcome
 - Completion: latest ready date recorded AND outcome recorded
 - Due: red once inside the arrival window
-- Owner: the order's PIC
+- Task Owner: the module assigns it
 
-### Recovery (opens only when the promise is already lost)
+### Supplier exception (opens when the goods will not arrive as promised)
 
-**`Confirm recovery plan`** — internal, nobody phones the customer yet
-- Trigger: latest supplier ready date is LATER than the customer's promised date
-- Checklist: confirm the real ready date with the supplier · check available dates with logistics · decide the date or window to propose · name who calls the customer
-- Completion: a proposed date exists AND a communication owner is named
-- Owner: the order's PIC
+The lifecycle is one shared vocabulary, used by every module that waits on a supplier:
+
+```
+Receiving Exception Created
+        ↓
+Contact Supplier  →  Waiting Supplier Reply  →  Waiting Goods Arrival
+        ↓                                              ↓
+Supplier Cannot Fulfil                          Goods Received
+        ↓                                              ↓
+Case Owner Decision Required                    Exception Closed
+```
+
+**`Contact {supplier} — confirm what happens next`**
+- Trigger: the goods will miss the customer's promised date, or arrived short / damaged / wrong
+- Checklist: state the problem · agree what the supplier will do · record the reply · record the new arrival date
+- Completion: a supplier reply is recorded AND either a new arrival date exists or the supplier has said it cannot fulfil
+- Task Owner: the module assigns it
+
+**`Case Owner Decision Required`**
+- Trigger: the supplier cannot fulfil
+- Completion: the case owner has chosen what happens to this order
+- Owner: the **Case Owner** — this is the one action that is never delegated
 
 **`Call {customer} — agree new delivery date`**
-- Trigger: a recovery plan exists and the original date still cannot be met
+- Trigger: the arrival date will miss the promise and the answer is known (a new arrival date, or the case owner's decision)
 - Checklist: explain the confirmed delay · give the proposed date or window · record the response · confirm the agreed new date · record who and when
 - Completion: the customer accepted a new date AND the outcome is recorded
-- Owner: the communication owner named in the plan
+- Task Owner: the person named to make the call
+- **Never before the answer exists.** Nobody calls a customer able only to say "it will be late".
 
 ### Payment
 
@@ -72,7 +98,7 @@ when the system knows it, the role word only when it does not.
 - Trigger: outstanding > RM 0, where outstanding = Σ order lines + add-ons + chargeable storage − `orders.paid`
 - Checklist: confirm the amount · contact the customer · state the amount and the deadline · record the response · verify the payment
 - Completion: outstanding = RM 0
-- Owner: the order's PIC
+- Task Owner: the module assigns it
 - **Survives delivery.** A delivered order that still owes money keeps this action and its red money dot.
 
 ### Delivery
@@ -82,18 +108,18 @@ when the system knows it, the role word only when it does not.
 - Checklist: select the company · record it · record who assigned · record when
 - Completion: a logistics company is recorded. **Never "they accepted"** — assigning is our decision
 - Due: 3 working days before the customer's date
-- Owner: the order's PIC
+- Task Owner: the module assigns it
 
 **`Call {logistics} — confirm delivery date`**
 - Trigger: logistics assigned but the customer has not confirmed BOTH a date and a slot
 - Checklist: logistics contacted the customer · proposed date · customer-confirmed date · customer-confirmed slot · the response · the reason if unresolved · (for condominiums) driver name · driver phone · vehicle number · lift or registration requirement
 - Completion: a customer-confirmed date AND slot exist. **A date logistics proposed is a fact, not a confirmation**
 - Due: 1 working day before the customer's date
-- Owner: the order's PIC
+- Task Owner: the module assigns it
 
 **`Issue delivery order`**
-- Trigger: the customer-confirmed date exists
-- Checklist: core goods ready · confirmed date · confirmed slot · payment condition passed · issue
+- Trigger: customer-confirmed date **AND** customer-confirmed time slot **AND** core goods ready **AND** the payment condition passed — all four. The action appears only when it can actually be done
+- Checklist: issue
 - Completion: the delivery order document exists for this trip
 - **The system produces it; nobody writes one by hand.** Today the number is stamped at
   dispatch, which is too late to hand to logistics the day before — card C7 moves it to
@@ -101,8 +127,11 @@ when the system knows it, the role word only when it does not.
 
 **`Deliver today`**
 - Trigger: the customer-confirmed date is today and nothing has been delivered
-- Completion: delivered, OR one specific named problem recorded (customer unreachable · customer rejected the date · driver absent · vehicle breakdown · condominium entry refused · lift booking not done · delivery failed). **Never a generic "exception"** — use the shared reason list, never a second one
-- Owner: the order's PIC
+- Completion: **Delivered**, or a **Delivery Exception Created** carrying its reason
+  (customer unreachable · customer rejected the date · driver absent · vehicle breakdown ·
+  condominium entry refused · lift booking not done · delivery failed). Every module fails
+  the same way: one Exception plus a Reason — never a family of different failure words
+- Task Owner: the module assigns it
 
 **`Upload delivery photo`**
 - Trigger: delivered, no photo attached
@@ -132,12 +161,15 @@ cannot deliver. It never disappears: it is always in the drawer list and the Owi
 
 A gate REFUSES an action. Display order only decides what is read first.
 
-Confirming a delivery booking is refused unless: every goods line is reserved to this
-order (accessories pass automatically) · the balance is collected · the date is not a
-Sunday. A bed set (mattress + frame) can never be split; a sofa may travel on a second trip
+**Issuing the delivery order is the hard gate**, not agreeing a date: a date can be agreed
+with a customer while the goods and the money are still coming. Issuing is refused unless
+every goods line is reserved to this order (accessories pass automatically), the balance is
+collected, and the date is not a Sunday or a Malaysian public holiday. Agreeing the date
+still WARNS about the same three, so nobody promises a day the goods cannot make. A bed set (mattress + frame) can never be split; a sofa may travel on a second trip
 only if the customer agreed; accessories never block a delivery. A logistics company's own
 working days, closed dates, capacity and notice period **warn but never block** — a phone
-call beats a calendar.
+call beats a calendar. **Two exceptions that DO block: Sunday and Malaysian public
+holidays.**
 
 **The money gate is broken today** and must be fixed before it can be trusted: it reads the
 empty ledger, so it refuses bookings for customers who have already paid. Card C5.
@@ -156,7 +188,7 @@ Three independent facts, so the column has no header; each dot carries its own s
 
 | | green | amber | red |
 |---|---|---|---|
-| goods | all in | waiting arrival | no PO raised, or the supplier's date is late against the deadline |
+| goods | all in | Waiting Goods Arrival | no PO raised, or the supplier's date is late against the deadline |
 | delivery | the CUSTOMER confirmed | logistics gave a date, customer has not confirmed | past the deadline and still unconfirmed |
 | money | settled | — | still owing (stays red after delivery) |
 
@@ -167,3 +199,6 @@ A delivered order never alarms on goods or delivery. Delivered is not paid.
 - Anything a trigger already does by itself (a number stamped by the database).
 - Any step nobody records: "goods loaded", "driver departed".
 - Any tick-box that would only record "I say I did it".
+- **Waiting states are not actions.** `Waiting Supplier Reply` · `Waiting Goods Arrival` are
+  monitoring states: nobody does anything while they are true. They become an action only
+  when the wait EXPIRES or a human decision is required.

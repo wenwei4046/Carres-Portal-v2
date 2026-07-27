@@ -160,9 +160,12 @@ If the tooltip would just re-state the label, delete the tooltip.
 Every visible ACTION label (queue name, ladder pill, drawer button, checklist
 row, follow-up preset) is written as:
 
-    [Verb] + [named party] + [measurable object]
+    [Verb] + [clear object]
+    — and the NAMED PARTY whenever an outside party is involved.
 
-- **Name the party.** Use the actual person/company when the system knows it
+- **Name the party when there is one.** `Assign logistics`, `Issue delivery order` and
+  `Upload delivery photo` involve nobody outside, so they carry no party and are correct as
+  they stand. Use the actual person/company when the system knows it
   (`Call Ohana — confirm PO-88 ready date` · `Call NETS — confirm delivery
   date`); the role word (`customer`, `supplier`) only when no name exists.
 - **The object is measurable.** "Contacted the supplier" completes nothing —
@@ -178,9 +181,9 @@ row, follow-up preset) is written as:
 
 ## Where the engine law lives
 
-How actions are computed, when they appear and disappear, which one shows first, and what
-every action must carry — **`docs/ACTION-FLOW-STANDARD.md`**. This file does not repeat it.
-This file is only about the WORDS.
+**This file defines WORDING only.** Action behaviour → `docs/ACTION-FLOW-STANDARD.md` ·
+a module's workflow → `docs/<MODULE>-WORKING-FLOW.md` · execution queues →
+`docs/execution-queues-index.md`. A rule lives in one document and is never copied here.
 
 ## The delivery queue words (re-ruled by Jess 2026-07-27 — this is the only version)
 
@@ -194,8 +197,8 @@ checklist item. The list is closed; a new chat does not add a fifth:
 | 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
 | 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
 
-Every deadline is counted in **working days** (Mon–Sat, Selangor public holidays
-skipped) — the same engine procurement uses. Lateness is written as the count
+Every deadline is counted in **working days** (see the one definition above) — the same
+engine procurement uses. Lateness is written as the count
 tail, numbers up front: `5 · 2 late`.
 
 **`Issue delivery order` IS an action** (Jess 2026-07-27): once the customer's date is
@@ -304,6 +307,25 @@ human action to show. `orders.do_number` is stamped by a DB trigger on dispatch 
 **"Issue delivery order" is not an action in this portal** — the verb rule and the trigger
 agree. It becomes an action only if Carres later wants a human gate before dispatch, which
 is a business decision, not a wording one.
+
+### Receiving and supplier-exception words (locked 2026-07-27)
+
+One vocabulary for every module that waits on a supplier. Never invent a synonym.
+
+| Group | The words |
+|---|---|
+| Receiving result | `Received` · `Received with exception` · `Rejected` |
+| Exception lifecycle | `Receiving exception created` · `Contact supplier` · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
+
+**Waiting words are STATES, never actions** — nobody acts while one is true (engine law).
+**Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
+different failure words.
+
+### Working days — one definition everywhere
+
+Monday–Saturday · Sunday excluded · Malaysian public holidays excluded (the live calendar
+is the Selangor observance set — the warehouse is in Selangor) · a due date landing on a
+non-working day moves automatically to the next working day.
 
 ### UI type dictionary (locked 2026-07-27)
 
