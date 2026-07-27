@@ -296,6 +296,39 @@ when C1 reaches it.
 stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
 (our shape puts the party first: `Call Ohana — confirm ready date`).
 
+### UI type dictionary (locked 2026-07-27)
+
+Every visible element has exactly one allowed shape. If a string does not fit its row,
+it is in the wrong element.
+
+| UI element | Must be |
+|---|---|
+| Action (ladder · queue · button · checklist row) | verb + named party + measurable object |
+| Checklist item | one short measurable task |
+| Completion rule | a condition the SYSTEM can measure — never "someone did it" |
+| Queue | a list of open Actions (its name IS the action) |
+| Dashboard tile | a count of open Actions |
+| Badge | fact only |
+| Status dot | fact only |
+| Filter | fact only |
+| Bulk action | verb + PLURAL object (`Send 12 POs` · `Call 8 suppliers — confirm ready date`) |
+
+**Banned words — never visible anywhere** (each names a mood or a gap instead of work):
+
+`Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
+`Pending` · `Processing` · `In Progress` · `Waiting` · `At Risk` · `Attention` ·
+`Inventory` · `Movements`
+
+(Filters may name a real STATE — `Placed`, `Proceed`, `Delivered`, `Owing` — but never
+one of the words above.)
+
+**The no-decorative-checkbox law.** A checklist item may exist only if it is either
+(a) DERIVED from a signal the system already stores, or (b) an input the system then
+stores. **A tick-box that only records "I say I did it" is banned** — it turns the portal
+into a manual to-do list and lets an order look complete when nothing happened. Where a
+FORM already collects the inputs (the PO form, the confirm-booking form), that form IS the
+checklist — never a second list of ticks beside it.
+
 ## Vocabulary — the canonical words
 
 Use these words EVERYWHERE. Never a synonym in a different page. When in

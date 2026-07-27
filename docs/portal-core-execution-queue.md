@@ -42,7 +42,10 @@ every visible word, audited") — build from that table, not from memory.** In t
 - `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
 - `Confirm` (bare) → `Confirm delivery with {customer}`
 - delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
-- `Pending` filter → rename to the state it selects (read the predicate first)
+- `Pending` filter → **rename to the state it selects — read the predicate first**; if it
+  selects "proceeded but not yet confirmed for delivery", the word is `To book`
+- column header `Manage` → **`Next`** (the card's own vocabulary; one word, not two)
+- facet chip `For Jess` → **`For manager`** (a product must not hard-code a person's name)
 - keep untouched: `Assign logistic` · `Deliver today` · `Upload delivery photo` · `Done` ·
   `No carrier` · the two confirmed/provisional fact strings
 - the party is the REAL name when known (supplier/carrier/customer), role word otherwise
@@ -132,6 +135,42 @@ fact, not by accident).
 **Done when:** SO-1209 can be confirmed; the 18 genuinely-owing orders show 🔒; no reader
 of money touches `order_payments`.
 
+## C6 · Every action opens its checklist (from Jess's ChatGPT ACTION FLOW, 2026-07-27)
+
+**Concept:** clicking an action in C2's Dynamic Checklist expands it into the steps that
+close it, and the action ticks itself when a **system-measurable** condition is true.
+Staff never tick anything that only means "I say I did it".
+
+**Build only the actions whose completion the system can already measure** (verified live):
+
+| Action | Completion rule | Signal that exists today |
+|---|---|---|
+| `Send PO to {supplier}` | PO exists AND supplier ETA recorded | `purchase_orders` + its eta |
+| `Call {supplier} — confirm ready date` | latest ETA updated | `ops_order_control.line_etas` |
+| `Collect RM {amount} from {customer}` | outstanding = RM 0 | **C5's shared helper — build C5 first** |
+| `Assign logistic` | carrier set | `ops_assigned_logistic` |
+| `Call {carrier} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
+| `Call {customer} — agree new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
+| `Upload delivery photo` | at least one photo | `delivery_photos` (0280) |
+
+**Two of the proposal's nine actions are deliberately NOT built:**
+- **`Issue Delivery Order`** — nobody issues one. `orders.do_number` is stamped by a DB
+  trigger on the dispatch transition (0098), so the action would have no human in it
+  (already ruled in T7; the ruling stands).
+- **`Deliver today`'s sub-steps** (`Goods loaded` · `Driver departed`) — no data exists.
+  Verified live: `partner_fleet` holds driver/vehicle columns but **1 row**, and
+  `ops_order_control` has **no per-order driver column at all**. Same for
+  `Driver assigned` / `Vehicle confirmed` inside the carrier call, and
+  `Condo registration completed`. They would be decorative checkboxes — banned by the
+  no-decorative-checkbox law. `Deliver today` keeps its own completion (delivered) and
+  no sub-list until a per-order driver field exists.
+
+**Where a form already collects the inputs, the form IS the checklist** — the PO form and
+the confirm-booking form are not to be duplicated as tick lists beside themselves.
+**Depends on C2 (the action list) and C5 (the money rule). No migration.**
+**Done when:** every built action closes itself from a real signal; no tick-box in the
+portal records only an assertion.
+
 ## Status
 
 | Card | Status | PR |
@@ -140,4 +179,5 @@ of money touches `order_payments`.
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |
-| C5 | ⬜ **HIGH** — live false-block, do before T9 | — |
+| C5 | ⬜ **HIGH** — live false-block, do FIRST | — |
+| C6 | ⬜ after C2 + C5 · action checklists | — |
