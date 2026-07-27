@@ -260,8 +260,26 @@ A gate REFUSES an action. Display order only decides what is read first.
 
 **Issuing the delivery order is the hard gate**, not agreeing a date: a date can be agreed
 with a customer while the goods and the money are still coming. Issuing is refused unless
-every goods line is reserved to this order (accessories pass automatically), the balance is
-collected, and the date is not a Sunday or a Malaysian public holiday. Agreeing the date
+every goods line is reserved to this order (accessories pass automatically), **the money is
+collected**, and the date is not a Sunday or a Malaysian public holiday.
+
+**"The money" is ONE number, and an unpaid storage fee is part of it** (Jess, 2026-07-27):
+`outstanding = Σ lines + add-ons + chargeable storage fee − orders.paid`. A storage fee
+that has not been collected holds the delivery exactly as an unpaid balance does — there is
+no second, softer rule for it.
+
+**The emergency override — the only way past it.** When goods must go out before the money
+is in, **the manager approves it, nobody else** (Jess, 2026-07-27). The request and the
+decision both live on the order and reuse the approval channel that already exists; the
+decision records who asked, who decided, when, and why. Two outcomes, and the approver
+picks one out loud:
+- **released, fee still owed** — the goods go, the money action stays open. This is the
+  default; an override must never quietly forgive money.
+- **released and waived** — the fee is written off with a reason.
+
+**Operations is told by the work itself.** The moment the override is granted the order's
+top action changes from collecting to delivering, so it surfaces in the operator's queue by
+itself — the same way every other action in this portal arrives. No separate alert engine. Agreeing the date
 still WARNS about the same three, so nobody promises a day the goods cannot make. A bed set (mattress + frame) can never be split; a sofa may travel on a second trip
 only if the customer agreed; accessories never block a delivery. A logistics company's own
 working days, closed dates, capacity and notice period **warn but never block** — a phone
