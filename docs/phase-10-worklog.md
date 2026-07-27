@@ -2251,3 +2251,39 @@ web 16) — zero new failures. typecheck 0, build + `check:v4` clean, design-sta
 (one new grey hover caught and fixed to `hover:bg-hovertint`). Live bundle downloaded to a
 file (4,327,283 bytes) before grepping: 5 T10 markers present, `SERVICE_ROLE` 0. All 4
 canonicals converged on `index-CD_Zji_Q.js` on the first poll.
+
+### Ship
+
+PR **#410** (merge in main) + renumber **#419**. Order mattered and was followed:
+**0289 applied first** (final tail check immediately before — it caught the second collision),
+then api Worker **`0cd3106b`** via `wrangler deploy --env production` (bindings receipt read:
+`PUBLIC_WEB_URL=https://pos.carresofficial.com`, `api.carresofficial.com` routed — not the
+default-env localhost), then web **`index-CD_Zji_Q.js`** to carres-portal + carres-pos, both
+`--branch=main`. All 4 canonicals converged on the first poll.
+
+Post-apply reconciliation against the file, not by eye: `md5(prosrc)` **e8d0686a…** + length
+**661** match the file's function body byte for byte; 1 copy (no ghost overload); `provolatile`
+= `i`; both constraints present; bucket private, 26214400, the five mime types; **2 storage
+policies and ZERO delete/update**; 0 sanity rows left behind; SC2607-01 intact.
+
+Live bundle downloaded to a file (a piped grep on 4 MB truncates and reports a false 0):
+**4,327,283 bytes**, byte-identical to the local build, `SERVICE_ROLE` **0**, and four markers
+from MOUNTED components present (`Take these first`, `Film slowly from left to right`,
+`service-case-evidence`, `Photo of the box it came in`). All three new routes answer **401**
+unauth on the custom domain.
+
+### Two things worth carrying forward
+
+**Guardrail #8 fired TWICE on one card.** 0287 was taken by `ready_stock_plan` before the
+first PR, and 0288 by `supplier_claims` *after* that PR had merged — so the second rename had
+to be its own follow-up (#419) rather than an edit to a file already on main. The rule that
+saved it both times is the SECOND check, the one immediately before applying.
+
+**The bundle hash did not move, and that was correct.** T10 had already deployed web from a
+union tip carrying this card's merged web code, so `index-CD_Zji_Q.js` was live before this
+session's deploy — the renumber only changed comments, which esbuild strips. That also means
+**S2's UI was live with no API behind it** for the gap between the two: the wizard showed step
+6 while the Worker had no `/evidence/sign-upload`, so uploads 404'd and Create Case stayed
+disabled. Nothing could be filed wrongly (the gate fails closed), but the wizard was unusable.
+T10's decision to hold the API back is exactly what kept a route from going live against a
+missing migration — the right call, and the reason this deploy is a fix as much as a ship.
