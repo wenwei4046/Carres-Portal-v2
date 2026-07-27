@@ -190,12 +190,17 @@ a module's workflow → `docs/<MODULE>-WORKING-FLOW.md` · execution queues →
 The delivery lifecycle is FOUR queues; the queue's label IS the row's top
 checklist item. The list is closed; a new chat does not add a fifth:
 
-| Step | The label | It holds | It goes late |
-|---|---|---|---|
-| 1 | `Assign logistics` | Stock in, no logistics company picked | 3 working days before the promised date |
-| 2 | `Confirm delivery date` | Logistics assigned, customer has not confirmed (row line: `Call {logistics} — confirm delivery date`) | 1 working day before the promised date |
-| 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
-| 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
+| Step | The label |
+|---|---|
+| 1 | `Assign logistics` |
+| 2 | `Confirm delivery date` (row line: `Call {logistics} — confirm delivery date`) |
+| 3 | `Deliver today` |
+| 4 | `Upload delivery photo` |
+
+**Only the words live here.** What each queue holds and when it goes late are TRIGGERS and
+DUE conditions — they live in `docs/ORDERS-WORKING-FLOW.md` §3, and nowhere else (Law 0A).
+This table used to carry them; C2 found the copy and it was deleted rather than kept in
+step.
 
 Every deadline is counted in **working days** (see the one definition above) — the same
 engine procurement uses. Lateness is written as the count

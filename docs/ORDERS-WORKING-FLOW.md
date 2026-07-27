@@ -240,9 +240,10 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 
 ```
 1  Broken commitment or today's run
-     Deliver today · the failed-delivery follow-up · Upload delivery photo
-2  The customer must be told something
-     Call {customer} — agree new delivery date
+     Deliver today · Upload delivery photo
+     (the follow-up after a FAILED delivery is not built — see below)
+2  The customer must be told something, through logistics
+     Call {logistics} — arrange new delivery date
 3  Goods are not secured
      Send PO to {supplier} · Call {supplier} — confirm ready date
 4  Delivery preparation
@@ -250,6 +251,11 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 5  Money
      Collect RM {amount} from {customer}
 ```
+
+**Not built yet, and named so nobody reads this list as a description of the screen:** the
+follow-up action after a failed delivery. `Deliver today` completes on delivered OR a
+Delivery Exception with its reason, but nothing yet turns that exception into the next
+action. It belongs to whichever card next touches the delivery day.
 
 Money shows last and this is not a demotion — you do not chase payment for goods you
 cannot deliver. It never disappears: it is always in the drawer list and the Owing filter.

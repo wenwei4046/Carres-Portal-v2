@@ -335,7 +335,13 @@ the confirm-booking form are not to be duplicated as tick lists beside themselve
 **ONE output only: the screen.** No printable action cards, no wall chart, no SOP document
 (Jess 2026-07-27: "我就是要用 system … portal lead to do"). The registry feeds the UI and
 nothing else; a staff member who needs paper means the screen failed.
-**Depends on C2 (the action list) and C5 (the money rule). No migration.**
+**No action has a Task Owner today** (C2 found it). Law 2 requires one on every action; the
+portal has only a per-ORDER `assigned_staff`. C6 needs it to say who a checklist step is
+waiting on — decide here whether the order's PIC is the task owner for every action of that
+order (cheapest, and true today) or whether a step can be handed to someone else.
+
+**Depends on C2 (the action list) and C5 (the money rule). No migration** unless a step must
+be ownable separately from its order.
 **Done when:** every built action closes itself from a real signal; no tick-box in the
 portal records only an assertion.
 
