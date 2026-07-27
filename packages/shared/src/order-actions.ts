@@ -27,8 +27,9 @@
  * new couplings:
  *   · the past-deadline escalation is scoped to "something has been ordered"
  *     (Loo, freeze gate 2026-07-12) so it can never leapfrog `Send PO`;
- *   · the money LOCK on `Confirm delivery` is a GATE (Law 4: "Money still
- *     LOCKS"), and C2's card says to keep it.
+ *   · the money LOCK is a GATE (Law 4: "Money still LOCKS"), which C2 kept and
+ *     C3 moved onto `collect` — the action that clears it — when the resting
+ *     `Confirm delivery` it used to ride was retired.
  * Neither REMOVES another track's action from the list, which is what Law 1
  * forbids.
  *
@@ -134,6 +135,52 @@ function goodsAction(s: OrderActionSignals): OrderOpenAction | null {
 }
 
 /**
+ * C3 — the money LOCK, as ONE predicate both tracks ask.
+ *
+ * Everything for the trip is arranged and the customer still owes: the delivery
+ * may not be made. Before C3 this was a `Confirm delivery` action carrying a 🔒;
+ * that action is retired (see `deliveryAction`), so the lock moves onto the
+ * thing that actually has to happen — collecting the money. The two tracks read
+ * ONE predicate so the delivery track can never fall silent while the money
+ * track forgets to say why.
+ *
+ * Reading a delivery signal here does not break Law 1: independence is about
+ * OUTPUTS. The lock REMOVES no action from the list — `collect` is open either
+ * way, and it is a gate, which Law 4 keeps ("Money still LOCKS").
+ */
+function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
+  return (
+    !s.completed &&
+    s.goodsReady &&
+    s.hasLogistics &&
+    s.bookingConfirmed &&
+    s.moneyOwing
+  );
+}
+
+/**
+ * C3 · The DELIVERING FACT — everything is arranged and the day has not come.
+ *
+ * Not an action and never in `openOrderActions`: goods in · logistics assigned ·
+ * the customer's date confirmed · that date still ahead means there is nothing
+ * for a human to do (`docs/ORDERS-WORKING-FLOW.md` §8). The row prints the quiet
+ * fact instead of a verb nobody can close, and the drawer's list is one row
+ * shorter.
+ *
+ * It is deliberately FALSE while the money holds the delivery: printing
+ * "Delivering 27 Jul" over an order the server will refuse to send would be the
+ * screen telling a lie. In that case the money track carries the row, locked.
+ */
+export function orderIsDelivering(s: OrderActionSignals): boolean {
+  if (s.completed || !s.goodsReady || !s.hasLogistics || !s.bookingConfirmed)
+    return false;
+  if (s.moneyOwing) return false;
+  // A confirmed date that is today or past is not "still ahead" — those are
+  // `Deliver today` and the broken-run escalation, both real actions.
+  return !(s.confirmedDateIso && s.confirmedDateIso <= s.todayIso);
+}
+
+/**
  * DELIVERY — arranging the trip. Runs whether or not the goods are in: you pick
  * a logistics company and get the customer's date for an order still in
  * production, and hiding that until the goods land is exactly the work the old
@@ -168,10 +215,12 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
   if (!s.bookingConfirmed)
     return action("confirm_delivery_date", "delivery", "info");
 
-  // Booked. The money LOCK sits here and nowhere else (the card: keep it) — you
-  // do not run a delivery you are not allowed to make.
-  if (s.goodsReady && s.moneyOwing)
-    return action("confirm_delivery", "delivery", "warning", { locked: true });
+  // Booked and HELD on money — the PayHold law (T7): you do not arrange, and
+  // you do not run, a delivery you are not allowed to make. The delivery track
+  // therefore says nothing at all, exactly as it did when this was a locked
+  // `Confirm delivery` sitting in front of the date split; the money track
+  // carries the row and carries the 🔒 (`deliveryHeldOnMoney`).
+  if (deliveryHeldOnMoney(s)) return null;
 
   // T7: a confirmed booking is not one resting state — its own date splits it.
   if (s.confirmedDateIso) {
@@ -184,11 +233,12 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
       return action("deliver_today", "delivery", "info");
   }
 
-  // Everything arranged for a future day. This is the ONE delivery answer that
-  // waits on the goods track: "everything ready, confirm" must not be said over
-  // goods that are not in. The goods action is still open and still listed —
-  // nothing is suppressed, this trigger simply has not fired.
-  return s.goodsReady ? action("confirm_delivery", "delivery", "success") : null;
+  // Everything arranged for a future day: NOT an action (C3, Jess 2026-07-27).
+  // There is nothing for a human to do until the day, so the row prints the
+  // quiet FACT `Delivering 27 Jul · 12pm–3pm` (`orderIsDelivering`) and the
+  // drawer's checklist is one row shorter instead of holding a row no button
+  // can close. `Deliver today` takes over on the day.
+  return null;
 }
 
 /**
@@ -196,7 +246,11 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
  * delivered order that still owes money keeps this action and its red dot.
  */
 function moneyAction(s: OrderActionSignals): OrderOpenAction | null {
-  return s.moneyOwing ? action("collect", "money", "warning") : null;
+  if (!s.moneyOwing) return null;
+  // C3 — the 🔒 the ladder has always shown, now on the action that clears it.
+  return deliveryHeldOnMoney(s)
+    ? action("collect", "money", "warning", { locked: true })
+    : action("collect", "money", "warning");
 }
 
 /**
@@ -234,12 +288,12 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // 4 · delivery preparation
   assign_logistics: 40,
   confirm_delivery_date: 41,
-  confirm_delivery: 42,
   // 5 · money — last on purpose, and it is not a demotion: 催钱前先看货. It is
   // always in this list and always in the Owing filter.
   collect: 50,
-  // Terminal fact, never raised as an action; ranked only so the map is total.
+  // FACTS, never raised as actions; ranked only so the map stays total.
   done: 90,
+  delivering: 91,
 };
 
 /** A broken commitment outranks everything (Law 4 rung 1), whatever track it

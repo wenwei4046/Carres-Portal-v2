@@ -48,12 +48,14 @@ describe("OrderActionList", () => {
   });
 
   it("a held action carries the lock the ladder already shows", () => {
+    // C3 — the 🔒 rides `Collect` now: the resting `Confirm delivery` it used to
+    // ride was retired, and the lock belongs on the action that CLEARS it.
     const { container } = render(
       <OrderActionList
         actions={[
           {
-            key: "confirm_delivery",
-            line: "Confirm delivery with John Tan",
+            key: "collect",
+            line: "Collect RM 2,455 from John Tan",
             tone: "warning",
             locked: true,
           },

@@ -1467,7 +1467,11 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + customer confirmed + paid → Confirm (green)", () => {
+  // C3 (Jess 2026-07-27) — "everything ready, the day has not come" stopped
+  // being an action: it was the one row in the drawer no button could close.
+  // The ladder answers with the quiet FACT instead, and `Deliver today` takes
+  // over on the day.
+  it("ready + carrier + customer confirmed + paid → the Delivering FACT, quiet", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1475,12 +1479,14 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
-      tone: "success",
+      label: "Delivering",
+      tone: "neutral",
     });
+    // Never red, and never an action: the drawer's list is EMPTY for this row.
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("ready + carrier + customer confirmed + owing balance → Confirm, held (🔒)", () => {
+  it("ready + carrier + customer confirmed + owing balance → Collect, held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1488,7 +1494,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
@@ -1499,7 +1505,7 @@ describe("nextActionOf (C2)", () => {
   // them owed RM 56,859. It now reads the shared `orderMoney` — the priced
   // lines against `orders.paid` — the SAME rule the server's booking gate asks.
 
-  it("SO-1256's shape: priced lines with a 50% deposit → Confirm, held (🔒)", () => {
+  it("SO-1256's shape: priced lines with a 50% deposit → held (🔒)", () => {
     const o = makeRow({
       id: "x",
       so: 1256,
@@ -1510,12 +1516,12 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
 
-  it("SO-1209's shape: paid in full → Confirm, NOT held", () => {
+  it("SO-1209's shape: paid in full → NOT held, and the day is simply ahead", () => {
     // The live false-block. RM 6,998 + RM 250 of add-ons, `orders.paid`
     // RM 7,248, balance NULL. Nothing may hold this delivery.
     const o = makeRow({
@@ -1528,7 +1534,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm delivery");
+    expect(r.label).toBe("Delivering");
     expect(r.locked).toBeFalsy();
   });
 
@@ -1558,7 +1564,7 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
-  it("ready + carrier + customer confirmed + owing storage → Confirm, held", () => {
+  it("ready + carrier + customer confirmed + owing storage → held", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1566,12 +1572,12 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
 
-  it("ready + carrier + customer confirmed + storage waived → Confirm, NOT held", () => {
+  it("ready + carrier + customer confirmed + storage waived → NOT held", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1583,7 +1589,7 @@ describe("nextActionOf (C2)", () => {
       },
     });
     const r = nextActionOf(o, { state: "ready" }, []);
-    expect(r.label).toBe("Confirm delivery");
+    expect(r.label).toBe("Delivering");
     expect(r.locked).toBeFalsy();
   });
 
@@ -1614,17 +1620,18 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("confirmed for a future day → still Confirm (T7 changes nothing before the day)", () => {
+  it("confirmed for a future day → the quiet FACT, with no action behind it", () => {
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, confirmed_date: inDays(3) },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Confirm delivery");
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Delivering");
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("owing balance beats Deliver today (PayHold: never chase a delivery we may not make)", () => {
+  it("owing balance beats Deliver today (PayHold: never arrange a delivery we may not make)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1632,7 +1639,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Confirm delivery",
+      label: "Collect",
       locked: true,
     });
   });
@@ -1999,5 +2006,148 @@ describe("Delivery column (T1 booking truth)", () => {
     expect(prov).not.toHaveStyle({ color: "#3B6D11" });
     const conf = within(row(2001)).getByText("27 Jul · 9–11 AM");
     expect(conf).toHaveStyle({ color: "#3B6D11" });
+  });
+});
+
+// ─── C3 · the Actions column shows the whole truth ───────────────────────────
+// (docs/portal-core-execution-queue.md · Jess 2026-07-27)
+//
+// Two things ship here. The `+N` — the row shows Layer 2's top action and says
+// how many more are open, so nothing is hidden by the one that leads. And the
+// retirement of `Confirm delivery with {customer}`: "everything ready, the day
+// has not come" is a FACT, not work, so the cell states it quietly and the
+// drawer's list is one row shorter instead of holding a row no button can
+// close.
+describe("Actions column · +N and the delivering FACT (C3)", () => {
+  const iso = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  /** Three open actions: nothing ordered (goods) · no logistics (delivery) ·
+   *  a priced order with nothing paid (money). The card's own example. */
+  const THREE = makeRow({
+    id: "three",
+    so: 3001,
+    status: "proceed_order",
+    operation_stage: "confirmed",
+    customer_name: "John Tan",
+    delivery_date: iso(10),
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 2455 }],
+    paid: 0,
+  });
+  /** One open action: goods are in, the money is settled, no logistics yet. */
+  const ONE = makeRow({
+    id: "one",
+    so: 3002,
+    status: "proceed_order",
+    operation_stage: "ready_to_dispatch",
+    customer_name: "Siti",
+    delivery_date: iso(10),
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1000 }],
+    paid: 1000,
+    ops_order_control: { line_stock_status: { "mattress:MAT-1": "ready" } },
+  });
+  /** Everything arranged, the day is ahead, paid in full → the FACT. */
+  const ARRANGED = makeRow({
+    id: "arranged",
+    so: 3003,
+    status: "proceed_order",
+    operation_stage: "ready_to_dispatch",
+    customer_name: "Kong",
+    delivery_date: iso(6),
+    delivery_partners: { id: "p-nets", name: "NETS" },
+    order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1000 }],
+    paid: 1000,
+    ops_order_control: {
+      line_stock_status: { "mattress:MAT-1": "ready" },
+      booking_stage: "confirmed",
+      confirmed_date: iso(6),
+      confirmed_time_slot: "Morning (9–11 AM)",
+    },
+  });
+
+  beforeEach(() => {
+    listHookState.data = { orders: [THREE, ONE, ARRANGED] };
+  });
+
+  function row(so: number) {
+    return screen
+      .getAllByTestId("order-row")
+      .find((r) => r.textContent?.includes(`SO-${so}`))!;
+  }
+
+  it("an order with three open actions leads with one and counts the rest", () => {
+    wrap(<OperationOrdersControl />);
+    const cell = row(3001);
+    expect(within(cell).getByText("Send PO to supplier")).toBeInTheDocument();
+    expect(within(cell).getByTestId("next-more")).toHaveTextContent("+2");
+  });
+
+  it("a row with one action shows no +N", () => {
+    wrap(<OperationOrdersControl />);
+    expect(within(row(3002)).getByText("Assign logistics")).toBeInTheDocument();
+    expect(within(row(3002)).queryByTestId("next-more")).toBeNull();
+  });
+
+  it("the count always equals C2's row count — 1 + N is the drawer's list length", () => {
+    // Asserted against the DRAWER the row opens, never against a second run of
+    // the ladder: if these two ever diverge the row is lying about what is open.
+    wrap(<OperationOrdersControl />);
+    for (const so of [3001, 3002]) {
+      const cell = row(so);
+      const more = within(cell).queryByTestId("next-more");
+      const claimed = 1 + (more ? Number(more.textContent!.replace("+", "")) : 0);
+      fireEvent.click(cell);
+      const journey = JSON.parse(
+        screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+      );
+      expect(journey.openActions).toHaveLength(claimed);
+      fireEvent.click(screen.getByText("close"));
+    }
+  });
+
+  it("the +N names what it is hiding and opens the drawer's full list", () => {
+    wrap(<OperationOrdersControl />);
+    const more = within(row(3001)).getByTestId("next-more");
+    expect(more.getAttribute("title")).toContain("Collect RM 2,455 from John Tan");
+    fireEvent.click(more);
+    expect(screen.getByTestId("drawer-stub")).toHaveAttribute("data-order-id", "three");
+  });
+
+  it("everything arranged, the day ahead → a quiet FACT, no verb and nothing to click", () => {
+    wrap(<OperationOrdersControl />);
+    const cell = row(3003);
+    const fact = within(cell).getByText("Delivering");
+    // A fact, not a pill: a pill in this column is a button, and there is
+    // nothing here for a human to press.
+    expect(fact.className).toContain("t4-caption");
+    expect(fact.className).not.toContain("pill");
+    expect(within(cell).queryByTestId("next-more")).toBeNull();
+    expect(within(cell).queryByText(/Confirm delivery with/)).toBeNull();
+    // Never red — quiet tone is the ruling.
+    expect(fact.className).not.toContain("danger");
+  });
+
+  it("the row keeps the day OUT of the cell and the drawer states it in full", () => {
+    // The Delivery cell one column to the left already prints the booked day,
+    // so printing it again here would say the same thing twice; the tooltip
+    // carries it, and the drawer's journey strip says the whole sentence.
+    wrap(<OperationOrdersControl />);
+    const cell = row(3003);
+    const fact = within(cell).getByText("Delivering");
+    expect(fact.getAttribute("title")).toMatch(/Nothing to do until/);
+    fireEvent.click(cell);
+    const journey = JSON.parse(
+      screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
+    );
+    expect(journey.next.line).toMatch(/^Delivering \d+ \w+ · 9–11 AM$/);
+    // …and the drawer's dynamic checklist is EMPTY: one fewer row, not a row
+    // nobody can act on.
+    expect(journey.openActions).toEqual([]);
   });
 });

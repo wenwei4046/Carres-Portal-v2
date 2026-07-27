@@ -64,8 +64,10 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
       { hasPo: true, goodsReady: true, bookingConfirmed: true },
       "Delivery",
     ],
+    // C3 — the FACT that replaced `Confirm delivery`: the ● still lands on
+    // Delivery (booking finished, delivery not happened), but nobody acts.
     [
-      "Confirm delivery",
+      "Delivering",
       { hasPo: true, goodsReady: true, bookingConfirmed: true },
       "Delivery",
     ],
@@ -225,8 +227,11 @@ describe("deriveOrderJourney — owner", () => {
       "Assign logistics",
       "Confirm delivery date",
       "Deliver today",
-      "Confirm delivery",
+      "Delivering",
       "Upload delivery photo",
+      // C2 made `Collect` a headline in its own right; C3's hold makes it one
+      // more often, so it needs an owner line like every other word.
+      "Collect",
       "Done",
     ];
     for (const label of verbs) {
@@ -244,7 +249,7 @@ describe("deriveOrderJourney — owner", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm delivery", tone: "warning", locked: true },
+          next: { label: "Collect", tone: "warning", locked: true },
         }),
         holdAmountLabel: "1,200",
       }),
@@ -268,7 +273,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm delivery", tone: "warning", locked: true },
+          next: { label: "Collect", tone: "warning", locked: true },
           holdAmount: 1200,
         }),
         holdAmountLabel: "1,200",
@@ -282,7 +287,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm delivery", tone: "warning", locked: true },
+          next: { label: "Collect", tone: "warning", locked: true },
         }),
       }),
     );
@@ -315,7 +320,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm delivery", tone: "warning", locked: true },
+          next: { label: "Collect", tone: "warning", locked: true },
         }),
         holdAmountLabel: "500",
         ledgerOutstanding: 2800,
@@ -391,7 +396,7 @@ describe("OrderJourneyHeader — the strip", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm delivery", tone: "warning", locked: true },
+          next: { label: "Collect", tone: "warning", locked: true },
         }),
         holdAmountLabel: "1,200",
       }),
@@ -415,8 +420,9 @@ describe("OrderJourneyHeader — the strip", () => {
       "Assign logistics",
       "Confirm delivery date",
       "Deliver today",
-      "Confirm delivery",
+      "Delivering",
       "Upload delivery photo",
+      "Collect",
       "Done",
     ]) {
       const j = deriveOrderJourney(

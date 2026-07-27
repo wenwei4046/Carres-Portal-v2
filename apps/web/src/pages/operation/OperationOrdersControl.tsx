@@ -56,13 +56,13 @@ import {
   deliveryQueueForLabel,
   deliveryStepOverdue,
   myHolidaySet,
-  collectPillLabel,
   deliveryDateGapFact,
   orderActionLine,
   orderActionQueue,
   orderActionsInDisplayOrder,
   displayOrderAction,
   openOrderActions,
+  orderIsDelivering,
   orderMoney,
   type OrderActionKey,
   type OrderActionSignals,
@@ -694,7 +694,7 @@ export function rowDotsOf(
   }
   return [money, goods, delivery];
 }
-function fmtRM(n: number): string {
+export function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
 }
 
@@ -836,16 +836,20 @@ function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
     : { key, label: orderActionQueue(key), tone };
 }
 
-/** LAYER 2 for this row. Nothing open → `Done`, the terminal FACT: the engine
- *  refuses to invent it (an empty list is the honest answer), and this is the
- *  one surface that has to print something. */
+/** LAYER 2 for this row. Nothing open → a FACT, because the engine refuses to
+ *  invent one (an empty list is its honest answer) and this is the surface that
+ *  has to print something. TWO facts, and picking the wrong one is the whole
+ *  point of C3: `Delivering …` when the trip is arranged and the day has not
+ *  come, `Done` when the order is genuinely finished. Both are quiet, neither
+ *  is ever a queue — no facet row and no delivery queue names either word. */
 export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
 ): NextAction {
-  const top = displayOrderAction(openOrderActions(orderActionSignalsOf(o, stock, lines)));
-  if (!top) return act("done", "neutral");
+  const s = orderActionSignalsOf(o, stock, lines);
+  const top = displayOrderAction(openOrderActions(s));
+  if (!top) return act(orderIsDelivering(s) ? "delivering" : "done", "neutral");
   return top.locked
     ? act(top.key, top.tone, true)
     : act(top.key, top.tone);
@@ -1241,12 +1245,17 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // longest words, so "Customer confirmed" never clips (Jess 2026-07-19 asked
   // for exactly that on the old pair). Rebalanced out of customer/next.
   { key: "dots", label: "Status", w: 11 },
-  { key: "order", label: "Order", w: 10 },
+  // C3 gave 1 unit to Actions. `SO-1002` + `CR0418 +1` are both short mono
+  // strings with visible slack; the two longest STATUS words are what pinned
+  // `dots` at 11 (C1), so that column was left alone.
+  { key: "order", label: "Order", w: 9 },
   { key: "customer", label: "Customer", w: 11 },
   // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
   // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law).
   { key: "deadline", label: "Deadline", w: 13 },
-  { key: "stock", label: "Stock", w: 11 },
+  // The other unit C3 moved to Actions. The widest thing here is
+  // `ETA 20 Jul 26, Sun` on a caption line, which still fits.
+  { key: "stock", label: "Stock", w: 10 },
   // Delivery + Actions each took a point from the cells beside them: C1's words
   // name the party, so the strings are longer ("NETS — confirm delivery date").
   { key: "delivery", label: "Delivery", w: 13 },
@@ -1254,7 +1263,16 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
   // ACTIONS, plural (Jess 2026-07-27): an order can have several. Was "Manage".
-  { key: "next", label: "Actions", w: 14 },
+  //
+  // C3 · the truncation question Jess deferred to this card, DECIDED: the
+  // column takes 2 more units (from `order` and `stock`, the two with real
+  // slack) and the longest lines still truncate with their tooltip — and that
+  // is accepted, not conceded. A row of eight columns cannot hold
+  // `Call NETS Logistics — confirm delivery date` whole without starving a
+  // neighbour, the visible half is the half that acts (verb + party), and since
+  // C2 the FULL text has a proper home one click away: the drawer lists every
+  // open action in full. The `+N` beside the pill says how much is behind it.
+  { key: "next", label: "Actions", w: 16 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1673,11 +1691,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const holdAmount = money.known ? money.outstanding : null;
     const na = nextActionOf(o, stock, o.order_lines ?? []);
     const sid = primarySupplierId(o, skuMeta, suppliers);
+    // C3 — the drawer is the ONE surface that prints the delivering FACT in
+    // full (`Delivering 27 Jul · 12pm–3pm`). The Orders row and the Delivery
+    // detail pane both sit beside a cell that already carries the booked day,
+    // so they print the short `Delivering`; here nothing else says it.
+    const booking = orderBookingDay(o);
     const actionParties = {
       supplier: sid ? supplierNameById.get(sid) ?? null : null,
       logistics: logisticOf(o, partnerName),
       customer: o.customer_name,
       amount: money.known ? fmtRM(money.outstanding) : null,
+      deliveryDate:
+        booking.kind === "confirmed" && booking.date ? dayMon(booking.date) : null,
+      deliverySlot:
+        booking.kind === "confirmed" && booking.slot ? shortSlot(booking.slot) : null,
     };
     return {
       next: {
@@ -4380,12 +4407,13 @@ function OrderRow({
         />
       </td>
       )}
-      {/* ACTIONS — the action, with the party NAMED (C1, Jess 2026-07-27), and
-          a one-click act (2026-07-19): the whole row opens the drawer, so the
-          pill itself is the button that acts on the order. The pill reads the
-          row LINE (`Call NETS — confirm delivery date`); the QUEUE word behind
-          it (`Confirm delivery date`) is what the facet rail and the counts
-          use, and `data-next-action` keeps carrying that stable word. */}
+      {/* ACTIONS — the whole truth (C3, Jess 2026-07-27): the top action from
+          Layer 2, with the party NAMED (C1), plus `+N` when more are open. The
+          pill reads the row LINE (`Call NETS — confirm delivery date`); the
+          QUEUE word behind it (`Confirm delivery date`) is what the facet rail
+          and the counts use, and `data-next-action` keeps carrying that stable
+          word. One-click act (2026-07-19): the whole row opens the drawer, so
+          the pill itself is the button that acts on the order. */}
       {showCol("next") && (
       <td className="pl-2 pr-2">
         {(() => {
@@ -4402,29 +4430,63 @@ function OrderRow({
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
           if (completed && na.key === "done") return null;
-          // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
-          // is the PRIMARY action; an outstanding balance is an INDEPENDENT
-          // track, shown as a secondary `Collect RM {amount}` pill (max two
-          // pills). Hidden once the order is closed. A 🔒 Confirm delivery
-          // already means "money-held", so the pill isn't doubled up there.
-          // C5: the figure comes from the shared money rule, so the pill, the
-          // 🔒 and the Owing facet can never disagree. An order nobody has
-          // priced shows no money pill at all — we do not know what it owes.
           const m = moneyOf(o);
-          const owing = !completed && m.owing;
-          const showMoney =
-            owing && na.key !== "confirm_delivery" && na.key !== "collect";
-          const amount = fmtRM(m.outstanding);
-          // C2: money is its own track now, so `collect` can BE the headline —
-          // on a delivered order that still owes, it is the only action left.
-          // The amount has to ride the line then, or the pill reads
-          // "Collect from John Tan" and names no figure.
-          const line = orderActionLine(na.key, {
+          const parties = {
             supplier: supplierName,
             logistics: logi.partner,
             customer: o.customer_name,
-            amount: m.known ? amount : null,
-          });
+            amount: m.known ? fmtRM(m.outstanding) : null,
+            // C3 — the fact's own two values, already formatted; the words
+            // module owns the sentence and never a date (see below: this cell
+            // prints the SHORT form, so they only reach the tooltip).
+            deliveryDate: logi.date ? dayMon(logi.date) : null,
+            deliverySlot: logi.slot ? shortSlot(logi.slot) : null,
+          };
+          // C3 — the FACT that replaced `Confirm delivery with {customer}`:
+          // everything is arranged and the day has not come, so there is
+          // nothing to do and nothing to click. Quiet grey, never a pill: a
+          // pill in this column is a button, and a fact is not one.
+          //
+          // WHICH FORM: the short one. The Delivery cell immediately to the
+          // left already prints `27 Jul · 12pm–3pm`, so the full
+          // `Delivering 27 Jul · 12pm–3pm` would say the same thing twice in
+          // adjacent columns — the trap C1 hit in the delivery badge and solved
+          // by dropping the verb. Here the duplicated half is the DATE, so the
+          // cell keeps the word and the tooltip carries the day. The full
+          // sentence still ships, in the drawer's journey strip, where nothing
+          // else on screen says it.
+          if (na.key === "delivering") {
+            const full = orderActionLine("delivering", parties);
+            return (
+              <span
+                className="t4-caption truncate block"
+                data-next-action={na.label}
+                title={
+                  full === "Delivering"
+                    ? "Goods in, logistics booked, the customer confirmed the day. Nothing to do until then."
+                    : `Goods in, logistics booked. Nothing to do until ${full.replace(/^Delivering /, "")}.`
+                }
+              >
+                {na.label}
+              </span>
+            );
+          }
+          // C2/C3: money is its own track, so `collect` can BE the headline —
+          // on a delivered order that still owes, or on one whose delivery is
+          // held for the balance, it is the only action left. The amount rides
+          // the line then, or the pill reads "Collect from John Tan" and names
+          // no figure. C5: the figure comes from the shared money rule, so the
+          // pill, the 🔒 and the Owing facet can never disagree.
+          const line = orderActionLine(na.key, parties);
+          // C3 — everything else that is open, folded into ONE `+N`. It
+          // replaces the old secondary `Collect RM …` pill: a cell may have
+          // exactly one way of saying "there is more", and the `+N` covers all
+          // three tracks where the money pill covered one (and, since Law 4,
+          // money is the one that displays LAST). The count is
+          // `open.length − 1` by construction, so the drawer opened by this row
+          // shows exactly `1 + N` rows — it is the same computation.
+          const open = openActionsOf(o, stock, lines);
+          const more = open.slice(1);
           return (
             <div className="flex items-center gap-1.5 max-w-full">
               <button
@@ -4440,21 +4502,20 @@ function OrderRow({
                 {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
                 <span className="truncate min-w-0">{line}</span>
               </button>
-              {showMoney && (
+              {more.length > 0 && (
                 <button
                   type="button"
+                  data-testid="next-more"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onNextAction(orderActionQueue("collect"));
+                    onOpen();
                   }}
-                  className="pill pill-collected shrink-0 hover:brightness-95"
-                  data-next-action={orderActionQueue("collect")}
-                  title={orderActionLine("collect", {
-                    amount,
-                    customer: o.customer_name,
-                  })}
+                  className="shrink-0 tabular-nums text-[12px] font-semibold text-base-500 hover:text-base-900"
+                  title={`Also open: ${more
+                    .map((a) => orderActionLine(a.key, parties))
+                    .join(" · ")} — click to see them all`}
                 >
-                  {collectPillLabel(amount)}
+                  +{more.length}
                 </button>
               )}
             </div>

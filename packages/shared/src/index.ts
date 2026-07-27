@@ -799,6 +799,8 @@ export {
   displayOrderAction,
   openOrderActions,
   orderActionsInDisplayOrder,
+  // C3 — the FACT that replaced the retired `Confirm delivery` action.
+  orderIsDelivering,
   type OrderActionSignals,
   type OrderActionTone,
   type OrderActionTrack,

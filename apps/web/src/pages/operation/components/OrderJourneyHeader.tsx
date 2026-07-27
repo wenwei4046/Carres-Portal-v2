@@ -125,7 +125,10 @@ const VERB_STAGE: Record<string, JourneyStage> = {
   [orderActionQueue("assign_logistics")]: "Booking",
   [orderActionQueue("confirm_delivery_date")]: "Booking",
   [orderActionQueue("deliver_today")]: "Delivery",
-  [orderActionQueue("confirm_delivery")]: "Delivery",
+  // C3 — the FACT that replaced `Confirm delivery`. It is not an action, but it
+  // IS what the ladder returns for an order waiting for its booked day, so the
+  // ● has to land somewhere: Booking is finished, Delivery has not happened.
+  [orderActionQueue("delivering")]: "Delivery",
   [orderActionQueue("upload_delivery_photo")]: "Done",
 };
 
@@ -141,8 +144,15 @@ const VERB_OWNER: Record<string, string> = {
   [orderActionQueue("confirm_delivery_date")]:
     "Logistics — customer has not confirmed a date",
   [orderActionQueue("deliver_today")]: "Logistics — delivering today",
-  [orderActionQueue("confirm_delivery")]: "Operations — everything ready, confirm",
+  // C3 — nobody acts before the day, and saying so is the point of retiring the
+  // old `Confirm delivery`: this line used to read "everything ready, confirm"
+  // over a row no button could close.
+  [orderActionQueue("delivering")]: "Logistics — delivering on the confirmed day",
   [orderActionQueue("upload_delivery_photo")]: "Operations — upload the delivery photo",
+  // C2 made `collect` a headline in its own right (a delivered order that still
+  // owes; a delivery held on the balance). Without this it fell through to
+  // "check this order", which tells an operator nothing.
+  [orderActionQueue("collect")]: "Operations — collect the balance",
   [orderActionQueue("done")]: "Nobody — this order is closed",
 };
 /** The money hold reads differently from the plain Confirm: the ladder's 🔒
