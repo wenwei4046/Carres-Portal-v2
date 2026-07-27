@@ -845,6 +845,33 @@ export {
   type SupplierClaimCloseProblem,
 } from "./supplier-claim";
 
+// R4 · Problem stock is quarantined — on hold · returned · written off
+export {
+  OPS_STOCK_STATUS_LABEL,
+  SELLABLE_STOCK_STATUSES,
+  HELD_STOCK_STATUS,
+  RETURNED_STOCK_STATUS,
+  WRITTEN_OFF_STOCK_STATUS,
+  TERMINAL_STOCK_STATUSES,
+  STOCK_HOLD_REASONS,
+  STOCK_HOLD_REASON_KEYS,
+  STOCK_HOLD_OUTCOMES,
+  STOCK_HOLD_OUTCOME_KEYS,
+  STOCK_HOLD_OUTCOME_STATUS,
+  STOCK_HOLD_RESOLVE_PROBLEM_TEXT,
+  opsStockStatusLabel,
+  isHeldStockStatus,
+  isSellableStockStatus,
+  stockHoldReasonLabel,
+  stockHoldOutcomeLabel,
+  holdOutcomeNeedsNote,
+  holdResolveProblems,
+  heldUnitsLine,
+  type StockHoldReason,
+  type StockHoldOutcome,
+  type StockHoldResolveProblem,
+} from "./stock-hold";
+
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
 export {
   DELIVERY_GROUPS,

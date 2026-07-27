@@ -3375,6 +3375,11 @@ export interface SupplierClaimListRow {
    *  could not tell (the line was deleted), which counts as still pending. */
   line_pending: boolean | null;
   next_move: SupplierClaimMove;
+  /** R4 — units of this claim still quarantined (`on_hold`). Read from the
+   *  register, not derived from `qty`: a partner warehouse keeps no per-unit
+   *  register, and resolved units are gone from the count. */
+  held_units: number;
+  hold_reason: string | null;
 }
 
 export interface SupplierClaimsResponse {
@@ -3437,6 +3442,9 @@ export interface SupplierClaimMoveResult {
   status?: string;
   requested_action?: string;
   supplier_response?: string;
+  /** R4 — the hold resolution answers with what it moved. */
+  outcome?: string;
+  units?: number;
 }
 
 function useSupplierClaimMove<TInput>(
@@ -3514,6 +3522,36 @@ export function useSupplierClaimCloseMutation(
   return useSupplierClaimMove<{ note?: string }>(
     (id) => `/api/operation/supplier-claims/${id}/close`,
     opts,
+  );
+}
+
+/**
+ * R4 — what happened to the quarantined units.
+ *
+ * Shares the claim-move invalidation because the answer changes the row's held
+ * count, and it ALSO invalidates the stock register: the units either entered
+ * the ready pool or left the building, and an On-hand list still showing them
+ * on hold is the one thing this card exists to prevent.
+ */
+export function useSupplierClaimHoldResolveMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; outcome: string; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useSupplierClaimMove<{ outcome: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/hold-resolve`,
+    {
+      ...opts,
+      onSuccess: async (...args) => {
+        await qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+        opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+      },
+    },
   );
 }
 

@@ -112,6 +112,15 @@ describe("GET /api/operation/supplier-claims", () => {
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
         if (t === "app_users")
           return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        // R4 — the two units this claim quarantined.
+        if (t === "ops_stock_items")
+          return listBuilder(
+            [
+              { hold_claim_id: "c1", hold_reason: "damaged" },
+              { hold_claim_id: "c1", hold_reason: "damaged" },
+            ],
+            eqCalls,
+          );
         throw new Error(`unmocked table ${t}`);
       }),
     };
@@ -134,6 +143,9 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(body.claims[0].supplier_name).toBe("Ohana");
     expect(body.claims[0].reported_by_name).toBe("Shasha");
     expect(body.claims[0].photo_count).toBe(1);
+    // R4 — the goods, read from the register rather than copied from qty.
+    expect(body.claims[0].held_units).toBe(2);
+    expect(body.claims[0].hold_reason).toBe("damaged");
     // NEVER the admin client for a read the caller's own RLS can do.
     expect(adminClient).not.toHaveBeenCalled();
   });
@@ -210,6 +222,7 @@ describe("GET /api/operation/supplier-claims", () => {
         // The line still owes 1 unit → the supplier still owes the move.
         if (t === "purchase_order_lines")
           return listBuilder([{ id: "l2", qty: 3, received_qty: 2 }], eqCalls);
+        if (t === "ops_stock_items") return listBuilder([], eqCalls);
         throw new Error(`unmocked table ${t}`);
       }),
     };
@@ -550,5 +563,126 @@ describe("POST /:id/close — settle it", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R4 (migration 0299) — what happened to the quarantined units
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The invisibility itself is the DATABASE's job (a trigger refuses `on_hold →
+// reserved|sold|transferred` whichever door tries it, dry-run-asserted against
+// live before apply). What the ROUTER owes is narrower and is what these pin:
+// the right RPC with the right arguments, the note rule answered in words
+// before a round-trip, an invented outcome refused, and the RPC's own refusal
+// surfaced with its detail code intact.
+
+describe("POST /:id/hold-resolve — the goods", () => {
+  it("puts the units back in stock through the RPC", async () => {
+    const sb = rpcClient({
+      data: { claim_no: "SC-1001", outcome: "back_to_stock", units: 2 },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", { outcome: "back_to_stock" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("ops_stock_resolve_hold", {
+      p_claim_id: "c1",
+      p_outcome: "back_to_stock",
+      p_note: null,
+    });
+    // A user-JWT write. The RPC gates independently; there is no service-role
+    // bypass anywhere on this desk.
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("sends the units back to the supplier with their note", async () => {
+    const sb = rpcClient({ data: { outcome: "returned", units: 1 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", {
+      outcome: "returned",
+      note: "Collected by Ohana's lorry",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("ops_stock_resolve_hold", {
+      p_claim_id: "c1",
+      p_outcome: "returned",
+      p_note: "Collected by Ohana's lorry",
+    });
+  });
+
+  it("refuses a write-off with no words, in a sentence, before any round-trip", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", { outcome: "written_off" });
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("unprocessable");
+    expect(body.message).toBe("Say why the units were written off.");
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a whitespace-only reason is not a reason", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", {
+      outcome: "written_off",
+      note: "   ",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("accepts a write-off that says why", async () => {
+    const sb = rpcClient({ data: { outcome: "written_off", units: 1 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", {
+      outcome: "written_off",
+      note: "Frame cracked through, unsellable",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("ops_stock_resolve_hold", {
+      p_claim_id: "c1",
+      p_outcome: "written_off",
+      p_note: "Frame cracked through, unsellable",
+    });
+  });
+
+  it("refuses an invented outcome without touching the database", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", { outcome: "sold_it_cheap" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the RPC's refusal when nothing is on hold", async () => {
+    const sb = rpcClient({
+      error: {
+        code: "P0001",
+        details: "no_held_units",
+        message: "claim SC-1001 has no units on hold",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/hold-resolve", { outcome: "returned" });
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((await res.json()) as any).code).toBe("no_held_units");
+  });
+
+  it("refuses a supplier, a partner and a dealer", async () => {
+    for (const role of ["supplier", "partner", "dealer"]) {
+      const res = await post("c1/hold-resolve", { outcome: "returned" }, role);
+      expect(res.status).toBe(403);
+    }
+    expect(userClient).not.toHaveBeenCalled();
   });
 });

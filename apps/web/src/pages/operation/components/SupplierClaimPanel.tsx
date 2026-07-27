@@ -4,8 +4,13 @@ import { useMemo, useState } from "react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
+  STOCK_HOLD_OUTCOMES,
+  STOCK_HOLD_RESOLVE_PROBLEM_TEXT,
   SUPPLIER_CLAIM_RESPONSES,
   claimCloseProblems,
+  heldUnitsLine,
+  holdOutcomeNeedsNote,
+  holdResolveProblems,
   requestedActionsFor,
   responseNeedsNote,
   supplierClaimRequestLabel,
@@ -16,6 +21,7 @@ import {
 import {
   useOperationSupplierClaimPhotos,
   useSupplierClaimCloseMutation,
+  useSupplierClaimHoldResolveMutation,
   useSupplierClaimRequestMutation,
   useSupplierClaimResponseMutation,
   type SupplierClaimListRow,
@@ -42,6 +48,13 @@ import { buildSupplierClaimMessage } from "@/lib/wa-templates";
  * A recorded side becomes READ-ONLY prose. Nothing on this panel can rewrite
  * history into agreement — the ask freezes the moment an answer lands, which is
  * exactly what makes "what we wanted vs what we got" worth reading later.
+ *
+ * R4 adds the GOODS, on the left under the evidence. The units this claim is
+ * about are quarantined (`on_hold`) from the moment the receive raised it, and
+ * this is where somebody says what happened to them. It is deliberately NOT
+ * gated on the claim being closed: the goods and the paperwork move on
+ * different days, and tying them would teach people to close a claim early just
+ * to clear a shelf.
  */
 
 export default function SupplierClaimPanel({
@@ -59,12 +72,15 @@ export default function SupplierClaimPanel({
   const requestM = useSupplierClaimRequestMutation();
   const responseM = useSupplierClaimResponseMutation();
   const closeM = useSupplierClaimCloseMutation();
+  const holdM = useSupplierClaimHoldResolveMutation();
 
   const asks = useMemo(() => requestedActionsFor(claim.claim_type), [claim.claim_type]);
   const [ask, setAsk] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [answerNote, setAnswerNote] = useState("");
   const [closeNote, setCloseNote] = useState("");
+  const [outcome, setOutcome] = useState<string>("");
+  const [outcomeNote, setOutcomeNote] = useState("");
 
   const supplier = claim.supplier_name ?? "supplier";
   const closeProblems = claimCloseProblems(claim);
@@ -109,6 +125,16 @@ export default function SupplierClaimPanel({
   const answerReady =
     !!answer && (!answerNoteRequired || answerNote.trim().length > 0);
 
+  // R4 — the goods. `held_units` comes off the register, so 0 is a real answer
+  // (nothing quarantined: a late claim, a partner warehouse, or already
+  // resolved) and not a loading state.
+  const holdProblems = holdResolveProblems({
+    heldUnits: claim.held_units,
+    outcome: outcome || null,
+    note: outcomeNote,
+  });
+  const outcomeNoteRequired = holdOutcomeNeedsNote(outcome);
+
   return (
     <div className="grid gap-5 md:grid-cols-2" data-testid={`claim-panel-${claim.claim_no}`}>
       {/* ── left: the evidence ───────────────────────────────────────────── */}
@@ -141,6 +167,86 @@ export default function SupplierClaimPanel({
                 {p.path} (unavailable)
               </span>
             ),
+          )}
+        </div>
+
+        {/* R4 · the goods themselves */}
+        <div className="mt-5" data-testid="claim-held-stock">
+          <SectionTitle>The goods</SectionTitle>
+          <div className="text-[12.5px] text-base-800">
+            {heldUnitsLine(claim.held_units, claim.hold_reason)}
+          </div>
+
+          {claim.held_units > 0 && (
+            <div className="space-y-2 mt-2">
+              <div className="flex flex-wrap gap-1.5">
+                {STOCK_HOLD_OUTCOMES.map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    onClick={() => setOutcome(o.key)}
+                    aria-pressed={outcome === o.key}
+                    className={`text-[12px] px-2.5 py-1 rounded border ${
+                      outcome === o.key
+                        ? "bg-base-900 text-white border-base-900 font-semibold"
+                        : "bg-white text-base-700 border-base-200 hover:border-base-400"
+                    }`}
+                    data-testid={`hold-outcome-${o.key}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              {outcome && (
+                <input
+                  value={outcomeNote}
+                  onChange={(e) => setOutcomeNote(e.target.value)}
+                  maxLength={500}
+                  placeholder={
+                    outcomeNoteRequired
+                      ? "Say why the units were written off"
+                      : "Anything worth keeping (optional)"
+                  }
+                  className="w-full text-[12px] rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  data-testid="hold-outcome-note"
+                />
+              )}
+
+              <button
+                type="button"
+                disabled={holdProblems.length > 0 || holdM.isPending}
+                onClick={() =>
+                  void holdM
+                    .mutateAsync({
+                      claimId: claim.id,
+                      outcome,
+                      note: outcomeNote.trim() || undefined,
+                    })
+                    .then(() => {
+                      setOutcome("");
+                      setOutcomeNote("");
+                    })
+                }
+                className="btn-primary text-[12px] py-1.5 px-3 disabled:opacity-40"
+                data-testid="hold-resolve"
+              >
+                {holdM.isPending ? "Saving…" : "Save what happened"}
+              </button>
+
+              {holdProblems.length > 0 && outcome && (
+                <div className="text-[11.5px] text-base-600">
+                  {holdProblems
+                    .map((p) => STOCK_HOLD_RESOLVE_PROBLEM_TEXT[p])
+                    .join(" ")}
+                </div>
+              )}
+              {holdM.isError && (
+                <div className="text-[11.5px] text-danger">
+                  {holdM.error?.message ?? "Couldn't save."}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

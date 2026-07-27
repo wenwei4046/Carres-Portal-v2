@@ -22,6 +22,7 @@ const suppliersQuery = vi.fn();
 const requestMutate = vi.fn();
 const responseMutate = vi.fn();
 const closeMutate = vi.fn();
+const holdMutate = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -38,6 +39,7 @@ vi.mock("@/lib/queries", async () => {
     useSupplierClaimRequestMutation: () => mutation(requestMutate),
     useSupplierClaimResponseMutation: () => mutation(responseMutate),
     useSupplierClaimCloseMutation: () => mutation(closeMutate),
+    useSupplierClaimHoldResolveMutation: () => mutation(holdMutate),
   };
 });
 
@@ -78,6 +80,8 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
     closed_at: null,
     close_note: null,
     line_pending: null,
+    held_units: 0,
+    hold_reason: null,
     next_move: { key: "ask", owner: "carres", label: "" },
     ...over,
   };
@@ -109,6 +113,7 @@ beforeEach(() => {
   requestMutate.mockReset();
   responseMutate.mockReset();
   closeMutate.mockReset();
+  holdMutate.mockReset();
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
   suppliersQuery.mockReturnValue({
     data: {
@@ -120,6 +125,7 @@ beforeEach(() => {
   requestMutate.mockResolvedValue({});
   responseMutate.mockResolvedValue({});
   closeMutate.mockResolvedValue({});
+  holdMutate.mockResolvedValue({});
   Object.assign(navigator, {
     clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
   });
@@ -448,5 +454,98 @@ describe("R3 — the close keeps both sides", () => {
     expect(screen.queryByTestId("claim-send-ask")).not.toBeInTheDocument();
     expect(screen.queryByTestId("claim-save-answer")).not.toBeInTheDocument();
     expect(screen.getByText("New unit delivered 30 Jul")).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R4 — the goods (migration 0299)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The quarantine itself is the database's (a trigger refuses `on_hold →
+// reserved|sold|transferred` whichever door tries it). What the panel owes is
+// that a human can SEE the units are held and SAY what happened to them —
+// without that, the hold is a black hole and the units are lost on purpose.
+
+describe("OperationSupplierClaims — the goods (R4)", () => {
+  function openClaim(claim: SupplierClaimListRow) {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
+  }
+
+  it("says the units are held AND that they cannot be sold", () => {
+    openClaim(row({ held_units: 2, hold_reason: "damaged" }));
+    const panel = screen.getByTestId("claim-held-stock");
+    expect(panel).toHaveTextContent("2 units on hold");
+    expect(panel).toHaveTextContent("Arrived damaged");
+    // The whole point of the card, said out loud rather than left to a status
+    // word nobody scrolls to.
+    expect(panel).toHaveTextContent("cannot be sold, reserved or delivered");
+  });
+
+  it("offers the card's three outcomes and nothing else", () => {
+    openClaim(row({ held_units: 1, hold_reason: "wrong_item" }));
+    expect(screen.getByTestId("hold-outcome-back_to_stock")).toBeInTheDocument();
+    expect(screen.getByTestId("hold-outcome-returned")).toBeInTheDocument();
+    expect(screen.getByTestId("hold-outcome-written_off")).toBeInTheDocument();
+  });
+
+  it("records what happened, and the browser never names the status", async () => {
+    openClaim(row({ held_units: 2, hold_reason: "damaged" }));
+    fireEvent.click(screen.getByTestId("hold-outcome-returned"));
+    fireEvent.click(screen.getByTestId("hold-resolve"));
+    await waitFor(() => expect(holdMutate).toHaveBeenCalled());
+    // `outcome`, never `status`: which status each outcome means is the
+    // database's answer, mirrored once in the shared module.
+    expect(holdMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      outcome: "returned",
+      note: undefined,
+    });
+  });
+
+  it("will not write off units without saying why", async () => {
+    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
+    fireEvent.click(screen.getByTestId("hold-outcome-written_off"));
+    expect(screen.getByTestId("hold-resolve")).toBeDisabled();
+    expect(screen.getByTestId("claim-held-stock")).toHaveTextContent(
+      "Say why the units were written off.",
+    );
+
+    fireEvent.change(screen.getByTestId("hold-outcome-note"), {
+      target: { value: "Frame cracked through" },
+    });
+    expect(screen.getByTestId("hold-resolve")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("hold-resolve"));
+    await waitFor(() => expect(holdMutate).toHaveBeenCalled());
+    expect(holdMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      outcome: "written_off",
+      note: "Frame cracked through",
+    });
+  });
+
+  it("a late-delivery claim holds nothing, and says so instead of showing buttons", () => {
+    // Nothing arrived, so there is nothing to quarantine. 0 is an answer.
+    openClaim(LATE);
+    const panel = screen.getByTestId("claim-held-stock");
+    expect(panel).toHaveTextContent("Nothing on hold");
+    expect(screen.queryByTestId("hold-resolve")).not.toBeInTheDocument();
+  });
+
+  it("a resolved claim stops offering the buttons — the units already moved", () => {
+    openClaim(
+      row({
+        held_units: 0,
+        hold_reason: null,
+        requested_action: "replace",
+        requested_at: "2026-07-27T03:00:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-07-27T04:00:00Z",
+      }),
+    );
+    expect(screen.queryByTestId("hold-outcome-returned")).not.toBeInTheDocument();
   });
 });
