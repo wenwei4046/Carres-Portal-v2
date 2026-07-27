@@ -32,18 +32,29 @@
 **Goal:** every visible label in the Orders list, queues and drawer follows
 verb + named party + measurable object, and the word Chase disappears:
 
-- queue `Chase logistic` → `Confirm delivery date`; row line
-  `Call {carrier or customer} — confirm delivery date`
-- ladder/next words `Chase supplier` (and kin) → `Call {supplier} — confirm ready date`
-- drawer follow-up presets: `Call customer (book delivery)` → `Call {name} — book
-  delivery date` · `Call customer (stock delay)` → `Call {name} — stock delay`
+**The full rename list is the audit table in `docs/COPY-STANDARD.md` ("The dictionary —
+every visible word, audited") — build from that table, not from memory.** In this card:
+
+- `Chase logistic` → queue `Confirm delivery date`; row `Call {carrier} — confirm delivery date`
+- `Chase supplier` → `Call {supplier} — confirm ready date`
+- `Order PO` → `Send PO to {supplier}`
+- `Call customer (stock delay)` → `Call {customer} — agree new delivery date`
+- `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
+- `Confirm` (bare) → `Confirm delivery with {customer}`
+- delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
+- `Pending` filter → rename to the state it selects (read the predicate first)
+- keep untouched: `Assign logistic` · `Deliver today` · `Upload delivery photo` · `Done` ·
+  `No carrier` · the two confirmed/provisional fact strings
 - the party is the REAL name when known (supplier/carrier/customer), role word otherwise
 
 **Also in this card — the T1 leftover (found by the J3 chat, deliberately left for C1):**
 `OrderDetailDrawer.tsx` still renders the banned word **`Unscheduled`** in TWO places —
 line ~3814 (the header MiniBadge, carrier assigned + no date) and ~3853 (`statusWord` in
 the delivery card). T1 banned the word and fixed the LIST; these two survived, and the
-live bundle greps 1. Fix = the word T1 locked for exactly this state: **`need booking`**.
+live bundle greps 1. **The replacement is NOT T1's `need booking`** — Jess struck that word
+on 2026-07-27: it is a to-do hiding inside a fact ("need" = the reader still has to work out
+what to do). Both spots — and the LIST column that T1 shipped — become
+**`{carrier} — confirm delivery date`** (the carrier name is already in that cell).
 Its neighbours in both spots are already correct (`Confirmed` · `not confirmed · carrier
 said {date}` · `No carrier`) — change only the two strings, and delete the stale word
 "Unscheduled" from the comment block above 3837 so no future chat reads it as intended.
