@@ -1,6 +1,6 @@
 # Execution queues — THE index (Jess's build map, 2026-07-27)
 
-> **The whole balance of work lives in FIVE card-queue docs.** Open a new chat, pick ONE
+> **The whole balance of work lives in SIX card-queue docs.** Open a new chat, pick ONE
 > card from ONE line, paste the line's kickoff sentence. When a card ships, that chat
 > marks ✅ + PR number in its own doc. These docs are the memory; chats are disposable.
 >
@@ -18,7 +18,7 @@
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
 
-## The five lines
+## The six lines
 
 | Line | Doc | Cards | State |
 |---|---|---|---|

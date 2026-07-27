@@ -173,28 +173,14 @@ row, follow-up preset) is written as:
   2026-07-27) — it names a mood, not an outcome; every former Chase label
   becomes a Call with a named party and a measurable object. "DO" and "PO"
   survive because the team already speaks them daily.
-- Reserved delivery action labels (use EXACTLY these shapes):
-  - `Call {customer} — book delivery date` — fix the date + slot.
-  - `Call {customer} — stock delay` — stock ready date overshoots the promise
-    (delay radar). The call informs BEFORE the promise breaks.
-  - `Call {carrier} — confirm delivery date` — carrier assigned, customer's
-    date not confirmed yet.
-  - `Upload delivery photo` — attach the photo proving delivery.
-  - `Deliver today` — the customer confirmed TODAY as the delivery day.
+- **Every label lives in ONE place** — the audit table below ("The dictionary"). There is
+  no second list of approved labels anywhere.
 
-## The Dynamic Checklist law (Jess ruling 2026-07-27)
+## Where the engine law lives
 
-An order never shows just one suggested action — it shows **every open action
-at once**, as a checklist:
-
-- **Drawer**: a `Dynamic Checklist` block lists ALL currently-firing actions
-  (each row = verb + named party + measurable object), derived from the same
-  signals that exist today. An item ticks itself when its signal clears —
-  staff never manually add, reorder, or tick items.
-- **List row**: the NEXT column shows the TOP item plus a `+N` count when more
-  are open (`Call Ohana — confirm ready date  +2`), so scanning stays fast and
-  nothing is hidden.
-- Priority order of items is the existing ladder order — money first.
+How actions are computed, when they appear and disappear, which one shows first, and what
+every action must carry — **`docs/ACTION-FLOW-STANDARD.md`**. This file does not repeat it.
+This file is only about the WORDS.
 
 ## The delivery queue words (re-ruled by Jess 2026-07-27 — this is the only version)
 
@@ -203,8 +189,8 @@ checklist item. The list is closed; a new chat does not add a fifth:
 
 | Step | The label | It holds | It goes late |
 |---|---|---|---|
-| 1 | `Assign logistic` | Stock in, no carrier picked | 3 working days before the promised date |
-| 2 | `Confirm delivery date` | Carrier assigned, customer has not confirmed (row line: `Call {carrier or customer} — confirm delivery date`) | 1 working day before the promised date |
+| 1 | `Assign logistics` | Stock in, no logistics company picked | 3 working days before the promised date |
+| 2 | `Confirm delivery date` | Logistics assigned, customer has not confirmed (row line: `Call {logistics} — confirm delivery date`) | 1 working day before the promised date |
 | 3 | `Deliver today` | Customer confirmed TODAY | — (it is today) |
 | 4 | `Upload delivery photo` | Delivered, no photo attached | 1 working day after the delivery |
 
@@ -212,9 +198,10 @@ Every deadline is counted in **working days** (Mon–Sat, Selangor public holida
 skipped) — the same engine procurement uses. Lateness is written as the count
 tail, numbers up front: `5 · 2 late`.
 
-One word we deliberately did NOT introduce: **`Issue DO`** — nobody issues a
-DO. `orders.do_number` is stamped by a DB trigger on the dispatch transition,
-so a queue for it would never have a human in it.
+**`Issue delivery order` IS an action** (Jess 2026-07-27): once the customer's date is
+confirmed, the SYSTEM produces the document and the operator only presses the button —
+nobody authors a delivery order by hand. Card C7 builds it; the number is stamped at
+dispatch today, which is too late to hand to logistics, and C7 moves it.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -254,7 +241,7 @@ mixing them is what produced words like "need booking":
 
 **The trap is the third kind: a FACT that is secretly a to-do.** `need booking` ·
 `Unscheduled` · `Pending` · `At Risk` · `Attention` — they describe a GAP, so the reader
-still has to work out what to do. **Rule: a fact may state an absence (`No carrier`), but
+still has to work out what to do. **Rule: a fact may state an absence (`No logistics`), but
 it may never contain a to-do word (`need`, `pending`, `required`, `TBD`, `at risk`).**
 If the sentence is about a gap, write the ACTION that closes it.
 
@@ -266,9 +253,9 @@ If the sentence is about a gap, write the ACTION that closes it.
 |---|---|---|
 | `Order PO` | no party | `Send PO to {supplier}` |
 | `Chase supplier` | banned word · no measurable object | `Call {supplier} — confirm ready date` |
-| `Chase logistic` | banned word | `Call {carrier} — confirm delivery date` |
+| `Chase logistic` | banned word + banned party word | `Call {logistics} — confirm delivery date` |
 | `Call customer (stock delay)` | party is a role · object not measurable | `Call {customer} — agree new delivery date` |
-| `Assign logistic` | ✅ keep | (the party is what you are choosing — it cannot be named yet) |
+| `Assign logistics` | ✅ keep | (the party is what you are choosing — it cannot be named yet) |
 | `Deliver today` | ✅ keep | (verb + when; the truck is the party) |
 | `Upload delivery photo` | ✅ keep | (nobody else is involved) |
 | `Collect $` | no amount, no party | `Collect RM {amount} from {customer}` (pill: `Collect RM 2,455`) |
@@ -280,10 +267,10 @@ If the sentence is about a gap, write the ACTION that closes it.
 | Ships today | Verdict | Must become |
 |---|---|---|
 | `confirmed 27 Jul · 9–11 AM` | ✅ keep | — |
-| `not confirmed · carrier said 27 Jul` | ✅ keep | — |
-| `need booking` | **to-do word in a fact** | `{carrier} — confirm delivery date` |
-| `Unscheduled` | banned (T1) | `{carrier} — confirm delivery date` |
-| `No carrier` | ✅ keep | (states an absence, no to-do word; the NEXT column carries `Assign logistic`) |
+| `not confirmed · logistics said 27 Jul` | ✅ keep | — |
+| `need booking` | **to-do word in a fact** | `{logistics} — confirm delivery date` |
+| `Unscheduled` | banned (T1) | `{logistics} — confirm delivery date` |
+| `No logistics` | ✅ keep | (states an absence, no to-do word; the Actions column carries `Assign logistics`) |
 
 **FILTER / STATE words** live in FILTERS only (C-vocab, Jess 2026-07-19) and are nouns,
 not actions: `All · Placed · Proceed · Scheduled · Delivered · Owing`. **`Pending` is
@@ -308,7 +295,7 @@ Four verbs, four meanings. Every module uses these; no module invents a fifth.
 | **Upload** | evidence is attached | the file exists |
 
 Examples: `Assign logistic` · `Assign PIC` · `Assign warehouse picker` ·
-`Call {supplier} — confirm ready date` · `Call {carrier} — confirm delivery date` ·
+`Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
 `Call {customer} — agree new delivery date` · `Issue invoice` · `Issue credit note` ·
 `Upload delivery photo` · `Upload payment proof`.
 
@@ -375,10 +362,10 @@ doubt, grep the codebase and match what already ships.
 | The delivery company (any page/label) | **Logistics** (with s) · a named one reads `NETS Logistics` | Logistic · Carrier · Partner · Delivery partner |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
-| A carrier's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
-| Notice a carrier needs before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
-| A date a carrier is closed | **not running on** | Blackout · Unavailable · Out of service |
-| Most drops a carrier takes in a day | **deliveries a day** | Capacity · Max load · Slots |
+| A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
+| Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
+| A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
+| Most drops logistics take in a day | **deliveries a day** | Capacity · Max load · Slots |
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 
@@ -391,25 +378,25 @@ split them.
 |---|---|---|
 | The three calendar views | **Today · Tomorrow · This week** | Next 7 days · Week view · Upcoming |
 | The customer said yes to this date | **Confirmed** (+ the slot, e.g. `12pm–3pm`) | Booked · Locked · Scheduled |
-| Only the carrier has named this date | **Carrier's date** | Provisional · Tentative · ETA · Pencilled in |
-| Promised on this day, no booking yet | **Promised this day, needs a date** | Unscheduled · Not booked · Unbooked · Pending |
-| No carrier picked yet | **No carrier picked** | Unassigned · TBD · — |
+| Only logistics have named this date | **Logistics' date** | Provisional · Tentative · ETA · Pencilled in · Carrier's date |
+| Promised on this day, no booking yet | **Promised this day, no date yet** | Unscheduled · Not booked · Unbooked · Pending · anything with "needs" |
+| No logistics picked yet | **No logistics picked** | Unassigned · TBD · No carrier · — |
 | Nothing booked on a day | **No deliveries booked this day.** | Empty · Free · Nothing |
 
 - **"This week" means the REST of this week** — today through Saturday. Sunday
-  is never in a delivery range: it is refused for every carrier.
+  is never in a delivery range: it is refused for every logistics company.
 - A promised-but-unbooked order is never COUNTED as a delivery. It is listed
   under its own heading with the call that fixes it
   (`Call {customer} — book delivery date`), so a day never reads as empty when
   work is sitting on it, and never reads as booked when nothing is.
 - Confirmed is the ONLY green on the calendar, exactly as in the Orders list's
-  Delivery column (T1). The carrier's own date is amber, always.
+  Delivery column (T1). The logistics company's own date is amber, always.
 
-**The carrier-rule word law (T9, Jess 2026-07-27):** every one of these lines
-WARNS and none of them blocks, so every one of them must name the carrier and
+**The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
+WARNS and none of them blocks, so every one of them must name the logistics company and
 end in something the operator can do — "call them" or "pick another day". A
 warning that only states a fact ("capacity exceeded") tells a new hire nothing
-about the next second. Sunday never appears in a carrier's rules: it is refused
+about the next second. Sunday never appears in a logistics company's rules: it is refused
 for everyone, and a per-partner Sunday line would read as though a phone call
 could buy one.
 
