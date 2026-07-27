@@ -29,18 +29,23 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | **C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅.
-**Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot.
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C5 ✅ #447**.
+**Drawer lane, in this order:** C1 → C2 → C3 → C6 → C7 → C8. R/S/K run in parallel
+throughout; C4 waits for a free R slot.
 
-**Expect after C5:** the Delivery board holds every order today because the money hold has
-never fired (`balance` NULL on all 55 rows). The moment C5 makes the gate read `orders.paid`,
-about 18 owing orders leave the board at once. That is correct behaviour, and it will look
-like a disappearance.
+**What C5 actually changed (measured after shipping — it is NOT the disappearance this
+line used to predict).** No order changes its action word today: all 55 control rows are
+`booking_stage='none'`, so the ladder returns `Chase logistic` and never reaches the money
+rung, and nothing leaves the Delivery board. What appears instead: the money dot turns RED
+on 18 orders (it was grey on all 55), the Owing filter and the `Collect $` pill find those
+18 (they found none), the Payments collections queue fills with real figures (it computed
+RM 0 owing for everybody), and the drawer stops telling an operator that a paid-in-full
+order owes its whole value. The 18 orders WILL start showing 🔒 — but only once someone
+confirms a booking, which is the rung the hold sits on.
 
 
 ## Sidebar map — where every line lands

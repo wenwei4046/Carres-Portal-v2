@@ -1433,6 +1433,71 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
+  // ── C5 · the money hold reads the number that exists ──────────────────────
+  // Until 2026-07-27 this 🔒 read `ops_order_control.balance`, NULL on all 55
+  // live control rows, so it had never fired for a single order while 18 of
+  // them owed RM 56,859. It now reads the shared `orderMoney` — the priced
+  // lines against `orders.paid` — the SAME rule the server's booking gate asks.
+
+  it("SO-1256's shape: priced lines with a 50% deposit → Confirm, held (🔒)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1256,
+      ops_assigned_logistic: "p1",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 3998 }],
+      order_addons: [{ qty: 1, unit_price: 250 }],
+      paid: 2124,
+      ops_order_control: { ...BOOKED },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Confirm",
+      locked: true,
+    });
+  });
+
+  it("SO-1209's shape: paid in full → Confirm, NOT held", () => {
+    // The live false-block. RM 6,998 + RM 250 of add-ons, `orders.paid`
+    // RM 7,248, balance NULL. Nothing may hold this delivery.
+    const o = makeRow({
+      id: "x",
+      so: 1209,
+      ops_assigned_logistic: "p1",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 6998 }],
+      order_addons: [{ qty: 1, unit_price: 250 }],
+      paid: 7248,
+      ops_order_control: { ...BOOKED },
+    });
+    const r = nextActionOf(o, { state: "ready" }, []);
+    expect(r.label).toBe("Confirm");
+    expect(r.locked).toBeFalsy();
+  });
+
+  it("an unpriced import with no keyed balance is UNKNOWN — unknown never holds", () => {
+    // SO-1221's shape. Nobody has said what it is worth, so it cannot owe a
+    // figure; the 37 imported archive rows must not all lock overnight.
+    const o = makeRow({
+      id: "x",
+      so: 1221,
+      ops_assigned_logistic: "p1",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+      paid: 1300,
+      ops_order_control: { ...BOOKED },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
+  });
+
+  it("priced lines beat a stale keyed balance — a paid order is never held by an old number", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 4000 }],
+      paid: 4000,
+      ops_order_control: { ...BOOKED, balance: 5000 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
+  });
+
   it("ready + carrier + customer confirmed + owing storage → Confirm, held", () => {
     const o = makeRow({
       id: "x",
