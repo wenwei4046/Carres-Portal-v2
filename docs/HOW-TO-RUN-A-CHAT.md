@@ -24,6 +24,11 @@
 **One concern, one file. When Jess re-rules something, the old text is DELETED and
 overwritten — never annotated "superseded", never two versions side by side.**
 
+**Following the law is not silent obedience.** Every chat must also tell Jess where the law
+or the flow is WRONG — with evidence — and let her decide. A chat that saw a problem and
+said nothing has failed, even if the card shipped perfectly. Both prompts below end with a
+mandatory review section for exactly this reason.
+
 ---
 
 ## ① PLAN chat — paste this, then paste the ChatGPT conversation underneath
@@ -68,6 +73,17 @@ Rules:
   - Do NOT invent business policy. If it is a business decision, it is my call.
   - If something in the pasted text is already law here, say so and move on.
   - Reply in Chinese; anything I need to copy elsewhere in English.
+
+FINISH WITH THIS SECTION EVERY TIME, even if the answer is "nothing found":
+
+  MY REVIEW OF OUR OWN FLOW
+  1. What in our flow file or laws contradicts the real code or the live data?
+  2. What would confuse a new staff member on their first day?
+  3. What could not be built exactly as written, and why?
+  4. What does the flow not cover at all — a real case it has no answer for?
+
+  Tell me even when I did not ask. Never change a law to suit yourself — report it,
+  I decide, then you overwrite it.
 ```
 
 ## ② BUILD chat — paste this, change the card id
@@ -90,6 +106,22 @@ then mark <ID> ✅ in its doc with the PR number.
   - Deploy law: merge to main first, deploy from the main tip, both Pages projects,
     then poll all four canonical URLs until they converge.
   - Reply in Chinese.
+
+BEFORE you build: if doing this card exactly as written would ship something wrong —
+the card contradicts the live code or data, or the flow file is wrong — STOP and tell
+me first. Do not build a known-wrong thing because the card said so, and do not quietly
+build something different from what the card says.
+
+AFTER you ship, finish with this section every time, even if the answer is
+"nothing found":
+
+  MY REVIEW OF OUR OWN FLOW
+  1. What in the flow file or the laws contradicts what I actually found in the code?
+  2. What would confuse a new staff member on their first day?
+  3. What could not be built exactly as written, and why?
+  4. What did I have to guess because nothing told me?
+
+  Report it — never edit a law to suit the card.
 ```
 
 ---
