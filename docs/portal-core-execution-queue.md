@@ -501,6 +501,12 @@ instead, without breaking dispatch for orders that never take this path. Touchin
 existing trigger = draft the migration to Jess first (guardrail #8) and dry-run it in a
 rolled-back transaction on prod before applying.
 
+**C9 left two things here** (reported, not fixed): the money gate is on CONFIRMATION today
+while `ORDERS-WORKING-FLOW.md` §5 puts it on ISSUING — **moving it is this card's job**. And
+"the manager" who releases a storage hold is currently the `principal` ROLE; HR-P2 built duty
+keys for exactly this shape, and this is a money decision — decide here whether it becomes a
+duty key rather than a role.
+
 **Trigger:** `booking_stage='confirmed'` with a date · **Completion:** the delivery order
 document exists for this trip (and, once logistics have their own portal, has been sent).
 **Done when:** an operator never types a DO again; the document is available the moment the

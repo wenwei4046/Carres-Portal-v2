@@ -26,7 +26,7 @@
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C4 ✅ #484 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
@@ -165,6 +165,11 @@ to be remembered.
   shape: `Standard production working days` (optionally min / max / default planning). Then
   `chase from = customer date − production working days − internal buffer`. **Belongs to the
   Purchasing line** — the Orders arrival window reads it once it exists.
+- **Does a supplier's record change the promise we make?** R5 built the scorecard but left
+  its "feeds Purchase's promise-setting" clause unbuilt — with 0 POs there is no performance
+  to price a promise off, and it carries a business decision Jess has not made: does a
+  supplier's on-time record shorten the promise we give the CUSTOMER, or only the date we
+  expect from the FACTORY? **Belongs to the Purchasing line**, with the lead-time work.
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
 
