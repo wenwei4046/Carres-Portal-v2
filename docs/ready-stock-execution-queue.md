@@ -115,12 +115,51 @@ bearing for K3-K5:
   that closes proposals, so the two can never disagree. `rejected` is terminal.
 - **Nothing seeded** — no cycle exists until someone opens a month.
 
-## K3 · Emergency request lane
+## K3 · Emergency request lane ✅ (PR #424)
 
 **Goal:** same flow, any time, flagged `EMERGENCY` with reason
 (`Promotion · Unexpected demand · Weekend stock low · OOS risk · New launch · Other`);
 skips consolidation (straight to COO), never mixes into the monthly plan's numbers.
 **Done when:** a viral-product weekend can be restocked without waiting for month-end.
+
+**Shipped 2026-07-27** (PR #424, migration **0290**). The urgent lane is a section on the
+same Ready stock tab, below the monthly plan — one place to ask, two speeds. Notes K4-K5
+need:
+
+- **"Never mixes into the monthly plan's numbers" is a SEPARATE TABLE, not a flag.** An
+  `is_emergency` column on `ops_stock_plan_proposals` was the cheaper build and would have
+  made every future reader of that table responsible for remembering to filter it — the
+  first one who forgets silently inflates a month's ask with a weekend panic. Instead
+  `ops_stock_emergency_requests` has **no `plan_id` and no `period`**, K2's engine reads
+  proposals, and 0290's sanity block **asserts the absence of those columns** so a later
+  card cannot quietly reconnect the lanes.
+- **NO suggested quantity here, deliberately.** An emergency is by definition demand the
+  sales history does not contain, so scaling a run rate off it would be exactly the
+  fabrication K2 refuses to print (0287's coverage rules). The row states FACTS — free now
+  · spoken for · on the way — and warns `already has enough free` when the register covers
+  the ask. **Warns, never blocks**: the register can be behind what the person on the floor
+  knows.
+- **A FOURTH state the card does not name: `ordered`.** K2's handover list is scoped by its
+  month so it clears itself; this lane runs continuously, and without a way to say "I
+  raised the PO" an approved ask would sit on the worklist forever. Not auto-PO (still the
+  LATER section) — a human ticking a box, gated on **`po_duty_editor`**, the duty that
+  already means "the person who raises purchase orders".
+- **ZERO new duty keys**, asserted in 0290's sanity block exactly as 0287 did: raise = any
+  operation login (**not** duty-gated — it is the person on the floor who sees the shelf
+  empty, and gating it would mean only the two busiest people can report an emergency) ·
+  decide = `stock_planner` · mark ordered = `po_duty_editor`. All resolve to Jess today.
+- **Cutting and approving are ONE act.** The card says this lane skips consolidation, so a
+  save-quantity-then-press-approve pair would rebuild the step it removes. One box, one
+  click, `approved_qty` defaulting to what was asked when the COO says nothing.
+- **`Other` cannot be filed without words** — enforced by the same shared function on the
+  disabled button, in the route and by a DB CHECK. The whole point of a locked reason list
+  is that K4/K5 can read WHY the pool drains; a wordless "Other" is a hole in that answer.
+- Two plain-word relabels, the no-jargon law rather than a redesign: `OOS risk` →
+  **About to run out** (OOS is warehouse jargon a low-English operator does not read). Keys
+  keep the card's vocabulary.
+- 1 table with a READ policy and **NO write policy at all**; the 3 audited DEFINER RPCs are
+  the only door (0286/0287's shape). `rejected` and `ordered` are terminal.
+- **Nothing seeded** — the lane is empty until somebody asks.
 
 ## K4 · Pool usage reasons + reserve level
 
@@ -151,6 +190,6 @@ SKU rows.
 | K0 | ✅ shipped 2026-07-27 | #376 |
 | K1 | ✅ shipped 2026-07-27 | #400 |
 | K2 | ✅ shipped 2026-07-27 | #409 |
-| K3 | ⬜ | — |
+| K3 | ✅ shipped 2026-07-27 | #424 |
 | K4 | ⬜ | — |
 | K5 | ⬜ | — |

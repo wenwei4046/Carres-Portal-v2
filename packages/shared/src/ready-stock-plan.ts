@@ -246,7 +246,7 @@ export function salesCoverage(
 
 // ── The view ────────────────────────────────────────────────────────────────
 
-interface Counts {
+export interface Counts {
   free: number;
   reserved: number;
   incoming: number;
@@ -255,6 +255,35 @@ interface Counts {
 function unitQty(u: PlanStockUnit): number {
   const n = u.qty ?? 1;
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * The warehouse register, per SKU.
+ *
+ * Sums `qty`, never counts rows — 0286's finding: `stock_balances` is a
+ * `count(*)` rollup that predates the 0218 bulk register, so the 555-unit
+ * pillow reads there as 1. Every K-card must ask this one function, which is
+ * why it is exported rather than kept private to the plan view: K3's urgent
+ * lane shows the same "free / coming" numbers beside its asks, and two
+ * aggregations of one register is how two screens start disagreeing about how
+ * much stock exists.
+ */
+export function aggregateStockUnits(
+  units: readonly PlanStockUnit[],
+): Map<string, Counts> {
+  const stock = new Map<string, Counts>();
+  for (const u of units) {
+    const sku = u.sku?.trim();
+    if (!sku) continue;
+    const c =
+      stock.get(sku) ?? stock.set(sku, { free: 0, reserved: 0, incoming: 0 }).get(sku)!;
+    const q = unitQty(u);
+    if (u.status === "free") c.free += q;
+    else if (u.status === "reserved") c.reserved += q;
+    else if (u.status === "incoming") c.incoming += q;
+    // sold / transferred / voided have left the building.
+  }
+  return stock;
 }
 
 /**
@@ -274,18 +303,7 @@ export function computePlanView(input: {
   const coverage = salesCoverage(sales, asOf);
 
   // Stock, aggregated exactly as K1 does it (sum `qty`, never count rows).
-  const stock = new Map<string, Counts>();
-  for (const u of units) {
-    const sku = u.sku?.trim();
-    if (!sku) continue;
-    const c =
-      stock.get(sku) ?? stock.set(sku, { free: 0, reserved: 0, incoming: 0 }).get(sku)!;
-    const q = unitQty(u);
-    if (u.status === "free") c.free += q;
-    else if (u.status === "reserved") c.reserved += q;
-    else if (u.status === "incoming") c.incoming += q;
-    // sold / transferred / voided have left the building.
-  }
+  const stock = aggregateStockUnits(units);
 
   // Sales, windowed. `real` already excludes archive + cancelled.
   const real = usableLines(sales);

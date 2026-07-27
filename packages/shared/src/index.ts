@@ -578,6 +578,21 @@ export {
   type OpsStockPlanResponse,
 } from "./schemas/ops-stock-plan";
 
+// Ready Stock K3 (0290) — the urgent lane's wire contracts.
+export {
+  emergencyReasonSchema,
+  emergencyStatusSchema,
+  opsStockEmergencyRaiseInputSchema,
+  opsStockEmergencyDecideInputSchema,
+  opsStockEmergencyOrderedInputSchema,
+  opsStockEmergencyRowSchema,
+  opsStockEmergencyResponseSchema,
+  type OpsStockEmergencyRaiseInput,
+  type OpsStockEmergencyDecideInput,
+  type OpsStockEmergencyRow,
+  type OpsStockEmergencyResponse,
+} from "./schemas/ops-stock-emergency";
+
 // Migration 0140 — Service Notes (SN module / Issue Tracker).
 export {
   snSectionASchema,
@@ -1446,6 +1461,7 @@ export {
   planAwaitsDecision,
   isWeekendDate,
   daysBetween,
+  aggregateStockUnits,
   type PlanSalesLine,
   type PlanStockUnit,
   type PlanProposal,
@@ -1456,6 +1472,28 @@ export {
   type PlanStatus,
   type SalesCoverage,
 } from "./ready-stock-plan";
+// Ready Stock K3 (0290) — the urgent lane. A SEPARATE table and a separate
+// engine on purpose: the card's "never mixes into the monthly plan's numbers"
+// is structural here, not a filter somebody has to remember (see the header).
+export {
+  EMERGENCY_REASONS,
+  EMERGENCY_REASON_LABEL,
+  EMERGENCY_STATUSES,
+  EMERGENCY_STATUS_LABEL,
+  EMERGENCY_MAX_QTY,
+  EMERGENCY_NOTE_MAX,
+  reasonNeedsNote,
+  emergencyDraftProblem,
+  computeEmergencyView,
+  emergencyPoList,
+  type EmergencyReason,
+  type EmergencyStatus,
+  type EmergencyDraft,
+  type EmergencyRequest,
+  type EmergencyRow,
+  type EmergencyPoLine,
+  type EmergencyView,
+} from "./emergency-stock-request";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

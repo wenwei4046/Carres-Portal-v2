@@ -39,6 +39,9 @@ import {
   type OpsStockPlanConsolidateInput,
   type OpsStockPlanFinalInput,
   type OpsStockPlanDecideInput,
+  type OpsStockEmergencyResponse,
+  type OpsStockEmergencyRaiseInput,
+  type OpsStockEmergencyDecideInput,
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
@@ -6454,6 +6457,59 @@ export function useDecideStockPlan(planId: string) {
   return useStockPlanMutation<OpsStockPlanDecideInput>(
     () => `/api/ops/stock-plan/${planId}/decide`,
     (i) => i,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Urgent restock — card K3 (migration 0290)
+// ---------------------------------------------------------------------------
+// raise → the COO decides → somebody raises the PO. No month, no consolidation.
+// Its own query key on purpose: the urgent lane and the monthly plan share a
+// screen but never a number, and a shared cache key would be the first place
+// that stops being true.
+
+const urgentStockKey = ["operation", "ops-stock", "urgent"] as const;
+
+export function useUrgentStock() {
+  return useQuery({
+    queryKey: urgentStockKey,
+    queryFn: () => apiFetch<OpsStockEmergencyResponse>("/api/ops/stock-emergency"),
+    staleTime: 15_000,
+  });
+}
+
+function useUrgentStockMutation<TInput>(
+  path: (input: TInput) => string,
+  body: (input: TInput) => unknown,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TInput) =>
+      apiFetch<unknown>(path(input), catalogJson("POST", body(input))),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: urgentStockKey });
+    },
+  });
+}
+
+export function useRaiseUrgentStock() {
+  return useUrgentStockMutation<OpsStockEmergencyRaiseInput>(
+    () => "/api/ops/stock-emergency",
+    (i) => i,
+  );
+}
+
+export function useDecideUrgentStock() {
+  return useUrgentStockMutation<OpsStockEmergencyDecideInput & { id: string }>(
+    (i) => `/api/ops/stock-emergency/${i.id}/decide`,
+    ({ decision, qty, remark }) => ({ decision, qty, remark }),
+  );
+}
+
+export function useMarkUrgentStockOrdered() {
+  return useUrgentStockMutation<{ id: string }>(
+    (i) => `/api/ops/stock-emergency/${i.id}/ordered`,
+    () => ({}),
   );
 }
 
