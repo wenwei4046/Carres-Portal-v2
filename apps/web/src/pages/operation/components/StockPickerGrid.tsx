@@ -7,6 +7,7 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { lineCategory, stockMatchKey } from "@/lib/line-category";
 import type { ReserveFreeUnit } from "./ReserveStockDialog";
+import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
 
 /**
  * StockPickerGrid — the EMBEDDED stock-reserve grid (Jess 2026-06-30) that lives
@@ -106,6 +107,9 @@ function BareSection({ children }: { children: ReactNode }) {
 export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan, actions, bare }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  // K4 — the same question the other picker asks, from the same component, so
+  // two screens that draw from one pool cannot ask it two different ways.
+  const draw = usePoolDrawReason();
   // ONE search box (Jess 2026-07-13, replaces the 7 per-column funnels) — every
   // typed token must match SOMEWHERE across model / size / category / PO /
   // old ref / date-in / condition (AND across tokens, OR across fields).
@@ -202,13 +206,13 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
   const loaning = loanMode && !!onLoan;
 
   async function reserveIds(ids: string[]) {
-    if (ids.length === 0) return;
+    if (ids.length === 0 || draw.problem) return;
     setSubmitting(true);
     const results = await Promise.allSettled(
       ids.map((itemId) =>
         apiFetch("/api/ops/stock/reserve-item", {
           method: "POST",
-          body: JSON.stringify({ itemId, ref: soRef }),
+          body: JSON.stringify({ itemId, ref: soRef, ...draw.body }),
         }),
       ),
     );
@@ -416,12 +420,12 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   ) : (
                     <Btn
                       size="sm"
-                      disabled={submitting}
+                      disabled={submitting || !!draw.problem}
                       onClick={(e) => {
                         e.stopPropagation();
                         void reserveIds([r.id]);
                       }}
-                      title={`Reserve this unit to ${soRef}`}
+                      title={draw.problem ?? `Reserve this unit to ${soRef}`}
                     >
                       Reserve
                     </Btn>
@@ -444,9 +448,32 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         </div>
       </div>
 
+      {/* K4 — a ready-stock unit does not leave the shelf without a reason.
+          A loan is not a pool draw (the unit comes back), so the question only
+          appears on the reserve lane. */}
+      {!loaning ? (
+        <div className="px-1.5 pt-2 border-t border-base-100">
+          <PoolReasonPicker
+            state={draw}
+            warnings={draw.warningsFor(
+              [
+                ...rows
+                  .filter((r) => checked.has(r.id))
+                  .reduce((m, r) => m.set(r.sku, (m.get(r.sku) ?? 0) + (r.qty ?? 1)), new Map<string, number>()),
+              ].map(([s, qty]) => ({ sku: s, qty })),
+            )}
+          />
+        </div>
+      ) : null}
+
       <div className="px-1.5 py-2 border-t border-base-100 flex items-center justify-end gap-2">
         <span className="t-tiny text-base-500 mr-auto">
           need {need} · {checked.size} picked
+          {draw.problem && !loaning ? (
+            <span className="ml-2 text-base-600" data-testid="picker-reason-problem">
+              {draw.problem}
+            </span>
+          ) : null}
         </span>
         {loaning ? (
           <Btn
@@ -465,15 +492,17 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
             <Btn
               icon={Wand2}
               onClick={autoMatch}
-              disabled={submitting || rows.length === 0}
-              title="Reserve the oldest matching free unit(s) covering this line"
+              disabled={submitting || rows.length === 0 || !!draw.problem}
+              title={
+                draw.problem ?? "Reserve the oldest matching free unit(s) covering this line"
+              }
             >
               Auto-match & reserve
             </Btn>
             <Btn
               icon={PackageCheck}
               onClick={reserve}
-              disabled={submitting || checked.size === 0}
+              disabled={submitting || checked.size === 0 || !!draw.problem}
             >
               {submitting
                 ? "Reserving…"

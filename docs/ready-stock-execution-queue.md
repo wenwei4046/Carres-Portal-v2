@@ -161,13 +161,56 @@ need:
   the only door (0286/0287's shape). `rejected` and `ordered` are terminal.
 - **Nothing seeded** — the lane is empty until somebody asks.
 
-## K4 · Pool usage reasons + reserve level
+## K4 · Pool usage reasons + reserve level ✅ (PR #434)
 
 **Goal:** taking a ready-stock unit records WHY (the locked reason list); each SKU carries
 a COO-set `reserve level` — at/below it, further use warns (`近最低保留量`) but never
 blocks (COO decides, system reminds). Usage split (Sales 60% / supplier-delay 25% / …)
 readable per month.
 **Done when:** "为什么一直缺货" is answerable from data.
+
+**Shipped 2026-07-27** (PR #434, migrations **0292** + **0294**). The split lives at the
+bottom of the same Ready stock tab, under the monthly plan and the urgent lane. Notes K5
+needs:
+
+- **The reason is a DATED LEDGER, not a column on the unit.** `ops_stock_items.
+  reserve_reason` has existed since 0213 with two values and cannot answer this card: it is
+  overwritten when a released unit is drawn again, carries no date, and leaves the question
+  entirely once the unit is sold. Measured first — it holds **0 non-null values across 87
+  records** — so nothing was migrated and the column was left untouched (nothing writes it
+  now; carry-forward, not a drop). **K5 reads `ops_stock_pool_usage`, never that column.**
+- **Not `stock_movements` either, and that was checked rather than assumed**: 0 rows, no
+  reserve has ever written to it, and it carries a **blanket INSERT policy for every
+  operation login** — a reason stored there could be written or skipped by any client,
+  which is the shape K1-K3 refused. It records PHYSICAL moves; a draw is a COMMITMENT (the
+  goods are still on the floor, they are just no longer available), which is when the pool
+  actually drains.
+- **The draw and the reason are ONE transaction.** 0213 stamped the reason with a
+  best-effort UPDATE *after* the reserve succeeded, so a failed stamp left a drawn unit
+  nobody could explain. `ops_stock_pool_draw` serves BOTH reserve doors (the drawer's
+  picker by item id, the On-hand box by oldest-of-SKU) so there is ONE ledger writer; the
+  routes' 404/409 contracts survive byte-for-byte via a null return.
+- **THREE doors, not two.** `Takeout` is offered on a **free** row as well as a reserved
+  one, so a unit could still leave the pool silently. 0294 closes it: from FREE a reason is
+  required, from RESERVED it is neither asked nor recorded (that draw is already in the
+  ledger — a second row would inflate the month). Leaving that door open behind a
+  carry-forward would have looked disciplined and behaved like a trap.
+- **Reserve levels are their own table.** Same key and same duty as K1's reorder points,
+  but `ops_reorder_points.reorder_point` is NOT NULL and **0 means "the reorder alert is
+  OFF"** — inserting a placeholder row would silently flip a SKU from K1's "Set a number"
+  to "watched and fine". Two numbers, two questions (when to BUY vs how low to let it GO).
+- **Warns, never blocks — enforced by absence.** Nothing in the client or the server
+  disables anything because of a reserve level; the only thing that dims a button is a
+  missing reason. Tested explicitly, because "never blocks" is the kind of rule a later
+  card breaks by being helpful.
+- **The split counts WHY, not net units** — a released draw still happened for a reason —
+  and shows **draws beside units**, since one bulk accessory record is 555 units in ONE
+  act. Shares use largest-remainder so they sum to exactly 100.
+- **ZERO new duty keys**, asserted in 0292's sanity block as 0287 and 0290 did:
+  draw = any operation login (it is the person on the floor) · set the level =
+  `stock_planner`, the key 0286 minted for exactly this.
+- **Nothing seeded** — the split reads "Nothing has been taken from ready stock this month"
+  and every SKU reads "Set a number" until the COO picks one.
 
 ## K5 · Stock health + proposal accuracy
 
@@ -191,5 +234,5 @@ SKU rows.
 | K1 | ✅ shipped 2026-07-27 | #400 |
 | K2 | ✅ shipped 2026-07-27 | #409 |
 | K3 | ✅ shipped 2026-07-27 | #424 |
-| K4 | ⬜ | — |
+| K4 | ✅ shipped 2026-07-27 | #434 |
 | K5 | ⬜ | — |

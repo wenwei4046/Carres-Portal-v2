@@ -314,7 +314,9 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   {
     let q = sb
       .from("ops_stock_items")
-      .select("id, unit_code, sku, warehouse_id, condition, po_no, source_ref, date_in")
+      // `qty` (K4): a bulk accessory record is ONE row of N units, so the
+      // reserve dialog needs it to say truthfully what a draw would leave.
+      .select("id, unit_code, sku, warehouse_id, condition, po_no, source_ref, date_in, qty")
       .eq("status", "free")
       .eq("needs_repair", false)
       .order("date_in", { ascending: true, nullsFirst: false });
@@ -331,6 +333,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       poNo: r.po_no,
       sourceRef: r.source_ref,
       dateIn: r.date_in,
+      qty: r.qty ?? 1,
     }));
   }
 

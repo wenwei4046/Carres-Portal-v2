@@ -33,6 +33,8 @@ import {
   type OpsStockImportRow,
   type OpsReorderResponse,
   type OpsReorderPointInput,
+  type OpsStockUsageResponse,
+  type OpsReserveLevelInput,
   type OpsStockPlanResponse,
   type OpsStockPlanOpenInput,
   type OpsStockPlanProposeInput,
@@ -6493,6 +6495,45 @@ export function useSetReorderPoint() {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: reorderKey });
+    },
+  });
+}
+
+// ── Pool usage + reserve levels · Ready Stock K4 (migration 0292) ───────────
+// Where the ready stock went, and how low each SKU may go. The SERVER decides
+// every number (one shared engine, `summarisePoolUsage` +
+// `computeReserveLevelRows`); these hooks only carry the answer.
+//
+// Keyed by MONTH: the usage question is always "this month", and a shared key
+// would make switching months show the previous month's split for a beat.
+
+const stockUsageKey = (period?: string) =>
+  ["operation", "ops-stock", "usage", period ?? "current"] as const;
+
+export function useStockUsage(period?: string, opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: stockUsageKey(period),
+    queryFn: () =>
+      apiFetch<OpsStockUsageResponse>(
+        `/api/ops/stock/usage${period ? `?period=${period}` : ""}`,
+      ),
+    enabled: opts?.enabled ?? true,
+    staleTime: 30_000,
+  });
+}
+
+/** Set (or switch off, with 0) one SKU's reserve level. COO / principal —
+ *  the server re-gates in SQL, so `canEdit` only decides what renders. */
+export function useSetReserveLevel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OpsReserveLevelInput) =>
+      apiFetch<{ sku: string; reserveLevel: number }>(
+        "/api/ops/stock/reserve-level",
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock", "usage"] });
     },
   });
 }
