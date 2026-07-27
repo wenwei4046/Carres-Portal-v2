@@ -156,7 +156,7 @@ Secondary: the customer's promised date.
 Tertiary: order value, high to low — **a tie-breaker only.** A RM 20,000 order three weeks
 out never outranks a RM 1,500 order going out tomorrow.
 
-## Law 6 — the three dots have no header
+## Law 6 — the three dots have no header — ⚠️ NOT BUILT YET
 
 The dots are three INDEPENDENT facts, not one status, so the column carries no header word
 (`Status` was wrong, `Checks` reads as "cheques" next to money). Each dot is labelled by
@@ -170,6 +170,12 @@ John Tan        🟢 🟡 🔴       Call Ohana — confirm ready date  +2
 
 A delivered order may still show a red money dot and keep an open payment action.
 Delivered is not paid.
+
+**Nothing on screen does this today.** `rowDotsOf()` computes the three dots, is unit
+tested, and **is rendered nowhere**; the list's `Status` column shows a stage pill instead.
+C1 found this while trying to rename a header that does not exist. Building the dots is a
+feature, not a rename — card **C10**. Until C10 ships, this law describes the intent, not
+the screen.
 
 ## What this replaces
 
