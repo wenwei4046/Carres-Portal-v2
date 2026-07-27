@@ -40,12 +40,13 @@ throughout; C4 waits for a free R slot.
 **What C5 actually changed (measured after shipping — it is NOT the disappearance this
 line used to predict).** No order changes its action word today: all 55 control rows are
 `booking_stage='none'`, so the ladder returns `Chase logistic` and never reaches the money
-rung, and nothing leaves the Delivery board. What appears instead: the money dot turns RED
-on 18 orders (it was grey on all 55), the Owing filter and the `Collect $` pill find those
-18 (they found none), the Payments collections queue fills with real figures (it computed
-RM 0 owing for everybody), and the drawer stops telling an operator that a paid-in-full
-order owes its whole value. The 18 orders WILL start showing 🔒 — but only once someone
-confirms a booking, which is the rung the hold sits on.
+rung, and nothing leaves the Delivery board. What appears instead: the **Owing facet row
+shows up for the first time** (`Owing · 18 · RM 56,859` — that row renders only when the
+count is above zero, and the count was always zero), the `Collect $` pill finds those 18,
+the Payments collections queue fills with real figures (it computed RM 0 owing for
+everybody), and the drawer stops telling an operator that a paid-in-full order owes its
+whole value. The 18 orders WILL start showing 🔒 — but only once someone confirms a
+booking, which is the rung the hold sits on.
 
 
 ## Sidebar map — where every line lands

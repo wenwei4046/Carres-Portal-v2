@@ -691,8 +691,10 @@ function ovlOf(o: operationOrderListRow) {
 // ONE reading of what an order still owes, shared with the booking gate, the
 // drawer and the collections desk (`orderMoney`, packages/shared). Before this
 // card every money surface here read `ops_order_control.balance` — NULL on all
-// 55 live control rows — so the 🔒, the money dot, the Owing filter and the
-// Collect $ pill were all permanently silent while 18 orders owed RM 56,859.
+// 55 live control rows — so the 🔒, the Owing facet row and the Collect $ pill
+// were all permanently silent while 18 orders owed RM 56,859. (The money DOT
+// reads this too, but `rowDotsOf` is dead code — nothing renders it; the
+// Status column shows a stage-word pill. Its strings grep 0 in the bundle.)
 //
 // STORAGE is folded in here, not inside the shared rule: its clock and its
 // collected/waived flags are this page's own signals, and the shared function
