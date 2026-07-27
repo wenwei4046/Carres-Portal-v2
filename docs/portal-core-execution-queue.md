@@ -178,9 +178,17 @@ Leaving it would have made the drawer contradict its own row.
 3. **The 18 owing orders do NOT leave the Delivery board** (the index's "Expect after C5"
    note). All 55 control rows are `booking_stage='none'`, so the ladder returns
    `Chase logistic` and never reaches the money rung — no row changes its action word
-   today. What changes: the money dot (red on 18, was grey on 55), the Owing filter and
-   `Collect $` pill (18, were 0), the Payments queue (18 rows with real figures, was
-   empty), the drawer's Outstanding, and the booking gate's money answer.
+   today. What changes: the **Owing facet row appears for the first time** (`Owing · 18 ·
+   RM 56,859` — it renders only when the count is above zero, and the count was always
+   zero), the `Collect $` pill finds those 18, the Payments collections queue fills with
+   real figures, the drawer stops telling an operator that a paid-in-full order owes its
+   whole value, and the booking gate's money answer is right.
+4. **`rowDotsOf` is dead code** — it is exported and unit-tested but nothing renders it
+   (the Status column shows a stage-word pill; the three-dot design was replaced). Its
+   money branch was updated for consistency and it changes nothing on screen. Caught by
+   grepping the shipped bundle for its strings: zero hits. Filed as a carry-forward
+   rather than deleted — removing an exported function is Jess's call, not a build
+   chat's.
 
 **SO-1209's money gate passes — its booking is still refused for GOODS** (0 units reserved,
 `line_received` NULL). That is the goods half doing its job, and it is a separate question.
