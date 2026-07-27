@@ -64,6 +64,7 @@ import {
   type DeliveryGroupKey,
   displayGuaranteeId,
   effectiveGuaranteeStatus,
+  deliveryDateGapFact,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -272,10 +273,15 @@ function deriveOrderStage(sig: {
   return "needs_setup";
 }
 
+/** C1 (Jess 2026-07-27): `Pending` is a banned word — pending on WHAT? This
+ *  stage means the PO is out and the goods have not landed, so it says that.
+ *  NOTE this is the DRAWER's own stage set and `scheduled` here is
+ *  `operation_stage = dispatched | ready_to_dispatch` — NOT the list's
+ *  customer-confirmed booking, so the two deliberately keep different words. */
 const PIPELINE_LABEL: Record<PipelineStatus, string> = {
   needs_setup: "Needs setup",
   proceed: "Proceed",
-  pending: "Pending",
+  pending: "Goods not in",
   in_production: "In Production",
   ready: "Ready",
   scheduled: "Scheduled",
@@ -942,7 +948,7 @@ function PieDial({
   );
 }
 
-/** One Chase Now row — a counterparty that needs a push right now. */
+/** One ACTIONS row — a counterparty someone has to reach right now. */
 interface ChaseNowRow {
   key: string;
   label: string;
@@ -950,15 +956,15 @@ interface ChaseNowRow {
   /** Hover detail when the sub is abbreviated (e.g. the full PO list behind
    *  a "2 POs" count). Falls back to the sub itself. */
   subTitle?: string;
-  /** red dot = overdue (sorts on top) · amber dot = needs attention. */
+  /** red dot = overdue (sorts on top) · amber dot = due soon. */
   urgency: "overdue" | "attention";
   onAct: (tone: "reminder" | "chase") => void;
-  /** Row click → the tab where this chase is WORKED (supplier→Items,
-   *  logistic→Delivery, customer→Balance). Manage▾ stays the chase itself. */
+  /** Row click → the tab where this is WORKED (supplier→Items,
+   *  logistics→Delivery, customer→Balance). Actions▾ stays the message. */
   onOpen?: () => void;
 }
 
-/** Relative "how long ago" for the chase stamp — short, truncation-proof. */
+/** Relative "how long ago" for the last-message stamp — truncation-proof. */
 function agoWord(iso: string): string {
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60_000);
   if (mins < 60) return `${Math.max(1, mins)}m ago`;
@@ -967,14 +973,16 @@ function agoWord(iso: string): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
-/** Chase Now (MASTER SPEC §7, B2) — the left-rail panel that owns ALL the
- *  chasing (Reminder/Chase left the KPI tracks): one row per COUNTERPARTY —
- *  supplier (POs merged per supplier, §13) / logistic / owing customer.
+/** ACTIONS (MASTER SPEC §7, B2; renamed from "Chase now" by C1 — Jess banned
+ *  the word 2026-07-27, and `Actions` is the word she chose for an order's open
+ *  actions on the list, so the drawer uses the same one). The left-rail panel
+ *  that owns ALL the outward calls: one row per COUNTERPARTY — supplier (POs
+ *  merged per supplier, §13) / logistics / owing customer.
  *  Colour discipline: the DOT + the overdue FACT line carry the red; the
  *  counterparty name stays ink (red marks what's wrong, not who). Overdue
- *  sorts on top; Manage▾ = Reminder/Chase (same language as the Items rows'
- *  Manage▾). Empty = "Nothing to chase ✓". `lastChasedAt` = the shared
- *  order-level chase stamp (0221; populates once the API deploys). */
+ *  sorts on top; Actions▾ = Remind / Call (the two message tones, same language
+ *  as the Items rows' menu). `lastChasedAt` = the shared order-level stamp
+ *  (0221; populates once the API deploys). */
 function ChaseNowPanel({
   rows,
   lastChasedAt,
@@ -986,21 +994,21 @@ function ChaseNowPanel({
     <div className="kpi-box shrink-0">
       <span className="flex items-baseline gap-2 mb-1">
         <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
-          Chase now
+          Actions
         </span>
         {rows.length > 0 && lastChasedAt && (
           <span
             className="ml-auto text-[12px] text-base-400 whitespace-nowrap"
-            title={`Last chase copied ${fmtDate(lastChasedAt)}`}
+            title={`Last message copied ${fmtDate(lastChasedAt)}`}
           >
-            chased {agoWord(lastChasedAt)}
+            last message {agoWord(lastChasedAt)}
           </span>
         )}
       </span>
       {rows.length === 0 ? (
         <span className="flex items-center gap-1.5 min-h-9 text-[12px] font-medium text-success">
           <Check size={14} strokeWidth={2.5} aria-hidden="true" />
-          Nothing to chase
+          0 calls to make · everything on track.
         </span>
       ) : (
         rows.map((r) => (
@@ -1019,8 +1027,9 @@ function ChaseNowPanel({
               className={`w-2 h-2 rounded-full shrink-0 ${
                 r.urgency === "overdue" ? "bg-danger" : "bg-warning"
               }`}
-              title={r.urgency === "overdue" ? "Overdue" : "Needs attention"}
-              aria-label={r.urgency === "overdue" ? "Overdue" : "Needs attention"}
+              /* "Attention" is a banned word — it names a mood, not the work. */
+              title={r.urgency === "overdue" ? "Overdue" : "Due soon"}
+              aria-label={r.urgency === "overdue" ? "Overdue" : "Due soon"}
             />
             <span className="min-w-0 flex-1">
               <span
@@ -1040,10 +1049,13 @@ function ChaseNowPanel({
                 {r.sub}
               </span>
             </span>
+            {/* The two message TONES, in the canonical words: `Remind` is the
+                pre-deadline follow-up, `Call` the firm one. The row above
+                already names the party and what is outstanding. */}
             <RowManageMenu
               items={[
-                { label: "Reminder", onClick: () => r.onAct("reminder") },
-                { label: "Chase", onClick: () => r.onAct("chase") },
+                { label: "Remind", onClick: () => r.onAct("reminder") },
+                { label: "Call", onClick: () => r.onAct("chase") },
               ]}
             />
           </div>
@@ -1073,9 +1085,10 @@ function shortSite(loc: string): string {
   return loc;
 }
 
-/** §9 ACTION column — "Manage ▾": the row's secondary actions (Reserve /
+/** §9 ACTIONS column — "Actions ▾": the row's secondary actions (Reserve /
  *  Loan / Change route). The row's MUST-DO action renders as its own direct
- *  button beside this menu. */
+ *  button beside this menu. Plural, and the same word the list column carries
+ *  (Jess 2026-07-27) — a row can have several. */
 function RowManageMenu({
   items,
 }: {
@@ -1085,7 +1098,7 @@ function RowManageMenu({
   return (
     <span className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <Btn size="sm" onClick={() => setOpen((v) => !v)} title="Row actions">
-        Manage
+        Actions
         <ChevronDown size={14} aria-hidden="true" />
       </Btn>
       {open && (
@@ -1113,7 +1126,7 @@ function RowManageMenu({
   );
 }
 
-/** One PO-led chase target — a supplier (portal PO) or a bare AutoCount PO
+/** One PO-led follow-up target — a supplier (portal PO) or a bare AutoCount PO
  *  number, with the category lines it covers. */
 interface ChaseGroup {
   key: string;
@@ -1132,11 +1145,11 @@ interface StockCat {
   ready: number;
   total: number;
   allReady: boolean;
-  /** PO-led chase targets, overdue first. */
+  /** PO-led follow-up targets, overdue first. */
   groups: ChaseGroup[];
   /** The row's supplier-status readout ("in stock" / "no PO" / "<sup> · ETA x"). */
   status: string;
-  /** Stalled / overdue — the chase turns hot. */
+  /** Stalled / overdue — the follow-up turns hot. */
   hot: boolean;
 }
 
@@ -1175,8 +1188,8 @@ function DrawerBody({
   // rev18 — the Stock ETA column edits IN PLACE (click the date → input);
   // the expander no longer repeats it.
   const [etaEditSku, setEtaEditSku] = useState<string | null>(null);
-  // §7.6 — the Delivery card's multi-leg "Carriers / route" block is HIDDEN by
-  // default (the Logistic dropdown is the default route); it expands behind
+  // §7.6 — the Delivery card's multi-leg "Logistics / route" block is HIDDEN by
+  // default (the Logistics dropdown is the default route); it expands behind
   // "+ Add stop" and stays open once the order actually has legs.
   const [showRouteBlock, setShowRouteBlock] = useState(false);
   // rev23 — "Postponed? →" reveals the one-time formal extension recorder
@@ -1496,7 +1509,7 @@ function DrawerBody({
       (order.status !== "place" && order.status !== "cancelled"),
   });
 
-  // Collect-before-delivery gate (Jess 2026-07-02), keyed to the Logistic ETA
+  // Collect-before-delivery gate (Jess 2026-07-02), keyed to the logistics date
   // (delivery date). Two stages: amber "Collect before delivery" while the ETA
   // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
   // Applies to BOTH the goods balance and the storage fee; the header rolls up
@@ -1667,12 +1680,12 @@ function DrawerBody({
     onSuccess: () => toast.success("Saved"),
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
-  // Chase-event stamp (0221, deploy-gated) — SILENT on error so a not-yet-
-  // deployed API never blocks the chase itself (the copy already happened).
+  // Follow-up stamp (0221, deploy-gated) — SILENT on error so a not-yet-
+  // deployed API never blocks the message itself (the copy already happened).
   const chaseStamp = useSaveOrderControl(order.id);
   // WhatsApp two-tone chase (docs/whatsapp-chase-templates.md): every audience
-  // gets Reminder (gentle first contact) + Chase (firmer). COPY the template +
-  // log the chase event; the stored number + wa.me deep link — and the portal
+  // gets Reminder (gentle first contact) + Call (firmer). COPY the template +
+  // log the event; the stored number + wa.me deep link — and the portal
   // auto-fire — write the SAME event later.
   const chasePartnerName = assignedLogisticName ?? formalPartnerName ?? null;
   const receiptMetaOf = () => ({
@@ -1688,7 +1701,7 @@ function DrawerBody({
       : "—";
   // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
   // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
-  // the short chase-template strings only.
+  // the short message-template strings only.
   const deadlineFull = order.delivery_date_tbd
     ? "TBD"
     : order.delivery_date
@@ -1743,11 +1756,13 @@ function DrawerBody({
               deadline: deadlineLabel,
               overdue: daysToDelivery !== null && daysToDelivery < 0,
             });
+    // The word in the toast is the TONE of the message that was copied, and
+    // C1 banned "Chase": the firm tone is a Call (COPY-STANDARD verb table).
     const toneWord =
-      tone === "chase" ? "Chase" : tone === "final" ? "Final reminder" : "Reminder";
+      tone === "chase" ? "Call text" : tone === "final" ? "Final reminder" : "Reminder";
     // 1B — wa.me DIRECT send (Jess 2026-07-19). The CUSTOMER has a personal
     // number → open their WhatsApp with the message pre-filled (one tap to send;
-    // we never auto-send). Supplier/logistic chase a GROUP (chat.whatsapp.com,
+    // we never auto-send). Supplier/logistics go to a GROUP (chat.whatsapp.com,
     // no ?text= prefill) → copy the text as before. Clipboard is kept as the
     // desktop fallback regardless.
     void navigator.clipboard.writeText(text);
@@ -1760,14 +1775,14 @@ function DrawerBody({
     } else {
       toast.success(`${toneWord} copied — paste into the WhatsApp group`);
     }
-    // The logged chase event — a manual send stamps it; the future portal
+    // The logged follow-up event — a manual send stamps it; the future portal
     // auto-fire writes the SAME event.
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
 
   // ═══ KPI tracks = the 3 mission tracks (MASTER SPEC §7, A2) ═══
   // Three full-width progress lines; the tones colour each track's CURRENT
-  // node. Chasing lives in the left-rail Chase Now panel.
+  // node. The outward calls live in the left-rail ACTIONS panel.
   // CUSTOMER · money — green paid/0 · amber owing pre-last-call · red owing past
   // the collect gate (the same balanceGate the Balance card shows).
   // STOCK — green all reserved · red No PO or an on-PO line with no / passed
@@ -1785,8 +1800,8 @@ function DrawerBody({
         : nopoN > 0 || onPoStalled
           ? "danger"
           : "warning";
-  // LOGISTIC — green booked or >3 days left · amber ≤3 days & not booked · red
-  // deadline passed & not booked.
+  // LOGISTICS — green booked or >3 days left · amber ≤3 days & no date · red
+  // deadline passed & no date confirmed.
   const bookedEta = form.control?.logistic_eta ?? null;
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
@@ -1822,7 +1837,7 @@ function DrawerBody({
       return !v;
     });
 
-  // ═══ Track signals (A2) — shared by the stage arrays + Chase Now. ═══
+  // ═══ Track signals (A2) — shared by the stage arrays + ACTIONS. ═══
   const deliveredDone = pipelineStatus === "completed";
   const goodsN = goodsLines.length;
   const overDeadline = daysToDelivery !== null && daysToDelivery < 0;
@@ -1968,7 +1983,7 @@ function DrawerBody({
   };
 
   // ── STOCK by CATEGORY (KPI rev 10) — one row per core category present:
-  // N/M ready + that category's supplier status + its OWN PO-led chase.
+  // N/M ready + that category's supplier status + its OWN PO-led follow-up.
   // Chase targets group by PO: a portal PO resolves its supplier name; an
   // AutoCount source_po chases by the PO number itself.
   const CAT_WORD = {
@@ -2073,7 +2088,7 @@ function DrawerBody({
     });
     void navigator.clipboard.writeText(text);
     toast.success(
-      `${tone === "reminder" ? "Reminder" : "Chase"} copied — ${g.label}`,
+      `${tone === "reminder" ? "Reminder" : "Call text"} copied — ${g.label}`,
     );
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
@@ -2106,8 +2121,8 @@ function DrawerBody({
   }
   const chaseGroups = [...chaseByPo.values()];
 
-  // ═══ Chase Now rows (§7, B2) — one per COUNTERPARTY; overdue on top.
-  // A delivered order is CLOSED: no supplier/logistic chasing remains — only
+  // ═══ ACTIONS rows (§7, B2) — one per COUNTERPARTY; overdue on top.
+  // A delivered order is CLOSED: no supplier/logistics call remains — only
   // an owing customer survives delivery. Lateness reads RELATIVE ("5d late"
   // beats a truncated absolute date). ═══
   const daysLateOf = (iso: string) =>
@@ -2173,9 +2188,11 @@ function DrawerBody({
     chaseRows.push({
       key: "logistic",
       label: chasePartnerName,
+      // A fact may state an ABSENCE ("no date confirmed") but never a to-do
+      // word — "not booked" is banned (C1, Jess 2026-07-27).
       sub: overDeadline
-        ? `${bookedEta ? `booked ${fmtDate(bookedEta).split(",")[0]}` : "not booked"} · ${lateDays}d late`
-        : `not booked · due ${deadlineLabel}`,
+        ? `${bookedEta ? `logistics said ${fmtDate(bookedEta).split(",")[0]}` : "no date confirmed"} · ${lateDays}d late`
+        : `no date confirmed · due ${deadlineLabel}`,
       urgency: overDeadline ? "overdue" : "attention",
       onAct: (tone) => copyChase("logistic", tone),
       onOpen: () => setTab("delivery"),
@@ -2293,8 +2310,8 @@ function DrawerBody({
           : "wait",
       sub: deliveredDone
         ? "delivered"
-        : `${assignedLogisticName ?? "no partner yet"}${
-            logisticTone === "danger" ? " · not booked" : ""
+        : `${assignedLogisticName ?? "no logistics picked yet"}${
+            logisticTone === "danger" ? " · no date confirmed" : ""
           }`,
     },
   ];
@@ -2488,7 +2505,7 @@ function DrawerBody({
             }
             collapsed={railCollapsed}
           />
-          {/* Chase Now (MASTER SPEC §7) — a PANEL (not a tab) between the
+          {/* ACTIONS (MASTER SPEC §7) — a PANEL (not a tab) between the
               Customer block and the tab rail; hides with the collapsed rail
               (the tab dots still carry the alerts). */}
           {!railCollapsed && (
@@ -2639,7 +2656,7 @@ function DrawerBody({
         </nav>
         </div>
         {/* RIGHT — the tab content owns the whole column (rev15, Jess: the
-            KPI strip is GONE — the tab dots, Chase Now panel and each tab's
+            KPI strip is GONE — the tab dots, ACTIONS panel and each tab's
             own §8 status vocabulary carry the state; the work surface starts
             at the top). */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 overflow-hidden"><div className="flex-1 min-w-0 min-h-0 overflow-y-auto scroll-overlay">
@@ -2816,7 +2833,7 @@ function DrawerBody({
                                   ? {
                                       t: "Delayed",
                                       c: "pill-overdue",
-                                      hint: "The PO's ETA has passed — chase the supplier",
+                                      hint: "The PO's ETA has passed — call the supplier for a new ready date",
                                     }
                                   : {
                                       t: "On PO",
@@ -2995,7 +3012,7 @@ function DrawerBody({
                               ) : (
                                 <span
                                   className="inline-flex items-center gap-1 text-[12px] font-medium text-danger cursor-pointer"
-                                  title="No stock ETA — click to set it (or chase the supplier)"
+                                  title="No stock ETA — click to set it, or call the supplier for the ready date"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEtaEditSku(l.sku);
@@ -3734,7 +3751,7 @@ function DrawerBody({
 
           <div className={tab === "delivery" ? "min-h-full flex flex-col gap-3" : "hidden"}>
           {/* Card B — Delivery. Header badge = region. Body split Original |
-              Logistic update; then the 2 remark rows; then a Route section only
+              Logistics update; then the 2 remark rows; then a Route section only
               for a cross-border / multi-leg order. (Natural height now — the
               Activity card below carries `grow` to fill the column bottom.) */}
           <SectionCard className="shrink-0">
@@ -3771,7 +3788,7 @@ function DrawerBody({
             summary={
               /* rev24 header (Jess): DEADLINE readout + the truth-ladder chip
                  (Delivered ✓ › on hold › overdue Nd › booked › not booked ›
-                 no carrier). "booked" = logistic_eta; assigned-but-unbooked
+                 no logistics). "booked" = logistic_eta; assigned-but-unbooked
                  is the 93% normal state and must NOT read as failure. A
                  delivered order never alarms (pre-golive guardrail #2). */
               /* rev25 (Jess): badge FIRST, no "deadline" word, the date stays
@@ -3797,7 +3814,7 @@ function DrawerBody({
                       </span>
                     );
                   // D1 (0277, Loo): the chip states FACTS. Green is reserved
-                  // for the CUSTOMER's confirmation; a carrier date alone must
+                  // for the CUSTOMER's confirmation; a logistics date alone must
                   // never read as done — that mislabel is the 68% stuck-order
                   // root the two-stage booking exists to fix.
                   if (
@@ -3816,12 +3833,21 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="waiting">
-                        not confirmed · carrier said {dayMon(eta)}
+                        not confirmed · logistics said {dayMon(eta)}
                       </MiniBadge>
                     );
+                  // C1 (Jess 2026-07-27): T1 banned "Unscheduled" and this badge
+                  // survived it. Its replacement is NOT T1's "need booking" —
+                  // that hides a to-do inside a fact ("need" = the reader still
+                  // has to work out what to do). The badge states the ACTION
+                  // that closes the gap instead, with the party named.
                   if (order.ops_assigned_logistic)
-                    return <MiniBadge tone="waiting">Unscheduled</MiniBadge>;
-                  return <MiniBadge tone="muted">No carrier</MiniBadge>;
+                    return (
+                      <MiniBadge tone="waiting">
+                        {deliveryDateGapFact(chasePartnerName)}
+                      </MiniBadge>
+                    );
+                  return <MiniBadge tone="muted">No logistics picked</MiniBadge>;
                 })()}
                 {/* deadline date lives ONCE — on the card header below (mono);
                     a second sans copy here read as "two fonts" (Jess). */}
@@ -3842,9 +3868,10 @@ function DrawerBody({
                 const onHold = balanceGate === "hold" || storageGate === "hold";
                 // The delivery status word (D1 0277, supersedes the 2026-07-19
                 // "Scheduled" wording): Confirmed = the CUSTOMER confirmed date
-                // + slot · Not confirmed = only a carrier date (logistic_eta)
-                // exists · Unscheduled = carrier assigned, no date (the normal
-                // state) · Delivered = done (grey, never alarms).
+                // + slot · Not confirmed = only a logistics date (logistic_eta)
+                // exists · logistics assigned with no date at all = the ACTION
+                // that closes it (C1 banned the gap-word that used to sit here)
+                // · Delivered = done (grey, never alarms).
                 const bookingConfirmed =
                   form.control?.booking_stage === "confirmed" &&
                   !!form.control.confirmed_date;
@@ -3859,8 +3886,8 @@ function DrawerBody({
                         : eta
                           ? "Not confirmed"
                           : order.ops_assigned_logistic
-                            ? "Unscheduled"
-                            : "No carrier";
+                            ? deliveryDateGapFact(chasePartnerName)
+                            : "No logistics picked";
                 return (
                   <div className="max-w-[700px]">
                     {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
@@ -3869,7 +3896,7 @@ function DrawerBody({
                         rail. Icon never tints (grey when done); status word in
                         the caption; deadline anchor + DO print top-right. */}
                     <div className="bg-white border border-base-200 rounded-[11px] shadow-[0_1px_2px_rgba(16,24,40,0.05)] overflow-hidden">
-                      {/* header — truck · status · carrier · deadline / DO */}
+                      {/* header — truck · status · logistics · deadline / DO */}
                       <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
                         <div className="flex items-start gap-2.5 min-w-0">
                           <span
@@ -3889,9 +3916,9 @@ function DrawerBody({
                               className={`text-[13px] font-semibold truncate ${
                                 deliveredDone ? "text-base-500" : "text-base-900"
                               }`}
-                              title={chasePartnerName ?? "No carrier yet"}
+                              title={chasePartnerName ?? "No logistics picked yet"}
                             >
-                              {chasePartnerName ?? "No carrier yet"}
+                              {chasePartnerName ?? "No logistics picked yet"}
                             </div>
                           </div>
                         </div>
@@ -3916,7 +3943,7 @@ function DrawerBody({
                       </div>
                       {/* T5 — booking progress spine (read-only): WHERE the
                           delivery is in 3 seconds. Each tick derives from a
-                          signal this card already reads — the carrier name
+                          signal this card already reads — the logistics name
                           above, booking_stage (0277), do_number (auto on
                           dispatch, 0098), the same delivered signal as the
                           chip, the delivery-photo ledger (T6, 0280) — so
@@ -4027,9 +4054,10 @@ function DrawerBody({
                           </span>
                         </DRow>
                       )}
-                      {/* Chase logistic — Remind (gentle) / Chase (firm). */}
+                      {/* Confirm delivery date — the two message tones:
+                          Remind (gentle, pre-deadline) / Call (firm). */}
                       {order.ops_assigned_logistic && !deliveredDone && (
-                        <DRow k="Chase logistic">
+                        <DRow k="Confirm delivery date">
                           <span className="flex items-center gap-1.5">
                             <Btn
                               variant="ghost"
@@ -4045,13 +4073,13 @@ function DrawerBody({
                               icon={MessageCircle}
                               onClick={() => copyChase("logistic", "chase")}
                             >
-                              Chase
+                              Call
                             </Btn>
                           </span>
                         </DRow>
                       )}
-                      {/* D1 BOOKING (0277) — the two-stage truth under Chase
-                          logistic: what the carrier said (provisional) vs what
+                      {/* D1 BOOKING (0277) — the two-stage truth under Confirm
+                          delivery date: what logistics said (provisional) vs what
                           the CUSTOMER confirmed (date + slot, evidence-stamped).
                           The server enforces the gates; hints here assist. */}
                       {!deliveredDone && (
@@ -4091,12 +4119,12 @@ function DrawerBody({
                                 }
                               />
                             </FieldGrid>
-                            {/* Auto-reminder — the 0197 cron creates the chase
+                            {/* Auto-reminder — the 0197 cron creates the
                                 task by ITSELF on deadline−N; nothing to press. */}
                             {contactByLabel && (
                               <div className="flex items-center gap-1 py-0.5 text-[12px] text-base-400">
                                 <span className="truncate">
-                                  if not booked, auto-reminder {contactByLabel}
+                                  if no date confirmed, auto-reminder {contactByLabel}
                                 </span>
                                 {editingChaseDays ? (
                                   <span className="flex items-center gap-0.5 whitespace-nowrap shrink-0">
@@ -4123,7 +4151,7 @@ function DrawerBody({
                                         setEditingChaseDays(false);
                                       }}
                                       placeholder="3"
-                                      aria-label="Days before the deadline for the automatic chase reminder"
+                                      aria-label="Days before the deadline for the automatic reminder"
                                       className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[12px] text-center outline-none focus:border-primary"
                                     />
                                     <span>d</span>
@@ -4169,8 +4197,8 @@ function DrawerBody({
                         }}
                       />
                     </div>
-              {/* Carriers / route (§7.6) — HIDDEN by default: the Logistic
-                  dropdown above IS the standard single-carrier route, so the
+              {/* Logistics / route (§7.6) — HIDDEN by default: the Logistics
+                  dropdown above IS the standard single-company route, so the
                   multi-leg bar only renders when the order actually has legs,
                   or after "+ Add stop" opens it. */}
               {/* 3A — no permanent multi-leg furniture on the tab face: the
@@ -4180,7 +4208,7 @@ function DrawerBody({
                 <div className="border-t border-base-100 pt-2 mt-2">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] text-base-400">
-                      Carriers / route
+                      Logistics / route
                     </span>
                     <MiniBadge tone="muted">
                       {order.delivery_stops?.length
@@ -4875,7 +4903,7 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
 /** D1 two-stage booking (0277) — the BOOKING rows under Chase logistic.
- *  Stage 1 (provisional) = the carrier's date; it already lives in
+ *  Stage 1 (provisional) = the logistics company's date; it already lives in
  *  logistic_eta (editable in the Booking ETA fold). This block records
  *  Stage 2: the CUSTOMER's yes — date + time slot, both required (invariant
  *  #1). The confirm endpoint enforces goods ready + balance ready + no
@@ -4932,7 +4960,7 @@ function BookingBlock({
   const confirm = useConfirmBooking(orderId, {
     onSuccess: (res) => {
       toast.success("Booking confirmed — the customer's date + slot are recorded");
-      // T9 — the booking is SAVED either way; if the carrier's own rules bend
+      // T9 — the booking is SAVED either way; if the company's own rules bend
       // on that date, say so once so the operator knows to ring them.
       const first = res.partnerWarnings?.[0];
       if (first) toast.warning(first.message);
@@ -5002,7 +5030,7 @@ function BookingBlock({
             {eta ? (
               <>
                 <span className="text-[12px] text-base-600 whitespace-nowrap">
-                  carrier said
+                  logistics said
                 </span>
                 <span className="font-mono text-[13px] font-semibold text-base-900 whitespace-nowrap">
                   {fmtDate(eta).split(",")[0]}
@@ -5142,10 +5170,10 @@ function BookingBlock({
               Sunday is not a delivery working day — pick another date
             </div>
           )}
-          {/* T9 (0283) — the carrier's own rules against THIS date. Amber, not
+          {/* T9 (0283) — the company's own rules against THIS date. Amber, not
               red, and the Confirm button stays live: these are the partner's
               facts, and a phone call can change them. Every line names the
-              carrier so a new hire knows who to ring. */}
+              company so a new hire knows who to ring. */}
           {partnerWarnings.length > 0 && (
             <div className="text-right text-[12px] text-warning py-0.5 space-y-0.5">
               {partnerWarnings.map((w) => (
@@ -5192,13 +5220,13 @@ function BookingBlock({
   );
 }
 
-/** T9 (0283) — the carrier's own delivery rules, edited where they are FIRST
+/** T9 (0283) — the logistics company's own delivery rules, edited where FIRST
  *  read (L6: "build the fields WITH the first consumer, not as an admin page up
  *  front"). Four facts, plain words: which days it runs, days it is not running
  *  at all, how many drops it takes, and how much notice it needs.
  *
  *  Sunday is not offered: nobody delivers on Sunday, and the booking gate
- *  refuses it for every carrier — showing a switch for it would suggest the
+ *  refuses it for every company — showing a switch for it would suggest the
  *  rule is negotiable per partner.
  *
  *  The rules belong to the CARRIER, not this order: saving here changes what
@@ -5253,7 +5281,7 @@ function PartnerRulesEditor({
       cur.includes(n) ? cur.filter((d) => d !== n) : [...cur, n],
     );
   // Sunday is always off; the API validates the same thing, this keeps the
-  // operator from saving a carrier that runs no day at all.
+  // operator from saving a company that runs no day at all.
   const runsSomeDay = WEEK.some((d) => runsOn(d.n));
   const capacityNum = capacity.trim() === "" ? null : Number(capacity);
   const leadNum = Number(lead || 0);
@@ -5269,7 +5297,7 @@ function PartnerRulesEditor({
       <div className="py-1 space-y-1.5 text-right">
         <div className="text-[11px] text-base-500">
           These are {partnerName}&apos;s own rules — they apply to every order
-          this carrier delivers, and they warn, never block.
+          this logistics company delivers, and they warn, never block.
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           <span className="text-[12px] text-base-600">Delivers on</span>
@@ -5291,7 +5319,7 @@ function PartnerRulesEditor({
         </div>
         {!runsSomeDay && (
           <div className="text-[12px] text-danger">
-            A carrier must run on at least one day of the week
+            A logistics company must run on at least one day of the week
           </div>
         )}
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -6874,8 +6902,8 @@ function MoneyCard({
               onClick={onRemind}
               title={
                 deliveryEve
-                  ? "Copy the delivery-eve FINAL reminder (WhatsApp) + log the chase event"
-                  : "Copy the gentle payment reminder (WhatsApp) + log the chase event"
+                  ? "Copy the delivery-eve FINAL reminder (WhatsApp) + log the message"
+                  : "Copy the gentle payment reminder (WhatsApp) + log the message"
               }
               className={`btn-chase ${collectByPast ? "btn-chase-hot" : ""}`}
             >
@@ -7009,7 +7037,7 @@ function ActionsMenu({
                 {pipelineStatus === "ready" && (
                   <MenuItem
                     icon={<Truck className="w-4 h-4" />}
-                    label="Assign logistic"
+                    label="Assign logistics"
                     onClick={() => {
                       close();
                       onDispatchClick();

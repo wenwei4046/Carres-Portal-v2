@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
  *  seconds: a checklist, not a status word. Every tick DERIVES from a signal
  *  the Delivery card already reads — nothing here writes, and the parent must
  *  feed the SAME sources the header chip uses so the two can never disagree:
- *  partner = the card's own carrier name · confirmed = booking_stage (0277)
+ *  logistics = the card's own company name · confirmed = booking_stage (0277)
  *  · DO = orders.do_number (auto-assigned on dispatch, 0098) · delivered =
  *  the same pipeline signal as the "Delivered ✓" chip · photo = the
  *  delivery-photo ledger (T6, 0280 — ≥1 entry lights the tick). */
@@ -25,7 +25,7 @@ export default function BookingSpine({
   photoUploaded: boolean;
 }) {
   const steps: { label: string; state: SpineState }[] = [
-    { label: "Logistic assigned", state: partnerAssigned ? "done" : "todo" },
+    { label: "Logistics assigned", state: partnerAssigned ? "done" : "todo" },
     { label: "Customer confirmed", state: customerConfirmed ? "done" : "todo" },
     { label: "Delivery order issued", state: doIssued ? "done" : "todo" },
     { label: "Delivered", state: delivered ? "done" : "todo" },

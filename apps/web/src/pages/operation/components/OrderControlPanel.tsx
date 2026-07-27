@@ -329,7 +329,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
 
 /** Region + logistic select + delivery date → the Delivery grid. Writes
  *  straight to `orders` (own mutations). Always editable so the operator can
- *  fix or (re)assign the carrier / date at any stage (Jess: every cell edits). */
+ *  fix or (re)assign the logistics company / date at any stage (every cell edits). */
 export function RoutingFields({
   orderId: _orderId,
   customerAddress,
@@ -367,7 +367,7 @@ export function RoutingFields({
     [partnersData],
   );
   const setLogistic = useSetOpsAssignedLogistic(_orderId, {
-    onSuccess: () => toast.success("Logistic updated"),
+    onSuccess: () => toast.success("Logistics updated"),
     onError: (e) => toast.error(`Couldn't set logistic — ${e.message}`),
   });
   const setDate = useOperationSetDeliveryDate(_orderId, {
@@ -391,7 +391,7 @@ export function RoutingFields({
         </FieldRow>
       )}
 
-      <FieldRow label="Logistic">
+      <FieldRow label="Logistics">
         <div className="flex items-center gap-2 flex-wrap w-full px-1">
           <select
             id="fld-logistic"
@@ -402,7 +402,7 @@ export function RoutingFields({
             }
             className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
-            <option value="">— pick carrier —</option>
+            <option value="">— pick logistics —</option>
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -462,9 +462,10 @@ export function RoutingFields({
   );
 }
 
-/** Logistic ETA (the carrier's committed delivery date) → the Delivery section's
- *  RIGHT column. Distinct from Deadline (the customer's requested date); this is
- *  what the logistic partner updates. */
+/** The logistics company's own date → the Delivery section's RIGHT column.
+ *  Distinct from Deadline (the customer's requested date) and from the
+ *  CUSTOMER's confirmation: this is only what logistics said (COPY-STANDARD
+ *  calls it "Logistics' date" and it is never green). */
 export function LogisticEtaField({
   form,
   onCommit,
@@ -475,7 +476,7 @@ export function LogisticEtaField({
   onCommit?: (value: string) => void;
 }) {
   return (
-    <FieldRow label="Logistic ETA">
+    <FieldRow label="Logistics' date">
       <input
         id="fld-logistic-eta"
         type="date"

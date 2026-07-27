@@ -1,6 +1,6 @@
 // design-standard: not-a-list-page — modal review overlay (logistic-partner
-// chase cards), launched from the Orders bulk bar's Logistic ⋮; the page shell
-// stays underneath. Mirror of ChaseSupplierReview, grouped by delivery partner.
+// message cards), launched from the Orders bulk bar's Logistics ⋮; the page
+// shell stays underneath. Mirror of ChaseSupplierReview, grouped by company.
 import { useMemo, useState } from "react";
 import { Copy, ExternalLink, MessageCircle, X } from "lucide-react";
 import { toast } from "sonner";
@@ -27,13 +27,20 @@ export interface PartnerChaseOrder {
 }
 
 /**
- * Chase-logistic review (Remind / Chase over the selection):
+ * Confirm-delivery-date review (Remind / Call over the selection):
  * ONE card per delivery partner — the message lists every selected order's
  * CR/TCF ref + customer (region) + items + deadline. Copy grabs the text; Open
  * group opens the partner's WhatsApp group. GROUP invite links
  * (chat.whatsapp.com/…) don't accept a ?text= prefill, so Open just opens the
  * group and the operator pastes the copied message. Open to ALL operation.
  */
+/** The two message TONES, in the canonical words (COPY-STANDARD): `Remind` is
+ *  the pre-deadline follow-up, `Call` the firm one. "Chase" is banned. */
+const TONE_LABEL: Record<"remind" | "chase", string> = {
+  remind: "Remind",
+  chase: "Call",
+};
+
 export default function ChasePartnerReview({
   orders,
   partners,
@@ -44,7 +51,7 @@ export default function ChasePartnerReview({
   partners: DeliveryPartnerRow[];
   onClose: () => void;
   /** Which tone the review opens on: the LOGISTIC section's "Remind" opens on
-   *  remind, "Chase" opens on chase. */
+   *  remind, "Call" opens on the firmer tone. */
   initialMode?: "remind" | "chase";
 }) {
   const [mode, setMode] = useState<"remind" | "chase">(initialMode);
@@ -55,7 +62,7 @@ export default function ChasePartnerReview({
   );
 
   // Group the selection by partner; orders with no partner are counted as
-  // unassigned (nothing to chase — they need Assign first).
+  // unassigned (no call to make — they need Assign logistics first).
   const { cards, unassigned } = useMemo(() => {
     const byPartner = new Map<string, PartnerChaseOrder[]>();
     let noPartner = 0;
@@ -105,7 +112,7 @@ export default function ChasePartnerReview({
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <MessageCircle size={16} className="text-base-500" strokeWidth={2} />
           <span className="text-[13px] font-semibold">
-            Chase logistic — one message per partner
+            Confirm delivery date — one message per logistics company
           </span>
           <span className="text-[12px] text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
@@ -121,7 +128,7 @@ export default function ChasePartnerReview({
           </button>
         </div>
 
-        {/* Remind / Chase toggle */}
+        {/* Remind / Call toggle — the two message TONES */}
         <div className="flex items-center gap-2 px-5 py-3 border-b border-base-100">
           <div className="inline-flex rounded-lg border border-base-200 p-0.5 bg-base-50">
             {(["remind", "chase"] as const).map((m) => (
@@ -129,31 +136,31 @@ export default function ChasePartnerReview({
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`text-[12px] font-medium px-3 py-1 rounded-md capitalize ${
+                className={`text-[12px] font-medium px-3 py-1 rounded-md ${
                   mode === m ? "bg-white text-base-900 shadow-sm" : "text-base-500 hover:text-base-900"
                 }`}
               >
-                {m}
+                {TONE_LABEL[m]}
               </button>
             ))}
           </div>
           <span className="text-[12px] text-base-500">
             {mode === "remind"
               ? "Gentle — before the delivery deadline."
-              : "Firmer — the deadline is at risk or passed."}
+              : "Firmer — the deadline is close or already passed."}
           </span>
         </div>
 
         {unassigned > 0 && (
           <div className="px-5 py-2 text-[12px] text-base-500 border-b border-base-100">
-            {unassigned} order{unassigned === 1 ? "" : "s"} have no delivery partner yet —
-            assign one first, then chase.
+            {unassigned} order{unassigned === 1 ? "" : "s"} have no logistics company
+            yet — assign one first, then call.
           </div>
         )}
 
         {cards.length === 0 && (
           <div className="px-5 py-8 text-[13px] text-base-500">
-            Nothing to chase — no order in the selection has a delivery partner.
+            No calls to make — no order in the selection has a logistics company.
           </div>
         )}
 
@@ -231,7 +238,7 @@ export default function ChasePartnerReview({
         {/* Footer */}
         <div className="flex items-center gap-2 px-5 py-3 border-t border-base-200">
           <span className="text-[12px] text-base-500">
-            Copy the message, then open the partner&rsquo;s WhatsApp group and paste.
+            Copy the message, then open the company&rsquo;s WhatsApp group and paste.
           </span>
           <button
             type="button"
