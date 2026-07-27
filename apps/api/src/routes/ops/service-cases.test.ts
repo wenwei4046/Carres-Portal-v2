@@ -104,7 +104,7 @@ function buildSb(rows: unknown[]) {
       return chain;
     },
   };
-  for (const m of ["order", "limit", "in", "is", "or", "contains", "single"]) {
+  for (const m of ["order", "limit", "in", "is", "or", "contains", "single", "gte"]) {
     chain[m] = () => chain;
   }
   const sb = {
@@ -1203,5 +1203,68 @@ describe("GET /api/ops/service-cases/:id", () => {
     const body = (await res.json()) as { so: number | null };
     expect(res.status).toBe(200);
     expect(body.so).toBe(1258);
+  });
+});
+
+/**
+ * S5 — the numbers. **No migration and no new column.**
+ *
+ * The one thing a screenshot could never prove: the route must NOT be shadowed
+ * by `/:id`. `/numbers` is a literal path registered before the parameter one,
+ * and if that order ever slipped the request would be read as a case id and
+ * answer 404 — with the tab showing "not available yet" and looking like a
+ * deploy lag rather than a routing bug.
+ */
+describe("GET /api/ops/service-cases/numbers", () => {
+  /** The live row: one case, closed, opened before the guided questions. */
+  const LEGACY_CASE = {
+    id: "c1",
+    case_no: "SC2607-01",
+    opened_at: "2026-06-16",
+    product_category: null,
+    issue_type: null,
+    progress: null,
+    sla_events: null,
+    service_case_statuses: { is_closed: true },
+    suppliers: null,
+  };
+
+  it("is not shadowed by /:id and answers the report", async () => {
+    const { sb } = buildSb([LEGACY_CASE]);
+    const res = await get("/ops/service-cases/numbers", sb);
+    const body = (await res.json()) as {
+      months: string[];
+      totals: { closedWithoutFinishDate: number };
+      finish: { avgWorkingDays: number | null };
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.months).toHaveLength(6);
+    // The case cannot be measured, and the route says so instead of averaging it.
+    expect(body.totals.closedWithoutFinishDate).toBe(1);
+    expect(body.finish.avgWorkingDays).toBeNull();
+  });
+
+  it("reads only the window, in the database", async () => {
+    const { sb, selects } = buildSb([]);
+    await get("/ops/service-cases/numbers", sb);
+    // No `progress`/`sla_events` fetch means no finish date and no deadline —
+    // both figures would silently withhold themselves for the wrong reason.
+    expect(selects.join(" ")).toContain("progress");
+    expect(selects.join(" ")).toContain("sla_events");
+    expect(selects.join(" ")).toContain("service_case_statuses(is_closed)");
+  });
+
+  it("ignores a malformed period rather than heading a whole window with it", async () => {
+    const { sb } = buildSb([LEGACY_CASE]);
+    const res = await get("/ops/service-cases/numbers?period=last-month", sb);
+    const body = (await res.json()) as { period: string | null };
+    expect(body.period).toBeNull();
+  });
+
+  it("refuses a dealer — the numbers open no new door", async () => {
+    const { sb } = buildSb([]);
+    const res = await get("/ops/service-cases/numbers", sb, "dealer");
+    expect(res.status).toBe(403);
   });
 });
