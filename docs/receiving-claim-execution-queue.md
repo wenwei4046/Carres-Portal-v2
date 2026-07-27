@@ -34,6 +34,16 @@ A partial receive leaves the PO open with its pending qty visible — no separat
 **ALREADY EXISTS:** per-line receive in ReceivePOModal — extend it, don't replace it.
 Copy the 2990s partial-receipt shape (shopping-list item) before designing.
 **Done when:** "还有 2 张没到" is readable from the Receiving list without opening anything.
+**SHIPPED 2026-07-27 (PR #401, migration 0284).** The Receive modal asks three
+numbers per line (Receive now · Damaged · Wrong item) under a `Pending delivery`
+column, and the row carries the progress pill + "2 units pending delivery".
+Locked while building: a damaged/wrong unit is **not** received — it never
+enters stock and its qty stays Pending delivery, which is what leaves R4
+something to quarantine and nothing to un-book. The issue counters accumulate
+per DO (`received_qty` keeps its new-total semantics); the cap is per-delivery
+inside the RPC (`report_exceeds_ordered`), never cumulative, so a replacement
+delivery is still possible. Fully received outranks a historical issue, so a PO
+that was made good stops being red by itself.
 
 ## R2 · Receiving issue auto-becomes a case
 
@@ -103,7 +113,7 @@ reviews.
 
 | Card | Status | PR |
 |---|---|---|
-| R1 | ⬜ | — |
+| R1 | ✅ | [#401](https://github.com/wenwei4046/Carres-Portal-v2/pull/401) · 0284 |
 | R2 | ⬜ | — |
 | R3 | ⬜ | — |
 | R4 | ⬜ | — |
