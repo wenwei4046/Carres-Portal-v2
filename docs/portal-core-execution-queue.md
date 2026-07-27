@@ -438,11 +438,28 @@ set (goods · delivery · money — never emoji), no header word. Red/amber/gree
 `docs/ORDERS-WORKING-FLOW.md` §7. A delivered order never alarms on goods or delivery and
 may still show red money.
 
-**Decide first (Jess):** the column currently shows the STAGE PILL. Do the dots REPLACE it,
-or sit beside it? Replacing loses the stage word from the list; keeping both spends width on
-a column that is 9 units wide today.
+**RULED (Jess 2026-07-27): side by side — the stage pill stays untouched.** The two answer
+different questions and neither replaces the other:
 
-**No migration. Web-only.** **Done when:** `rowDotsOf` has a renderer, or is deleted.
+```
+Status column
+  ┌──────────────┬─────────────┐
+  │ Proceed      │  📦 🚚 $     │
+  │ stage pill   │  the checks  │
+  │ WHERE this   │  WHICH part  │
+  │ order is     │  has trouble │
+  └──────────────┴─────────────┘
+```
+
+The **stage pill is the order's overall progress summary** (Placed → Proceed → … →
+Delivered) — Jess: "dont change". The **three dots are three independent facts** and never
+merge into one word. The dots need no header of their own; each carries its own icon from
+the portal icon set (never emoji). The column is 9 units wide today and will need more —
+take it from the widest neighbour, not from the Actions column, which C3 is about to grow.
+
+**No migration. Web-only.** **Done when:** `rowDotsOf` has a renderer, the stage pill is
+byte-identical to today, and a delivered order still never alarms on goods or delivery
+while it may show red money.
 
 ## Status
 
