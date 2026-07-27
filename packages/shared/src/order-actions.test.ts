@@ -4,6 +4,7 @@ import {
   displayOrderAction,
   openOrderActions,
   orderActionsInDisplayOrder,
+  orderIsDelivering,
   type OrderActionSignals,
 } from "./order-actions";
 
@@ -202,53 +203,79 @@ describe("delivery track", () => {
     expect(a).toMatchObject({ key: "confirm_delivery_date", broken: true });
   });
 
-  it("arranged for a future day and paid → Confirm delivery (green)", () => {
-    expect(openOrderActions(sig())[0]).toMatchObject({
-      key: "confirm_delivery",
-      tone: "success",
-    });
+  // ── C3 · "everything ready, the day has not come" is NOT an action ────────
+  // Jess 2026-07-27 (`docs/ORDERS-WORKING-FLOW.md` §8): it was the one row in
+  // the drawer no button in the portal could close, and a row with no button
+  // teaches a new hire that they have missed something.
+
+  it("arranged for a future day and paid → NO action at all, and the FACT instead", () => {
+    expect(keys(sig())).toEqual([]);
+    expect(orderIsDelivering(sig())).toBe(true);
   });
 
-  it("money owing HOLDS the confirm — the lock the card says to keep", () => {
-    expect(openOrderActions(sig({ moneyOwing: true }))[0]).toMatchObject({
-      key: "confirm_delivery",
-      locked: true,
-    });
+  it("money owing HOLDS the delivery — the lock the card says to keep, on the action that clears it", () => {
+    const s = sig({ moneyOwing: true });
+    // The delivery track says nothing (PayHold: you do not arrange a delivery
+    // you may not make), the money track carries the row, and it carries the 🔒.
+    expect(keys(s)).toEqual(["collect"]);
+    expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
+    // And it is NOT the quiet fact: printing "Delivering 27 Jul" over an order
+    // the server will refuse to send would be the screen telling a lie.
+    expect(orderIsDelivering(s)).toBe(false);
   });
 
   it("the hold beats today's run — you do not deliver what you may not deliver", () => {
     const s = sig({ confirmedDateIso: "2026-07-27", moneyOwing: true });
-    expect(first(s)).toBe("confirm_delivery");
+    expect(first(s)).toBe("collect");
+    expect(keys(s)).not.toContain("deliver_today");
   });
 
-  // C9 — the lock and the money action stop being the same question.
+  it("the hold needs the goods in — an unpaid order whose goods are out is not held, it is late", () => {
+    // Exact parity with the pre-C3 lock, which also required `goodsReady`.
+    const s = sig({ goodsReady: false, confirmedDateIso: "2026-07-27", moneyOwing: true });
+    expect(keys(s)).toContain("deliver_today");
+    expect(openOrderActions(s).find((a) => a.key === "collect")?.locked).toBeUndefined();
+  });
+
+  // C9 — the lock and the money action stop being the same question. C3 moved
+  // the 🔒 onto `collect`, so a RELEASE now reads as the lock simply coming off
+  // an action that stays open, which is exactly what a release means.
   it("a RELEASED order unlocks the delivery and keeps its Collect action", () => {
     // The manager let the goods go over an uncollected storage fee. The 🔒
     // comes off; the money is still ours, so the money track is untouched.
     const s = sig({ moneyOwing: true, moneyHolds: false });
     const list = openOrderActions(s);
-    expect(list.find((a) => a.track === "delivery")).toMatchObject({
-      key: "confirm_delivery",
-      tone: "success",
-    });
-    expect(list.find((a) => a.track === "delivery")?.locked).toBeUndefined();
+    // The delivery track raises nothing: the goods are going on their booked
+    // day and there is no human step before it (C3's FACT covers that state).
+    expect(list.find((a) => a.track === "delivery")).toBeUndefined();
     expect(list.find((a) => a.track === "money")).toMatchObject({ key: "collect" });
+    expect(list.find((a) => a.track === "money")?.locked).toBeUndefined();
+    // The trip IS going ahead — a release is a release — but the row never
+    // prints the quiet fact, because an open action always outranks it.
+    expect(orderIsDelivering(s)).toBe(true);
+    expect(first(s)).toBe("collect");
   });
 
   it("omitting moneyHolds reproduces the pre-C9 lock exactly", () => {
     const s = sig({ moneyOwing: true });
     expect(s.moneyHolds).toBeUndefined();
-    expect(openOrderActions(s)[0]).toMatchObject({
-      key: "confirm_delivery",
-      locked: true,
-    });
+    expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
   });
 
-  it("booked for a future day while the goods are still out → no Confirm delivery", () => {
-    // "Everything ready, confirm" may not be said over goods that are not in.
-    // The goods action is what is open, and it is still listed.
+  it("booked for a future day while the goods are still out → no delivering fact either", () => {
+    // The fact says "everything is ready"; it may not be said over goods that
+    // are not in. The goods action is what is open, and it is still listed.
     const s = sig({ goodsReady: false });
     expect(keys(s)).toEqual(["confirm_ready_date"]);
+    expect(orderIsDelivering(s)).toBe(false);
+  });
+
+  it("the delivering fact ends the moment the day arrives or passes", () => {
+    expect(orderIsDelivering(sig({ confirmedDateIso: "2026-07-27" }))).toBe(false);
+    expect(orderIsDelivering(sig({ confirmedDateIso: "2026-07-20" }))).toBe(false);
+    expect(orderIsDelivering(sig({ completed: true }))).toBe(false);
+    expect(orderIsDelivering(sig({ hasLogistics: false }))).toBe(false);
+    expect(orderIsDelivering(sig({ bookingConfirmed: false }))).toBe(false);
   });
 
   it("delivered with an empty photo ledger → Upload delivery photo (amber, never red)", () => {

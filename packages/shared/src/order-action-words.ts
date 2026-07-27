@@ -33,7 +33,7 @@ export type OrderActionKey =
   | "confirm_delivery_date"
   | "deliver_today"
   | "upload_delivery_photo"
-  | "confirm_delivery"
+  | "delivering"
   | "collect"
   | "done";
 
@@ -44,6 +44,12 @@ export interface OrderActionParties {
   customer?: string | null;
   /** `Collect RM {amount}` — the caller's formatted integer, WITHOUT "RM". */
   amount?: string | null;
+  /** C3 — the `Delivering {date} · {slot}` FACT. Both already formatted by the
+   *  caller (`27 Jul`, `12pm–3pm`): this module owns WORDS and never dates.
+   *  Absent → the bare `Delivering`, which is the right thing to print in a
+   *  cell whose neighbour already carries the booked day. */
+  deliveryDate?: string | null;
+  deliverySlot?: string | null;
 }
 
 interface OrderActionWord {
@@ -106,9 +112,28 @@ const WORDS: readonly OrderActionWord[] = [
     line: () => "Upload delivery photo",
   },
   {
-    key: "confirm_delivery",
-    queue: "Confirm delivery",
-    line: (p) => `Confirm delivery with ${party(p.customer, "customer")}`,
+    // C3 (Jess 2026-07-27) — a FACT, not an action. `Confirm delivery with
+    // {customer}` used to sit here: it fired when the goods were in, logistics
+    // was assigned, the customer's date was confirmed and that date was still
+    // ahead — nothing for a human to do, which is why it was the one row in the
+    // drawer that no button in the portal could close. A row with no button
+    // teaches a new hire they have missed something
+    // (`docs/ORDERS-WORKING-FLOW.md` §8).
+    //
+    // The QUEUE word is the SHORT form and the LINE is the full one, exactly as
+    // for every action — and here that split does real work: the Orders row and
+    // the Delivery detail pane both sit beside a cell that already prints the
+    // booked day, so they print `Delivering` and let the neighbour carry the
+    // date; the drawer's journey strip, where nothing else says it, prints
+    // `Delivering 27 Jul · 12pm–3pm`.
+    key: "delivering",
+    queue: "Delivering",
+    line: (p) => {
+      const date = (p.deliveryDate ?? "").trim();
+      const slot = (p.deliverySlot ?? "").trim();
+      if (!date) return "Delivering";
+      return slot ? `Delivering ${date} · ${slot}` : `Delivering ${date}`;
+    },
   },
   {
     key: "collect",

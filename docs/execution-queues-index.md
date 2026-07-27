@@ -29,15 +29,15 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
 ③ **LINE COMPLETE** (S1-S5, the last being #474 — the Numbers tab, and the finding that
 S5 needs no `closed_at` column because S3's own close gate already stores the day the
 customer confirmed) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471**.
-**Drawer lane, in this order:** C3 → C6 → C7 → C8. **C10 shipped**: Jess's one call was
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471**.
+**Drawer lane, in this order:** C6 → C7 → C8. **C10 shipped**: Jess's one call was
 already answered inside the card (side by side, the stage pill untouched), so the three dots
 Law 6 describes are finally on screen.
 R/S/K run in parallel throughout; C4 waits for a free R slot.
@@ -64,6 +64,18 @@ delivery) is now a different question from `owing` (what is due), and a release 
 thing that parts them. **It also found the storage fee being read three different ways** —
 the ladder ignored the override, the dispatch gate ignored the Master-imported fee — now one
 shared rule with four readers. Live it changes nothing today: no order carries a storage fee.
+
+**What C3 changed (2026-07-27, PR #479).** The Actions cell leads with Layer 2's top
+action and folds everything else into `+N` — which **replaces the secondary `Collect RM …`
+pill**, so a cell has exactly one way of saying "there is more" and it covers all three
+tracks instead of the one Law 4 displays last (the figure rides the `+N` tooltip and the
+drawer). And `Confirm delivery with {customer}` **stops being an action**: it fired when
+everything was arranged and the day had not come, which is why it was the one row in the
+drawer no button could close. It is now the quiet fact `Delivering 27 Jul · 9–11 AM` — full
+sentence in the drawer, the bare word `Delivering` in the row, because the Delivery cell
+beside it already prints the day. The money 🔒 survives and moved onto `Collect`, the action
+that clears it; PayHold behaviour is unchanged. **C7 is BLOCKED on a law conflict C3 found:
+COPY-STANDARD says both that `Issue delivery order` IS an action and that it is not.**
 
 **What C2 changed (2026-07-27, PR #466).** The ladder is TWO LAYERS now: three tracks —
 goods · delivery · money — computed independently, then one pure function picks which goes

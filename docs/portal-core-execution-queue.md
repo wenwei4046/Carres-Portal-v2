@@ -185,7 +185,7 @@ ticked/done rows — the journey strip directly above already renders ✓ per st
 ticked list would say the same thing twice. The list holds what is OPEN, and its empty state
 teaches that a new action appears by itself.
 
-## C3 · The Actions column shows the whole truth
+## C3 · The Actions column shows the whole truth — ✅ LIVE (PR #479)
 
 **Goal:** the column (renamed `Actions` in C1) renders the top action from Layer 2 plus
 `+N` when more are open: `Call Ohana — confirm ready date  +2`. Click opens the drawer's
@@ -206,6 +206,68 @@ is acceptable with its tooltip (Jess deferred this to C3 rather than tuning one 
 
 **Done when:** a row with one action shows no `+N`; the count always equals C2's row count;
 no row in the drawer shows an action with no way to complete it.
+
+**SHIPPED (PR #479).** The `+N` **replaces the secondary `Collect RM …` pill**, and that
+is the one thing on screen this card takes away: a cell may have exactly ONE way of saying
+"there is more", and the `+N` covers all three tracks where the money pill covered one — the
+one Law 4 displays LAST. The figure is not lost: the `+N` tooltip names every hidden action
+in full (`Also open: Collect RM 2,455 from John Tan`), the drawer lists them, the Owing facet
+still reads `Owing · 18 · RM 56,859` and the Payments desk is unchanged. **Live effect: 18
+rows** — the ones C5 gave a money pill the day before — now read `Send PO to {supplier}  +2`
+instead of carrying a second pill.
+
+**`Confirm delivery` is DELETED, not left unused.** The key came out of `OrderActionKey`, so
+the type checker found every surface that spelt it (the journey strip's stage map, its owner
+map, four test fixtures) instead of leaving a word alive that nothing can emit. The FACT
+`delivering` takes its place beside `done` — both are words the ladder returns and neither is
+ever an action, so neither can be a queue: an arranged order now sits in **no queue at all**,
+which is correct, because it has no work.
+
+**The money LOCK survives, and it moved onto the action that CLEARS it.**
+`deliveryHeldOnMoney` is ONE predicate the delivery track and the money track both ask, so
+the delivery track can never fall silent while the money track forgets to say why. A held
+order reads `🔒 Collect RM 2,455 from John Tan` where it read `🔒 Confirm delivery with John
+Tan` — better named, and the PayHold behaviour is byte-identical: it still carries no
+delivery queue and still never reaches the Delivery board (asserted).
+
+**The two decisions the card handed to this chat, made with the widths in front of me:**
+
+1. **Duplication — the row prints the SHORT form.** The Delivery cell one column to the left
+   already prints `27 Jul · 12pm–3pm`, so the full sentence would say the same thing twice in
+   adjacent columns. The row (and the Delivery module's detail pane, for the same reason)
+   prints `Delivering`, quiet grey, **not a pill** — a pill in that column is a button and
+   there is nothing to press — with the day in its tooltip. The full
+   `Delivering 27 Jul · 12pm–3pm` ships in the drawer's journey strip, where nothing else on
+   screen says it. This is C1's queue-word/row-line split doing the work, not a second
+   spelling: the queue word IS the short form.
+2. **Truncation — accepted, with 2 more units.** Actions goes 14 → 16, taken from `order` and
+   `stock` (the two neighbours with real slack; `dots` was left alone because C1 pinned it at
+   11 so `Customer confirmed` never clips). The longest lines still clip with their tooltip,
+   and that is the right trade: a row of eight columns cannot hold
+   `Call NETS Logistics — confirm delivery date` whole without starving a neighbour, the
+   visible half is the half that acts (verb + party), and since C2 the full text has a proper
+   home one click away.
+
+### What C3 found — read before C6 and C7
+
+1. **`COPY-STANDARD.md` contradicts itself about `Confirm`.** Its audit table carries BOTH
+   `| Confirm | bare verb — worst offender | Confirm delivery with {customer} |` and
+   `| Delivering {date} · {slot} | ✅ the quiet fact that replaces the old Confirm action |`.
+   The first row is now dead — C3 retired that action on Jess's own ruling. **A PLAN chat
+   should delete it**, or the next build chat re-introduces the word from the table.
+2. **`COPY-STANDARD.md` says both YES and NO on `Issue delivery order`, in one file.** The
+   delivery-queue section: "**`Issue delivery order` IS an action** (Jess 2026-07-27) … Card
+   C7 builds it." The verb dictionary, further down: "**'Issue delivery order' is not an
+   action in this portal**" because the number is trigger-stamped. **C7 cannot be built until
+   one of those is deleted** — they are not two readings of one rule, they are two rules.
+3. **The drawer's kebab menu still says `Confirm delivery`** (`OrderDetailDrawer.tsx` ~7056,
+   shown on `pipelineStatus === 'scheduled'`, opens the delivery-order dialog). C3 did not
+   touch it: it is a form door, not a worklist action, and renaming it is C7's job — under
+   the verb dictionary it is `Issue delivery order`. Reported so it is not read as a survivor.
+4. **Law 4 rung 1 still names "the failed-delivery follow-up" and no such action exists**
+   (C2 found this; unchanged).
+5. **No action has a Task Owner** (C2's finding #5, unchanged). Law 2 requires one; the portal
+   stores `assigned_staff` per ORDER. **C6 needs it and it is still not built.**
 
 ## C4 · Purchase + Payments sweep
 
@@ -628,7 +690,7 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 |---|---|---|
 | C1 | ✅ LIVE 2026-07-27 | #461 |
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
-| C3 | ⬜ **next** — the `+N` on the Actions column (C2 shipped its list) | — |
+| C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ⬜ after C2 + C5 · action checklists | — |
