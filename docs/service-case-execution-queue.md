@@ -221,8 +221,8 @@ breakdown Excel can't do: issues by type per category, by supplier, avg days to 
 SLA hit rate. A small `Numbers` tab on the module; no new tables — read the cases.
 **Done when:** "which supplier / which issue type causes the most cases" is one glance.
 
-> **SHIPPED 2026-07-27 (PR #474, NO migration, Worker `<pending>` + web
-> `<pending>`).** Notes for whoever comes back to this module:
+> **SHIPPED 2026-07-27 (PR #474, NO migration, Worker `ace384c3` + web
+> `index-CsnNUn76.js`).** Notes for whoever comes back to this module:
 > - **The carry-forward said add a column; the column is not needed.**
 >   `case-sla-no-closed-at` wanted `closed_at` in S5's own migration. That is
 >   true of the STATUS FLIP and false of the case: S3 (0293) made closing
