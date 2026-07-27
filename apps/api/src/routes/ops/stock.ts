@@ -22,7 +22,14 @@ import {
   summarisePoolUsage,
   POOL_USE_REASON_LABEL,
   isStockPlanner,
+  computeStockHealthRows,
+  stockHealthCounts,
+  stockHealthHeadline,
+  computeSlowMovers,
+  computePlanAccuracy,
   type StockUnitKeyParts,
+  type PlanSalesLine,
+  type PlanStatus,
   type PlanStockUnit,
   type PoolUsageEntry,
   type PoolUseReason,
@@ -51,6 +58,12 @@ import type { AppEnv } from "../../types";
  * Pool usage + reserve levels — K4 (migration 0292):
  *   GET  /usage         — a month's draws, split by reason, + the levels
  *   PUT  /reserve-level — set one SKU's floor (COO duty, re-gated in SQL)
+ *
+ * Stock health + proposal accuracy — K5 (NO migration):
+ *   GET  /health — the ladder, the slow-moving alert and per-month accuracy.
+ *   Read-only: it asks K1's points, K4's levels and K2's cycles and adds no
+ *   number of its own.
+ *
  *   /reserve and /reserve-item now go through `ops_stock_pool_draw`, which
  *   takes the unit AND writes the reason in ONE transaction. 0213's
  *   best-effort stamp-after-the-fact is gone: a draw either happens with a
@@ -256,6 +269,219 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
     canEdit: isStockPlanner(c.var.auth.role, c.var.auth.email, await myDuties(c)),
   });
 });
+
+// =====================================================================
+// Stock health + proposal accuracy — Ready Stock K5 (no migration)
+// =====================================================================
+
+/**
+ * GET /health — the review layer, in one answer.
+ *
+ * "COO opens one tab and knows what needs attention today — without reading SKU
+ * rows", so the headline sentence, the ladder counts, the slow-moving alert and
+ * the per-month accuracy are all decided HERE by the shared pure engine.
+ *
+ * It READS ONLY. K5 mints no table, no duty and no number of its own: the
+ * ladder asks K1's reorder points and K4's reserve levels, and the accuracy
+ * asks K2's own cycles. There is no PUT on this endpoint because there is
+ * nothing here a person sets.
+ */
+opsStockRouter.get("/health", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const asOf = todayMyt();
+
+  // The plans decide how far back the sales window must reach: a month can only
+  // be scored if its own sales were fetched. Read them first for that reason.
+  const { data: planRows, error: planErr } = await sb
+    .from("ops_stock_plans")
+    .select("id,period,status")
+    .eq("status", "approved");
+  if (planErr) throw new HTTPException(500, { message: planErr.message });
+  const plans = (planRows ?? []) as { id: string; period: string; status: PlanStatus }[];
+
+  const oldestPlanMonth = plans
+    .map((p) => String(p.period).slice(0, 7))
+    .sort()[0];
+  const windowStart = earliest(
+    isoDaysAgo(HEALTH_SALES_LOOKBACK_DAYS, asOf),
+    oldestPlanMonth ? `${oldestPlanMonth}-01` : null,
+  );
+
+  const [stockRes, pointRes, levelRes, salesRes, firstOrderRes, lineRes, propRes] =
+    await Promise.all([
+      sb.from("ops_stock_items").select("sku,status,qty"),
+      sb.from("ops_reorder_points").select("sku,reorder_point"),
+      sb.from("ops_stock_reserve_levels").select("sku,reserve_level"),
+      sb
+        .from("order_lines")
+        .select("sku,qty,orders!inner(placed_at,status,source_system)")
+        .gte("orders.placed_at", windowStart),
+      // When the first REAL order was placed. `source_system` is NULL on every
+      // native order and only the AutoCount archive fills it, so this has to be
+      // an explicit `is null OR neq` — a plain `not.eq.autocount` drops NULLs
+      // and would return no rows at all (measured on prod: 19 native orders,
+      // all NULL).
+      sb
+        .from("orders")
+        .select("placed_at")
+        .or("source_system.is.null,source_system.neq.autocount")
+        .order("placed_at", { ascending: true })
+        .limit(1),
+      plans.length > 0
+        ? sb
+            .from("ops_stock_plan_lines")
+            .select("plan_id,sku,consolidated_qty,approved_qty")
+            .in("plan_id", plans.map((p) => p.id))
+        : Promise.resolve({ data: [], error: null }),
+      plans.length > 0
+        ? sb
+            .from("ops_stock_plan_proposals")
+            .select("plan_id,sku,qty,proposed_by")
+            .in("plan_id", plans.map((p) => p.id))
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+  for (const r of [stockRes, pointRes, levelRes, salesRes, firstOrderRes, lineRes, propRes])
+    if (r.error) throw new HTTPException(500, { message: r.error.message });
+
+  const units = (stockRes.data ?? []) as PlanStockUnit[];
+  const sales = toHealthSalesLines(
+    (salesRes.data ?? []) as HealthSalesJoinRow[],
+  );
+
+  // The window is complete only from whichever is LATER: where we looked, and
+  // when the first real order was placed. Claiming either alone is a lie in one
+  // direction each — see `withSalesKnownFrom` in the shared engine.
+  const firstOrderOn = (
+    (firstOrderRes.data ?? []) as { placed_at: string | null }[]
+  )[0]?.placed_at;
+  const salesKnownFrom = firstOrderOn
+    ? latest(windowStart, String(firstOrderOn).slice(0, 10))
+    : null;
+
+  const rows = computeStockHealthRows(
+    units,
+    ((pointRes.data ?? []) as { sku: string; reorder_point: number }[]).map((p) => ({
+      sku: p.sku,
+      reorderPoint: p.reorder_point,
+    })),
+    ((levelRes.data ?? []) as { sku: string; reserve_level: number }[]).map((l) => ({
+      sku: l.sku,
+      reserveLevel: l.reserve_level,
+    })),
+  );
+  const counts = stockHealthCounts(rows);
+
+  const slow = computeSlowMovers({ units, sales, asOf, salesKnownFrom });
+
+  const linesByPlan = groupBy(
+    (lineRes.data ?? []) as {
+      plan_id: string;
+      sku: string;
+      consolidated_qty: number | null;
+      approved_qty: number | null;
+    }[],
+    (l) => l.plan_id,
+  );
+  const propsByPlan = groupBy(
+    (propRes.data ?? []) as {
+      plan_id: string;
+      sku: string;
+      qty: number;
+      proposed_by: string;
+    }[],
+    (p) => p.plan_id,
+  );
+
+  const accuracy = computePlanAccuracy({
+    plans: plans.map((p) => ({
+      period: String(p.period).slice(0, 7),
+      status: p.status,
+      lines: (linesByPlan.get(p.id) ?? []).map((l) => ({
+        sku: l.sku,
+        consolidatedQty: l.consolidated_qty,
+        approvedQty: l.approved_qty,
+      })),
+      proposals: (propsByPlan.get(p.id) ?? []).map((pr) => ({
+        sku: pr.sku,
+        qty: pr.qty,
+        proposedBy: pr.proposed_by,
+      })),
+    })),
+    units,
+    sales,
+    asOf,
+    salesKnownFrom,
+  });
+
+  return c.json({
+    headline: stockHealthHeadline(counts),
+    counts,
+    rows,
+    slowMovers: slow.rows,
+    slowWindows: slow.windows,
+    slowWithheldReason: slow.withheldReason,
+    accuracy,
+  });
+});
+
+/**
+ * How far back the health read fetches sales lines.
+ *
+ * 200 days covers the deepest slow-moving window (180) with room to spare. It
+ * is a WINDOW, not a claim: `salesKnownFrom` tells the engine exactly where it
+ * ends, so a shorter window can never be mistaken for a shorter history.
+ */
+const HEALTH_SALES_LOOKBACK_DAYS = 200;
+
+interface HealthSalesJoinRow {
+  sku: string | null;
+  qty: number | null;
+  orders:
+    | { placed_at: string | null; status: string | null; source_system: string | null }
+    | { placed_at: string | null; status: string | null; source_system: string | null }[]
+    | null;
+}
+
+/** Same flattening + archive flagging K2's route does (0265's law). */
+function toHealthSalesLines(rows: readonly HealthSalesJoinRow[]): PlanSalesLine[] {
+  const out: PlanSalesLine[] = [];
+  for (const r of rows) {
+    const o = Array.isArray(r.orders) ? r.orders[0] : r.orders;
+    if (!o?.placed_at || !r.sku) continue;
+    out.push({
+      sku: r.sku,
+      qty: r.qty ?? 0,
+      soldOn: String(o.placed_at).slice(0, 10),
+      fromArchive: o.source_system === "autocount",
+      cancelled: o.status === "cancelled",
+    });
+  }
+  return out;
+}
+
+function isoDaysAgo(days: number, asOf: string): string {
+  const [y, m, d] = asOf.split("-").map(Number);
+  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1) - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function earliest(a: string, b: string | null): string {
+  return b && b < a ? b : a;
+}
+function latest(a: string, b: string): string {
+  return b > a ? b : a;
+}
+
+function groupBy<T>(rows: readonly T[], key: (row: T) => string): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const row of rows) {
+    const k = key(row);
+    const arr = out.get(k) ?? out.set(k, []).get(k)!;
+    arr.push(row);
+  }
+  return out;
+}
 
 /** PUT /reserve-level — set (or switch off, with 0) one SKU's floor. */
 opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
@@ -606,8 +832,18 @@ interface RawRow {
   sku: string;
   warehouse_id: string;
   condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
-  // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled).
-  status: "incoming" | "free" | "reserved" | "sold" | "transferred" | "voided";
+  // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled);
+  // 0299 added the R4 quarantine trio.
+  status:
+    | "incoming"
+    | "free"
+    | "reserved"
+    | "sold"
+    | "transferred"
+    | "voided"
+    | "on_hold"
+    | "returned_to_supplier"
+    | "written_off";
   reserved_ref: string | null;
   ref_history: string[];
   needs_repair: boolean;
@@ -653,6 +889,11 @@ function shape(rows: RawRow[]) {
 /** This month in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
 function thisMonthMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
+}
+
+/** Today in the same calendar. K5 dates everything from here. */
+function todayMyt(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
 /** A malformed `?period=` reads as "this month" rather than 500-ing: the

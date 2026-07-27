@@ -2701,3 +2701,184 @@ assertions say the page renders nothing for it either way.
 
 Post-apply: `commission_run_state` exactly **1** copy, `md5(prosrc)`
 `1d9bdbbcc3ca8e308bdf69c9d3477873`, length 1722 → **1345**, `provolatile = 's'`.
+
+---
+
+**2026-07-27 · Service Case S4 — the deadline, and nobody passes it silently** (PR #449 merge `b981558a`, migration **0298 applied**, Worker `ce4f4c9e` + web `index-Ds-5K6Ke.js` — DEPLOYED from main tip `ffa5d623`, worktree `service-case-execution-queue-s4`) — card S4 of `docs/service-case-execution-queue.md`: "every case shows its deadline (14 WORKING days from report) … at day 10 unresolved the operator informs the customer BEFORE day 14, with a T4-style structured reason … special-order parts may extend once", **done when no case silently passes day 14.**
+
+- **The deadline is DERIVED, never stored — the S3 law applied to the clock.** There is no `due_at` column. It is `opened_at + 14 working days`, computed by `packages/shared/src/service-case-sla.ts` on every read, off the same working-day engine procurement (2026-07-21) and delivery T7 already share — Mon-Sat, Sunday out, Selangor holidays out, injected not hardcoded. A stored deadline is a copy of a rule: correct the holiday calendar and every stored copy is silently wrong, while a derivation fixes every case at once. What the database stores is the half that genuinely IS a fact and cannot be derived from anything: that somebody rang the customer on a date with a reason, and that the deadline was moved once.
+
+- **Every event carries the deadline it was made against, and that field is load-bearing.** "The customer has been told" is never true in general — it is true about ONE deadline. So each event records `due` (the deadline in force when it was made) and an extension records `until` (the deadline it CREATED); the call is owed again whenever no event points at today's deadline. Without it, extending would mark the new deadline as already explained, and the case the extension was created for would be the single case that never gets the second call — the exact opposite of the card's acceptance.
+
+- **The card's own `⚠ SLA at risk` is the one line NOT built as written, and it is reported rather than done quietly.** `COPY-STANDARD.md` bans `At Risk` outright ("Banned words — never visible anywhere") and lists `SLA` in the do-not-use column. The four laws outrank a card, so the BEHAVIOUR is exactly what S4 asked for and the WORDS are the laws': the FACT is `22 Jul 26, Wed` + `4 working days left` / `2 working days late` / `Moved once`, and the ACTION is `Call {customer} — say why it is taking longer` (verb + named party + measurable object — the reason lands in the ledger, so the Call verb's own completion rule is met). A test asserts every visible string against the banned list, including the reason labels.
+
+- **Law 1 / Law 4, honoured rather than quoted.** The clock is its own TRACK, computed independently of S3's chain, and when the call is owed it is ranked FIRST in the Next step cell — Law 4 rung 2 ("the customer must be told something") outranks every goods step. Nothing is suppressed: the chain's own next step rides behind as `+N`, exactly as before.
+
+- **Two decisions the card did not make, made explicitly.** (1) The extension's LENGTH: bounded at one more full period (14 working days) measured against the BASE deadline, so a caller who has just moved it cannot re-read the new one and walk it forward; a date landing on a Sunday or a public holiday moves to the next working day BEFORE the bound is checked, and the form says so before anything is pressed. (2) The reason list is deliberately NOT narrowed to special-order parts: the card names that case and it is the first of the seven options, but refusing every other true reason would only get the deadline moved under a false one. Each reason also carries a hidden `responsibility` (supplier | carres | customer) — T4's own "one field now saves a re-tag of history later" — so S5 can answer "which supplier causes the most late cases" without a second pass.
+
+- **One rule, two consumers.** `caseSlaRecordProblem` is asked by the disabled button and by the Hono route, so the screen can never be more permissive than the rule (or more strict, which is how an operator learns to distrust the screen). The route additionally stamps `at`/`by`/`by_role` **and `due`** server-side: a client that could author `due` could mark a deadline explained that nobody had explained.
+
+- **What SQL holds (0298): one column, two CHECKs, no trigger and no RPC.** The stamp (`sc_sla_events_wellformed` — refuses an entry missing kind/on/reason/due/at/by/by_role, naming a kind outside the two, or an extension with no new deadline) and **extend ONCE** (`sc_sla_one_extension`). The BOUNDS stay in the API, exactly as 0289 left the evidence checklist there: they are a function of the working-day calendar, and a SQL copy of that calendar would be a second drifting rule rather than a mirror.
+
+- **Verification.** The whole migration — column, both helpers, both CHECKs and 10 assertions — was dry-run against live prod inside a rolled-back transaction; afterwards the column, the functions and the constraints were confirmed absent again and the one live case (SC2607-01) untouched. **The md5 reconcile earned its keep a third time**: after apply, `service_case_sla_events_wellformed` measured 1061 bytes against the file's 1216 — the applied payload had dropped two comment lines from INSIDE the function body. Re-applied the file's exact text; both functions now match byte-for-byte, one copy each, no ghost overload.
+
+- **Live state at ship: 1 service case, closed, opened 2026-06-16** — so no case on file has a running clock, and the Deadline column is its empty state until the next case is filed. Nothing was back-filled and nothing needed to be: the deadline is derived, so the moment a case is opened it has one.
+
+- **Nothing sends anything.** S1 ruled "notify manager" a visible flag because no message channel exists anywhere in `apps/api`; the same holds here. There is no cron and no message — the row turns by itself, on read, which is why "no case silently passes day 14" is true without anybody subscribing to anything.
+
+- Suites at baseline (shared **1665/1665** · api **3 pre-existing** · web **16 pre-existing**), `tsc -p tsconfig.app.json` clean, build + `check:v4` + lint clean, `SERVICE_ROLE` greps 0 in the downloaded live bundle. **Deploy note**: `wrangler` is a dependency of `apps/api`, not `apps/web`, and two Cloudflare accounts are authorised — Pages deploys run from `apps/api` with `CLOUDFLARE_ACCOUNT_ID` set, or wrangler stops and asks. Three canonicals converged on the first poll, `erp.carresofficial.com` on the second. **A composed string greps 0 as a whole sentence**: `4 working days left` is built from a template, so the marker has to be the literal fragment (`" working "` … `" late"` / `Due today`), not the rendered sentence.
+
+---
+
+## 2026-07-27 · The webhook was reading the wrong invoice shape (PR #457)
+
+**PR #457** merged as `9b73fb17`, no migration, api Worker **`2a0b5707`** — **DEPLOYED** (api only). Worktree `rental-modular-sku`.
+
+Found with Loo, in the Stripe dashboard, minutes after 0295 shipped. He opened the endpoint page to check the event subscription and the page answered a question nobody had asked: **API version `2025-02-24.acacia`**.
+
+### The bug
+
+Stripe shapes a webhook payload to the **endpoint's** pinned API version, not to the SDK's. Our SDK is v22 (Basil-era), and **Basil is where `invoice.subscription` was replaced by `parent.subscription_details.subscription`**.
+
+Both `recordRentalInvoice` (0281, `invoice.paid`) and `recordRentalInvoiceFailure` (0295, `invoice.payment_failed`) read only the new field. Against an acacia-shaped payload `invoice.parent` is `undefined`, so **every real rental invoice — paid or refused — resolved to `not_a_subscription_invoice`, was acknowledged with a cheerful 200, and dropped.**
+
+0281's own code comment was confidently wrong in an instructive way: *"SDK v22 moved this: `invoice.subscription` is gone."* True of the SDK's **types**. Not true of the **wire payload**, which follows the endpoint.
+
+### The fix
+
+`subscriptionIdOf()` reads the new field, falls back to the legacy one, and accepts either an id string or an expanded object. **Deliberately not "work out which release moved it and code to that answer"** — reading both is correct under either version and survives the endpoint being upgraded later, for the price of one fallback.
+
+### Why it survived to production
+
+**0281 shipped its webhook branch with no test at all.** That is the whole story. Coverage added for both events under both shapes, plus the neither-shape case (still ignored, never guessed).
+
+**Negative control run, because a test that passes before and after proves nothing**: with the fallback removed, exactly the 3 legacy-shape tests fail; with it, 29/29 pass.
+
+### What else the Stripe account turned out to hold
+
+Pulled the live invoice and subscription lists while diagnosing. The CARRESS Stripe account is **shared with the old carressglobal system, and those subscriptions are still live and still collecting** — e.g. `SO-00000011`, RM 29/month, contract to 2030-05-20; `SO-00000007`, RM 129/month, to 2032-05-20; `livemode: true`, recent successful charges.
+
+This is safe by construction: our handler looks the subscription up in `rental_agreements`, finds nothing, and returns `ignored: unknown_subscription`. 0281 anticipated exactly this. But it means that **the moment `invoice.paid` is subscribed, the Worker starts receiving the old system's traffic** — expected, and correctly ignored.
+
+### Still not done, and it is not code
+
+The endpoint says **"Listening to 3 events"** and our code handles **5**. The three are almost certainly the `checkout.session` trio from 0223; `invoice.paid` was added by 0281 on 07-26 and nothing in that worklog entry mentions returning to the Stripe dashboard. If that reading is right, **the collection engine has never fired once** — which is exactly what `rental_billing_events` holding a single hand-entered row says. Both `invoice.paid` and `invoice.payment_failed` need ticking. CF `rental-payment-failed-event-not-subscribed` covers it.
+
+### Note on the api typecheck baseline
+
+It moved **4 → 6 before this branch**: PR #440 left `hr.ts` importing `hrAssignSalespersonInput`, which `@carres/shared` no longer exports. Verified by restoring clean `origin/main` versions of my two files and re-counting — **not stash**, after that trap already cost a round this session. Harmless at runtime (unused import, esbuild drops it; `wrangler --dry-run` bundles clean) but it should be tidied by that line. New CF.
+
+### Deploy
+
+Tracker checked first: tail **0298**, and main's last migration file is 0298, so the union tip was not ahead of the database. `wrangler deploy --env production` — bindings receipt read: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + `api.carresofficial.com (custom domain)`. Webhook re-verified live: unsigned **400**, bad signature **400 `invalid_signature`**; `/api/rental/agreements` unauth **401**.
+
+**api-only deploy.** A parallel line had deployed web in the meantime (`index-CKQhEuFh.js`), so rather than assume, the live bundle was downloaded and checked: 4,410,666 bytes, `SERVICE_ROLE` **0**, all three 0295 markers present and the deleted page's `pos-rental-page` testid still **0** — their deploy contained this line's work.
+
+---
+
+## 2026-07-27 · Receiving R4 — problem stock is quarantined
+
+**PR [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454)** · merge `b059e2a5` ·
+migration **0299_problem_stock_is_quarantined** applied ·
+Worker `19a94f44` + web `index-CyW_vWlS.js` from main tip `b315b03f` — **DEPLOYED**,
+4 canonicals converged on the first poll.
+
+Card R4 of `docs/receiving-claim-execution-queue.md`: damaged/wrong units flip to
+`on_hold` with a reason, goods sent back flip to `returned_to_supplier`, claim resolution
+flips them back to free or writes them off. **Done when: a held unit is invisible to every
+sell/reserve/deliver path, provably.**
+
+### What was actually wrong — R1's leftover was worse than invisible
+
+A PO mints one `incoming` unit per ordered piece (0153/0154) and the receive flips the good
+ones to `free`. R1 (0284) deliberately did not *receive* a damaged unit — "that is also why
+R4 will have something to quarantine and nothing to un-book". What it left behind is a unit
+stuck at `incoming` **forever**, and `incoming` is not a neutral parking space:
+`reorder-alert.ts` and `ready-stock-plan.ts` both read it as *ordered, on the way*. A unit
+sitting broken in our own warehouse was being counted as a future arrival that will never
+come, and the reorder engine under-ordered by exactly that many.
+
+### The guard asks WHERE, never WHO — and that is the whole design
+
+`ops_stock_items` carries a blanket `FOR ALL TO authenticated USING (is_internal())` policy,
+and live code updates `status` through PostgREST in **three** places (the sofa-loan claim,
+its rollback, the loan return). A rule that only lived inside an RPC would be a rule one
+PostgREST call walks around. Column-level `revoke update (status)` **would** have been a real
+lock — and would have broken the sofa-loan lane, which is a different card's machinery.
+
+So the trigger never asks who is writing. It constrains where a held unit may go: `free`,
+`returned_to_supplier` or `written_off`. The three states every sell / reserve / deliver path
+actually writes — `reserved`, `sold`, `transferred` — are unreachable from `on_hold` no
+matter who tries or through which door. **The read side needed no change at all**: every
+pick already filters `status='free'` (takeout also accepts `reserved`, a unit already drawn
+from this same pool), and `ops_rollup_stock_balances` counts only free+reserved, so a held
+unit is absent from the aggregate ledger the whole logistics reserve machine runs on.
+`SELLABLE_STOCK_STATUSES` in the shared module states the same fact as data, asserted as an
+**equality** rather than a membership check so a future widening has to argue for itself.
+
+### The bug holding the units caused, and had to fix in the same change
+
+With the damaged units held rather than left `incoming`, a **replacement DO has nothing left
+to flip**: `update … where status='incoming' limit v_delta` moves 0 rows while
+`stock_balances` gains 2, and the next rollup takes them straight back off. So the receive
+now mints the shortfall as new free units — own warehouses only, the same `kind = 'own'`
+condition the PO mint uses, so a partner warehouse keeps having no per-unit register rather
+than growing one by accident. *Before R4 the same line did something worse but
+count-correct: it freed the **broken** units, because they were the only `incoming` ones
+left.*
+
+Two smaller truths fixed while in there: the On-hand group header computed `ready` by
+subtraction (`rs.length - reserved - repair`), which called every other status ready — a
+held unit would have been advertised as available in the one number a picker reads at a
+glance; and the register printed the raw column value, which is how `written_off` would have
+reached the screen reading `written_off`.
+
+### Decisions that are load-bearing
+
+- **A hold is created by RECEIVING and nothing else** (the guard allows only
+  `incoming → on_hold`). A pool unit later found damaged has its own machine (`needs_repair`
+  + the Defective view). A second quarantine concept would give the warehouse two ways to say
+  one thing — and worse, `/refurbish-complete` is a direct PostgREST update gated only on
+  `needs_repair`, so it would hand a "held" unit back to the pool with the claim unanswered.
+- **`returned_to_supplier` and `written_off` are terminal**, and **a held unit cannot be
+  DELETED** — the hard-delete door is for a mis-keyed row, and on a held unit it would erase
+  the physical evidence an open claim is chasing.
+- **Only a write-off must carry a note** — it is the one outcome that leaves no other trace
+  of why. 0291's rule, same reasoning: a box the other two must fill to proceed gets ".".
+- **`back_to_stock` does NOT touch the PO line.** `received_qty` means "good units this
+  supplier delivered", and a unit we quarantined and then kept was not delivered good —
+  `damaged_qty` records it and the CLAIM's answer settles whether the supplier still owes us.
+  It does write a `stock_movements` row and re-roll `stock_balances`, because the goods
+  genuinely enter sellable stock at that moment. **Reported, not hidden**: a PO made good by a
+  release rather than a replacement stays `open`; that is pre-existing R1 shape (only the
+  receive RPC ever closes a PO) and duplicating its close + thread-advance + reserve loop
+  inside a stock RPC would put two copies one edit apart from disagreeing. CF filed, and R5
+  is told to read the claim's `closed_at`, never `purchase_orders.status`.
+- **The resolution is per claim, not per unit, and is not gated on the claim closing** —
+  goods and paperwork move on different days; tying them would teach people to close a claim
+  early just to clear a shelf.
+- **The units moved are taken from the UPDATE's own `RETURNING`**, not re-read afterwards: a
+  re-read of "the claim's free units" would sweep up units an earlier release had already put
+  back and count them into stock twice.
+
+### Verification
+
+18 assertions passed against live prod in a rolled-back transaction **before** apply: the
+register lands 1 free / 2 on hold / 0 incoming · a held unit refuses `reserved`, `sold`,
+`transferred` and `DELETE` · `ops_stock_pool_draw` returns nothing for it · `stock_balances`
+never counts it · a free unit cannot be quarantined · a write-off with no words is refused ·
+back-to-stock frees, stamps and writes the movement · a second release finds nothing ·
+returned is terminal · the replacement DO mints 2 · the line keeps its damage history.
+Complete rollback re-verified afterwards (0 columns, 0 triggers, 87 units untouched). Live
+at ship: **87 units all `free`, 0 POs, 0 PO lines, 0 claims** — nothing backfilled.
+
+**Guardrail #8 fired**: drafted as 0298, renumbered to **0299** when a parallel line applied
+`0298_service_case_deadline` mid-build. The live receive RPC was re-hashed before apply
+(12,785 chars, unchanged) to confirm the dry run still described reality. The
+**md5(prosrc) + length reconcile matched byte-for-byte on all three functions** — no comment
+stripping this time.
+
+Suites at baseline: api **3** pre-existing · web **16** pre-existing · shared **1716/1716**.
+New tests: shared 22 · api 8 · web 6. typecheck 0 new (api 6 / shared 3 pre-existing,
+verified identical on a stashed tree), build + v4 guard + design lint clean, `SERVICE_ROLE`
+grep **0** in the live 4,414,341-byte bundle.

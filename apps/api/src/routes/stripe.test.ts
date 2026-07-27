@@ -599,4 +599,97 @@ describe("POST /stripe/webhook", () => {
       expect(await res.json()).toEqual({ received: true, seq: 3, already: true });
     });
   });
+
+  /**
+   * Both invoice shapes.
+   *
+   * The live endpoint is pinned to API version 2025-02-24.acacia while the SDK
+   * is v22 (Basil-era), and Stripe shapes the payload to the ENDPOINT's version.
+   * Basil is where `invoice.subscription` became
+   * `parent.subscription_details.subscription`, so code reading only the new
+   * field dropped every real invoice on the floor. 0281 shipped its branch with
+   * no webhook test at all, which is exactly why nobody noticed.
+   */
+  describe("invoice shape — acacia (legacy) and basil (parent)", () => {
+    const AG2 = "aaaaaaaa-0000-0000-0000-000000000002";
+    function sb(rpc: { data: unknown; error: unknown }) {
+      return makeSb({ rental_agreements: { maybeSingle: { data: { id: AG2 }, error: null } } }, rpc);
+    }
+    /** What an acacia-pinned endpoint actually delivers: no `parent` at all. */
+    const legacyInvoice = {
+      id: "in_legacy_1",
+      number: "CARRES-0009",
+      amount_due: 5900,
+      amount_paid: 5900,
+      created: 1_800_000_000,
+      status_transitions: { paid_at: 1_800_000_100 },
+      subscription: "sub_legacy",
+    };
+    /** What a basil-pinned endpoint delivers. */
+    const parentInvoice = {
+      id: "in_basil_1",
+      number: "CARRES-0010",
+      amount_due: 5900,
+      amount_paid: 5900,
+      created: 1_800_000_000,
+      status_transitions: { paid_at: 1_800_000_100 },
+      parent: { subscription_details: { subscription: "sub_basil" } },
+    };
+
+    function run(type: string, object: unknown, rpc: { data: unknown; error: unknown }) {
+      const admin = sb(rpc);
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue({ id: "evt_shape", type, data: { object } });
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+      return { admin, res: app.fetch(hook({}, "good"), env) };
+    }
+
+    it("invoice.paid records on the LEGACY shape (this was the live no-op)", async () => {
+      const { admin, res } = run("invoice.paid", legacyInvoice, { data: { seq: 2 }, error: null });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect(admin.calls.rpc[0].name).toBe("rental_record_payment");
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_agreement_id).toBe(AG2);
+    });
+
+    it("invoice.paid still records on the new parent shape", async () => {
+      const { admin, res } = run("invoice.paid", parentInvoice, { data: { seq: 2 }, error: null });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect(admin.calls.rpc[0].name).toBe("rental_record_payment");
+    });
+
+    it("invoice.payment_failed records on the LEGACY shape too", async () => {
+      const { admin, res } = run("invoice.payment_failed", legacyInvoice, {
+        data: { already: false, seq: 2 },
+        error: null,
+      });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect(admin.calls.rpc[0].name).toBe("rental_record_payment_failure");
+    });
+
+    it("an invoice with NEITHER shape is still ignored, not guessed at", async () => {
+      const { admin, res } = run(
+        "invoice.paid",
+        { id: "in_oneoff", amount_paid: 100, created: 1_800_000_000 },
+        { data: null, error: null },
+      );
+      const r = await res;
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ received: true, ignored: "not_a_subscription_invoice" });
+      expect(admin.calls.rpc).toHaveLength(0);
+    });
+
+    it("accepts an EXPANDED subscription object, not just an id string", async () => {
+      const { admin, res } = run(
+        "invoice.paid",
+        { ...legacyInvoice, subscription: { id: "sub_expanded" } },
+        { data: { seq: 2 }, error: null },
+      );
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+    });
+  });
 });

@@ -40,7 +40,22 @@ re-cuts these orders by another angle.
 | logistics chosen | `orders.delivery_partners` / `ops_assigned_logistic` |
 | booking | `ops_order_control.booking_stage` + `confirmed_date` + `confirmed_time_slot` |
 | delivery photos | `ops_order_control.delivery_photos` |
-| **money** | **`orders.paid`** — the only money figure with a writer (`top_up_order`, Stripe). `ops_order_control.balance` is NULL on every live row and the payment ledger tables hold zero rows with no writer. **Never read the ledger.** |
+| **money** | **`orders.paid`** — the money truth (`top_up_order`, Stripe and the AutoCount import all write it). One shared rule: `packages/shared/order-money.ts`. |
+
+**Three facts about money that a chat will get wrong unless it reads them here** (measured
+live 2026-07-27, and they corrected this file's earlier wording):
+
+- **The payment ledger is empty but it is NOT unwritten.** Two doors write `order_payments`,
+  and the raw-create door writes the SAME deposit into BOTH `orders.paid` and the ledger.
+  Adding them would read a half-paid order as paid in full. **The ledger must never enter an
+  outstanding calculation** — not because nobody writes it, but because adding it
+  double-counts.
+- **`ops_order_control.balance` means "what the customer still owes"**, not the order total
+  (0165). Anything that subtracts payments from it is subtracting twice.
+- **An order whose value is UNKNOWN never holds anything.** 37 live orders carry no line
+  prices and no keyed balance. A number nobody knows may not stand between a customer and
+  their goods — unknown warns, never blocks. (Same principle the booking gate already used
+  for "total not set".)
 
 ## 3 · The actions
 
@@ -245,8 +260,26 @@ A gate REFUSES an action. Display order only decides what is read first.
 
 **Issuing the delivery order is the hard gate**, not agreeing a date: a date can be agreed
 with a customer while the goods and the money are still coming. Issuing is refused unless
-every goods line is reserved to this order (accessories pass automatically), the balance is
-collected, and the date is not a Sunday or a Malaysian public holiday. Agreeing the date
+every goods line is reserved to this order (accessories pass automatically), **the money is
+collected**, and the date is not a Sunday or a Malaysian public holiday.
+
+**"The money" is ONE number, and an unpaid storage fee is part of it** (Jess, 2026-07-27):
+`outstanding = Σ lines + add-ons + chargeable storage fee − orders.paid`. A storage fee
+that has not been collected holds the delivery exactly as an unpaid balance does — there is
+no second, softer rule for it.
+
+**The emergency override — the only way past it.** When goods must go out before the money
+is in, **the manager approves it, nobody else** (Jess, 2026-07-27). The request and the
+decision both live on the order and reuse the approval channel that already exists; the
+decision records who asked, who decided, when, and why. Two outcomes, and the approver
+picks one out loud:
+- **released, fee still owed** — the goods go, the money action stays open. This is the
+  default; an override must never quietly forgive money.
+- **released and waived** — the fee is written off with a reason.
+
+**Operations is told by the work itself.** The moment the override is granted the order's
+top action changes from collecting to delivering, so it surfaces in the operator's queue by
+itself — the same way every other action in this portal arrives. No separate alert engine. Agreeing the date
 still WARNS about the same three, so nobody promises a day the goods cannot make. A bed set (mattress + frame) can never be split; a sofa may travel on a second trip
 only if the customer agreed; accessories never block a delivery. A logistics company's own
 working days, closed dates, capacity and notice period **warn but never block** — a phone

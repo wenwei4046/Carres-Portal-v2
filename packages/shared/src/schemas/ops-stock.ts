@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { POOL_USE_REASONS, POOL_USE_NOTE_MAX } from "../pool-usage";
+import { STOCK_HEALTH_STATES } from "../stock-health";
 
 /**
  * Per-unit stock register actions — Phase A step 5 (migration 0137).
@@ -27,6 +28,13 @@ export const opsStockStatusSchema = z.enum([
   "sold",
   "transferred",
   "voided",
+  // R4 (0299) — problem stock is quarantined. A held unit can never become
+  // reserved / sold / transferred (a trigger, not a convention), and the two
+  // terminal states record goods that physically left. Labels live in
+  // OPS_STOCK_STATUS_LABEL; the transition rules live in stock-hold.ts.
+  "on_hold",
+  "returned_to_supplier",
+  "written_off",
 ]);
 export type OpsStockStatus = z.infer<typeof opsStockStatusSchema>;
 
@@ -295,3 +303,83 @@ export const opsStockUsageResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type OpsStockUsageResponse = z.infer<typeof opsStockUsageResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Stock health + proposal accuracy — Ready Stock card K5 (no migration)
+// ---------------------------------------------------------------------------
+// The review layer reads only: `ops_stock_items`, K1's reorder points, K4's
+// reserve levels and K2's cycles. There is no input schema because there is no
+// write — K5 asks one question and answers it.
+
+export const opsStockHealthStateSchema = z.enum(STOCK_HEALTH_STATES);
+
+export const opsStockHealthRowSchema = z.object({
+  sku: z.string(),
+  free: z.number().int(),
+  reserved: z.number().int(),
+  incoming: z.number().int(),
+  cover: z.number().int(),
+  reorderPoint: z.number().int().nullable(),
+  keepLevel: z.number().int().nullable(),
+  state: opsStockHealthStateSchema,
+});
+export type OpsStockHealthRow = z.infer<typeof opsStockHealthRowSchema>;
+
+export const opsSlowMoverSchema = z.object({
+  sku: z.string(),
+  free: z.number().int(),
+  lastSoldOn: z.string().nullable(),
+  quietDays: z.number().int(),
+  window: z.number().int(),
+});
+
+export const opsStockHealthCountsSchema = z.object({
+  critical: z.number().int(),
+  low: z.number().int(),
+  over: z.number().int(),
+  healthy: z.number().int(),
+  unrated: z.number().int(),
+});
+
+export const opsMonthAccuracySchema = z.object({
+  period: z.string(),
+  reported: z.boolean(),
+  withheld: z.enum(["month_not_over", "records_start_later"]).nullable(),
+  askedQty: z.number().int(),
+  orderedQty: z.number().int(),
+  soldQty: z.number().int(),
+  leftOnFloor: z.number().int(),
+  movedPct: z.number().nullable(),
+  rows: z.array(
+    z.object({
+      sku: z.string(),
+      askedQty: z.number().int(),
+      orderedQty: z.number().int(),
+      soldQty: z.number().int(),
+      leftOnFloor: z.number().int(),
+      movedPct: z.number().nullable(),
+    }),
+  ),
+});
+export type OpsMonthAccuracy = z.infer<typeof opsMonthAccuracySchema>;
+
+/** GET /api/ops/stock/health */
+export const opsStockHealthResponseSchema = z.object({
+  /** The one line the COO reads instead of the rows. */
+  headline: z.string(),
+  counts: opsStockHealthCountsSchema,
+  rows: z.array(opsStockHealthRowSchema),
+  slowMovers: z.array(opsSlowMoverSchema),
+  slowWindows: z.array(
+    z.object({
+      days: z.number().int(),
+      ready: z.boolean(),
+      count: z.number().int(),
+    }),
+  ),
+  /** Why the slow-moving alert is silent, when it is. Null when it is live. */
+  slowWithheldReason: z.string().nullable(),
+  /** Newest approved cycle first. Empty until a month has been approved. */
+  accuracy: z.array(opsMonthAccuracySchema),
+});
+export type OpsStockHealthResponse = z.infer<typeof opsStockHealthResponseSchema>;

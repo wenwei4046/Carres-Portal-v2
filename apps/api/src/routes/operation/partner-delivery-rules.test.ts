@@ -433,6 +433,8 @@ describe("POST /:id/booking/confirm — partner rules warn, they never block", (
         data: {
           id: ORDER_ID,
           so: 1234,
+          // C5: the money gate reads `orders.paid`, never the empty ledger.
+          paid: 2500,
           delivery_partner_id: PARTNER_ID,
           ops_assigned_logistic: null,
         },
@@ -456,10 +458,6 @@ describe("POST /:id/booking/confirm — partner rules warn, they never block", (
         },
       ),
       ops_stock_items: tableMock({ data: [], error: null }),
-      order_payments: tableMock({
-        data: [{ kind: "payment", amount: 2500 }],
-        error: null,
-      }),
       delivery_partners: tableMock({ data: partner, error: null }),
     };
   }

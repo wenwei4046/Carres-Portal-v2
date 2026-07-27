@@ -34,6 +34,7 @@ import {
   type OpsReorderResponse,
   type OpsReorderPointInput,
   type OpsStockUsageResponse,
+  type OpsStockHealthResponse,
   type OpsReserveLevelInput,
   type OpsStockPlanResponse,
   type OpsStockPlanOpenInput,
@@ -2744,8 +2745,23 @@ export interface operationOrderListRow {
   /** Inbox-triage LP (migration 0136), a delivery_partners.id resolved to a
    *  name client-side. Shown in the 物流 cell when no formal LP is set yet. */
   ops_assigned_logistic?: string | null;
-  /** Compact line embed for the 货品 items summary (control table only). */
-  order_lines?: { sku: string; qty: number; source_po?: string | null }[];
+  /** Compact line embed for the 货品 items summary (control table only).
+   *  `unit_price` (C5) lets the row compute what the order is worth. */
+  order_lines?: {
+    sku: string;
+    qty: number;
+    unit_price?: number | string | null;
+    source_po?: string | null;
+  }[];
+  /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
+   *  live payment path writes; with the add-on sum below and the line prices
+   *  above it feeds the shared `orderMoney`, so the row's 🔒, the drawer and
+   *  the booking gate all answer with the same number. BOTH are optional: a
+   *  browser on this build against a pre-C5 Worker reads them as absent, the
+   *  order's value is then UNKNOWN, and unknown holds nothing — which is
+   *  exactly what shipped before this card. */
+  paid?: number | string | null;
+  order_addons?: { qty: number; unit_price?: number | string | null }[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation
@@ -3359,6 +3375,11 @@ export interface SupplierClaimListRow {
    *  could not tell (the line was deleted), which counts as still pending. */
   line_pending: boolean | null;
   next_move: SupplierClaimMove;
+  /** R4 — units of this claim still quarantined (`on_hold`). Read from the
+   *  register, not derived from `qty`: a partner warehouse keeps no per-unit
+   *  register, and resolved units are gone from the count. */
+  held_units: number;
+  hold_reason: string | null;
 }
 
 export interface SupplierClaimsResponse {
@@ -3421,6 +3442,9 @@ export interface SupplierClaimMoveResult {
   status?: string;
   requested_action?: string;
   supplier_response?: string;
+  /** R4 — the hold resolution answers with what it moved. */
+  outcome?: string;
+  units?: number;
 }
 
 function useSupplierClaimMove<TInput>(
@@ -3498,6 +3522,36 @@ export function useSupplierClaimCloseMutation(
   return useSupplierClaimMove<{ note?: string }>(
     (id) => `/api/operation/supplier-claims/${id}/close`,
     opts,
+  );
+}
+
+/**
+ * R4 — what happened to the quarantined units.
+ *
+ * Shares the claim-move invalidation because the answer changes the row's held
+ * count, and it ALSO invalidates the stock register: the units either entered
+ * the ready pool or left the building, and an On-hand list still showing them
+ * on hold is the one thing this card exists to prevent.
+ */
+export function useSupplierClaimHoldResolveMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; outcome: string; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useSupplierClaimMove<{ outcome: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/hold-resolve`,
+    {
+      ...opts,
+      onSuccess: async (...args) => {
+        await qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+        opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+      },
+    },
   );
 }
 
@@ -6535,6 +6589,25 @@ export function useSetReserveLevel() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock", "usage"] });
     },
+  });
+}
+
+// ── Stock health + proposal accuracy · Ready Stock K5 (no migration) ────────
+// The review layer. It READS the numbers K1 and K4 already collect and K2's own
+// cycles — there is no mutation hook here because K5 sets nothing.
+//
+// Its own key rather than a slice of `usage`: the health read reaches back 200
+// days of sales lines and every plan cycle, so hanging it off a month-keyed
+// query would re-fetch all of that every time somebody changes the month.
+
+const stockHealthKey = ["operation", "ops-stock", "health"] as const;
+
+export function useStockHealth(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: stockHealthKey,
+    queryFn: () => apiFetch<OpsStockHealthResponse>("/api/ops/stock/health"),
+    enabled: opts?.enabled ?? true,
+    staleTime: 60_000,
   });
 }
 

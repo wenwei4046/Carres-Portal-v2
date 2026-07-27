@@ -57,6 +57,7 @@ import {
   STOCK_LOCATIONS,
   DELIVERY_TIME_SLOTS,
   isSundayIso,
+  orderMoney,
   deliveryGroupOf,
   deliveryGroupLabel,
   orderDeliveryGroups,
@@ -1523,24 +1524,32 @@ function DrawerBody({
         )
       : null;
   const pastLastCall = daysToDelivery !== null && daysToDelivery <= 1;
-  // ── Money (batch 2, Jess 2026-07-09) — ledger-based Total / Collected /
-  //    Outstanding. Path 1 (no migration): Total = the order's to-collect figure —
-  //    the line-sum when priced (native), else the keyed ops_order_control.balance
-  //    (AutoCount has no line prices → staff keys it once). Collected = Σ goods
-  //    payments (payment+deposit) from the order_payments ledger. Outstanding =
-  //    Total − Collected. The whole system already nets balance − ledger
-  //    (OperationPayments), so this stays consistent. Total-not-set ⇒ don't block.
+  // ── Money (C5, 2026-07-27) — Total / Collected / Outstanding through the ONE
+  //    shared rule (`orderMoney`), the same one the Orders row's 🔒 and the
+  //    server's booking gate ask, so the three can never disagree about a
+  //    number that decides whether a delivery goes out.
+  //
+  //    Collected was Σ of the `order_payments` ledger. That table holds ZERO
+  //    rows and no live payment path writes it, so this drawer showed the full
+  //    order value outstanding for every customer — SO-1209 read "RM 7,248
+  //    outstanding · HOLD DELIVERY" while `orders.paid` said it was paid in
+  //    full. `orders.paid` is the money truth (`top_up_order`, Stripe, and the
+  //    AutoCount import all write it). The ledger is still fetched below for
+  //    the payment HISTORY list and for storage collections.
   const ledger = paymentsQuery.data?.payments ?? [];
-  const collected = ledger
-    .filter((p) => p.kind === "payment" || p.kind === "deposit")
-    .reduce((s, p) => s + Number(p.amount || 0), 0);
-  const keyedTotal = form.draft.balance.trim()
+  const keyedBalance = form.draft.balance.trim()
     ? Number(form.draft.balance)
-    : Number(form.control?.balance ?? 0);
-  const orderTotal = hasLineTotal ? grandTotal : keyedTotal;
-  const totalSet = orderTotal > 0;
-  const moneyOutstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
-  const balanceOwing = totalSet && moneyOutstanding > 0;
+    : form.control?.balance ?? null;
+  const money = orderMoney({
+    lineSum: hasLineTotal ? grandTotal : 0,
+    paid: order.paid,
+    controlBalance: keyedBalance,
+  });
+  const collected = money.paid;
+  const orderTotal = money.total ?? 0;
+  const totalSet = money.known;
+  const moneyOutstanding = money.goodsOwing;
+  const balanceOwing = money.owing;
   // ── AUTO storage (Jess 2026-07-18): the machine counts, nobody clicks.
   // Anchor = (supplier late ? latest goods ETA : deadline) + 7d — a
   // supplier-late stretch never bills the customer. A manual From date

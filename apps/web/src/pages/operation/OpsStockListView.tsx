@@ -6,6 +6,9 @@ import { fmtDate } from "@/lib/fmt-date";
 import {
   POOL_USE_REASONS,
   POOL_USE_REASON_LABEL,
+  isHeldStockStatus,
+  isSellableStockStatus,
+  opsStockStatusLabel,
   poolDrawProblem,
   type OpsStockItem,
   type OpsStockListResponse,
@@ -606,7 +609,14 @@ export default function OpsStockListView(props: Props) {
                         (x) => x.status === "reserved",
                       ).length;
                       const repair = rs.filter((x) => x.needsRepair).length;
-                      const ready = rs.length - reserved - repair;
+                      // R4: counted, never subtracted. `rs.length - reserved -
+                      // repair` called every other status ready, so a held unit
+                      // would have been advertised as available in the one
+                      // number a picker reads at a glance.
+                      const ready = rs.filter(
+                        (x) => isSellableStockStatus(x.status) && !x.needsRepair,
+                      ).length;
+                      const held = rs.filter((x) => isHeldStockStatus(x.status)).length;
                       return (
                         <Fragment key={"g-" + sku}>
                           <tr className="bg-base-100 border-t border-base-200">
@@ -628,6 +638,12 @@ export default function OpsStockListView(props: Props) {
                                     {ready} ready
                                   </span>
                                   {reserved ? ` · ${reserved} reserved` : ""}
+                                  {held ? (
+                                    <span className="text-warning-700">
+                                      {" "}
+                                      · {held} on hold
+                                    </span>
+                                  ) : null}
                                   {repair ? (
                                     <span className="text-warning-700">
                                       {" "}
@@ -754,16 +770,22 @@ function RowItem({
         ) : null}
       </td>
       <td className="px-3 py-2">
+        {/* R4 (0299): the words come from the shared label map, not from the
+            raw column — a status added in SQL used to reach the screen as
+            `written_off`. A held unit is amber, not red: nothing is broken
+            about the system, the goods are simply not available. */}
         <span
-          className={`pill capitalize ${
+          className={`pill ${
             row.status === "free"
               ? "pill-confirmed"
               : row.status === "reserved"
                 ? "pill-collected"
-                : "pill-neutral"
+                : row.status === "on_hold"
+                  ? "pill-warning"
+                  : "pill-neutral"
           }`}
         >
-          {row.status}
+          {opsStockStatusLabel(row.status)}
         </span>
       </td>
       <td className="px-3 py-2 text-base-700">{row.reservedRef ?? "—"}</td>

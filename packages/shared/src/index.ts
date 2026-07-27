@@ -542,6 +542,15 @@ export {
   opsUsageSkuSliceSchema,
   opsPoolUsageEntrySchema,
   opsStockUsageResponseSchema,
+  opsStockHealthStateSchema,
+  opsStockHealthRowSchema,
+  opsSlowMoverSchema,
+  opsStockHealthCountsSchema,
+  opsMonthAccuracySchema,
+  opsStockHealthResponseSchema,
+  type OpsStockHealthRow,
+  type OpsMonthAccuracy,
+  type OpsStockHealthResponse,
   type OpsReorderPointInput,
   type OpsReorderRow,
   type OpsReorderResponse,
@@ -657,8 +666,13 @@ export {
   // S3 (0291) — the recorded outcomes of the follow-up chain.
   caseProgressEntrySchema,
   recordCaseStepInputSchema,
+  // S4 (0298) — the deadline's recorded events.
+  caseSlaEventSchema,
+  recordCaseSlaInputSchema,
   type CaseProgressEntryRecord,
   type RecordCaseStepInput,
+  type CaseSlaEventRecord,
+  type RecordCaseSlaInput,
   type CaseEvidenceEntry,
   type CaseEvidenceListResponse,
   type CaseEvidenceUploaded,
@@ -843,6 +857,33 @@ export {
   type SupplierClaimMoveOwner,
   type SupplierClaimCloseProblem,
 } from "./supplier-claim";
+
+// R4 · Problem stock is quarantined — on hold · returned · written off
+export {
+  OPS_STOCK_STATUS_LABEL,
+  SELLABLE_STOCK_STATUSES,
+  HELD_STOCK_STATUS,
+  RETURNED_STOCK_STATUS,
+  WRITTEN_OFF_STOCK_STATUS,
+  TERMINAL_STOCK_STATUSES,
+  STOCK_HOLD_REASONS,
+  STOCK_HOLD_REASON_KEYS,
+  STOCK_HOLD_OUTCOMES,
+  STOCK_HOLD_OUTCOME_KEYS,
+  STOCK_HOLD_OUTCOME_STATUS,
+  STOCK_HOLD_RESOLVE_PROBLEM_TEXT,
+  opsStockStatusLabel,
+  isHeldStockStatus,
+  isSellableStockStatus,
+  stockHoldReasonLabel,
+  stockHoldOutcomeLabel,
+  holdOutcomeNeedsNote,
+  holdResolveProblems,
+  heldUnitsLine,
+  type StockHoldReason,
+  type StockHoldOutcome,
+  type StockHoldResolveProblem,
+} from "./stock-hold";
 
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
 export {
@@ -1481,6 +1522,42 @@ export {
   type CaseProgressEntry,
   type CaseTimelineRow,
 } from "./service-case-plan";
+// S4 — the deadline. 14 WORKING days from the report, derived and never stored;
+// only the calls and the one allowed extension are (service_cases.sla_events,
+// 0298). No case silently passes day 14.
+export {
+  CASE_SLA_WORKING_DAYS,
+  CASE_SLA_NOTICE_WORKING_DAY,
+  CASE_SLA_NOTICE_DAYS_BEFORE,
+  CASE_SLA_EXTENSION_MAX_WORKING_DAYS,
+  CASE_SLA_NOTE_MAX,
+  CASE_DELAY_REASONS,
+  CASE_DELAY_REASON_LABEL,
+  CASE_DELAY_REASON_RESPONSIBILITY,
+  caseDelayNeedsNote,
+  caseDelayReasonLabel,
+  caseSlaBaseDue,
+  caseSlaClock,
+  caseSlaExtension,
+  caseSlaExtensionMax,
+  caseSlaWorkingDay,
+  caseSlaAction,
+  caseSlaCountLabel,
+  caseSlaRecordProblem,
+  type CaseDelayReason,
+  type CaseDelayResponsibility,
+  type CaseSlaEvent,
+  type CaseSlaEventKind,
+  type CaseSlaInput,
+  type CaseSlaState,
+  type CaseSlaClock,
+  type CaseSlaRecordInput,
+} from "./service-case-sla";
+export {
+  orderMoney,
+  type OrderMoneyInput,
+  type OrderMoney,
+} from "./order-money";
 export {
   bookingConfirmGate,
   isSundayIso,
@@ -1604,6 +1681,34 @@ export {
   type UsageSkuSlice,
   type PoolUsageSummary,
 } from "./pool-usage";
+// Ready Stock K5 — the review layer. NO migration: it reads the two numbers K1
+// and K4 already ask the COO for and K2's own cycles, adds no third number and
+// writes nothing. Its coverage gates are load-bearing, not cosmetic: live prod
+// keeps 7 days of real sales records, so the naive build of this card flags all
+// 49 warehouse SKUs as dead stock. See the module header.
+export {
+  OVER_STOCK_MULTIPLE,
+  SLOW_MOVING_WINDOWS,
+  STOCK_HEALTH_STATES,
+  STOCK_HEALTH_LABEL,
+  ACCURACY_WITHHELD_LABEL,
+  computeStockHealthRows,
+  stockHealthCounts,
+  stockHealthHeadline,
+  computeSlowMovers,
+  computePlanAccuracy,
+  type StockHealthState,
+  type StockHealthRow,
+  type StockHealthCounts,
+  type SlowMovingWindow,
+  type SlowMover,
+  type SlowMovingWindowResult,
+  type SlowMovingReport,
+  type AccuracyPlanInput,
+  type AccuracyRow,
+  type AccuracyWithheld,
+  type MonthAccuracy,
+} from "./stock-health";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

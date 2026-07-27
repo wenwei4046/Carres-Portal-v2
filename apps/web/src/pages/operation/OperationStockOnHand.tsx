@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
+import {
+  isHeldStockStatus,
+  isSellableStockStatus,
+  type OpsStockItem,
+  type OpsStockListResponse,
+} from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
 import Segmented from "@/components/Segmented";
@@ -33,12 +38,15 @@ import ReorderStockCard from "./components/ReorderStockCard";
  *   defective: needs_repair OR condition='damaged'
  */
 
-type Status = "all" | "ready" | "reserved" | "defective";
+type Status = "all" | "ready" | "reserved" | "on-hold" | "defective";
 
 const STATUS_FILTERS: { key: Status; label: string }[] = [
   { key: "all", label: "All" },
   { key: "ready", label: "Ready" },
   { key: "reserved", label: "Reserved" },
+  // R4 — a quarantined unit is physically here and cannot be sold. Without a
+  // filter it is a row nobody can find in a list of a thousand.
+  { key: "on-hold", label: "On hold" },
   { key: "defective", label: "Defective" },
 ];
 
@@ -53,7 +61,7 @@ const CONDITION_ORDER = ["new", "exhibition", "old", "refurbished", "damaged"];
 
 function isReady(r: OpsStockItem): boolean {
   return (
-    r.status === "free" &&
+    isSellableStockStatus(r.status) &&
     (r.condition === "new" ||
       r.condition === "exhibition" ||
       r.condition === "old" ||
@@ -63,6 +71,12 @@ function isReady(r: OpsStockItem): boolean {
 }
 function isReserved(r: OpsStockItem): boolean {
   return r.status === "reserved";
+}
+/** R4 — quarantined by receiving under a supplier claim. NOT the same thing as
+ *  Defective: a defective unit is ours to repair, a held one is the supplier's
+ *  problem and cannot leave the building until the claim says how. */
+function isOnHold(r: OpsStockItem): boolean {
+  return isHeldStockStatus(r.status);
 }
 function isDefective(r: OpsStockItem): boolean {
   return r.needsRepair || r.condition === "damaged";
@@ -74,6 +88,8 @@ function matchesStatus(r: OpsStockItem, s: Status): boolean {
       return isReady(r);
     case "reserved":
       return isReserved(r);
+    case "on-hold":
+      return isOnHold(r);
     case "defective":
       return isDefective(r);
     case "all":
@@ -127,6 +143,7 @@ export default function OperationStockOnHand() {
   const counts = useMemo(() => {
     let ready = 0,
       reserved = 0,
+      onHold = 0,
       defective = 0,
       repair = 0,
       noPo = 0;
@@ -135,6 +152,7 @@ export default function OperationStockOnHand() {
     for (const r of items) {
       if (isReady(r)) ready += 1;
       if (isReserved(r)) reserved += 1;
+      if (isOnHold(r)) onHold += 1;
       if (isDefective(r)) defective += 1;
       if (r.needsRepair) repair += 1;
       if (!r.poNo) noPo += 1;
@@ -146,6 +164,7 @@ export default function OperationStockOnHand() {
       all: items.length,
       ready,
       reserved,
+      "on-hold": onHold,
       defective,
       repair,
       noPo,
@@ -272,6 +291,15 @@ export default function OperationStockOnHand() {
               <MetricRow label="All units" n={counts.all} />
               <MetricRow label="Ready" n={counts.ready} tone="text-success-700" />
               <MetricRow label="Reserved" n={counts.reserved} />
+              {/* R4 — shown only when there is something on hold. A permanent
+                  "On hold 0" row is a worry about nothing. */}
+              {counts["on-hold"] > 0 ? (
+                <MetricRow
+                  label="On hold"
+                  n={counts["on-hold"]}
+                  tone="text-warning-700"
+                />
+              ) : null}
               <MetricRow
                 label="Defective"
                 n={counts.defective}

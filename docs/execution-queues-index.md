@@ -27,20 +27,38 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C9 | **C1 ✅ #461 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅.
-**Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot.
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C5 ✅ #447**.
+**Drawer lane, in this order:** C2 → C3 → C6 → C7 → C8 (C9 any time after C5).
+R/S/K run in parallel throughout; C4 waits for a free R slot.
 
-**Expect after C5:** the Delivery board holds every order today because the money hold has
-never fired (`balance` NULL on all 55 rows). The moment C5 makes the gate read `orders.paid`,
-about 18 owing orders leave the board at once. That is correct behaviour, and it will look
-like a disappearance.
+**What C1 changed on screen (2026-07-27).** Every action label on Orders, its queues,
+its drawer and the Delivery module now names the party: `Chase logistic` → the queue
+`Confirm delivery date` with the row reading `Call NETS — confirm delivery date`. The
+words live in ONE module (`packages/shared/order-action-words.ts`) and each action
+carries TWO strings — a party-free QUEUE word for facets and counts, a party-named ROW
+line for one order — so a queue and a row structurally cannot spell one action two
+ways. Also renamed: the `Manage` column → `Actions`, the `Pending` / `Scheduled` tabs
+→ `To book` / `Customer confirmed`, `For Jess` → `For manager review`, and `logistic` /
+`carrier` / `partner` → `Logistics` everywhere. **C1 did NOT build the three-dot
+column** — `rowDotsOf` is computed and rendered by nothing, so there was no header to
+remove; that is a feature for Jess, and the C-card records it.
+
+**What C5 actually changed (measured after shipping — it is NOT the disappearance this
+line used to predict).** No order changes its action word today: all 55 control rows are
+`booking_stage='none'`, so the ladder returns `Confirm delivery date` and never reaches the money
+rung, and nothing leaves the Delivery board. What appears instead: the **Owing facet row
+shows up for the first time** (`Owing · 18 · RM 56,859` — that row renders only when the
+count is above zero, and the count was always zero), the `Collect RM …` pill finds those 18,
+the Payments collections queue fills with real figures (it computed RM 0 owing for
+everybody), and the drawer stops telling an operator that a paid-in-full order owes its
+whole value. The 18 orders WILL start showing 🔒 — but only once someone confirms a
+booking, which is the rung the hold sits on.
 
 
 ## Sidebar map — where every line lands
