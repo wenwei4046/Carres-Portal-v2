@@ -552,6 +552,32 @@ export {
   type OpsStockListResponse,
 } from "./schemas/ops-stock";
 
+// Ready Stock K2 (0287) — the monthly plan's wire contracts.
+export {
+  planStatusSchema,
+  planPeriodSchema,
+  opsStockPlanOpenInputSchema,
+  opsStockPlanProposeInputSchema,
+  opsStockPlanConsolidateInputSchema,
+  opsStockPlanFinalInputSchema,
+  opsStockPlanDecideInputSchema,
+  opsStockPlanProposalSchema,
+  opsStockPlanRowSchema,
+  opsStockPlanCoverageSchema,
+  opsStockPlanHeaderSchema,
+  opsStockPlanResponseSchema,
+  type PlanStatusValue,
+  type OpsStockPlanOpenInput,
+  type OpsStockPlanProposeInput,
+  type OpsStockPlanConsolidateInput,
+  type OpsStockPlanFinalInput,
+  type OpsStockPlanDecideInput,
+  type OpsStockPlanRow,
+  type OpsStockPlanCoverage,
+  type OpsStockPlanHeader,
+  type OpsStockPlanResponse,
+} from "./schemas/ops-stock-plan";
+
 // Migration 0140 — Service Notes (SN module / Issue Tracker).
 export {
   snSectionASchema,
@@ -1319,6 +1345,35 @@ export {
   type ReorderState,
   type ReorderStockRow,
 } from "./reorder-alert";
+// Ready Stock K2 (0287) — the monthly propose → consolidate → approve lane.
+// The coverage rules are load-bearing, not cosmetic: see the file header for
+// the live measurement that made them necessary.
+export {
+  MIN_HISTORY_DAYS_FOR_SUGGESTION,
+  MIN_HISTORY_DAYS_FOR_BASELINE,
+  OVER_SUGGESTION_MULTIPLE,
+  SALES_WINDOW_DAYS,
+  PLAN_STATUSES,
+  PLAN_STATUS_LABEL,
+  salesCoverage,
+  computePlanView,
+  planPoList,
+  pendingConsolidation,
+  planAcceptsProposals,
+  planAcceptsConsolidation,
+  planAwaitsDecision,
+  isWeekendDate,
+  daysBetween,
+  type PlanSalesLine,
+  type PlanStockUnit,
+  type PlanProposal,
+  type PlanLine,
+  type PlanSkuStats,
+  type PlanView,
+  type PlanPoLine,
+  type PlanStatus,
+  type SalesCoverage,
+} from "./ready-stock-plan";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

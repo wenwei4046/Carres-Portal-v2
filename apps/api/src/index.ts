@@ -79,6 +79,7 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import opsStockPlanRouter from "./routes/ops/stock-plan";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
 import snRouter from "./routes/ops/service-notes";
 // Migration 0210 — Service Cases (case parent layer above Service Notes).
@@ -220,6 +221,9 @@ api.route("/supplier/products", supplierProductsRouter);
 api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
+// K1 reorder routes on that router keep their paths unchanged.
+api.route("/ops/stock-plan", opsStockPlanRouter);
 api.route("/ops/service-notes", snRouter);
 api.route("/ops/service-cases", scRouter);
 api.route("/ops/notes", opsNotesRouter);

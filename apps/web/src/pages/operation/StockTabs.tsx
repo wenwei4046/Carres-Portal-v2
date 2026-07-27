@@ -1,22 +1,25 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Boxes, ArrowLeftRight, type LucideIcon } from "lucide-react";
+import { Boxes, ArrowLeftRight, ClipboardList, type LucideIcon } from "lucide-react";
 
 /**
  * StockTabs — the shared top tab bar for the merged Stock module (K0,
  * Jess 2026-07-27; same pattern as PurchasingTabs, the 2026-07-21 merge).
  *
  * One warehouse, three questions:
- *   • On hand  → `/operation?tab=stock-onhand`  (what's here now)
- *   • In & out → `/operation?tab=movements`     (when things moved)
- *   • Ready stock (how much to keep) joins as the middle tab when K2 ships.
+ *   • On hand     → `/operation?tab=stock-onhand`  (what's here now)
+ *   • Ready stock → `/operation?tab=stock-plan`    (how much to keep) — K2
+ *   • In & out    → `/operation?tab=movements`     (when things moved)
+ *
+ * Ready stock sits in the MIDDLE exactly as K0 reserved it. It is a PLAN about
+ * the same goods, never a second pool.
  *
  * Word law (COPY-STANDARD): the user-facing word is "Stock"; "Inventory" and
  * "Movements" are banned UI words. The in/out page's own h1 already reads
  * "Stock in & out history" — the tab label just says the same thing.
  */
 
-type StockTab = "on-hand" | "in-out";
+type StockTab = "on-hand" | "ready" | "in-out";
 
 interface TabDef {
   key: StockTab;
@@ -27,13 +30,15 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: "on-hand", label: "On hand", to: "/operation?tab=stock-onhand", icon: Boxes },
+  { key: "ready", label: "Ready stock", to: "/operation?tab=stock-plan", icon: ClipboardList },
   { key: "in-out", label: "In & out", to: "/operation?tab=movements", icon: ArrowLeftRight },
 ];
 
 export default function StockTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
   const tabParam = new URLSearchParams(location.search).get("tab");
-  const active: StockTab = tabParam === "movements" ? "in-out" : "on-hand";
+  const active: StockTab =
+    tabParam === "movements" ? "in-out" : tabParam === "stock-plan" ? "ready" : "on-hand";
 
   return (
     <div

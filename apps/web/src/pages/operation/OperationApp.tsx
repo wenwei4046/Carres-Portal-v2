@@ -47,6 +47,8 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import OperationStockOnHand from "./OperationStockOnHand";
+// K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
+import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
 import OperationGuarantees from "./OperationGuarantees";
@@ -334,6 +336,8 @@ export default function OperationApp() {
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
+            {/* K2 — Ready stock: the monthly propose → approve plan. */}
+            {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}

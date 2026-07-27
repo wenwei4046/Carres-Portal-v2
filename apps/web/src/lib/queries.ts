@@ -33,6 +33,12 @@ import {
   type OpsStockImportRow,
   type OpsReorderResponse,
   type OpsReorderPointInput,
+  type OpsStockPlanResponse,
+  type OpsStockPlanOpenInput,
+  type OpsStockPlanProposeInput,
+  type OpsStockPlanConsolidateInput,
+  type OpsStockPlanFinalInput,
+  type OpsStockPlanDecideInput,
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
@@ -6286,6 +6292,81 @@ export function useSetReorderPoint() {
       void qc.invalidateQueries({ queryKey: reorderKey });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Ready stock plan — card K2 (migration 0287)
+// ---------------------------------------------------------------------------
+// The monthly lane: propose → consolidate → approve → PO list. Every number on
+// the screen (run rate, suggestion, coverage, the ⚠ warning, the PO list) is
+// decided SERVER-side by the shared engine; these hooks only carry the answer,
+// so the browser can never present a different arithmetic from the API.
+
+const stockPlanKey = (period?: string) =>
+  ["operation", "ops-stock", "plan", period ?? "current"] as const;
+
+export function useStockPlan(period?: string) {
+  return useQuery({
+    queryKey: stockPlanKey(period),
+    queryFn: () =>
+      apiFetch<OpsStockPlanResponse>(
+        `/api/ops/stock-plan${period ? `?period=${encodeURIComponent(period)}` : ""}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
+/** Every plan mutation refreshes the whole cycle — one stage can change another
+ *  (the first cut closes proposals), so a partial invalidation would leave the
+ *  screen showing a stage that has already moved on. */
+function useStockPlanMutation<TInput>(
+  path: (input: TInput) => string,
+  body: (input: TInput) => unknown,
+  method: "POST" = "POST",
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TInput) =>
+      apiFetch<unknown>(path(input), catalogJson(method, body(input))),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock", "plan"] });
+    },
+  });
+}
+
+export function useOpenStockPlan() {
+  return useStockPlanMutation<OpsStockPlanOpenInput>(
+    () => "/api/ops/stock-plan",
+    (i) => i,
+  );
+}
+
+export function useProposeStockPlan(planId: string) {
+  return useStockPlanMutation<OpsStockPlanProposeInput>(
+    () => `/api/ops/stock-plan/${planId}/propose`,
+    (i) => i,
+  );
+}
+
+export function useConsolidateStockPlan(planId: string) {
+  return useStockPlanMutation<OpsStockPlanConsolidateInput>(
+    () => `/api/ops/stock-plan/${planId}/consolidate`,
+    (i) => i,
+  );
+}
+
+export function useSetStockPlanFinal(planId: string) {
+  return useStockPlanMutation<OpsStockPlanFinalInput>(
+    () => `/api/ops/stock-plan/${planId}/final`,
+    (i) => i,
+  );
+}
+
+export function useDecideStockPlan(planId: string) {
+  return useStockPlanMutation<OpsStockPlanDecideInput>(
+    () => `/api/ops/stock-plan/${planId}/decide`,
+    (i) => i,
+  );
 }
 
 /** GRN per-line receive (migration 0208) — book n units of one order line into
