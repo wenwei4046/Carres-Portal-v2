@@ -83,6 +83,44 @@ message bodies but their BUTTON labels follow the law.
 **Lane:** shares ④'s pages — not alongside an R-chat.
 **Done when:** visible `Chase` greps 0 across the whole web bundle.
 
+## C5 · The money gate reads the number that exists — ⚠️ HIGH, live false-block
+
+**Verified against prod 2026-07-27 (every figure below is a live count, not an estimate):**
+
+| The three money numbers | Live state |
+|---|---|
+| `ops_order_control.balance` — what the ladder's 🔒 reads | **NULL on all 55 control rows** |
+| `orders.paid` — a column on `orders` | **the only written number**: `top_up_order` and `record_stripe_checkout_payment` both write it |
+| `order_payments` / `payments` — the "ledger" | **0 rows, both tables. No payment RPC writes them.** |
+
+**The bug is worse than a dead lock.** `bookingConfirmGate` (D1/T-series) computes
+`collected` from `order_payments` — an empty table — so outstanding = the FULL order value
+for every priced order. Concrete live case: **SO-1209, value RM 7,248, `orders.paid`
+RM 7,248 — paid in full — and the confirm gate refuses its booking for money.** The lock
+that never fires and the gate that always fires are the SAME root cause: two readers each
+pointed at a column nobody writes.
+
+**Real outstanding, computed from the number that exists** (Σ lines + add-ons − `orders.paid`,
+clamped per order): **18 orders, RM 56,859** (RM 52,209 counting order lines only).
+
+**Decided (unless Jess redirects):** `orders.paid` is the money truth. Do NOT wire anything
+to `order_payments` in this card — a table with no writer cannot become a source of truth by
+being read. Build:
+1. `bookingConfirmGate`'s `collected` comes from `orders.paid` (one call site: the API
+   route that feeds it — `order-control.ts` ~267 currently selects from `order_payments`).
+2. The ladder's money rung computes outstanding the same way, with
+   `ops_order_control.balance` as a FALLBACK for imported rows that carry no line prices.
+3. Payments' "Ready to chase" queue (C4 renames it) reads the same computation — one
+   helper in `packages/shared`, three consumers, so they cannot drift.
+4. A test pinning SO-1209's shape: fully-paid order ⇒ gate passes.
+
+**Not in this card:** starting to WRITE the ledger (a real migration + a rewrite of
+`top_up_order`; it belongs to a Payments card, and until then the ledger stays empty by
+fact, not by accident).
+**Lane:** Orders list + drawer + API — the C/T/J lane. **No migration.**
+**Done when:** SO-1209 can be confirmed; the 18 genuinely-owing orders show 🔒; no reader
+of money touches `order_payments`.
+
 ## Status
 
 | Card | Status | PR |
@@ -91,3 +129,4 @@ message bodies but their BUTTON labels follow the law.
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |
+| C5 | ⬜ **HIGH** — live false-block, do before T9 | — |
