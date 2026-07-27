@@ -22,16 +22,18 @@
 
 | Line | Doc | Cards | State |
 |---|---|---|---|
-| ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1-T6 ✅ · T7 next · ENDS at T11 |
+| ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | T1-T9 ✅ · T10 next · ENDS at T11 |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C4 | Jess rulings 2026-07-27: Dynamic Checklist + Chase banned |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C5 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
 
-**State 2026-07-27:** ① T1-T7 ✅ (T8 running) · ② J1-J2 ✅ · ⑤ K0 ✅ — 10 of 31 shipped.
-**Run now in parallel:** T8 (already running) + R1 + S1 + K1, four chats. J3 waits for the
-T-line's drawer work to pause (slot it right after T8). Total = 36 cards.
+**State 2026-07-27:** ① T1-T9 ✅ (#363 #367 #370 #377 #382 #384 #386 #391 #398) ·
+② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅ —
+**14 of 37 shipped**.
+**Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
+C3 → T10 → T11. R/S/K run in parallel throughout; C4 waits for a free R slot.
 
 ## Sidebar map — where every line lands
 

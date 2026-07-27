@@ -32,16 +32,40 @@
 **Goal:** every visible label in the Orders list, queues and drawer follows
 verb + named party + measurable object, and the word Chase disappears:
 
-- queue `Chase logistic` → `Confirm delivery date`; row line
-  `Call {carrier or customer} — confirm delivery date`
-- ladder/next words `Chase supplier` (and kin) → `Call {supplier} — confirm ready date`
-- drawer follow-up presets: `Call customer (book delivery)` → `Call {name} — book
-  delivery date` · `Call customer (stock delay)` → `Call {name} — stock delay`
+**The full rename list is the audit table in `docs/COPY-STANDARD.md` ("The dictionary —
+every visible word, audited") — build from that table, not from memory.** In this card:
+
+- `Chase logistic` → queue `Confirm delivery date`; row `Call {carrier} — confirm delivery date`
+- `Chase supplier` → `Call {supplier} — confirm ready date`
+- `Order PO` → `Send PO to {supplier}`
+- `Call customer (stock delay)` → `Call {customer} — agree new delivery date`
+- `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
+- `Confirm` (bare) → `Confirm delivery with {customer}`
+- delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
+- `Pending` filter → rename to the state it selects (read the predicate first)
+- keep untouched: `Assign logistic` · `Deliver today` · `Upload delivery photo` · `Done` ·
+  `No carrier` · the two confirmed/provisional fact strings
 - the party is the REAL name when known (supplier/carrier/customer), role word otherwise
+
+**Also in this card — the T1 leftover (found by the J3 chat, deliberately left for C1):**
+`OrderDetailDrawer.tsx` still renders the banned word **`Unscheduled`** in TWO places —
+line ~3814 (the header MiniBadge, carrier assigned + no date) and ~3853 (`statusWord` in
+the delivery card). T1 banned the word and fixed the LIST; these two survived, and the
+live bundle greps 1. **The replacement is NOT T1's `need booking`** — Jess struck that word
+on 2026-07-27: it is a to-do hiding inside a fact ("need" = the reader still has to work out
+what to do). Both spots — and the LIST column that T1 shipped — become
+**`{carrier} — confirm delivery date`** (the carrier name is already in that cell).
+Its neighbours in both spots are already correct (`Confirmed` · `not confirmed · carrier
+said {date}` · `No carrier`) — change only the two strings, and delete the stale word
+"Unscheduled" from the comment block above 3837 so no future chat reads it as intended.
+**Add a banned-word guard to the drawer's own test file** (`POD` / `Proof of Delivery` /
+`Unscheduled` / `Not booked` / `Chase`) — `OrderDocuments`, `BookingSpine` and
+`OrderJourneyHeader` each ship one already, which is precisely why nobody caught the
+drawer: every component guarded ITSELF and the badge sat outside all three.
 
 **No migration. Copy + label maps + tests.**
 **Done when:** grep of the web bundle for visible `Chase` = 0 on Orders/Delivery
-surfaces; every renamed label carries a named party.
+surfaces AND `Unscheduled` = 0; every renamed label carries a named party.
 
 ## C2 · Dynamic Checklist in the drawer
 
@@ -70,6 +94,44 @@ message bodies but their BUTTON labels follow the law.
 **Lane:** shares ④'s pages — not alongside an R-chat.
 **Done when:** visible `Chase` greps 0 across the whole web bundle.
 
+## C5 · The money gate reads the number that exists — ⚠️ HIGH, live false-block
+
+**Verified against prod 2026-07-27 (every figure below is a live count, not an estimate):**
+
+| The three money numbers | Live state |
+|---|---|
+| `ops_order_control.balance` — what the ladder's 🔒 reads | **NULL on all 55 control rows** |
+| `orders.paid` — a column on `orders` | **the only written number**: `top_up_order` and `record_stripe_checkout_payment` both write it |
+| `order_payments` / `payments` — the "ledger" | **0 rows, both tables. No payment RPC writes them.** |
+
+**The bug is worse than a dead lock.** `bookingConfirmGate` (D1/T-series) computes
+`collected` from `order_payments` — an empty table — so outstanding = the FULL order value
+for every priced order. Concrete live case: **SO-1209, value RM 7,248, `orders.paid`
+RM 7,248 — paid in full — and the confirm gate refuses its booking for money.** The lock
+that never fires and the gate that always fires are the SAME root cause: two readers each
+pointed at a column nobody writes.
+
+**Real outstanding, computed from the number that exists** (Σ lines + add-ons − `orders.paid`,
+clamped per order): **18 orders, RM 56,859** (RM 52,209 counting order lines only).
+
+**Decided (unless Jess redirects):** `orders.paid` is the money truth. Do NOT wire anything
+to `order_payments` in this card — a table with no writer cannot become a source of truth by
+being read. Build:
+1. `bookingConfirmGate`'s `collected` comes from `orders.paid` (one call site: the API
+   route that feeds it — `order-control.ts` ~267 currently selects from `order_payments`).
+2. The ladder's money rung computes outstanding the same way, with
+   `ops_order_control.balance` as a FALLBACK for imported rows that carry no line prices.
+3. Payments' "Ready to chase" queue (C4 renames it) reads the same computation — one
+   helper in `packages/shared`, three consumers, so they cannot drift.
+4. A test pinning SO-1209's shape: fully-paid order ⇒ gate passes.
+
+**Not in this card:** starting to WRITE the ledger (a real migration + a rewrite of
+`top_up_order`; it belongs to a Payments card, and until then the ledger stays empty by
+fact, not by accident).
+**Lane:** Orders list + drawer + API — the C/T/J lane. **No migration.**
+**Done when:** SO-1209 can be confirmed; the 18 genuinely-owing orders show 🔒; no reader
+of money touches `order_payments`.
+
 ## Status
 
 | Card | Status | PR |
@@ -78,3 +140,4 @@ message bodies but their BUTTON labels follow the law.
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |
+| C5 | ⬜ **HIGH** — live false-block, do before T9 | — |
