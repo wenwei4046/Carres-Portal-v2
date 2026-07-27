@@ -16,6 +16,7 @@ import {
 } from "@/lib/queries";
 import StockTabs from "./StockTabs";
 import UrgentRestockPanel from "./components/UrgentRestockPanel";
+import PoolUsagePanel from "./components/PoolUsagePanel";
 
 /**
  * Ready stock — the monthly plan (card K2, migration 0287).
@@ -150,6 +151,12 @@ export default function OperationStockPlan() {
             on a day the monthly cycle fails to load, which is exactly the kind
             of day somebody needs it. */}
         <UrgentRestockPanel />
+
+        {/* K4 — where the pool actually went, and how low it may go. It reads
+            the SAME month the plan header selects: one month control on the
+            page, so "July" means July everywhere on it. Outside the plan's
+            branches for the same reason as the urgent lane. */}
+        <PoolUsagePanel period={period} />
       </div>
     </>
   );

@@ -13,12 +13,19 @@ import {
   opsStockCreateInputSchema,
   opsStockImportInputSchema,
   opsReorderPointInputSchema,
+  opsReserveLevelInputSchema,
   reconcileStockImport,
   computeReorderRows,
   reorderAlertCount,
   reorderUnsetCount,
+  computeReserveLevelRows,
+  summarisePoolUsage,
+  POOL_USE_REASON_LABEL,
   isStockPlanner,
   type StockUnitKeyParts,
+  type PlanStockUnit,
+  type PoolUsageEntry,
+  type PoolUseReason,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
@@ -40,6 +47,14 @@ import type { AppEnv } from "../../types";
  * Reorder points — K1 (migration 0286):
  *   GET  /reorder — current · reorder point · incoming, per watched SKU
  *   PUT  /reorder — set one point (COO duty / principal, re-gated in SQL)
+ *
+ * Pool usage + reserve levels — K4 (migration 0292):
+ *   GET  /usage         — a month's draws, split by reason, + the levels
+ *   PUT  /reserve-level — set one SKU's floor (COO duty, re-gated in SQL)
+ *   /reserve and /reserve-item now go through `ops_stock_pool_draw`, which
+ *   takes the unit AND writes the reason in ONE transaction. 0213's
+ *   best-effort stamp-after-the-fact is gone: a draw either happens with a
+ *   reason or does not happen.
  *
  * All endpoints gated to operation/principal via requireOperationOrPrincipal.
  */
@@ -162,15 +177,116 @@ opsStockRouter.put("/reorder", requireOperationOrPrincipal, async (c) => {
 });
 
 // =====================================================================
+// Pool usage + reserve levels — Ready Stock K4 (migration 0292)
+// =====================================================================
+
+/**
+ * GET /usage?period=YYYY-MM — where the ready stock went that month, and how
+ * low each SKU is allowed to go.
+ *
+ * The month is sliced HERE (Asia/Kuala_Lumpur, the only calendar the warehouse
+ * lives in) and every number is decided by the shared pure engine, so the
+ * browser and any later consumer can never disagree about what a share means.
+ */
+opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
+  const period = monthParam(c.req.query("period"));
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const [usageRes, stockRes, levelRes] = await Promise.all([
+    sb
+      .from("ops_stock_pool_usage")
+      .select("id,sku,qty,reason,note,ref,taken_by,taken_at")
+      .gte("taken_at", monthStartIso(period))
+      .lt("taken_at", monthStartIso(nextMonth(period)))
+      .order("taken_at", { ascending: false }),
+    sb.from("ops_stock_items").select("sku,status,qty"),
+    sb.from("ops_stock_reserve_levels").select("sku,reserve_level,note"),
+  ]);
+  if (usageRes.error) throw new HTTPException(500, { message: usageRes.error.message });
+  if (stockRes.error) throw new HTTPException(500, { message: stockRes.error.message });
+  if (levelRes.error) throw new HTTPException(500, { message: levelRes.error.message });
+
+  const raw = (usageRes.data ?? []) as {
+    id: string;
+    sku: string;
+    qty: number;
+    reason: PoolUseReason;
+    note: string | null;
+    ref: string | null;
+    taken_by: string;
+    taken_at: string;
+  }[];
+
+  const names = await nameMap(sb, [...new Set(raw.map((r) => r.taken_by))]);
+  const entries: PoolUsageEntry[] = raw.map((r) => ({
+    id: r.id,
+    sku: r.sku,
+    qty: r.qty,
+    reason: r.reason,
+    note: r.note,
+    ref: r.ref,
+    takenByName: names.get(r.taken_by) ?? null,
+    takenAt: r.taken_at,
+  }));
+
+  const summary = summarisePoolUsage(entries);
+  const levels = computeReserveLevelRows(
+    (stockRes.data ?? []) as PlanStockUnit[],
+    ((levelRes.data ?? []) as {
+      sku: string;
+      reserve_level: number;
+      note: string | null;
+    }[]).map((l) => ({ sku: l.sku, reserveLevel: l.reserve_level, note: l.note })),
+  );
+
+  return c.json({
+    period,
+    totalUnits: summary.totalUnits,
+    totalDraws: summary.totalDraws,
+    byReason: summary.byReason,
+    bySku: summary.bySku,
+    entries: entries.map((e) => ({
+      ...e,
+      label: POOL_USE_REASON_LABEL[e.reason] ?? e.reason,
+    })),
+    levels,
+    lowCount: levels.filter((l) => l.state === "low").length,
+    // A client-supplied duty is never trusted for the write (the RPC re-gates
+    // in SQL); this only decides whether the pencil renders.
+    canEdit: isStockPlanner(c.var.auth.role, c.var.auth.email, await myDuties(c)),
+  });
+});
+
+/** PUT /reserve-level — set (or switch off, with 0) one SKU's floor. */
+opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsReserveLevelInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("ops_set_reserve_level", {
+    p_sku: parsed.sku,
+    p_level: parsed.reserveLevel,
+    p_note: parsed.note ?? null,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ sku: parsed.sku, reserveLevel: parsed.reserveLevel });
+});
+
+// =====================================================================
 // POST actions — thin wrappers over the SECURITY DEFINER RPCs.
 // =====================================================================
 
+// /reserve — take the OLDEST free unit of a SKU (the On-hand box). K4 (0292):
+// the pick rule is unchanged (FIFO, SKIP LOCKED, same warehouse default); what
+// changed is that the reason is written in the same transaction, so the "no
+// matching free unit" answer and the ledger can never disagree.
 opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockReserveInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_reserve", {
-    p_sku: parsed.sku,
+  const { data, error } = await sb.rpc("ops_stock_pool_draw", {
     p_ref: parsed.ref,
+    p_reason: parsed.reason,
+    p_note: parsed.note ?? null,
+    p_item_id: null,
+    p_sku: parsed.sku,
     p_condition: parsed.condition ?? null,
     p_wh: parsed.warehouseId ?? null,
   });
@@ -180,48 +296,34 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
       message: "No matching free unit available for this SKU",
     });
   }
-  // 0212 — stamp WHY the ready-pool unit was pulled (urgent vs exchange).
-  // Best-effort under write_internal RLS: the reserve itself already succeeded,
-  // so a reason-stamp hiccup must not surface as a false reserve failure.
-  if (parsed.reason) {
-    await sb
-      .from("ops_stock_items")
-      .update({ reserve_reason: parsed.reason })
-      .eq("id", data as string);
-  }
   return c.json({ itemId: data });
 });
 
 // /reserve-item — reserve ONE specific free unit to a customer ref (the
 // order-drawer Ready picker, Jess 2026-06-30). The operator picked the exact
 // unit (matched to the order line via normalizeSkuKey on the client), so we
-// target by id and flip free→reserved directly under RLS — mirroring the
-// /condition PATCH + the "+ Add stock" insert (no RPC; reserve writes no
-// rollup, same as ops_stock_reserve). The status='free' guard makes it a
-// no-op-safe claim: a unit grabbed by someone else returns 409, not a silent
-// over-reserve.
+// target by id. K4 (0292) moved the flip into `ops_stock_pool_draw` so the
+// reason lands with it; the status='free' guard survives inside the RPC, so a
+// unit grabbed by someone else still returns 409, not a silent over-reserve.
 opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockReserveItemInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("ops_stock_items")
-    .update({
-      status: "reserved",
-      reserved_ref: parsed.ref,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.itemId)
-    .eq("status", "free")
-    .eq("needs_repair", false)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await sb.rpc("ops_stock_pool_draw", {
+    p_ref: parsed.ref,
+    p_reason: parsed.reason,
+    p_note: parsed.note ?? null,
+    p_item_id: parsed.itemId,
+    p_sku: null,
+    p_condition: null,
+    p_wh: null,
+  });
   if (error) throw mapErr(error);
   if (!data) {
     throw new HTTPException(409, {
       message: "Unit is no longer free (already reserved / sold / flagged)",
     });
   }
-  return c.json({ itemId: (data as { id: string }).id });
+  return c.json({ itemId: data });
 });
 
 opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
@@ -258,8 +360,13 @@ opsStockRouter.post("/reassign", requireOperationOrPrincipal, async (c) => {
 opsStockRouter.post("/takeout", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockTakeoutInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // K4 (0294) — a takeout straight off the FREE shelf is a pool draw and the
+  // RPC refuses it without a reason. Whether it is one is decided in SQL from
+  // the unit's locked row, never from what the browser believed its status was.
   const { data, error } = await sb.rpc("ops_stock_takeout", {
     p_item_id: parsed.itemId,
+    p_reason: parsed.reason ?? null,
+    p_note: parsed.note ?? null,
   });
   if (error) throw mapErr(error);
   if (!data) {
@@ -541,6 +648,43 @@ function shape(rows: RawRow[]) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }));
+}
+
+/** This month in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
+function thisMonthMyt(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
+}
+
+/** A malformed `?period=` reads as "this month" rather than 500-ing: the
+ *  screen's default question is always the current month anyway. */
+function monthParam(raw: string | undefined): string {
+  return raw && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : thisMonthMyt();
+}
+
+/** MYT midnight on the 1st, as an offset-carrying ISO string Postgres can
+ *  compare against a timestamptz without guessing a zone. */
+function monthStartIso(period: string): string {
+  return `${period}-01T00:00:00+08:00`;
+}
+
+function nextMonth(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return m === 12
+    ? `${y + 1}-01`
+    : `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+async function nameMap(
+  sb: ReturnType<typeof userClient>,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (ids.length === 0) return map;
+  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
+  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
+    if (u.name) map.set(u.id, u.name);
+  }
+  return map;
 }
 
 async function parseBody<S extends import("zod").ZodTypeAny>(

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { POOL_USE_REASONS, POOL_USE_NOTE_MAX } from "../pool-usage";
+
 /**
  * Per-unit stock register actions — Phase A step 5 (migration 0137).
  * Operation-facing only. Carres Klang scope for V1 (other WHs continue
@@ -28,8 +30,15 @@ export const opsStockStatusSchema = z.enum([
 ]);
 export type OpsStockStatus = z.infer<typeof opsStockStatusSchema>;
 
-/** POST /api/ops/stock/reserve */
-export const opsStockReserveReasonSchema = z.enum(["urgent", "exchange"]);
+/**
+ * POST /api/ops/stock/reserve
+ *
+ * K4 (0292): the reason is the card's locked five and is REQUIRED — taking a
+ * ready-stock unit records why, and an optional reason is a reason nobody
+ * fills in. It supersedes 0213's two-value `reserve_reason` column, which
+ * held 0 rows on live prod and could not carry a date.
+ */
+export const opsStockReserveReasonSchema = z.enum(POOL_USE_REASONS);
 export type OpsStockReserveReason = z.infer<typeof opsStockReserveReasonSchema>;
 
 export const opsStockReserveInputSchema = z.object({
@@ -37,8 +46,8 @@ export const opsStockReserveInputSchema = z.object({
   ref: z.string().trim().min(1),
   condition: opsStockConditionSchema.optional(),
   warehouseId: z.string().uuid().optional(),
-  // Ready-pool usage reason (0212): urgent sale vs damage exchange.
-  reason: opsStockReserveReasonSchema.optional(),
+  reason: opsStockReserveReasonSchema,
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
 });
 export type OpsStockReserveInput = z.infer<typeof opsStockReserveInputSchema>;
 
@@ -62,12 +71,25 @@ export type OpsStockReassignInput = z.infer<typeof opsStockReassignInputSchema>;
 export const opsStockReserveItemInputSchema = z.object({
   itemId: z.string().uuid(),
   ref: z.string().trim().min(1),
+  // K4 (0292) — the same locked reason the oldest-unit door asks for. Both
+  // doors draw from the same pool, so both must answer the same question.
+  reason: opsStockReserveReasonSchema,
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
 });
 export type OpsStockReserveItemInput = z.infer<typeof opsStockReserveItemInputSchema>;
 
-/** POST /api/ops/stock/takeout */
+/**
+ * POST /api/ops/stock/takeout
+ *
+ * K4 (0294): taking a FREE unit is a pool draw and needs a reason; taking a
+ * RESERVED one does not, because the draw was recorded when it was reserved.
+ * The reason is therefore OPTIONAL here and the DATABASE decides which case
+ * applies — the browser must not be the thing that knows a unit's real status.
+ */
 export const opsStockTakeoutInputSchema = z.object({
   itemId: z.string().uuid(),
+  reason: opsStockReserveReasonSchema.nullish(),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
 });
 export type OpsStockTakeoutInput = z.infer<typeof opsStockTakeoutInputSchema>;
 
@@ -198,3 +220,78 @@ export const opsReorderResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type OpsReorderResponse = z.infer<typeof opsReorderResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Pool usage + reserve levels — Ready Stock card K4 (migration 0292)
+// ---------------------------------------------------------------------------
+
+/** PUT /api/ops/stock/reserve-level — `reserveLevel: 0` is the OFF switch, so
+ *  there is no delete verb (0286's shape). */
+export const opsReserveLevelInputSchema = z.object({
+  sku: z.string().trim().min(1),
+  reserveLevel: z.coerce.number().int().min(0).max(100000),
+  note: z.string().trim().max(200).nullish(),
+});
+export type OpsReserveLevelInput = z.infer<typeof opsReserveLevelInputSchema>;
+
+export const opsPoolUseReasonSchema = z.enum(POOL_USE_REASONS);
+export const opsReserveLevelStateSchema = z.enum(["low", "ok", "unset"]);
+
+/** One row of the reserve-level table — the shape `computeReserveLevelRows`
+ *  returns, so the browser never recomputes what the server already decided. */
+export const opsReserveLevelRowSchema = z.object({
+  sku: z.string(),
+  free: z.number().int(),
+  reserved: z.number().int(),
+  reserveLevel: z.number().int().nullable(),
+  state: opsReserveLevelStateSchema,
+  shortfall: z.number().int(),
+});
+export type OpsReserveLevelRow = z.infer<typeof opsReserveLevelRowSchema>;
+
+export const opsUsageReasonSliceSchema = z.object({
+  reason: opsPoolUseReasonSchema,
+  label: z.string(),
+  units: z.number().int(),
+  draws: z.number().int(),
+  share: z.number().int(),
+});
+
+export const opsUsageSkuSliceSchema = z.object({
+  sku: z.string(),
+  units: z.number().int(),
+  draws: z.number().int(),
+  topReason: opsPoolUseReasonSchema,
+  topReasonLabel: z.string(),
+});
+
+export const opsPoolUsageEntrySchema = z.object({
+  id: z.string(),
+  sku: z.string(),
+  qty: z.number().int(),
+  reason: opsPoolUseReasonSchema,
+  label: z.string(),
+  note: z.string().nullable(),
+  ref: z.string().nullable(),
+  takenByName: z.string().nullable(),
+  takenAt: z.string(),
+});
+export type OpsPoolUsageEntry = z.infer<typeof opsPoolUsageEntrySchema>;
+
+/** GET /api/ops/stock/usage?period=YYYY-MM */
+export const opsStockUsageResponseSchema = z.object({
+  period: z.string(),
+  totalUnits: z.number().int(),
+  totalDraws: z.number().int(),
+  byReason: z.array(opsUsageReasonSliceSchema),
+  bySku: z.array(opsUsageSkuSliceSchema),
+  /** The month's draws themselves, newest first — the audit trail behind the
+   *  percentages, so a share nobody believes can be opened and read. */
+  entries: z.array(opsPoolUsageEntrySchema),
+  levels: z.array(opsReserveLevelRowSchema),
+  /** SKUs sitting at or below their reserve level right now. */
+  lowCount: z.number().int(),
+  /** May THIS caller set the levels? (COO duty / principal.) */
+  canEdit: z.boolean(),
+});
+export type OpsStockUsageResponse = z.infer<typeof opsStockUsageResponseSchema>;

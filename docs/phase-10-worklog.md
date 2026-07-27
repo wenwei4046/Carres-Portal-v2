@@ -2391,3 +2391,50 @@ names. COPY-STANDARD gains only the four strings this page genuinely owns: `Queu
 shared **1527/1527** (+11) · web **+16** · api untouched. Suites at the §17.7 baseline
 (api 3, web 16) — zero new failures. typecheck 0, build + `check:v4` + design-standard lint
 clean. No migration; the API change is one column added to an existing select.
+
+---
+
+**2026-07-27 · Ready Stock K4 — the pool says why it drained, and how low it may go · migrations 0292 + 0294 · PR #PENDING** — the shared ready pool has always been a black box: units left it and nobody could say what for. K4 makes every draw name a reason from Jess's locked list, gives each SKU a COO-set floor that reminds without refusing, and puts the month's split on the bottom of the same Ready stock tab the plan and the urgent lane already share.
+
+### The finding that decided the data model
+
+`ops_stock_items.reserve_reason` has existed since **0213** with two values (`urgent`, `exchange`) and looks like the obvious home. It cannot answer this card, for three separate reasons: it is **overwritten** when a released unit is drawn again, it carries **no date** (so "per month" is unanswerable), and it **leaves with the unit** when the row is sold or hard-deleted. Measured before choosing: it holds **0 non-null values across 87 records**, so there was no history to preserve and nothing to migrate. `ops_stock_pool_usage` is therefore a dated, attributed ledger with `ON DELETE SET NULL` on the unit and a copied `sku`, so July's answer survives the unit disappearing in August. The old column was left untouched and files as a carry-forward — dropping a column is Loo's call.
+
+The other candidate, `stock_movements`, was checked rather than assumed: **0 rows**, no reserve has ever written to it (only `ops_stock_takeout` does), and it carries a **blanket INSERT policy for every operation login** — a reason stored there could be written, or skipped, by any client. It also records PHYSICAL movement, while a draw is a **commitment**: the goods are still on the floor, they are simply no longer available, and that is the moment the pool drains. Two ledgers for one concept is a real smell, so this is stated in the migration header with the measurement behind it, not waved away.
+
+### The shape: one act, not two
+
+0213's route stamped the reason with a best-effort `UPDATE` **after** the reserve succeeded — so a failed stamp left a drawn unit nobody could explain, and the API could not tell the difference. `ops_stock_pool_draw` does the flip and the ledger row in one transaction, and serves **both** reserve doors (the order drawer's picker by item id, the On-hand box by oldest-of-SKU) so there is exactly ONE ledger writer. Both routes' HTTP contracts survive byte-for-byte: the RPC returns NULL when nothing free matched, and the routes keep turning that into their existing 409 (unit grabbed) and 404 (no free unit).
+
+### THREE doors, not two — found after 0292 was already applied
+
+`Takeout` is offered on a **free** row, not only a reserved one (`OpsStockListView` gates it on `status in (free, reserved)`), so a unit could still be marked sold with no reason recorded. Filing that as a carry-forward would have looked disciplined and behaved like a trap — the 2026-07-26 care-plan lesson. **0294** closes it: from FREE a reason is required and one ledger row is written; from RESERVED it is neither asked nor recorded, because that draw is already in the ledger and a second row would inflate the month. Whether it is a draw is decided **in SQL from the unit's own locked row**, never from what the browser believed the status was. Drop-and-create rather than a defaulted overload (two candidate signatures would let PostgREST call the ungated one), with the ghost-overload assertion 0290 introduced.
+
+### Reserve levels: their own table, on purpose
+
+Same key, same duty, same screen as K1's reorder points — but `ops_reorder_points.reorder_point` is `NOT NULL` and **0 is documented as "the reorder alert is OFF"**, so setting a reserve level for a SKU with no reorder point would have had to insert a placeholder row and silently flip that SKU from K1's honest `Set a number` to a reassuring `watched and fine`. Two numbers answering two questions (when to BUY vs how low to let it GO), stored accordingly. `ops_set_reserve_level` reuses `stock_planner` — **zero new duty keys**, asserted in 0292's own sanity block exactly as 0287 and 0290 did.
+
+### Warns, never blocks — enforced by absence
+
+Jess's word, and the same restraint K2's over-suggestion warning and K3's "already has enough free" keep. Nothing in the client or the server disables anything because of a reserve level; the ONLY thing that dims a draw button is a missing reason, which is the thing being collected. There is a test for it, because "never blocks" is the sort of rule a later card breaks by trying to be helpful.
+
+### Smaller decisions worth keeping
+
+- **The split counts WHY, not net units.** A draw later released still happened for a reason; nothing subtracts. Stated in the table comment so a future reader does not "fix" it into a stock balance.
+- **Draws beside units.** One bulk accessory record is 555 units in ONE act — units alone make one act look like a month of demand, acts alone hide the pillows.
+- **Shares sum to exactly 100** (largest-remainder). A split that prints 99% invites a question the data cannot answer.
+- **`Other` needs words** at the button, in the route and in a DB CHECK — K3's law inherited, not reinvented.
+- The reason picker is ONE shared component across all three doors, so two screens drawing on one pool cannot ask the question two different ways.
+- The panel degrades: a browser on this build against a pre-K4 Worker shows an empty month instead of white-screening the whole Stock tab (covered by a test — and it was a real crash first, caught by K2's own suite).
+- One additive API line: the order drawer's free-unit payload now carries `qty`, so the warning can say truthfully what a bulk draw would leave.
+
+### Law 0 review
+
+- **Contradicts the code:** nothing found. The card's own sentence ("taking a ready-stock unit records WHY") turned out to be broader than the two reserve doors — that is what 0294 is.
+- **Would confuse a new hire:** `ops_stock_items.reserve_reason` still exists with the OLD two-word vocabulary and nothing writes it. Filed as a carry-forward with the exact four places to delete when Loo says the word.
+- **Could not be built as written:** partial draws. The register flips a WHOLE record, so reserving the 555-unit pillow row for one pillow takes 555 out and the ledger honestly says 555. Splitting a bulk record is the reservation engine's job and the card says do not rebuild it — filed, not silently rounded.
+- **Not covered:** the ledger has no reversal, so a released draw stays in the month's split (0 releases have ever happened on prod). And `stock_movements` still writes a hardcoded `qty 1`, noticed while reading takeout — pre-dates K4, and fixing it alone would make it disagree with the `count(*)`-based rollup in a new way. Both filed.
+
+### Evidence
+
+Both migrations dry-run in full on live prod inside rolled-back transactions before apply — **18 assertions** for 0292, **10** for 0294 — with a negative control proving a failing assertion actually surfaces through the tool. Post-apply both function bodies reconciled to the repo files by `md5(prosrc)` + length (0292's draw function diverged by one re-wrapped comment line; the file was corrected to match live). Live after apply: 2 read policies, **0 write policies**, anon EXECUTE false / authenticated true on all three functions, exactly ONE `ops_stock_takeout`. **Guardrail #8 fired twice on this card** — 0291 went to supplier claims and 0293 to service-case follow-ups while these drafts were being dry-run — so K4 shipped as 0292 + 0294. shared **1562/1562** (+41) · api **+22** · web **+13**; suites at the §17.7 baseline (api 3, web 16) with zero new failures; typecheck 0, build + `check:v4` + design-standard lint clean; `SERVICE_ROLE` grep 0 in the built bundle.

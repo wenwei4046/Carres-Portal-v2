@@ -533,9 +533,23 @@ export {
   opsReorderStateSchema,
   opsReorderRowSchema,
   opsReorderResponseSchema,
+  // Ready Stock K4 (0292) — pool usage + reserve levels.
+  opsReserveLevelInputSchema,
+  opsPoolUseReasonSchema,
+  opsReserveLevelStateSchema,
+  opsReserveLevelRowSchema,
+  opsUsageReasonSliceSchema,
+  opsUsageSkuSliceSchema,
+  opsPoolUsageEntrySchema,
+  opsStockUsageResponseSchema,
   type OpsReorderPointInput,
   type OpsReorderRow,
   type OpsReorderResponse,
+  type OpsReserveLevelInput,
+  type OpsReserveLevelRow,
+  type OpsPoolUsageEntry,
+  type OpsStockUsageResponse,
+  type OpsStockReserveReason,
   type OpsStockCondition,
   type OpsStockStatus,
   type OpsStockReserveInput,
@@ -1505,6 +1519,31 @@ export {
   type EmergencyPoLine,
   type EmergencyView,
 } from "./emergency-stock-request";
+// Ready Stock K4 (0292) — why the shared pool drained, and how low it may go.
+// The reason lives in a DATED LEDGER, not on the unit: `ops_stock_items.
+// reserve_reason` (0213) is overwritten on re-draw, carries no date and leaves
+// the question entirely once the unit is sold. See the module header.
+export {
+  POOL_USE_REASONS,
+  POOL_USE_REASON_LABEL,
+  POOL_USE_NOTE_MAX,
+  RESERVE_LEVEL_MAX,
+  poolUseNeedsNote,
+  poolDrawProblem,
+  computeReserveLevelRows,
+  reserveLevelWarning,
+  summarisePoolUsage,
+  type PoolUseReason,
+  type PoolDraw,
+  type ReserveLevelState,
+  type ReserveLevelConfig,
+  type ReserveLevelRow,
+  type ReserveLevelWarning,
+  type PoolUsageEntry,
+  type UsageReasonSlice,
+  type UsageSkuSlice,
+  type PoolUsageSummary,
+} from "./pool-usage";
 export {
   purchaseUrgencyBucketSchema,
   purchaseBundleItemSchema,

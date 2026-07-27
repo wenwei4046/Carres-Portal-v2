@@ -3,7 +3,14 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
-import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
+import {
+  POOL_USE_REASONS,
+  POOL_USE_REASON_LABEL,
+  poolDrawProblem,
+  type OpsStockItem,
+  type OpsStockListResponse,
+  type PoolUseReason,
+} from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
 /**
@@ -77,7 +84,12 @@ export default function OpsStockListView(props: Props) {
   }
 
   const reserveMut = useMutation({
-    mutationFn: (args: { sku: string; ref: string; reason?: string }) =>
+    mutationFn: (args: {
+      sku: string;
+      ref: string;
+      reason: PoolUseReason;
+      note: string | null;
+    }) =>
       apiFetch<{ itemId: string }>(`/api/ops/stock/reserve`, {
         method: "POST",
         body: JSON.stringify(args),
@@ -110,10 +122,14 @@ export default function OpsStockListView(props: Props) {
     onSuccess: invalidateAll,
   });
   const takeoutMut = useMutation({
-    mutationFn: (itemId: string) =>
+    mutationFn: (args: {
+      itemId: string;
+      reason: PoolUseReason | null;
+      note: string | null;
+    }) =>
       apiFetch(`/api/ops/stock/takeout`, {
         method: "POST",
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify(args),
       }),
     onSuccess: invalidateAll,
   });
@@ -163,10 +179,15 @@ export default function OpsStockListView(props: Props) {
   // matching SKU automatically.
   const [reserveSku, setReserveSku] = useState("");
   const [reserveRef, setReserveRef] = useState("");
-  // 0212 — why the ready-pool unit is being pulled (required on reserve).
-  const [reserveReason, setReserveReason] = useState<"" | "urgent" | "exchange">(
-    "",
-  );
+  // K4 (0292) — why the ready-pool unit is being pulled. The card's locked five
+  // replace 0213's two, and the SAME shared rule the server enforces decides
+  // whether the button is live, so a dark button and a refusal always agree.
+  const [reserveReason, setReserveReason] = useState<PoolUseReason | "">("");
+  const [reserveNote, setReserveNote] = useState("");
+  const reserveProblem = poolDrawProblem({
+    reason: reserveReason,
+    note: reserveNote,
+  });
 
   // "+ Add stock" form state.
   const EMPTY_ADD = {
@@ -254,13 +275,13 @@ export default function OpsStockListView(props: Props) {
         }
         onRelease={() => releaseMut.mutate(r.id)}
         onReassign={(newRef) => reassignMut.mutate({ itemId: r.id, newRef })}
-        onTakeout={() => {
+        onTakeout={(reason, note) => {
           if (
             window.confirm(
               `Take out unit ${r.sku}? This marks it sold + writes a stock movement.`,
             )
           ) {
-            takeoutMut.mutate(r.id);
+            takeoutMut.mutate({ itemId: r.id, reason, note });
           }
         }}
         onFlagRepair={(flag) => flagRepairMut.mutate({ itemId: r.id, flag })}
@@ -454,15 +475,31 @@ export default function OpsStockListView(props: Props) {
                 className="rounded border border-base-300 px-2 py-1.5 text-sm w-44"
                 value={reserveReason}
                 onChange={(e) =>
-                  setReserveReason(
-                    e.target.value as "" | "urgent" | "exchange",
-                  )
+                  setReserveReason(e.target.value as PoolUseReason | "")
                 }
+                data-testid="onhand-reserve-reason"
               >
-                <option value="">Select…</option>
-                <option value="urgent">Urgent sale</option>
-                <option value="exchange">Exchange</option>
+                <option value="">Why taken?</option>
+                {POOL_USE_REASONS.map((r) => (
+                  <option key={r} value={r}>
+                    {POOL_USE_REASON_LABEL[r]}
+                  </option>
+                ))}
               </select>
+            </label>
+            <label className="text-xs">
+              <span className="block text-base-500 mb-1">Detail</span>
+              <input
+                className="rounded border border-base-300 px-2 py-1.5 text-sm w-48"
+                value={reserveNote}
+                onChange={(e) => setReserveNote(e.target.value)}
+                placeholder={
+                  reserveReason === "other"
+                    ? "Say what the reason is"
+                    : "Optional"
+                }
+                data-testid="onhand-reserve-note"
+              />
             </label>
             <button
               type="button"
@@ -470,7 +507,7 @@ export default function OpsStockListView(props: Props) {
               disabled={
                 !reserveSku.trim() ||
                 !reserveRef.trim() ||
-                !reserveReason ||
+                !!reserveProblem ||
                 reserveMut.isPending
               }
               onClick={() =>
@@ -478,13 +515,15 @@ export default function OpsStockListView(props: Props) {
                   {
                     sku: reserveSku.trim(),
                     ref: reserveRef.trim(),
-                    reason: reserveReason,
+                    reason: reserveReason as PoolUseReason,
+                    note: reserveNote.trim() || null,
                   },
                   {
                     onSuccess: () => {
                       setReserveSku("");
                       setReserveRef("");
                       setReserveReason("");
+                      setReserveNote("");
                     },
                   },
                 )
@@ -492,6 +531,14 @@ export default function OpsStockListView(props: Props) {
             >
               {reserveMut.isPending ? "Reserving…" : "Reserve"}
             </button>
+            {reserveProblem ? (
+              <span
+                className="text-xs text-base-500 self-center"
+                data-testid="onhand-reserve-problem"
+              >
+                {reserveProblem}
+              </span>
+            ) : null}
           </div>
           {reserveMut.isError ? (
             <p className="mt-2 text-xs text-error-700">
@@ -656,7 +703,7 @@ function RowItem({
   onConditionChange: (c: string) => void;
   onRelease: () => void;
   onReassign: (newRef: string) => void;
-  onTakeout: () => void;
+  onTakeout: (reason: PoolUseReason | null, note: string | null) => void;
   onFlagRepair: (flag: boolean) => void;
   onRefurbish: () => void;
   onRefurbishComplete: () => void;
@@ -665,6 +712,11 @@ function RowItem({
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [newRef, setNewRef] = useState("");
+  // K4 — the reason a FREE unit is being taken, asked inline (the same shape
+  // the Reassign box already uses) because a window.confirm cannot ask it.
+  const [showTakeout, setShowTakeout] = useState(false);
+  const [takeoutReason, setTakeoutReason] = useState<PoolUseReason | "">("");
+  const [takeoutNote, setTakeoutNote] = useState("");
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
       {/* Unit ID = the minted per-unit serial (id-abc123456). Falls back to "—"
@@ -760,9 +812,68 @@ function RowItem({
               <ActionBtn label="Reassign" onClick={() => setShowReassign(true)} disabled={busy} />
             )
           ) : null}
-          {actions.includes("takeout") &&
-          (row.status === "free" || row.status === "reserved") ? (
-            <ActionBtn label="Takeout" onClick={onTakeout} disabled={busy} />
+          {/* K4 — taking a unit straight off the FREE shelf draws on ready
+              stock, so it answers the same question the reserve doors ask.
+              A RESERVED unit does not: that draw was recorded when it was
+              reserved, and asking twice would double-count the month. */}
+          {actions.includes("takeout") && row.status === "free" ? (
+            showTakeout ? (
+              <>
+                <select
+                  value={takeoutReason}
+                  onChange={(e) =>
+                    setTakeoutReason(e.target.value as PoolUseReason | "")
+                  }
+                  className="rounded border border-base-300 px-1.5 py-1 text-xs"
+                  aria-label={`Why ${row.sku} is being taken`}
+                  data-testid={`takeout-reason-${row.id}`}
+                >
+                  <option value="">Why taken?</option>
+                  {POOL_USE_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {POOL_USE_REASON_LABEL[r]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="rounded border border-base-300 px-2 py-1 text-xs w-28"
+                  value={takeoutNote}
+                  onChange={(e) => setTakeoutNote(e.target.value)}
+                  placeholder={takeoutReason === "other" ? "say what" : "detail"}
+                  aria-label="More detail"
+                />
+                <ActionBtn
+                  label="✓"
+                  onClick={() => {
+                    onTakeout(takeoutReason as PoolUseReason, takeoutNote.trim() || null);
+                    setShowTakeout(false);
+                    setTakeoutReason("");
+                    setTakeoutNote("");
+                  }}
+                  disabled={
+                    busy ||
+                    !!poolDrawProblem({ reason: takeoutReason, note: takeoutNote })
+                  }
+                />
+                <ActionBtn
+                  label="×"
+                  onClick={() => {
+                    setShowTakeout(false);
+                    setTakeoutReason("");
+                    setTakeoutNote("");
+                  }}
+                  disabled={busy}
+                />
+              </>
+            ) : (
+              <ActionBtn
+                label="Takeout"
+                onClick={() => setShowTakeout(true)}
+                disabled={busy}
+              />
+            )
+          ) : actions.includes("takeout") && row.status === "reserved" ? (
+            <ActionBtn label="Takeout" onClick={() => onTakeout(null, null)} disabled={busy} />
           ) : null}
           {actions.includes("flag-repair") ? (
             <ActionBtn

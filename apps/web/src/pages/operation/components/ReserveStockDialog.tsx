@@ -3,6 +3,7 @@ import { GripVertical, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
 
 /**
  * ReserveStockDialog — the order-drawer "Ready" picker (Jess 2026-06-30).
@@ -32,6 +33,10 @@ export interface ReserveFreeUnit {
   /** Warehouse location (§7.8 Location column) — optional: older API builds
    *  don't return it; the grid shows "—" until they do. */
   location?: string | null;
+  /** Units this record represents (0218 bulk rows). Optional for the same
+   *  reason as `location`; absent reads as 1, which under-states a reserve
+   *  level warning rather than inventing one. */
+  qty?: number | null;
 }
 
 interface Props {
@@ -96,6 +101,8 @@ export default function ReserveStockDialog({
         : new Set(),
   );
   const [submitting, setSubmitting] = useState(false);
+  // K4 — a ready-stock unit does not leave the shelf without a reason.
+  const draw = usePoolDrawReason();
   // Per-column filter values (empty string = no filter on that column).
   const [f, setF] = useState<Record<string, string>>({});
   const setFilter = (k: string, v: string) =>
@@ -149,6 +156,20 @@ export default function ReserveStockDialog({
 
   const allViewChecked = view.length > 0 && view.every((r) => checked.has(r.id));
 
+  // What the ticked units would leave on the shelf, per SKU. A bulk accessory
+  // record is one row of N units, so this sums `qty` rather than counting rows.
+  const warnings = useMemo(() => {
+    const perSku = new Map<string, number>();
+    for (const r of rows) {
+      if (!checked.has(r.id)) continue;
+      perSku.set(r.sku, (perSku.get(r.sku) ?? 0) + (r.qty ?? 1));
+    }
+    return draw.warningsFor(
+      [...perSku].map(([sku, qty]) => ({ sku, qty })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, checked, draw.warningsFor]);
+
   function toggle(id: string) {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -168,13 +189,13 @@ export default function ReserveStockDialog({
 
   async function reserve() {
     const ids = [...checked];
-    if (ids.length === 0) return;
+    if (ids.length === 0 || draw.problem) return;
     setSubmitting(true);
     const results = await Promise.allSettled(
       ids.map((itemId) =>
         apiFetch("/api/ops/stock/reserve-item", {
           method: "POST",
-          body: JSON.stringify({ itemId, ref: soRef }),
+          body: JSON.stringify({ itemId, ref: soRef, ...draw.body }),
         }),
       ),
     );
@@ -371,24 +392,32 @@ export default function ReserveStockDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-base-200 bg-base-50/50 flex items-center justify-between gap-3">
-          <span className="t-tiny text-base-500">
-            {view.length} of {rows.length} shown · {checked.size} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="btn-ghost t-tiny py-1.5 px-3">
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={reserve}
-              disabled={submitting || checked.size === 0}
-              className="btn-primary t-tiny py-1.5 px-4"
-              data-testid="reserve-stock-confirm"
-            >
-              {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
-            </button>
+        {/* Footer — K4: the reason rides with the draw, never after it. */}
+        <div className="px-4 py-2.5 border-t border-base-200 bg-base-50/50 flex flex-col gap-2">
+          <PoolReasonPicker state={draw} warnings={warnings} />
+          <div className="flex items-center justify-between gap-3">
+            <span className="t-tiny text-base-500">
+              {view.length} of {rows.length} shown · {checked.size} selected
+              {draw.problem && checked.size > 0 ? (
+                <span className="ml-2 text-base-600" data-testid="reserve-stock-problem">
+                  {draw.problem}
+                </span>
+              ) : null}
+            </span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onClose} className="btn-ghost t-tiny py-1.5 px-3">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={reserve}
+                disabled={submitting || checked.size === 0 || !!draw.problem}
+                className="btn-primary t-tiny py-1.5 px-4 disabled:opacity-40"
+                data-testid="reserve-stock-confirm"
+              >
+                {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
