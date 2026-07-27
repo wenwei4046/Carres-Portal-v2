@@ -84,6 +84,44 @@ item · Repair · Return for inspection`) and what the SUPPLIER answered
 the supplier's WhatsApp GROUP link (memory: suppliers recognise the CR/TCF ref, not PO#);
 labels follow the 2026-07-27 word law (`Call {supplier} — confirm …`, never Chase).
 **Done when:** every open claim shows who owes the next move; closed claims keep both sides.
+**SHIPPED 2026-07-27 (PR #428, migration 0291).** Who owes the next move is
+DERIVED (`claimNextMove`, shared) — a stored owner is a second copy of the
+ask/answer pair and drifts on the first write nobody mirrored. Notes the next
+cards need:
+- **The card's ask list has a GAP and this is how it was closed.** All five asks
+  describe things you do to goods you are HOLDING, so none of them fits
+  `late_delivery` — and that type is minted automatically every night, so a late
+  claim with no legal ask would jam the queue on the one type nobody files by
+  hand. A late claim is therefore BORN with `deliver_remaining` stamped (the
+  supplier answer list's own word, not a sixth invented one) and nothing is
+  offered to pick. **Jess's call on the word — one constant changes it.**
+- **The supplier's answer is never narrowed by what we asked.** They may offer
+  something else or refuse; that mismatch is exactly what R5 counts. Only OUR
+  side is narrowed, and only by the one fact the system knows: did goods arrive?
+- **A claim cannot close with either side blank, and there is NO escape hatch
+  for a supplier who never answers** — that claim stays open and keeps naming
+  them, which is what R5's avg-resolution-days must see. `closed_at` is the
+  timestamp R2 said R3 owed R5.
+- **The ask FREEZES once answered** (RPC + the two-field design): editing it
+  afterwards would rewrite history into agreement.
+- Seven CHECK constraints hold the rules against a hand-run `UPDATE`, not just
+  against the RPC. `supplier_claims` still has NO write policy — the three moves
+  are SECURITY DEFINER RPCs, gated operation+principal (narrower than the read
+  policy: finance has no move, because a claim never produces a credit note).
+- **The late-claim staleness trap, closed:** the sweep creates and never closes,
+  so the list route re-reads the PO line's pending qty **for late claims only**;
+  a delivered one flips to `Close {claim_no} — {supplier} delivered the rest`.
+  An unreadable line counts as STILL PENDING — unknown never reads as delivered.
+- Follow-up = the supplier's WhatsApp group (`whatsapp_group_url`, 0239); one
+  button records the ask, copies the message and opens the group. **5 of 10
+  suppliers have no group link** — the panel says so and still records the ask.
+- **Two words need Jess's ruling:** COPY-STANDARD's four-verb dictionary
+  (Assign · Call · Issue · Upload) has no verb for ENDING a case (`Close` used)
+  or for recording an answer (`Save` used); and `Send to {supplier}` reuses a
+  word the vocabulary table pins to raising a PO.
+- **Nothing auto-closes a claim when replacement goods arrive** — R4 owns
+  "claim resolution flips them back to free", so the close is a human move.
+- Live at ship: **0 claims / 0 POs**, so nothing was backfilled.
 
 ## R4 · Problem stock is quarantined (On hold / Returned to supplier)
 
@@ -158,7 +196,7 @@ auto-receives their own PO.
 |---|---|---|
 | R1 | ✅ | [#401](https://github.com/wenwei4046/Carres-Portal-v2/pull/401) · 0284 |
 | R2 | ✅ | [#412](https://github.com/wenwei4046/Carres-Portal-v2/pull/412) · 0288 |
-| R3 | ⬜ | — |
+| R3 | ✅ | [#428](https://github.com/wenwei4046/Carres-Portal-v2/pull/428) · 0291 |
 | R4 | ⬜ | — |
 | R5 | ⬜ | — |
 | R6 | ⬜ after R1-R2 · warehouse login | — |
