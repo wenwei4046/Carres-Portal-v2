@@ -9,8 +9,8 @@
 > - ACROSS lines: parallel chats are FINE when the lines live on different pages —
 >   **R + S + K is a safe trio** (Purchasing · Service Cases · Stock never share files).
 > - **① Delivery (T), ② Journey (J) and ⑥ Core C1-C3 may NEVER run at the same time** —
->   all edit the Orders list/drawer. Any ONE of them can run alongside R/S/K.
->   ⑥ C4 shares ④'s pages — not alongside an R-chat.
+>   all edit the Orders list/drawer. Any ONE of them can run alongside R/S/K/P.
+>   **⑥ C4 and ⑦ P share the Purchasing pages with ④ R — only ONE of those three at a time.**
 > - Migration-bearing cards: check the remote tracker tail immediately before apply
 >   (guardrail #8). Two lines may take dual numbers the same day — cosmetic, the tracker
 >   keys on timestamp; never renumber applied files.
@@ -20,22 +20,29 @@
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
 
-## The six lines
+## The seven lines
 
 | Line | Doc | Cards | State |
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
-| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C9 | **C1 ✅ #461 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 · S4 ✅ #449 — **S5 is the last** |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 — R5 next |
+| ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned · the three dots) |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted |
 
-**State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
-and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C5 ✅ #447**.
-**Drawer lane, in this order:** C2 → C3 → C6 → C7 → C8 (C9 any time after C5).
-R/S/K run in parallel throughout; C4 waits for a free R slot.
+**State 2026-07-27:** ① ② ⑤ **LINE COMPLETE** · ③ S1-S4 ✅, S5 left · ④ R1-R4 ✅, R5 next ·
+⑥ C1 ✅ #461 · C5 ✅ #447 · ⑦ opened.
+**Orders lane, in this order:** C2 → C3 → C6 → C10 → C7 → C8 (C9 any time after C5).
+S / R / P run in parallel throughout; **C4 shares the Purchasing pages — never alongside an
+R-chat or a P-chat.**
+
+**Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
+specified a different purchasing module and none was authoritative, so every build chat
+picked a different one. They are DELETED. The single owner is
+`docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
+turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
 
 **What C1 changed on screen (2026-07-27).** Every action label on Orders, its queues,
 its drawer and the Delivery module now names the party: `Chase logistic` → the queue
@@ -69,7 +76,10 @@ existing door.**
 ```
 Dashboard
 Orders              ← ① T1-T6 live here · ② Order Journey button lives in its drawer
-Purchasing          ← ④ R1-R3 (Receiving tab exists; Claims becomes a sibling tab)
+Purchasing          ← ④ R-cards + ⑦ P-cards. Tabs: To Order · Purchase Orders ·
+                       Receiving · Claims · Settings (P2 adds Claims, P1 adds
+                       Settings). Receiving stays a TAB, never a menu item —
+                       warehouse staff land on it through their own login (R6)
 Delivery            ← ✅ LIVE (① T11, PR #425) — the 3-pane module page; reads only,
                        every write hands back to the order drawer
 Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tabs
@@ -91,13 +101,26 @@ to be remembered.
 
 ## Frozen rulings waiting for their line (Jess 2026-07-27)
 
-- **Supplier production time must become a NUMBER.** The supplier master holds free text
-  ("7-10 days") and 8 of 10 suppliers are empty, so nothing can compute a chase date. Frozen
-  shape: `Standard production working days` (optionally min / max / default planning). Then
-  `chase from = customer date − production working days − internal buffer`. **Belongs to the
-  Purchasing line** — the Orders arrival window reads it once it exists.
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
+- **UI-KIT carries retired vocabulary and more than one version of some rules.** Jess flagged
+  it 2026-07-27: it is to be read top to toe, the old versions DELETED, and one final file
+  agreed with her. The banned action words were removed the same day; the rest is a
+  dedicated planning round, not a build card.
+
+## Every rule's home (Law 0A, restated because it is what keeps failing)
+
+| The rule | Its ONLY home |
+|---|---|
+| How an action behaves | `docs/ACTION-FLOW-STANDARD.md` |
+| Every visible word — **five strings per action** | `docs/COPY-STANDARD.md` (mirror: `packages/shared/order-action-words.ts`) |
+| The page shell + the click behaviour | `docs/UI-KIT.md` |
+| A module's flow, its queue tiles and its table columns | `docs/<MODULE>-WORKING-FLOW.md` |
+| What is built and what is next | this file |
+
+**A second file for any of these is how Delivery gets fixed and Purchasing is forgotten.**
+There is no `UI-DICTIONARY.md` and there must never be one — the dictionary is a section of
+COPY-STANDARD.
 
 ## Source of Truth Law
 
@@ -148,6 +171,8 @@ Read docs/order-journey-execution-queue.md. Do card J1 ONLY. ...
 Read docs/service-case-execution-queue.md. Do card S1 ONLY. ...
 Read docs/receiving-claim-execution-queue.md. Do card R1 ONLY. ...
 Read docs/ready-stock-execution-queue.md. Do card K1 ONLY. ...
+Read docs/purchasing-execution-queue.md. Do card P1 ONLY. ...
+Read docs/portal-core-execution-queue.md. Do card C2 ONLY. ...
 ```
 
 Full sentence template: "Read <doc>. Do card <n> ONLY. Build it, test it, create the PR,

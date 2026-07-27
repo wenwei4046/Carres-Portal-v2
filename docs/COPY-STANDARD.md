@@ -248,22 +248,51 @@ still has to work out what to do. **Rule: a fact may state an absence (`No logis
 it may never contain a to-do word (`need`, `pending`, `required`, `TBD`, `at risk`).**
 If the sentence is about a gap, write the ACTION that closes it.
 
-### Live audit — what ships today vs what it must say
+### THE DICTIONARY — five strings per action (locked 2026-07-27)
 
-**ACTIONS (the ladder, the queues, the buttons):**
+**An action appears on screen in FIVE places, and all five are locked here.** Four
+were being invented per chat, which is why the same action read three different
+ways on three screens.
 
-| Ships today | Verdict | Must become |
+| # | The string | Where it shows |
 |---|---|---|
-| `Order PO` | no party | `Send PO to {supplier}` |
-| `Chase supplier` | banned word · no measurable object | `Call {supplier} — confirm ready date` |
-| `Chase logistic` | banned word + banned party word | `Call {logistics} — confirm delivery date` |
-| `Call customer (stock delay)` | party is a role · object not measurable | `Call {customer} — agree new delivery date` |
-| `Assign logistics` | ✅ keep | (the party is what you are choosing — it cannot be named yet) |
-| `Deliver today` | ✅ keep | (verb + when; the truck is the party) |
-| `Upload delivery photo` | ✅ keep | (nobody else is involved) |
-| `Collect $` | no amount, no party | `Collect RM {amount} from {customer}` (pill: `Collect RM 2,455`) |
-| `Confirm` | bare verb — worst offender | `Confirm delivery with {customer}` |
-| `Done` | ✅ keep | (terminal fact, not an action) |
+| 1 | **Queue tile** | the facet row, the filter chip, the count — **no party**, because a queue holds many |
+| 2 | **Row line** | one record's Actions cell — **names the party**, because a row is one order |
+| 3 | **Button** | the button that does it, inside the drawer or the form |
+| 4 | **Done message** | the confirmation after it is recorded |
+| 5 | **Empty state** | what the queue says when it holds nothing (why · when it changes · what to do meanwhile) |
+
+**Five filled = designed. One missing = not designed — do not open a card for it.**
+The code mirror is `packages/shared/order-action-words.ts`; that module and this
+table are one-to-one, so a queue and a row can never spell one action two ways.
+
+**ORDERS + DELIVERY** (shipped C1, PR #461):
+
+| Queue tile | Row line | Button | Done message | Empty state |
+|---|---|---|---|---|
+| `Send PO` | `Send PO to {supplier}` | `Send PO` | `PO sent to {supplier}` | `No POs to send today.` |
+| `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
+| `Assign logistics` | `Assign logistics` | `Assign logistics` | `{logistics} assigned` | `Every order has a logistics company.` |
+| `Confirm delivery date` | `Call {logistics} — confirm delivery date` | `Confirm booking` | `Delivery confirmed {date} · {slot}` | `0 calls to make · everything on track.` |
+| `Issue delivery order` | `Issue delivery order` | `Issue delivery order` | `Delivery order issued` | `Nothing waiting for a delivery order.` |
+| `Deliver today` | `Deliver today` | `Mark delivered` | `Delivered` | `No deliveries today.` |
+| `Upload delivery photo` | `Upload delivery photo` | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
+| `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
+| `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
+
+**PURCHASING** (`docs/PURCHASING-WORKING-FLOW.md`):
+
+| Queue tile | Row line | Button | Done message | Empty state |
+|---|---|---|---|---|
+| `Send PO` | `Send PO to {supplier}` | `Send PO` | `PO sent to {supplier}` | `No POs to send today. Next PO day is {date}.` |
+| `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
+| `Confirm tomorrow's delivery` | `Call {supplier} — confirm tomorrow's delivery` | `Record answer` | `Answer recorded` | `Nothing arriving tomorrow.` |
+| `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
+| `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
+
+**`Send PO` and `Confirm ready date` are ONE action each, shared by Orders and
+Purchasing** — same trigger, same completion, same words. They are listed twice
+because both flows show them; they are never spelt differently.
 
 **FACTS (the delivery column, badges):**
 
@@ -309,16 +338,18 @@ not WHAT — label it `Open WhatsApp group` / `Copy message`, never as a second 
 | **Upload** | evidence is attached | the file exists |
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 
-Examples: `Assign logistic` · `Assign PIC` · `Assign warehouse picker` ·
+Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
-`Call {customer} — agree new delivery date` · `Issue invoice` · `Issue credit note` ·
+`Call {logistics} — arrange new delivery date` · `Issue invoice` · `Issue credit note` ·
 `Upload delivery photo` · `Upload payment proof`.
 
-**Consequence of the Issue rule:** if a document is produced automatically, there is no
-human action to show. `orders.do_number` is stamped by a DB trigger on dispatch (0098), so
-**"Issue delivery order" is not an action in this portal** — the verb rule and the trigger
-agree. It becomes an action only if Carres later wants a human gate before dispatch, which
-is a business decision, not a wording one.
+**Consequence of the Issue rule:** the SYSTEM writes the document; the human only presses
+the button. **`Issue delivery order` IS an action** (Jess ruled 2026-07-27): once the
+customer's date is confirmed, the operator presses one button and the document exists, ready
+to hand to logistics. Today `orders.do_number` is stamped by a DB trigger on the DISPATCH
+transition (0098) — a day too late to give logistics the paper they ask for the evening
+before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
+order by hand.
 
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
@@ -411,6 +442,13 @@ doubt, grep the codebase and match what already ships.
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
 | Most drops logistics take in a day | **deliveries a day** | Capacity · Max load · Slots |
+| How long a factory takes to make an item | **production working days** | Lead time · Manufacturing lead · Turnaround |
+| The last day we may send the PO and still be safe | **order-by date** | Raise-by · Trigger date · Reorder date |
+| The days of the week we send POs | **PO days** | Cycle · Review day · Batch day |
+| Days kept back for arranging the delivery | **order-by buffer** | Safety stock days · Slack · Padding |
+| Where the supplier must send the goods | **where the goods go** | Ship-to · Destination · Drop point |
+| What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |
+| Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 
@@ -436,6 +474,28 @@ split them.
   work is sitting on it, and never reads as booked when nothing is.
 - Confirmed is the ONLY green on the calendar, exactly as in the Orders list's
   Delivery column (T1). The logistics company's own date is amber, always.
+
+## The delivery window words (locked with Jess 2026-07-27)
+
+**How long a delivery takes depends on the building**, and the POS already asks: the
+customer step carries a building type (`Landed · Condo · Apartment · Office · Retail ·
+Other`), stored in `entry_data.fields.building_type`. Today **nothing reads it** — it is
+printed in the drawer and no rule uses it.
+
+| Building type | The window | Why |
+|---|---|---|
+| `Landed` · `Retail` | **Full-day delivery** | the truck drives up to the door |
+| `Condo` · `Apartment` · `Office` | **Half-day delivery** | the lift must be booked and the driver must report in |
+| `Other` / not filled | **Full-day delivery**, and the booking is refused until it is filled | measured 2026-07-27: **40 of 56 live orders have it blank.** A rule read from a blank field is a rule that does not exist |
+
+Fixed phrasings — reuse, never invent a variant:
+
+- The fact: `Half-day delivery · condominium` · `Full-day delivery`
+- The refusal: `Fill in the building type first — a condominium can only take a
+  half-day delivery.`
+
+**Never** write "access restrictions", "site constraints", "delivery window policy" or
+"lift booking required" on screen. Say what the building is and how long the truck has.
 
 ## The Delivery module words (T11, locked with Jess 2026-07-27)
 

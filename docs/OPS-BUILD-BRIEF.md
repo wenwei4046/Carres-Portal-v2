@@ -14,7 +14,7 @@
 Carres = furniture retailer. Dealers/showrooms SELL; the **customer pays HQ direct** (no dealer credit). The **Operation portal** is COO Jess's daily driver (single operator, ~1000 orders/mo, all outsourced). **Every order runs 3 parallel tracks:**
 
 - **货 STOCK** (supplier): No PO → `Order PO` · PO'd, waiting → `Chase supplier` · Ready ✓. Chase via each supplier's WhatsApp GROUP, REF-led (CR/TCF doc-no, NEVER the SO). Consolidated PO + monthly PO-duty rotation (SPEC §14.6).
-- **送 DELIVERY** (logistic partner): unassigned → `Assign logistic` · assigned/not booked → `Chase logistic` · booked ✓. `assign` = WE pick the carrier; `booked` = the PARTNER fixed a slot with the customer. NETS is the main partner.
+- **送 DELIVERY** (logistics company): unassigned → `Assign logistics` · assigned/not confirmed → `Call {logistics} — confirm delivery date` · customer confirmed ✓. **The words come from docs/COPY-STANDARD.md, never from here.** `assign` = WE pick the carrier; `booked` = the PARTNER fixed a slot with the customer. NETS is the main partner.
 - **钱 MONEY** (customer): balance / storage owing → `Collect $` (+ `Confirm 🔒` while money-held). Storage: from ETA, MS/BF RM150/mo · SOF RM200/2wk.
 
 ## State vocabulary — use THESE words only (never leak DB stage words)

@@ -33,16 +33,20 @@
 
 **Hover law (LOCKED 2026-07-19).** Every clickable ROW / nav item / chip hovers to ONE faint-blue tint — `hover:bg-hovertint` (`#EAF3FE`, the `--hover-tint` token). NEVER a grey hover (it clashes with the section-band grey and reads as structure, not an affordance). Selection stays the stronger blue (`#C2E7FF` rows/chips, `#e6f1fb` table rows) so hover and selection are always distinguishable. Element-type nuance (international standard, don't force blue on these): **underline tabs** hover by darkening their text; **colour-filled pills** hover with `hover:brightness-95` (keep their own colour). Blue-bg hover is for neutral rows/nav/chips only.
 
-**Action law — MANAGE column (LOCKED 2026-07-19).** A row's actions live in a column named **Manage** and are ALWAYS `.pill`s — never a plain-text verb sitting next to a pill. Each action's tone maps to its status pill (one language across QUEUES ↔ Manage ↔ the drawer's Chase Now):
+**Action law — ACTIONS column (LOCKED 2026-07-19, renamed 2026-07-27).** A row's actions
+live in a column named **Actions** (plural — a row can carry several) and are ALWAYS
+`.pill`s — never a plain-text verb sitting next to a pill. **This file never spells an
+action word**: every label comes from the dictionary in `docs/COPY-STANDARD.md`, mirrored
+in `packages/shared/order-action-words.ts`. What this file locks is the TONE:
 
-| tone | pill class | verbs |
+| tone | pill class | when |
 |---|---|---|
-| danger (red) | `pill-overdue` | Order PO · Chase supplier (in window) · Chase logistic (overdue) |
-| warning (amber) | `pill-warning` | Chase supplier (out of window) · Confirm 🔒 (money-held) |
-| info (blue) | `pill-sent` | Assign logistic · Chase logistic |
-| success (green) | `pill-confirmed` | Confirm |
-| neutral (grey) | `pill-neutral` | Done |
-| money (indigo) | `pill-collected` | **Collect $** — the independent money track, shown as a SECOND pill (max two pills/row) |
+| danger (red) | `pill-overdue` | the action's due date has passed |
+| warning (amber) | `pill-warning` | due soon, or held (🔒) |
+| info (blue) | `pill-sent` | open and not yet due |
+| success (green) | `pill-confirmed` | the action can be completed right now |
+| neutral (grey) | `pill-neutral` | terminal fact (`Done`) |
+| money (indigo) | `pill-collected` | the money action — an independent track, shown as a SECOND pill (max two pills/row) |
 
 **New-panel top-to-toe checklist** (every new list/panel must pass — mirror the Orders page):
 
@@ -54,14 +58,14 @@
 □ Section bands = <SectionBand strong> (base-200 #E5E7EB — visible on white)
 □ Icons 14/16/18 · text 11/12/13 · row height 36/40/52 (lint RULE C/D/F)
 □ Table: table-fixed + % col widths — one screen, no horizontal scroll (§A / §11)
-□ Status word ≠ action word; verbs from the C-vocab set (Order PO · Chase supplier · Assign logistic · Chase logistic · Confirm · Collect $)
+□ Status word ≠ action word; EVERY action word comes from the dictionary in docs/COPY-STANDARD.md — never invented here
 □ Money: 18 mono hero · 13 tabular row (only these two sizes)
 □ Facets multi-select (Set); each pick = one ✕-able chip on the toolbar
 □ Delivered = closed (no red alarm, no chase)
 □ Gate before commit: tsc -p tsconfig.app.json · check:v4 · lint · tests (16 pre-existing fails are the baseline)
 ```
 
-**Module-tab law (LOCKED 2026-07-22, Purchase cockpit).** When a page sits under a module tab bar (like Purchasing's `To Order / Purchase Orders / Receiving`), the page does NOT render `<ListPageShell>`'s `breadcrumb` slot or the big `title` prop — they duplicate the active tab and burn ~80px of vertical space (Jess is height-constrained, not width-constrained). Move the freshness stamp (`Today · Wed 22 Jul`) and refresh icon to the RIGHT side of the tab bar; content starts immediately below. **Stand-alone pages (Orders, Stock, Payments) keep the two-row header per the date law above** — this exception is for module-tabbed pages only. Reference implementation: `docs/purchase-cockpit-handoff.md` §5.1.
+**Module-tab law (LOCKED 2026-07-22, Purchase cockpit).** When a page sits under a module tab bar (like Purchasing's `To Order / Purchase Orders / Receiving`), the page does NOT render `<ListPageShell>`'s `breadcrumb` slot or the big `title` prop — they duplicate the active tab and burn ~80px of vertical space (Jess is height-constrained, not width-constrained). Move the freshness stamp (`Today · Wed 22 Jul`) and refresh icon to the RIGHT side of the tab bar; content starts immediately below. **Stand-alone pages (Orders, Stock, Payments) keep the two-row header per the date law above** — this exception is for module-tabbed pages only. Purchasing's tabs are `To Order / Purchase Orders / Receiving / Claims / Settings` (`docs/PURCHASING-WORKING-FLOW.md` §1).
 
 **Copy law (LOCKED 2026-07-22).** Before writing any button label, section title, row line, empty state, error, or tooltip in `apps/web`, read **[`docs/COPY-STANDARD.md`](COPY-STANDARD.md)** — 10 rules, row action-line template, "What to do" template, and the canonical vocabulary (never mix synonyms across pages). Every new UI string is checked against the vocabulary table in that doc; a review will reject a new synonym.
 
@@ -313,14 +317,29 @@ row, table column-header all FIXED; only the facet body and table rows scroll.
 3. **Bulk bar** — ticking rows REPLACES the toolbar in place with a flame band
    (`bg-signature-50 border-signature-100`); nothing else moves.
 4. **Facet** — one white 240px panel, cream `SectionBand` groups
-   (SUMMARY → CHASE NOW (danger) → STOCK → LOGISTIC → REGION → CATEGORY);
+   (SUMMARY → the module's own queue names, danger group first → STOCK →
+   LOGISTICS → REGION → CATEGORY);
    rows = Gmail-nav pills; « on SUMMARY collapses the whole panel.
-5. **Table** — 44px FIXED rows, sticky head, infinite scroll ×30, single-verb NEXT
-   column (`Order PO → Chase supplier → Assign logistic → Chase logistic →
-   Confirm`, Confirm 🔒 on a money-hold; C-vocab 2026-07-19 — "assign" = we
-   pick the carrier, "booked" = the partner's slot STATE, "Book logistic"
-   dead), sort = slack ascending.
+5. **Table** — 44px FIXED rows, sticky head, infinite scroll ×30, an `Actions`
+   column (plural — a row can carry several), sort = slack ascending.
+   **The action WORDS are never written here**: they live in the dictionary in
+   `docs/COPY-STANDARD.md` and in the one shared module `packages/shared/
+   order-action-words.ts`. A money-hold shows 🔒 on the action.
 6. **Footer** — `N orders · Reset filters`.
+
+**Interaction law (LOCKED 2026-07-27 — one behaviour for EVERY module).** Every
+list page in the portal behaves identically, so a new hire learns it once:
+
+```
+Click a queue tile   → the table filters to that queue, the tile shows selected
+Click it again / ✕   → the filter clears and every row comes back
+Two tiles picked     → both queues show; each pick is one ✕-able chip
+Click a row          → the drawer opens on its FIRST tab, never a deep tab
+Close the drawer     → the table keeps its filter and scroll position
+```
+
+A module never invents its own click behaviour. If a module needs a different
+one, that is a change to THIS law, decided by Jess — not a local exception.
 
 List pages are **list-first**: no KPI cards above the table; summary lives in
 the facet SUMMARY block. Three archetypes exist — List (`ListPageShell`),
@@ -337,9 +356,9 @@ Full-screen takeover on the cream page (‹ Orders back, no ✕):
     · order-state pill (icon+word) · meta 14px `base-500`
     (`customer · region · ordered <date>`) · Flag 18 · ⋮ menu 16.
   - Below it: **3 `.kpi-box` INDEPENDENT WHITE CARDS** (`grid grid-cols-3
-    gap-2.5`) — CUSTOMER·MONEY / STOCK / LOGISTIC: icon 16 + 12px uppercase
+    gap-2.5`) — CUSTOMER·MONEY / STOCK / LOGISTICS: icon 16 + 12px uppercase
     label; value `text-[20px] font-bold .t-num` INK (colour only as the alert
-    mark); sub-facts 12px; chase buttons INSIDE the card when red.
+    mark); sub-facts 12px; action buttons INSIDE the card when red.
 - **Body** = 2 independently-scrolling columns (`340px | 1fr`, overlay
   scrollbars), each ONE SectionCard of stacked Panels:
   LEFT (view): CUSTOMER / BALANCE / STORAGE / DELIVERY / ACTIVITY.

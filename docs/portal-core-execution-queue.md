@@ -43,7 +43,7 @@ every visible word, audited") — build from that table, not from memory.** In t
 - `Chase logistic` → queue `Confirm delivery date`; row `Call {carrier} — confirm delivery date`
 - `Chase supplier` → `Call {supplier} — confirm ready date`
 - `Order PO` → `Send PO to {supplier}`
-- `Call customer (stock delay)` → `Call {customer} — agree new delivery date`
+- `Call customer (stock delay)` → `Call {logistics} — arrange new delivery date` (Jess 2026-07-27: Carres never phones a customer about a delay — logistics does)
 - `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
 - `Confirm` (bare) → `Confirm delivery with {customer}`
 - delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
@@ -244,14 +244,15 @@ Staff never tick anything that only means "I say I did it".
 | `Send PO to {supplier}` | PO exists AND supplier ETA recorded | `purchase_orders` + its eta |
 | `Call {supplier} — confirm ready date` | latest ETA updated | `ops_order_control.line_etas` |
 | `Collect RM {amount} from {customer}` | outstanding = RM 0 | **C5's shared helper — build C5 first** |
-| `Assign logistic` | carrier set — **not** "carrier accepted" (Jess 2026-07-27: Assign is an internal decision; acceptance is the later `Call` action) | `ops_assigned_logistic` |
-| `Call {carrier} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
-| `Call {customer} — agree new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
+| `Assign logistics` | logistics company set — **not** "they accepted" (Jess 2026-07-27: Assign is an internal decision; acceptance is the later `Call` action) | `ops_assigned_logistic` |
+| `Call {logistics} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
+| `Call {logistics} — arrange new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
 | `Upload delivery photo` | at least one photo | `delivery_photos` (0280) |
 
 **The flow is an ORDER OF EVENTS, not a gate chain — and not the display order.** The
-lifecycle reads Send PO → Call supplier → Collect payment → Assign logistic → Call carrier
-→ (Call customer, only on stock delay) → Deliver today → Upload delivery photo. That is
+lifecycle reads Send PO → Call supplier → Collect payment → Assign logistics → Call
+logistics → (call LOGISTICS, never the customer, only on stock delay) → Deliver today →
+Upload delivery photo. That is
 what happens WHEN. It does **not** mean an action is hidden until the one before it closes
 (Rule 1: an order shows ALL its open actions at once), and it does **not** reorder the
 ladder: **money still displays first** (PayHold is a live, deliberate rule). Lifecycle
@@ -373,6 +374,34 @@ first; draft to Jess before applying. **Depends on C5** (shipped).
 **Done when:** an order with an uncollected storage fee cannot issue its delivery order; the
 manager can release it; a release that does not waive leaves the money action open.
 
+## C10 · The three dots (Jess ruling 2026-07-27)
+
+**The law already specifies it and nothing renders it.** `docs/ACTION-FLOW-STANDARD.md`
+Law 6 describes a three-dot column — goods · delivery · money, three INDEPENDENT facts, no
+header word, each dot carrying its own small icon from the portal icon set (never emoji).
+C1 found that `rowDotsOf()` computes exactly that and **no component uses it**: the list
+shows a single stage pill in a column headed `Status`.
+
+**Jess ruled 2026-07-27: build the dots, and they REPLACE the `Status` pill.** One pill can
+only ever say one of the three things — it says where the order is in the pipeline and can
+never say the customer still owes RM 2,000.
+
+**Build:**
+1. Render `rowDotsOf` as the column (it is already computed and unit-tested — this is a
+   presentation card, not an engine card).
+2. **No header word.** `Status` is wrong for three facts and `Checks` reads as "cheques"
+   next to money. Each dot is labelled by its own icon: goods · delivery · money.
+3. The `Status` stage pill comes out of the list. **Check first where else that word is
+   read** — the drawer keeps its own `Scheduled`/stage vocabulary, which is a DIFFERENT
+   state (`operation_stage`), and C1 deliberately left it alone.
+4. Colours follow `docs/ORDERS-WORKING-FLOW.md` §7 — including the rule that a delivered
+   order still shows red on money. **Delivered is not paid.**
+
+**No migration. Presentation only.** Closes the carry-forward `row-dots-of-is-dead-code`.
+**Depends on C2** (so the dots and the action list are computed from one pass).
+**Done when:** one row shows three independent dots; a delivered-but-unpaid order shows a
+red money dot; the word `Status` no longer heads that column.
+
 ## Status
 
 | Card | Status | PR |
@@ -386,3 +415,4 @@ manager can release it; a release that does not waive leaves the money action op
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ⬜ storage fee holds delivery · manager override | — |
+| C10 | ⬜ after C2 · the three dots replace the Status pill | — |

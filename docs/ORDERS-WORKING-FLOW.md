@@ -40,6 +40,7 @@ re-cuts these orders by another angle.
 | logistics chosen | `orders.delivery_partners` / `ops_assigned_logistic` |
 | booking | `ops_order_control.booking_stage` + `confirmed_date` + `confirmed_time_slot` |
 | delivery photos | `ops_order_control.delivery_photos` |
+| the building we deliver to | `orders.entry_data → fields.building_type` — the POS asks it (`Landed · Condo · Apartment · Office · Retail · Other`). **It decides half-day vs full-day.** 40 of 56 live orders have it blank |
 | **money** | **`orders.paid`** — the money truth (`top_up_order`, Stripe and the AutoCount import all write it). One shared rule: `packages/shared/order-money.ts`. |
 
 **Three facts about money that a chat will get wrong unless it reads them here** (measured
@@ -80,13 +81,9 @@ finish; it never changes and is never repeated on an action.
 - Trigger: ready date missing · due for re-confirmation · passed with no goods in · later than the customer's date · changed by the supplier
 - Checklist: production status · ready date · ready quantity · any delayed item · record the latest ready date · record the outcome
 - Completion: latest ready date recorded AND outcome recorded
-- Due: red once inside the arrival window. **Today that window is a flat 7 days (mattress /
-  bed frame) and 5 days (sofa), which is wrong — a sofa takes longer to make and gets the
-  shorter warning.** The fix is frozen but not buildable here: the supplier master must
-  carry production time as a NUMBER (`Standard production working days`), not the free text
-  it holds today (8 of 10 suppliers are empty). Then the rule becomes
-  `customer date − production working days − internal buffer`. **That change belongs to the
-  Purchasing line**, and this window reads it once it exists.
+- Due: red once inside the arrival window. **The window and every number in it are owned by
+  `docs/PURCHASING-WORKING-FLOW.md` §2 — Orders reads them, never re-states them.**
+  `arrival window = customer date − production working days − order-by buffer`.
 - Task Owner: the module assigns it
 
 ### Delay planning — a state machine, with a gate before the customer
@@ -211,7 +208,8 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 - Trigger: logistics assigned but the customer has not confirmed BOTH a date and a slot
 - Checklist: logistics contacted the customer · proposed date · customer-confirmed date · customer-confirmed slot · the response · the reason if unresolved · (for condominiums) driver name · driver phone · vehicle number · lift or registration requirement
 - Completion: a customer-confirmed date AND slot exist. **A date logistics proposed is a fact, not a confirmation**
-- Due: 1 working day before the customer's date
+- **The slot length comes from the building type** — a condominium, apartment or office takes a half-day; landed and retail take a full day (`docs/COPY-STANDARD.md`)
+- Due: a settable number of working days before the customer's date — **1 today, Jess may set 5** (`docs/PURCHASING-WORKING-FLOW.md` §2 holds every settable number)
 - Task Owner: the module assigns it
 
 **`Issue delivery order`**
@@ -241,8 +239,8 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 ```
 1  Broken commitment or today's run
      Deliver today · the failed-delivery follow-up · Upload delivery photo
-2  The customer must be told something
-     Call {customer} — agree new delivery date
+2  The customer must be told something — THROUGH LOGISTICS, never by us
+     Call {logistics} — arrange new delivery date
 3  Goods are not secured
      Send PO to {supplier} · Call {supplier} — confirm ready date
 4  Delivery preparation
@@ -279,15 +277,25 @@ picks one out loud:
 
 **Operations is told by the work itself.** The moment the override is granted the order's
 top action changes from collecting to delivering, so it surfaces in the operator's queue by
-itself — the same way every other action in this portal arrives. No separate alert engine. Agreeing the date
-still WARNS about the same three, so nobody promises a day the goods cannot make. A bed set (mattress + frame) can never be split; a sofa may travel on a second trip
-only if the customer agreed; accessories never block a delivery. A logistics company's own
-working days, closed dates, capacity and notice period **warn but never block** — a phone
-call beats a calendar. **Two exceptions that DO block: Sunday and Malaysian public
-holidays.**
+itself — the same way every other action in this portal arrives. No separate alert engine.
 
-**The money gate is broken today** and must be fixed before it can be trusted: it reads the
-empty ledger, so it refuses bookings for customers who have already paid. Card C5.
+**AGREEING a date is softer than ISSUING the document.** Agreeing still WARNS about goods,
+money and the calendar, so nobody promises a day the goods cannot make — but it does not
+refuse. What is refused at agreement time:
+
+- **Sunday and Malaysian public holidays** — the two hard blocks. No logistics company runs.
+- **A missing building type.** A condominium can only take a half-day delivery, so the date
+  cannot be agreed until the building type is filled in
+  (`docs/COPY-STANDARD.md`, the delivery window words). Measured 2026-07-27: 40 of 56 live
+  orders have it blank, so without this refusal the half-day rule would never apply.
+
+What only WARNS: a logistics company's own working days, closed dates, capacity and notice
+period — a phone call beats a calendar.
+
+**Grouping rules, unchanged:** a bed set (mattress + frame) can never be split; a sofa may
+travel on a second trip only if the customer agreed; accessories never block a delivery.
+**The default is one trip** — with a one-month selling window both usually make it — and the
+split question is only asked when the sofa would hold the bed set back.
 
 ## 6 · Row order
 
