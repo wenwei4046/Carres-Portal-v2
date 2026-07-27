@@ -156,7 +156,7 @@ Secondary: the customer's promised date.
 Tertiary: order value, high to low — **a tie-breaker only.** A RM 20,000 order three weeks
 out never outranks a RM 1,500 order going out tomorrow.
 
-## Law 6 — the three dots have no header — ⚠️ NOT BUILT YET
+## Law 6 — the three dots have no header — ✅ BUILT (C10, PR #471)
 
 The dots are three INDEPENDENT facts, not one status, so the column carries no header word
 (`Status` was wrong, `Checks` reads as "cheques" next to money). Each dot is labelled by
@@ -175,11 +175,17 @@ Delivered is not paid.
 order's overall progress summary — where this order is; the dots are which part has trouble.
 Different questions, both kept.
 
-**Nothing on screen does this today.** `rowDotsOf()` computes the three dots, is unit
-tested, and **is rendered nowhere**; the list's `Status` column shows a stage pill instead.
-C1 found this while trying to rename a header that does not exist. Building the dots is a
-feature, not a rename — card **C10**. Until C10 ships, this law describes the intent, not
-the screen.
+**This is on screen since C10 (PR #471).** `rowDotsOf()` renders as three 14px Lucide icons
+beside the stage pill; each dot carries its own tooltip naming its track. (For nine days it
+computed the dots and was rendered nowhere — and, contrary to what this paragraph used to
+say, it was not unit tested either. C10 wrote that cover.)
+
+**One sentence above needs Jess's pen.** "The column carries no header word" was written
+when the dots were to OWN that column; her later ruling put the stage pill beside them, and
+a column holding a stage pill needs a word for it. C10 shipped what card C10 itself says —
+**the dots need no header of their own**: `Status` heads the pill, and each dot is labelled
+by its icon. Until that sentence is struck, a chat reading only this line would strip the
+header and leave the pill unlabelled.
 
 ## What this replaces
 
