@@ -262,6 +262,41 @@ SLA hit rate. A small `Numbers` tab on the module; no new tables — read the ca
 >   day. Nothing in S5 writes, so the risk of that is a stale sentence in this
 >   note, not a wrong row in the database.
 
+### Two things S5 locked (confirmed 2026-07-27 — do not undo them)
+
+**No `closed_at` column, ever.** The carry-forward insisted S5 add one; S5 refused and it
+was right. A column would record *the afternoon someone changed a dropdown*. The finish date
+is already on the record with the right meaning: S3's `customer_confirmed` entry carries
+`on` — the business date the customer said it was solved, stamped server-side — and 0293
+makes closing impossible without it. The finish date is DERIVED from that entry. The
+proposed backfill (`closed_at` from `updated_at`, flagged "approximate") is exactly the trap:
+it puts a row-touch into a business figure.
+
+**A figure withholds itself rather than inventing one.** Too few records ⇒ print the reason,
+not a number (the portal-wide law in COPY-STANDARD). A case filed before the guided questions
+reads `Filed before the questions`, never the `Other` a human actually picks.
+
+## S6 · A case closes itself (Jess ruling 2026-07-27)
+
+**The inconsistency S5 found:** a case can carry a `customer_confirmed` entry while its
+status is still open. S5 counts it as FINISHED (the business fact); the list still shows it
+RUNNING. Two surfaces, one case, two answers.
+
+**Ruling: the business fact wins, and the system does the closing.** The engine law says an
+action disappears BY ITSELF when its completion becomes true — and this completion is
+already the human act: someone recorded that the customer confirmed, on a real date, and
+0293 refuses to close without it. Nothing is left for a person to decide, so leaving the
+case "running" until somebody remembers a dropdown is exactly the stale status word this
+portal exists to remove.
+
+**Build:** recording the `customer_confirmed` entry closes the case in the same transaction
+— not a sweep, not a nightly job, so the two surfaces can never disagree even briefly. Every
+other close gate (S3's open-steps refusal) still applies: if a step is open, recording the
+confirmation does not close the case, and the API says which step is short.
+**Small. No migration expected** — 0293's trigger already detects the transition; check
+whether it can carry the flip before adding anything. **Done when:** no case can be finished
+on the Numbers tab and running on the list.
+
 ## LATER
 
 - WhatsApp-side customer updates · quality score per case · decision-tree admin editor
