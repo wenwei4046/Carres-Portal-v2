@@ -398,10 +398,13 @@ card. Also still open from T9: the drawer's two `Unscheduled` copies
 
 ## T11 · Delivery module page (promotes L5) — the LAST card
 
-The 3-pane standalone module per `docs/delivery-module-proposal.md` (LOCKED 2026-07-22
-with Jess). By T11 every signal, queue, reason and profile already exists — this card is
-ASSEMBLY, not invention. After T11: two weeks of live usage writes the fix list; nothing
-else is planned past T11 on purpose.
+The 3-pane standalone module per `docs/delivery-module-proposal.md` (rewritten 2026-07-27 —
+the pre-T-series version was deleted, not annotated). By T11 every signal, queue, word,
+reason, profile and calendar already exists — this card is ASSEMBLY, not invention, and it
+carries the ONE new sidebar item in the whole plan. **Runs last in the drawer lane**, after
+C5 → C1 → C2 → C3 → C6 → C7 → C8: assembling before the words and the action model are
+settled means building the page twice. After T11: two weeks of live usage writes the fix
+list; nothing else is planned past T11 on purpose.
 
 ---
 
