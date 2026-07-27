@@ -29,15 +29,38 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C10 ✅ #471**.
-**Drawer lane, in this order:** C3 → C6 → C7 → C8 (C9 any time after C5). **C10 shipped**:
-Jess's one call was already answered inside the card (side by side, the stage pill untouched),
-so the three dots Law 6 describes are finally on screen.
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471**.
+**Drawer lane, in this order:** C3 → C6 → C7 → C8. **C10 shipped**: Jess's one call was
+already answered inside the card (side by side, the stage pill untouched), so the three dots
+Law 6 describes are finally on screen.
 R/S/K run in parallel throughout; C4 waits for a free R slot.
+
+**What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
+describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status
+column, each as its own icon (`package` · `truck` · `wallet`) with its own tooltip — the icon
+is what labels the dot, which is why the dots need no header of their own. `rowDotsOf` had
+computed them for nine days and nothing rendered it; **proved both directions on the
+downloaded bundles**, its strings grep 0 in the previous live bundle and 1 in this one.
+Widths were measured against the app's own stylesheet (Status 11 → 14, taken from deadline
+and stock, never from Actions) and **the row still stays exactly 40px**. It also found that
+`rowDotsOf` was never unit tested, contrary to two docs, and wrote the first cover its truth
+table has had.
+
+**What C9 changed (2026-07-27, PR #472) — no migration.** An uncollected storage fee now
+holds a delivery exactly as an unpaid balance does: the booking gate reads ONE number
+(lines + add-ons + chargeable storage − `orders.paid`), and only the manager can release it,
+in two outcomes they pick out loud — `Release, fee still owed` (default; `Collect RM …` stays
+on the row) and `Release and waive the fee` (written off). The two ride the columns that
+already exist, so `storage_waiver_status = 'approved'` means RELEASED and the write-off is
+`storage_fee_override = 0`. **The enabling split is in `orderMoney`:** `holds` (what blocks a
+delivery) is now a different question from `owing` (what is due), and a release is the one
+thing that parts them. **It also found the storage fee being read three different ways** —
+the ladder ignored the override, the dispatch gate ignored the Master-imported fee — now one
+shared rule with four readers. Live it changes nothing today: no order carries a storage fee.
 
 **What C2 changed (2026-07-27, PR #466).** The ladder is TWO LAYERS now: three tracks —
 goods · delivery · money — computed independently, then one pure function picks which goes

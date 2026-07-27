@@ -1577,7 +1577,10 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("ready + carrier + customer confirmed + storage waived → Confirm, NOT held", () => {
+  // ── C9 · the manager's release (Jess 2026-07-27) ──
+  it("storage RELEASED → Confirm is unheld, and Collect stays on the worklist", () => {
+    // The card's own done-when: "a release that does not waive leaves the money
+    // action open". The manager let the goods go; the RM 150 is still ours.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1591,6 +1594,39 @@ describe("nextActionOf (C2)", () => {
     const r = nextActionOf(o, { state: "ready" }, []);
     expect(r.label).toBe("Confirm delivery");
     expect(r.locked).toBeFalsy();
+    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toContain(
+      "collect",
+    );
+  });
+
+  it("storage WAIVED (the override written to 0) → nothing left to collect", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: {
+        ...BOOKED,
+        storage_fee_msbf: 150,
+        storage_fee_override: 0,
+        storage_waiver_status: "approved",
+      },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
+    expect(
+      openActionsOf(o, { state: "ready" }, []).map((a) => a.key),
+    ).not.toContain("collect");
+  });
+
+  it("a keyed override beats the Master figure — 'No storage' really means no fee", () => {
+    // The ladder used to read storage_fee_msbf and ignore the override, so an
+    // order the operator had exempted still showed its 🔒.
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED, storage_fee_msbf: 150, storage_fee_override: 0 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
   // ── T7 · the confirmed date is itself a deadline ──

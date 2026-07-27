@@ -46,7 +46,13 @@ function makeSb(
   byTable: Record<string, TableCfg>,
   rpc?: { data: unknown; error: unknown },
 ) {
-  const calls = { inserts: [] as unknown[], upserts: [] as unknown[], deletes: 0, rpc: [] as unknown[] };
+  const calls = {
+    inserts: [] as unknown[],
+    upserts: [] as unknown[],
+    updates: [] as Record<string, unknown>[],
+    deletes: 0,
+    rpc: [] as unknown[],
+  };
   const from = vi.fn((table: string) => {
     const cfg = byTable[table] ?? {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,7 +66,10 @@ function makeSb(
         calls.deletes += 1;
         return builder;
       }),
-      update: vi.fn(() => builder),
+      update: vi.fn((payload: Record<string, unknown>) => {
+        calls.updates.push(payload);
+        return builder;
+      }),
       upsert: vi.fn((payload: unknown) => {
         calls.upserts.push(payload);
         return builder;
@@ -366,6 +375,64 @@ describe("storage waiver", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { control: { storage_waiver_status: string } };
     expect(body.control.storage_waiver_status).toBe("approved");
+  });
+
+  // ── C9 · the two release outcomes (Jess 2026-07-27) ───────────────────────
+  async function decide(decision: string) {
+    const sb = makeSb({
+      ops_order_control: {
+        maybeSingle: {
+          data: { order_id: ORDER_ID, storage_waiver_status: "approved" },
+          error: null,
+        },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      }),
+      env,
+    );
+    return { res, sb };
+  }
+
+  it("RELEASED, fee still owed → the hold lifts and the fee is NOT written off", async () => {
+    const { res, sb } = await decide("released");
+    expect(res.status).toBe(200);
+    const patch = sb.calls.updates.at(-1)!;
+    expect(patch.storage_waiver_status).toBe("approved");
+    // The whole point of the card: an override must never quietly forgive
+    // money, so the decision may not touch the fee.
+    expect("storage_fee_override" in patch).toBe(false);
+    expect((await res.json() as { decision: string }).decision).toBe("released");
+  });
+
+  it("RELEASED AND WAIVED → the same release PLUS the write-off", async () => {
+    const { res, sb } = await decide("waived");
+    expect(res.status).toBe(200);
+    const patch = sb.calls.updates.at(-1)!;
+    expect(patch.storage_waiver_status).toBe("approved");
+    expect(patch.storage_fee_override).toBe(0);
+  });
+
+  it("REJECTED never writes off a fee", async () => {
+    const { sb } = await decide("rejected");
+    const patch = sb.calls.updates.at(-1)!;
+    expect(patch.storage_waiver_status).toBe("rejected");
+    expect("storage_fee_override" in patch).toBe(false);
+  });
+
+  it("every decision leaves an audit sentence naming what happened", async () => {
+    // The override alone cannot say what it replaced — the 0211 trigger does
+    // not watch that column — so the amount goes into the order's activity.
+    const { sb } = await decide("waived");
+    const note = sb.calls.rpc.at(-1) as { name: string; args: { p_content: string } };
+    expect(note.name).toBe("operation_add_annotation");
+    expect(note.args.p_content).toContain("written off");
   });
 
   it("decide on an order with no waiver → 404", async () => {

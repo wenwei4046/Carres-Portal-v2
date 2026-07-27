@@ -46,13 +46,40 @@ describe("storageBlock", () => {
     expect(await storageBlock(sb, ORDER_ID)).toBeNull();
   });
 
-  it("opens the gate once a principal approves a waiver", async () => {
+  it("opens the gate once the manager releases the delivery", async () => {
     const sb = gateSb({
       control: { storage_from: PAST, storage_collected_at: null, storage_waiver_status: "approved" },
       order: { delivery_date: PAST },
       lines: [{ sku: "MS1001" }],
     });
     expect(await storageBlock(sb, ORDER_ID)).toBeNull();
+  });
+
+  it("a REQUESTED release is not a release — the goods stay", async () => {
+    const sb = gateSb({
+      control: { storage_from: PAST, storage_collected_at: null, storage_waiver_status: "requested" },
+      order: { delivery_date: PAST },
+      lines: [{ sku: "MS1001" }],
+    });
+    expect(await storageBlock(sb, ORDER_ID)).not.toBeNull();
+  });
+
+  it("C9 — the Master-imported fee blocks too (this gate used to ignore it)", async () => {
+    // The hole: `storage_fee_msbf` / `_sof` (0207) carry Jess's own keyed
+    // figure. The Orders row counted them and this gate did not, so an order
+    // with a Master fee and no storage_from dispatched with the money unpaid.
+    const sb = gateSb({
+      control: {
+        storage_from: null,
+        storage_collected_at: null,
+        storage_waiver_status: "none",
+        storage_fee_msbf: 150,
+      },
+      order: { delivery_date: PAST },
+      lines: [{ sku: "MS1001" }],
+    });
+    const block = await storageBlock(sb, ORDER_ID);
+    expect(block?.amount).toBe(150);
   });
 
   it("BLOCKS when a fee is owed and neither collected nor approved", async () => {
