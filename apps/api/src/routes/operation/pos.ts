@@ -917,6 +917,14 @@ operationPosRouter.post("/:id/receive", requireOperation, async (c) => {
       // TOTAL, these two are what THIS delivery found (they accumulate).
       damaged_qty: l.damagedQty ?? 0,
       wrong_item_qty: l.wrongItemQty ?? 0,
+      // R2 (0288): the claim's evidence rides with the report, because the RPC
+      // mints the claim in the SAME transaction that moves the counters — a
+      // guard trigger refuses the counters otherwise. Empty arrays are fine to
+      // send: the RPC only demands photos for a line that actually reported a
+      // problem.
+      damaged_photos: l.damagedPhotos ?? [],
+      wrong_item_claim_type: l.wrongItemClaimType ?? null,
+      wrong_item_photos: l.wrongItemPhotos ?? [],
     })),
   });
   if (error) {

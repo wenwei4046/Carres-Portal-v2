@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { poLineReportable } from "@carres/shared";
+import {
+  caseProductCategory,
+  poLineReportable,
+  receiveLineClaimProblems,
+  wrongItemClaimTypesFor,
+  RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
+} from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import ClaimPhotoUploadField from "../../../components/ClaimPhotoUploadField";
 import {
   useOperationReceiveThreads,
   useOperationThreadsForPo,
@@ -68,6 +75,16 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  * because the supplier still owes a good one. One DO may never account for more
  * units than the line still owes — the inputs clamp to the remaining allowance
  * and the RPC refuses the rest (`report_exceeds_ordered`).
+ *
+ * 2026-07-27 (R2, migration 0288): a reported problem BECOMES a supplier claim
+ * in the same transaction, so the form now asks for what a claim needs before
+ * it will submit — at least one photo per problem (S2's evidence law) and,
+ * for a wrong item, WHICH kind of wrong, narrowed by the line's product family
+ * (Jess's own lists: a mattress has no parts to be missing). The gate is the
+ * shared `receiveLineClaimProblems`, whose server-side twin lives in the RPC,
+ * so the disabled button and the 422 can never disagree. Nothing changes for a
+ * clean delivery: the claim panel only exists once a number is typed into the
+ * Damaged or Wrong-item box.
  */
 interface Props {
   po: operationPoListRow;
@@ -103,6 +120,12 @@ export default function ReceivePOModal({
   // delivery submits exactly the payload it always did.
   const [dmg, setDmg] = useState<Record<string, number>>({});
   const [wrong, setWrong] = useState<Record<string, number>>({});
+  // R2: the claim each of those numbers becomes. Photos are storage keys
+  // already uploaded; `wrongType` is WHICH kind of wrong, narrowed by the
+  // line's product family.
+  const [dmgPhotos, setDmgPhotos] = useState<Record<string, string[]>>({});
+  const [wrongType, setWrongType] = useState<Record<string, string>>({});
+  const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>({});
   const [doNumber, setDoNumber] = useState(suggestDoNumber);
   const [doNote, setDoNote] = useState("");
   const [signed, setSigned] = useState(false);
@@ -176,12 +199,38 @@ export default function ReceivePOModal({
   const totalWrong = Object.values(wrong).reduce((s, n) => s + (n || 0), 0);
   const totalIssue = totalDamaged + totalWrong;
   const totalPending = lines.reduce((s, l) => s + poLineReportable(l), 0);
+
+  /** R2: what each reported problem still needs before it can become a claim.
+   *  ONE shared function answers this for the button, for each line's hint and
+   *  (in its server-side twin) for the RPC — so the button and the server can
+   *  never disagree about what "complete" means. */
+  const claimProblems = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const l of lines) {
+      const problems = receiveLineClaimProblems({
+        damagedQty: dmg[l.id] || 0,
+        damagedPhotos: dmgPhotos[l.id] ?? [],
+        wrongItemQty: wrong[l.id] || 0,
+        wrongItemClaimType: wrongType[l.id] ?? null,
+        wrongItemPhotos: wrongPhotos[l.id] ?? [],
+        category: caseProductCategory(l.sku),
+      });
+      if (problems.length > 0)
+        out[l.id] = problems.map((p) => RECEIVE_LINE_CLAIM_PROBLEM_TEXT[p]);
+    }
+    return out;
+  }, [lines, dmg, dmgPhotos, wrong, wrongType, wrongPhotos]);
+  const claimsIncomplete = Object.keys(claimProblems).length > 0;
+
   const valid =
     doNumber.trim().length >= 3 &&
     signed &&
     // R1: a delivery where EVERYTHING arrived broken is still a delivery worth
     // recording, so an issue-only DO may be submitted.
     totalReceiving + totalIssue > 0 &&
+    // R2 — the evidence law: a reported problem without its photo (and, for a
+    // wrong item, its kind) cannot be filed at all.
+    !claimsIncomplete &&
     !!doFilePath &&
     !receive.isPending;
 
@@ -240,6 +289,12 @@ export default function ReceivePOModal({
     setRecv(zero);
     setDmg({});
     setWrong({});
+    // R2: the evidence belongs to the numbers. Clearing the numbers without
+    // clearing their photos would leave a claim's proof pointing at a problem
+    // nobody is reporting any more.
+    setDmgPhotos({});
+    setWrongType({});
+    setWrongPhotos({});
   }
 
   async function submit() {
@@ -271,15 +326,28 @@ export default function ReceivePOModal({
           receivedQty,
           // Omitted when clean, so a normal delivery sends byte-for-byte the
           // payload it sent before R1 (the RPC reads an absent key as 0).
-          ...(damagedQty > 0 ? { damagedQty } : {}),
-          ...(wrongItemQty > 0 ? { wrongItemQty } : {}),
+          ...(damagedQty > 0
+            ? { damagedQty, damagedPhotos: dmgPhotos[id] ?? [] }
+            : {}),
+          ...(wrongItemQty > 0
+            ? {
+                wrongItemQty,
+                // R2: the claim this number becomes. The RPC refuses the whole
+                // receive without them, so the modal never sends one half.
+                wrongItemClaimType: wrongType[id],
+                wrongItemPhotos: wrongPhotos[id] ?? [],
+              }
+            : {}),
         }));
-      await receive.mutateAsync({
+      const res = await receive.mutateAsync({
         doNumber: doNumber.trim(),
         doFilePath,
         lines: tickedLines,
       });
       const allReceived = totalReceiving === totalPending;
+      // R2: name the claims the receive just opened — the operator has to know
+      // a case now exists (and that somebody has to chase it).
+      const claims = res?.claims_created ?? 0;
       const issueBit =
         totalIssue > 0
           ? ` · issue: ${[
@@ -287,7 +355,7 @@ export default function ReceivePOModal({
               totalWrong > 0 ? `${totalWrong} wrong item` : null,
             ]
               .filter(Boolean)
-              .join(" · ")}`
+              .join(" · ")}${claims > 0 ? ` · ${claims} supplier claim${claims === 1 ? "" : "s"} opened` : ""}`
           : "";
       toast.success(
         allReceived
@@ -341,10 +409,14 @@ export default function ReceivePOModal({
             if (typeof attrs.fabric_name === "string") variantBits.push(attrs.fabric_name);
           }
           const variantLabel = variantBits.length > 0 ? variantBits.join(" · ") : null;
+          // R2 — a reported problem opens its claim panel right under the line.
+          const hasIssue = (dmg[l.id] || 0) > 0 || (wrong[l.id] || 0) > 0;
+          const category = caseProductCategory(l.sku);
+          const problems = claimProblems[l.id] ?? [];
           return (
+            <div key={l.id} className="border-t border-base-100">
             <label
-              key={l.id}
-              className={`grid items-center gap-2 px-3.5 py-2.5 border-t border-base-100 ${disabled ? "opacity-50" : "cursor-pointer"}`}
+              className={`grid items-center gap-2 px-3.5 py-2.5 ${disabled ? "opacity-50" : "cursor-pointer"}`}
               style={{ gridTemplateColumns: "28px 1fr 76px 78px 72px 76px" }}
             >
               <input
@@ -419,6 +491,88 @@ export default function ReceivePOModal({
                 className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
               />
             </label>
+
+            {/* R2 — the claim panel. It appears only when the operator has
+                actually reported something, so a clean delivery still sees the
+                exact form it saw before. Everything asked for here is what the
+                supplier will be shown; nothing is free text. */}
+            {hasIssue && (
+              <div
+                className="px-3.5 pb-3 pt-1 bg-base-50/60 grid gap-2"
+                data-testid={`receive-claim-panel-${l.sku}`}
+              >
+                <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 font-body">
+                  Supplier claim for this line
+                </div>
+
+                {(dmg[l.id] || 0) > 0 && (
+                  <ClaimPhotoUploadField
+                    poId={po.id}
+                    doNumber={doNumber}
+                    paths={dmgPhotos[l.id] ?? []}
+                    onChange={(paths) =>
+                      setDmgPhotos((prev) => ({ ...prev, [l.id]: paths }))
+                    }
+                    label={`Photo of the damage (${dmg[l.id]} unit${(dmg[l.id] || 0) === 1 ? "" : "s"})`}
+                    testId={`claim-damaged-photos-${l.sku}`}
+                  />
+                )}
+
+                {(wrong[l.id] || 0) > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label
+                        className="text-[11px] text-base-600 font-body"
+                        htmlFor={`wrong-kind-${l.id}`}
+                      >
+                        What is wrong with it?
+                      </label>
+                      <select
+                        id={`wrong-kind-${l.id}`}
+                        value={wrongType[l.id] ?? ""}
+                        onChange={(e) =>
+                          setWrongType((prev) => ({
+                            ...prev,
+                            [l.id]: e.target.value,
+                          }))
+                        }
+                        data-testid={`claim-wrong-kind-${l.sku}`}
+                        className="px-2 py-1 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                      >
+                        <option value="">Choose…</option>
+                        {/* The list follows the product family — Jess's own
+                            lists (a mattress has no parts to be missing). */}
+                        {wrongItemClaimTypesFor(category).map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <ClaimPhotoUploadField
+                      poId={po.id}
+                      doNumber={doNumber}
+                      paths={wrongPhotos[l.id] ?? []}
+                      onChange={(paths) =>
+                        setWrongPhotos((prev) => ({ ...prev, [l.id]: paths }))
+                      }
+                      label={`Photo of the wrong item (${wrong[l.id]} unit${(wrong[l.id] || 0) === 1 ? "" : "s"})`}
+                      testId={`claim-wrong-photos-${l.sku}`}
+                    />
+                  </>
+                )}
+
+                {problems.length > 0 && (
+                  <div
+                    className="text-[11px] text-danger font-body"
+                    data-testid={`claim-problems-${l.sku}`}
+                  >
+                    {problems.join(" · ")}
+                  </div>
+                )}
+              </div>
+            )}
+            </div>
           );
         })}
         <div className="flex justify-between items-center px-3.5 py-2 bg-base-50 border-t border-base-100">
@@ -459,6 +613,10 @@ export default function ReceivePOModal({
         >
           Damaged and wrong-item units are not booked into stock. Their qty stays{" "}
           <strong>pending delivery</strong> until the supplier sends good ones.
+          {/* R2: say out loud what pressing the button will create — the
+              operator is filing a case against a supplier, not just typing a
+              number into a box. */}{" "}
+          Each one opens a <strong>supplier claim</strong> with the photos below.
         </div>
       )}
 
@@ -570,7 +728,8 @@ export default function ReceivePOModal({
         onPrimary={submit}
         primary={
           totalIssue > 0
-            ? "Receive · report issue"
+            ? // R2 — the button says what it does: it opens a case.
+              "Receive · open supplier claim"
             : totalReceiving === totalPending
               ? "Mark received"
               : "Receive partial"

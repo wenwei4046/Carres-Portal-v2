@@ -439,6 +439,12 @@ export const qk = {
      *  `SetThresholdDialog` invalidates this key on save so the tile
      *  re-derives. */
     stockAlerts: () => ["operation", "stock-alerts"] as const,
+    /** R2 — the supplier-claim queue. Invalidated by a receive, because a
+     *  receive is the thing that opens claims. */
+    supplierClaims: (status: string) =>
+      ["operation", "supplier-claims", status] as const,
+    supplierClaimPhotos: (id: string) =>
+      ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
     /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
      *  warehouse so future blunt invalidations on `["operation","warehouse"]`
@@ -3143,6 +3149,12 @@ export interface operationReceivePoWithDoResponse {
   po_status: "open" | "received" | "cancelled";
   sup_status: string;
   was_relocated: boolean;
+  // R1 (0284) / R2 (0288) — what the inspection found, and how many supplier
+  // claims it opened. OPTIONAL so a browser on this build talking to a
+  // pre-0288 Worker degrades instead of crashing.
+  damaged_qty?: number;
+  wrong_item_qty?: number;
+  claims_created?: number;
 }
 
 // --- Filter → query string helpers -----------------------------------------
@@ -3293,6 +3305,79 @@ export function useDeliveryPartners(
 /** Suppliers — populates the CreatePOModal supplier dropdown (M5 task 3
  *  §18.4). Stable list (suppliers are managed in operation Settings + don't
  *  change between sessions); cache for 5 minutes. */
+/**
+ * R2 — the supplier-claim queue (`GET /api/operation/supplier-claims`).
+ *
+ * Read-only by design: there is no "file a claim" mutation anywhere, because a
+ * claim is minted by the receive (or the daily late-delivery sweep) inside
+ * migration 0288. A hand-filed claim would be a receiving problem with no
+ * receiving behind it — the exact hole the card closes.
+ */
+export interface SupplierClaimListRow {
+  id: string;
+  claim_no: string;
+  po_id: string;
+  po_line_id: string | null;
+  supplier_id: string;
+  supplier_name: string | null;
+  sku: string;
+  product_category: string;
+  claim_type: string;
+  qty: number;
+  status: string;
+  do_number: string | null;
+  note: string | null;
+  reported_by_name: string | null;
+  reported_at: string;
+  photo_count: number;
+}
+
+export interface SupplierClaimsResponse {
+  claims: SupplierClaimListRow[];
+  counts: { open: number; closed: number; all: number };
+}
+
+export function useOperationSupplierClaims(
+  status: "open" | "closed" | "all",
+  opts?: Partial<UseQueryOptions<SupplierClaimsResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.supplierClaims(status),
+    queryFn: () =>
+      apiFetch<SupplierClaimsResponse>(
+        `/api/operation/supplier-claims?status=${status}`,
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export interface SupplierClaimPhoto {
+  path: string;
+  at?: string;
+  by?: string | null;
+  url: string | null;
+}
+
+/** Signed URLs for one claim's evidence. Fetched only when the operator opens
+ *  the row — the URLs are short-lived, so minting them for a whole list would
+ *  be both wasteful and stale by the time anyone clicked. */
+export function useOperationSupplierClaimPhotos(
+  claimId: string | null,
+  opts?: Partial<UseQueryOptions<{ photos: SupplierClaimPhoto[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.supplierClaimPhotos(claimId ?? "none"),
+    queryFn: () =>
+      apiFetch<{ photos: SupplierClaimPhoto[] }>(
+        `/api/operation/supplier-claims/${claimId}/photos`,
+      ),
+    enabled: !!claimId,
+    staleTime: 10 * 60_000,
+    ...opts,
+  });
+}
+
 export function useOperationSuppliers(
   opts?: Partial<UseQueryOptions<SuppliersListResponse>>,
 ) {
@@ -4769,6 +4854,9 @@ export function useReceivePoWithDoMutation(
       // alerts" stay stale for up to 30s after qty/reserved change.
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      // R2 — a receive is the door that opens supplier claims; the Claims tab
+      // must not still be showing yesterday's queue.
+      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
       // Receiving stock can unblock in_production orders → invalidate orders.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });

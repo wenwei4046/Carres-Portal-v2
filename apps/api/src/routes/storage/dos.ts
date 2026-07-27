@@ -35,11 +35,17 @@ const dosRouter = new Hono<AppEnv>();
 const ALLOWED_MIMES = ["application/pdf", "image/jpeg", "image/png"] as const;
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MiB
 
+// R2 (0288) — `kind: "claim"` names the file `<po_id>/<uuid>-claim-<do>.<ext>`
+// instead of the DO-number scheme. Same bucket, same RLS, same per-PO prefix:
+// a supplier-claim photo IS a document about that PO, so giving it its own
+// bucket would have meant a second storage policy for no gain. The default is
+// "do", so every existing caller is byte-for-byte unchanged.
 const signUploadSchema = z.object({
   po_id: z.string().min(1).max(100),
   do_number: z.string().min(3).max(50),
   mime_type: z.enum(ALLOWED_MIMES),
   size_bytes: z.number().int().positive().max(MAX_SIZE),
+  kind: z.enum(["do", "claim"]).default("do"),
 });
 
 // Order-level DO uploads (operation → customer final delivery). Path prefix
@@ -107,10 +113,11 @@ dosRouter.post("/sign-upload", async (c) => {
     );
   }
 
-  const { po_id, do_number, mime_type } = parsed.data;
+  const { po_id, do_number, mime_type, kind } = parsed.data;
   const safeDo = do_number.replace(/[^a-zA-Z0-9._-]/g, "_");
   const ext = extForMime(mime_type);
-  const path = `${po_id}/${crypto.randomUUID()}-${safeDo}.${ext}`;
+  const slug = kind === "claim" ? `claim-${safeDo}` : safeDo;
+  const path = `${po_id}/${crypto.randomUUID()}-${slug}.${ext}`;
 
   // F11 — USER JWT, never service_role. Storage RLS (migration 0042) gates
   // writes; we just defer to it.

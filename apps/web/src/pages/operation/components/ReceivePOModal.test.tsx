@@ -75,10 +75,23 @@ let threadsResponse: unknown = [];
 function setThreadsResponse(rows: unknown) {
   threadsResponse = rows;
 }
+let uploadSeq = 0;
 function installApiFetchRouter() {
-  vi.mocked(apiFetch).mockImplementation((url: string) => {
+  uploadSeq = 0;
+  vi.mocked(apiFetch).mockImplementation((url: string, init?: RequestInit) => {
     if (typeof url === "string" && url.includes("/threads")) {
       return Promise.resolve(threadsResponse) as ReturnType<typeof apiFetch>;
+    }
+    // R2: a claim photo goes through the SAME sign-upload door with
+    // `kind: "claim"`. Each call returns a distinct path so a test asserting
+    // two photos cannot pass on one path echoed twice.
+    const body = typeof init?.body === "string" ? init.body : "";
+    if (body.includes('"kind":"claim"')) {
+      uploadSeq += 1;
+      return Promise.resolve({
+        token: "sign-tok",
+        path: `PO-2050/claim-${uploadSeq}.jpg`,
+      }) as ReturnType<typeof apiFetch>;
     }
     // Default = storage sign-upload response.
     return Promise.resolve({
@@ -86,6 +99,16 @@ function installApiFetchRouter() {
       path: "PO-2050/abc-DO-1.pdf",
     }) as ReturnType<typeof apiFetch>;
   });
+}
+
+/** R2 — attach one claim photo to the field whose label matches. */
+async function attachClaimPhoto(labelRe: RegExp) {
+  const input = screen.getByLabelText(labelRe);
+  const photo = new File(["jpegbytes"], "damage.jpg", { type: "image/jpeg" });
+  fireEvent.change(input, { target: { files: [photo] } });
+  await waitFor(() =>
+    expect(input.parentElement?.textContent).toMatch(/photo(s)? attached/),
+  );
 }
 
 function wrap(node: React.ReactNode) {
@@ -569,7 +592,7 @@ describe("ReceivePOModal — R1 inspection numbers", () => {
     });
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Mark received|Receive partial|report issue/ }),
+        screen.getByRole("button", { name: /Mark received|Receive partial|supplier claim/ }),
       ).not.toBeDisabled(),
     );
   }
@@ -605,15 +628,24 @@ describe("ReceivePOModal — R1 inspection numbers", () => {
       screen.getByLabelText(/Receive qty for mattress:carres-cloud:King/),
       { target: { value: "3" } },
     );
+    // R2: each reported problem now needs its evidence before it can be filed.
+    await attachClaimPhoto(/Photo of the damage/);
+    fireEvent.change(screen.getByTestId("claim-wrong-kind-mattress:carres-cloud:King"), {
+      target: { value: "wrong_sku" },
+    });
+    await attachClaimPhoto(/Photo of the wrong item/);
     await armTheDo();
-    fireEvent.click(screen.getByRole("button", { name: /report issue/ }));
+    fireEvent.click(screen.getByRole("button", { name: /supplier claim/ }));
     await waitFor(() => expect(receiveMutateAsync).toHaveBeenCalledTimes(1));
     expect(receiveMutateAsync.mock.calls[0]?.[0].lines).toEqual([
       {
         id: "44444444-4444-4444-8444-444444444444",
         receivedQty: 3,
         damagedQty: 1,
+        damagedPhotos: ["PO-2050/claim-1.jpg"],
         wrongItemQty: 1,
+        wrongItemClaimType: "wrong_sku",
+        wrongItemPhotos: ["PO-2050/claim-2.jpg"],
       },
     ]);
   });
@@ -638,14 +670,16 @@ describe("ReceivePOModal — R1 inspection numbers", () => {
       screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
       { target: { value: "5" } },
     );
+    await attachClaimPhoto(/Photo of the damage/);
     await armTheDo();
-    fireEvent.click(screen.getByRole("button", { name: /report issue/ }));
+    fireEvent.click(screen.getByRole("button", { name: /supplier claim/ }));
     await waitFor(() => expect(receiveMutateAsync).toHaveBeenCalledTimes(1));
     expect(receiveMutateAsync.mock.calls[0]?.[0].lines).toEqual([
       {
         id: "44444444-4444-4444-8444-444444444444",
         receivedQty: 0,
         damagedQty: 5,
+        damagedPhotos: ["PO-2050/claim-1.jpg"],
       },
     ]);
   });
@@ -699,5 +733,169 @@ describe("ReceivePOModal — R1 inspection numbers", () => {
     expect(
       await screen.findByTestId("receive-po-issue-note"),
     ).toHaveTextContent(/not booked into stock/i);
+  });
+});
+
+/**
+ * R2 (migration 0288) — a reported problem becomes a supplier claim, and the
+ * form will not let it be filed without what a claim needs.
+ */
+describe("ReceivePOModal — R2 the claim, and its evidence", () => {
+  function openPo(sku = "mattress:carres-cloud:King") {
+    render(
+      wrap(
+        <ReceivePOModal
+          po={makePo({
+            purchase_order_lines: [
+              {
+                id: "44444444-4444-4444-8444-444444444444",
+                sku,
+                qty: 5,
+                received_qty: 0,
+              },
+            ],
+          })}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE}
+          onClose={() => {}}
+        />,
+      ),
+    );
+  }
+
+  function armDoOnly() {
+    fireEvent.click(
+      screen.getByText(/Goods inspected and DO signed by warehouse/)
+        .previousSibling as Element,
+    );
+    const file = new File(["%PDF-1.4"], "do.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText(/^do file$/i), {
+      target: { files: [file] },
+    });
+  }
+
+  it("shows no claim panel at all for a clean delivery", () => {
+    openPo();
+    expect(
+      screen.queryByTestId("receive-claim-panel-mattress:carres-cloud:King"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the claim panel the moment a problem is reported", () => {
+    openPo();
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "2" } },
+    );
+    expect(
+      screen.getByTestId("receive-claim-panel-mattress:carres-cloud:King"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Photo of the damage/)).toBeInTheDocument();
+  });
+
+  it("refuses to submit damage with no photo, and says so in plain words", async () => {
+    openPo();
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "2" } },
+    );
+    armDoOnly();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("claim-problems-mattress:carres-cloud:King"),
+      ).toHaveTextContent("Add a photo of the damage"),
+    );
+    expect(
+      screen.getByRole("button", { name: /supplier claim/ }),
+    ).toBeDisabled();
+  });
+
+  it("a wrong item needs BOTH a kind and a photo before it can be filed", async () => {
+    openPo();
+    fireEvent.change(
+      screen.getByLabelText(/Wrong item qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    armDoOnly();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("claim-problems-mattress:carres-cloud:King"),
+      ).toHaveTextContent(/Say what is wrong.*Add a photo of the wrong item/),
+    );
+    // Kind alone is not enough.
+    fireEvent.change(
+      screen.getByTestId("claim-wrong-kind-mattress:carres-cloud:King"),
+      { target: { value: "wrong_sku" } },
+    );
+    expect(
+      screen.getByRole("button", { name: /supplier claim/ }),
+    ).toBeDisabled();
+    await attachClaimPhoto(/Photo of the wrong item/);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /supplier claim/ }),
+      ).not.toBeDisabled(),
+    );
+  });
+
+  it("offers a mattress only its own problems — no missing parts, no uneven colour", () => {
+    openPo("mattress:carres-cloud:King");
+    fireEvent.change(
+      screen.getByLabelText(/Wrong item qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    const options = Array.from(
+      screen
+        .getByTestId("claim-wrong-kind-mattress:carres-cloud:King")
+        .querySelectorAll("option"),
+    ).map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(["", "wrong_sku", "other"]);
+  });
+
+  it("offers a sofa the colour-uneven problem a mattress cannot have", () => {
+    openPo("sofa:glano:3-seater");
+    fireEvent.change(
+      screen.getByLabelText(/Wrong item qty for sofa:glano:3-seater/),
+      { target: { value: "1" } },
+    );
+    const options = Array.from(
+      screen
+        .getByTestId("claim-wrong-kind-sofa:glano:3-seater")
+        .querySelectorAll("option"),
+    ).map((o) => (o as HTMLOptionElement).value);
+    expect(options).toContain("colour_uneven");
+    expect(options).not.toContain("damaged");
+  });
+
+  it("the button says what it does — it opens a case", () => {
+    openPo();
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    expect(
+      screen.getByRole("button", { name: "Receive · open supplier claim" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Clear takes the evidence with the numbers", async () => {
+    openPo();
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "2" } },
+    );
+    await attachClaimPhoto(/Photo of the damage/);
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(
+      screen.queryByTestId("receive-claim-panel-mattress:carres-cloud:King"),
+    ).not.toBeInTheDocument();
+    // Re-reporting starts from a blank claim, not yesterday's photo.
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    expect(
+      screen.queryByTestId("claim-damaged-photos-mattress:carres-cloud:King-count"),
+    ).not.toBeInTheDocument();
   });
 });
