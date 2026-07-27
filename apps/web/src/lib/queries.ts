@@ -2996,6 +2996,13 @@ export interface operationPoListRow {
     sku: string;
     qty: number;
     received_qty: number;
+    /** R1 (0284) — what arrived broken / as the wrong item, cumulative across
+     *  every DO on this line. Neither counts as received: the supplier still
+     *  owes a good unit, so the qty stays PENDING DELIVERY (never "missing").
+     *  Optional because only the endpoints that select them return them — an
+     *  absent value reads as "no problem recorded", not as unknown. */
+    damaged_qty?: number;
+    wrong_item_qty?: number;
     // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
     // pre-0073 lines; bedframe carries {color, gap}; sofa carries
     // {fabric_id, fabric_name, fabric_surcharge}.

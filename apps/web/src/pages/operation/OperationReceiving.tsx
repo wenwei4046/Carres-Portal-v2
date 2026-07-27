@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
+import { poReceivingProgress, type PoReceivingState } from "@carres/shared";
 import {
   useOperationPos,
   useOperationSuppliers,
   useOperationWarehouse,
-  type operationPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
@@ -26,6 +26,15 @@ import PurchasingTabs from "./PurchasingTabs";
  * Location, not a Klang GRN. Current master data has Carres Klang as the only
  * own warehouse, so every open PO shown here is Klang-bound; when multi-location
  * lands (P4) this list filters to own-warehouse POs.
+ *
+ * 2026-07-27 (R1 of the receiving & claim queue): the row stops being a binary
+ * "Receive → / Done". A PROGRESS column reads the four per-line numbers through
+ * the shared `poReceivingProgress` and says, in words, where the delivery is —
+ * In transit · Partially received (8/10) · Fully received · Receiving issue —
+ * with the outstanding qty underneath it ("2 units pending delivery"). The
+ * point of the card: 还有 2 张没到 must be readable from this list without
+ * opening anything. The supplier's own Stage pill stays — it is a different
+ * fact (what the supplier says) from what we actually counted.
  */
 
 type Tab = "to_receive" | "received" | "all";
@@ -69,13 +78,15 @@ function supStatusPill(s: string): string {
   return SUP_STATUS_PILL[s] ?? "pill-neutral";
 }
 
-function poTotals(po: operationPoListRow): { received: number; total: number } {
-  const lines = po.purchase_order_lines ?? [];
-  return {
-    received: lines.reduce((s, l) => s + Number(l.received_qty || 0), 0),
-    total: lines.reduce((s, l) => s + Number(l.qty || 0), 0),
-  };
-}
+/** R1 — progress state → v17 pill. Grey while nothing has landed, amber while
+ *  half-landed, green when settled, red when something is wrong. Colour lives
+ *  here (design is the web's job); the shared module owns the state + words. */
+const PROGRESS_PILL: Record<PoReceivingState, string> = {
+  in_transit: "pill-neutral",
+  partially_received: "pill-warning",
+  fully_received: "pill-confirmed",
+  receiving_issue: "pill-overdue",
+};
 
 export default function OperationReceiving() {
   const [tab, setTab] = useState<Tab>("to_receive");
@@ -269,7 +280,7 @@ export default function OperationReceiving() {
               <Th>PO</Th>
               <Th>Supplier</Th>
               <Th>Warehouse</Th>
-              <Th>Items</Th>
+              <Th>Progress</Th>
               <Th>ETA</Th>
               <Th>Stage</Th>
               <Th> </Th>
@@ -287,7 +298,7 @@ export default function OperationReceiving() {
               </tr>
             )}
             {visible.map((po) => {
-              const { received, total } = poTotals(po);
+              const progress = poReceivingProgress(po.purchase_order_lines);
               const supName = supplierById.get(po.supplier_id)?.name ?? "—";
               const whName = warehouseById.get(po.warehouse_id)?.name ?? "—";
               const done = po.status === "received";
@@ -304,13 +315,25 @@ export default function OperationReceiving() {
                   <td className="px-4 py-3 whitespace-nowrap text-base-700">
                     {whName}
                   </td>
+                  {/* R1 — the whole point of the card: what still has to
+                      arrive is readable here, without opening anything. */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-mono text-base-800">
-                      {received}/{total}
+                    <span
+                      className={`pill ${PROGRESS_PILL[progress.state]}`}
+                      data-testid={`receiving-progress-${po.id}`}
+                    >
+                      {progress.label}
                     </span>
-                    <span className="text-[11px] text-base-500 ml-1.5">
-                      unit{total === 1 ? "" : "s"}
-                    </span>
+                    {progress.pendingLabel && (
+                      <div className="text-[11px] text-base-600 mt-1">
+                        {progress.pendingLabel}
+                      </div>
+                    )}
+                    {progress.issueLabel && (
+                      <div className="text-[11px] text-danger mt-0.5">
+                        {progress.issueLabel}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-base-700">
                     {po.eta_date ? (

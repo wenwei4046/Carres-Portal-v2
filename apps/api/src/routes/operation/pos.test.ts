@@ -533,7 +533,12 @@ describe("POST /api/operation/pos/:id/receive", () => {
       // v_line->>'received_qty' at 0045:688). camelCase → snake_case
       // reshape happens at the route boundary. 0076 (2026-05-10): `id` is
       // already snake-case (single token), no reshape needed.
-      p_lines: [{ id: LINE_ID, received_qty: 2 }],
+      // R1 (0284): the two inspection counters ride every line explicitly —
+      // a clean delivery states "nothing was wrong" rather than staying
+      // silent about it. The RPC would read an absent key as 0 either way.
+      p_lines: [
+        { id: LINE_ID, received_qty: 2, damaged_qty: 0, wrong_item_qty: 0 },
+      ],
     });
     assertRpcCallShape(rpc, "operation_receive_po_with_do", [
       "p_po_id",
@@ -649,6 +654,87 @@ describe("POST /api/operation/pos/:id/receive", () => {
     );
     expect(res.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  // --- R1 (0284): receiving is an inspection ---------------------------------
+
+  it("R1 — forwards damaged + wrong-item qty as snake_case to the RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { po_id: PO_ID, po_status: "open", damaged_qty: 1, wrong_item_qty: 2 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: 1, wrongItemQty: 2 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(
+      "operation_receive_po_with_do",
+      expect.objectContaining({
+        p_lines: [
+          { id: LINE_ID, received_qty: 2, damaged_qty: 1, wrong_item_qty: 2 },
+        ],
+      }),
+    );
+  });
+
+  it("R1 — rejects a negative damagedQty", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: -1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("R1 — maps the RPC's report_exceeds_ordered refusal to a 422 code", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "reported 14 units on a line of 10",
+        details: "report_exceeds_ordered",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ id: LINE_ID, receivedQty: 9, damagedQty: 5 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("report_exceeds_ordered");
   });
 });
 

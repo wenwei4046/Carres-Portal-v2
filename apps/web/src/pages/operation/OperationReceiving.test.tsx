@@ -27,7 +27,17 @@ function po(p: {
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   sup_status: string;
-  lines: { id: string; sku: string; qty: number; received_qty: number }[];
+  // R1 (0284): the two inspection counters are optional on the fixture, the
+  // same way they are optional on the wire — a PO with a clean delivery
+  // history simply omits them.
+  lines: {
+    id: string;
+    sku: string;
+    qty: number;
+    received_qty: number;
+    damaged_qty?: number;
+    wrong_item_qty?: number;
+  }[];
   warehouse_id?: string;
 }) {
   return {
@@ -162,5 +172,74 @@ describe("OperationReceiving", () => {
     // PO-3001 → Carres Klang (own WH) shows; PO-3002 → HOUZS Balakong (LP) excluded.
     await waitFor(() => expect(screen.getByText("PO-3001")).toBeInTheDocument());
     expect(screen.queryByText("PO-3002")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * R1 — the row says where the delivery is, in words.
+ *
+ * The card's own done-when: "还有 2 张没到" must be readable from this list
+ * without opening anything.
+ */
+describe("OperationReceiving — R1 progress state", () => {
+  const R1_POS = [
+    po({ id: "PO-4001", supplier_id: "sup-nf", status: "open", sup_status: "in_production", lines: [{ id: "a1", sku: "MS01", qty: 10, received_qty: 0 }] }),
+    po({ id: "PO-4002", supplier_id: "sup-nf", status: "open", sup_status: "partially_shipped", lines: [{ id: "a2", sku: "MS02", qty: 10, received_qty: 8 }] }),
+    po({ id: "PO-4003", supplier_id: "sup-oh", status: "open", sup_status: "partially_shipped", lines: [{ id: "a3", sku: "SF01", qty: 6, received_qty: 3, damaged_qty: 2, wrong_item_qty: 1 }] }),
+    po({ id: "PO-4004", supplier_id: "sup-oh", status: "received", sup_status: "delivered", lines: [{ id: "a4", sku: "BF01", qty: 4, received_qty: 4 }] }),
+  ];
+
+  beforeEach(() => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (typeof path === "string" && path.includes("/api/operation/suppliers"))
+        return Promise.resolve({ suppliers: SUPPLIERS });
+      if (typeof path === "string" && path.includes("/api/operation/warehouse"))
+        return Promise.resolve({ warehouses: WAREHOUSES });
+      if (typeof path === "string" && path.includes("/api/operation/pos"))
+        return Promise.resolve({ pos: R1_POS });
+      return Promise.resolve({});
+    });
+  });
+
+  it("reads In transit / Partially received (8/10) / Receiving issue off the list", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() =>
+      expect(screen.getByTestId("receiving-progress-PO-4001")).toHaveTextContent(
+        "In transit",
+      ),
+    );
+    expect(screen.getByTestId("receiving-progress-PO-4002")).toHaveTextContent(
+      "Partially received (8/10)",
+    );
+    expect(screen.getByTestId("receiving-progress-PO-4003")).toHaveTextContent(
+      "Receiving issue",
+    );
+  });
+
+  it("states what is still coming — 2 units pending delivery, never 'missing'", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() =>
+      expect(screen.getByText("2 units pending delivery")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("10 units pending delivery")).toBeInTheDocument();
+    expect(screen.queryByText(/missing/i)).not.toBeInTheDocument();
+  });
+
+  it("names the problem on a PO with a receiving issue", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() =>
+      expect(screen.getByText("2 damaged · 1 wrong item")).toBeInTheDocument(),
+    );
+  });
+
+  it("a settled PO reads Fully received with nothing outstanding", async () => {
+    wrap(<OperationReceiving />);
+    const tabs = await statusTabs();
+    fireEvent.click(tabs[1]); // Received
+    await waitFor(() =>
+      expect(screen.getByTestId("receiving-progress-PO-4004")).toHaveTextContent(
+        "Fully received",
+      ),
+    );
   });
 });

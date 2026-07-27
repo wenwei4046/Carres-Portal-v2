@@ -376,11 +376,12 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
     ]);
     render(wrap(<ProcurementTabContent slug="nice-future" />));
     fireEvent.click(screen.getByTestId("receive-po-PO-2050"));
-    // Pending = 3 - 1 = 2
+    // Pending delivery = 3 - 1 = 2. R1 (0284): the footer counts three things
+    // now (received · damaged · wrong item), so it says "received", not "units".
     fireEvent.click(screen.getByRole("button", { name: /Clear/ }));
-    expect(screen.getByText(/Σ 0 units this DO/)).toBeInTheDocument();
+    expect(screen.getByText(/Σ 0 received this DO/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Receive all pending/ }));
-    expect(screen.getByText(/Σ 2 units this DO/)).toBeInTheDocument();
+    expect(screen.getByText(/Σ 2 received this DO/)).toBeInTheDocument();
   });
 
   it("ReceivePOModal submit fires one batched mutation call carrying every ticked line", async () => {

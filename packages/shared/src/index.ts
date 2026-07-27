@@ -707,6 +707,15 @@ export {
   type DeliveryQueueAnchor,
 } from "./delivery-queue";
 
+// R1 · Receiving speaks Pending-delivery (never "Missing") + PO progress state
+export {
+  poReceivingProgress,
+  poLineReportable,
+  type PoReceivingLine,
+  type PoReceivingProgress,
+  type PoReceivingState,
+} from "./po-receiving";
+
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
 export {
   DELIVERY_GROUPS,
