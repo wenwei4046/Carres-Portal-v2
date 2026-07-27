@@ -34,6 +34,7 @@ import {
   type OpsReorderResponse,
   type OpsReorderPointInput,
   type OpsStockUsageResponse,
+  type OpsStockHealthResponse,
   type OpsReserveLevelInput,
   type OpsStockPlanResponse,
   type OpsStockPlanOpenInput,
@@ -6535,6 +6536,25 @@ export function useSetReserveLevel() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock", "usage"] });
     },
+  });
+}
+
+// ── Stock health + proposal accuracy · Ready Stock K5 (no migration) ────────
+// The review layer. It READS the numbers K1 and K4 already collect and K2's own
+// cycles — there is no mutation hook here because K5 sets nothing.
+//
+// Its own key rather than a slice of `usage`: the health read reaches back 200
+// days of sales lines and every plan cycle, so hanging it off a month-keyed
+// query would re-fetch all of that every time somebody changes the month.
+
+const stockHealthKey = ["operation", "ops-stock", "health"] as const;
+
+export function useStockHealth(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: stockHealthKey,
+    queryFn: () => apiFetch<OpsStockHealthResponse>("/api/ops/stock/health"),
+    enabled: opts?.enabled ?? true,
+    staleTime: 60_000,
   });
 }
 

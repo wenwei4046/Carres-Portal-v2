@@ -14,9 +14,11 @@ import {
   useSetStockPlanFinal,
   useDecideStockPlan,
 } from "@/lib/queries";
+import { fmtMonth } from "@/lib/fmt-date";
 import StockTabs from "./StockTabs";
 import UrgentRestockPanel from "./components/UrgentRestockPanel";
 import PoolUsagePanel from "./components/PoolUsagePanel";
+import StockHealthPanel from "./components/StockHealthPanel";
 
 /**
  * Ready stock — the monthly plan (card K2, migration 0287).
@@ -47,15 +49,6 @@ const STATUS_PILL: Record<PlanStatus, string> = {
 
 /** Column geometry, declared once so header and rows can never drift. */
 const GRID = "1fr 56px 60px 62px 62px 66px 72px 92px 78px 78px";
-
-function monthLabel(period: string): string {
-  const [y, m] = period.split("-").map(Number);
-  return new Date(Date.UTC(y, (m ?? 1) - 1, 1)).toLocaleDateString("en-GB", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 function thisMonth(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
@@ -101,7 +94,7 @@ export default function OperationStockPlan() {
             >
               {periods.map((p) => (
                 <option key={p} value={p}>
-                  {monthLabel(p)}
+                  {fmtMonth(p)}
                 </option>
               ))}
             </select>
@@ -115,6 +108,14 @@ export default function OperationStockPlan() {
             ) : null}
           </div>
         </div>
+
+        {/* K5 — the review layer, FIRST on the tab. The card's Done-when is
+            "the COO opens one tab and knows what needs attention today", so
+            the digest sits above the month's work rather than under it, and
+            renders outside the plan's loading and error branches for the same
+            reason the urgent lane does: it must still answer on a day the
+            monthly cycle fails to load. */}
+        <StockHealthPanel />
 
         {isLoading ? (
           <p className="text-sm text-base-500">Loading…</p>
@@ -182,7 +183,7 @@ function NoPlanYet({
     >
       <ClipboardList size={18} strokeWidth={2} className="mx-auto text-base-300" />
       <div className="t-h4 text-base-900 mt-2">
-        No plan for {monthLabel(period)} yet
+        No plan for {fmtMonth(period)} yet
       </div>
       <div className="text-[13px] text-base-600 mt-1 max-w-md mx-auto">
         Open the month and the team can start asking for what they want on the
@@ -195,7 +196,7 @@ function NoPlanYet({
         className="btn-primary mt-4 disabled:opacity-50"
         data-testid="plan-open"
       >
-        {pending ? "Opening…" : `Open ${monthLabel(period)}`}
+        {pending ? "Opening…" : `Open ${fmtMonth(period)}`}
       </button>
       {failed ? (
         <div className="text-[12px] text-danger mt-2" data-testid="plan-open-error">
