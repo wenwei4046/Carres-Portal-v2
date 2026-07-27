@@ -2413,7 +2413,7 @@ proves both surfaces now speak the ruled words.
 
 ---
 
-**2026-07-27 · Service Case S3 — the case drives the follow-ups** (PR #431, migration **0293 applied**, worktree `service-case-execution-queue-s3`) — card S3 of `docs/service-case-execution-queue.md`: "on submit, the system creates the next steps instead of the staff remembering", **done when closing a case requires all its tasks closed + customer-confirmed.**
+**2026-07-27 · Service Case S3 — the case drives the follow-ups** (PR #431 merge `340dfa7c`, migration **0293 applied**, Worker `ccc9616a` + web `index-DEsBDZHt.js` — DEPLOYED, worktree `service-case-execution-queue-s3`) — card S3 of `docs/service-case-execution-queue.md`: "on submit, the system creates the next steps instead of the staff remembering", **done when closing a case requires all its tasks closed + customer-confirmed.**
 
 **The card says "creates"; what shipped is stronger — the steps are DERIVED.** `packages/shared/src/service-case-plan.ts` turns question 5 of the intake ("what does the customer want") into the chain, on every read. There is no `service_case_tasks` table: a row can be forgotten at creation, deleted, or left pointing at an answer somebody has since edited, and a derivation cannot. What the database stores is the half that genuinely IS a fact — `service_cases.progress`, one entry per step, carrying the business date it happened on, stamped server-side with who recorded it. **Nothing in the card is a tick-box** (ACTION-FLOW-STANDARD Law 2's no-decorative-checkbox law taken literally): a step closes because a date exists.
 
@@ -2441,3 +2441,22 @@ The chain, from the wants: **repair** → supplier date · collect · send to su
 ### Evidence
 
 shared **1581/1581** (+23) · api **+18** · web **+7**. Suites at the §17.7 baseline (api 3, web 16) — zero new failures. typecheck 0, build + `check:v4` + design-standard lint clean.
+
+### Ship
+
+PR **#431** merged as `340dfa7c`. Deployed from the MAIN TIP, not the feature branch
+(`git log HEAD..origin/main` empty first). Migration tracker checked before the api deploy:
+tail is **0293** — this card's own migration, applied BEFORE the Worker carrying the routes
+that read the new columns, and no other repo migration sits unapplied behind the union tip.
+
+api Worker **`ccc9616a`** via `wrangler deploy --env production` — bindings receipt read:
+`PUBLIC_WEB_URL=https://pos.carresofficial.com` and `api.carresofficial.com` routed (not the
+default env's localhost). `POST /api/ops/service-cases/:id/progress` and the list both answer
+**401** unauthenticated on the custom domain. web **`index-DEsBDZHt.js`** to carres-portal +
+carres-pos, both `--branch=main`. **All 4 canonicals converged on the first poll.**
+
+Live bundle downloaded to a file before grepping (a piped grep on 4 MB truncates and reports
+a false 0): **4,379,801 bytes**, `SERVICE_ROLE` **0**, and four markers from MOUNTED
+components present — `confirm the problem is solved`, `What happens next`, `And starts these`,
+`can only be closed once every step above`. `Call Ohana` greps **0** and correctly so: the
+factory's name is interpolated at runtime from the case's own snapshot, never a literal.
