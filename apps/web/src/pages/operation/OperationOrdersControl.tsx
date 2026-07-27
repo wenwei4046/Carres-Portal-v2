@@ -53,6 +53,7 @@ import {
   poUrgentBypass,
   DELIVERY_QUEUES,
   deliveryQueueByKey,
+  deliveryQueueForLabel,
   deliveryStepOverdue,
   myHolidaySet,
   type DeliveryQueueKey,
@@ -175,7 +176,7 @@ const TAB_DESC: Record<SettledTab, string> = {
 
 /** Stage derivation — mirrors OperationOrders.stageOf so the two surfaces never
  *  disagree on where an order sits in the pipeline. */
-function stageOf(o: operationOrderListRow): OperationStage {
+export function stageOf(o: operationOrderListRow): OperationStage {
   if (o.status === "place") return "placed";
   if (o.operation_stage) return o.operation_stage as OperationStage;
   if (o.status === "delivered") return "delivered";
@@ -218,7 +219,7 @@ function controlTabOf(
 
 type StockState = "ready" | "in_stock" | "need_po" | "awaiting" | "unknown";
 
-interface StockInfo {
+export interface StockInfo {
   state: StockState;
   /** Units needed / coverable from free stock — only on the matchable
    *  early-stage states (in_stock / need_po). */
@@ -244,7 +245,7 @@ interface StockInfo {
  *  SKUs are absent from availableBySku → unknown ("—"), the old behaviour. The
  *  map being undefined (stock still loading / errored) also falls back to
  *  unknown, so the column degrades gracefully. */
-function stockReadiness(
+export function stockReadiness(
   o: operationOrderListRow,
   availableBySku?: Map<string, number>,
 ): StockInfo {
@@ -388,7 +389,7 @@ function daysToDue(o: operationOrderListRow): number | null {
 //  the NEXT verb's red/amber tone, not a separate filter.)
 
 /** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
-function todayIso(): string {
+export function todayIso(): string {
   const t = new Date();
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 }
@@ -554,7 +555,7 @@ const NEXT_QUEUE_DESC: Record<string, string> = {
 const DELIVERY_PHOTO_VERB = deliveryQueueByKey("photo").label;
 /** The step's anchor date for the auto-overdue check — a TBD customer date has
  *  no anchor, so those rows can never be late (silence over a false alarm). */
-function deliveryStepAnchor(
+export function deliveryStepAnchor(
   o: operationOrderListRow,
   step: DeliveryQueueKey,
 ): string | null {
@@ -1687,7 +1688,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     };
     const tally = (o: operationOrderListRow, only?: DeliveryQueueKey) => {
       const label = nextVerbOf(o);
-      const def = DELIVERY_QUEUES.find((q) => q.label === label);
+      const def = deliveryQueueForLabel(label);
       if (!def) return;
       if (only ? def.key !== only : def.key === "photo") return;
       bump(label, deliveryStepOverdue(def.key, deliveryStepAnchor(o, def.key), today, holidayOpts));

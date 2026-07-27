@@ -92,6 +92,18 @@ export const DELIVERY_QUEUE_LABELS = DELIVERY_QUEUES.map((q) => q.label) as [
   ...string[],
 ];
 
+/**
+ * The step a NEXT verb names, or null when the verb is not a delivery step.
+ *
+ * The C-vocab law says a row sits in exactly the queue its NEXT verb names, so
+ * every surface that groups rows by queue does this same lookup. Naming it once
+ * keeps the Orders list and the Delivery module reading ONE mapping — and when
+ * C1 renames the labels, both move together instead of one growing a synonym.
+ */
+export function deliveryQueueForLabel(label: string): DeliveryQueueDef | null {
+  return DELIVERY_QUEUES.find((q) => q.label === label) ?? null;
+}
+
 export function deliveryQueueByKey(key: DeliveryQueueKey): DeliveryQueueDef {
   const def = DELIVERY_QUEUES.find((q) => q.key === key);
   // Unreachable for a typed key; throwing beats returning a silent wrong step.

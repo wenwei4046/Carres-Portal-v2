@@ -225,7 +225,12 @@ export function carrierDayLoads(
     const cur = acc.get(id) ?? {
       dateIso: day,
       partnerId: b.partnerId ?? null,
-      partnerName: b.partnerName?.trim() || "No carrier picked",
+      // COPY-STANDARD's ruled word for this fact is "No logistics picked" —
+      // `Carrier` is a banned UI word (the Logistics word law, Jess
+      // 2026-07-27). Fixed HERE, at the single source, so the right-rail
+      // calendar and the Delivery module say the same thing (rule 8) instead
+      // of the new page inventing a second word for one fact.
+      partnerName: b.partnerName?.trim() || "No logistics picked",
       confirmed: 0,
       provisional: 0,
       capacity: null,

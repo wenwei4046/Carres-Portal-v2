@@ -392,6 +392,26 @@ split them.
 - Confirmed is the ONLY green on the calendar, exactly as in the Orders list's
   Delivery column (T1). The logistics company's own date is amber, always.
 
+## The Delivery module words (T11, locked with Jess 2026-07-27)
+
+The standalone Delivery page adds **no new vocabulary**. Its queue names, its
+action pills and its calendar lines are the words already ruled above, taken
+from the same shared constants the Orders list reads — a module that spelt a
+queue differently would be rule 8's failure with its own menu item. Only these
+four strings are the page's own:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The two views of the module | **Queues · Calendar** | List · Board · Schedule · Planner |
+| How much work is on the board | **{n} to do · {n} late** | Total · Outstanding · Open items |
+| Nothing in the picked queue | **Nothing to do here.** + the sentence saying when an order joins | No results · Empty · All clear |
+| Leaving the module to act | **Open order** | View · Details · Go to order · Edit |
+
+**The module states facts and hands over.** Every write — booking a date,
+recording a reason, uploading a delivery photo — happens in the order drawer,
+which is where the gates live. So the page carries exactly ONE button, and its
+word says where it takes you.
+
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and
 end in something the operator can do — "call them" or "pick another day". A

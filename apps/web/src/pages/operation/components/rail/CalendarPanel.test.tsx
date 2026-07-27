@@ -92,7 +92,7 @@ describe("CalendarPanel — the day comes from the BOOKING, never the promise", 
     h.orders = [order({ so: 1204, delivery_date: TODAY, customer_name: "ella" })];
     render(<CalendarPanel />);
     const today = day(TODAY)!;
-    expect(within(today).getByText("Promised this day, needs a date")).toBeTruthy();
+    expect(within(today).getByText("Promised this day, no date yet")).toBeTruthy();
     expect(within(today).getByText("Call ella — book delivery date")).toBeTruthy();
   });
 
@@ -108,7 +108,7 @@ describe("CalendarPanel — the day comes from the BOOKING, never the promise", 
   it("a delivered order's kept promise is not outstanding work", () => {
     h.orders = [order({ so: 1204, delivery_date: TODAY, status: "delivered" })];
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).queryByText("Promised this day, needs a date")).toBeNull();
+    expect(within(day(TODAY)!).queryByText("Promised this day, no date yet")).toBeNull();
   });
 });
 
@@ -125,7 +125,7 @@ describe("CalendarPanel — confirmed is the only green", () => {
     h.orders = [provisional(TODAY, { so: 1210 })];
     render(<CalendarPanel />);
     const today = day(TODAY)!;
-    expect(within(today).getByText("Carrier's date")).toBeTruthy();
+    expect(within(today).getByText("Logistics' date")).toBeTruthy();
     expect(within(today).queryByText("Confirmed")).toBeNull();
   });
 
@@ -134,7 +134,7 @@ describe("CalendarPanel — confirmed is the only green", () => {
       confirmed(TODAY, { so: 1211, delivery_partner_id: null, delivery_partners: null }),
     ];
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).getAllByText("No carrier picked").length).toBeGreaterThan(0);
+    expect(within(day(TODAY)!).getAllByText("No logistics picked").length).toBeGreaterThan(0);
   });
 });
 

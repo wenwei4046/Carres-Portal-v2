@@ -396,7 +396,7 @@ owns that rename; touching it here would rename a different panel's word from a 
 card. Also still open from T9: the drawer's two `Unscheduled` copies
 (`OrderDetailDrawer.tsx` ~3814 and ~3853).
 
-## T11 · Delivery module page (promotes L5) — the LAST card
+## T11 · Delivery module page (promotes L5) — the LAST card ✅ (PR #425)
 
 The 3-pane standalone module per `docs/delivery-module-proposal.md` (rewritten 2026-07-27 —
 the pre-T-series version was deleted, not annotated). By T11 every signal, queue, word,
@@ -405,6 +405,49 @@ carries the ONE new sidebar item in the whole plan. **Runs last in the drawer la
 C5 → C1 → C2 → C3 → C6 → C7 → C8: assembling before the words and the action model are
 settled means building the page twice. After T11: two weeks of live usage writes the fix
 list; nothing else is planned past T11 on purpose.
+
+**Shipped note (PR #425):** shared + web + one additive API select line, **no migration**.
+
+**The module WRITES nothing, and that is the design call.** Every booking, reason and
+photo is entered through the order drawer, where the gates actually live (the server-side
+`bookingConfirmGate`, the T6 upload door). A second write surface would mean a second set
+of gates to keep in step, and the first time they diverged an operator would be handed a
+confirmation the server refuses. The page carries exactly ONE button — `Open order`.
+
+**Scope is decided by the LADDER, not by a status column.** An order is delivery work
+exactly when `nextActionOf` — the same function the Orders list runs, imported, never
+re-derived — says a delivery verb is next. That is why a money-held order (🔒 Confirm) is
+correctly absent (PayHold: you do not arrange a delivery you may not make), and why the two
+pages structurally cannot name one order differently. Queue-less orders are still BUILT,
+because the calendar shows every booked truck including the held ones, and clicking one
+must open a pane that says what the Orders list says rather than a blank.
+
+**The one thing no earlier card produced was the RANKING.** The Orders list sorts by the
+order's overall slack (stock included); a delivery board sorted that way puts the wrong
+truck on top. New pure `packages/shared/delivery-board.ts` (11 tests) = ACTION-FLOW Law 5
+narrowed to delivery risk: late first · nearest deadline · nearest truck day · the promise ·
+the SO. **A row with no anchor sorts LAST** — T7's "a step that cannot be late is not
+urgent", expressed as an ordering.
+
+**Words: the module adds none.** The queue names and action pills come from the shared
+constant, so C1's rename moves this page and the Orders facet on one commit; inventing
+`Assign logistics` here while the Orders list still said `Assign logistic` would have been
+COPY-STANDARD rule 8's exact failure with its own menu item. T10's three strings the copy
+rewrite banned were instead fixed AT SOURCE (`Carrier's date` → `Logistics' date` ·
+`No carrier picked` → `No logistics picked` · `Promised this day, needs a date` →
+`…, no date yet`), so the rail calendar and this page cannot spell one fact two ways.
+
+**Found, not fixed (not this card):** `Delivery` now has its own menu item, but its actions
+live in `docs/ORDERS-WORKING-FLOW.md` §3 — deliberate, because they are the ORDER's actions
+and Law 3 forbids two homes. A `DELIVERY-WORKING-FLOW.md` would require the Orders file to
+lose that section; that is Jess's call, not a build chat's. Also still open from T9/T10: the
+drawer's two `Unscheduled` copies (`OrderDetailDrawer.tsx` ~3814, ~3853) and the PO lens's
+`Chase` tab.
+
+**The board inherits C5's live money bug, harmlessly for now.** While
+`ops_order_control.balance` is NULL on all 55 rows nothing is money-held, so nothing is
+filtered off the board today. The moment C5 fixes the gate to read `orders.paid`, ~18 owing
+orders leave the board at once — correct behaviour that will look like a disappearance.
 
 ---
 
@@ -429,8 +472,11 @@ list; nothing else is planned past T11 on purpose.
   building, not the carrier), so it stays here unclaimed rather than being wedged into a
   partner profile.
 - **L4 Multi-leg surfacing** — `delivery_stops` jsonb exists; UI in `DeliveryChain.tsx`.
-- **L5 Delivery module page (3-pane) → PROMOTED TO T11** — `docs/delivery-module-proposal.md` (LOCKED 2026-07-22);
-  the 6-step lifecycle maps INTO its 3 tabs; not a conflict, do after T-series.
+- **L5 Delivery module page (3-pane) → SHIPPED as T11 (PR #425).** The 3 panes are facet ·
+  list · detail with the calendar as the list pane's second view, and every one of them
+  reads a rule that already shipped — there is no delivery logic in the module at all.
+  **What this entry asked for and did NOT get: a page that acts.** The module writes
+  nothing; `Open order` hands over to the drawer, because that is where the gates live.
 - **L6 Logistic partner profiles → SHIPPED as T9 (PR #398, migration 0283).**
   All four fields landed (working days · blackout dates · daily capacity · booking lead
   time), and the editor sits WITH its first consumer — the drawer's confirm flow — exactly
@@ -467,4 +513,4 @@ list; nothing else is planned past T11 on purpose.
 | T8 | ✅ shipped 2026-07-27 | #391 |
 | T9 | ✅ shipped 2026-07-27 | #398 |
 | T10 | ✅ shipped 2026-07-27 | #413 |
-| T11 | ⬜ delivery module page (FINAL) | — |
+| T11 | ✅ shipped 2026-07-27 — **LINE COMPLETE** | #425 |

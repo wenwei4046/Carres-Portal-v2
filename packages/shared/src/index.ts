@@ -752,6 +752,7 @@ export {
   DELIVERY_QUEUES,
   DELIVERY_QUEUE_LABELS,
   deliveryQueueByKey,
+  deliveryQueueForLabel,
   deliveryStepDueIso,
   deliveryStepOverdue,
   type DeliveryQueueDef,
@@ -848,6 +849,16 @@ export {
   type DeliveryRange,
   type DeliveryRangeKey,
 } from "./delivery-calendar";
+
+// T11 · The delivery board's ORDER — delivery risk, not the order's overall
+// slack. The Delivery module's ranking law (ACTION-FLOW Law 5, narrowed).
+export {
+  compareDeliveryRows,
+  deliveryDueState,
+  sortDeliveryRows,
+  type DeliveryBoardRow,
+  type DeliveryDueState,
+} from "./delivery-board";
 
 export {
   monthKeyMYT,

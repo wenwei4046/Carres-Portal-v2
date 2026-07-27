@@ -2824,6 +2824,11 @@ export interface opsRemarkEmbed {
    *  the queue stays silent; an explicit `[]` is the real "no photo yet". Only
    *  paths ride the list — a signed view URL is minted per click in the drawer. */
   delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+  /** T8 delivery groups (migration 0282) — what the LIVE booking covers.
+   *  `null`/absent = the trip carries the whole order (T8's own definition, so
+   *  there is nothing to backfill); T11's detail pane reads it to name the
+   *  second trip. Optional: a pre-T11 Worker simply doesn't select it. */
+  booking_groups?: string[] | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

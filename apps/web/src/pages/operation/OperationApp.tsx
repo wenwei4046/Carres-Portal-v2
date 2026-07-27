@@ -17,6 +17,10 @@ import OperationDashboard from "./OperationDashboard";
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
+// T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
+// build plan. Tab-state driven like Payments / Stock (only orders and
+// procurement are path-driven), so `?tab=delivery` deep-links it.
+import OperationDelivery from "./OperationDelivery";
 import OperationPayments from "./OperationPayments";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -321,6 +325,9 @@ export default function OperationApp() {
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
             {tab === "claims" && <OperationSupplierClaims />}
+            {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
+                Read-only by design; every write stays behind the order drawer. */}
+            {tab === "delivery" && <OperationDelivery />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
