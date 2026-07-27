@@ -296,6 +296,28 @@ when C1 reaches it.
 stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
 (our shape puts the party first: `Call Ohana — confirm ready date`).
 
+### The verb dictionary — portal-wide (locked 2026-07-27)
+
+Four verbs, four meanings. Every module uses these; no module invents a fifth.
+
+| Verb | Means | Completion is |
+|---|---|---|
+| **Assign** | an INTERNAL decision — we choose who | the object is chosen. **Never** "the other side accepted" — acceptance is a later, separate action |
+| **Call** | OUTWARD communication — we ask someone for information | the information is obtained **and recorded in the system**. A call with nothing recorded is not complete |
+| **Issue** | the SYSTEM produces a formal document | the document exists |
+| **Upload** | evidence is attached | the file exists |
+
+Examples: `Assign logistic` · `Assign PIC` · `Assign warehouse picker` ·
+`Call {supplier} — confirm ready date` · `Call {carrier} — confirm delivery date` ·
+`Call {customer} — agree new delivery date` · `Issue invoice` · `Issue credit note` ·
+`Upload delivery photo` · `Upload payment proof`.
+
+**Consequence of the Issue rule:** if a document is produced automatically, there is no
+human action to show. `orders.do_number` is stamped by a DB trigger on dispatch (0098), so
+**"Issue delivery order" is not an action in this portal** — the verb rule and the trigger
+agree. It becomes an action only if Carres later wants a human gate before dispatch, which
+is a business decision, not a wording one.
+
 ### UI type dictionary (locked 2026-07-27)
 
 Every visible element has exactly one allowed shape. If a string does not fit its row,

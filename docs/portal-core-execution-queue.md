@@ -148,22 +148,38 @@ Staff never tick anything that only means "I say I did it".
 | `Send PO to {supplier}` | PO exists AND supplier ETA recorded | `purchase_orders` + its eta |
 | `Call {supplier} — confirm ready date` | latest ETA updated | `ops_order_control.line_etas` |
 | `Collect RM {amount} from {customer}` | outstanding = RM 0 | **C5's shared helper — build C5 first** |
-| `Assign logistic` | carrier set | `ops_assigned_logistic` |
+| `Assign logistic` | carrier set — **not** "carrier accepted" (Jess 2026-07-27: Assign is an internal decision; acceptance is the later `Call` action) | `ops_assigned_logistic` |
 | `Call {carrier} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
 | `Call {customer} — agree new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
 | `Upload delivery photo` | at least one photo | `delivery_photos` (0280) |
+
+**The flow is an ORDER OF EVENTS, not a gate chain — and not the display order.** The
+lifecycle reads Send PO → Call supplier → Collect payment → Assign logistic → Call carrier
+→ (Call customer, only on stock delay) → Deliver today → Upload delivery photo. That is
+what happens WHEN. It does **not** mean an action is hidden until the one before it closes
+(Rule 1: an order shows ALL its open actions at once), and it does **not** reorder the
+ladder: **money still displays first** (PayHold is a live, deliberate rule). Lifecycle
+order and display priority are two different things — do not collapse them.
 
 **Two of the proposal's nine actions are deliberately NOT built:**
 - **`Issue Delivery Order`** — nobody issues one. `orders.do_number` is stamped by a DB
   trigger on the dispatch transition (0098), so the action would have no human in it
   (already ruled in T7; the ruling stands).
-- **`Deliver today`'s sub-steps** (`Goods loaded` · `Driver departed`) — no data exists.
-  Verified live: `partner_fleet` holds driver/vehicle columns but **1 row**, and
-  `ops_order_control` has **no per-order driver column at all**. Same for
-  `Driver assigned` / `Vehicle confirmed` inside the carrier call, and
-  `Condo registration completed`. They would be decorative checkboxes — banned by the
-  no-decorative-checkbox law. `Deliver today` keeps its own completion (delivered) and
-  no sub-list until a per-order driver field exists.
+- **`Deliver today`'s sub-steps** (`Goods loaded` · `Driver departed`) — nobody records
+  either, and neither is information we ask anyone for. They stay unbuilt: `Deliver today`
+  keeps its own completion (delivered) and no sub-list.
+
+**The carrier call's driver / vehicle / condo items ARE buildable — as INPUTS, not ticks.**
+Under the verb rule, a `Call` completes when the information is obtained **and recorded**,
+so these are category (b) of the no-decorative-checkbox law: fields the call fills in.
+Verified live: `partner_fleet` carries driver/vehicle columns but holds **1 row**, and
+`ops_order_control` has **no per-order driver column** — so there is nowhere to record them
+today. C6 therefore carries ONE small additive migration: the call-outcome fields on
+`ops_order_control` (driver name · driver phone · vehicle no · condo registration done),
+all nullable, none of them gates. **Draft the migration to Jess first (guardrail #8), and
+check the remote tracker tail immediately before applying.** Each field is optional on the
+form — "if required" in the checklist means the field may stay empty, never that a tick
+lies.
 
 **Where a form already collects the inputs, the form IS the checklist** — the PO form and
 the confirm-booking form are not to be duplicated as tick lists beside themselves.
