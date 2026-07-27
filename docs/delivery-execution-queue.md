@@ -25,9 +25,11 @@
 - **Drawer booking UI is LIVE**: `OrderDetailDrawer.tsx` ~4553 — amber "not confirmed ·
   carrier said 23 Aug" / green "confirmed 23 Aug · 12pm–3pm" + `Confirm with customer` flow.
 - Copy law: `docs/COPY-STANDARD.md` — REWRITTEN 2026-07-27 (Jess): `Chase` is banned; labels
-  are verb + named party + measurable object; Dynamic Checklist law added. The C-line
-  (`docs/portal-core-execution-queue.md`) renames the live UI; T9-T11 are built speaking the
-  NEW words. Older wording inside shipped notes below is historical record, not law.
+  are verb + clear object (party named when one exists); Dynamic Checklist law added.
+  **The rename of the LIVE strings is C1's job and C1 has not run** — until it does, a card
+  renders the shared queue constant rather than forking the vocabulary mid-flight. Do not
+  rename live labels inside a T-card. Older wording inside shipped notes below is historical
+  record, not law.
 - Design law: `docs/UI-KIT.md`. Never leak DB stage words.
 - Deploy law: merge to main first, deploy from main tip, both Pages projects, re-curl 4 canonicals.
 

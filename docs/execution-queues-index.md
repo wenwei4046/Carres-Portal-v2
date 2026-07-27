@@ -31,13 +31,17 @@
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
 
-**State 2026-07-27:** ① **LINE COMPLETE** (#363 #367 #370 #377 #382 #384 #386 #391 #398
-#413 #425 — the Delivery menu item is live, and it is the only new one the plan ever gets) ·
-② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅.
+**State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
+and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
+⑤ K0 #376 + K1 #400 ✅.
 **Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot. T11 shipped
-AHEAD of that lane on Jess's instruction: it runs the Orders list's own ladder rather than a
-copy, so C1's rename and C2's two-layer rewrite reach the Delivery page for free.
+C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot.
+
+**Expect after C5:** the Delivery board holds every order today because the money hold has
+never fired (`balance` NULL on all 55 rows). The moment C5 makes the gate read `orders.paid`,
+about 18 owing orders leave the board at once. That is correct behaviour, and it will look
+like a disappearance.
+
 
 ## Sidebar map — where every line lands
 
