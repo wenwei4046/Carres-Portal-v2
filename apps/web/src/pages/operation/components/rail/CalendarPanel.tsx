@@ -279,7 +279,7 @@ export default function CalendarPanel() {
   });
 
   // Is there anything to show for this day UNDER THE ACTIVE LENS? The
-  // "promised, needs a date" block only exists on a lens that shows deliveries,
+  // "promised, no date yet" block only exists on a lens that shows deliveries,
   // so it must not make a Send-lens day count as occupied — otherwise the range
   // renders neither the day nor the empty line.
   const showsDeliveries = tab === "all" || tab === "deliveries";
@@ -518,7 +518,7 @@ export default function CalendarPanel() {
                   ))}
                   {dayPromised.length > 0 && (
                     <div className="pt-1.5 space-y-1.5">
-                      <div className="t-micro text-warning">Promised this day, needs a date</div>
+                      <div className="t-micro text-warning">Promised this day, no date yet</div>
                       {dayPromised.map((o) => (
                         <div
                           key={o.id}
@@ -553,14 +553,14 @@ export default function CalendarPanel() {
 function DeliveryRow({ d }: { d: DayDelivery }) {
   const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
-  const carrier = d.partnerName?.trim() || "No carrier picked";
+  const carrier = d.partnerName?.trim() || "No logistics picked";
   return (
     <div
       className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"
       title={
         confirmed
           ? "The customer confirmed this date."
-          : "Only the carrier has given this date — not confirmed with the customer yet."
+          : "Only logistics have given this date — not confirmed with the customer yet."
       }
     >
       <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />
@@ -570,7 +570,7 @@ function DeliveryRow({ d }: { d: DayDelivery }) {
           <span
             className={`text-[11px] font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
           >
-            {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Carrier's date"}
+            {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Logistics' date"}
           </span>
         </div>
         <div className={`text-[12px] text-base-700 truncate ${cjkClassName(d.customer)}`}>

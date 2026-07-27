@@ -8,6 +8,7 @@ import {
   BookOpen,
   Calculator,
   Truck,
+  Route,
   LifeBuoy,
   ArrowDownLeft,
   ArrowUpRight,
@@ -143,6 +144,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
           "path:/operation/procurement",
         ],
       },
+      // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
+      // build plan**; every other line upgrades an existing door, and its place
+      // in the rail is the one the queue index draws (Orders · Purchasing ·
+      // Delivery · Stock · Payments). The module WRITES nothing: bookings,
+      // reasons and photos stay behind the order drawer's server-side gates, so
+      // this door shows the delivery work and hands over to the same drawer the
+      // Orders list opens.
+      { key: "delivery", label: "Delivery", icon: Route },
       // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
       // entry, same shape as the Purchasing merge above: one warehouse, three
       // questions (On hand · Ready stock [joins at K2] · In & out). Click
