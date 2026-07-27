@@ -131,6 +131,39 @@ allocated, reserved, or delivered; goods physically sent back flip to
 **ALREADY EXISTS:** `ops_stock_items` per-unit statuses (incoming/free/reserved/void…) —
 ADD statuses to the existing machine, never a parallel table.
 **Done when:** a held unit is invisible to every sell/reserve/deliver path, provably.
+**SHIPPED 2026-07-27 (PR #454, migration 0299).** Three statuses on the existing
+machine — `on_hold` · `returned_to_supplier` · `written_off` — plus why a unit is
+held, under which claim, and when the hold ended. Notes the next cards need:
+- **"Provably" is a DESTINATION rule, not a caller check.** `ops_stock_items`
+  carries a blanket internal write policy and three live PostgREST paths update
+  `status` (the sofa-loan claim, its rollback, the loan return), so a guard
+  inside one RPC is a guard one call walks around — and revoking column-level
+  UPDATE would break the sofa lane. The trigger asks only WHERE a unit is going:
+  `on_hold` may reach `free`, `returned_to_supplier` or `written_off`, and never
+  `reserved`, `sold` or `transferred`. **The read side needed no change at all** —
+  every pick already filters `status='free'`, and the rollup counts only
+  free+reserved, so a held unit is absent from `stock_balances` too.
+- **R1's leftover was worse than invisible.** A damaged unit stayed `incoming`
+  forever, and both `reorder-alert.ts` and `ready-stock-plan.ts` read `incoming`
+  as "on the way" — a unit that will never come was inflating future supply.
+- **A hold is created by RECEIVING and nothing else** (the guard allows only
+  `incoming → on_hold`). A pool unit later found damaged keeps its own machine
+  (`needs_repair` + the Defective view); a second quarantine concept would let a
+  held unit be "refurbished" back into the pool with the claim unanswered.
+- **`returned_to_supplier` and `written_off` are terminal, and a held unit cannot
+  be DELETED** — the hard-delete door would erase evidence an open claim chases.
+- **`back_to_stock` does NOT touch the PO line** — `damaged_qty` is history
+  (R1's accumulate law) and whether the supplier still owes us is the CLAIM's
+  answer. It does write a `stock_movements` row + re-roll `stock_balances`.
+  **Consequence R5 must know:** a PO whose shortfall is closed by a release
+  rather than a replacement delivery stays `open` (only the receive RPC ever
+  closes a PO). Filed as a carry-forward, not fixed inside a stock RPC.
+- **The receive now MINTS the shortfall** — with the damaged units held, a
+  replacement DO had no `incoming` unit left to flip. Own warehouses only.
+- The resolution is **per claim, not per unit**, and is **not gated on the claim
+  closing**: goods and paperwork move on different days.
+- Live at ship: **87 units all `free`, 0 POs, 0 claims** — nothing backfilled.
+  18 assertions passed against live in a rolled-back transaction before apply.
 
 ## R5 · Supplier scorecard
 
@@ -197,7 +230,7 @@ auto-receives their own PO.
 | R1 | ✅ | [#401](https://github.com/wenwei4046/Carres-Portal-v2/pull/401) · 0284 |
 | R2 | ✅ | [#412](https://github.com/wenwei4046/Carres-Portal-v2/pull/412) · 0288 |
 | R3 | ✅ | [#428](https://github.com/wenwei4046/Carres-Portal-v2/pull/428) · 0291 |
-| R4 | ⬜ | — |
+| R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ⬜ | — |
 | R6 | ⬜ after R1-R2 · warehouse login | — |
 | R7 | ⬜ after R1 · GRN duty auto-assign | — |
