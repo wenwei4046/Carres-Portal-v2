@@ -233,30 +233,36 @@ document exists for this trip (and, once logistics have their own portal, has be
 **Done when:** an operator never types a DO again; the document is available the moment the
 customer's date is confirmed.
 
-## C8 · Stock delay becomes TWO steps (Jess ruling 2026-07-27)
+## C8 · A stock delay goes through logistics, not to the customer (Jess ruling 2026-07-27)
 
-**The problem with what shipped in T3:** the moment the latest supplier date overshoots the
-promise, the row says `Call {customer} — agree new delivery date`. A staff member then rings
-the customer with nothing but "it will be late" — and cannot answer "so when?".
+**Two things are wrong in what shipped as T3.** It tells the operator to
+`Call customer (stock delay)` — and Carres does not phone the customer about a delay
+(logistics arranges every delivery appointment, so they carry this one too), and it fires
+the moment the miss is certain, before anyone knows the new ready date. An operator who
+rings and cannot answer "then when?" has made it worse.
 
-**New shape (Jess: "yes need to do"):** the delay first opens an INTERNAL action —
-
-`Confirm recovery plan` · checklist:
+**The chain (from Jess's own words):**
 ```
-□ Confirm the latest ready date with {supplier}
-□ Check available dates with {logistics}
-□ Decide the date or window to propose
-□ Name who calls the customer
+stock problem  →  we try to fix it ourselves (the customer knows nothing)
+               →  we get the REAL ready date from the supplier
+               →  we hand it to logistics
+               →  logistics agrees a new date with the customer
+               →  the customer-confirmed new date lands in the system
 ```
-Completion: a proposed date exists AND a communication owner is named.
 
-**Only then** does `Call {customer} — agree new delivery date` open, and the operator picks
-up the phone already knowing the answer.
+**Build:**
+1. The stock-delay rung stops naming the customer. Until the real ready date is known it
+   stays on the supplier (`Call {supplier} — confirm ready date`) — chasing the date IS the
+   work at that point.
+2. Once a ready date exists and it misses the promise, the action becomes
+   **`Call {logistics} — arrange new delivery date`**, completing on a customer-confirmed
+   date + slot — the same evidence the normal booking flow records, so no second path.
+3. **Nothing may open a customer call about a delay.** No label, no queue, no preset.
 
-**Needs a small additive migration** (proposed date · communication owner) — draft to Jess
-first. Reuse T4's `DELIVERY_REASONS`; **do not create a second reason list.**
-**Depends on C2** (both actions must be able to be open at once).
-**Done when:** nobody can reach the customer-call step without a proposal recorded.
+**Small additive migration** for the proposed date / who is handling it — draft to Jess
+first. Reuse T4's `DELIVERY_REASONS`; never a second reason list. **Depends on C2.**
+**Done when:** no surface anywhere tells an operator to phone a customer about a delay, and
+the logistics action cannot open before a ready date exists.
 
 ## Status
 
