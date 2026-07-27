@@ -114,7 +114,15 @@ uploader role in the case view.
 - each party sees only its own task; the case shows the whole chain as a timeline
   (`Complaint → Collected → At supplier → Repaired → Redelivered → Closed`)
 
-**Done when:** closing a case requires all its tasks closed + customer-confirmed.
+**How a case ENDS depends on who found it (Jess 2026-07-27)** — the same shape as S2's
+`reporters` rule: a case the CUSTOMER raised, or one on goods already in their home, ends
+with the customer confirming they are satisfied. A case the WAREHOUSE or a supplier found
+before the goods went out ends when the fix is verified internally — the customer was never
+told, so there is nothing for them to confirm. If such a case DELAYS the customer's
+delivery, that is not this case's ending: it opens the delivery-side chain, where logistics
+arranges the new date (see `docs/ORDERS-WORKING-FLOW.md`).
+**Done when:** closing a case requires all its steps closed, and the ending that matches
+who reported it.
 
 > **SHIPPED 2026-07-27 (PR #431, migration 0293 applied, Worker `ccc9616a` + web
 > `index-DEsBDZHt.js`).** Notes for the cards that follow:

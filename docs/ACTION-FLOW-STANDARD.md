@@ -128,8 +128,9 @@ open on the same record at the same time.
 ```
 1  Broken commitment or today's run
      Deliver today · the failed-delivery follow-up · Upload delivery photo
-2  The customer must be told something
-     Call {customer} — agree new delivery date
+2  The customer must be told something (through logistics — Carres does not
+   phone about a delay, and never before the ready date is known)
+     Call {logistics} — arrange new delivery date
 3  Goods are not secured
      Send PO to {supplier} · Call {supplier} — confirm ready date
 4  Delivery preparation
