@@ -161,7 +161,7 @@ need:
   the only door (0286/0287's shape). `rejected` and `ordered` are terminal.
 - **Nothing seeded** — the lane is empty until somebody asks.
 
-## K4 · Pool usage reasons + reserve level ✅ (PR #429)
+## K4 · Pool usage reasons + reserve level ✅ (PR #434)
 
 **Goal:** taking a ready-stock unit records WHY (the locked reason list); each SKU carries
 a COO-set `reserve level` — at/below it, further use warns (`近最低保留量`) but never
@@ -169,7 +169,7 @@ blocks (COO decides, system reminds). Usage split (Sales 60% / supplier-delay 25
 readable per month.
 **Done when:** "为什么一直缺货" is answerable from data.
 
-**Shipped 2026-07-27** (PR #429, migrations **0292** + **0294**). The split lives at the
+**Shipped 2026-07-27** (PR #434, migrations **0292** + **0294**). The split lives at the
 bottom of the same Ready stock tab, under the monthly plan and the urgent lane. Notes K5
 needs:
 
@@ -234,5 +234,5 @@ SKU rows.
 | K1 | ✅ shipped 2026-07-27 | #400 |
 | K2 | ✅ shipped 2026-07-27 | #409 |
 | K3 | ✅ shipped 2026-07-27 | #424 |
-| K4 | ✅ shipped 2026-07-27 | #429 |
+| K4 | ✅ shipped 2026-07-27 | #434 |
 | K5 | ⬜ | — |

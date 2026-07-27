@@ -2394,7 +2394,7 @@ clean. No migration; the API change is one column added to an existing select.
 
 ---
 
-**2026-07-27 · Ready Stock K4 — the pool says why it drained, and how low it may go · migrations 0292 + 0294 · PR #PENDING** — the shared ready pool has always been a black box: units left it and nobody could say what for. K4 makes every draw name a reason from Jess's locked list, gives each SKU a COO-set floor that reminds without refusing, and puts the month's split on the bottom of the same Ready stock tab the plan and the urgent lane already share.
+**2026-07-27 · Ready Stock K4 — the pool says why it drained, and how low it may go · migrations 0292 + 0294 · PR #434** — the shared ready pool has always been a black box: units left it and nobody could say what for. K4 makes every draw name a reason from Jess's locked list, gives each SKU a COO-set floor that reminds without refusing, and puts the month's split on the bottom of the same Ready stock tab the plan and the urgent lane already share.
 
 ### The finding that decided the data model
 
