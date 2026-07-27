@@ -657,8 +657,13 @@ export {
   // S3 (0291) — the recorded outcomes of the follow-up chain.
   caseProgressEntrySchema,
   recordCaseStepInputSchema,
+  // S4 (0298) — the deadline's recorded events.
+  caseSlaEventSchema,
+  recordCaseSlaInputSchema,
   type CaseProgressEntryRecord,
   type RecordCaseStepInput,
+  type CaseSlaEventRecord,
+  type RecordCaseSlaInput,
   type CaseEvidenceEntry,
   type CaseEvidenceListResponse,
   type CaseEvidenceUploaded,
@@ -1468,6 +1473,37 @@ export {
   type CaseProgressEntry,
   type CaseTimelineRow,
 } from "./service-case-plan";
+// S4 — the deadline. 14 WORKING days from the report, derived and never stored;
+// only the calls and the one allowed extension are (service_cases.sla_events,
+// 0298). No case silently passes day 14.
+export {
+  CASE_SLA_WORKING_DAYS,
+  CASE_SLA_NOTICE_WORKING_DAY,
+  CASE_SLA_NOTICE_DAYS_BEFORE,
+  CASE_SLA_EXTENSION_MAX_WORKING_DAYS,
+  CASE_SLA_NOTE_MAX,
+  CASE_DELAY_REASONS,
+  CASE_DELAY_REASON_LABEL,
+  CASE_DELAY_REASON_RESPONSIBILITY,
+  caseDelayNeedsNote,
+  caseDelayReasonLabel,
+  caseSlaBaseDue,
+  caseSlaClock,
+  caseSlaExtension,
+  caseSlaExtensionMax,
+  caseSlaWorkingDay,
+  caseSlaAction,
+  caseSlaCountLabel,
+  caseSlaRecordProblem,
+  type CaseDelayReason,
+  type CaseDelayResponsibility,
+  type CaseSlaEvent,
+  type CaseSlaEventKind,
+  type CaseSlaInput,
+  type CaseSlaState,
+  type CaseSlaClock,
+  type CaseSlaRecordInput,
+} from "./service-case-sla";
 export {
   orderMoney,
   type OrderMoneyInput,

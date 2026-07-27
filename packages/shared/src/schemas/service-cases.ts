@@ -11,6 +11,7 @@ import {
   CASE_EVIDENCE_SLOT_KEYS,
 } from "../service-case-evidence";
 import { CASE_STEP_KEYS } from "../service-case-plan";
+import { CASE_DELAY_REASONS, CASE_SLA_NOTE_MAX } from "../service-case-sla";
 
 /**
  * Service Cases (migration 0210) — the case / 病历 parent layer above Service
@@ -159,6 +160,58 @@ export const recordCaseStepInputSchema = z.object({
 });
 export type RecordCaseStepInput = z.infer<typeof recordCaseStepInputSchema>;
 
+// ── The deadline (S4, migration 0298) ────────────────────────────────────────
+
+/**
+ * One deadline event — the customer being told why a case is taking longer, or
+ * the one allowed move of the deadline.
+ *
+ * `at` / `by` / `byRole` / `due` are stamped by the SERVER and refused by
+ * 0298's CHECK if absent. `due` is the load-bearing one: "the customer has been
+ * told" is only ever true about ONE deadline, so each event records which
+ * deadline it was about — otherwise moving the deadline would silently inherit
+ * the last call's silence.
+ *
+ * `kind` and `reason` are plain strings on the READ side (like an evidence
+ * `slot` or a progress `step`): a key that is later retired must stay readable
+ * in the history rather than vanish from it.
+ */
+export const caseSlaEventSchema = z.object({
+  kind:   z.string(),
+  /** The BUSINESS date — the day the customer was actually told. */
+  on:     z.string(),
+  reason: z.string(),
+  note:   z.string().nullable().optional(),
+  /** `extension` only: the new deadline this event created. */
+  until:  z.string().nullable().optional(),
+  /** The deadline in force when the event was made. */
+  due:    z.string().nullable().optional(),
+  at:     z.string(),
+  by:     z.string(),
+  byRole: z.string(),
+});
+export type CaseSlaEventRecord = z.infer<typeof caseSlaEventSchema>;
+
+/**
+ * Record one deadline event. Four fields: which kind, the day the customer was
+ * told, the reason from the locked list, and — for an extension — the new
+ * deadline. Everything else about the entry is the server's to write.
+ *
+ * The date is NOT range-checked here, for the same reason S3's is not: a
+ * back-dated call is legitimate, and "no future dates" would refuse a same-day
+ * record made between midnight and 8 AM MYT, where the browser's date is
+ * already tomorrow by the Worker's UTC clock. The extension's `until` IS
+ * bounded — by `caseSlaRecordProblem`, against the base deadline.
+ */
+export const recordCaseSlaInputSchema = z.object({
+  kind:   z.enum(["customer_told", "extension"]),
+  on:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD"),
+  reason: z.enum(CASE_DELAY_REASONS),
+  note:   z.string().trim().max(CASE_SLA_NOTE_MAX).optional(),
+  until:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD").optional(),
+});
+export type RecordCaseSlaInput = z.infer<typeof recordCaseSlaInputSchema>;
+
 // ── The case record ──────────────────────────────────────────────────────────
 
 export const serviceCaseSchema = z.object({
@@ -240,6 +293,17 @@ export const serviceCaseSchema = z.object({
   progress:        z.array(caseProgressEntrySchema).optional(),
   supplierId:      z.string().uuid().nullable().optional(),
   supplierName:    z.string().nullable().optional(),
+
+  /**
+   * S4 — the deadline (migration 0298). The deadline itself is NOT here: it is
+   * 14 working days after `openedAt`, derived by `caseSlaClock` wherever it is
+   * read. What travels is what was RECORDED — the calls telling the customer
+   * why it is taking longer, and the one allowed move of the deadline.
+   *
+   * Optional for the same degrade-don't-crash reason as the S1-S3 fields above:
+   * a web build newer than the Worker reads an empty clock, never a crash.
+   */
+  slaEvents:       z.array(caseSlaEventSchema).optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 

@@ -18,6 +18,7 @@ import { Search, X } from "lucide-react";
 import CaseOrderLink from "./CaseOrderLink";
 import CaseEvidenceGallery from "./CaseEvidenceGallery";
 import CaseFollowUps from "./CaseFollowUps";
+import CaseDeadline from "./CaseDeadline";
 
 /**
  * Create / edit a Service Case (病历).
@@ -326,6 +327,21 @@ export default function ServiceCaseModal({
                 />
               </dl>
             </div>
+          )}
+
+          {/* S4 — the deadline: 14 working days from the day it was reported,
+              derived from the same clock the list column reads. It sits ABOVE
+              the chain on purpose: it is the one thing on this screen with a
+              date the customer is waiting on. Edit mode only — a case that
+              does not exist yet has not been reported. */}
+          {mode === "edit" && id && existingQ.data && (
+            <CaseDeadline
+              caseId={id}
+              openedAt={existingQ.data.openedAt ?? null}
+              closed={existingQ.data.statusIsClosed}
+              customerName={existingQ.data.customerName}
+              events={existingQ.data.slaEvents ?? []}
+            />
           )}
 
           {/* S3 — the follow-up chain. Derived from what the customer asked
