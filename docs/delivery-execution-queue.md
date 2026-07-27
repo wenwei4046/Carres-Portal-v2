@@ -345,10 +345,56 @@ names the carrier and ends in something the operator can do.
 T1 banned that word and fixed the LIST column; these two drawer copies were left behind.
 One-line fix to T1's `need booking`, flagged rather than touched.
 
-## T10 · Delivery calendar as single source (promotes L2)
+## T10 · Delivery calendar as single source (promotes L2) ✅ (PR #413)
 
 Today / Tomorrow / This week views reading the SAME booking fields — never a second store.
 Partner capacity from T9 shows on the day.
+
+**Shipped note (PR #413):** shared + web, **no migration, no API change** — every field
+the calendar needs already rides the orders list payload (T1 put `booking_stage` /
+`confirmed_date` / `confirmed_time_slot` there; T9 put the carrier rules on
+`/api/operation/partners`).
+
+**The second store already existed, and it was the calendar.** There was no calendar to
+build — the right-rail Calendar has had a Deliveries lens since 2026-07-23, and it bucketed
+orders by `orders.delivery_date`: the date we PROMISED the customer. That is not when a
+truck moves. Since D1 (0277) the truck's day is the booking, and the two dates diverge the
+moment anything is rescheduled — which is the entire reason D1 split them. So T10 is not
+"add a calendar", it is "make the calendar read the booking", and the fix is structural:
+the confirmed-vs-provisional decision moved into ONE pure function
+(`bookingDayOf`, `packages/shared/delivery-calendar.ts`, 34 tests) that the Orders list's
+Delivery column now delegates to as well. The two surfaces cannot put the same order on two
+different days, because there is only one rule left.
+
+**The live finding that shaped the screen:** the database holds **zero bookings** —
+0 confirmed, 0 provisional, across all 55 control rows — while **52 orders carry a promised
+date**. So the pre-T10 calendar was showing 52 deliveries, and not one of them was a booked
+truck. Reading only the booking would therefore have emptied the calendar completely and
+read as a broken panel. The promise is kept on screen as **what it is**: a separate
+`Promised this day, needs a date` block carrying `Call {customer} — book delivery date`,
+never counted as a delivery. The day badge counts bookings; the block counts work. A day
+can now be honestly empty of trucks and honestly full of calls at the same time.
+
+**Ranges:** `This week` is the REST of the week — today through Saturday, because Sunday is
+refused for every carrier by the booking gate. On a Saturday it is just today; on a Sunday
+it is the Mon–Sat starting tomorrow. Empty days are skipped inside a multi-day range (noise)
+but a single empty day still says so out loud (that is the answer).
+
+**T9 on the day, under T9's own law:** each carrier's row shows what it is carrying, and
+only CONFIRMED bookings count toward its limit — a provisional date is not a promise, so it
+cannot fill a truck. All 8 live carriers are bare rows, so today every one shows a plain
+count and warns about nothing. **Sunday is deliberately silent**: every carrier carries the
+default `off_days [0]`, so voicing it as a per-partner rule would have blamed all 8 of them
+for a rule none of them set — and T9 already ruled that a phone call cannot buy a Sunday.
+
+`docs/COPY-STANDARD.md` gains the calendar words (`Confirmed` · `Carrier's date` ·
+`Promised this day, needs a date` · `No carrier picked` · the three range words).
+
+**Found, not fixed (not this card):** the panel's PO lens still has a tab labelled `Chase`,
+banned by the 2026-07-27 copy rewrite. It belongs to the Purchase vocabulary and the C-line
+owns that rename; touching it here would rename a different panel's word from a delivery
+card. Also still open from T9: the drawer's two `Unscheduled` copies
+(`OrderDetailDrawer.tsx` ~3814 and ~3853).
 
 ## T11 · Delivery module page (promotes L5) — the LAST card
 
@@ -367,7 +413,10 @@ else is planned past T11 on purpose.
   deadline relative to the confirmed date (assign ≥3 working days before · confirm ≥1-3 days
   before · delivery order 1 day before · photo same/next day) so a queue item can turn
   overdue BY ITSELF — no human watching required.
-- **L2 Delivery calendar → PROMOTED TO T10** (reads the same booking fields; never a second store).
+- **L2 Delivery calendar → SHIPPED as T10 (PR #413)** — and the "second store" this entry
+  warned about turned out to be the right-rail Calendar itself, which had been bucketing by
+  the PROMISED date since 2026-07-23. It reads the booking now, through the same
+  `bookingDayOf` rule the Orders list Delivery column reads.
 - **L3 Working-day calendar engine** — **already existed** (found in T7):
   `packages/shared/working-days.ts` + `my-holidays.ts`, shipped with procurement
   2026-07-21 (Mon–Sat, Selangor holidays, calendar injected). T7's deadlines use it.
@@ -414,5 +463,5 @@ else is planned past T11 on purpose.
 | T7 | ✅ shipped 2026-07-27 | #386 |
 | T8 | ✅ shipped 2026-07-27 | #391 |
 | T9 | ✅ shipped 2026-07-27 | #398 |
-| T10 | ⬜ delivery calendar | — |
+| T10 | ✅ shipped 2026-07-27 | #413 |
 | T11 | ⬜ delivery module page (FINAL) | — |

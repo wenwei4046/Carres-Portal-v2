@@ -1,10 +1,27 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
+  carrierDayLoads,
+  carrierDayNote,
+  daysInRange,
+  dayWord,
+  deliveryRange,
+  DELIVERY_RANGE_KEYS,
+  inRange,
+  partnerDeliveryRules,
+  type CarrierDayLoad,
+  type DayBooking,
+  type DeliveryRangeKey,
+  type PartnerDeliveryRules,
+} from "@carres/shared";
+import {
   useOperationOrders,
   usePurchaseToday,
   useOperationSuppliers,
+  useDeliveryPartners,
+  type operationOrderListRow,
 } from "@/lib/queries";
+import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import { fmtDateShort } from "@/lib/fmt-date";
@@ -12,12 +29,26 @@ import { fmtDateShort } from "@/lib/fmt-date";
 /**
  * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
  * a month grid with tab-filtered activity from BOTH the customer-delivery
- * side (orders.delivery_date) and the supplier procurement side (Send POs
- * by order-by · Chase by expected-ready · Receive by ETA). Tabs let the
- * operator see a single lens (all / send / chase / receive / deliveries)
- * without leaving the panel. Click a day to list that day's items under
- * the selected tab. Read-only — no new API (reuses purchase-today +
+ * side and the supplier procurement side (Send POs by order-by · Chase by
+ * expected-ready · Receive by ETA). Tabs let the operator see a single lens
+ * without leaving the panel. Read-only — no new API (reuses purchase-today +
  * orders queries already cached by their pages).
+ *
+ * **T10 (delivery calendar as single source, 2026-07-27):** the Deliveries lens
+ * used to bucket orders by `orders.delivery_date` — the date we PROMISED the
+ * customer. That is not when a truck moves. Since D1 (0277) the truck's day is
+ * the BOOKING (`booking_stage` + `confirmed_date`, with `logistic_eta` as the
+ * carrier's provisional word), and the two diverge the moment anything is
+ * rescheduled — which is the entire reason D1 split them. So the lens now reads
+ * the booking through the same `orderBookingDay` adapter the Orders list's
+ * Delivery column reads: never a second store.
+ *
+ * The promise did not disappear from the screen. A day with an order promised
+ * on it and nothing booked is real work — it is simply not a delivery, so it
+ * never counts as one. It is listed as what it is, under the call that fixes it.
+ *
+ * Today / Tomorrow / This week (T10) select a RANGE of days; clicking a day in
+ * the grid selects that one day. Exactly one of the two is active at a time.
  */
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -41,11 +72,21 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** One booked delivery, as the calendar shows it. */
+interface DayDelivery extends DayBooking {
+  orderId: string;
+  so: number;
+  customer: string;
+  slot: string | null;
+  address: string | null;
+}
+
 export default function CalendarPanel() {
   const { data } = useOperationOrders();
   const orders = useMemo(() => data?.orders ?? [], [data]);
   const { data: purchase } = usePurchaseToday();
   const { data: suppliersData } = useOperationSuppliers();
+  const { data: partnersData } = useDeliveryPartners();
   const supplierNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of suppliersData?.suppliers ?? []) m.set(s.id, s.name);
@@ -54,13 +95,73 @@ export default function CalendarPanel() {
   const supplierName = (id: string, fallback: string | null) =>
     fallback?.trim() || supplierNameById.get(id) || id.slice(0, 8);
 
+  // T9 carrier rules, keyed by partner. A partner row that has never been
+  // edited normalises to DEFAULT — zero warnings, which is every live carrier
+  // today (silence over a false alarm).
+  const rulesByPartner = useMemo(() => {
+    const m = new Map<string, PartnerDeliveryRules>();
+    for (const p of partnersData?.partners ?? []) {
+      m.set(
+        p.id,
+        partnerDeliveryRules({
+          offDays: p.off_days ?? undefined,
+          blackoutDates: (p.blackout_dates ?? []).map((d) => String(d).slice(0, 10)),
+          dailyCapacity: p.daily_capacity ?? null,
+          bookingLeadDays: p.booking_lead_days ?? 0,
+        }),
+      );
+    }
+    return m;
+  }, [partnersData]);
+
   const [tab, setTab] = useState<CalTab>("all");
 
-  // Bucket customer deliveries by delivery_date (skip TBD / null).
+  const carrierOf = (o: operationOrderListRow): { id: string | null; name: string | null } => ({
+    id: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
+    name: o.delivery_partners?.name ?? null,
+  });
+
+  // Bucket deliveries by the BOOKING day (T10) — confirmed date when the
+  // customer said yes, otherwise the carrier's provisional date. An order with
+  // neither is not on any day; it is a queue item (Assign / confirm the date).
   const deliveriesByDay = useMemo(() => {
-    const m = new Map<string, typeof orders>();
+    const m = new Map<string, DayDelivery[]>();
+    for (const o of orders) {
+      const booking = orderBookingDay(o);
+      if (booking.kind === "none" || !booking.date) continue;
+      const carrier = carrierOf(o);
+      const entry: DayDelivery = {
+        orderId: o.id,
+        so: o.so,
+        customer: o.customer_name,
+        partnerId: carrier.id,
+        partnerName: carrier.name,
+        kind: booking.kind,
+        date: booking.date,
+        slot: booking.slot,
+        address: o.customer_address ?? null,
+        // No `cancelled` flag to set: the list endpoint filters status IN
+        // (place, proceed_order, delivered), so a cancelled order never
+        // reaches this panel. `DayBooking.cancelled` exists for callers that
+        // read a wider status set.
+      };
+      const arr = m.get(booking.date) ?? [];
+      arr.push(entry);
+      m.set(booking.date, arr);
+    }
+    return m;
+  }, [orders]);
+
+  // Promised on this day with NOTHING booked. Not a delivery — never counted as
+  // one — but real work sitting on that date, so the day never reads as empty
+  // when it isn't.
+  const promisedByDay = useMemo(() => {
+    const m = new Map<string, operationOrderListRow[]>();
     for (const o of orders) {
       if (o.delivery_date_tbd || !o.delivery_date) continue;
+      // A delivered order's promise is kept — it is not outstanding work.
+      if (o.status === "delivered") continue;
+      if (orderBookingDay(o).kind !== "none") continue;
       const key = o.delivery_date.slice(0, 10);
       const arr = m.get(key) ?? [];
       arr.push(o);
@@ -111,6 +212,8 @@ export default function CalendarPanel() {
   }, [purchase]);
 
   // Per-tab active count-per-day map + per-tab totals for the header badges.
+  // The deliveries count is BOOKINGS only — a promised date with nothing booked
+  // is not a truck, and painting it as one is exactly the lie T10 removes.
   const activeCount = (key: string): number => {
     if (tab === "send") return sendByDay.get(key)?.length ?? 0;
     if (tab === "chase") return chaseByDay.get(key)?.length ?? 0;
@@ -124,21 +227,37 @@ export default function CalendarPanel() {
       (deliveriesByDay.get(key)?.length ?? 0)
     );
   };
+  const bookedTotal = useMemo(
+    () => [...deliveriesByDay.values()].reduce((n, arr) => n + arr.length, 0),
+    [deliveriesByDay],
+  );
   const tabTotals = {
     all:
       (purchase?.placeGroups.length ?? 0) +
       (purchase?.chase.length ?? 0) +
       (purchase?.receive.length ?? 0) +
-      deliveriesByDay.size,
+      bookedTotal,
     send: purchase?.placeGroups.length ?? 0,
     chase: purchase?.chase.length ?? 0,
     receive: purchase?.receive.length ?? 0,
-    deliveries: orders.filter((o) => !o.delivery_date_tbd && o.delivery_date).length,
+    deliveries: bookedTotal,
   };
 
   const today = new Date();
+  const todayKey = ymd(today);
   const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
-  const [selected, setSelected] = useState<string | null>(ymd(today));
+  // T10: exactly ONE of these is active. A range chip clears the picked day; a
+  // grid click clears the range. Default = Today, so the panel opens on the
+  // question an operator actually has.
+  const [range, setRange] = useState<DeliveryRangeKey | null>("today");
+  const [picked, setPicked] = useState<string | null>(null);
+
+  const activeRange = range ? deliveryRange(range, todayKey) : null;
+  const shownDays = activeRange
+    ? daysInRange(activeRange.fromIso, activeRange.toIso)
+    : picked
+      ? [picked]
+      : [];
 
   // Build the calendar grid (weeks of the current view month, padded).
   const cells = useMemo(() => {
@@ -158,11 +277,15 @@ export default function CalendarPanel() {
     month: "long",
     year: "numeric",
   });
-  const todayKey = ymd(today);
-  const selectedDeliveries = selected ? (deliveriesByDay.get(selected) ?? []) : [];
-  const selectedSend = selected ? (sendByDay.get(selected) ?? []) : [];
-  const selectedChase = selected ? (chaseByDay.get(selected) ?? []) : [];
-  const selectedReceive = selected ? (receiveByDay.get(selected) ?? []) : [];
+
+  // Is there anything to show for this day UNDER THE ACTIVE LENS? The
+  // "promised, needs a date" block only exists on a lens that shows deliveries,
+  // so it must not make a Send-lens day count as occupied — otherwise the range
+  // renders neither the day nor the empty line.
+  const showsDeliveries = tab === "all" || tab === "deliveries";
+  const dayIsEmpty = (d: string) =>
+    activeCount(d) === 0 && (!showsDeliveries || (promisedByDay.get(d)?.length ?? 0) === 0);
+  const hasAnything = shownDays.some((d) => !dayIsEmpty(d));
 
   return (
     <div className="flex flex-col h-full">
@@ -187,6 +310,42 @@ export default function CalendarPanel() {
               {n > 0 && (
                 <span className="tabular-nums font-bold">{n > 99 ? "99+" : n}</span>
               )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* T10 range chips — Today / Tomorrow / This week. "This week" is the
+          REST of the week, ending Saturday (Sunday is not a delivery day). */}
+      <div className="flex gap-1 mb-2" data-testid="calendar-ranges">
+        {DELIVERY_RANGE_KEYS.map((key) => {
+          const r = deliveryRange(key, todayKey);
+          const active = range === key;
+          const n = daysInRange(r.fromIso, r.toIso).reduce((s, d) => s + activeCount(d), 0);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setRange(key);
+                setPicked(null);
+                // Jump the grid to the month the range lives in.
+                const [y, m] = r.fromIso.split("-").map(Number);
+                if (y && m) setView({ y, m: m - 1 });
+              }}
+              title={
+                r.fromIso === r.toIso
+                  ? fmtDateShort(r.fromIso)
+                  : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
+              }
+              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${
+                active
+                  ? "bg-base-900 text-white"
+                  : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
+              }`}
+            >
+              <span>{r.label}</span>
+              {n > 0 && <span className="tabular-nums font-bold">{n > 99 ? "99+" : n}</span>}
             </button>
           );
         })}
@@ -228,7 +387,9 @@ export default function CalendarPanel() {
           if (!cell) return <div key={i} />;
           const count = activeCount(cell.key);
           const isToday = cell.key === todayKey;
-          const isSel = cell.key === selected;
+          const isSel = activeRange
+            ? inRange(cell.key, activeRange)
+            : cell.key === picked;
           // Per-tab dot tone matches the tab pill for visual consistency.
           const countTone =
             count === 0
@@ -246,9 +407,14 @@ export default function CalendarPanel() {
             <button
               key={i}
               type="button"
-              onClick={() => setSelected(cell.key)}
+              onClick={() => {
+                setPicked(cell.key);
+                setRange(null);
+              }}
               title={count > 0 ? `${count} ${TAB_LABEL[tab].toLowerCase()}` : undefined}
-              className="aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg hover:bg-base-100 transition-colors"
+              className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors ${
+                isSel ? "bg-base-100" : "hover:bg-base-100"
+              }`}
             >
               <span
                 className={`w-6 h-6 grid place-items-center rounded-full text-[12px] ${
@@ -271,94 +437,186 @@ export default function CalendarPanel() {
         })}
       </div>
 
-      {/* Selected day list — content adapts to the active tab. Each section
-          only renders when the tab includes it (all = everything). */}
-      <div className="mt-3 pt-3 border-t border-base-200 flex-1 overflow-auto space-y-3">
-        <div className="t-micro text-base-500">
-          {selected ? fmtDateShort(selected) : "Pick a day"}
-        </div>
-
-        {(tab === "all" || tab === "send") && (
-          <DaySection
-            title="Send POs"
-            tone="text-danger"
-            empty="No POs to send this day."
-            items={selectedSend.map((s) => ({
-              key: `s-${s.supplierId}`,
-              main: supplierName(s.supplierId, s.supplierName),
-              sub: `${s.units} unit${s.units === 1 ? "" : "s"} · send by today`,
-            }))}
-          />
-        )}
-        {(tab === "all" || tab === "chase") && (
-          <DaySection
-            title="Chase"
-            tone="text-warning"
-            empty="No POs to chase this day."
-            items={selectedChase.map((r) => ({
-              key: `c-${r.poId}`,
-              main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-              sub: `${r.units} unit${r.units === 1 ? "" : "s"} · past promised ready`,
-            }))}
-          />
-        )}
-        {(tab === "all" || tab === "receive") && (
-          <DaySection
-            title="Receive"
-            tone="text-success"
-            empty="Nothing arriving this day."
-            items={selectedReceive.map((r) => ({
-              key: `r-${r.poId}`,
-              main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-              sub: `${r.units} unit${r.units === 1 ? "" : "s"} · ETA today`,
-            }))}
-          />
-        )}
-        {(tab === "all" || tab === "deliveries") && (
-          <div>
-            <div className="t-micro text-info mb-1.5">Customer deliveries</div>
-            {selectedDeliveries.length === 0 ? (
-              <div className="text-[12px] text-base-400 text-center py-4">
-                No deliveries this day.
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {selectedDeliveries.map((o) => {
-                  const loc = locationForAddress(o.customer_address ?? null);
-                  return (
-                    <div key={o.id} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
-                      <span className="w-1 rounded-full bg-info shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[12px] font-semibold text-base-900">SO-{o.so}</span>
-                          {loc.label && (
-                            <span
-                              className={`text-[11px] font-medium ${
-                                loc.area === "KV" ? "text-success" : loc.area === "Outstation" ? "text-warning" : "text-base-500"
-                              }`}
-                            >
-                              {loc.label}
-                            </span>
-                          )}
-                        </div>
-                        <div className={`text-[12px] text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
-                          {o.customer_name || "—"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      {/* The days themselves — one block per day in the active range (or the
+          one picked day). Content adapts to the active tab. */}
+      <div className="mt-3 pt-3 border-t border-base-200 flex-1 overflow-auto space-y-4">
+        {shownDays.length === 0 && (
+          <div className="text-[12px] text-base-400 text-center py-4">
+            Pick a day, or Today / Tomorrow / This week.
           </div>
         )}
+        {shownDays.length > 1 && !hasAnything && (
+          <div className="text-[12px] text-base-400 text-center py-4">
+            Nothing on the books for these days.
+          </div>
+        )}
+        {shownDays.map((day) => {
+          const dayDeliveries = deliveriesByDay.get(day) ?? [];
+          const dayPromised = promisedByDay.get(day) ?? [];
+          const daySend = sendByDay.get(day) ?? [];
+          const dayChase = chaseByDay.get(day) ?? [];
+          const dayReceive = receiveByDay.get(day) ?? [];
+          // On a multi-day range an empty day is noise; on ONE day it is the
+          // answer ("nothing that day") and must still be said out loud.
+          if (shownDays.length > 1 && dayIsEmpty(day)) return null;
+          const word = dayWord(day, todayKey);
+          const loads = carrierDayLoads(dayDeliveries, day, rulesByPartner);
+          return (
+            <div key={day} data-testid={`calendar-day-${day}`}>
+              <div className="t-micro text-base-500 mb-2">
+                {word ? `${word} · ${fmtDateShort(day)}` : fmtDateShort(day)}
+              </div>
+
+              {(tab === "all" || tab === "send") && (
+                <DaySection
+                  title="Send POs"
+                  tone="text-danger"
+                  empty="No POs to send this day."
+                  items={daySend.map((s) => ({
+                    key: `s-${s.supplierId}`,
+                    main: supplierName(s.supplierId, s.supplierName),
+                    sub: `${s.units} unit${s.units === 1 ? "" : "s"} · send by today`,
+                  }))}
+                />
+              )}
+              {(tab === "all" || tab === "chase") && (
+                <DaySection
+                  title="Chase"
+                  tone="text-warning"
+                  empty="No POs to chase this day."
+                  items={dayChase.map((r) => ({
+                    key: `c-${r.poId}`,
+                    main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
+                    sub: `${r.units} unit${r.units === 1 ? "" : "s"} · past promised ready`,
+                  }))}
+                />
+              )}
+              {(tab === "all" || tab === "receive") && (
+                <DaySection
+                  title="Receive"
+                  tone="text-success"
+                  empty="Nothing arriving this day."
+                  items={dayReceive.map((r) => ({
+                    key: `r-${r.poId}`,
+                    main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
+                    sub: `${r.units} unit${r.units === 1 ? "" : "s"} · ETA today`,
+                  }))}
+                />
+              )}
+              {showsDeliveries && (
+                <div className="space-y-1.5">
+                  <div className="t-micro text-info">Deliveries</div>
+                  {dayDeliveries.length === 0 ? (
+                    <div className="text-[12px] text-base-400 text-center py-3">
+                      No deliveries booked this day.
+                    </div>
+                  ) : (
+                    dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} />)
+                  )}
+                  {loads.map((l) => (
+                    <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
+                  ))}
+                  {dayPromised.length > 0 && (
+                    <div className="pt-1.5 space-y-1.5">
+                      <div className="t-micro text-warning">Promised this day, needs a date</div>
+                      {dayPromised.map((o) => (
+                        <div
+                          key={o.id}
+                          className="flex gap-2 rounded bg-base-50 px-2 py-1.5"
+                          title="The customer was promised this day but no delivery is booked yet."
+                        >
+                          <span className="w-1 rounded-full bg-warning shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-[12px] font-semibold text-base-900">
+                              SO-{o.so}
+                            </div>
+                            <div className="text-[11px] text-base-500 truncate">
+                              Call {o.customer_name?.trim() || "the customer"} — book delivery date
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-// Section renderer used by Send/Chase/Receive lists (delivered lens keeps its
-// own richer layout because it carries customer name + region tag).
+/** One booked delivery. Confirmed is the ONLY green (T1): the customer said
+ *  yes. The carrier's own date is amber — a date nobody has agreed to. */
+function DeliveryRow({ d }: { d: DayDelivery }) {
+  const confirmed = d.kind === "confirmed";
+  const loc = locationForAddress(d.address);
+  const carrier = d.partnerName?.trim() || "No carrier picked";
+  return (
+    <div
+      className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"
+      title={
+        confirmed
+          ? "The customer confirmed this date."
+          : "Only the carrier has given this date — not confirmed with the customer yet."
+      }
+    >
+      <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[12px] font-semibold text-base-900">SO-{d.so}</span>
+          <span
+            className={`text-[11px] font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
+          >
+            {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Carrier's date"}
+          </span>
+        </div>
+        <div className={`text-[12px] text-base-700 truncate ${cjkClassName(d.customer)}`}>
+          {d.customer || "—"}
+        </div>
+        <div className="text-[11px] text-base-500 truncate">
+          {carrier}
+          {loc.label ? ` · ${loc.label}` : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** "Afternoon (12pm–3pm)" → "12pm–3pm" — the drawer's short-slot read. */
+function shortSlot(slot: string): string {
+  return /\(([^)]+)\)/.exec(slot)?.[1] ?? slot;
+}
+
+/** What a carrier is carrying that day, plus the one sentence its own rules
+ *  earn (T9). Silence is the normal case: a carrier with no rules recorded
+ *  shows its load and says nothing. */
+function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
+  const note = carrierDayNote(load);
+  const alert = !load.runs || load.atLimit;
+  return (
+    <div className="px-2 pt-1">
+      <div
+        className={`flex items-center justify-between gap-2 text-[11px] ${
+          alert ? "text-warning font-semibold" : "text-base-500"
+        }`}
+      >
+        <span className="truncate">{load.partnerName}</span>
+        <span className="tabular-nums shrink-0">
+          {load.capacity != null
+            ? `${load.confirmed} of ${load.capacity}`
+            : `${load.confirmed + load.provisional}`}
+        </span>
+      </div>
+      {note && <div className="text-[11px] text-warning mt-0.5">{note}</div>}
+    </div>
+  );
+}
+
+// Section renderer used by Send/Chase/Receive lists (the delivery lens keeps
+// its own richer layout because it carries carrier + slot + region).
 function DaySection({
   title,
   tone,
@@ -371,10 +629,10 @@ function DaySection({
   items: Array<{ key: string; main: string; sub: string }>;
 }) {
   return (
-    <div>
+    <div className="mb-3">
       <div className={`t-micro mb-1.5 ${tone}`}>{title}</div>
       {items.length === 0 ? (
-        <div className="text-[12px] text-base-400 text-center py-4">{empty}</div>
+        <div className="text-[12px] text-base-400 text-center py-3">{empty}</div>
       ) : (
         <div className="space-y-1.5">
           {items.map((it) => (
