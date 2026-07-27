@@ -29,13 +29,28 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447** · Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) |
 
 **State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
 and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
-⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C5 ✅ #447**.
-**Drawer lane, in this order:** C2 → C3 → C6 → C7 → C8 (C9 any time after C5).
+⑤ K0 #376 + K1 #400 ✅ · ⑥ **C1 ✅ #461 · C2 ✅ #466 · C5 ✅ #447**.
+**Drawer lane, in this order:** C3 → C6 → C7 → C8 (C9 any time after C5; C10 needs one Jess call).
 R/S/K run in parallel throughout; C4 waits for a free R slot.
+
+**What C2 changed (2026-07-27, PR #466).** The ladder is TWO LAYERS now: three tracks —
+goods · delivery · money — computed independently, then one pure function picks which goes
+first. **The row's headline is unchanged and that is proved, not claimed**: `nextActionOf`
+kept its signature, became Layer 2 over Layer 1, and its whole existing suite (Loo's freeze
+gate, the T3 radar, T7's date split, C5's money hold — 103 assertions) passed across the
+split. What is NEW is the drawer: it lists every open action, built from the same call that
+produced the row's pill, so the two cannot disagree. **What that unhides on today's board:**
+51 of 56 orders carry a logistics company and **0 have a confirmed booking**, so the
+delivery call now sits beside the supplier call instead of behind it, and `Assign logistics`
+no longer waits for stock it never depended on. **The one headline that changes**: money is
+its own track and survives delivery, so a delivered order that still owes reads
+`Collect RM … from {customer}` where it read `Done` — live there are 0 delivered orders, so
+no row moved on the day. C2 also fixed the `To book` predicate PR #464 handed it (it demanded
+stock be in; the tab now answers only "has the customer confirmed?").
 
 **What C1 changed on screen (2026-07-27).** Every action label on Orders, its queues,
 its drawer and the Delivery module now names the party: `Chase logistic` → the queue
