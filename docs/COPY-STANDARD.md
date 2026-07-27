@@ -242,6 +242,60 @@ Fixed phrasings — reuse these, do not invent variants:
 **Never** write "partial delivery", "split shipment", "back-order" or
 "consignment" on screen — say what goes and what follows, in furniture words.
 
+## The dictionary — every visible word, audited (Jess 2026-07-27)
+
+**First, the distinction that stops the arguing.** Screen text is one of TWO kinds, and
+mixing them is what produced words like "need booking":
+
+| Kind | Must read as | Lives in |
+|---|---|---|
+| **ACTION** — what a human does next | verb + **named party** + **measurable object** | NEXT column · queue names · buttons · drawer checklist |
+| **FACT** — what is true right now | a name, a date, a number | delivery column · badges · timeline |
+
+**The trap is the third kind: a FACT that is secretly a to-do.** `need booking` ·
+`Unscheduled` · `Pending` · `At Risk` · `Attention` — they describe a GAP, so the reader
+still has to work out what to do. **Rule: a fact may state an absence (`No carrier`), but
+it may never contain a to-do word (`need`, `pending`, `required`, `TBD`, `at risk`).**
+If the sentence is about a gap, write the ACTION that closes it.
+
+### Live audit — what ships today vs what it must say
+
+**ACTIONS (the ladder, the queues, the buttons):**
+
+| Ships today | Verdict | Must become |
+|---|---|---|
+| `Order PO` | no party | `Send PO to {supplier}` |
+| `Chase supplier` | banned word · no measurable object | `Call {supplier} — confirm ready date` |
+| `Chase logistic` | banned word | `Call {carrier} — confirm delivery date` |
+| `Call customer (stock delay)` | party is a role · object not measurable | `Call {customer} — agree new delivery date` |
+| `Assign logistic` | ✅ keep | (the party is what you are choosing — it cannot be named yet) |
+| `Deliver today` | ✅ keep | (verb + when; the truck is the party) |
+| `Upload delivery photo` | ✅ keep | (nobody else is involved) |
+| `Collect $` | no amount, no party | `Collect RM {amount} from {customer}` (pill: `Collect RM 2,455`) |
+| `Confirm` | bare verb — worst offender | `Confirm delivery with {customer}` |
+| `Done` | ✅ keep | (terminal fact, not an action) |
+
+**FACTS (the delivery column, badges):**
+
+| Ships today | Verdict | Must become |
+|---|---|---|
+| `confirmed 27 Jul · 9–11 AM` | ✅ keep | — |
+| `not confirmed · carrier said 27 Jul` | ✅ keep | — |
+| `need booking` | **to-do word in a fact** | `{carrier} — confirm delivery date` |
+| `Unscheduled` | banned (T1) | `{carrier} — confirm delivery date` |
+| `No carrier` | ✅ keep | (states an absence, no to-do word; the NEXT column carries `Assign logistic`) |
+
+**FILTER / STATE words** live in FILTERS only (C-vocab, Jess 2026-07-19) and are nouns,
+not actions: `All · Placed · Proceed · Scheduled · Delivered · Owing`. **`Pending` is
+banned even as a filter** — pending on what? Rename it to the state it actually selects
+when C1 reaches it.
+
+**Adopted from the PORTAL_CORE vocabulary proposal:** the ban on `Chase`, on `At Risk` /
+`Attention` / `Pending`, and the rule that a label names measurable work.
+**Deliberately NOT adopted:** its ban on the WORD "customer" as a party (when no name is
+stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
+(our shape puts the party first: `Call Ohana — confirm ready date`).
+
 ## Vocabulary — the canonical words
 
 Use these words EVERYWHERE. Never a synonym in a different page. When in
