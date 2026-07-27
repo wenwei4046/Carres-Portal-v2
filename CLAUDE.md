@@ -7,6 +7,13 @@
 > decisions, then writes CARDS; it writes no code) and a **BUILD chat** (does ONE card, ships
 > it, marks it ✅; it redesigns nothing).
 >
+> **SEVEN lines now — ⑦ Purchasing opened 2026-07-27** with
+> [`docs/PURCHASING-WORKING-FLOW.md`](docs/PURCHASING-WORKING-FLOW.md) +
+> [`docs/purchasing-execution-queue.md`](docs/purchasing-execution-queue.md). **Seven older
+> purchasing documents (1,222 lines) were DELETED** — none was authoritative, so every build
+> chat picked a different one and built something different. That is the whole reason the
+> module failed five times, and it is why one concern gets exactly one file.
+>
 > **FOUR LAWS outrank anything pasted into a chat:**
 > [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) — how actions are computed,
 > appear, close, and which one shows first ·
@@ -30,6 +37,16 @@
 > code · what would confuse a new hire · what could not be built as written · what the flow
 > does not cover). "Nothing found" is a valid answer; **silence is a failure.** If building
 > as written would ship something wrong, stop before building and ask.
+
+> **⭐⭐⭐ EVERY ROW IN THE DATABASE TODAY IS TEST DATA (Jess, said many times, restated
+> 2026-07-27).** The AutoCount import and the Master Sheet import are a TRIAL — she is
+> checking whether the portal can eat them. **At go-live the database starts CLEAN and no old
+> data is carried over.** Therefore: live counts are evidence about whether CODE WORKS, never
+> about business volume or history · **never propose a backfill, a repair worklist or a
+> cleanup card for imported rows** (that mistake already cost the attribution worklist,
+> deleted whole in #435 / 0296) · no feature may depend on old data existing after go-live ·
+> what must survive is CONFIGURATION (suppliers, SKUs, production days, rates), not
+> transactions.
 
 > **⭐⭐ FOR ANY OPERATION-PORTAL / OPS-PANEL WORK, READ [`docs/OPS-BUILD-BRIEF.md`](docs/OPS-BUILD-BRIEF.md) FIRST.**
 > It is the single un-skippable entry point: the 3-track business model (货→送→钱), the

@@ -43,7 +43,7 @@ every visible word, audited") — build from that table, not from memory.** In t
 - `Chase logistic` → queue `Confirm delivery date`; row `Call {carrier} — confirm delivery date`
 - `Chase supplier` → `Call {supplier} — confirm ready date`
 - `Order PO` → `Send PO to {supplier}`
-- `Call customer (stock delay)` → `Call {customer} — agree new delivery date`
+- `Call customer (stock delay)` → `Call {logistics} — arrange new delivery date` (Jess 2026-07-27: Carres never phones a customer about a delay — logistics does)
 - `Collect $` → `Collect RM {amount}` (pill) · `Collect RM {amount} from {customer}` (row)
 - `Confirm` (bare) → `Confirm delivery with {customer}`
 - delivery column + drawer badges: `need booking` / `Unscheduled` → `{carrier} — confirm delivery date`
@@ -373,14 +373,15 @@ Staff never tick anything that only means "I say I did it".
 | `Send PO to {supplier}` | PO exists AND supplier ETA recorded | `purchase_orders` + its eta |
 | `Call {supplier} — confirm ready date` | latest ETA updated | `ops_order_control.line_etas` |
 | `Collect RM {amount} from {customer}` | outstanding = RM 0 | **C5's shared helper — build C5 first** |
-| `Assign logistic` | carrier set — **not** "carrier accepted" (Jess 2026-07-27: Assign is an internal decision; acceptance is the later `Call` action) | `ops_assigned_logistic` |
-| `Call {carrier} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
-| `Call {customer} — agree new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
+| `Assign logistics` | logistics company set — **not** "they accepted" (Jess 2026-07-27: Assign is an internal decision; acceptance is the later `Call` action) | `ops_assigned_logistic` |
+| `Call {logistics} — confirm delivery date` | customer date + slot confirmed | `booking_stage='confirmed'` (0277) |
+| `Call {logistics} — arrange new delivery date` | new date recorded with a reason | 0196 extension + T4 reasons |
 | `Upload delivery photo` | at least one photo | `delivery_photos` (0280) |
 
 **The flow is an ORDER OF EVENTS, not a gate chain — and not the display order.** The
-lifecycle reads Send PO → Call supplier → Collect payment → Assign logistic → Call carrier
-→ (Call customer, only on stock delay) → Deliver today → Upload delivery photo. That is
+lifecycle reads Send PO → Call supplier → Collect payment → Assign logistics → Call
+logistics → (call LOGISTICS, never the customer, only on stock delay) → Deliver today →
+Upload delivery photo. That is
 what happens WHEN. It does **not** mean an action is hidden until the one before it closes
 (Rule 1: an order shows ALL its open actions at once), and it does **not** reorder the
 ladder: **money still displays first** (PayHold is a live, deliberate rule). Lifecycle
