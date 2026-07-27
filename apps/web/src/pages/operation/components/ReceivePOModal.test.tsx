@@ -527,3 +527,177 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
     expect(receiveMutateAsync).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * R1 (receiving & claim queue, 2026-07-27) — receiving is an INSPECTION.
+ *
+ * The modal records three numbers per line instead of one, speaks "Pending
+ * delivery" (never "Missing"), and refuses to let one DO account for more
+ * units than the line still owes.
+ */
+describe("ReceivePOModal — R1 inspection numbers", () => {
+  function openDamagedPo() {
+    render(
+      wrap(
+        <ReceivePOModal
+          po={makePo({
+            purchase_order_lines: [
+              {
+                id: "44444444-4444-4444-8444-444444444444",
+                sku: "mattress:carres-cloud:King",
+                qty: 5,
+                received_qty: 0,
+              },
+            ],
+          })}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE}
+          onClose={() => {}}
+        />,
+      ),
+    );
+  }
+
+  async function armTheDo() {
+    fireEvent.click(
+      screen.getByText(/Goods inspected and DO signed by warehouse/)
+        .previousSibling as Element,
+    );
+    const file = new File(["%PDF-1.4"], "do.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText(/^do file$/i), {
+      target: { files: [file] },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Mark received|Receive partial|report issue/ }),
+      ).not.toBeDisabled(),
+    );
+  }
+
+  it("says Pending delivery, never Missing", () => {
+    openDamagedPo();
+    expect(screen.getByText("Pending delivery")).toBeInTheDocument();
+    expect(screen.queryByText(/missing/i)).not.toBeInTheDocument();
+  });
+
+  it("offers a Damaged and a Wrong item box per line", () => {
+    openDamagedPo();
+    expect(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Wrong item qty for mattress:carres-cloud:King/),
+    ).toBeInTheDocument();
+  });
+
+  it("sends damaged + wrong-item qty with the receive", async () => {
+    openDamagedPo();
+    // 3 good, 1 damaged, 1 wrong item out of 5 ordered.
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Wrong item qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Receive qty for mattress:carres-cloud:King/),
+      { target: { value: "3" } },
+    );
+    await armTheDo();
+    fireEvent.click(screen.getByRole("button", { name: /report issue/ }));
+    await waitFor(() => expect(receiveMutateAsync).toHaveBeenCalledTimes(1));
+    expect(receiveMutateAsync.mock.calls[0]?.[0].lines).toEqual([
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        receivedQty: 3,
+        damagedQty: 1,
+        wrongItemQty: 1,
+      },
+    ]);
+  });
+
+  it("a clean delivery sends the pre-R1 payload — no empty issue keys", async () => {
+    openDamagedPo();
+    await armTheDo();
+    fireEvent.click(screen.getByRole("button", { name: /Mark received/ }));
+    await waitFor(() => expect(receiveMutateAsync).toHaveBeenCalledTimes(1));
+    expect(receiveMutateAsync.mock.calls[0]?.[0].lines).toEqual([
+      { id: "44444444-4444-4444-8444-444444444444", receivedQty: 5 },
+    ]);
+  });
+
+  it("an all-broken delivery is still submittable (0 good units)", async () => {
+    openDamagedPo();
+    fireEvent.change(
+      screen.getByLabelText(/Receive qty for mattress:carres-cloud:King/),
+      { target: { value: "0" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "5" } },
+    );
+    await armTheDo();
+    fireEvent.click(screen.getByRole("button", { name: /report issue/ }));
+    await waitFor(() => expect(receiveMutateAsync).toHaveBeenCalledTimes(1));
+    expect(receiveMutateAsync.mock.calls[0]?.[0].lines).toEqual([
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        receivedQty: 0,
+        damagedQty: 5,
+      },
+    ]);
+  });
+
+  it("reporting damage takes its units off Receive-now instead of snapping back to 0", () => {
+    openDamagedPo();
+    const damaged = screen.getByLabelText(
+      /Damaged qty for mattress:carres-cloud:King/,
+    ) as HTMLInputElement;
+    const receive = screen.getByLabelText(
+      /Receive qty for mattress:carres-cloud:King/,
+    ) as HTMLInputElement;
+    // Receive-now starts pre-filled with all 5 pending units.
+    expect(receive.value).toBe("5");
+    fireEvent.change(damaged, { target: { value: "2" } });
+    expect(damaged.value).toBe("2");
+    expect(receive.value).toBe("3");
+  });
+
+  it("never lets one DO account for more units than the line still owes", () => {
+    openDamagedPo();
+    const damaged = screen.getByLabelText(
+      /Damaged qty for mattress:carres-cloud:King/,
+    ) as HTMLInputElement;
+    const wrongItem = screen.getByLabelText(
+      /Wrong item qty for mattress:carres-cloud:King/,
+    ) as HTMLInputElement;
+    const receive = screen.getByLabelText(
+      /Receive qty for mattress:carres-cloud:King/,
+    ) as HTMLInputElement;
+    fireEvent.change(damaged, { target: { value: "9" } });
+    expect(damaged.value).toBe("5");
+    expect(receive.value).toBe("0");
+    // 5 already damaged leaves no room for a wrong item on the same DO.
+    fireEvent.change(wrongItem, { target: { value: "1" } });
+    expect(wrongItem.value).toBe("0");
+    fireEvent.change(receive, { target: { value: "3" } });
+    expect(receive.value).toBe("0");
+  });
+
+  it("explains that a damaged unit is not booked into stock", async () => {
+    openDamagedPo();
+    fireEvent.change(
+      screen.getByLabelText(/Receive qty for mattress:carres-cloud:King/),
+      { target: { value: "4" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/Damaged qty for mattress:carres-cloud:King/),
+      { target: { value: "1" } },
+    );
+    expect(
+      await screen.findByTestId("receive-po-issue-note"),
+    ).toHaveTextContent(/not booked into stock/i);
+  });
+});

@@ -81,6 +81,13 @@ export type AttachDoInput = z.infer<typeof attachDoInput>;
  * Atomic semantics: the RPC processes every line in one transaction — any
  * line failure rolls back the whole receive, including stock_balances bumps
  * and thread advancement. No more "did this PO partial-write half its lines?"
+ *
+ * R1 (0284, receiving & claim queue): receiving is an INSPECTION, so a line
+ * may also report what was WRONG with this delivery. `damagedQty` and
+ * `wrongItemQty` are what THIS DO found — the RPC adds them to the line's
+ * running counters, unlike `receivedQty` which stays a new total. They are
+ * NOT received: a damaged unit never enters stock and its qty stays Pending
+ * delivery, because the supplier still owes a good one.
  */
 export const receivePoWithDoInput = z.object({
   doNumber: z.string().min(3),
@@ -93,6 +100,10 @@ export const receivePoWithDoInput = z.object({
     // purchase_order_lines select. sku is kept for display/audit only.
     id: z.string().uuid(),
     receivedQty: z.number().int().nonnegative(),
+    // R1: optional so a caller that only books good goods is unchanged.
+    // The RPC refuses received + damaged + wrong > ordered on one DO.
+    damagedQty: z.number().int().nonnegative().optional(),
+    wrongItemQty: z.number().int().nonnegative().optional(),
   })).min(1),
 }).strict();
 export type ReceivePoWithDoInput = z.infer<typeof receivePoWithDoInput>;

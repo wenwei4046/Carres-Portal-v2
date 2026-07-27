@@ -103,7 +103,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   let q = sb
     .from("purchase_orders")
     .select(
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(sku, qty, received_qty, attrs)",
+      // R1 (0284): damaged_qty + wrong_item_qty ride the list so the Receiving
+      // queue can show a progress state — In transit / Partially received /
+      // Fully received / Receiving issue — without opening a single PO.
+      // The line UUID is the lookup key `operation_receive_po_with_do` needs
+      // (0076) — without it the Receiving station could not submit a receive
+      // at all. Every other PO-line select already carries it.
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, attrs)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -904,6 +910,13 @@ operationPosRouter.post("/:id/receive", requireOperation, async (c) => {
       // RPC body.
       id: l.id,
       received_qty: l.receivedQty,
+      // R1 (0284): what this DO found wrong. Snake-case to match the RPC's
+      // `v_line->>'damaged_qty'` read. Omitted keys are 0 inside the RPC, so a
+      // clean delivery sends the same payload it always did. NOTE the mixed
+      // semantics, which the RPC comments spell out: received_qty is the NEW
+      // TOTAL, these two are what THIS delivery found (they accumulate).
+      damaged_qty: l.damagedQty ?? 0,
+      wrong_item_qty: l.wrongItemQty ?? 0,
     })),
   });
   if (error) {
