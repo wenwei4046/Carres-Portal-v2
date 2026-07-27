@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import {
   CASE_REPORTERS,
+  caseFollowUpPlan,
   caseIssueLabel,
+  caseMayClose,
   caseNeedsManager,
   caseProductCategoryLabel,
   caseUsableLabel,
@@ -15,6 +17,7 @@ import {
 import { Search, X } from "lucide-react";
 import CaseOrderLink from "./CaseOrderLink";
 import CaseEvidenceGallery from "./CaseEvidenceGallery";
+import CaseFollowUps from "./CaseFollowUps";
 
 /**
  * Create / edit a Service Case (病历).
@@ -147,6 +150,23 @@ export default function ServiceCaseModal({
 
   const canSave = customerName.trim().length > 0 && !saveMut.isPending;
 
+  /**
+   * S3 — may this case be closed? The same shared answer the server's gate
+   * gives, so the greyed-out option and the refusal cannot disagree. A case
+   * that is ALREADY closed keeps its closing statuses selectable: the rule is
+   * about entering the state, not about staying in it.
+   */
+  const canClose =
+    (existingQ.data?.statusIsClosed ?? false) ||
+    caseMayClose(
+      caseFollowUpPlan({
+        customerWants: existingQ.data?.customerWants ?? [],
+        customerName:  existingQ.data?.customerName,
+        supplierName:  existingQ.data?.supplierName ?? null,
+      }),
+      existingQ.data?.progress ?? [],
+    );
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
       <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
@@ -238,11 +258,18 @@ export default function ServiceCaseModal({
               </select>
             </Field>
             <Field label="Status">
+              {/* S3 — a closing status is not offered while the chain is still
+                  open. The server refuses it either way (`case_steps_open`);
+                  this is the courtesy that stops a new hire meeting a refusal
+                  they could have seen coming. Already-closed cases keep every
+                  option: the gate is the transition, not a lock on the row. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-sm bg-white">
                 <option value="">— select —</option>
                 {configQ.data?.statuses.map((s) => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
+                  <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
+                    {s.label}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -299,6 +326,22 @@ export default function ServiceCaseModal({
                 />
               </dl>
             </div>
+          )}
+
+          {/* S3 — the follow-up chain. Derived from what the customer asked
+              for, so it needs no state of its own and cannot drift from the
+              case; only the OUTCOMES are stored. Edit mode only — a case that
+              does not exist yet has nothing to follow up. */}
+          {mode === "edit" && id && existingQ.data && (
+            <CaseFollowUps
+              caseId={id}
+              answers={{
+                customerWants: existingQ.data.customerWants ?? [],
+                customerName:  existingQ.data.customerName,
+                supplierName:  existingQ.data.supplierName ?? null,
+              }}
+              progress={existingQ.data.progress ?? []}
+            />
           )}
 
           {/* S2 — the evidence the case was filed with, each file naming who

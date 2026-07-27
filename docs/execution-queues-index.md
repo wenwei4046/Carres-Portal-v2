@@ -14,6 +14,8 @@
 > - Migration-bearing cards: check the remote tracker tail immediately before apply
 >   (guardrail #8). Two lines may take dual numbers the same day — cosmetic, the tracker
 >   keys on timestamp; never renumber applied files.
+> - **Business-rule documents may be edited only in a PLAN chat.** A BUILD chat implements
+>   the existing standards; it never redesigns them. (It still REPORTS problems — Law 0.)
 > - Deploys will occasionally collide: every chat already follows the union-tip rule
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
@@ -24,18 +26,22 @@
 |---|---|---|---|
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
-| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | not started |
+| ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S5 | S1 ✅ #397 · S2 ✅ #410 · S3 ✅ #431 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | not started |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | K0 ✅ #376 · K1 ✅ #400 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C8 | Jess rulings 2026-07-27 (Dynamic Checklist · Chase banned) + **C5 HIGH money-gate fix** |
 
-**State 2026-07-27:** ① **LINE COMPLETE** (#363 #367 #370 #377 #382 #384 #386 #391 #398
-#413 #425 — the Delivery menu item is live, and it is the only new one the plan ever gets) ·
-② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) · ⑤ K0 #376 + K1 #400 ✅.
+**State 2026-07-27:** ① **LINE COMPLETE** (T1-T11, the last being #425 — the Delivery page
+and the one new sidebar item) · ② **LINE COMPLETE** (J1 #385 · J2 #389 · J3 #394) ·
+⑤ K0 #376 + K1 #400 ✅.
 **Drawer lane, in this order:** **C5 (HIGH — money gate, live false-block)** → C1 → C2 →
-C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot. T11 shipped
-AHEAD of that lane on Jess's instruction: it runs the Orders list's own ladder rather than a
-copy, so C1's rename and C2's two-layer rewrite reach the Delivery page for free.
+C3 → C6 → C7 → C8. R/S/K run in parallel throughout; C4 waits for a free R slot.
+
+**Expect after C5:** the Delivery board holds every order today because the money hold has
+never fired (`balance` NULL on all 55 rows). The moment C5 makes the gate read `orders.paid`,
+about 18 owing orders leave the board at once. That is correct behaviour, and it will look
+like a disappearance.
+
 
 ## Sidebar map — where every line lands
 
@@ -65,12 +71,20 @@ Service Cases       ← ③ S1-S5 (wizard rebuilds the entry, list/Service Note 
 outside design conversation into cards) and a BUILD chat (do one card). Nothing else needs
 to be remembered.
 
+## Source of Truth Law
+
+Every rule exists in ONE place only. Business rules → the module's working flow · action
+engine → `docs/ACTION-FLOW-STANDARD.md` · UI wording → `docs/COPY-STANDARD.md` · execution
+queue → this file. **Never duplicate a rule into a second document.** When a rule changes,
+the source document is updated and nothing else — a copy elsewhere is how Delivery gets
+fixed and Purchasing is forgotten.
+
 ## The module working-flow files (one per module — the only home for its actions)
 
-| Module | File |
-|---|---|
-| Orders | `docs/ORDERS-WORKING-FLOW.md` |
-| Purchasing · Receiving · Service · Stock · Payments | same shape, written when the line starts |
+**Every module owns ONE working-flow file. Every working-flow file uses the same structure.
+Only the business content differs — the document structure never changes.** Orders' file
+(`docs/ORDERS-WORKING-FLOW.md`) is the template; each further module gets
+`docs/<MODULE>-WORKING-FLOW.md` when its line starts.
 
 ## The engine law (read before any C-card, and before any new module)
 

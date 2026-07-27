@@ -94,7 +94,9 @@ export default function HrOverviewTab({
   if (unattributed.length > 0) {
     todos.push({
       text: `${unattributed.length} order${unattributed.length === 1 ? "" : "s"} without a salesperson`,
-      to: "/hr?tab=attribution",
+      // Attribution retired 2026-07-27 — the worklist opens on Commission →
+      // Earnings, under the warning it belongs to.
+      to: "/hr?tab=commission",
     });
   }
   if (commissionTotal === 0 && staffWithoutRate.length === activeStaff.length && activeStaff.length > 0) {

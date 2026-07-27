@@ -272,6 +272,7 @@ import {
   type SetPositionDutyInput,
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
+  type SupplierClaimMove,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -3322,12 +3323,13 @@ export function useDeliveryPartners(
  *  §18.4). Stable list (suppliers are managed in operation Settings + don't
  *  change between sessions); cache for 5 minutes. */
 /**
- * R2 — the supplier-claim queue (`GET /api/operation/supplier-claims`).
+ * R2 + R3 — the supplier-claim queue (`GET /api/operation/supplier-claims`).
  *
- * Read-only by design: there is no "file a claim" mutation anywhere, because a
- * claim is minted by the receive (or the daily late-delivery sweep) inside
- * migration 0288. A hand-filed claim would be a receiving problem with no
- * receiving behind it — the exact hole the card closes.
+ * There is no "file a claim" mutation anywhere, because a claim is minted by
+ * the receive (or the daily late-delivery sweep) inside migration 0288. A
+ * hand-filed claim would be a receiving problem with no receiving behind it —
+ * the exact hole the card closes. R3's three mutations move a claim that
+ * already exists; none of them can create one.
  */
 export interface SupplierClaimListRow {
   id: string;
@@ -3346,6 +3348,18 @@ export interface SupplierClaimListRow {
   reported_by_name: string | null;
   reported_at: string;
   photo_count: number;
+  // R3 — the two sides, and who owes the next move.
+  requested_action: string | null;
+  requested_at: string | null;
+  supplier_response: string | null;
+  supplier_response_note: string | null;
+  responded_at: string | null;
+  closed_at: string | null;
+  close_note: string | null;
+  /** Does the PO line still owe us units? Read for late claims only; null =
+   *  could not tell (the line was deleted), which counts as still pending. */
+  line_pending: boolean | null;
+  next_move: SupplierClaimMove;
 }
 
 export interface SupplierClaimsResponse {
@@ -3392,6 +3406,100 @@ export function useOperationSupplierClaimPhotos(
     staleTime: 10 * 60_000,
     ...opts,
   });
+}
+
+/**
+ * R3 — the three moves on a claim: what we asked · what they answered · close.
+ *
+ * One hook shape for all three because they share one invalidation: any move
+ * changes the row, the counts and who owes the next move, so the whole queue is
+ * refetched rather than patched. A claim desk is small — correctness beats a
+ * clever cache write, and a stale "supplier owes the move" is the one thing
+ * this card exists to prevent.
+ */
+export interface SupplierClaimMoveResult {
+  claim_no?: string;
+  status?: string;
+  requested_action?: string;
+  supplier_response?: string;
+}
+
+function useSupplierClaimMove<TInput>(
+  path: (claimId: string) => string,
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string } & TInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    SupplierClaimMoveResult,
+    ApiError,
+    { claimId: string } & TInput
+  >({
+    mutationFn: ({ claimId, ...body }) =>
+      apiFetch<SupplierClaimMoveResult>(path(claimId), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** What WE ask the supplier to do. */
+export function useSupplierClaimRequestMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; requested_action: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ requested_action: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/request`,
+    opts,
+  );
+}
+
+/** What the SUPPLIER answered. Does not close the claim — the goods usually
+ *  arrive days after the promise. */
+export function useSupplierClaimResponseMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; supplier_response: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ supplier_response: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/response`,
+    opts,
+  );
+}
+
+/** Settle it. The server refuses unless both sides are on file. */
+export function useSupplierClaimCloseMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/close`,
+    opts,
+  );
 }
 
 export function useOperationSuppliers(

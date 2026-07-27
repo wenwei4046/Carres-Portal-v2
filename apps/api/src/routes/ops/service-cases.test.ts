@@ -115,24 +115,64 @@ function buildSb(rows: unknown[]) {
   return { sb, eqCalls, selects, inserts };
 }
 
-/** The create path needs `.single()` to resolve to a ROW, not an array. */
-function buildInsertSb() {
+/** The create path needs `.single()` to resolve to a ROW, not an array.
+ *  `supplierId` answers the S3 catalog lookup (SKU → the factory). */
+function buildInsertSb(supplierId: string | null = null) {
   const inserts: Record<string, unknown>[] = [];
-  const chain: Record<string, unknown> = {
-    insert: (row: Record<string, unknown>) => {
-      inserts.push(row);
-      return chain;
-    },
-    then: (res: (v: { data: unknown; error: null }) => unknown) =>
-      Promise.resolve({ data: { id: "new-case", case_no: "SC2607-02" }, error: null }).then(res),
-  };
-  for (const m of ["select", "eq", "single", "order"]) chain[m] = () => chain;
+  function make(result: unknown) {
+    const chain: Record<string, unknown> = {
+      insert: (row: Record<string, unknown>) => {
+        inserts.push(row);
+        return chain;
+      },
+      then: (res: (v: { data: unknown; error: null }) => unknown) =>
+        Promise.resolve({ data: result, error: null }).then(res),
+    };
+    for (const m of ["select", "eq", "single", "maybeSingle", "order", "limit"]) {
+      chain[m] = () => chain;
+    }
+    return chain;
+  }
   const sb = {
-    from: vi.fn(() => chain),
+    from: vi.fn((table: string) =>
+      table === "product_skus"
+        ? make(supplierId ? [{ supplier_id: supplierId }] : [])
+        : make({ id: "new-case", case_no: "SC2607-02" }),
+    ),
     rpc: vi.fn(async () => ({ data: "SC2607-02", error: null })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
   return { sb, inserts };
+}
+
+/**
+ * S3 — a stub that answers per TABLE, because the close gate and the progress
+ * endpoint both read the case (and the target status) before they write.
+ */
+function buildCaseSb(caseRow: unknown, statusIsClosed = true) {
+  const updates: Record<string, unknown>[] = [];
+  function make(result: unknown) {
+    const chain: Record<string, unknown> = {
+      update: (row: Record<string, unknown>) => {
+        updates.push(row);
+        return chain;
+      },
+      then: (res: (v: { data: unknown; error: null }) => unknown) =>
+        Promise.resolve({ data: result, error: null }).then(res),
+    };
+    for (const m of ["select", "eq", "single", "maybeSingle", "order", "limit", "insert"]) {
+      chain[m] = () => chain;
+    }
+    return chain;
+  }
+  const sb = {
+    from: vi.fn((table: string) =>
+      table === "service_case_statuses" ? make({ is_closed: statusIsClosed }) : make(caseRow),
+    ),
+    rpc: vi.fn(async () => ({ data: "SC2607-02", error: null })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+  return { sb, updates };
 }
 
 async function post(body: unknown, sb: unknown, role = "operation") {
@@ -598,6 +638,282 @@ describe("POST /api/ops/service-cases/:id/evidence", () => {
 
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code: string }).code).toBe("evidence_path_mismatch");
+  });
+});
+
+describe("S3 — the case drives the follow-ups", () => {
+  /** A repair on a sofa from Ohana: date · collect · out · back · redeliver ·
+   *  the customer's word. */
+  const REPAIR_CASE = {
+    ...CASE_ROW,
+    customer_wants: ["repair"],
+    customer_name: "Ryan Chong",
+    suppliers: { name: "Ohana" },
+    progress: [],
+  };
+
+  const stamped = (step: string) => ({
+    step,
+    on: "2026-07-27",
+    at: "2026-07-27T02:00:00Z",
+    by: "u1",
+    by_role: "operation",
+  });
+
+  async function patch(id: string, body: unknown, sb: unknown, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return app.request(
+      `/api/ops/service-cases/${id}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  async function record(id: string, body: unknown, sb: unknown, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return app.request(
+      `/api/ops/service-cases/${id}/progress`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  it("resolves the factory from the SKU so the follow-up can name it", async () => {
+    // 200 of 205 SKUs in prod carry a supplier; 0 purchase orders do. The SKU is
+    // the only route to a name today, and a follow-up that cannot name the party
+    // is the label failure COPY-STANDARD exists to stop.
+    const { sb, inserts } = buildInsertSb("sup-ohana");
+    const res = await post(WIZARD_BODY, sb);
+
+    expect(res.status).toBe(201);
+    expect(inserts[0].supplier_id).toBe("sup-ohana");
+  });
+
+  it("still files the case when the SKU traces to no factory", async () => {
+    const { sb, inserts } = buildInsertSb(null);
+    const res = await post(WIZARD_BODY, sb);
+
+    expect(res.status).toBe(201);
+    expect(inserts[0].supplier_id).toBeNull();
+  });
+
+  it("never lets the client choose the factory or seed the chain", async () => {
+    const { sb, inserts } = buildInsertSb("sup-ohana");
+    await post(
+      { ...WIZARD_BODY, supplierId: "sup-somebody-else", progress: [stamped("customer_confirmed")] },
+      sb,
+    );
+
+    expect(inserts[0].supplier_id).toBe("sup-ohana");
+    expect(inserts[0]).not.toHaveProperty("progress");
+  });
+
+  it("refuses to close a case whose chain is still open, and names what is left", async () => {
+    const { sb, updates } = buildCaseSb(REPAIR_CASE, true);
+    const res = await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb);
+
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("case_steps_open");
+    expect(body.message).toContain("Call Ohana — confirm the repair date");
+    expect(body.message).toContain("Call Ryan Chong — confirm the problem is solved");
+    // Nothing reached the database.
+    expect(updates).toHaveLength(0);
+  });
+
+  it("refuses a close that has everything EXCEPT the customer's word", async () => {
+    const { sb, updates } = buildCaseSb(
+      {
+        ...REPAIR_CASE,
+        progress: ["supplier_date", "collect", "at_supplier", "back_from_supplier", "redeliver"].map(
+          stamped,
+        ),
+      },
+      true,
+    );
+    const res = await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb);
+
+    expect(res.status).toBe(422);
+    expect((await res.json()) as { message: string }).toMatchObject({
+      message: expect.stringContaining("confirm the problem is solved"),
+    });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("closes the case once every step has an outcome on file", async () => {
+    const { sb, updates } = buildCaseSb(
+      {
+        ...REPAIR_CASE,
+        progress: [
+          "supplier_date",
+          "collect",
+          "at_supplier",
+          "back_from_supplier",
+          "redeliver",
+          "customer_confirmed",
+        ].map(stamped),
+      },
+      true,
+    );
+    const res = await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb);
+
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ status_id: "33333333-3333-3333-3333-333333333333" });
+  });
+
+  it("leaves an ALREADY closed case editable — the gate is the transition", async () => {
+    // SC2607-01, the one real row, is closed and predates all of this. A gate
+    // that locked it would make its own history unfixable.
+    const { sb, updates } = buildCaseSb(
+      {
+        ...REPAIR_CASE,
+        service_case_statuses: { label: "Resolved", is_closed: true },
+      },
+      true,
+    );
+    const res = await patch(
+      "c1",
+      { statusId: "33333333-3333-3333-3333-333333333333", carresAction: "corrected" },
+      sb,
+    );
+
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ carres_action: "corrected" });
+  });
+
+  it("does not gate a status that is not a closing one", async () => {
+    const { sb, updates } = buildCaseSb(REPAIR_CASE, false);
+    const res = await patch("c1", { statusId: "44444444-4444-4444-4444-444444444444" }, sb);
+
+    expect(res.status).toBe(200);
+    expect(updates).toHaveLength(1);
+  });
+
+  it("stamps who recorded a step and when — the client cannot author it", async () => {
+    const { sb, updates } = buildCaseSb(REPAIR_CASE);
+    const res = await record(
+      "c1",
+      {
+        step: "collect",
+        on: "2026-07-20",
+        // A client trying to forge the recorder: not in the schema, so stripped.
+        by: "somebody-else",
+        by_role: "principal",
+        at: "1999-01-01T00:00:00Z",
+      },
+      sb,
+    );
+
+    expect(res.status).toBe(201);
+    const entries = (updates[0].progress as Record<string, string>[]) ?? [];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      step: "collect",
+      on: "2026-07-20",
+      by: "11111111-1111-1111-1111-000000000999", // the JWT's subject
+      by_role: "operation",
+    });
+    expect(entries[0].at).not.toBe("1999-01-01T00:00:00Z");
+    expect(Number.isNaN(Date.parse(entries[0].at))).toBe(false);
+  });
+
+  it("appends rather than replaces — the ledger is a history, not a state", async () => {
+    const { sb, updates } = buildCaseSb({ ...REPAIR_CASE, progress: [stamped("supplier_date")] });
+    await record("c1", { step: "collect", on: "2026-07-20" }, sb);
+
+    const entries = updates[0].progress as Record<string, string>[];
+    expect(entries.map((e) => e.step)).toEqual(["supplier_date", "collect"]);
+  });
+
+  it("refuses to record the same step twice", async () => {
+    const { sb, updates } = buildCaseSb({ ...REPAIR_CASE, progress: [stamped("collect")] });
+    const res = await record("c1", { step: "collect", on: "2026-07-21" }, sb);
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("step_already_recorded");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("refuses an inspection with nothing written down", async () => {
+    const { sb, updates } = buildCaseSb({ ...REPAIR_CASE, customer_wants: ["inspection"] });
+    const res = await record("c1", { step: "inspect", on: "2026-07-21" }, sb);
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("note_required");
+    expect(updates).toHaveLength(0);
+
+    const { sb: sb2, updates: u2 } = buildCaseSb({
+      ...REPAIR_CASE,
+      customer_wants: ["inspection"],
+    });
+    const ok = await record(
+      "c1",
+      { step: "inspect", on: "2026-07-21", note: "Left seam open, 4 inches." },
+      sb2,
+    );
+    expect(ok.status).toBe(201);
+    expect((u2[0].progress as Record<string, string>[])[0].note).toBe("Left seam open, 4 inches.");
+  });
+
+  it("refuses a step key it does not know, and a date that is not one", async () => {
+    const { sb } = buildCaseSb(REPAIR_CASE);
+    expect((await record("c1", { step: "have_a_coffee", on: "2026-07-21" }, sb)).status).toBe(400);
+    expect((await record("c1", { step: "collect", on: "21/07/2026" }, sb)).status).toBe(400);
+  });
+
+  it("records a step the plan does not currently ask for", async () => {
+    // The intake answers stay editable. Refusing to record something that has
+    // physically happened would leave the case lying about itself; what the plan
+    // decides is which steps are still OWED (the close gate's question).
+    const { sb, updates } = buildCaseSb({ ...REPAIR_CASE, customer_wants: ["refund"] });
+    const res = await record("c1", { step: "at_supplier", on: "2026-07-21" }, sb);
+
+    expect(res.status).toBe(201);
+    expect((updates[0].progress as Record<string, string>[])[0].step).toBe("at_supplier");
+  });
+
+  it("still refuses a dealer — the follow-ups open no new door", async () => {
+    const { sb } = buildCaseSb(REPAIR_CASE);
+    expect((await record("c1", { step: "collect", on: "2026-07-21" }, sb, "dealer")).status).toBe(
+      403,
+    );
+    expect((await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb, "dealer")).status).toBe(403);
+  });
+
+  it("carries the chain's recorded outcomes back on the list read", async () => {
+    const { sb } = buildSb([{ ...REPAIR_CASE, progress: [stamped("collect")] }]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as {
+      items: { progress: { step: string; byRole: string }[]; supplierName: string | null }[];
+    };
+
+    expect(body.items[0].progress).toEqual([
+      { step: "collect", on: "2026-07-27", at: "2026-07-27T02:00:00Z", by: "u1", byRole: "operation", note: null },
+    ]);
+    expect(body.items[0].supplierName).toBe("Ohana");
+  });
+
+  it("reports an empty chain for a case that predates S3 rather than crashing", async () => {
+    const { sb } = buildSb([CASE_ROW]);
+    const res = await get("/ops/service-cases", sb);
+    const body = (await res.json()) as { items: { progress: unknown[]; supplierName: null }[] };
+
+    expect(body.items[0].progress).toEqual([]);
+    expect(body.items[0].supplierName).toBeNull();
   });
 });
 

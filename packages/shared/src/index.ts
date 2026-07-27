@@ -654,6 +654,11 @@ export {
   caseEvidenceUploadedSchema,
   signCaseEvidenceUploadInputSchema,
   signCaseEvidenceUploadResponseSchema,
+  // S3 (0291) — the recorded outcomes of the follow-up chain.
+  caseProgressEntrySchema,
+  recordCaseStepInputSchema,
+  type CaseProgressEntryRecord,
+  type RecordCaseStepInput,
   type CaseEvidenceEntry,
   type CaseEvidenceListResponse,
   type CaseEvidenceUploaded,
@@ -803,6 +808,27 @@ export {
   type SupplierClaimPhoto,
   type ReceiveLineClaimDraft,
   type ReceiveLineClaimProblem,
+  // R3 · the lifecycle — what we asked, what they answered, who moves next
+  SUPPLIER_CLAIM_REQUESTS,
+  SUPPLIER_CLAIM_REQUEST_KEYS,
+  SUPPLIER_CLAIM_REQUEST_REMAINING,
+  SUPPLIER_CLAIM_RESPONSES,
+  SUPPLIER_CLAIM_RESPONSE_KEYS,
+  SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT,
+  supplierClaimRequestLabel,
+  supplierClaimResponseLabel,
+  requestedActionsFor,
+  isRequestedActionFor,
+  responseNeedsNote,
+  claimNextMove,
+  claimMoveOwnerLabel,
+  claimCloseProblems,
+  type SupplierClaimRequest,
+  type SupplierClaimResponse,
+  type SupplierClaimMove,
+  type SupplierClaimMoveInput,
+  type SupplierClaimMoveOwner,
+  type SupplierClaimCloseProblem,
 } from "./supplier-claim";
 
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
@@ -1421,6 +1447,27 @@ export {
   type CaseEvidenceGap,
   type CaseEvidenceMimeType,
 } from "./service-case-evidence";
+// S3 — the case drives the follow-ups. The chain is DERIVED from the intake
+// answers; only its outcomes are stored (service_cases.progress, 0291).
+export {
+  CASE_STEP_ORDER,
+  CASE_STEP_KEYS,
+  caseFollowUpPlan,
+  caseStepCatalogue,
+  caseStepDefinition,
+  caseStepEntry,
+  caseStepDone,
+  caseOpenSteps,
+  caseNextStep,
+  caseMayClose,
+  caseCloseBlockerMessage,
+  caseTimeline,
+  type CaseStepKey,
+  type CaseStep,
+  type CaseFollowUpInput,
+  type CaseProgressEntry,
+  type CaseTimelineRow,
+} from "./service-case-plan";
 export {
   bookingConfirmGate,
   isSundayIso,

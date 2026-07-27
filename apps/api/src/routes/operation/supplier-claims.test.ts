@@ -186,6 +186,93 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(userClient).not.toHaveBeenCalled();
   });
 
+  it("computes who owes the next move, and reads the line only for LATE claims", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const tables: string[] = [];
+    const LATE = {
+      ...CLAIM,
+      id: "c2",
+      claim_no: "SC-1002",
+      claim_type: "late_delivery",
+      po_line_id: "l2",
+      photos: [],
+      requested_action: "deliver_remaining",
+      requested_at: "2026-07-27T00:00:00Z",
+    };
+    const sb = {
+      from: vi.fn((t: string) => {
+        tables.push(t);
+        if (t === "supplier_claims") return listBuilder([CLAIM, LATE], eqCalls);
+        if (t === "suppliers")
+          return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+        if (t === "app_users")
+          return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        // The line still owes 1 unit → the supplier still owes the move.
+        if (t === "purchase_order_lines")
+          return listBuilder([{ id: "l2", qty: 3, received_qty: 2 }], eqCalls);
+        throw new Error(`unmocked table ${t}`);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    const damaged = body.claims.find((c: { claim_no: string }) => c.claim_no === "SC-1001");
+    const late = body.claims.find((c: { claim_no: string }) => c.claim_no === "SC-1002");
+    expect(damaged.next_move).toEqual({
+      key: "ask",
+      owner: "carres",
+      label: "Call Ohana — agree the fix",
+    });
+    expect(late.next_move.owner).toBe("supplier");
+    expect(late.line_pending).toBe(true);
+    // ONE line query, and only because a late claim was in the page. The
+    // damaged claim's goods are already in the warehouse — nothing to check.
+    expect(tables.filter((t) => t === "purchase_order_lines")).toHaveLength(1);
+  });
+
+  it("a late claim whose line is gone stays PENDING — unknown never reads as delivered", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const LATE = {
+      ...CLAIM,
+      claim_no: "SC-1002",
+      claim_type: "late_delivery",
+      po_line_id: "gone",
+      photos: [],
+      requested_action: "deliver_remaining",
+      requested_at: "2026-07-27T00:00:00Z",
+    };
+    const sb = {
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([LATE], eqCalls);
+        // po_line_id is ON DELETE SET NULL — the line can simply not be there.
+        if (t === "purchase_order_lines") return listBuilder([], eqCalls);
+        return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.claims[0].line_pending).toBeNull();
+    expect(body.claims[0].next_move.owner).toBe("supplier");
+  });
+
   it("admits principal", async () => {
     const eqCalls: Array<[string, unknown]> = [];
     const sb = { from: vi.fn(() => listBuilder([], eqCalls)) };
@@ -267,6 +354,192 @@ describe("GET /api/operation/supplier-claims/:id/photos", () => {
   });
 
   it("there is no write door — POST is not a route", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ po_id: "PO-1", claim_type: "damaged", qty: 1 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R3 (migration 0290) — the three moves
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The RULES live in the database (which ask is legal for which claim type,
+// which answers need a note, that a close needs both sides), so these tests pin
+// what the ROUTER owes: the right RPC with the right arguments, obvious junk
+// refused before a round-trip, the caller's own JWT used, and the RPC's own
+// refusal surfaced with its `detail` code intact so the operator sees a
+// sentence rather than a 500.
+
+function rpcClient(result: { data?: unknown; error?: unknown }) {
+  const rpc = vi.fn().mockResolvedValue({
+    data: result.data ?? null,
+    error: result.error ?? null,
+  });
+  return { rpc };
+}
+
+async function post(path: string, body: unknown, role = "operation") {
+  const jwt = await makeJwt(role);
+  return app.fetch(
+    new Request(`http://t/api/operation/supplier-claims/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+describe("POST /:id/request — what WE ask", () => {
+  it("calls the RPC with the claim and the ask", async () => {
+    const sb = rpcClient({ data: { claim_no: "SC-1001", requested_action: "replace" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/request", { requested_action: "replace" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_request", {
+      p_claim_id: "c1",
+      p_requested_action: "replace",
+      p_note: null,
+    });
+    // A user-JWT write: RLS + the RPC's own gate are the boundary, never a
+    // service-role bypass.
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("refuses a word that is not one of the asks, without touching the database", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/request", { requested_action: "please_fix_it" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the RPC's refusal with its own code — the ask freezes once answered", async () => {
+    const sb = rpcClient({
+      error: {
+        code: "P0001",
+        details: "request_frozen",
+        message: "claim SC-1001 already carries the supplier's answer",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/request", { requested_action: "repair" });
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((await res.json()) as any).code).toBe("request_frozen");
+  });
+
+  it("refuses a supplier and a dealer", async () => {
+    for (const role of ["supplier", "dealer"]) {
+      const res = await post("c1/request", { requested_action: "replace" }, role);
+      expect(res.status).toBe(403);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /:id/response — what the SUPPLIER answered", () => {
+  it("passes the answer and its note through", async () => {
+    const sb = rpcClient({ data: { claim_no: "SC-1001", supplier_response: "reject" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/response", {
+      supplier_response: "reject",
+      note: "Out of warranty",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_response", {
+      p_claim_id: "c1",
+      p_response: "reject",
+      p_note: "Out of warranty",
+    });
+  });
+
+  it("does not narrow the supplier's answer to what we asked", async () => {
+    const sb = rpcClient({ data: {} });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    for (const answer of [
+      "replacement",
+      "deliver_remaining",
+      "repair",
+      "return_and_replace",
+      "other_agreement",
+    ]) {
+      const res = await post("c1/response", { supplier_response: answer, note: "ok" });
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it("lets the DATABASE be the one that demands a note for a refusal", async () => {
+    // The route does not second-guess it: one rule, one place. A missing note
+    // comes back as the RPC's own detail code.
+    const sb = rpcClient({
+      error: {
+        code: "P0001",
+        details: "response_note_required",
+        message: "a reject answer must say what was agreed or why",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/response", { supplier_response: "reject" });
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((await res.json()) as any).code).toBe("response_note_required");
+  });
+
+  it("refuses an invented answer word", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/response", { supplier_response: "maybe_later" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /:id/close — settle it", () => {
+  it("closes with an optional note", async () => {
+    const sb = rpcClient({ data: { claim_no: "SC-1001", status: "closed" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/close", { note: "New unit delivered 30 Jul" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_close", {
+      p_claim_id: "c1",
+      p_note: "New unit delivered 30 Jul",
+    });
+  });
+
+  it("surfaces the refusal when a side is missing — a closed claim keeps both", async () => {
+    const sb = rpcClient({
+      error: {
+        code: "P0001",
+        details: "response_required",
+        message: "claim SC-1001 cannot close: the supplier's answer is not recorded",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/close", {});
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((await res.json()) as any).code).toBe("response_required");
+  });
+
+  it("still offers no door that CREATES a claim", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/supplier-claims", {

@@ -10,6 +10,7 @@ import {
   caseEvidenceComplete,
   caseEvidenceGapMessage,
   caseEvidenceGaps,
+  caseFollowUpPlan,
   caseIntakeComplete,
   caseIssuesFor,
   caseNeedsManager,
@@ -131,6 +132,10 @@ export default function ServiceCaseWizard({
   };
 
   const customerName = (order?.customerName || manualName).trim();
+
+  /** S3 — what filing this case sets in motion. Derived from the same answers,
+   *  so the preview cannot promise work the case will not carry. */
+  const followUps = caseFollowUpPlan({ customerWants: wants, customerName });
 
   const lookupMut = useMutation({
     mutationFn: (term: string) => {
@@ -500,6 +505,27 @@ export default function ServiceCaseWizard({
               <div className="rounded border border-base-200 bg-base-50 p-3">
                 <p className="t-tiny mb-1 uppercase tracking-wider text-base-500">This case will say</p>
                 <p className="text-sm text-base-800">{composeCaseSummary(answers)}</p>
+
+                {/* S3 — the follow-ups this case starts. Shown BEFORE it is
+                    filed so the answers on the last screen are visibly the
+                    thing that decides the work, and nobody has to be told to
+                    remember any of it. The factory is named on the case itself
+                    (resolved from the SKU server-side), so it reads as "the
+                    supplier" here and by name from then on. */}
+                {followUps.length > 0 && (
+                  <div className="mt-2 border-t border-base-200 pt-2">
+                    <p className="t-tiny mb-1 uppercase tracking-wider text-base-500">
+                      And starts these
+                    </p>
+                    <ol className="space-y-0.5">
+                      {followUps.map((s) => (
+                        <li key={s.key} className="text-[13px] text-base-700">
+                          · {s.label}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
                 {priority && (
                   <p className="mt-2">
                     <span className={`pill ${priority === "high" ? "pill-overdue" : "pill-neutral"}`}>
