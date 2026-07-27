@@ -29,7 +29,7 @@ import { fmtDateShort } from "@/lib/fmt-date";
 /**
  * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
  * a month grid with tab-filtered activity from BOTH the customer-delivery
- * side and the supplier procurement side (Send POs by order-by · Chase by
+ * side and the supplier procurement side (Send POs by order-by · confirm by
  * expected-ready · Receive by ETA). Tabs let the operator see a single lens
  * without leaving the panel. Read-only — no new API (reuses purchase-today +
  * orders queries already cached by their pages).
@@ -38,7 +38,7 @@ import { fmtDateShort } from "@/lib/fmt-date";
  * used to bucket orders by `orders.delivery_date` — the date we PROMISED the
  * customer. That is not when a truck moves. Since D1 (0277) the truck's day is
  * the BOOKING (`booking_stage` + `confirmed_date`, with `logistic_eta` as the
- * carrier's provisional word), and the two diverge the moment anything is
+ * logistics company's provisional word), and the two diverge the moment anything is
  * rescheduled — which is the entire reason D1 split them. So the lens now reads
  * the booking through the same `orderBookingDay` adapter the Orders list's
  * Delivery column reads: never a second store.
@@ -53,10 +53,14 @@ import { fmtDateShort } from "@/lib/fmt-date";
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 type CalTab = "all" | "send" | "chase" | "receive" | "deliveries";
+// C1 (Jess 2026-07-27): "Chase" is banned. The lens is the Purchase panel's
+// second stage, whose word is `Confirm ready date` — the same one the Orders
+// queue rail uses, so the two never spell one action differently. The tab KEY
+// stays `chase` (internal, and it is in the URL nowhere).
 const TAB_LABEL: Record<CalTab, string> = {
   all: "All",
   send: "Send",
-  chase: "Chase",
+  chase: "Confirm ready date",
   receive: "Receive",
   deliveries: "Deliveries",
 };
@@ -95,8 +99,8 @@ export default function CalendarPanel() {
   const supplierName = (id: string, fallback: string | null) =>
     fallback?.trim() || supplierNameById.get(id) || id.slice(0, 8);
 
-  // T9 carrier rules, keyed by partner. A partner row that has never been
-  // edited normalises to DEFAULT — zero warnings, which is every live carrier
+  // T9 logistics rules, keyed by company. A row that has never been
+  // edited normalises to DEFAULT — zero warnings, which is every live company
   // today (silence over a false alarm).
   const rulesByPartner = useMemo(() => {
     const m = new Map<string, PartnerDeliveryRules>();
@@ -122,7 +126,7 @@ export default function CalendarPanel() {
   });
 
   // Bucket deliveries by the BOOKING day (T10) — confirmed date when the
-  // customer said yes, otherwise the carrier's provisional date. An order with
+  // customer said yes, otherwise the logistics company's provisional date. An order with
   // neither is not on any day; it is a queue item (Assign / confirm the date).
   const deliveriesByDay = useMemo(() => {
     const m = new Map<string, DayDelivery[]>();
@@ -171,7 +175,7 @@ export default function CalendarPanel() {
   }, [orders]);
 
   // Bucket procurement activity per stage by its keyed date. Send groups → by
-  // earliestOrderBy; Chase → by expectedReadyDate; Receive → by etaDate ??
+  // earliestOrderBy; the ready-date lens → by expectedReadyDate; Receive → by etaDate ??
   // expectedReadyDate. Empty maps when purchase data hasn't loaded yet — the
   // grid stays functional on the deliveries tab regardless.
   const sendByDay = useMemo(() => {
@@ -481,9 +485,9 @@ export default function CalendarPanel() {
               )}
               {(tab === "all" || tab === "chase") && (
                 <DaySection
-                  title="Chase"
+                  title={TAB_LABEL.chase}
                   tone="text-warning"
-                  empty="No POs to chase this day."
+                  empty="No supplier to call about a ready date this day."
                   items={dayChase.map((r) => ({
                     key: `c-${r.poId}`,
                     main: `${r.poId} · ${supplierName(r.supplierId, null)}`,

@@ -1,5 +1,7 @@
 import { AlertTriangle, Check } from "lucide-react";
 
+import { orderActionQueue } from "@carres/shared";
+
 /**
  * J3 — the journey header. ONE strip at the top of the order drawer answering
  * the three questions in 3 seconds: where is this order · who is next · what is
@@ -72,7 +74,13 @@ export interface OrderJourney {
 export interface OrderJourneySignals {
   /** `nextActionOf(...)` verbatim — not a re-derivation of it. */
   next: {
+    /** The action's QUEUE word — what this module keys its maps on. */
     label: string;
+    /** The row LINE, party named (`Call NETS — confirm delivery date`). The
+     *  caller builds it with the SAME shared helper the Orders list uses, so
+     *  the strip and the row can never spell one action two ways. Absent →
+     *  the queue word is shown, which is still a legal label. */
+    line?: string;
     tone: "danger" | "warning" | "info" | "success" | "neutral";
     locked?: boolean;
   };
@@ -82,8 +90,8 @@ export interface OrderJourneySignals {
   /** The ladder's own "ready" rule (live free stock OR the Master import's
    *  per-line ready flag). */
   goodsReady: boolean;
-  /** D1/0277 — the CUSTOMER confirmed a date, not the carrier's provisional
-   *  word. Same predicate as `bookingConfirmedOf`. */
+  /** D1/0277 — the CUSTOMER confirmed a date, not the logistics company's
+   *  provisional word. Same predicate as `bookingConfirmedOf`. */
   bookingConfirmed: boolean;
   /** The order reached the customer. */
   delivered: boolean;
@@ -97,34 +105,38 @@ export interface OrderJourneySignals {
   holdAmount: number | null;
 }
 
-/** The verb → stage map. This is the ONE place the two surfaces are joined:
- *  the ladder picks the verb, and the verb picks the ● . A verb this map does
- *  not know (an older or newer Worker) falls through to "the first stage that
- *  is not finished", so the strip degrades instead of pointing nowhere. */
+/** The action → stage map. This is the ONE place the two surfaces are joined:
+ *  the ladder picks the action, and the action picks the ● . Keyed on the
+ *  QUEUE word (party-free), which is exactly what `nextActionOf` hands over.
+ *  An action this map does not know (an older or newer Worker) falls through
+ *  to "the first stage that is not finished", so the strip degrades instead of
+ *  pointing nowhere. */
 const VERB_STAGE: Record<string, JourneyStage> = {
-  "Order PO": "Purchase",
-  "Chase supplier": "Goods",
-  "Call customer (stock delay)": "Goods",
-  "Assign logistic": "Booking",
-  "Chase logistic": "Booking",
-  "Deliver today": "Delivery",
-  Confirm: "Delivery",
-  "Upload delivery photo": "Done",
+  [orderActionQueue("send_po")]: "Purchase",
+  [orderActionQueue("confirm_ready_date")]: "Goods",
+  [orderActionQueue("agree_new_delivery_date")]: "Goods",
+  [orderActionQueue("assign_logistics")]: "Booking",
+  [orderActionQueue("confirm_delivery_date")]: "Booking",
+  [orderActionQueue("deliver_today")]: "Delivery",
+  [orderActionQueue("confirm_delivery")]: "Delivery",
+  [orderActionQueue("upload_delivery_photo")]: "Done",
 };
 
-/** Who acts next, and why — keyed on the same verb. Plain words, the party
- *  named (COPY-STANDARD rules 1/8/9): a new operator must read one line and
- *  know whether to pick up the phone, and to whom. */
+/** Who acts next, and why — keyed on the same queue word. Plain words, the
+ *  party named (COPY-STANDARD rules 1/8/9): a new operator must read one line
+ *  and know whether to pick up the phone, and to whom. */
 const VERB_OWNER: Record<string, string> = {
-  "Order PO": "Operations — raise the purchase order",
-  "Chase supplier": "Supplier — goods not in yet",
-  "Call customer (stock delay)": "Operations — tell the customer the new date",
-  "Assign logistic": "Operations — assign the logistic",
-  "Chase logistic": "Logistic — waiting customer confirmation",
-  "Deliver today": "Logistic — delivering today",
-  Confirm: "Operations — everything ready, confirm",
-  "Upload delivery photo": "Operations — upload the delivery photo",
-  Done: "Nobody — this order is closed",
+  [orderActionQueue("send_po")]: "Operations — send the purchase order",
+  [orderActionQueue("confirm_ready_date")]: "Supplier — goods not in yet",
+  [orderActionQueue("agree_new_delivery_date")]:
+    "Operations — agree a new date with the customer",
+  [orderActionQueue("assign_logistics")]: "Operations — pick the logistics company",
+  [orderActionQueue("confirm_delivery_date")]:
+    "Logistics — customer has not confirmed a date",
+  [orderActionQueue("deliver_today")]: "Logistics — delivering today",
+  [orderActionQueue("confirm_delivery")]: "Operations — everything ready, confirm",
+  [orderActionQueue("upload_delivery_photo")]: "Operations — upload the delivery photo",
+  [orderActionQueue("done")]: "Nobody — this order is closed",
 };
 /** The money hold reads differently from the plain Confirm: the ladder's 🔒
  *  says the delivery may not happen, and the person who unblocks it is the
@@ -177,13 +189,15 @@ export interface OrderJourneyInput {
 export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
   const { signals: sig } = input;
   const verb = sig.next.label;
+  const line = sig.next.line ?? verb;
   const locked = sig.next.locked === true;
 
   // ── Where the order sits ────────────────────────────────────────────────
   const firstOpen = JOURNEY_STAGES.find((s) => !stageDone(s, sig)) ?? null;
   const mapped = VERB_STAGE[verb];
   // "Done" is the ladder's closed state: no stage is current.
-  const current: JourneyStage | null = verb === "Done" ? null : (mapped ?? firstOpen);
+  const closed = verb === orderActionQueue("done");
+  const current: JourneyStage | null = closed ? null : (mapped ?? firstOpen);
   const stages: JourneyStageCell[] = JOURNEY_STAGES.map((stage) => ({
     stage,
     state:
@@ -210,7 +224,7 @@ export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
         : "Delivery on hold — balance not collected",
     });
   }
-  if (verb === "Call customer (stock delay)") {
+  if (verb === orderActionQueue("agree_new_delivery_date")) {
     health.push({
       key: "stock_delay",
       tone: "danger",
@@ -239,7 +253,7 @@ export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
 
   return {
     stages,
-    nextLabel: verb,
+    nextLabel: line,
     nextTone: sig.next.tone,
     nextLocked: locked,
     owner,

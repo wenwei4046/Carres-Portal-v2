@@ -56,6 +56,11 @@ import {
   deliveryQueueForLabel,
   deliveryStepOverdue,
   myHolidaySet,
+  collectPillLabel,
+  deliveryDateGapFact,
+  orderActionLine,
+  orderActionQueue,
+  type OrderActionKey,
   type DeliveryQueueKey,
   type OpsTask,
   type OpsTasksListResponse,
@@ -104,17 +109,20 @@ import {
  * read-only feed (OperationAllOrders) — into ONE daily-driver table. Every
  * order lands here; a click opens the existing full-control OrderDetailDrawer.
  *
- * Status tabs map the Master Sheet's `Logistic Remark` flow onto the live
- * pipeline (Placed → Proceed → Pending → Scheduled → Completed → All):
+ * Status tabs map the Master Sheet's logistics-remark flow onto the live
+ * pipeline (Placed → Proceed → To book → Customer confirmed → Delivered → All).
+ * C1 (Jess 2026-07-27) renamed the middle two: `Pending` is a banned word
+ * (pending on WHAT?) and a date logistics proposed is not a booking.
  *
- *   Placed    — genuinely new, not yet triaged (native/salesperson)
- *   Proceed   — being arranged. INCLUDES AutoCount-imported orders per the
- *               agreed entry rule (AutoCount import → Proceed; future
- *               salesperson → Placed) + proceed_request stage.
- *   Pending   — awaiting_operation_action (PO open, waiting on stock)
- *   Scheduled — ready_to_dispatch + dispatched (LP assigned / en route)
- *   Completed — delivered
- *   All       — see-everything
+ *   Placed            — genuinely new, not yet triaged (native/salesperson)
+ *   Proceed           — being arranged. INCLUDES AutoCount-imported orders per
+ *                       the agreed entry rule (AutoCount import → Proceed;
+ *                       future salesperson → Placed) + proceed_request stage.
+ *   To book           — past placement, goods and/or the customer's date still
+ *                       outstanding (the readiness split below)
+ *   Customer confirmed— stock in AND the customer confirmed a date + slot
+ *   Delivered         — delivered
+ *   All               — see-everything
  *
  * Reuses the kanban driver `/api/operation/orders` (via useOperationOrders) as
  * the single source of truth for stage derivation — the control table is the
@@ -142,8 +150,8 @@ const TABS: { key: ControlTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "placed", label: "Placed" },
   { key: "proceed", label: "Proceed" },
-  { key: "pending", label: "Pending" },
-  { key: "scheduled", label: "Scheduled" },
+  { key: "pending", label: "To book" },
+  { key: "scheduled", label: "Customer confirmed" },
   { key: "completed", label: "Delivered" },
 ];
 
@@ -158,8 +166,8 @@ type SettledTab = Exclude<ControlTab, "all">;
 const TAB_LABEL: Record<SettledTab, string> = {
   placed: "Placed",
   proceed: "Proceed",
-  pending: "Pending",
-  scheduled: "Scheduled",
+  pending: "To book",
+  scheduled: "Customer confirmed",
   completed: "Delivered",
 };
 
@@ -169,8 +177,9 @@ const TAB_LABEL: Record<SettledTab, string> = {
 const TAB_DESC: Record<SettledTab, string> = {
   placed: "New order, not processed yet (a salesperson placed it)",
   proceed: "Confirmed — being arranged. Every AutoCount-imported order starts here.",
-  pending: "PO raised — waiting for stock to arrive at the warehouse",
-  scheduled: "Stock secured — delivery partner assigned / out for delivery",
+  pending:
+    "The goods and/or the customer's delivery date are still outstanding — the Actions column says which",
+  scheduled: "Stock in AND the customer confirmed a delivery date + time slot",
   completed: "Delivered and closed",
 };
 
@@ -194,21 +203,22 @@ function controlTabOf(
   if (s === "placed" && o.source_system !== "autocount") return "placed";
   // In-pipeline (proceeded / autocount / confirmed / in_production / dispatched).
   // READINESS split (Jess 2026-07-19): the pipeline stage never advances in the
-  // portal (POs are raised outside), so tabs must read the REAL state — Pending
-  // = still waiting on stock OR a delivery slot; Scheduled = stock in AND a slot
-  // booked. Needs the live free-stock map; without it we fall back to the old
-  // stage mapping (used by the param-less `=== "completed"` callers).
+  // portal (POs are raised outside), so tabs must read the REAL state — To book
+  // = still waiting on stock OR the customer's date; Customer confirmed = stock
+  // in AND that date confirmed. Needs the live free-stock map; without it we
+  // fall back to the old stage mapping (the param-less `=== "completed"`
+  // callers).
   if (availableBySku) {
     // Stock is READY when EITHER the live free-stock check says so OR the Master
     // import marked every line ready (line_stock_status='ready', via stockEtaOf).
     // Without the Master signal, AutoCount SKUs never match the catalog → the
-    // live check is always "awaiting" → NOTHING ever reached Scheduled (Jess
-    // 2026-07-19: "why scheduled no showing?"). Same fix as nextActionOf #5.
+    // live check is always "awaiting" → NOTHING ever reached the confirmed tab
+    // (Jess 2026-07-19: "why scheduled no showing?"). Same fix as the ladder's.
     const stockReady =
       stockBucketOf(o, availableBySku) === "Ready" || stockEtaOf(o).state === "ready";
     // T1 (0277): "a slot booked" = the CUSTOMER confirmed (booking_stage), not
-    // the carrier's provisional logistic_eta — provisional rows stay Pending,
-    // so the tab counts agree with the drawer's booking chip.
+    // the logistics company's provisional logistic_eta — provisional rows stay
+    // in To book, so the tab counts agree with the drawer's booking chip.
     const logisticBooked = bookingConfirmedOf(o);
     return stockReady && logisticBooked ? "scheduled" : "pending";
   }
@@ -339,7 +349,7 @@ function toRaisePoOrder(o: operationOrderListRow): RaisePoOrder {
   };
 }
 
-/** Row → the pure Chase-supplier plan input. Suppliers speak the ORIGINAL
+/** Row → the pure supplier follow-up plan input. Suppliers speak the ORIGINAL
  *  CR/TCF ref (source_ref[0]), never the SO number. */
 function toChaseOrder(o: operationOrderListRow): ChaseOrder {
   return {
@@ -355,7 +365,7 @@ function toChaseOrder(o: operationOrderListRow): ChaseOrder {
   };
 }
 
-/** Row → the partner (logistic) chase input. Partners speak the ORIGINAL
+/** Row → the logistics follow-up input. Companies speak the ORIGINAL
  *  CR/TCF ref; the partner is the order-level LP (delivery_partner_id) or the
  *  Inbox-triaged LP (ops_assigned_logistic). Region = the real delivery place. */
 function toPartnerChaseOrder(o: operationOrderListRow): PartnerChaseOrder {
@@ -524,30 +534,37 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
   return ovl?.booking_stage === "confirmed" && !!ovl.confirmed_date;
 }
 
-/** C-vocab (Jess 2026-07-19): the QUEUES rows ARE the NEXT verbs — one
- *  vocabulary across QUEUES · the NEXT column · the drawer's Chase Now. A row
- *  sits in exactly the queue its NEXT verb names; the counts match by
- *  construction. State words (Waiting/Ready) live in FILTERS only. The old
- *  "To book" / "Waiting stock" / "No logistic" queue rows are dead words. */
-// T7 (Jess 2026-07-27) — the QUEUE SPLIT: the STOCK verbs stay here, the four
-// DELIVERY verbs moved to their own facet group (DELIVERY_QUEUES in
+/** C-vocab (Jess 2026-07-19): the QUEUES rows ARE the actions — one vocabulary
+ *  across QUEUES · the Actions column · the drawer. A row sits in exactly the
+ *  queue its action names; the counts match by construction. State words
+ *  (Waiting/Ready) live in FILTERS only.
+ *
+ *  C1 (Jess 2026-07-27): every one of these words now comes from
+ *  `orderActionQueue` in packages/shared — the ONE home of COPY-STANDARD's
+ *  action dictionary — so the queue word and the row line can never drift. A
+ *  queue word carries NO party (a queue holds many suppliers); the row line
+ *  names one (`Call Ohana — confirm ready date`). */
+// T7 (Jess 2026-07-27) — the QUEUE SPLIT: the STOCK actions stay here, the four
+// DELIVERY actions moved to their own facet group (DELIVERY_QUEUES in
 // packages/shared), each carrying its own auto-overdue deadline. Assign /
-// Chase logistic used to sit in this list; they are the same NEXT verbs, just
-// rendered in the delivery group now — no row changed queue.
-const NEXT_QUEUE_VERBS = [
-  "Order PO",
-  "Chase supplier",
-  "Call customer (stock delay)",
-] as const;
+// Confirm delivery date used to sit in this list; they are the same actions,
+// just rendered in the delivery group now — no row changed queue.
+const STOCK_QUEUE_KEYS = [
+  "send_po",
+  "confirm_ready_date",
+  "agree_new_delivery_date",
+] as const satisfies readonly OrderActionKey[];
+const NEXT_QUEUE_VERBS = STOCK_QUEUE_KEYS.map(orderActionQueue);
 const NEXT_QUEUE_DESC: Record<string, string> = {
-  "Order PO": "Goods not ordered from any supplier yet — raise the PO",
-  "Chase supplier":
-    "PO raised but goods not in yet — chase the supplier (red once inside the stock window)",
-  "Call customer (stock delay)":
-    "Stock ETA lands AFTER the promised date — tell the customer now, before the window (delay radar, T3)",
+  [orderActionQueue("send_po")]:
+    "Goods not ordered from any supplier yet — send the PO",
+  [orderActionQueue("confirm_ready_date")]:
+    "PO sent but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+  [orderActionQueue("agree_new_delivery_date")]:
+    "Stock ETA lands AFTER the promised date — call the customer now, before the window (delay radar, T3)",
 };
 
-/** T7 — the delivery-photo verb. Its queue is the ONLY delivery queue that
+/** T7 — the delivery-photo action. Its queue is the ONLY delivery queue that
  *  deliberately spans CLOSED orders (same reason as Owing: the proof is still
  *  outstanding after the order is delivered), so it is named here for the two
  *  places that must special-case it — the count scope and the facet-active
@@ -576,22 +593,28 @@ export function deliveryStepAnchor(
 // overlay). Never mutates readinessOf / stageOf / counts.
 type NextTone = "danger" | "warning" | "info" | "success" | "neutral";
 export interface NextAction {
+  /** Which action this is. The QUEUE word and the row LINE are both derived
+   *  from it (packages/shared `order-action-words`), so a rename lands in one
+   *  place and every surface follows. */
+  key: OrderActionKey;
+  /** The action's QUEUE word — party-free, so it can name a facet row, a filter
+   *  chip and a count. The row's own line is `orderActionLine(key, parties)`. */
   label: string;
   tone: NextTone;
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-/** MANAGE column (Jess 2026-07-19): every action is a tone-coloured .pill — one
- *  consistent language (no more plain-text verb next to a Collect $ pill). Each
- *  NextTone maps to its status pill: danger→red · warning→amber · info→blue ·
- *  success→green · neutral→grey. (Money's "Collect $" keeps the distinct indigo
- *  pill-collected so the independent money track reads apart from the goods/
- *  delivery action.) */
+/** ACTIONS column (Jess 2026-07-19, renamed from Manage 2026-07-27): every
+ *  action is a tone-coloured .pill — one consistent language (no plain-text
+ *  verb next to a money pill). Each NextTone maps to its status pill:
+ *  danger→red · warning→amber · info→blue · success→green · neutral→grey.
+ *  (Money's `Collect RM {amount}` keeps the distinct indigo pill-collected so
+ *  the independent money track reads apart from the goods/delivery action.) */
 const NEXT_PILL_CLASS: Record<NextTone, string> = {
   danger: "pill-overdue",
   warning: "pill-warning",
-  // info actions (Assign logistic / Chase logistic-not-yet) are AMBER, not blue:
-  // blue is reserved for SELECTION only (§2 colour law, Jess 2026-07-19).
+  // info actions (Assign logistics / Confirm delivery date-not-yet) are AMBER,
+  // not blue: blue is reserved for SELECTION only (§2 colour law, 2026-07-19).
   info: "pill-warning",
   success: "pill-confirmed",
   neutral: "pill-neutral",
@@ -621,7 +644,7 @@ export function rowDotsOf(
   const ovl = ovlOf(o);
   const bal = ovl?.balance == null ? null : Number(ovl.balance);
   // 钱 — an owing balance stays RED even after delivery (§7: the owing customer
-  // is the one chase that survives Delivered).
+  // is the one call that survives Delivered).
   const money: RowDot =
     bal == null
       ? { color: DOT_HEX.grey, title: "Money — no balance data" }
@@ -639,14 +662,14 @@ export function rowDotsOf(
     goods = { color: DOT_HEX.red, title: "Stock — supplier ETA late vs the deadline" };
   else goods = { color: DOT_HEX.amber, title: "Stock — waiting arrival" };
   // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
-  // reserved for the CUSTOMER's confirmation; a provisional carrier date stays
+  // reserved for the CUSTOMER's confirmation; a provisional logistics date stays
   // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
   if (completed) delivery = { color: DOT_HEX.green, title: "Delivery — delivered" };
   else if (logi.key === "confirmed")
     delivery = { color: DOT_HEX.green, title: "Delivery — customer confirmed" };
   else if (logi.key === "unassigned")
-    delivery = { color: DOT_HEX.grey, title: "Delivery — no carrier yet" };
+    delivery = { color: DOT_HEX.grey, title: "Delivery — no logistics picked yet" };
   else {
     const dd = daysToDue(o);
     const late = dd !== null && dd < 0;
@@ -654,10 +677,10 @@ export function rowDotsOf(
       logi.key === "provisional"
         ? late
           ? { color: DOT_HEX.red, title: "Delivery — past deadline, customer not confirmed" }
-          : { color: DOT_HEX.amber, title: "Delivery — carrier date only, customer not confirmed" }
+          : { color: DOT_HEX.amber, title: "Delivery — logistics date only, customer not confirmed" }
         : late
           ? { color: DOT_HEX.red, title: "Delivery — past deadline, no booking" }
-          : { color: DOT_HEX.amber, title: "Delivery — needs a booking" };
+          : { color: DOT_HEX.amber, title: "Delivery — customer has not confirmed a date" };
   }
   return [money, goods, delivery];
 }
@@ -685,19 +708,31 @@ function ovlOf(o: operationOrderListRow) {
   return orderControlOf(o);
 }
 
-/** NEXT — one single-action verb per order, DUAL-TRACK (Jess spec §5, 2026-07-12):
- *  a stock track ∥ a logistic track, surfaced as the one most-urgent verb —
- *    Order PO → Call customer (stock delay) → Chase supplier → Assign logistic
- *    → Chase logistic → Confirm.
- *  T3 Delay Radar (2026-07-26): "Call customer (stock delay)" fires when the
- *  latest waiting-line stock ETA overshoots the customer's delivery date.
- *  WORD LAW (Jess 2026-07-19, C-vocab): "assign" = WE pick the carrier;
- *  "booked" = the PARTNER fixed a slot with the customer (a STATE, never our
- *  verb). "Book logistic" was firing on no-carrier rows — wrong word, dead.
+/** NEXT — one action per order, DUAL-TRACK (Jess spec §5, 2026-07-12): a stock
+ *  track ∥ a delivery track, surfaced as the one most-urgent action —
+ *    Send PO → Agree new delivery date → Confirm ready date
+ *    → Assign logistics → Confirm delivery date → Confirm delivery.
+ *  T3 Delay Radar (2026-07-26): the customer call fires when the latest
+ *  waiting-line stock ETA overshoots the customer's delivery date.
+ *  WORD LAW (Jess 2026-07-19 C-vocab, re-ruled 2026-07-27): "Assign" = WE pick
+ *  the logistics company; "Confirmed" = the CUSTOMER fixed a date + slot (a
+ *  STATE, never our verb). "Chase" is banned — every former Chase label is a
+ *  `Call {party} — {measurable outcome}` (COPY-STANDARD).
  *  Stock leads while it isn't secured (you don't arrange delivery of goods that
- *  don't exist yet); once Ready the logistic track takes over. Confirm is the
- *  close, and it stays 🔒 LOCKED while a money-hold (unpaid balance / storage) is
- *  outstanding. Operation neither schedules nor calls the customer from here. */
+ *  don't exist yet); once Ready the delivery track takes over. Confirm delivery
+ *  is the close, and it stays 🔒 LOCKED while a money-hold (unpaid balance /
+ *  storage) is outstanding. Operation never calls the customer about a delay
+ *  from here — logistics carries that call.
+ *
+ *  `label` is the action's QUEUE word (party-free). The pill the operator reads
+ *  is `orderActionLine(key, …)` — the same action with the real name in it. */
+/** One action, one word — the label is never typed here. */
+function act(key: OrderActionKey, tone: NextTone, locked?: true): NextAction {
+  return locked
+    ? { key, label: orderActionQueue(key), tone, locked }
+    : { key, label: orderActionQueue(key), tone };
+}
+
 export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
@@ -714,32 +749,31 @@ export function nextActionOf(
     // real "no photo yet".
     const photos = ovlOf(o)?.delivery_photos;
     if (Array.isArray(photos) && photos.length === 0)
-      return { label: DELIVERY_PHOTO_VERB, tone: "warning" };
-    return { label: "Done", tone: "neutral" };
+      return act("upload_delivery_photo", "warning");
+    return act("done", "neutral");
   }
 
   // PAST-DEADLINE ESCALATION (Loo locked, freeze gate 2026-07-12): once the
-  // promise date has passed with a partner assigned but no delivery booked, the
-  // responsibility shifts from the partner's "call now" (LOGISTIC) to OPS's
-  // "Chase logistic" (NEXT) — this OVERRIDES the stock track. Scoped to
-  // has-partner (you can't chase a logistic that isn't assigned yet) AND to
-  // stock NOT "unknown": a No-PO order's real unblock is RUNG 1 "Order PO", which
-  // the escalation must never leapfrog (chasing a partner for un-ordered goods is
-  // an empty action).
+  // promise date has passed with logistics assigned but no delivery booked, the
+  // responsibility shifts from their "call now" to OPS's own call — this
+  // OVERRIDES the stock track. Scoped to has-logistics (you cannot call a
+  // company that isn't assigned yet) AND to stock NOT "unknown": a No-PO
+  // order's real unblock is RUNG 1 `Send PO`, which the escalation must never
+  // leapfrog (calling logistics about un-ordered goods is an empty action).
   const dd = daysToDue(o);
   const hasPartner = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
   // T1 (0277): "no delivery booked" = the customer hasn't confirmed — a
-  // provisional carrier date past the deadline still escalates.
+  // provisional logistics date past the deadline still escalates.
   if (dd !== null && dd < 0 && hasPartner && stock.state !== "unknown" && !bookingConfirmedOf(o))
-    return { label: "Chase logistic", tone: "danger" };
+    return act("confirm_delivery_date", "danger");
 
   // STOCK-READY signal (Jess 2026-07-19 #5 fix): the STOCK column trusts the
   // Master import's per-line `line_stock_status='ready'` (stockEtaOf), but
   // nextActionOf used to trust ONLY stockReadiness (order_lines vs live
   // stock_balances) — which is always "awaiting" for AutoCount SKUs that don't
-  // match the catalog → the row stayed on "Chase supplier" even when the STOCK
-  // column showed "Ready". Honour BOTH signals so a Master-ready order flows to
-  // the logistic track (Assign / Chase logistic), matching what the row shows.
+  // match the catalog → the row stayed on `Confirm ready date` even when the
+  // STOCK column showed "Ready". Honour BOTH signals so a Master-ready order
+  // flows to the delivery track, matching what the row shows.
   const ready =
     stock.state === "ready" ||
     stock.state === "in_stock" ||
@@ -747,16 +781,16 @@ export function nextActionOf(
 
   // STOCK TRACK — leads until the goods are secured.
   if (!ready) {
-    if (stock.state === "unknown") return { label: "Order PO", tone: "danger" };
+    if (stock.state === "unknown") return act("send_po", "danger");
     // T3 DELAY RADAR (Jess's Golden Rule, 2026-07-26): risk is not "is stock
     // here today" — it is "can the LATEST stock ETA still honour the customer's
     // date". Once the max waiting-line ETA OVERSHOOTS the promised date the
-    // miss is already certain, so chasing the supplier can no longer save the
-    // date — the action flips to telling the CUSTOMER now, not to showing
-    // overdue after the window. Completed orders never reach here (guardrail
-    // #2, the Done return above); No-PO stays RUNG 1 (the real unblock is
-    // ordering the goods); the past-deadline Chase-logistic escalation above
-    // stays locked (Loo, freeze gate 2026-07-12).
+    // miss is already certain, so calling the supplier can no longer save the
+    // date — the action flips to agreeing a new date with the CUSTOMER now, not
+    // to showing overdue after the window. Completed orders never reach here
+    // (guardrail #2, the Done return above); No-PO stays RUNG 1 (the real
+    // unblock is ordering the goods); the past-deadline delivery escalation
+    // above stays locked (Loo, freeze gate 2026-07-12).
     const se = stockEtaOf(o);
     if (
       se.etaIso &&
@@ -764,9 +798,9 @@ export function nextActionOf(
       o.delivery_date &&
       se.etaIso > o.delivery_date
     )
-      return { label: "Call customer (stock delay)", tone: "danger" };
-    // "Chase supplier" turns red once we're inside the stock-arrival window and
-    // it still hasn't landed (MS/BF = deadline−7d, Sofa = deadline−5d), amber otherwise.
+      return act("agree_new_delivery_date", "danger");
+    // `Confirm ready date` turns red once we're inside the stock-arrival window
+    // and it still hasn't landed (MS/BF = deadline−7d, Sofa = −5d), else amber.
     const hasMsbf = lines.some((l) => {
       const c = lineCategory(l.sku);
       return c === "mattress" || c === "bedframe";
@@ -774,43 +808,44 @@ export function nextActionOf(
     const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
     const lead = hasMsbf ? 7 : hasSofa ? 5 : 7;
     const overdue = dd !== null && dd < lead;
-    return { label: "Chase supplier", tone: overdue ? "danger" : "warning" };
+    return act("confirm_ready_date", overdue ? "danger" : "warning");
   }
 
-  // LOGISTIC TRACK — stock is in; arrange the delivery. T1 (0277): the chase
-  // ends only on the CUSTOMER's confirmation — a provisional carrier date
-  // (logistic_eta alone) keeps the row in the Chase logistic queue, matching
-  // the drawer's "not confirmed" chip.
+  // DELIVERY TRACK — stock is in; arrange the delivery. T1 (0277): the call ends
+  // only on the CUSTOMER's confirmation — a provisional logistics date
+  // (logistic_eta alone) keeps the row in the Confirm-delivery-date queue,
+  // matching the drawer's "not confirmed" chip.
   if (!(o.delivery_partners?.name || o.ops_assigned_logistic))
-    return { label: "Assign logistic", tone: "info" };
-  if (!bookingConfirmedOf(o)) return { label: "Chase logistic", tone: "info" };
+    return act("assign_logistics", "info");
+  if (!bookingConfirmedOf(o)) return act("confirm_delivery_date", "info");
 
-  // Both tracks done → Confirm. A money-hold keeps it 🔒 (never a separate action).
+  // Both tracks done → confirm the delivery with the customer. A money-hold
+  // keeps it 🔒 (never a separate action).
   const ovl = ovlOf(o);
   const owingBalance = Number(ovl?.balance ?? 0) > 0;
   const storageFee =
     (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
   const owingStorage =
     storageFee > 0 && !ovl?.storage_collected_at && ovl?.storage_waiver_status !== "approved";
-  if (owingBalance || owingStorage)
-    return { label: "Confirm", tone: "warning", locked: true };
+  if (owingBalance || owingStorage) return act("confirm_delivery", "warning", true);
 
   // T7 (Jess 2026-07-27): the CUSTOMER's confirmed date is itself a deadline, so
   // a confirmed booking is not one resting state — it splits by that date.
   //   today  → "Deliver today" (this is today's run; a real queue of its own)
   //   passed → the booked run did not happen and nothing recorded a delivery →
-  //            back to "Chase logistic" (the carrier is who to ask). This is the
-  //            auto-overdue: the row leaves the Deliver-today queue by itself.
-  // The money-hold above still wins (PayHold law — you don't chase a delivery
-  // you're not allowed to make), and bookingConfirmedOf() guarantees a date here.
+  //            back to `Call {logistics} — confirm delivery date` (they are who
+  //            to ask). This is the auto-overdue: the row leaves the
+  //            Deliver-today queue by itself.
+  // The money-hold above still wins (PayHold law — you don't collect for a
+  // delivery you're not allowed to make), and bookingConfirmedOf() guarantees a
+  // date here.
   const confirmedDate = ovl?.confirmed_date ?? null;
   if (confirmedDate) {
     const today = todayIso();
-    if (confirmedDate < today) return { label: "Chase logistic", tone: "danger" };
-    if (confirmedDate === today)
-      return { label: deliveryQueueByKey("deliver_today").label, tone: "info" };
+    if (confirmedDate < today) return act("confirm_delivery_date", "danger");
+    if (confirmedDate === today) return act("deliver_today", "info");
   }
-  return { label: "Confirm", tone: "success" };
+  return act("confirm_delivery", "success");
 }
 
 /** Sort by SLACK ascending (Jess spec §5) — the most dangerous order (least
@@ -835,9 +870,9 @@ function regionBucket(address: string | null): string {
   return detectState(address) ?? OTHERS_LABEL;
 }
 
-/** Carrier / logistic name for an order — the formal LP, else the Inbox-triage
+/** Logistics company name for an order — the formal LP, else the Inbox-triage
  *  assignment resolved via the partners map; null when none yet. Drives the
- *  Logistic filter chips + the Carrier cell (Jess 2026-06-24). */
+ *  LOGISTICS filter chips + the Delivery cell (Jess 2026-06-24). */
 function logisticOf(
   o: operationOrderListRow,
   partnerName: Map<string, string>,
@@ -849,7 +884,7 @@ function logisticOf(
 }
 const NO_CARRIER = "—";
 
-// ─── Logistic delivery state (locked列 spec 2026-07-12 · T1 booking truth
+// ─── Logistics delivery state (locked column spec 2026-07-12 · T1 booking truth
 // 2026-07-26) ─────────────────────────────────────────────────────────────────
 // The LOGISTIC column = partner tag + booking state, as a small state machine.
 // D1 (0277) split "a date exists" into two stages, and the column tells the
@@ -866,7 +901,7 @@ type LogisticStateKey =
 interface LogisticState {
   key: LogisticStateKey;
   partner: string | null;
-  /** ISO date — the customer's confirmed date on "confirmed"; the carrier's
+  /** ISO date — the customer's confirmed date on "confirmed"; the logistics
    *  provisional date on "provisional". */
   date: string | null;
   /** Customer's time slot — only on "confirmed" (null until recorded). */
@@ -1080,7 +1115,7 @@ interface Props {
  *  (Jess 2026-06-25, #4 top-bar Export menu). */
 const EXPORT_HEADER = [
   "SO", "Customer", "Phone", "Address", "Units", "Items",
-  "Deadline", "Proceed", "Location", "Logistic", "Status",
+  "Deadline", "Proceed", "Location", "Logistics", "Status",
 ] as const;
 
 /** One order → its export cells (strings). Shared by CSV + print so the two
@@ -1195,24 +1230,28 @@ interface OrderColDef {
 }
 /** §14 six-col rebuild (Jess picked C, 2026-07-18): dots lead, SO+Ref and
  *  Customer+Region merge into two-line cells, LOGISTIC→DELIVERY (truth-ladder
- *  words), NEXT is plain text. Old keys (orderId/ref/region/logistic) retired —
+ *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status now shows a STAGE word pill (Placed/Proceed/Pending/Scheduled),
-  // not the old anonymous dots — 9% so "Scheduled"/"Pending" never clip to
-  // "Pendir" (Jess 2026-07-19). Rebalanced out of customer/deadline/delivery/next.
-  { key: "dots", label: "Status", w: 9 },
+  // Status shows a STAGE word pill (Placed / Proceed / To book / Customer
+  // confirmed), not the old anonymous dots — 11% since C1 renamed the two
+  // longest words, so "Customer confirmed" never clips (Jess 2026-07-19 asked
+  // for exactly that on the old pair). Rebalanced out of customer/next.
+  { key: "dots", label: "Status", w: 11 },
   { key: "order", label: "Order", w: 10 },
-  { key: "customer", label: "Customer", w: 13 },
-  // Deadline right after Customer (Jess 2026-07-18). Wider (14) since every date
-  // now carries the weekday: "20 Jul 26, Sun" (Jess 2026-07-19 date law).
-  { key: "deadline", label: "Deadline", w: 14 },
-  { key: "stock", label: "Stock", w: 12 },
-  { key: "delivery", label: "Delivery", w: 12 },
+  { key: "customer", label: "Customer", w: 11 },
+  // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
+  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law).
+  { key: "deadline", label: "Deadline", w: 13 },
+  { key: "stock", label: "Stock", w: 11 },
+  // Delivery + Actions each took a point from the cells beside them: C1's words
+  // name the party, so the strings are longer ("NETS — confirm delivery date").
+  { key: "delivery", label: "Delivery", w: 13 },
   // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
   // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
   { key: "pic", label: "PIC", w: 5 },
-  { key: "next", label: "Manage", w: 13 },
+  // ACTIONS, plural (Jess 2026-07-27): an order can have several. Was "Manage".
+  { key: "next", label: "Actions", w: 14 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -1285,8 +1324,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Filter dimensions (Jess 2026-07-19, B redesign) — ALL multi-select: pick
   // several suppliers / partners / regions / deadline buckets at once (an order
   // matches ANY selected value within a dimension = OR). Empty set = no filter.
-  // The left rail is now pure FILTER; the chase ACTIONS live in the bulk bar
-  // (Supplier ⋮ / Logistic ⋮).
+  // The left rail is now pure FILTER; the follow-up ACTIONS live in the bulk
+  // bar (Supplier ⋮ / Logistics ⋮).
   const [dueFilter, setDueFilter] = useState<Set<DueBucket>>(new Set());
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
@@ -1311,7 +1350,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       return n;
     });
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
-  // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
+  // annotations) · ⏫ For manager review = needs a manager's decision. Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
   // Action cell owns flag/resolve via its own useAddAnnotation.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -1425,12 +1464,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // The consolidated Raise-PO review (Option A cards); null = closed.
   const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
   const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
-  // Logistic ⋮ → Remind/Chase over the selection (partner-grouped review).
+  // Logistics ⋮ → Remind/Call over the selection (company-grouped review).
   const [chasePartnerOrders, setChasePartnerOrders] = useState<
     operationOrderListRow[] | null
   >(null);
   // Which tone the Chase-supplier review opens on (Jess 2026-07-19): the
-  // SUPPLIER section's Remind opens remind, Chase opens chase.
+  // SUPPLIER section's Remind opens remind, Call opens the firmer tone.
   const [chaseInitialMode, setChaseInitialMode] = useState<"remind" | "chase">("remind");
   // When the chase is opened from the SUPPLIER facet (a specific supplier picked),
   // scope the review to THAT supplier so a multi-supplier order doesn't leak the
@@ -1487,7 +1526,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     onError: (e) => toast.error(`Reassign failed — ${e.message}`),
   });
 
-  // Bulk-action mutations: assign-logistic loops the Inbox ops-assign endpoint;
+  // Bulk-action mutations: assign-logistics loops the Inbox ops-assign endpoint;
   // create-tasks loops the ops cockpit /ops/tasks. CSV export is client-side.
   const assignMut = useMutation({
     mutationFn: (a: { orderId: string; partnerId: string | null }) =>
@@ -1584,7 +1623,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [tabFiltered],
   );
   // Owing queue — the ONE count that deliberately spans closed orders too
-  // (§7: the owing customer is the chase that survives Delivered).
+  // (§7: the owing customer is the call that survives Delivered).
   const owing = useMemo(() => {
     let n = 0;
     let rm = 0;
@@ -1639,8 +1678,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
       ovl?.balance == null && owingStorage === 0
         ? null
         : Number(ovl?.balance ?? 0) + owingStorage;
+    const na = nextActionOf(o, stock, o.order_lines ?? []);
+    const sid = primarySupplierId(o, skuMeta, suppliers);
     return {
-      next: nextActionOf(o, stock, o.order_lines ?? []),
+      next: {
+        ...na,
+        // C1 — the strip shows the SAME row line the list pill shows, built by
+        // the same shared helper. One action, one spelling, two surfaces.
+        line: orderActionLine(na.key, {
+          supplier: sid ? supplierNameById.get(sid) ?? null : null,
+          logistics: logisticOf(o, partnerName),
+          customer: o.customer_name,
+          amount: fmtRM(Number(ovl?.balance ?? 0)),
+        }),
+      },
       // The same test the ladder's RUNG 1 makes: goods with no purchase order
       // anywhere are goods nobody has ordered.
       hasPo: (o.order_lines ?? []).some((l) => !!l.source_po),
@@ -1749,8 +1800,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [liveScope, availableBySku],
   );
 
-  // Unassigned queue (Jess 2026-07-19): open orders with NO delivery partner yet,
-  // regardless of stock — the "who still needs a carrier" work list. Filters via
+  // No-logistics queue (Jess 2026-07-19): open orders with NO logistics company
+  // yet, regardless of stock — the whole "nobody is carrying this" list. Via
   // logisticFilter holding NO_CARRIER.
   const unassignedCount = useMemo(
     () => liveScope.filter((o) => !logisticOf(o, partnerName)).length,
@@ -1767,7 +1818,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // full delivery-partners list in with a 0 default.
     for (const p of partnersQ.data?.partners ?? [])
       if (!m.has(p.name)) m.set(p.name, 0);
-    // Data-present carriers by count desc first (tiebreak alpha), then the
+    // Data-present companies by count desc first (tiebreak alpha), then the
     // remaining 0-count partners alphabetically.
     return [...m.entries()]
       .sort((a, b) => {
@@ -1780,7 +1831,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   // SUPPLIER facet counts — per primary core-line supplier, over liveScope.
   // Unresolved (no core line / no supplier) rows are skipped. Sorted by name.
-  // (B redesign: the supplier-deadline urgency pills + Remind/Chase left the
+  // (B redesign: the supplier-deadline urgency pills + Remind/Call left the
   // rail — deadline is the shared DEADLINE band; chasing lives in the bulk bar.)
   const supplierEntries = useMemo(() => {
     const m = new Map<string, number>();
@@ -2222,7 +2273,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Multi-select facets: one chip per picked value (✕ removes just that one).
   for (const c of logisticFilter)
     activeChips.push({
-      label: c === NO_CARRIER ? "Unassigned" : `Logistic: ${c}`,
+      label: c === NO_CARRIER ? "No logistics picked" : `Logistics: ${c}`,
       onClear: () => setLogisticFilter((p) => toggleInSet(p, c)),
     });
   for (const rg of regionFilter)
@@ -2252,9 +2303,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   for (const b of dueFilter)
     activeChips.push({ label: `Deadline: ${b}`, onClear: () => setDueFilter((p) => toggleInSet(p, b)) });
   if (nextFilter)
-    activeChips.push({ label: `Next: ${nextFilter}`, onClear: () => setNextFilter(null) });
+    activeChips.push({ label: `Action: ${nextFilter}`, onClear: () => setNextFilter(null) });
   if (flaggedOnly) activeChips.push({ label: "Follow-up", onClear: () => setFlaggedOnly(false) });
-  if (escalateOnly) activeChips.push({ label: "For Jess", onClear: () => setEscalateOnly(false) });
+  // A product must not hard-code a person (Jess 2026-07-27) — the escalation
+  // goes to whoever holds the manager seat, not to a name in the code.
+  if (escalateOnly)
+    activeChips.push({ label: "For manager review", onClear: () => setEscalateOnly(false) });
   for (const key of categoryFilter)
     activeChips.push({
       label: `Cat: ${key}`,
@@ -2271,8 +2325,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // private message — everyone must see whose month it is and that today is
   // PO day). Only the ACTION is gated: the Raise PO button renders for the
   // holder + management. Speaks the C-vocab queue words, same as QUEUES+NEXT.
-  const orderPoCount = nextCounts.get("Order PO") ?? 0;
-  const chaseSupplierCount = nextCounts.get("Chase supplier") ?? 0;
+  const orderPoCount = nextCounts.get(orderActionQueue("send_po")) ?? 0;
+  const chaseSupplierCount =
+    nextCounts.get(orderActionQueue("confirm_ready_date")) ?? 0;
   // Quiet chip = every day (whole team, zero clicks): holder avatar + next PO
   // day. Hot state = Mon/Thu, urgent, or ?poday preview: the SAME slot grows
   // the action chip (+ Raise PO for holder/management). One announce home.
@@ -2305,7 +2360,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const picQueueChip = chipSlot(
     <span
       className="shrink-0 text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
-      title="Each PIC chases their own orders"
+      title="Each PIC follows up their own orders"
     >
       PIC
     </span>,
@@ -2314,7 +2369,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
       <span
         className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-[11px] text-base-500 whitespace-nowrap"
-        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls Order PO + Chase supplier (the one voice to suppliers). Full roster: right rail → Team.`}
+        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls ${orderActionQueue("send_po")} + ${orderActionQueue("confirm_ready_date")} (the one voice to suppliers). Full roster: right rail → Team.`}
       >
         <span
           className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none shrink-0"
@@ -2338,7 +2393,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <PackagePlus size={14} strokeWidth={2} />
           {poDayPreview || isPoDayMYT()
-            ? `PO day — Order PO ${orderPoCount} · Chase supplier ${chaseSupplierCount}`
+            ? `PO day — ${orderActionQueue("send_po")} ${orderPoCount} · ${orderActionQueue("confirm_ready_date")} ${chaseSupplierCount}`
             : `${urgentPoCount} urgent — inside the stock window`}
           {(poDayPreview || isPoDayMYT()) && urgentPoCount > 0 && (
             <span className="text-destructive">· {urgentPoCount} urgent</span>
@@ -2619,10 +2674,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }
               >
                 {/* C-vocab (Jess 2026-07-19): Overdue (结果) + Owing (钱) on
-                    top, then the NEXT-verb queues — the row's queue IS its
-                    NEXT word, so numbers match the column by construction.
-                    "To book" / "Waiting stock" / "No logistic" = dead words
-                    (states live in FILTERS; no-carrier = Assign logistic). */}
+                    top, then the action queues — the row's queue IS its action,
+                    so the numbers match the Actions column by construction.
+                    States live in FILTERS; no-logistics = Assign logistics. */}
                 {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
                   <KanbanRow
                     label="Overdue"
@@ -2630,7 +2684,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     tone="danger"
                     active={dueFilter.has("Overdue")}
                     chip={emptyQueueChip}
-                    title="Past the delivery date and not delivered yet — who to chase = the row's NEXT verb"
+                    title="Past the delivery date and not delivered yet — who to call = the row's Actions cell"
                     onClick={() => setDueFilter((p) => toggleInSet(p, "Overdue"))}
                   />
                 )}
@@ -2653,17 +2707,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       label={v}
                       count={nextCounts.get(v) ?? 0}
                       tone={
-                        v === "Order PO" || v === "Call customer (stock delay)"
-                          ? "danger"
-                          : v === "Chase supplier"
-                            ? "warning"
-                            : undefined
+                        v === orderActionQueue("confirm_ready_date")
+                          ? "warning"
+                          : "danger"
                       }
                       active={nextFilter === v}
                       chip={
-                        v === "Order PO" || v === "Chase supplier"
-                          ? dutyQueueChip
-                          : picQueueChip
+                        v === orderActionQueue("agree_new_delivery_date")
+                          ? picQueueChip
+                          : dutyQueueChip
                       }
                       title={NEXT_QUEUE_DESC[v]}
                       onClick={() => setNextFilter((f) => (f === v ? null : v))}
@@ -2697,11 +2749,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 )}
                 {escalateCount > 0 && (
                   <KanbanRow
-                    label="For Jess"
+                    label="For manager review"
                     count={escalateCount}
                     active={escalateOnly}
                     chip={emptyQueueChip}
-                    title="Escalated to Jess — orders needing the boss's action"
+                    title="Escalated — orders that need a manager's decision before anyone else can act"
                     onClick={() => setEscalateOnly((v) => !v)}
                   />
                 )}
@@ -2723,17 +2775,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   collapsed={collapsedGroups.has("DELIVERY")}
                   onToggle={() => toggleGroup("DELIVERY")}
                 >
-                  {/* Unassigned (Jess 2026-07-19): every open order with no
-                      delivery partner yet — the broader "needs a carrier" list
-                      (Assign logistic fires only once stock is Ready). Filters
-                      via logisticFilter holding NO_CARRIER. */}
+                  {/* Every open order with no logistics company yet — the
+                      broader list (Assign logistics fires only once stock is
+                      Ready). Filters via logisticFilter holding NO_CARRIER.
+                      The word is COPY-STANDARD's: a fact may state an absence,
+                      and "Unassigned" is not one of the allowed ones. */}
                   {unassignedCount > 0 && (
                     <KanbanRow
-                      label="Unassigned"
+                      label="No logistics picked"
                       count={unassignedCount}
                       active={logisticFilter.has(NO_CARRIER)}
                       chip={picQueueChip}
-                      title="No delivery partner picked yet — assign a carrier"
+                      title="No logistics company picked yet — the Actions cell says Assign logistics once the stock is in"
                       onClick={() => setLogisticFilter((p) => toggleInSet(p, NO_CARRIER))}
                     />
                   )}
@@ -2867,8 +2920,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       />
                     );
                   })}
-                  {/* "No PIC", NOT "Unassigned" — that word already means
-                      no-logistic in CHASE NOW (Jess 2026-07-18, word law). */}
+                  {/* "No PIC" — never a bare "Unassigned": that reads as the
+                      no-logistics row two groups down (word law). */}
                   <KanbanRow
                     label="No PIC"
                     count={staffEntries.none}
@@ -2917,13 +2970,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   </div>
                 </KanbanGroup>
                 <KanbanGroup
-                  title="LOGISTIC"
+                  title="LOGISTICS"
                   testid="filter-logistic"
-                  collapsed={collapsedGroups.has("LOGISTIC")}
-                  onToggle={() => toggleGroup("LOGISTIC")}
+                  collapsed={collapsedGroups.has("LOGISTICS")}
+                  onToggle={() => toggleGroup("LOGISTICS")}
                 >
-                  {/* no-carrier = the "Assign logistic" QUEUE (C-vocab); here
-                      EVERY partner is an option (0-count included, Jess
+                  {/* no-logistics = the "Assign logistics" QUEUE (C-vocab); here
+                      EVERY company is an option (0-count included, Jess
                       2026-07-19) so the whole fleet is filterable. */}
                   {logisticEntries.map((e) => (
                     <KanbanRow
@@ -3089,7 +3142,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </th>
               {showCol("dots") && (
                 <Th>
-                  <span title="Money · Stock · Delivery — green OK · amber in progress · red needs action">
+                  {/* This cell shows the pipeline STAGE in words, not the
+                      three-dot signal its `dots` key still names — see the
+                      column def. The tooltip describes what actually renders. */}
+                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered">
                     Status
                   </span>
                 </Th>
@@ -3104,7 +3160,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   <span title="Person in charge — who's watching this order">PIC</span>
                 </Th>
               )}
-              {showCol("next") && <Th>Manage</Th>}
+              {/* The header word lives in ORDER_COL_DEFS too (the Columns
+                  popover reads it) — take it from there so the two cannot
+                  disagree, which is exactly how "Manage" survived here. */}
+              {showCol("next") && (
+                <Th>{ORDER_COL_DEFS.find((d) => d.key === "next")!.label}</Th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -3137,9 +3198,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }
                 canAssign={isManager}
                 hasPendingChange={pendingCROrders.has(o.id)}
+                /* C1 — the row line names the real supplier, so the row needs
+                   the same resolution the SUPPLIER facet uses. Null = we cannot
+                   prove which supplier, and the line falls back to the role
+                   word rather than to a blank. */
+                supplierName={(() => {
+                  const sid = primarySupplierId(o, skuMeta, suppliers);
+                  return sid ? supplierNameById.get(sid) ?? null : null;
+                })()}
                 onNextAction={(verb) => {
-                  if (verb === "Order PO") setRaisePoOrders([o]);
-                  else if (verb === "Chase supplier") {
+                  if (verb === orderActionQueue("send_po")) setRaisePoOrders([o]);
+                  else if (verb === orderActionQueue("confirm_ready_date")) {
                     setChaseSupplierScope(null);
                     setChaseOrders([o]);
                   }
@@ -3174,8 +3243,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
-      {/* Chase supplier — one WhatsApp message per supplier group over the
-          selection (Remind / Chase). Open to all operation (no PO-duty gate). */}
+      {/* Confirm ready date — one WhatsApp message per supplier group over the
+          selection (Remind / Call). Open to all operation (no PO-duty gate). */}
       {chaseOrders && (
         <ChaseSupplierReview
           orders={chaseOrders.map(toChaseOrder)}
@@ -3188,8 +3257,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
-      {/* Chase logistic — one WhatsApp message per delivery-partner group over
-          the selection (Remind / Chase). Open to all operation. */}
+      {/* Confirm delivery date — one WhatsApp message per logistics company
+          over the selection (Remind / Call). Open to all operation. */}
       {chasePartnerOrders && (
         <ChasePartnerReview
           orders={chasePartnerOrders.map(toPartnerChaseOrder)}
@@ -3222,11 +3291,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
  *  move. A warm flame band (token classes, no raw hex). The leading checkbox
  *  stays checked / indeterminate so you can untick in place like Gmail; when the
  *  loaded window is a subset of the tab it offers "Select all N in <tab>". Inline:
- *  Assign logistic · Flag · Export ▾ (CSV / Print / Mark delivered); ✕ clears. */
+ *  Assign logistics · Flag · Export ▾ (CSV / Print / Mark delivered); ✕ clears. */
 /**
  * Bulk bar — Option B (Jess 2026-07-19): grouped by COUNTERPARTY, not by verb.
- * Three chips — [📦 Supplier ⋮] [🚚 Logistic ⋮] [More] — and the two
- * counterparty menus each hold that party's actions incl. Remind / Chase. The
+ * Three chips — [📦 Supplier ⋮] [🚚 Logistics ⋮] [More] — and the two
+ * counterparty menus each hold that party's actions incl. Remind / Call. The
  * gated Raise PO sits INSIDE the Supplier menu (locked for non-duty), so the bar
  * never shows a dead primary button; the shape stays 3 chips regardless of
  * permission or selection.
@@ -3268,9 +3337,9 @@ function OrdersBulkBar({
   onRaisePo: () => void;
   canRaisePo: boolean;
   raisePoTitle: string;
-  /** Open the supplier chase-review on the given tone (Remind / Chase). */
+  /** Open the supplier follow-up review on the given tone (Remind / Call). */
   onChaseSupplier: (mode: "remind" | "chase") => void;
-  /** Open the partner chase-review on the given tone (Remind / Chase). */
+  /** Open the logistics follow-up review on the given tone (Remind / Call). */
   onChasePartner: (mode: "remind" | "chase") => void;
   onFlag: () => void;
   onExport: () => void;
@@ -3315,7 +3384,7 @@ function OrdersBulkBar({
       <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
 
       {/* — SUPPLIER ⋮ — the goods counterparty. Raise PO (gated) + Remind +
-          Chase all live here; one voice per supplier. */}
+          Call all live here; one voice per supplier. */}
       <div className="relative">
         <button
           type="button"
@@ -3341,13 +3410,13 @@ function OrdersBulkBar({
             <div className="h-px bg-base-200 my-1 mx-1.5" />
             <BulkMenuItem
               icon={Bell}
-              label="Remind"
+              label="Remind suppliers"
               hint="before deadline"
               onClick={() => onChaseSupplier("remind")}
             />
             <BulkMenuItem
               icon={MessageCircle}
-              label="Chase"
+              label="Call suppliers — confirm ready date"
               hint="overdue"
               tone="wa"
               onClick={() => onChaseSupplier("chase")}
@@ -3356,8 +3425,8 @@ function OrdersBulkBar({
         )}
       </div>
 
-      {/* — LOGISTIC ⋮ — the delivery counterparty. Assign (partner picker) +
-          Remind + Chase. */}
+      {/* — LOGISTICS ⋮ — the delivery counterparty. Assign (company picker) +
+          Remind + Call. */}
       <div className="relative">
         <button
           type="button"
@@ -3367,7 +3436,7 @@ function OrdersBulkBar({
           aria-expanded={menu === "logistic"}
           className={chip}
         >
-          <Truck size={15} className="text-base-500" /> Logistic
+          <Truck size={15} className="text-base-500" /> Logistics
           <MoreVertical size={13} className="text-base-400 -mr-0.5" />
         </button>
         {menu === "logistic" && (
@@ -3381,13 +3450,14 @@ function OrdersBulkBar({
             <div className="h-px bg-base-200 my-1 mx-1.5" />
             <BulkMenuItem
               icon={Bell}
-              label="Remind"
-              hint="before收货日"
+              label="Remind logistics"
+              /* Was "before收货日" — the UI is English only (PR 209). */
+              hint="before the delivery day"
               onClick={() => onChasePartner("remind")}
             />
             <BulkMenuItem
               icon={MessageCircle}
-              label="Chase"
+              label="Call logistics — confirm delivery date"
               hint="overdue"
               tone="wa"
               onClick={() => onChasePartner("chase")}
@@ -3400,7 +3470,9 @@ function OrdersBulkBar({
               Assign to…
             </div>
             {partners.length === 0 && (
-              <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
+              <div className="px-2 py-1.5 text-[12px] text-base-400">
+                No logistics companies on file. Ask a manager to add one.
+              </div>
             )}
             {partners.map((p) => (
               <button
@@ -4024,6 +4096,7 @@ function OrderRow({
   onAssignStaff,
   canAssign,
   hasPendingChange,
+  supplierName,
   onNextAction,
 }: {
   o: operationOrderListRow;
@@ -4046,7 +4119,11 @@ function OrderRow({
   canAssign: boolean;
   /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
   hasPendingChange?: boolean;
-  /** One-click NEXT (2026-07-19) — the row's NEXT verb, clicked = act on it. */
+  /** C1 — the order's primary supplier NAME, so the action line can say
+   *  "Call Ohana — confirm ready date". Null → the role word "supplier". */
+  supplierName?: string | null;
+  /** One-click action (2026-07-19) — the row's action QUEUE word, clicked = act
+   *  on it. The queue word, not the row line: the handler branches on it. */
   onNextAction: (verb: string) => void;
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
@@ -4083,24 +4160,16 @@ function OrderRow({
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary
-          as the tabs (Placed → Proceed → Pending → Scheduled → Delivered). A
-          quiet .pill for the live stages; a muted "Delivered" (no pill) once
-          done. Replaces the anonymous status dots (new staff couldn't read). */}
+          as the tabs (Placed → Proceed → To book → Customer confirmed →
+          Delivered), read from TAB_LABEL so the two can never drift. A quiet
+          .pill for the live stages; a muted "Delivered" (no pill) once done. */}
       {showCol("dots") && (
       <td className="pl-2 pr-1">
         {completed ? (
           <span className="text-[12px] text-base-400">Delivered</span>
         ) : (
           (() => {
-            const stage = controlTabOf(o, availableBySku);
-            const label =
-              stage === "pending"
-                ? "Pending"
-                : stage === "scheduled"
-                  ? "Scheduled"
-                  : stage === "proceed"
-                    ? "Proceed"
-                    : "Placed";
+            const label = TAB_LABEL[controlTabOf(o, availableBySku)];
             // ONE shared status→pill map (no per-surface hand-roll).
             return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
           })()
@@ -4245,15 +4314,17 @@ function OrderRow({
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
       </td>
       )}
-      {/* Delivery — partner + the T1 booking truth (0277). The column never
-          says "Unscheduled": green `27 Jul · 12pm–3pm` ONLY on the customer's
-          confirmation; amber `carrier said 27 Jul` while only the carrier's
-          provisional date exists; grey `need booking` when a partner is
-          assigned with no date at all. Same vocabulary as the drawer chip. */}
+      {/* Delivery — the logistics company + the T1 booking truth (0277). C1
+          (Jess 2026-07-27) struck the last gap-word: `need booking` hid a to-do
+          inside a fact ("need" = the reader still has to work out what to do),
+          so the sub-line is now the ACTION that closes the gap —
+          `{logistics} — confirm delivery date`. Green `27 Jul · 12pm–3pm` ONLY
+          on the customer's confirmation; amber `logistics said 27 Jul` while
+          only their provisional date exists. Same vocabulary as the drawer. */}
       {showCol("delivery") && (
       <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
-          <span className="t4-caption">unassigned</span>
+          <span className="t4-caption">No logistics picked</span>
         ) : (
           <div style={{ lineHeight: "15px" }}>
             <div className="t4-row-strong truncate">{logi.partner}</div>
@@ -4274,10 +4345,19 @@ function OrderRow({
                 className="tabular-nums text-warning"
                 style={{ fontSize: "11px", fontWeight: 600 }}
               >
-                carrier said {dayMon(logi.date)}
+                logistics said {dayMon(logi.date)}
               </div>
             ) : (
-              <div className="t4-caption">need booking</div>
+              (() => {
+                // A FACT slot, so the action WITHOUT its verb — the neighbours
+                // in this cell are facts too (COPY-STANDARD's audit table).
+                const fact = deliveryDateGapFact(logi.partner);
+                return (
+                  <div className="t4-caption truncate" title={fact}>
+                    {fact}
+                  </div>
+                );
+              })()
             )}
           </div>
         )}
@@ -4296,30 +4376,40 @@ function OrderRow({
         />
       </td>
       )}
-      {/* Next action — one plain-text verb, now a one-click action (2026-07-19):
-          the whole row opens the drawer, so the NEXT verb itself is the button
-          that acts on the order (Order PO / Chase supplier / else open). */}
+      {/* ACTIONS — the action, with the party NAMED (C1, Jess 2026-07-27), and
+          a one-click act (2026-07-19): the whole row opens the drawer, so the
+          pill itself is the button that acts on the order. The pill reads the
+          row LINE (`Call NETS — confirm delivery date`); the QUEUE word behind
+          it (`Confirm delivery date`) is what the facet rail and the counts
+          use, and `data-next-action` keeps carrying that stable word. */}
       {showCol("next") && (
       <td className="pl-2 pr-2">
         {(() => {
-          // Delivered = closed → Manage is a NEXT-ACTION column, and a closed
+          // Delivered = closed → Actions is a next-action column, and a closed
           // order has no action, so the cell is BLANK (Jess 2026-07-19: STATUS
           // already says "Delivered"; a "Done" pill is redundant — and would be
-          // wrong if a 2nd delivery were still pending, which keeps the order
-          // in-pipeline, not Delivered).
+          // wrong if a 2nd delivery were still outstanding, which keeps the
+          // order in-pipeline, not Delivered).
           // T7 exception: a delivered order with NO delivery photo still owes
           // one real act, so the ladder returns "Upload delivery photo" instead
           // of "Done" and that pill DOES show. Only "Done" blanks the cell.
           const na = nextActionOf(o, stock, lines);
           if (!na.label) return null;
-          if (completed && na.label === "Done") return null;
+          if (completed && na.key === "done") return null;
           // MONEY track (Jess 2026-07-19 legend): the goods/delivery bottleneck
-          // is the PRIMARY verb; an outstanding balance is an INDEPENDENT track,
-          // shown as a secondary "Collect $" pill (max two pills). Hidden once
-          // the order is closed. `Confirm 🔒` already means "money-held", so the
-          // pill isn't doubled up there.
-          const owing = !completed && Number(ovlOf(o)?.balance ?? 0) > 0;
-          const showMoney = owing && na.label !== "Confirm";
+          // is the PRIMARY action; an outstanding balance is an INDEPENDENT
+          // track, shown as a secondary `Collect RM {amount}` pill (max two
+          // pills). Hidden once the order is closed. A 🔒 Confirm delivery
+          // already means "money-held", so the pill isn't doubled up there.
+          const balance = Number(ovlOf(o)?.balance ?? 0);
+          const owing = !completed && balance > 0;
+          const showMoney = owing && na.key !== "confirm_delivery";
+          const line = orderActionLine(na.key, {
+            supplier: supplierName,
+            logistics: logi.partner,
+            customer: o.customer_name,
+          });
+          const money = collectPillLabel(fmtRM(balance));
           return (
             <div className="flex items-center gap-1.5 max-w-full">
               <button
@@ -4330,23 +4420,26 @@ function OrderRow({
                 }}
                 className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
                 data-next-action={na.label}
-                title={`${na.label} — click to act`}
+                title={`${line} — click to act`}
               >
                 {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-                <span className="truncate min-w-0">{na.label}</span>
+                <span className="truncate min-w-0">{line}</span>
               </button>
               {showMoney && (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onNextAction("Collect $");
+                    onNextAction(orderActionQueue("collect"));
                   }}
                   className="pill pill-collected shrink-0 hover:brightness-95"
-                  data-next-action="Collect $"
-                  title="Outstanding balance — open the order to collect"
+                  data-next-action={orderActionQueue("collect")}
+                  title={orderActionLine("collect", {
+                    amount: fmtRM(balance),
+                    customer: o.customer_name,
+                  })}
                 >
-                  Collect $
+                  {money}
                 </button>
               )}
             </div>

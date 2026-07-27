@@ -766,6 +766,19 @@ export {
   type DeliveryResponsibility,
 } from "./delivery-reasons";
 
+// C1 · The words an order action may say — queue word (no party) + row line
+// (party named). The ONE code home for COPY-STANDARD's action dictionary.
+export {
+  ORDER_ACTION_QUEUES,
+  collectPillLabel,
+  deliveryDateGapFact,
+  orderActionForQueue,
+  orderActionLine,
+  orderActionQueue,
+  type OrderActionKey,
+  type OrderActionParties,
+} from "./order-action-words";
+
 // T7 · Delivery queues + auto-overdue (each step carries its own deadline)
 export {
   DELIVERY_QUEUES,

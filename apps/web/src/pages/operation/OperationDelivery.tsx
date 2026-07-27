@@ -16,6 +16,7 @@ import {
   DELIVERY_QUEUES,
   DELIVERY_RANGE_KEYS,
   myHolidaySet,
+  orderActionLine,
   orderDeliveryGroups,
   partnerBookingWarnings,
   partnerDeliveryRules,
@@ -104,10 +105,13 @@ type ViewKey = "queues" | "calendar";
 /** One row of the board: the order plus everything the panes ask of it. */
 interface DeliveryRow {
   order: operationOrderListRow;
-  /** The delivery queue its NEXT verb names — null when the ladder's answer is
+  /** The delivery queue its action names — null when the ladder's answer is
    *  not a delivery step at all (money-held, still waiting on stock, Done). */
   queue: DeliveryQueueKey | null;
+  /** The action's QUEUE word — party-free, used for the facet chip. */
   label: string;
+  /** The action's ROW LINE, party named — what the operator reads (C1). */
+  line: string;
   tone: "danger" | "warning" | "info" | "success" | "neutral";
   locked: boolean;
   dueIso: string | null;
@@ -183,8 +187,8 @@ export default function OperationDelivery() {
    * Every order, read through the ladder ONCE.
    *
    * `queue` is the whole scoping rule: an order is delivery WORK exactly when
-   * the ladder says the next thing to do is one of the four delivery verbs. A
-   * money-held order (🔒 Confirm) therefore carries no queue and never reaches
+   * the ladder says the next thing to do is one of the four delivery actions. A
+   * money-held order (🔒 Confirm delivery) carries no queue and never reaches
    * the board — you do not arrange a delivery you are not allowed to make (the
    * PayHold law, decided in T7 and simply obeyed here).
    *
@@ -203,6 +207,12 @@ export default function OperationDelivery() {
         order: o,
         queue: def?.key ?? null,
         label: next.label,
+        // C1 — the row says the action WITH the party in it, built by the same
+        // shared helper the Orders list uses; no second spelling can appear.
+        line: orderActionLine(next.key, {
+          logistics: state.partner,
+          customer: o.customer_name,
+        }),
         tone: next.tone,
         locked: !!next.locked,
         dueIso: def ? deliveryStepDueIso(def.key, anchor, holidayOpts) : null,
@@ -612,9 +622,12 @@ function QueueRow({
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-[13px] font-semibold text-base-900">SO-{o.so}</span>
-        <span className={`ml-auto pill ${PILL_CLASS[row.tone]} shrink-0`}>
+        <span
+          className={`ml-auto pill ${PILL_CLASS[row.tone]} shrink-0 max-w-[60%] truncate`}
+          title={row.line}
+        >
           {row.locked && <span aria-hidden>🔒 </span>}
-          {row.label}
+          {row.line}
         </span>
       </div>
       <div className={`mt-0.5 text-[13px] text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
@@ -957,13 +970,13 @@ function DeliveryDetail({
         </button>
       </div>
 
-      {/* What to do next — the SAME verb and tone the row and the Orders list
-          show, with the step's own deadline underneath. */}
+      {/* What to do next — the SAME action line and tone the row and the Orders
+          list show, with the step's own deadline underneath. */}
       <div className="px-4 py-3 border-b border-base-100">
         <div className="flex items-center gap-2">
           <span className={`pill ${PILL_CLASS[row.tone]}`}>
             {row.locked && <span aria-hidden>🔒 </span>}
-            {row.label}
+            {row.line}
           </span>
           {due !== "none" && row.dueIso && (
             <span

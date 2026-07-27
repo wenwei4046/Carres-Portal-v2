@@ -32,7 +32,7 @@
   "Ready-to-chase" queue wording; Purchase panel stages read Send · Chase · Receive.
 - Tests assert old strings — renames must update the assertions WITH the strings.
 
-## C1 · Orders + Delivery speak the new words
+## C1 · Orders + Delivery speak the new words — ✅ LIVE (PR #447)
 
 **Goal:** every visible label in the Orders list, queues and drawer follows
 verb + named party + measurable object, and the word Chase disappears:
@@ -79,6 +79,43 @@ drawer: every component guarded ITSELF and the badge sat outside all three.
 **No migration. Copy + label maps + tests.**
 **Done when:** grep of the web bundle for visible `Chase` = 0 on Orders/Delivery
 surfaces AND `Unscheduled` = 0; every renamed label carries a named party.
+
+**SHIPPED (PR #447).** The words live in ONE module — `packages/shared/src/order-action-words.ts`
+— and every surface asks it, so a queue and a row structurally cannot spell one action two
+ways. Each action carries **two** strings, and that split is the whole design: a **queue word**
+(party-free, because a queue holds many suppliers) and a **row line** (`Call Ohana — confirm
+ready date`). `nextActionOf` gained a stable `key`, so the queue counts, the `?tab`-style
+filter state and `data-next-action` keep keying on a word that never moves while the visible
+line names a real company. `delivery-queue.ts` now takes its four labels from that module.
+Three findings are recorded under **What C1 found** below — read them before C2/C3.
+
+### What C1 found — three things a later card has to decide (reported, not fixed)
+
+1. **There is no three-dot column to rename.** The card asks for "the three-dot column →
+   no header word at all; each dot gets its own small icon". `rowDotsOf()` computes the
+   three dots and **nothing renders it** — it is exported, used by no component and by no
+   test. What the list actually has is a `Status` column (internal key `dots`) showing the
+   pipeline stage as a pill. C1 therefore renamed that column's misleading tooltip (it
+   described the three dots, and used the banned words "in progress") and left the header
+   word `Status`, which is correct for a stage pill. **Building the three dots is a
+   feature, not a rename** — it needs Jess, and ACTION-FLOW Law 6 already specifies it.
+2. **`To book` is slightly wider than its own predicate.** The `pending` tab selects
+   in-pipeline orders where NOT (stock ready AND the customer confirmed), so an order whose
+   customer HAS confirmed but whose goods are not in also lands in `To book` — and for that
+   row the word is wrong. Live today it cannot happen: **0 of 55 control rows carry a
+   confirmed booking**, so every in-pipeline order genuinely has no date. The honest fix is
+   a predicate change (split the two conditions into two facts), not a word change, so C1
+   shipped the word Jess ruled and left the predicate alone.
+3. **The drawer keeps its own `Scheduled`, deliberately.** `PIPELINE_LABEL.scheduled` reads
+   `operation_stage = dispatched | ready_to_dispatch` — it is NOT the customer-confirmed
+   booking the list's tab now names, so renaming it to `Customer confirmed` would have made
+   two different states share one word. Its banned neighbour WAS renamed (`Pending` →
+   `Goods not in`). One word for two states is the worse error; this needs Jess's call.
+
+Also: **COPY-STANDARD contradicts itself on `Waiting`.** The banned-words list bans the word
+outright, while the receiving/supplier-exception vocabulary in the same file ships
+`Waiting supplier reply` and `Waiting goods arrival` as locked state words. Nothing in C1
+touches those, so nothing was changed — but the ④ R-cards will hit it.
 
 ## C2 · Split the ladder into TWO LAYERS + the drawer's action list
 
@@ -268,7 +305,7 @@ action.
 
 | Card | Status | PR |
 |---|---|---|
-| C1 | ⬜ after T8 | — |
+| C1 | ✅ LIVE 2026-07-27 | #447 |
 | C2 | ⬜ after C1 | — |
 | C3 | ⬜ after C2 | — |
 | C4 | ⬜ any time, not alongside R | — |

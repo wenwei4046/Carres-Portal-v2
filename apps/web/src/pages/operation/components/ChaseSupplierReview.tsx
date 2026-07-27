@@ -1,4 +1,4 @@
-// design-standard: not-a-list-page — modal review overlay (supplier chase
+// design-standard: not-a-list-page — modal review overlay (supplier follow-up
 // cards), launched from the Orders bulk bar; the page shell stays underneath.
 import { useMemo, useState } from "react";
 import { Copy, ExternalLink, MessageCircle, X } from "lucide-react";
@@ -11,13 +11,20 @@ import {
 import { buildChaseSupplierPlan, type ChaseOrder } from "./chase-supplier-plan";
 
 /**
- * Chase-supplier review (Remind / Chase over the selection):
+ * Confirm-ready-date review (Remind / Call over the selection):
  * ONE card per supplier — the message lists every selected order's CR/TCF ref
  * (suppliers never speak the SO number) + items. Copy grabs the text; Open group
  * opens the supplier's WhatsApp group. GROUP invite links (chat.whatsapp.com/…)
  * don't accept a ?text= prefill, so Open just opens the group and the operator
  * pastes the copied message. Open to ALL operation (no PO-duty gate).
  */
+
+/** The two message TONES, in the canonical words (COPY-STANDARD): `Remind` is
+ *  the pre-deadline follow-up, `Call` the firm one. "Chase" is banned. */
+const TONE_LABEL: Record<"remind" | "chase", string> = {
+  remind: "Remind",
+  chase: "Call",
+};
 
 export default function ChaseSupplierReview({
   orders,
@@ -28,12 +35,12 @@ export default function ChaseSupplierReview({
   orders: ChaseOrder[];
   onClose: () => void;
   /** Which tone the review opens on (Jess 2026-07-19): the SUPPLIER-section
-   *  "Remind" button opens on remind, "Chase" opens on chase. */
+   *  "Remind" button opens on remind, "Call" opens on the firmer tone. */
   initialMode?: "remind" | "chase";
   /** When the SUPPLIER facet is filtered to one supplier (Jess 2026-07-19 bug:
    *  "select Nice Future — why still show Ohana?"), scope the review to THAT
    *  supplier — a multi-supplier order otherwise spawns a card per supplier line.
-   *  null = no filter (the bulk-bar Supplier ⋮ → chase every supplier). */
+   *  null = no filter (the bulk-bar Supplier ⋮ → every supplier). */
   supplierScope?: string | null;
 }) {
   const suppliersQ = useOperationSuppliers();
@@ -93,7 +100,7 @@ export default function ChaseSupplierReview({
         {/* Header */}
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <MessageCircle size={16} className="text-base-500" strokeWidth={2} />
-          <span className="text-[13px] font-semibold">Chase supplier — one message per group</span>
+          <span className="text-[13px] font-semibold">Confirm ready date — one message per supplier</span>
           <span className="text-[12px] text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
             {totalUnits === 1 ? "" : "s"}
@@ -108,7 +115,7 @@ export default function ChaseSupplierReview({
           </button>
         </div>
 
-        {/* Remind / Chase toggle */}
+        {/* Remind / Call toggle — the two message TONES */}
         <div className="flex items-center gap-2 px-5 py-3 border-b border-base-100">
           <div className="inline-flex rounded-lg border border-base-200 p-0.5 bg-base-50">
             {(["remind", "chase"] as const).map((m) => (
@@ -116,11 +123,11 @@ export default function ChaseSupplierReview({
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`text-[12px] font-medium px-3 py-1 rounded-md capitalize ${
+                className={`text-[12px] font-medium px-3 py-1 rounded-md ${
                   mode === m ? "bg-white text-base-900 shadow-sm" : "text-base-500 hover:text-base-900"
                 }`}
               >
-                {m}
+                {TONE_LABEL[m]}
               </button>
             ))}
           </div>
@@ -140,7 +147,7 @@ export default function ChaseSupplierReview({
 
         {plan.cards.length === 0 && (
           <div className="px-5 py-8 text-[13px] text-base-500">
-            Nothing to chase — no core supplier line in the selection.
+            No calls to make — no core supplier line in the selection.
           </div>
         )}
 

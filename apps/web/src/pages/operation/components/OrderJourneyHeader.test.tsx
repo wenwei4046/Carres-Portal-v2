@@ -18,7 +18,7 @@ import OrderJourneyHeader, {
  */
 
 const SIG: OrderJourneySignals = {
-  next: { label: "Chase supplier", tone: "warning" },
+  next: { label: "Confirm ready date", tone: "warning" },
   hasPo: true,
   goodsReady: false,
   bookingConfirmed: false,
@@ -47,22 +47,22 @@ const stateOf = (j: ReturnType<typeof deriveOrderJourney>, stage: string) =>
 describe("deriveOrderJourney — the stage strip agrees with the ladder", () => {
   // (verb, the signals an order carrying that verb really has, expected ●)
   const MATRIX: [string, Partial<OrderJourneySignals>, string][] = [
-    ["Order PO", { hasPo: false, goodsReady: false }, "Purchase"],
-    ["Chase supplier", { hasPo: true, goodsReady: false }, "Goods"],
+    ["Send PO", { hasPo: false, goodsReady: false }, "Purchase"],
+    ["Confirm ready date", { hasPo: true, goodsReady: false }, "Goods"],
     [
-      "Call customer (stock delay)",
+      "Agree new delivery date",
       { hasPo: true, goodsReady: false },
       "Goods",
     ],
-    ["Assign logistic", { hasPo: true, goodsReady: true }, "Booking"],
-    ["Chase logistic", { hasPo: true, goodsReady: true }, "Booking"],
+    ["Assign logistics", { hasPo: true, goodsReady: true }, "Booking"],
+    ["Confirm delivery date", { hasPo: true, goodsReady: true }, "Booking"],
     [
       "Deliver today",
       { hasPo: true, goodsReady: true, bookingConfirmed: true },
       "Delivery",
     ],
     [
-      "Confirm",
+      "Confirm delivery",
       { hasPo: true, goodsReady: true, bookingConfirmed: true },
       "Delivery",
     ],
@@ -96,7 +96,7 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
         signals: sig({
           hasPo: true,
           goodsReady: true,
-          next: { label: "Chase logistic", tone: "info" },
+          next: { label: "Confirm delivery date", tone: "info" },
         }),
       }),
     );
@@ -116,7 +116,7 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
         signals: sig({
           hasPo: true,
           goodsReady: false,
-          next: { label: "Chase logistic", tone: "danger" },
+          next: { label: "Confirm delivery date", tone: "danger" },
         }),
       }),
     );
@@ -130,7 +130,7 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
         signals: sig({
           hasPo: false,
           goodsReady: true,
-          next: { label: "Assign logistic", tone: "info" },
+          next: { label: "Assign logistics", tone: "info" },
         }),
       }),
     );
@@ -216,13 +216,13 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
 describe("deriveOrderJourney — owner", () => {
   it("names the party for every rung the ladder can emit", () => {
     const verbs = [
-      "Order PO",
-      "Chase supplier",
-      "Call customer (stock delay)",
-      "Assign logistic",
-      "Chase logistic",
+      "Send PO",
+      "Confirm ready date",
+      "Agree new delivery date",
+      "Assign logistics",
+      "Confirm delivery date",
       "Deliver today",
-      "Confirm",
+      "Confirm delivery",
       "Upload delivery photo",
       "Done",
     ];
@@ -241,7 +241,7 @@ describe("deriveOrderJourney — owner", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm", tone: "warning", locked: true },
+          next: { label: "Confirm delivery", tone: "warning", locked: true },
         }),
         holdAmountLabel: "1,200",
       }),
@@ -265,7 +265,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm", tone: "warning", locked: true },
+          next: { label: "Confirm delivery", tone: "warning", locked: true },
           holdAmount: 1200,
         }),
         holdAmountLabel: "1,200",
@@ -279,7 +279,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm", tone: "warning", locked: true },
+          next: { label: "Confirm delivery", tone: "warning", locked: true },
         }),
       }),
     );
@@ -290,7 +290,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Call customer (stock delay)", tone: "danger" },
+          next: { label: "Agree new delivery date", tone: "danger" },
         }),
       }),
     );
@@ -312,7 +312,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm", tone: "warning", locked: true },
+          next: { label: "Confirm delivery", tone: "warning", locked: true },
         }),
         holdAmountLabel: "500",
         ledgerOutstanding: 2800,
@@ -343,7 +343,7 @@ describe("deriveOrderJourney — health", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Call customer (stock delay)", tone: "danger", locked: true },
+          next: { label: "Agree new delivery date", tone: "danger", locked: true },
         }),
         holdAmountLabel: "500",
         ledgerOutstanding: 2800,
@@ -368,7 +368,7 @@ describe("OrderJourneyHeader — the strip", () => {
         signals: sig({
           hasPo: true,
           goodsReady: true,
-          next: { label: "Chase logistic", tone: "info" },
+          next: { label: "Confirm delivery date", tone: "info" },
         }),
       }),
     );
@@ -378,9 +378,9 @@ describe("OrderJourneyHeader — the strip", () => {
     expect(cells.map((c) => c.getAttribute("data-stage"))).toEqual([
       ...JOURNEY_STAGES,
     ]);
-    expect(screen.getByTestId("journey-next")).toHaveTextContent("Chase logistic");
+    expect(screen.getByTestId("journey-next")).toHaveTextContent("Confirm delivery date");
     expect(screen.getByTestId("journey-owner")).toHaveTextContent(
-      "Logistic — waiting customer confirmation",
+      "Logistics — customer has not confirmed a date",
     );
   });
 
@@ -388,7 +388,7 @@ describe("OrderJourneyHeader — the strip", () => {
     const j = deriveOrderJourney(
       input({
         signals: sig({
-          next: { label: "Confirm", tone: "warning", locked: true },
+          next: { label: "Confirm delivery", tone: "warning", locked: true },
         }),
         holdAmountLabel: "1,200",
       }),
@@ -403,15 +403,16 @@ describe("OrderJourneyHeader — the strip", () => {
 
   it("uses no banned words (COPY-STANDARD)", () => {
     // Every rung's rendered strip, swept for the vocabulary Jess retired.
-    const banned = /\b(POD|Proof of Delivery|Unscheduled|Not booked|carrier)\b/i;
+    const banned =
+      /\b(POD|Proof of Delivery|Unscheduled|Not booked|carrier|chase|logistic(?!s))\b/i;
     for (const label of [
-      "Order PO",
-      "Chase supplier",
-      "Call customer (stock delay)",
-      "Assign logistic",
-      "Chase logistic",
+      "Send PO",
+      "Confirm ready date",
+      "Agree new delivery date",
+      "Assign logistics",
+      "Confirm delivery date",
       "Deliver today",
-      "Confirm",
+      "Confirm delivery",
       "Upload delivery photo",
       "Done",
     ]) {
