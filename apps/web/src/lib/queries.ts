@@ -31,6 +31,8 @@ import {
   type BalanceImportRow,
   type StockEtaImportResult,
   type OpsStockImportRow,
+  type OpsReorderResponse,
+  type OpsReorderPointInput,
   type ReceiveLineInput,
   type ReceiveLineResult,
   type LoanSofaInput,
@@ -6159,6 +6161,39 @@ export function useImportStock() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
       void qc.invalidateQueries({ queryKey: qk.operation.dashboard() });
+    },
+  });
+}
+
+// ── Reorder alert · Ready Stock K1 (migration 0286) ──────────────────────────
+// Pillow / mattress protector come from China on a ~2-month lead, so the alert
+// has to fire while stock is still on the shelf. The SERVER decides the state
+// (one shared engine, `computeReorderRows`); these hooks only carry the answer.
+
+const reorderKey = ["operation", "ops-stock", "reorder"] as const;
+
+/** current · reorder point · incoming, per watched SKU, + the alert count. */
+export function useReorderStock(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: reorderKey,
+    queryFn: () => apiFetch<OpsReorderResponse>("/api/ops/stock/reorder"),
+    enabled: opts?.enabled ?? true,
+    staleTime: 30_000,
+  });
+}
+
+/** Set (or switch off, with 0) one SKU's reorder point. COO / principal —
+ *  the server re-gates in SQL, so `canEdit` only decides what renders. */
+export function useSetReorderPoint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OpsReorderPointInput) =>
+      apiFetch<{ sku: string; reorderPoint: number }>(
+        "/api/ops/stock/reorder",
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: reorderKey });
     },
   });
 }

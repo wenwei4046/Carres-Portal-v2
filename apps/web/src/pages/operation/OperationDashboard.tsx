@@ -214,6 +214,9 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
           onJumpToWarehouse={() =>
             goWarehouse ? goWarehouse({ alert: true }) : setTab("warehouse")
           }
+          // K1 — a `Reorder stock` alert is answered on the Stock door, which
+          // is where the reorder point itself is set.
+          onJumpToStock={() => setTab("stock-onhand")}
         />
       </div>
 

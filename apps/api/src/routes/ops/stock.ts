@@ -12,10 +12,16 @@ import {
   opsStockUpdateConditionInputSchema,
   opsStockCreateInputSchema,
   opsStockImportInputSchema,
+  opsReorderPointInputSchema,
   reconcileStockImport,
+  computeReorderRows,
+  reorderAlertCount,
+  reorderUnsetCount,
+  isStockPlanner,
   type StockUnitKeyParts,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -30,6 +36,10 @@ import type { AppEnv } from "../../types";
  *
  * POST endpoints (5 actions, each calls a SECURITY DEFINER RPC):
  *   /reserve, /release, /reassign, /takeout, /flag-repair
+ *
+ * Reorder points — K1 (migration 0286):
+ *   GET  /reorder — current · reorder point · incoming, per watched SKU
+ *   PUT  /reorder — set one point (COO duty / principal, re-gated in SQL)
  *
  * All endpoints gated to operation/principal via requireOperationOrPrincipal.
  */
@@ -88,6 +98,67 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
     .order("status", { ascending: true });
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ items: shape(data ?? []), total: (data ?? []).length });
+});
+
+// =====================================================================
+// Reorder points — Ready Stock K1 (migration 0286)
+// =====================================================================
+
+/**
+ * GET /reorder — `current · reorder point · incoming` per watched SKU, plus
+ * the `Reorder stock` alert count.
+ *
+ * The whole judgement is made HERE, by the shared pure engine, so the browser
+ * and any future consumer (the dashboard tile, a cron) can never disagree
+ * about what "below the point" means — the HR-P5 one-engine lesson.
+ */
+opsStockRouter.get("/reorder", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const [stockRes, pointsRes] = await Promise.all([
+    sb.from("ops_stock_items").select("sku,status,qty"),
+    sb.from("ops_reorder_points").select("sku,reorder_point,lead_days,note"),
+  ]);
+  if (stockRes.error) throw new HTTPException(500, { message: stockRes.error.message });
+  if (pointsRes.error) throw new HTTPException(500, { message: pointsRes.error.message });
+
+  const rows = computeReorderRows(
+    (stockRes.data ?? []) as { sku: string; status: string; qty: number | null }[],
+    ((pointsRes.data ?? []) as {
+      sku: string;
+      reorder_point: number;
+      lead_days: number | null;
+      note: string | null;
+    }[]).map((p) => ({
+      sku: p.sku,
+      reorderPoint: p.reorder_point,
+      leadDays: p.lead_days,
+      note: p.note,
+    })),
+  );
+
+  return c.json({
+    rows,
+    alertCount: reorderAlertCount(rows),
+    unsetCount: reorderUnsetCount(rows),
+    // A client-supplied duty is never trusted for the write (the RPC re-gates
+    // in SQL); this only decides whether the pencil renders.
+    canEdit: isStockPlanner(c.var.auth.role, c.var.auth.email, await myDuties(c)),
+  });
+});
+
+/** PUT /reorder — set (or switch off, with 0) one SKU's reorder point. */
+opsStockRouter.put("/reorder", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsReorderPointInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("ops_set_reorder_point", {
+    p_sku: parsed.sku,
+    p_point: parsed.reorderPoint,
+    p_lead_days: parsed.leadDays ?? null,
+    p_note: parsed.note ?? null,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ sku: parsed.sku, reorderPoint: parsed.reorderPoint });
 });
 
 // =====================================================================

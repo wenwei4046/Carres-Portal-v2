@@ -6,6 +6,7 @@ import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
 import Segmented from "@/components/Segmented";
 import StockTabs from "./StockTabs";
+import ReorderStockCard from "./components/ReorderStockCard";
 
 /**
  * OperationStockOnHand — the unified Stock "On Hand" list.
@@ -239,6 +240,10 @@ export default function OperationStockOnHand() {
           onClose={() => setShowImport(false)}
         />
       ) : null}
+
+      {/* K1 — the import accessories that need ordering before they run out.
+          Renders nothing when there is nothing to watch. */}
+      <ReorderStockCard />
 
       {invQ.isLoading ? (
         <p className="text-sm text-base-500">Loading…</p>

@@ -21,6 +21,11 @@ export const DUTY_KEYS = [
   "account_creator",
   "finance_approver",
   "roster_editor",
+  // K1 (0286) — "Only the COO edits reorder points / reserve levels"
+  // (`docs/ready-stock-execution-queue.md`). Seeded to the COO seat ONLY,
+  // deliberately narrower than po_duty_editor (which also covers the empty
+  // Operation Manager seat). K4's reserve levels reuse this same key.
+  "stock_planner",
 ] as const;
 export type DutyKey = (typeof DUTY_KEYS)[number];
 
@@ -124,6 +129,21 @@ export function isPoDutyEditor(
   duties?: readonly string[] | null,
 ): boolean {
   return checkDuty("po_duty_editor", role, email, duties).allowed;
+}
+
+/**
+ * Who may SET a reorder point. Jess's locked line is "only the COO edits
+ * reorder points / reserve levels", so there is deliberately NO legacy email
+ * fallback here: the key is new, the seat that holds it is filled, and a
+ * fallback would only widen a gate the business asked to keep narrow.
+ * `principal` still passes, as it does on every gate.
+ */
+export function isStockPlanner(
+  role: string | null | undefined,
+  email: string | null | undefined,
+  duties?: readonly string[] | null,
+): boolean {
+  return checkDuty("stock_planner", role, email, duties).allowed;
 }
 
 /**
