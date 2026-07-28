@@ -52,7 +52,6 @@ import { toast } from "sonner";
 import {
   computeStorageFee,
   defaultStorageStart,
-  docNumber,
   normalizeSkuKey,
   STOCK_LOCATIONS,
   DELIVERY_TIME_SLOTS,
@@ -65,6 +64,8 @@ import {
   displayGuaranteeId,
   effectiveGuaranteeStatus,
   deliveryDateGapFact,
+  orderActionButton,
+  orderActionDone,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -102,6 +103,7 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
+  useIssueDeliveryOrder,
   usePartnerBookingCheck,
   useSetPartnerDeliveryRules,
   useDeliveryPhotos,
@@ -4390,6 +4392,7 @@ function DrawerBody({
                         <BookingBlock
                           orderId={order.id}
                           control={form.control}
+                          doNumber={order.do_number ?? null}
                           goodsReadyHint={allReceived}
                           balanceOwingHint={balanceOwing}
                           outstandingHint={moneyOutstanding}
@@ -5206,18 +5209,75 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
-/** D1 two-stage booking (0277) — the BOOKING rows under Chase logistic.
+/**
+ * C7 — the delivery order, in one row.
+ *
+ * Not issued → ONE button, and it is the dictionary's own BUTTON word so this
+ * file spells no verb. Issued → the number, as a plain fact; there is nothing
+ * to press, because the document already exists.
+ *
+ * **The gate is the server's** (`docs/ORDERS-WORKING-FLOW.md` §5 — goods
+ * reserved, money collected, no Sunday or public holiday). This row does not
+ * re-implement it: a client-side copy is a second engine, and the two would
+ * disagree the first time either changed. So the button stays live and the 422
+ * comes back as the sentence that names what is missing.
+ */
+function DeliveryOrderRow({
+  orderId,
+  doNumber,
+}: {
+  orderId: string;
+  doNumber: string | null;
+}) {
+  const issue = useIssueDeliveryOrder(orderId, {
+    // COPY-STANDARD's DONE MESSAGE for this action, read from the dictionary
+    // mirror rather than typed here, plus the number the document carries.
+    onSuccess: (res) =>
+      toast.success(
+        `${orderActionDone("issue_delivery_order")} — ${res.order.do_number}`,
+      ),
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : "Couldn't issue the delivery order",
+      ),
+  });
+  return (
+    <DRow k="Delivery order">
+      {doNumber ? (
+        <span className="font-mono text-[13px] font-semibold text-base-900">
+          {doNumber}
+        </span>
+      ) : (
+        <Btn
+          variant="box"
+          size="sm"
+          disabled={issue.isPending}
+          title="The system writes the delivery order and stamps its number — nobody types one by hand"
+          onClick={() => issue.mutate()}
+        >
+          {orderActionButton("issue_delivery_order")}
+        </Btn>
+      )}
+    </DRow>
+  );
+}
+
+/** D1 two-stage booking (0277) — the BOOKING rows under Confirm delivery date.
  *  Stage 1 (provisional) = the logistics company's date; it already lives in
  *  logistic_eta (editable in the Booking ETA fold). This block records
  *  Stage 2: the CUSTOMER's yes — date + time slot, both required (invariant
- *  #1). The confirm endpoint enforces goods ready + balance ready + no
- *  Sunday; the hint line here is assistance so nobody is surprised by a
- *  refusal, never the enforcement. Re-confirm updates the date/slot and
- *  re-stamps the evidence (no un-confirm — a typo is fixed by confirming
- *  again). */
+ *  #1). Re-confirm updates the date/slot and re-stamps the evidence (no
+ *  un-confirm — a typo is fixed by confirming again).
+ *
+ *  C7 (2026-07-27) — the confirm endpoint no longer refuses on goods or money
+ *  (`docs/ORDERS-WORKING-FLOW.md` §5: agreeing a date is softer than issuing
+ *  the document). It still refuses date-and-slot-both and Sunday; the hint
+ *  line below now names what ISSUING will refuse, which is where the hard gate
+ *  lives. */
 function BookingBlock({
   orderId,
   control,
+  doNumber,
   goodsReadyHint,
   balanceOwingHint,
   outstandingHint,
@@ -5225,6 +5285,9 @@ function BookingBlock({
 }: {
   orderId: string;
   control: OpsOrderControl | null;
+  /** C7 — `orders.do_number`: the delivery order's own completion signal.
+   *  Non-null = the document exists for this trip. */
+  doNumber: string | null;
   goodsReadyHint: boolean;
   balanceOwingHint: boolean;
   outstandingHint: number;
@@ -5268,6 +5331,11 @@ function BookingBlock({
       // on that date, say so once so the operator knows to ring them.
       const first = res.partnerWarnings?.[0];
       if (first) toast.warning(first.message);
+      // C7 — §5: agreeing a date WARNS about goods and money, it no longer
+      // refuses. The sentences name what the delivery order will refuse if
+      // nobody clears them, so the operator hears it now instead of at the
+      // last step.
+      for (const w of res.gateWarnings ?? []) toast.warning(w);
       setOpen(false);
       setRulesOpen(false);
       setTripGroups(null);
@@ -5358,6 +5426,15 @@ function BookingBlock({
           </span>
         )}
       </DRow>
+      {/* C7 — the delivery order (Jess 2026-07-27). Logistics ring to say they
+          are delivering tomorrow and, until this card, an operator had to
+          produce the paper by hand — the number was stamped by a DB trigger on
+          the DISPATCH transition (0098), a day too late to hand over. One press
+          now, the moment the customer's date is confirmed, and the SYSTEM
+          writes it. The row appears only when there is a trip to paper. */}
+      {(confirmed || doNumber) && (
+        <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
+      )}
       {/* T8 — the second trip. A split order still owes the customer a group;
           this row is the ONLY place that says so, and it stays until that
           group is booked. The button re-opens the same confirm panel scoped to
@@ -5444,13 +5521,15 @@ function BookingBlock({
             <Btn
               variant="box"
               size="sm"
-              disabled={!date || !slot || sunday || !tripReady || confirm.isPending}
+              // C7 (§5) — goods and money no longer disable this button: a date
+              // can be agreed with a customer while both are still coming, and
+              // the paper is what refuses to exist. What still stops it is §5's
+              // own short list: date + slot both, and no Sunday.
+              disabled={!date || !slot || sunday || confirm.isPending}
               title={
                 !date || !slot
                   ? "Date AND time slot both needed — a date alone is not a confirmation"
-                  : !tripReady
-                    ? "Not everything on this trip is reserved yet — pick a split, or wait for the stock"
-                    : undefined
+                  : undefined
               }
               onClick={() =>
                 confirm.mutate({
@@ -5509,8 +5588,8 @@ function BookingBlock({
           )}
           {gateHints.length > 0 && (
             <div className="text-right text-[12px] text-warning py-0.5">
-              Not ready yet: {gateHints.join(" · ")} — the system refuses to
-              confirm until these are cleared
+              Not ready yet: {gateHints.join(" · ")} — the delivery order cannot
+              be issued until these are cleared
             </div>
           )}
         </DRow>
@@ -5891,22 +5970,21 @@ async function openInvoicePdf(orderId: string, so: number) {
 
 /** Fetch DO data + render the Delivery Order PDF — the Delivery card's "🖨 DO".
  *  The driver's what-to-do sheet: items · customer · address · RM to collect.
- *  Mirrors PrintDoButton (same /print-do-data endpoint). The DO number follows
- *  the shared docNumber scheme (DO-DDMMYY-NNNN) so it shares this order's tail
- *  with its loan note / receipt (per-order grouping) — overriding the server's
- *  legacy random DO number. */
+ *  Mirrors PrintDoButton (same /print-do-data endpoint).
+ *
+ *  C7 (2026-07-27) — this used to RECOMPUTE the number client-side and override
+ *  the server's, which made the two printers in this very file disagree (the
+ *  kebab's `PrintDoButton` never overrode anything) and made a reprint on a
+ *  different day print a different number than the first copy. The number is
+ *  now minted ONCE, when the delivery order is issued, in the same locked
+ *  scheme — so the paper the customer signs is reproducible, which is the whole
+ *  reason `docNumber` derives its tail from a stable seed. */
 async function openDoPdf(orderId: string) {
   try {
     const data = await apiFetch<DoTemplateData>(
       `/api/operation/orders/${orderId}/print-do-data`,
     );
-    const do_number = docNumber({
-      prefix: "DO",
-      date: data.issue_date,
-      seed: orderId,
-      digits: 4,
-    });
-    const blob = await renderDoPdf({ ...data, do_number });
+    const blob = await renderDoPdf(data);
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
@@ -7360,7 +7438,17 @@ function ActionsMenu({
                 {pipelineStatus === "scheduled" && (
                   <MenuItem
                     icon={<CheckCircle2 className="w-4 h-4" />}
-                    label="Confirm delivery"
+                    // C3 reported this as C7's rename and read it as
+                    // `Issue delivery order` under the verb dictionary. It is
+                    // NOT: the door it opens attaches the CUSTOMER'S SIGNED DO
+                    // and flips the order to delivered — its own primary button
+                    // already says `Mark delivered`, which is the dictionary's
+                    // BUTTON word for `Deliver today`. Issuing happens earlier
+                    // and elsewhere (the Delivery card's own row). Renaming it
+                    // to `Issue delivery order` would have put one word on two
+                    // different acts, which is the error C6 finding #2 fixed
+                    // one card ago.
+                    label={orderActionButton("deliver_today") ?? "Mark delivered"}
                     onClick={() => {
                       close();
                       onDOClick();

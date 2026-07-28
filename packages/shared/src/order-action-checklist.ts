@@ -117,6 +117,16 @@ export function orderActionChecklist(
         closes("confirm_delivery_date"),
       ];
 
+    // C7 — the document is issued against the customer's confirmed booking, so
+    // the booking is the measured step before it. The closing step is the
+    // action's own outcome, un-ticked while the action is open, like every
+    // other last step here.
+    case "issue_delivery_order":
+      return [
+        measured("confirm_delivery_date", s.bookingConfirmed),
+        closes("issue_delivery_order"),
+      ];
+
     // Ruled: no sub-list. `Goods loaded` and `Driver departed` are recorded
     // nowhere and asked of nobody.
     case "deliver_today":

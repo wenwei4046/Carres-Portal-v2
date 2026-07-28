@@ -8,6 +8,7 @@ import {
   type operationOrderDetailWarehouse,
   type operationOrderDetailLine,
 } from "@/lib/queries";
+import { docNumber } from "@carres/shared";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 import SignaturePad from "../../dealer/new-order/SignaturePad";
 import { dataUrlToBlob } from "../../dealer/new-order/draft";
@@ -49,12 +50,33 @@ function totalItems(lines: operationOrderDetailLine[]): number {
   return lines.reduce((s, l) => s + Number(l.qty || 0), 0);
 }
 
-function suggestDoNumber(): string {
-  return "DO-" + (9800 + Math.floor(Math.random() * 200));
+/**
+ * C7 (Jess 2026-07-27) — **an operator never types a delivery order number
+ * again.** This used to hand them a RANDOM `DO-98xx` to edit, which is the
+ * opposite of the `Issue` verb ("the SYSTEM produces a formal document"): a
+ * hand-typed number cannot be reproduced on a reprint, and the paper the
+ * customer signed must be.
+ *
+ * The number is whatever the order already carries — the one minted when the
+ * delivery order was ISSUED. An order that reaches delivery without ever having
+ * been issued (a walk-in dispatched outside the booking flow) still needs one,
+ * so it falls back to the same locked scheme with the same stable seed: the
+ * same order always yields the same number.
+ */
+function deliveryOrderNumber(order: operationOrderDetailOrder): string {
+  const existing = (order.do_number ?? "").trim();
+  if (existing) return existing;
+  return docNumber({
+    prefix: "DO",
+    date: new Date().toISOString().slice(0, 10),
+    seed: order.id,
+    digits: 4,
+  });
 }
 
 export default function DOAttachModal({ order, warehouse, lines, onClose }: Props) {
-  const [doNumber, setDoNumber] = useState(suggestDoNumber);
+  // Not state: there is nothing for a human to change here.
+  const doNumber = deliveryOrderNumber(order);
   const [doNote, setDoNote] = useState("");
   // 0151 (Loo 2026-05-31) — REQUIRED customer e-signature replaces the old
   // operator-ticked "customer signed" checkbox. The customer types their name
@@ -70,7 +92,6 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
   const attach = useAttachDoMutation(order.id);
   const itemCount = totalItems(lines);
   const valid =
-    doNumber.trim().length >= 3 &&
     !!signatureDataUrl &&
     signerName.trim().length >= 2 &&
     !!doFilePath &&
@@ -187,15 +208,10 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
 
       <div className="grid gap-3 mb-4">
         <div>
-          <label className="label mb-1.5 block" htmlFor="do-number-input">
-            DO number *
-          </label>
-          <input
-            id="do-number-input"
-            value={doNumber}
-            onChange={(e) => setDoNumber(e.target.value)}
-            className={INPUT_CLS}
-          />
+          <span className="label mb-1.5 block">DO number</span>
+          <div className="font-mono text-[13px] font-semibold text-base-900">
+            {doNumber}
+          </div>
         </div>
         <div>
           <label className="label mb-1.5 block" htmlFor="do-note-input">

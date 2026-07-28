@@ -31,6 +31,7 @@ export type OrderActionKey =
   | "agree_new_delivery_date"
   | "assign_logistics"
   | "confirm_delivery_date"
+  | "issue_delivery_order"
   | "deliver_today"
   | "upload_delivery_photo"
   | "delivering"
@@ -65,6 +66,20 @@ interface OrderActionWord {
    * and a button word for one would be a button nobody can press.
    */
   button: string | null;
+  /**
+   * C7 — string 4 of the five: the DONE MESSAGE, what the portal says once the
+   * outcome is recorded.
+   *
+   * **The mirror grows one string per card that gains a READER, never per card
+   * that reads the table.** C6 added the Button because its checklist prints
+   * one; C7 adds the Done message for the action it builds, because the drawer
+   * toasts it. The other eight are locked in COPY-STANDARD's dictionary and are
+   * deliberately NOT copied here yet: a mirrored string nothing renders is
+   * exactly the dead code C10 spent a whole card resurrecting, and a second
+   * spelling that no screen reads is worse than no spelling at all. `null`
+   * therefore means "not mirrored yet", never "this action records nothing".
+   */
+  done: string | null;
 }
 
 /** Trim to a real name, else the role word — never an empty slot. */
@@ -86,12 +101,14 @@ const WORDS: readonly OrderActionWord[] = [
     queue: "Send PO",
     line: (p) => `Send PO to ${party(p.supplier, "supplier")}`,
     button: "Send PO",
+    done: null,
   },
   {
     key: "confirm_ready_date",
     queue: "Confirm ready date",
     line: (p) => `Call ${party(p.supplier, "supplier")} — confirm ready date`,
     button: "Record ready date",
+    done: null,
   },
   {
     key: "agree_new_delivery_date",
@@ -103,6 +120,7 @@ const WORDS: readonly OrderActionWord[] = [
     // two laws name different parties for this one rung and **C8 owns it**. The
     // button word is party-free, so it is the same under either ruling.
     button: "Record new date",
+    done: null,
   },
   {
     // Nobody outside is involved — the party is what you are choosing, so it
@@ -111,6 +129,7 @@ const WORDS: readonly OrderActionWord[] = [
     queue: "Assign logistics",
     line: () => "Assign logistics",
     button: "Assign logistics",
+    done: null,
   },
   {
     key: "confirm_delivery_date",
@@ -118,18 +137,38 @@ const WORDS: readonly OrderActionWord[] = [
     line: (p) =>
       `Call ${party(p.logistics, "logistics")} — confirm delivery date`,
     button: "Confirm booking",
+    done: null,
+  },
+  {
+    // C7 (Jess 2026-07-27) — `Issue delivery order` IS an action. Nobody
+    // outside is involved: the SYSTEM produces the document and the operator
+    // presses one button, so the line carries no party, exactly like
+    // `Assign logistics` (COPY-STANDARD's action naming law names all three
+    // party-free actions and this is one of them).
+    //
+    // The verb is `Issue` in its dictionary sense — "the SYSTEM produces a
+    // formal document", completion = "the document exists". That is the whole
+    // reason this is one press and not authoring: a human who typed a delivery
+    // order would be writing the document, which the verb forbids.
+    key: "issue_delivery_order",
+    queue: "Issue delivery order",
+    line: () => "Issue delivery order",
+    button: "Issue delivery order",
+    done: "Delivery order issued",
   },
   {
     key: "deliver_today",
     queue: "Deliver today",
     line: () => "Deliver today",
     button: "Mark delivered",
+    done: null,
   },
   {
     key: "upload_delivery_photo",
     queue: "Upload delivery photo",
     line: () => "Upload delivery photo",
     button: "Upload delivery photo",
+    done: null,
   },
   {
     // C3 (Jess 2026-07-27) — a FACT, not an action. `Confirm delivery with
@@ -155,6 +194,7 @@ const WORDS: readonly OrderActionWord[] = [
       return slot ? `Delivering ${date} · ${slot}` : `Delivering ${date}`;
     },
     button: null,
+    done: null,
   },
   {
     key: "collect",
@@ -165,6 +205,7 @@ const WORDS: readonly OrderActionWord[] = [
       return money ? `${money} from ${who}` : `Collect from ${who}`;
     },
     button: "Record payment",
+    done: null,
   },
   {
     // Terminal FACT, not an action — it lives here so the ladder has one place
@@ -173,6 +214,7 @@ const WORDS: readonly OrderActionWord[] = [
     queue: "Done",
     line: () => "Done",
     button: null,
+    done: null,
   },
 ];
 
@@ -233,6 +275,15 @@ export function collectPillLabel(amount: string | null | undefined): string {
  */
 export function orderActionButton(key: OrderActionKey): string | null {
   return wordFor(key).button;
+}
+
+/**
+ * C7 — the DONE MESSAGE: what the portal says once this action's outcome is
+ * recorded. `null` = not mirrored here yet (see the field's comment); the
+ * caller must then say nothing rather than invent a sentence.
+ */
+export function orderActionDone(key: OrderActionKey): string | null {
+  return wordFor(key).done;
 }
 
 /**

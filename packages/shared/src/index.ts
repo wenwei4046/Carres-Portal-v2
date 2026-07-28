@@ -828,6 +828,7 @@ export {
   collectPillLabel,
   deliveryDateGapFact,
   orderActionButton,
+  orderActionDone,
   orderActionForQueue,
   orderActionLine,
   orderActionQueue,
@@ -1662,6 +1663,13 @@ export {
   type BookingGateResult,
   type BookingGroupState,
 } from "./booking-gate";
+// C7 · The delivery order — the HARD gate (§5), asked out of the booking gate's
+// own goods + money answers so the two surfaces cannot disagree.
+export {
+  deliveryOrderIssueGate,
+  type DeliveryOrderIssueInput,
+  type DeliveryOrderIssueResult,
+} from "./delivery-order";
 export {
   isWorkingDay,
   addWorkingDays,

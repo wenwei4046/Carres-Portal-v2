@@ -892,6 +892,12 @@ export function orderActionSignalsOf(
     bookingConfirmed: bookingConfirmedOf(o),
     confirmedDateIso: ovlOf(o)?.confirmed_date ?? null,
     todayIso: todayIso(),
+    // C7 — has this trip's delivery order been issued? `do_number` is the
+    // document's own completion signal, and it is on the list select already.
+    // Three-way like the photo ledger: `undefined` (an older Worker that does
+    // not select the column) is UNKNOWN and raises nothing.
+    deliveryOrderIssued:
+      o.do_number === undefined ? null : !!(o.do_number ?? "").trim(),
     // T7's three-way answer: [] is "no photo yet", absent is UNKNOWN — an older
     // Worker that doesn't select the column must not flood every delivered row
     // with a demand we cannot substantiate.

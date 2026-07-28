@@ -29,11 +29,11 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 · **R8** (`Contact`→`Call` rename, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C9 ✅ #472 · C10 ✅ #471** — C4 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings). **P2 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** **D0.4 = retire `CARRES_ORDER_PORTAL_SPEC.md` completely (Loo 2026-07-28) — its own chat, safe beside anything, touches no page.** TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · C9 · C10 ✅ ·
+**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
 ⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
 
 **What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
@@ -57,11 +57,18 @@ the old 14/21, so nothing becomes sellable earlier than it is today.
 touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**
 (new components + a new `/ui` route only) and are safe beside anything; **D0.5c and D6 touch
 the Orders list and drawer** and are not.
-**Orders lane, in this order:** C7 → C8 (C4 any time a Purchasing slot is free).
-**C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
-`Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
-**it IS an action**, the system produces the document and the operator presses one button.
-COPY-STANDARD now says so once.
+**Orders lane: C8 is the only C-card left in it** (C4 any time a Purchasing slot is free).
+**C7 SHIPPED 2026-07-28 (PR #489), with no migration** — 0098 only stamps `do_number` when
+it is NULL, so minting it at customer confirmation cannot break dispatch, and the trigger
+stays as the backstop. The hard gate moved with it: goods and money stop REFUSING a
+confirmation and refuse the DOCUMENT instead, which is what `ORDERS-WORKING-FLOW.md` §5 has
+said all along and what C9 handed over. An arranged order no longer sits in no queue at all —
+there was one thing left to do and it is the paper. **An operator never types a DO again**:
+the modal's random `DO-98xx` is gone and the number is the locked `DO-DDMMYY-NNNN` scheme,
+seeded on the order so a reprint matches the paper the customer signed. Found on the way:
+`print-do-data` refuses every live order, so the drawer's DO print button had never once
+worked. **No delivery queue TILE was added** — §3 gives this action no Due, and every
+delivery queue is a deadline-carrying step, so the fifth tile waits on Jess ruling one.
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 

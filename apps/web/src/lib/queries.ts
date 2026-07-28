@@ -4127,6 +4127,11 @@ export function useSaveOrderControl(
 export interface ConfirmBookingResult {
   control: OpsOrderControl;
   partnerWarnings?: PartnerBookingWarningWire[];
+  /** C7 — the goods + money sentences. They used to be a 422; since
+   *  `docs/ORDERS-WORKING-FLOW.md` §5 moved the hard gate onto ISSUING the
+   *  delivery order, agreeing a date only warns. Optional: an older Worker
+   *  simply does not send it. */
+  gateWarnings?: string[];
 }
 
 /** D1 booking confirm (migration 0277) — record the CUSTOMER's confirmed date
@@ -4145,6 +4150,39 @@ export function useConfirmBooking(
       apiFetch<ConfirmBookingResult>(
         `/api/operation/orders/${orderId}/booking/confirm`,
         { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** C7 — the delivery order issues itself (Jess 2026-07-27).
+ *
+ *  One press: the SYSTEM produces the document and stamps the order's DO
+ *  number, using the LOCKED numbering scheme. The server holds the hard gate
+ *  (`docs/ORDERS-WORKING-FLOW.md` §5) — goods reserved, money collected, the
+ *  date not a Sunday or a public holiday — and a 422 carries the plain-English
+ *  reason. Idempotent: pressing twice returns the number already on file
+ *  (`issued: false`), never a second document for one trip. */
+export interface IssueDeliveryOrderResult {
+  order: { id: string; do_number: string | null };
+  /** true = this press minted it · false = it already existed. */
+  issued: boolean;
+}
+export function useIssueDeliveryOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<IssueDeliveryOrderResult, ApiError, void>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<IssueDeliveryOrderResult, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<IssueDeliveryOrderResult>(
+        `/api/operation/orders/${orderId}/delivery-order`,
+        { method: "POST", body: "{}" },
       ),
     ...opts,
     onSuccess: async (...args) => {

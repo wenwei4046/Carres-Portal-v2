@@ -1448,6 +1448,11 @@ describe("nextActionOf (C2)", () => {
     confirmed_date: inDays(6),
     confirmed_time_slot: "Morning (9–11 AM)",
   };
+  /** C7 — a trip whose PAPER exists. The `Delivering` FACT means "nothing for
+   *  a human to do", and until the delivery order is issued there is still one
+   *  thing: issuing it. So every FACT fixture below carries a DO number, and
+   *  the one that does not is C7's own test. */
+  const ISSUED = { do_number: "DO-270726-4821" };
 
   it("ready + carrier + provisional carrier date only → STILL Chase logistic (not Confirm)", () => {
     const o = makeRow({
@@ -1477,10 +1482,11 @@ describe("nextActionOf (C2)", () => {
   // being an action: it was the one row in the drawer no button could close.
   // The ladder answers with the quiet FACT instead, and `Deliver today` takes
   // over on the day.
-  it("ready + carrier + customer confirmed + paid → the Delivering FACT, quiet", () => {
+  it("ready + carrier + customer confirmed + paid + DO issued → the Delivering FACT, quiet", () => {
     const o = makeRow({
       id: "x",
       so: 1,
+      ...ISSUED,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED },
     });
@@ -1533,6 +1539,7 @@ describe("nextActionOf (C2)", () => {
     const o = makeRow({
       id: "x",
       so: 1209,
+      ...ISSUED,
       ops_assigned_logistic: "p1",
       order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 6998 }],
       order_addons: [{ qty: 1, unit_price: 250 }],
@@ -1591,6 +1598,7 @@ describe("nextActionOf (C2)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
+      ...ISSUED,
       ops_assigned_logistic: "p1",
       ops_order_control: {
         ...BOOKED,
@@ -1667,11 +1675,31 @@ describe("nextActionOf (C2)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
+      ...ISSUED,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, confirmed_date: inDays(3) },
     });
     expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Delivering");
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
+  });
+
+  // ── C7 · the last act before the truck (Jess 2026-07-27) ──
+  it("arranged, paid, and NO delivery order yet → Issue delivery order", () => {
+    // Before C7 this row sat in no queue at all and read `Delivering`. It has
+    // one thing left to do, and it is the paper logistics asks for the evening
+    // before — which used to be typed by hand, after dispatch.
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { ...BOOKED },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe(
+      "Issue delivery order",
+    );
+    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toEqual([
+      "issue_delivery_order",
+    ]);
   });
 
   it("owing balance beats Deliver today (PayHold: never arrange a delivery we may not make)", () => {
@@ -2296,6 +2324,9 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
     delivery_partners: { id: "p-nets", name: "NETS" },
     order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1000 }],
     paid: 1000,
+    // C7 — the paper exists, so there really is nothing left to do and the
+    // row prints the quiet FACT.
+    do_number: "DO-270726-4821",
     ops_order_control: {
       line_stock_status: { "mattress:MAT-1": "ready" },
       booking_stage: "confirmed",
