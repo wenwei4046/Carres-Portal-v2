@@ -65,8 +65,12 @@ Nothing on that screen can write — no tick, no checkbox, no button inside a st
 no-decorative-checkbox law is structure rather than a comment. **The Task Owner question
 C2 and C3 both left open is RULED, not built: the order's PIC is the task owner of every
 action of that order**, so an action carries no owner field and needs no store. Collapsed by
-default, so it adds zero permanent height. **The driver / vehicle / condo migration the card
-also names is NOT applied** — guardrail #8, the draft is in the PR for Jess.
+default, so it adds zero permanent height. **NO MIGRATION, and Jess CLOSED that question
+2026-07-28 rather than deferring it**: the card made one conditional on a step needing its
+own owner and the PIC ruling means the condition never opened; the frozen rulings below
+already put driver · vehicle · condominium registration out of scope this phase; and four
+columns nobody writes is `ops_order_control.balance`'s disease. If ever wanted, the first
+half is a confirm-booking form — its own card.
 
 **What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
 describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status

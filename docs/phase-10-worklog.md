@@ -3358,43 +3358,54 @@ assumption. Closes C2 finding #5 / C3 finding #5 **by ruling, not by building.**
 
 Collapsed by default, so C6 adds **zero permanent pixels** to the drawer.
 
-### NOT BUILT — the driver / vehicle / condo migration
+### NO MIGRATION — a closed question, not a deferred one (Jess ruled 2026-07-28)
 
 The card carries "ONE small additive migration — the call-outcome fields on
-`ops_order_control`" and, in its own last line, "**No migration** unless a step must be
-ownable separately from its order". Those two sentences disagree. Guardrail #8 settles what
-a build chat may do: draft SQL may not enter `supabase/migrations/` before Jess approves, so
-the draft sits in the PR body and in the card, and nothing was applied. It is also not
-needed by the Done-when — every built action closes from a signal that exists today. The
-fields are what the call FILLS IN (category (b) of the law), and they need a form on the
-confirm-booking surface before they mean anything, which is why they are one decision and
-not four spare columns.
+`ops_order_control` (driver · vehicle · condo)" and, in its own last line, "**No migration**
+unless a step must be ownable separately from its order". The chat built without one and put
+the draft to Jess; she struck the draft and closed the question, on three grounds each
+sufficient alone:
 
-### What C6 found — reported, not fixed (Law 0)
+1. **The condition never opened.** C6 ruled that the order's PIC is the task owner of every
+   action of that order, so no step needs an owner separate from its order.
+2. **The frozen rulings already say it.** `docs/execution-queues-index.md`: *driver ·
+   vehicle · condominium registration = OUT OF SCOPE this phase.* The driver is the logistics
+   company's person, not Carres's.
+3. **Four columns nobody writes is `ops_order_control.balance`'s disease** — C5 found a lock
+   reading a column with no writer, and it had been wrong for months without anyone noticing.
+   If the four facts are ever wanted, the FIRST half is a confirm-booking form that asks
+   them, and that is its own card.
 
-1. **The card contradicts itself about the migration** (above).
-2. **`ACTION-FLOW-STANDARD.md` Law 6 still ends "NOT BUILT YET … Card C10 builds it"** — C10
-   shipped 2026-07-27 and that section's own heading already says ✅ BUILT. The stale
-   paragraph also repeats the retired ruling that the dots REPLACE the stage pill; Jess
-   re-ruled *side by side*. A chat reading only the bottom of that section builds the screen
-   C10 deliberately did not build. Same stale-paragraph failure T2 met a day earlier, in the
-   law rather than in a comment.
-3. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
+Nothing is left "pending Jess" in the card, the PR or this entry — a pending note is how the
+next chat asks the same question again.
+
+### What C6 found — and how each was ruled (Jess 2026-07-28)
+
+1. **`ACTION-FLOW-STANDARD.md` Law 6 still ended "NOT BUILT YET … Card C10 builds it"** — C10
+   shipped 2026-07-27 and that section's own heading already said ✅ BUILT. The stale
+   paragraph also repeated the retired ruling that the dots REPLACE the stage pill; Jess
+   re-ruled *side by side*. Same stale-paragraph failure T2 met a day earlier, in the law
+   rather than in a comment. **RULED: correct it** — recording what has already happened is
+   not amending a law. The paragraph is replaced by the built state; the pill stays.
+2. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
    counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist in the
-   full-width band. COPY-STANDARD rule 8 is "same word app-wide". Both words were ruled;
-   picking one is a wording decision, not a build chat's.
+   full-width band. COPY-STANDARD rule 8 is "same word app-wide". **RULED: the dynamic
+   checklist KEEPS `Actions`** (it is literally a list of open actions, and the dictionary
+   already gives that column its plural word); the left rail's panel is the one that renames,
+   from a word already in COPY-STANDARD — no new word may be invented for it.
+3. **`send_po`'s completion rule in the card ("PO exists AND supplier ETA recorded") is not
+   how the engine works** — the moment a PO exists the action becomes `Call {supplier} —
+   confirm ready date`, which is what records the date. **RULED: the engine is right and the
+   card is wrong** — an action closes when *its own* recorded outcome lands, and the ready
+   date is the NEXT action's outcome. `PURCHASING-WORKING-FLOW.md` §3 is Jess's to correct.
 4. **`Arrange new delivery date` (dictionary) vs `Agree new delivery date` (code), and
    `{logistics}` vs `{customer}`** — C2 finding #3, unchanged; **C8 owns it.** C6's button
    word is party-free, so it is correct under either ruling.
 5. **A step names the button but cannot press it.** "Where a form already collects the
    inputs, the form IS the checklist" was read as *do not duplicate the form as ticks* — it
-   does not ask for navigation, and C2's list is deliberately control-free. Wiring each step
-   to the panel that owns it is a real improvement and a real risk in a 7,000-line file.
-6. **`send_po`'s completion rule in the card ("PO exists AND supplier ETA recorded") is not
-   how the engine works** — the moment a PO exists the action becomes `Call {supplier} —
-   confirm ready date`, which is what records the date. Built as the engine behaves, because
-   the card's own "ORDER OF EVENTS, not a gate chain" rule says the two must not be collapsed
-   into one action.
+   does not ask for navigation, and C2's list is deliberately control-free. **RULED: not
+   now** — carry-forward `action-step-cannot-open-its-form`, for whoever next opens the
+   7,000-line drawer for its own reason.
 
 ### Verification
 

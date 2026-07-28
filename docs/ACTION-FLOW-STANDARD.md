@@ -183,11 +183,9 @@ with an open payment action. Delivered is not paid.
 
 Tones live in `docs/ORDERS-WORKING-FLOW.md` §7 — one home (Law 0A).
 
-**NOT BUILT YET — this is a specification, not a description of the screen.** `rowDotsOf()`
-computes the three dots and nothing renders them; the Orders list shows a single stage pill
-in a `Status` column instead. Jess ruled 2026-07-27 that the three dots REPLACE that pill.
-Card **C10** builds it. Until C10 ships, a chat reading this law must not assume the column
-exists.
+**BUILT — C10, PR #471, live 2026-07-27.** The dots render beside the stage pill in the
+`Status` column, each as its own Lucide icon (goods `Package` · delivery `Truck` · money
+`Wallet`, 14px). The pill is untouched and keeps the header word.
 
 ## What this replaces
 

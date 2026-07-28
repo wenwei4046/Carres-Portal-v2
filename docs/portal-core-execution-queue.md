@@ -395,17 +395,19 @@ order and display priority are two different things — do not collapse them.
   either, and neither is information we ask anyone for. They stay unbuilt: `Deliver today`
   keeps its own completion (delivered) and no sub-list.
 
-**The carrier call's driver / vehicle / condo items ARE buildable — as INPUTS, not ticks.**
-Under the verb rule, a `Call` completes when the information is obtained **and recorded**,
-so these are category (b) of the no-decorative-checkbox law: fields the call fills in.
-Verified live: `partner_fleet` carries driver/vehicle columns but holds **1 row**, and
-`ops_order_control` has **no per-order driver column** — so there is nowhere to record them
-today. C6 therefore carries ONE small additive migration: the call-outcome fields on
-`ops_order_control` (driver name · driver phone · vehicle no · condo registration done),
-all nullable, none of them gates. **Draft the migration to Jess first (guardrail #8), and
-check the remote tracker tail immediately before applying.** Each field is optional on the
-form — "if required" in the checklist means the field may stay empty, never that a tick
-lies.
+**The carrier call's driver / vehicle / condo fields: NOT BUILT, and the condition for
+building them is not met (Jess ruled 2026-07-28 — this is settled, do not re-ask).** Three
+reasons, each sufficient on its own:
+
+1. **This card's own last line** makes a migration conditional on "a step must be ownable
+   separately from its order" — and C6 ruled that the order's PIC IS the task owner of every
+   action of that order. No step needs its own owner, so the condition never opened.
+2. **`docs/execution-queues-index.md`'s frozen rulings already say so**: *driver · vehicle ·
+   condominium registration = OUT OF SCOPE this phase.* The driver is the logistics
+   company's person, not Carres's.
+3. **Four columns nobody writes is `ops_order_control.balance`'s disease** — a lock read a
+   column with no writer for months and nobody noticed (C5). If it is ever wanted, the first
+   half is a confirm-booking FORM that asks the four things, and that is its own card.
 
 **Where a form already collects the inputs, the form IS the checklist** — the PO form and
 the confirm-booking form are not to be duplicated as tick lists beside themselves.
@@ -482,60 +484,38 @@ ruling, not by building.**
 do; the click is the affordance the card asks for, so C6 adds ZERO permanent pixels to the
 drawer.
 
-**NOT BUILT, and it is the half of the card that needs Jess: the driver / vehicle / condo
-migration.** The card carries "ONE small additive migration — the call-outcome fields on
-`ops_order_control`" and, in its own last line, "**No migration** unless a step must be
-ownable separately from its order". Those two sentences disagree. Guardrail #8 settles what
-a build chat may do about it: **draft SQL may not be written into `supabase/migrations/`
-before Jess approves**, so the draft is in the PR body and nothing was applied. It is also
-not needed by the Done-when — every built action closes from a signal that exists today.
-The draft, for her ruling:
+**NO MIGRATION, and it is a closed question rather than a deferred one.** The card's
+driver / vehicle / condo paragraph above carries Jess's 2026-07-28 ruling: the condition
+never opened, the frozen rulings already put those fields out of scope this phase, and four
+columns nobody writes is the `ops_order_control.balance` disease. Nothing is pending.
 
-```sql
--- DRAFT — NOT APPLIED. C6, the carrier call's recorded outcome.
-alter table public.ops_order_control
-  add column if not exists driver_name        text,
-  add column if not exists driver_phone       text,
-  add column if not exists vehicle_no         text,
-  add column if not exists condo_registered_at timestamptz;
-```
+### What C6 found — and how each was ruled (Jess 2026-07-28)
 
-All nullable, none of them a gate, none of them a tick — they are what the call FILLS IN,
-which is category (b) of the no-decorative-checkbox law. They need a form on the
-confirm-booking surface (the form IS the checklist) before they mean anything, which is why
-they are one decision and not a spare column.
-
-### What C6 found — reported, not fixed (Law 0)
-
-1. **The card contradicts itself about the migration** (above). One of the two sentences has
-   to go, or the next chat to read this card builds a different thing again.
-2. **`ACTION-FLOW-STANDARD.md` Law 6 still ends with "NOT BUILT YET — this is a
-   specification, not a description of the screen … Card C10 builds it."** C10 shipped on
-   2026-07-27 and the law's own heading already says ✅ BUILT. The paragraph also repeats the
-   retired ruling that the dots REPLACE the stage pill — Jess re-ruled *side by side*. A chat
-   reading the bottom of that section builds the screen C10 deliberately did not build. It is
-   the same stale-paragraph failure T2 met one day earlier, in the law rather than in a
-   comment.
-3. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
-   counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist in the
-   full-width band. COPY-STANDARD rule 8 is "same word app-wide", and this is the same word
-   for two different lists on one screen. C6 did not rename either: both words were ruled,
-   and picking one is a wording decision.
+1. **`ACTION-FLOW-STANDARD.md` Law 6 said "NOT BUILT YET … Card C10 builds it"** a day after
+   C10 shipped, and repeated the retired ruling that the dots REPLACE the stage pill.
+   **RULED: correct it** — writing down what has already happened is not amending a law.
+   Done in the same commit as this line; the pill stays, the dots sit beside it.
+2. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
+   counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist.
+   **RULED: the dynamic checklist KEEPS `Actions`** — it is literally a list of open actions
+   and the dictionary already gives that column its plural word. The left rail's panel is the
+   one that renames, from a word already in COPY-STANDARD; C6 put two candidates to Jess and
+   the rename itself belongs to whoever next opens that panel.
+3. **`send_po`'s completion rule in this card is "PO exists AND supplier ETA recorded", and
+   the engine does not work that way** — the moment a PO exists the action becomes
+   `Call {supplier} — confirm ready date`, which is what records the date. **RULED: the
+   engine is right and the card is wrong** — an action closes when *its own* recorded outcome
+   lands, and the ready date is the NEXT action's outcome. `PURCHASING-WORKING-FLOW.md` §3 is
+   Jess's to correct; a build chat does not touch it.
 4. **The dictionary's `Arrange new delivery date` and the code's `Agree new delivery date`
    still disagree, and so do their parties** (`{logistics}` vs `{customer}`) — C2 finding #3,
    unchanged; **C8 owns it.** C6's button word (`Record new date`) is party-free, so it is
    correct under either ruling.
 5. **A checklist step names the button but cannot press it.** "Where a form already collects
    the inputs, the form IS the checklist" was read as *do not duplicate the form as ticks* —
-   it does not ask for navigation, and C2's list is deliberately control-free. The operator
-   reads `Confirm booking` and still has to find that button in the drawer. Wiring each step
-   to the panel that owns it is a real improvement and a real risk in a 7,000-line file; it
-   belongs to whoever next opens the drawer for its own reason.
-6. **`send_po`'s completion rule in this card is "PO exists AND supplier ETA recorded", and
-   the engine does not work that way** — the moment a PO exists the action becomes
-   `Call {supplier} — confirm ready date`, which is what records the date. Built as the
-   engine behaves (one step), because the card's own "ORDER OF EVENTS, not a gate chain"
-   rule says the two must not be collapsed into one action.
+   it does not ask for navigation, and C2's list is deliberately control-free. **RULED: not
+   now** — carry-forward `action-step-cannot-open-its-form`, for whoever next opens the
+   7,000-line drawer for its own reason.
 
 ## C7 · The delivery order prints itself (Jess ruling 2026-07-27)
 
