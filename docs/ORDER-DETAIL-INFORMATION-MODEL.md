@@ -444,3 +444,77 @@ rule that stops the page slowly swallowing the rest of the system.
 - **R5's payment breakdown was already Detail**, so the unreadable ledger blocks nothing at
   Answer, Context or Evidence depth. Fixing it is now its own card, not a dependency.
 
+
+## 9 · Layout Specification L3 — states — **FROZEN 2026-07-28**
+
+**FROZEN by Loo, 2026-07-28.** L1 said which region answers which question, L2 said how deep
+each answer goes. **L3 says what each region says in each situation an order can be in.** It is
+the last specification that does not discuss position.
+
+### These are not statuses
+
+`docs/ORDERS-WORKING-FLOW.md` §1: an order has no single overall status. **L3's states are never
+stored and never reach the screen.** No word anywhere tells anyone the order is "Blocked". They
+are a checklist — used when designing and when testing, to ask *"what does this region say in
+this situation?"* — and nothing else.
+
+### Two states, not five
+
+**Business discussions use the names. Code may keep A1–B2.** (Loo, 2026-07-28.)
+
+```
+SHAPE A · there is work            SHAPE B · there is no work
+   A1  Working                        B1  Waiting   (all arranged, the day has not come)
+   A2  Blocked                        B2  Completed
+```
+
+Listing the obvious five (new · working · blocked · waiting · done) is what showed there are
+only two. **"New" is not a state at all** — a fresh order always has work (no PO), so it is
+**Working** with an empty record, and an empty record already renders nothing.
+
+**Blocked is not a rung above Working**, it is a variant: the work is still there, it just
+carries a condition and a door. Arranging these four as a ladder is exactly how they would turn
+back into the status word §1 forbids.
+
+### The six regions across the four
+
+| Region | **Working** | **Blocked** | **Waiting** | **Completed** |
+|---|---|---|---|---|
+| **R1** Identification | ← **identical in all four** → | | | |
+| **R4** Contents | ← **identical in all four** → | | | |
+| **R2** Work | every open item | the item, plus **what is holding it** and the door that lifts it | *"delivering 27 Jul, 9–11 AM — nothing to do"*, stated with certainty | "completed" |
+| **R3** Explanation | the stuck track gives its reason, the others one line each | the money track says it is holding the delivery | three calm lines | three finished lines — **money may still be owed** |
+| **R5** Money | collected / owed | held, with the reason and the due date | usually settled (the booking gate demands it) | settled **or** owed |
+| **R6** Record | what has happened — a new order is empty, and **empty renders nothing** | the release request and the decision live here | present | fullest; **"what is missing" is most likely to fire here** (the photo) |
+
+**R1 and R4 say the same thing in all four states.** Not a coincidence — it is evidence those
+two regions are correctly drawn: **identifying the customer and identifying the goods do not
+depend on how far the order has got.** Only work, reason, money and record move.
+
+### Completed — the hole L1 and L2 left open
+
+**Ruled (Loo, 2026-07-28): Completed means NO OPEN ACTIONS. It does not mean delivered.**
+
+A delivered order that still owes money has work and a red money track — **that is Working, not
+Completed**, which is `ORDERS-WORKING-FLOW.md` §7's rule ("delivered is not paid") arriving here
+by itself.
+
+**The page does not become a different page. It collapses.** All six regions remain, all of them
+at **Answer** depth only. The one still worth opening is R6, because after an order is over only
+two people come: someone asking what happened, and someone looking for a document.
+
+**So no second page is needed, and L1 + L2 hold unchanged.** That is the return on fixing depth
+before layout: *Completed is not a new design, it is the shallowest state of the same one.*
+
+### Unknown is an attribute, not a state
+
+**Ruled (Loo, 2026-07-28).** 37 live orders carry no prices and 40 no building type — unknown is
+the majority case, not the exception.
+
+1. **Unknown is always said out loud** ("not priced", "building type not filled in") and is
+   **never** dressed as 0 or as a blank.
+2. **Unknown warns, it does not block** — the single exception is the building type, which blocks
+   *agreeing a date* because a condominium physically takes a half-day. It blocks that one act,
+   never the order.
+3. **Unknown never changes the state.** An order nobody has priced is still Working or Waiting.
+   **If unknown could move an order between states, it would have become a status word.**
