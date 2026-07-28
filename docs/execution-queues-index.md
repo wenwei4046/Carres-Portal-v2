@@ -400,6 +400,23 @@ comes first, then the words** — so neither is a bug to sweep; they are lines t
 written their own file yet. A queue doc says WHAT to build. It cannot say how the module
 behaves, and a chat that treats it as the flow will name things on the business's behalf.
 
+### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
+
+```
+✅ P2-Receiving   #495          ✅ C8b  #497 (0305)
+▶  R8             the Purchasing lane's terminology cleanup — NEXT, and it takes the
+                  whole lane: no P-chat, no C4, no R7 beside it
+   T3             Jess uses the drawer for a day, against the settled UI
+   Foundation     1. RECEIVING-WORKING-FLOW.md
+                  2. SERVICE-CASES-WORKING-FLOW.md
+                  3. READY-STOCK-WORKING-FLOW.md
+```
+
+**This order is across lines and it beats any line's own "next card" pointer.** ⑦'s row says
+P3 is its next card, and that is true *within* ⑦ — it is not a licence to start P3 before R8.
+**R8 is deliberately the last thing that touches those pages before Jess reviews them**, so
+she reads a screen whose words have stopped moving.
+
 ### The three missing flows — SCHEDULED, and NOT to be started yet (Loo, 2026-07-28)
 
 Loo accepted this as a **Foundation gap, not a per-module bug** — the same hole showed up in
