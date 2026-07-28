@@ -179,6 +179,7 @@ import OrderDocuments, {
   deriveOrderDocuments,
   countDocumentsOnFile,
   countDocumentsMissing,
+  documentsMissingToState,
   type OrderDocRow,
 } from "./OrderDocuments";
 import RelatedCases, {
@@ -2057,6 +2058,9 @@ function DrawerBody({
   });
   const docsOnFile = countDocumentsOnFile(documentRows);
   const docsMissing = countDocumentsMissing(documentRows);
+  // Law 7: only the documents whose absence no action already owns may be
+  // STATED as something wrong. The badge above keeps counting all of them.
+  const healthDocRows = documentsMissingToState(documentRows);
 
   // ═══ J2 — Related cases: has anything gone wrong on this order? ═══
   // Both reads are silent-when-absent (retry: false) — a case list that fails
@@ -2093,7 +2097,12 @@ function DrawerBody({
   // `journeySignalsFor`), so nothing about the stage, the verb or the owner is
   // recomputed here. This block adds ONLY the two facts the Orders list cannot
   // see, and neither of them contradicts the ladder:
-  //   · docsMissing — J1's derived list, drawer-only data.
+  //   · docsMissing — J1's derived list, drawer-only data. Law 7 (Loo,
+  //     2026-07-28) narrows what may reach the HEALTH line to the documents no
+  //     action already covers: `documentsMissingToState`. The Documents tab's
+  //     own badge still counts every missing row — a records surface may say
+  //     what it lacks; what it may not do is say it a second time in the voice
+  //     of work the engine already owns.
   //   · moneyOutstanding — the payment LEDGER (order total − collected). The
   //     ladder's PayHold reads `ops_order_control.balance`, which is NULL on
   //     every live order, so the list's money dot correctly reads "no balance
@@ -2104,8 +2113,8 @@ function DrawerBody({
   const journeyView = journey
     ? deriveOrderJourney({
         signals: journey,
-        docsMissing,
-        docsMissingLabels: documentRows.filter((r) => r.missing).map((r) => r.label),
+        docsMissing: healthDocRows.length,
+        docsMissingLabels: healthDocRows.map((r) => r.label),
         ledgerOutstanding: moneyOutstanding,
         ledgerOutstandingLabel: Math.round(moneyOutstanding).toLocaleString(),
         // The amount the ladder itself locked on — its own PayHold input, NOT

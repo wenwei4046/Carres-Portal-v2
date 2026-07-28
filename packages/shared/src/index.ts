@@ -846,6 +846,9 @@ export {
 // C2 · The order action engine — two layers (compute every track · display
 // picks one). One track may never suppress another's action.
 export {
+  // How long one person's claim on an action survives. A TECHNICAL constant,
+  // never a business setting — the working flows name no number.
+  ACTION_CLAIM_TIMEOUT_MS,
   displayOrderAction,
   openOrderActions,
   orderActionsInDisplayOrder,

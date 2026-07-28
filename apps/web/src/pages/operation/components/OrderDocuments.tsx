@@ -220,6 +220,41 @@ export function countDocumentsMissing(rows: OrderDocRow[]): number {
   return rows.filter((r) => r.missing).length;
 }
 
+/**
+ * Document kinds whose absence the ACTION ENGINE already raises as work.
+ *
+ * `delivery_photo` → `Upload delivery photo` is a real action in
+ * `docs/ORDERS-WORKING-FLOW.md` §3, with its own trigger (delivered, no photo),
+ * its own due (1 working day after the delivery) and its own owner.
+ *
+ * Every other kind here is stamped by the database, not done by a person:
+ * `invoice` and `delivery_order` are auto-issued at dispatch (0098), so nobody
+ * can "do" a missing one — it is a fact and, if it really should exist, a
+ * defect to report. That is the other half of Law 7's split, and it is why this
+ * list is deliberately short rather than "everything that could be missing".
+ */
+const DOC_KINDS_RAISED_BY_AN_ACTION: readonly OrderDocKind[] = ["delivery_photo"];
+
+/**
+ * The missing documents that may be STATED as something wrong.
+ *
+ * `docs/ACTION-FLOW-STANDARD.md` Law 7 (Loo, 2026-07-28): the action engine is
+ * the only source of actions, and two computations may not describe the same
+ * fixable gap — if the engine already raises it, the record states nothing.
+ * `Delivery photo missing` was that duplicate: a document check saying, in the
+ * voice of a problem, the exact thing `Upload delivery photo` already says with
+ * a due date and an owner attached.
+ *
+ * The Documents list itself is unaffected and still shows the missing photo
+ * row — a records surface may say what it lacks. What it may not do is phrase
+ * that lack as a second piece of work.
+ */
+export function documentsMissingToState(rows: OrderDocRow[]): OrderDocRow[] {
+  return rows.filter(
+    (r) => r.missing && !DOC_KINDS_RAISED_BY_AN_ACTION.includes(r.kind),
+  );
+}
+
 export default function OrderDocuments({
   rows,
   onOpen,

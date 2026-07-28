@@ -254,11 +254,16 @@ for the balance turns one purchase into two and nothing reconciles afterwards.
 - **Counted per** — one row per **PO line**
 - **Re-checked when** — goods are received · the PO is stopped by Operations
 
-### `Contact {supplier} — confirm what happens next` (damaged / wrong goods)
+### `Call {supplier} — confirm what happens next` (damaged / wrong goods)
 
 **Already built** — the claim lifecycle (R2 · R3 · R4, `supplier_claims`). It is named here
 because it belongs to the purchasing flow, not because it is work: this file must not
 describe it a second way. See `docs/receiving-claim-execution-queue.md`.
+
+**The verb is `Call`, not `Contact`** (Loo, 2026-07-28). The portal has exactly five verbs and
+`Contact` was a sixth for behaviour `Call` already covers: reach the outside party · get an
+answer · record the outcome. The screens R2/R3 shipped still say `Contact` — that rename is
+scheduled in the ④ R lane, and no P-card touches it.
 
 **Held units are not "on the way".** A damaged unit becomes `on_hold` and stops counting as
 future supply (0299) — otherwise the planner keeps believing goods are coming that never will.
@@ -275,7 +280,7 @@ future supply (0299) — otherwise the planner keeps believing goods are coming 
 4  Cleaning up a part-delivery
      Call {supplier} — confirm balance delivery date
 5  Claims
-     Contact {supplier} — confirm what happens next
+     Call {supplier} — confirm what happens next
 ```
 
 Display order is not a gate chain. **A PO can carry several open actions at once**, and one
@@ -293,9 +298,31 @@ A gate REFUSES an action. Display order only decides what is read first.
   for the same supplier delivery order number.
 - **Nothing about money gates purchasing.** Paying the supplier is Finance's flow.
 
-**Two people will open the same task** — everybody can see everybody's work, by design. So a
-task shows who is on it (`Yu Jun is handling this · started 10:14`) and stays visible to
-everyone. It is never hidden, and a manager can take it back with a record of the handover.
+**Two people will open the same action** — everybody can see everybody's work, by design. So an
+action shows who is on it (`Yu Jun is handling this · started 10:14`) and stays visible to
+everyone. It is never hidden; a second person is TOLD and has to take it over deliberately,
+and the handover is recorded.
+
+**How that is stored — and what it may never become** (Loo, 2026-07-28):
+
+```
+(action identity) → claimed by → claimed at
+```
+
+- **Action identity** is the action's own key plus the record it is about (the PO, or the PO
+  line for a per-line action). Nothing else.
+- **Engine actions stay engine-generated.** A claim may NEVER be implemented by minting a
+  task row per action. The moment an action becomes a row somebody maintains, the portal is a
+  manual to-do list again and the engine stops being the single source of truth.
+- **Action claims automatically expire after the system-defined timeout**, and when the
+  action completes. **This file names no number**: the timeout is a technical constant
+  (`ACTION_CLAIM_TIMEOUT_MS`), not a business setting — nobody negotiates it, nobody tunes it
+  per supplier, and it never appears on the Settings tab. Changing it is a one-line code
+  change, not a document edit.
+- **If the action disappears, the claim disappears with it.** This is structural, not a
+  cleanup job: a claim is only ever READ through the list of currently-open actions, so an
+  action that is finished, recomputed away or no longer valid has nothing that can look its
+  claim up. The timeout exists for the other case — somebody opened it at 10:14 and went home.
 
 ## 6 · Row order
 
@@ -310,17 +337,26 @@ human or the system wrote it.
 
 ## 7 · What is on screen
 
-The frame — header, toolbar, bulk bar, facet panel, 44px table rows, footer — is
-`docs/UI-KIT.md` §A9, and the canonical example is the Orders list. **Purchasing copies it;
-it does not invent a layout.** Clicking a queue tile filters the table; clearing returns
-every row; clicking a row opens the drawer — one behaviour for every module, also UI-KIT.
+The frame — title, toolbar, filter chips, table header, footer — is `docs/UI-KIT.md` **§8.3**
+(module-tab law: a tabbed page renders no breadcrumb and no big title, because the tab IS the
+title) with the **§1.3** height budget, and the canonical example is the Orders list.
+**Purchasing copies it; it does not invent a layout.** **This file states no pixel** — the row
+height, the band heights and the budget all live in UI-KIT, and the one number this paragraph
+used to carry was already wrong (it said 44px; the Orders list ships 40px, measured by C10).
+The click behaviour is **§8.2**: a queue tile filters, clicking it again clears, a row opens
+the drawer on its FIRST tab, and closing keeps the filter and the scroll — one behaviour for
+every module.
 
 **The queue tiles** (each is a count of open actions, and its name IS the action):
 
 ```
 Send PO · Confirm ready date · Confirm tomorrow's delivery · Check in ·
-Confirm balance delivery date · Claims
+Confirm balance delivery date · Confirm what happens next
 ```
+
+**The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
+(COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not
+share one word.
 
 **The table columns:**
 

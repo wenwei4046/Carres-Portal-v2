@@ -253,8 +253,15 @@ one goes end to end.
 1. The two gates that have no home yet: a PO cannot be sent twice for the same customer line
    and quantity; a check-in cannot be posted twice for the same supplier delivery order
    number.
-2. Whoever is on a task shows on it (`Yu Jun is handling this · started 10:14`) — everybody
-   can see everybody's work, so two people WILL open the same task.
+2. Whoever is on an action shows on it (`Yu Jun is handling this · started 10:14`) — everybody
+   can see everybody's work, so two people WILL open the same action. **Store it as a
+   lightweight claim** — `(action identity) → claimed by → claimed at` — expiring on
+   `ACTION_CLAIM_TIMEOUT_MS` (already exported from `packages/shared/order-actions.ts`;
+   **import it, never retype the number**), and read it ONLY through the open-action list so a
+   finished or recomputed-away action cannot carry one (flow §5). **`ops_tasks` already has `claimed_by`/`claimed_at` and is still the
+   wrong home**: minting a task row per engine action turns the ladder back into a manual
+   to-do list, which is the one thing ACTION-FLOW-STANDARD forbids. Reuse the shape, not the
+   table.
 3. One PO document really does carry several customers' lines (§1), and one customer order
    really does need several POs. Prove both on the real run, not on a fixture.
 

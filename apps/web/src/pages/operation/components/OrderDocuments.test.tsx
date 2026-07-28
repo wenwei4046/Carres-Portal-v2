@@ -4,6 +4,7 @@ import OrderDocuments, {
   deriveOrderDocuments,
   countDocumentsOnFile,
   countDocumentsMissing,
+  documentsMissingToState,
   type OrderDocSignals,
 } from "./OrderDocuments";
 
@@ -47,6 +48,55 @@ describe("deriveOrderDocuments", () => {
     expect(kinds(RAW)).not.toContain("delivery_order");
     expect(kinds(RAW)).not.toContain("delivery_photo");
     expect(countDocumentsMissing(deriveOrderDocuments(RAW))).toBe(0);
+  });
+
+  it("a missing delivery photo is listed, but never STATED as something wrong", () => {
+    // Law 7 (Loo, 2026-07-28): the action engine is the only source of actions,
+    // and two computations may not describe the same fixable gap. A delivered
+    // order with no photo already carries the engine's `Upload delivery photo`
+    // — with a due (1 working day after the delivery) and an owner. So the
+    // document check must stop saying it a second time.
+    const rows = deriveOrderDocuments({
+      ...RAW,
+      dispatched: true,
+      invoiceNo: "INV-000123",
+      doNumber: "DO-1258-1",
+      delivered: true,
+    });
+    const photo = rows.find((r) => r.kind === "delivery_photo");
+
+    // Both directions. The Documents list still shows it — a records surface
+    // may say what it lacks...
+    expect(photo?.missing).toBe(true);
+    expect(countDocumentsMissing(rows)).toBe(1);
+    // ...and it is the ONLY thing missing here, so what may be stated is empty.
+    expect(documentsMissingToState(rows)).toEqual([]);
+  });
+
+  it("a document no action covers is still stated — the filter is not a mute button", () => {
+    // The other half of Law 7's split: an invoice is stamped by the database at
+    // dispatch (0098). Nobody can "do" a missing one, so no action exists and
+    // no action ever will — which is exactly why the record must keep saying it.
+    const rows = deriveOrderDocuments({ ...RAW, dispatched: true, delivered: true });
+    const stated = documentsMissingToState(rows).map((r) => r.kind);
+    expect(stated).toContain("invoice");
+    expect(stated).toContain("delivery_order");
+    expect(stated).not.toContain("delivery_photo");
+    // The badge is untouched by the filter and still counts all three.
+    expect(countDocumentsMissing(rows)).toBe(3);
+  });
+
+  it("a document that is present is never stated, missing filter or not", () => {
+    const rows = deriveOrderDocuments({
+      ...RAW,
+      dispatched: true,
+      invoiceNo: "INV-000123",
+      doNumber: "DO-1258-1",
+      delivered: true,
+      photos: [{ path: "p/1.jpg", url: "https://x/1.jpg" }],
+    });
+    expect(countDocumentsMissing(rows)).toBe(0);
+    expect(documentsMissingToState(rows)).toEqual([]);
   });
 
   it("a dispatched order owes an invoice and a delivery order", () => {

@@ -39,6 +39,28 @@
 
 import type { OrderActionKey } from "./order-action-words";
 
+/**
+ * How long one person's claim on an action survives without being refreshed.
+ *
+ * **A TECHNICAL CONSTANT, NOT A BUSINESS SETTING** (Loo, 2026-07-28). Nobody
+ * negotiates this number, nobody tunes it per supplier, and it never appears on
+ * a Settings tab — putting it there would add an eighth number that nobody ever
+ * changes, and a setting nobody changes is worse than a constant because the
+ * screen then implies somebody chose it. The working-flow documents say only
+ * *"action claims automatically expire after the system-defined timeout"*; the
+ * number lives here and changing it is a one-line code change, not a doc edit.
+ *
+ * It covers exactly one case: somebody opened an action at 10:14 and went home.
+ * Every other way a claim ends is structural — a claim is only ever READ through
+ * the list of currently-open actions, so an action that is completed or
+ * recomputed away has nothing that can look its claim up
+ * (`docs/PURCHASING-WORKING-FLOW.md` §5).
+ *
+ * NO CONSUMER YET — the claim itself is built by card P5. This is the definition
+ * it will import, so the number can never be typed twice.
+ */
+export const ACTION_CLAIM_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 export type OrderActionTone =
   | "danger"
   | "warning"

@@ -298,8 +298,10 @@ Identity                    ① Whose order is this?
 **1. Current Action is always visible.** On every surface — drawer, full page,
 tablet, phone — and it survives a collapsed rail. It is the reason the record is
 open; a user must never expand something to find out what to do today.
-*(Today the drawer hides `ChaseNowPanel` when the rail collapses. That is the
-bug this rule names.)*
+*(The bug this rule named — the drawer hiding its Current Action when the rail
+collapsed — was fixed by T2, `c9966ee3`. The panel is `CallsPanel` now; a chat
+grepping the name in that old sentence would have found nothing and concluded the
+rule was about something that no longer exists.)*
 
 **2. Current Issues disappears when there are none.** No "✓ None", no empty
 card, no reassuring green tick — an ERP's job is to say where today is *not*

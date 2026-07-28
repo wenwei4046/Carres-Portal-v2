@@ -294,6 +294,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Confirm tomorrow's delivery` | `Call {supplier} — confirm tomorrow's delivery` | `Record answer` | `Answer recorded` | `Nothing arriving tomorrow.` |
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
+| `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 
 **`Send PO` and `Confirm ready date` are ONE action each, shared by Orders and
 Purchasing** — same trigger, same completion, same words. They are listed twice
@@ -370,7 +371,14 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 | Group | The words |
 |---|---|
 | Receiving result | `Received` · `Received with exception` · `Rejected` |
-| Exception lifecycle | `Receiving exception created` · `Contact supplier` · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
+| Exception lifecycle | `Receiving exception created` · **`Call {supplier} — confirm what happens next`** · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
+
+**`Contact supplier` is retired** (Loo, 2026-07-28). It was a SIXTH verb for behaviour the
+five already cover — reach the outside party, get an answer, record the outcome, which is
+exactly `Call`. The action is `Call {supplier} — confirm what happens next` and its five
+strings are in the dictionary above. **The R2/R3 screens still say `Contact`; the rename is
+scheduled in the ④ R lane** — until it lands, this table is the ruling and the screen is the
+lag, not the other way round.
 
 **Waiting words are STATES, never actions** — nobody acts while one is true (engine law).
 **Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
@@ -475,6 +483,7 @@ doubt, grep the codebase and match what already ships.
 | Where the supplier must send the goods | **where the goods go** | Ship-to · Destination · Drop point |
 | What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |
 | Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
+| The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 

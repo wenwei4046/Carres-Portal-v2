@@ -268,6 +268,24 @@ column) — guardrail #8.
 **Done when:** no GRN exists without exactly one owner; the PO-duty holder never
 auto-receives their own PO.
 
+## R8 · `Contact supplier` becomes `Call {supplier} — confirm what happens next`
+
+**A rename, nothing else.** Loo ruled 2026-07-28 that the portal has exactly FIVE verbs
+(`Assign · Call · Issue · Upload · Close`) and `Contact` was a sixth for behaviour `Call`
+already covers — reach the outside party, get an answer, record the outcome. **The ruling is
+already law**: `docs/COPY-STANDARD.md` carries the five strings
+(`Confirm what happens next` · `Call {supplier} — confirm what happens next` ·
+`Record what happens next` · `Supplier answer recorded` ·
+`No claim is waiting for a supplier answer.`) and the exception-lifecycle row no longer lists
+`Contact supplier`. **The R2/R3 screens are the lag.**
+
+**Build:** every visible `Contact` on the claim screens reads from the shared word module,
+same as C1 did for Orders. No behaviour changes, no claim state changes, no migration.
+**Grep both directions** — `Contact supplier` at 0 proves nothing says the old word; the new
+string at 1 proves something says the new one.
+**Done when:** `Contact` appears nowhere on screen and the Claims queue tile has a name that
+is in the dictionary.
+
 ## LATER
 
 - Purchase Return flow (2990s has it — port, don't invent) · claim → service-case
@@ -288,3 +306,4 @@ auto-receives their own PO.
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ⬜ after R1-R2 · warehouse login | — |
 | R7 | ⬜ after R1 · GRN duty auto-assign | — |
+| R8 | ⬜ any time · `Contact` → `Call` rename (words only, no migration) | — |

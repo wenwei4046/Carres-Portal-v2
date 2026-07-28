@@ -12,6 +12,9 @@
 **FROZEN — the Business Thinking Model** (§1–§3): the order in which a human's brain asks
 questions when it opens one order, and what counts as a satisfying answer to each.
 
+**FROZEN — Layout Specification L1** (§6): the six regions of responsibility those questions
+become. A region is a unit of RESPONSIBILITY, not a place.
+
 **NOT frozen, and NOT decided by this file:**
 
 - **Layout** — nothing about position, order on screen, or what is read first *visually*.
@@ -211,3 +214,162 @@ Named so nobody reads this file as covering them:
 - **Whether the payment detail may be shown at all** — the ledger has writers and no reader
   (carry-forward `order-payments-ledger-has-no-reader`), so step 5's *explanation* can
   currently contradict step 5's *number*. The number is safe; the breakdown is not.
+
+## 6 · Layout Specification L1 — the page regions — **FROZEN 2026-07-28**
+
+**FROZEN by Loo, 2026-07-28.** L1 turns the six business questions into six regions of
+responsibility. A **Region is a unit of responsibility, not a place** — L1 says nothing about
+position, order on screen, or what is seen first. No component, no card, no tab, no rail, no
+visual decision is implied or permitted here.
+
+**The rule that keeps it honest: six questions → six regions, one to one.** Each region owns
+**exactly one** question. A seventh region requires a seventh question first — if none can be
+named, that region is another region's content that has set up on its own.
+
+### R1 · Identification
+
+| | |
+|---|---|
+| **Answers** | Q1 — whose order is this, does it concern me? |
+| **Done when** | one plain sentence carries both halves: whose (customer · the Ref they recognise · the date we promised) and my role (mine to work, or not) |
+| **Fed by** | **Identity** (customer · Ref · the responsible person · store/salesperson · building type · source · special identity: rental, guarantee, bundle) · **Commitment** (the promised date, as identification only, never as a judgement) · **Contents** (the outstanding figure — a *persistent fact*, §7②, resident here but not a member) |
+| **Does NOT answer** | what to do (R2) · why (R3) · how the outstanding figure was arrived at (R5) · **it never judges urgency and never chases.** One exception: a missing building type is not shouted here — it is handed to R2 as work, because it blocks a booking |
+| **When unknown** | no date → "date not set"; no prices → **"not priced", never RM 0** |
+| **Absent when** | never. All three readers enter here |
+
+### R2 · The work
+
+| | |
+|---|---|
+| **Answers** | Q2 — what do I have to do now? |
+| **Done when** | **every** open item is listed, each saying what · with whom · by when. Nothing open is stated with certainty ("delivering 27 Jul, nothing to do now") |
+| **Fed by** | **Actions** (every open action + its six things) · **Verdict** (how late → order and tone) · **Doors** (the door that closes an item travels with it) |
+| **Does NOT answer** | why it is like this (R3) · what has already been done (R6's history) · what was bought (R4) · **it never asks the reader to work out what to do** — the engine computed it, and making a human re-derive it wastes the computation |
+| **When empty** | it must say so plainly. **Silence is a failure** — a blank reads as "I have missed something" |
+| **Absent when** | never |
+
+> **Records do not feed this region.** Under `ACTION-FLOW-STANDARD` Law 7 the engine reads the
+> same stored signal and raises the action itself. There are **zero** cross-region channels.
+
+### R3 · Explanation
+
+| | |
+|---|---|
+| **Answers** | Q3 — why? |
+| **Done when** | **three independent answers** — goods · delivery · money, one line each. **They may never be merged into one summary** |
+| **Fed by** | **Commitment ⟷ Reality**, subtracted per track · **Verdict** (each track's tone) |
+| **Does NOT answer** | **it never tells anybody to do anything** (R2) · it does not lay out evidence — PO numbers, unit identifiers, working-day arithmetic are the *second sentence*, not the answer · it does not tell history (R6) · **a track that is fine does not explain itself** |
+| **When unknown** | unknown is an answer ("the factory has not given a date") |
+| **Absent when** | never — but when all is well it is worth one line |
+
+### R4 · Contents
+
+| | |
+|---|---|
+| **Answers** | Q4 — what did they buy? |
+| **Done when** | what · how many · which spec, in human words, not codes |
+| **Fed by** | **Contents** (lines · quantities · specs · service add-ons) |
+| **Does NOT answer** | the price explanation (R5) · discount and promotion breakdown (evidence) · where each unit physically sits (that is R3's goods evidence) · **it proves nothing** — it answers "what was bought" and stops |
+| **Its normal state** | unread. **That is correct, not failure** — it is triggered by three things only: the customer is asking · goods must be counted for a PO or a delivery document · R3 did not add up |
+
+### R5 · Money
+
+| | |
+|---|---|
+| **Answers** | Q5 — the *explanation* half |
+| **Done when** | what was collected · how storage accrued · whether the due date passed · whether a manager released it |
+| **Fed by** | **Contents** (the composition · storage) · **Reality** (the money track) · **Commitment** (the payment due date) |
+| **Does NOT answer** | **the figure itself** — that is a persistent fact resident in R1, because the speaking order needs it before the reading order arrives · chasing (that is an action in R2) · **cost and margin, ever** |
+| **Half of it cannot be built today** | the payment breakdown reads a ledger with no reader, and it can contradict the figure. Until that is fixed this region states only what can be computed exactly |
+| **When empty** | settled — one line |
+
+### R6 · Record
+
+| | |
+|---|---|
+| **Answers** | Q6 — what has happened? |
+| **Done when** | who · when · what they did, in time order, with what was said kept verbatim — **plus what is missing** |
+| **Fed by** | **Records** (history · notes · follow-ups · documents · related cases) |
+| **Does NOT answer** | **what to do now** — it produces a signal and stops; the engine decides whether that signal is work · why it is stuck (R3) · the system's own bookkeeping — it records what a *person* did |
+| **Documents have three states** | exists · cannot exist yet (**renders nothing**) · should exist by now (says "missing") |
+| **When empty** | a new order is almost entirely empty. **What is empty does not appear at all** |
+
+### Three things that are NOT regions
+
+1. **Evidence** — identifiers (SO id · PO · DO · invoice · SKU · unit numbers) · timestamps ·
+   who recorded what · working-day arithmetic · individual payments · storage workings.
+   **It has no region of its own and never may.** It is the *second sentence* of an answer.
+   Giving it a region promotes "material for an argument" into "work to be done".
+2. **Doors** — not a region. The door that closes an item travels with that item in R2; the
+   door that corrects history travels with R6. **Nobody opens an order in order to find a door.**
+3. **An overall status** — not a region. It does not exist. R3 needs three answers, and one
+   summarising word destroys all three.
+
+### One number, three depths (money)
+
+| Region | What it answers |
+|---|---|
+| R1 | **the figure itself** — the first second of a phone call cannot wait for R5 |
+| R3 | one line: is money what is blocking this? |
+| R5 | where the figure comes from |
+
+**All three must be computed by the same rule** (`order-money.ts`). This is not tidiness: this
+system has genuinely had three surfaces quoting three different figures for one order.
+
+## 7 · Architecture rulings — 2026-07-28
+
+Three questions asked of the architecture before the layout specification (L1) is frozen.
+**L1 itself is NOT in this file and is NOT frozen.** These are the rulings that constrain it.
+
+**Priority, ruled by the PM: ① → ② → ③.**
+
+### ① RULED AND NOW LAW — the action engine is the only source of actions
+
+`docs/ACTION-FLOW-STANDARD.md` **Law 7**. Not restated here (Law 0A).
+
+What it changes for this page: **Records produce SIGNALS ONLY.** The "what is missing" check
+does not flow into the work — the engine reads the same stored signal and raises an action
+with a due and an owner, or it is not work at all. The six regions therefore have **zero**
+cross-region channels, not one.
+
+### ② RESERVED, NOT YET LAW — "Persistent Facts" is its own concept
+
+**Ruled:** a small set of facts must stay available no matter which question is being asked.
+It is **an independent concept, not a member of any region.** A region may be where such a
+fact surfaces; that is residence, never membership.
+
+**A law will be written later.** Until it is, nothing here is enforceable. What it is expected
+to carry, recorded now so the reasoning is not lost:
+
+- **The admission test** — a fact qualifies only when staff are asked it in **outward**
+  communication, **answering it wrongly would create a wrong outward commitment** (an amount,
+  a date, a name), and it is computed by one rule into one value. Under this test the current
+  set admits **no new member**: 客户名 · Ref · the promised date · outstanding.
+- **A cap.** The set is full at four. A fifth requires removing one — the same
+  only-goes-one-way discipline as UI-KIT §16.
+- **Values only.** A persistent fact carries no explanation and no door. *Header Everything is
+  not caused by having many things; it is caused by things that start carrying actions and
+  explanations.*
+- **The symptom to watch for:** the first time someone argues for admission on the grounds of
+  "it's convenient / it's used a lot" rather than the test above. The test exists so that
+  argument has nothing to stand on.
+
+### ③ RESERVED, NOT BUILT — Gap stays implicit
+
+**Ruled:** reserve the concept; do **not** introduce a Gap layer. Upgrade only when a business
+scenario demands it.
+
+Why it is worth reserving: a gap has properties that belong to neither side of it — *has this
+already been acknowledged* and *whose fault is it*. Both exist in the system today, living
+apart (acknowledgement inside the extension record and the delay stages; fault recomputed by
+the supplier scorecard). A concept with properties of its own eventually earns a name.
+
+**The upgrade trigger, so nobody has to re-derive it:** when a third kind of commitment is
+added (a rental instalment date, a guarantee term, a service-case deadline are the candidates)
+and Verdict and Actions each have to be edited separately to keep up. That second separate
+edit is the signal — not a feeling that it would be tidier.
+
+**If it is ever built, three boundaries hold or it becomes a second "status":** computed and
+never stored · carries no tone, no colour and no action (Verdict and Actions both *read* it) ·
+**never rendered** — the page shows the gap in plain words, never the gap itself. Rendering it
+would create a seventh region, which is what L1's one-question-one-region rule exists to stop.

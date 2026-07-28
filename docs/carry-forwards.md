@@ -138,7 +138,7 @@
   Deliberate at ship time and ruled "not now" by Jess the same day: the card's "where a form
   already collects the inputs, the form IS the checklist" says *do not duplicate the form as
   a row of ticks*, it does not ask for navigation, and C2's action list is control-free by
-  design. The PATTERN already exists — `ChaseNowRow.onOpen` opens "the tab where this is
+  design. The PATTERN already exists — `CallsRow.onOpen` opens "the tab where this is
   worked" — so the firm fix is one `onOpen` per step key mapped to the panel that owns it
   (supplier → Items · logistics → Delivery · money → Balance · photo → Documents), passed
   down from `OrderDetailDrawer` exactly as `CallsPanel` receives its own. It stays a
