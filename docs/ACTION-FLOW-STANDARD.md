@@ -187,6 +187,35 @@ Tones live in `docs/ORDERS-WORKING-FLOW.md` §7 — one home (Law 0A).
 `Status` column, each as its own Lucide icon (goods `Package` · delivery `Truck` · money
 `Wallet`, 14px). The pill is untouched and keeps the header word.
 
+## Law 7 — the action engine is the ONLY source of actions
+
+**Ruled by Loo, 2026-07-28.** Nothing else in the portal creates work.
+
+A module, a panel, a record view or a report may produce **SIGNALS** — facts computed from
+what is stored. **Only the action engine turns a signal into an action**, and only when all
+six of Law 2's things exist.
+
+**Why this is a law and not a preference.** An action created anywhere else has no Due, no
+Task Owner and no Completion the system measures — so nothing can ever close it. That is
+exactly the row C3 retired (`Confirm delivery with {customer}`): the one line in the drawer
+that no button in the portal could close. A row with no button teaches a new hire that they
+have missed something.
+
+**Two kinds of "missing", and only one of them is work:**
+
+| | |
+|---|---|
+| **A human can fix it** — no delivery photo, no building type | the engine raises it as an ACTION, with a due and an owner |
+| **No human can fix it** — a number the system should have stamped and did not | **it is not work.** It is a fact in the record, and a defect to report. It may never be shown as a task |
+
+A "missing" list that fills up with things nobody can do is how a worklist dies: staff stop
+reading all of it.
+
+**What a records surface may do:** state what it has and what it lacks.
+**What it may not do:** phrase that lack as an instruction, give it a deadline, or assign it
+to anybody. Two computations may not describe the same fixable gap — if the engine already
+raises it, the record states nothing.
+
 ## What this replaces
 
 - The single next-action ladder as a business rule (it stays as Layer 2 input).

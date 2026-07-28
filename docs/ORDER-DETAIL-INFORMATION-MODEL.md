@@ -211,3 +211,61 @@ Named so nobody reads this file as covering them:
 - **Whether the payment detail may be shown at all** — the ledger has writers and no reader
   (carry-forward `order-payments-ledger-has-no-reader`), so step 5's *explanation* can
   currently contradict step 5's *number*. The number is safe; the breakdown is not.
+
+## 6 · Architecture rulings — 2026-07-28
+
+Three questions asked of the architecture before the layout specification (L1) is frozen.
+**L1 itself is NOT in this file and is NOT frozen.** These are the rulings that constrain it.
+
+**Priority, ruled by the PM: ① → ② → ③.**
+
+### ① RULED AND NOW LAW — the action engine is the only source of actions
+
+`docs/ACTION-FLOW-STANDARD.md` **Law 7**. Not restated here (Law 0A).
+
+What it changes for this page: **Records produce SIGNALS ONLY.** The "what is missing" check
+does not flow into the work — the engine reads the same stored signal and raises an action
+with a due and an owner, or it is not work at all. The six regions therefore have **zero**
+cross-region channels, not one.
+
+### ② RESERVED, NOT YET LAW — "Persistent Facts" is its own concept
+
+**Ruled:** a small set of facts must stay available no matter which question is being asked.
+It is **an independent concept, not a member of any region.** A region may be where such a
+fact surfaces; that is residence, never membership.
+
+**A law will be written later.** Until it is, nothing here is enforceable. What it is expected
+to carry, recorded now so the reasoning is not lost:
+
+- **The admission test** — a fact qualifies only when staff are asked it in **outward**
+  communication, **answering it wrongly would create a wrong outward commitment** (an amount,
+  a date, a name), and it is computed by one rule into one value. Under this test the current
+  set admits **no new member**: 客户名 · Ref · the promised date · outstanding.
+- **A cap.** The set is full at four. A fifth requires removing one — the same
+  only-goes-one-way discipline as UI-KIT §16.
+- **Values only.** A persistent fact carries no explanation and no door. *Header Everything is
+  not caused by having many things; it is caused by things that start carrying actions and
+  explanations.*
+- **The symptom to watch for:** the first time someone argues for admission on the grounds of
+  "it's convenient / it's used a lot" rather than the test above. The test exists so that
+  argument has nothing to stand on.
+
+### ③ RESERVED, NOT BUILT — Gap stays implicit
+
+**Ruled:** reserve the concept; do **not** introduce a Gap layer. Upgrade only when a business
+scenario demands it.
+
+Why it is worth reserving: a gap has properties that belong to neither side of it — *has this
+already been acknowledged* and *whose fault is it*. Both exist in the system today, living
+apart (acknowledgement inside the extension record and the delay stages; fault recomputed by
+the supplier scorecard). A concept with properties of its own eventually earns a name.
+
+**The upgrade trigger, so nobody has to re-derive it:** when a third kind of commitment is
+added (a rental instalment date, a guarantee term, a service-case deadline are the candidates)
+and Verdict and Actions each have to be edited separately to keep up. That second separate
+edit is the signal — not a feeling that it would be tidier.
+
+**If it is ever built, three boundaries hold or it becomes a second "status":** computed and
+never stored · carries no tone, no colour and no action (Verdict and Actions both *read* it) ·
+**never rendered** — the page shows the gap in plain words, never the gap itself. Rendering it
+would create a seventh region, which is what L1's one-question-one-region rule exists to stop.
