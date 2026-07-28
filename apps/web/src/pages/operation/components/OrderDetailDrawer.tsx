@@ -951,7 +951,7 @@ function PieDial({
 }
 
 /** One ACTIONS row — a counterparty someone has to reach right now. */
-interface ChaseNowRow {
+interface CallsRow {
   key: string;
   label: string;
   sub: string;
@@ -975,9 +975,16 @@ function agoWord(iso: string): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
-/** ACTIONS (MASTER SPEC §7, B2; renamed from "Chase now" by C1 — Jess banned
- *  the word 2026-07-27, and `Actions` is the word she chose for an order's open
- *  actions on the list, so the drawer uses the same one). The left-rail panel
+/** CALLS (MASTER SPEC §7, B2. `Chase now` → `Actions` by C1 when Jess banned the
+ *  word; `Actions` → **`Calls`** by C6, because that name was then on TWO blocks
+ *  of one drawer — this panel and the dynamic checklist below the journey strip —
+ *  and COPY-STANDARD rule 8 is "same word app-wide". Jess ruled 2026-07-28: the
+ *  checklist KEEPS `Actions`, because it is literally a list of open actions and
+ *  the dictionary already gives that column its plural word, and THIS panel
+ *  renames. `Calls` is not a new word: it is the verb this whole panel is made of
+ *  — `Call` = outward communication whose outcome is recorded, one of the five —
+ *  and it is already in the panel's own locked empty state,
+ *  `0 calls to make · everything on track.`). The left-rail panel
  *  that owns ALL the outward calls: one row per COUNTERPARTY — supplier (POs
  *  merged per supplier, §13) / logistics / owing customer.
  *  Colour discipline: the DOT + the overdue FACT line carry the red; the
@@ -985,12 +992,12 @@ function agoWord(iso: string): string {
  *  sorts on top; Actions▾ = Remind / Call (the two message tones, same language
  *  as the Items rows' menu). `lastChasedAt` = the shared order-level stamp
  *  (0221; populates once the API deploys). */
-function ChaseNowPanel({
+function CallsPanel({
   rows,
   lastChasedAt,
   collapsed,
 }: {
-  rows: ChaseNowRow[];
+  rows: CallsRow[];
   lastChasedAt: string | null;
   /** UI-KIT §1.4 rule 1 — Current Action is ALWAYS VISIBLE. The rail may
    *  collapse to 56px, but this block may not vanish with it: it is the reason
@@ -1005,8 +1012,8 @@ function ChaseNowPanel({
         className="kpi-box grid place-items-center py-2 shrink-0"
         title={
           rows.length === 0
-            ? "Actions — 0 calls to make"
-            : `Actions — ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
+            ? "Calls — 0 calls to make"
+            : `Calls — ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
         }
       >
         <span className="relative">
@@ -1022,10 +1029,12 @@ function ChaseNowPanel({
             </span>
           )}
         </span>
+        {/* The screen reader gets the panel's own locked words, never a second
+            spelling invented for the collapsed state. */}
         <span className="sr-only">
           {rows.length === 0
-            ? "No actions"
-            : `${rows.length} action${rows.length > 1 ? "s" : ""}`}
+            ? "0 calls to make"
+            : `${rows.length} calls to make`}
         </span>
       </div>
     );
@@ -1034,7 +1043,7 @@ function ChaseNowPanel({
     <div className="kpi-box shrink-0">
       <span className="flex items-baseline gap-2 mb-1">
         <span className="text-[12px] font-semibold uppercase tracking-[0.05em] text-base-500">
-          Actions
+          Calls
         </span>
         {rows.length > 0 && lastChasedAt && (
           <span
@@ -2328,7 +2337,7 @@ function DrawerBody({
       }
     }
   }
-  const chaseRows: ChaseNowRow[] = [...byParty.entries()].map(([key, p]) => {
+  const chaseRows: CallsRow[] = [...byParty.entries()].map(([key, p]) => {
     const lateBit = p.overdue
       ? `${daysLateOf(p.eta!)}d late`
       : p.eta
@@ -2753,7 +2762,7 @@ function DrawerBody({
         {/* ═══ TWO-COLUMN SHELL — the UI-KIT §1.4 Information Hierarchy ═══
             LEFT 280px (collapsible to 56 icon-only), top to bottom:
               ① Identity        CustomerIdentityCard
-              ② Current Action  ChaseNowPanel      — ALWAYS visible
+              ② Current Action  CallsPanel      — ALWAYS visible
               ③ Current Issues  CurrentIssuesPanel — auto-hides when empty
               ④ Progress        JourneyCard
                  then the section rail (⑤⑥) and Activity (⑦), which open in
@@ -2790,7 +2799,7 @@ function DrawerBody({
               under Identity. It used to hide with the collapsed rail; §1.4
               rule 1 forbids that (it is the reason the record is open), so it
               now renders in icon form instead of disappearing. */}
-          <ChaseNowPanel
+          <CallsPanel
             rows={chaseRows}
             lastChasedAt={form.control?.last_chased_at ?? null}
             collapsed={railCollapsed}

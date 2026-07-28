@@ -114,14 +114,14 @@ describe("OrderDetailDrawer — Information Hierarchy (UI-KIT §1.4)", () => {
 
   it("orders the left rail Identity → Current Action → Current Issues → Progress", () => {
     const identity = at("<CustomerIdentityCard");
-    const action = at("<ChaseNowPanel");
+    const action = at("<CallsPanel");
     const issues = at("<CurrentIssuesPanel");
     const progress = at("<JourneyCard");
     // Negative control: every block must actually be rendered, or the
     // ascending check below passes on a file that renders none of them.
     for (const [name, i] of [
       ["CustomerIdentityCard", identity],
-      ["ChaseNowPanel", action],
+      ["CallsPanel", action],
       ["CurrentIssuesPanel", issues],
       ["JourneyCard", progress],
     ] as const) {
@@ -133,7 +133,7 @@ describe("OrderDetailDrawer — Information Hierarchy (UI-KIT §1.4)", () => {
   });
 
   it("rule 1 — Current Action is never hidden by the collapsed rail", () => {
-    const i = at("<ChaseNowPanel");
+    const i = at("<CallsPanel");
     // Nothing may gate the render site on the rail being open. This is the
     // exact shape that used to sit here: `{!railCollapsed && (`.
     const before = SRC.slice(Math.max(0, i - 400), i);
