@@ -308,7 +308,21 @@ column) — guardrail #8.
 **Done when:** no GRN exists without exactly one owner; the PO-duty holder never
 auto-receives their own PO.
 
-## R8 · The banned-verb sweep on the receiving and claim screens
+## R8 · The banned-verb sweep across the Purchasing lane
+
+**Three screens, one sweep, one PR.** Every word below is already ruled; none of this is a
+design decision. Three separate rename cards for one law would be worse than one card that
+crosses two lines inside the SAME lane (Purchasing / Receiving is one lane by the index's own
+rule), which is why P2's finding was folded in here rather than becoming a P-card.
+
+**⓪ The To Order stage cells** (`OperationPurchase.tsx`), found by P2 2026-07-28 and live on
+screen right now: they read **`Send POs` · `Chase factory` · `Receive`**. The dictionary locks
+**`Send PO` · `Confirm ready date` · `Check in`**, and **`Chase` is a BANNED word** — this is
+not lag, it is a banned word shipped. Same fix as C1 did for Orders: read from the shared word
+module. **The cells are a STAGE picker, not queue tiles** (UI-KIT §8.2, the no-empty-state
+rule) — R8 renames them and changes no behaviour.
+
+
 
 **A rename, nothing else — and it is now TWO words, not one.**
 
@@ -354,9 +368,10 @@ rather than "fixing" the count to look clean.
 receiving, warehouse and claim screens, the two panels on the Receiving station say the same
 word for the same act, and the Claims queue tile has a name that is in the dictionary.
 
-**LANE:** these are ④ R's own screens, but **`OperationSupplierClaims.tsx` is also P2's** —
-P2 is building the queue tiles and the filter behaviour on the same file. Run R8 after P2
-merges, or the rename lands on a file that is being rewritten underneath it.
+**LANE:** R8 now touches the Purchasing module's own pages as well as ④ R's
+(`OperationPurchase.tsx` from ⓪, `OperationSupplierClaims.tsx` from ③), so **no P-chat and no
+C4 chat may run beside it** — the whole Purchasing lane is R8's for one PR. That is the price
+of doing the sweep once, and it is cheaper than three cards each waiting for the same lane.
 
 ## LATER
 

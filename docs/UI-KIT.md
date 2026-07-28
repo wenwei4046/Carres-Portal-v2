@@ -806,6 +806,31 @@ Close the drawer       →  the table keeps its filter AND its scroll position
 different one, that is a change to THIS law, decided by Jess — never a local
 exception.
 
+### A page with no "everything" state (added 2026-07-28, found by P2)
+
+The five lines above quietly assume every list has an **unfiltered** state to
+clear back to. Some do not. Purchasing's To Order is a **stage** page: three
+cells, exactly one always on, and no way to show all three at once — clearing the
+stage would show a blank screen, not every row.
+
+**So a picker with no empty state is not a queue tile and does not toggle.**
+
+| | Queue tile / facet | Stage picker |
+|---|---|---|
+| how many can be on | any number, including none | **exactly one, always** |
+| clicking the one that is on | clears it | **does nothing** — never a blank page |
+| carries a ✕ chip | yes | no — there is nothing to clear to |
+| the rest of §8.2 | applies | **applies in full** — filters and scroll still survive the drawer |
+
+**The test is the empty state, not the shape on screen.** If "none selected" is a
+legal, useful view, it is a tile and it toggles. If "none selected" shows nothing,
+it is a stage and re-clicking is a no-op. A tab bar is the same thing wearing a
+different look, which is why this rule is here and not in §8.3.
+
+**This narrows §8.2; it does not create an exception to it.** A module still may
+not invent behaviour — it reads which of the two shapes it has, and both are
+defined here.
+
 ## §8.3 Module-tab law (LOCKED 2026-07-22)
 
 When a page sits under a module tab bar (Purchasing's

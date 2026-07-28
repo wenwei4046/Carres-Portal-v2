@@ -179,7 +179,7 @@ believed it would go looking for something that is not there):
 
 | Tab | Facet rail | Filter state | What P2 owes it |
 |---|---|---|---|
-| **To Order** | yes | real — `supplierFilter` · `attn` · `selectedDay`, each with an `onClear` chip | the missing half of §8.2: **clicking the same tile again clears it**, and closing the drawer keeps the filter AND the scroll |
+| **To Order** | yes | **ONE live, TWO dead** — `supplierFilter` works; `attn` and `selectedDay` have state, filter logic and a clear chip, and **nothing on the page can switch them on** (their tiles were deleted 2026-07-23/24 and the state stayed). See the ruling below | ✅ done #492 |
 | **Purchase Orders** | — | — | check before building; it is a nested route, not a `?tab=` |
 | **Receiving** | **none** | **none** | a rail and tiles from scratch |
 | **Claims** | **none** | **none** | a rail and tiles from scratch |
@@ -188,6 +188,19 @@ believed it would go looking for something that is not there):
 again / ✕ → it clears · two tiles → two ✕-able chips · click a row → the drawer opens on its
 FIRST tab · closing keeps the filter AND the scroll position. **Orders is the reference — copy
 it, do not invent it.**
+
+**The three stage cells are NOT queue tiles and do not toggle** — exactly one is always on and
+clearing would blank the page. §8.2 gained the rule that says so (the no-empty-state shape),
+written after P2 found that the law assumed every list has an "everything" view. Their WORDS
+are wrong (`Send POs` · `Chase factory` · `Receive`, and `Chase` is banned) and that is **R8's
+sweep, not P2's** — a rename is not a click behaviour.
+
+**The two dead filters — ruled 2026-07-28.** `attn` and `selectedDay` are state with filter
+logic and a clear chip that nothing can turn on. My own earlier version of this card called
+all three "real, each with an onClear chip" — that was read off a grep and it was wrong; P2
+measured it and reported it, which is the only reason it is not still described as live here.
+Two dead filters that a card describes as working are `ops_order_control.balance` in miniature:
+the next chat plans around a feature nobody can reach.
 
 **Do NOT extract a shared component for this.** UI-KIT §8.2's enforcement row says the
 behaviour ends up inside `PageShell` / `DataTable`, and **that is card D0.5c on line ⑧**.
