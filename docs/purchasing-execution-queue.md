@@ -181,8 +181,8 @@ believed it would go looking for something that is not there):
 |---|---|---|---|
 | **To Order** | yes | **ONE live, TWO dead** — `supplierFilter` works; `attn` and `selectedDay` have state, filter logic and a clear chip, and **nothing on the page can switch them on** (their tiles were deleted 2026-07-23/24 and the state stayed). See the ruling below | ✅ done #492 |
 | **Purchase Orders** | — | — | check before building; it is a nested route, not a `?tab=` |
-| **Receiving** | **none** | **none** | a rail and tiles from scratch |
-| **Claims** | **none** | **none** | ✅ done #494 — a rail and tiles from scratch |
+| **Receiving** | ~~none~~ **yes** | ~~none~~ **3 live, all toggling** | ✅ done #TBD — a queue page, not a stage page |
+| **Claims** | ~~none~~ **yes** | ~~none~~ **3 live** | ✅ done #494 — a rail and tiles from scratch |
 
 **Build — the UI-KIT §8.2 interaction law:** click a queue tile → the table filters · click it
 again / ✕ → it clears · two tiles → two ✕-able chips · click a row → the drawer opens on its
@@ -267,7 +267,8 @@ and tiles from scratch, and both live in ④ R's files (`OperationReceiving.tsx`
 `OperationSupplierClaims.tsx`), which **R6 held when To Order ran** — the card's own LANE
 paragraph says to ship the To Order half alone rather than edit a file another line holds.
 **R6 has since merged (PR #490, `9fe094bf`), so that block is gone.** Claims took its own chat
-and shipped as #494, below. **Receiving is the last piece of P2.**
+and shipped as #494; Receiving took its own and shipped as #TBD. **Both are below, and P2 is
+now complete on all three tabs that have a list.**
 
 **Reported, not fixed (Law 0):**
 
@@ -370,6 +371,104 @@ the first already spent.
    document owns. P2 reused words already on screen (the Orders rail's, and this table's own
    column headers) rather than invent, but the next module that builds a rail has nothing to
    check itself against.
+
+### ✅ The RECEIVING half shipped 2026-07-28 (PR #TBD)
+
+**Done: Receiving.** No migration, no api change, no new word, and the interaction law is
+true on the tab. What was there before: **no facet rail and no filter state at all** — the
+earlier table in this card said "ALREADY EXISTS: the facet rail", which was true of To Order
+only, and the Receiving row was corrected to `none / none` before this ran.
+
+**The shape decision is the first thing the card owed, and it is written down.** §8.2's new
+rule (added by the To Order half) says a picker with no "nothing selected" state is a STAGE
+and re-clicking it is a no-op. **Receiving is the OTHER shape.** Its `All` tab is a legal and
+genuinely useful nothing-selected view — it is how an operator finds one PO — and the body
+renders ONE table for every combination of filters, so a cleared tile shows every row rather
+than a blank page. Therefore every tile toggles and every pick is an ✕-able chip. To Order is
+a stage page for exactly the opposite reason.
+
+**The rail, in §8.4's order, danger group first:**
+
+| Group | Rows | Where the words come from |
+|---|---|---|
+| `Today's work` | **`Check in`** | the ONE action of `PURCHASING-WORKING-FLOW.md` §7 that lives on this tab |
+| `Progress` | `Receiving issue` · `Partially received` · `In transit` · `Fully received` | the page's own R1 column (`packages/shared/po-receiving.ts`) |
+| `Supplier` | one row per factory | the same facet the To Order tab carries |
+
+**Only ONE of §7's six tiles is on this tab, and that is a finding, not a shortfall.**
+`Send PO` and `Confirm ready date` are To Order's · `Confirm what happens next` is the Claims
+tab's · `Confirm tomorrow's delivery` and `Confirm balance delivery date` are **P3, not built
+yet**. A tile for an action nothing can count would be a number nobody wrote — the
+`ops_order_control.balance` disease with a queue name on it. **When P3 lands, its two actions
+get their tiles in this same band.**
+
+**`Check in` is counted by QUANTITY, which is §9's own rule** — *"A PO is finished by
+QUANTITY, never by the existence of a receiving record."* So the tile reads
+`poReceivingProgress().pendingDelivery`, **not** the stored `status` word the three status
+tabs read, and a PO whose status still says `open` while its lines are fully received is
+correctly NOT in it. A test states exactly that; re-pointing the tile at the status word
+fires 3 tests. The band hides itself when the count is zero, so the `Received` tab shows no
+`Check in` tile at all rather than a reassuring `0`.
+
+**Closing the drawer gives the list back** — the tab, the search, all three filters and the
+facet rail's scroll. The one overlay this tab opens is `ReceivePOModal` (the Check in form);
+the scroll re-applies after each render until it sticks, because the refetch on close re-lays
+the rail out a frame or two later. Written inline again rather than shared: that behaviour
+belongs in `PageShell` / `DataTable`, which is **D0.5c on line ⑧**, and this card reserves it.
+
+**One thing was extracted, and it is not the forbidden one.** `FacetRow` now renders on TWO
+Purchasing tabs, and UI-KIT §6.1 is explicit: *"the second occurrence is a full stop: extract
+it first, then use it twice."* It moved verbatim into `components/FacetRow.tsx`. What P2
+forbids extracting is `PageShell` / `DataTable`, which own the BEHAVIOUR — untouched.
+
+**The page also stops hand-rolling its own header.** It renders through `ListPageShell` with
+no title, which is §8.3's module-tab law and what the sibling tab already does; the kicker +
+`<h1>Receiving</h1>` + the strapline were ~80px of a 200px list budget spent repeating the
+word already lit in the tab bar. **Nothing was renamed** — those three lines were deleted by
+the law, not reworded.
+
+`OperationReceiving.test.tsx` gained 9 tests, each with its negative control run (swap the
+tile onto the status word → 3 fail · make the tiles non-toggling → 4 fail · drop the state
+restore → 1 · drop the scroll re-apply → 1). Suites at baseline (web 2094 passed · 16
+pre-existing); typecheck 0; build + lint + v4 guard clean; `SERVICE_ROLE` 0.
+
+**Reported, not fixed (Law 0):**
+
+1. **`Send back` is live on this page and the dictionary retired it.** COPY-STANDARD's
+   warehouse-count words (Loo 2026-07-28) rule the two directions `Return count to Carres` /
+   `Return count to {warehouse}` and state that `Send back` is retired because `Send` is
+   pinned to raising a PO. R6's `WarehouseReceiptsPanel` on this tab still says `Send back`
+   three times. **Not touched** — R8 owns the sweep and this card was told to leave R6's panel
+   alone; but it is on the same screen the card just rebuilt, so it is named here rather than
+   left for a grep to find.
+2. **The row-click rung of §8.2 has nothing to open on this tab, so it was NOT invented.**
+   §8.2 says a row click opens the drawer on its first tab. Receiving has no detail drawer —
+   its only overlay is the Check in FORM, and a form is not a record view: opening it from a
+   row click would mean a `Fully received` row opens a form with nothing to submit. The PO's
+   detail lives on the Purchase Orders tab, which is a nested route, and navigating away is
+   not a drawer (closing it could not "give the list back"). **Jess rules whether Receiving
+   should get a PO drawer**; until then the `Receive →` button stays the only opener.
+3. **The empty state does not know about the new filters.** It still reads
+   `No purchase orders in this tab.` — accurate but not the whole truth once a tile is on
+   (the active chips are on screen beside it). A filtered-empty sentence needs words nobody
+   has ruled, so none were invented.
+4. **`Factory: {name}` on To Order vs `Supplier: {name}` here.** The chips for the same facet
+   spell the party two ways one tab apart. This page's own column header, §7's column list and
+   the dictionary's `{supplier}` all say **Supplier**, so that is what the new chip says — and
+   the To Order chip is now the odd one out. Rule 8 says one business fact, one word; **the
+   fix belongs in R8's sweep**, not in a card about clicking.
+5. **The status tabs and the `Check in` tile answer nearly the same question from two
+   different stores.** `To receive` reads `purchase_orders.status`; `Check in` reads the line
+   quantities, which is what §9 says is authoritative. They agree today because the receive
+   RPC sets the status word, and the divergence is exactly the case §9 was written for. Two
+   controls that usually agree and occasionally will not is worth Jess's word — the honest
+   options are to leave both (today), or to re-derive the tabs from quantities, which changes
+   what three existing words select and is therefore not a P-card.
+6. **The Claims half wrote a THIRD copy of the facet row.** #494 landed while this ran and
+   hand-rolled its own row inside `OperationSupplierClaims.tsx`; this half then extracted the
+   shared `components/FacetRow.tsx` per §6.1, so there are now two users of the component and
+   one copy beside it. **Not fixed here** — that file belonged to a parallel chat and this one
+   was told not to open it. It is a one-import change for whoever next has a reason to.
 
 ## P3 · The two missing supplier calls
 
@@ -479,7 +578,7 @@ number on screen matches what actually happened.
 | Card | Status | PR |
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
-| P2 | 🟡 PARTIALLY DONE · the interaction law is true on **To Order** (#492) and on **Claims** (#494). **Only Receiving is left** — `OperationReceiving.tsx`, a rail and tiles from scratch | #492 · #494 |
+| P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#TBD). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #TBD |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
