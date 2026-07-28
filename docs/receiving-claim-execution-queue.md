@@ -319,7 +319,18 @@ vocabulary table bans `Receive` as a verb outright (`Log goods arrival` → **`C
 this is lag, not a decision. It is the clearest possible case of rule 8 and a new hire meets
 it on their first shift.
 
-**② `Contact supplier` → `Call {supplier} — confirm what happens next`.** Loo ruled 2026-07-28
+**② `Send back` → `Return count to {warehouse}`, and `Save count` → `Return count to Carres`.**
+Loo ruled 2026-07-28 after R6 reported both words as having no legal source. `Send` is pinned
+to raising a PO to a factory and is never reused; `Return` is now the sixth verb and its two
+forms are in the dictionary with all five strings each. **Two live sites, and they are not the
+same feature** — `WarehouseReceiptsPanel.tsx` (R6's ops review, 3 occurrences + a comment) and
+**`OperationStockPlan.tsx:681`, which is Ready Stock K2's plan review.** Line ⑤ is complete,
+so that one is a stray in a finished line: it is the same SHAPE (a record going back to whoever
+produced it) but a different object, so it needs its own row in the dictionary before it is
+renamed — **do not guess `Return plan to …` here.** Report it and leave it if Jess has not
+ruled the words.
+
+**③ `Contact supplier` → `Call {supplier} — confirm what happens next`.** Loo ruled 2026-07-28
 that the portal has exactly FIVE verbs
 (`Assign · Call · Issue · Upload · Close`) and `Contact` was a sixth for behaviour `Call`
 already covers — reach the outside party, get an answer, record the outcome. **The ruling is
@@ -329,14 +340,14 @@ already law**: `docs/COPY-STANDARD.md` carries the five strings
 `No claim is waiting for a supplier answer.`) and the exception-lifecycle row no longer lists
 `Contact supplier`. **The R2/R3 screens are the lag.**
 
-**Build:** every visible `Receive` and `Contact` on the receiving and claim screens reads from
-the shared word module, same as C1 did for Orders. No behaviour changes, no claim state
-changes, no migration.
-**Grep both directions, for BOTH words** — the old string at 0 proves nothing says it; the new
+**Build:** every visible `Receive`, `Send back`, `Save count` and `Contact` on the receiving,
+warehouse and claim screens reads from the shared word module, same as C1 did for Orders. No
+behaviour changes, no claim state changes, no migration.
+**Grep both directions, for EVERY word** — the old string at 0 proves nothing says it; the new
 string at 1 proves something says it. One direction proves half.
-**Done when:** neither `Receive` (as a verb) nor `Contact` appears anywhere on screen, the two
-panels on the Receiving station say the same word for the same act, and the Claims queue tile
-has a name that is in the dictionary.
+**Done when:** `Receive` (as a verb), `Send back` and `Contact` appear nowhere on screen, the
+two panels on the Receiving station say the same word for the same act, and the Claims queue
+tile has a name that is in the dictionary.
 
 **LANE:** these are ④ R's own screens, but **`OperationSupplierClaims.tsx` is also P2's** —
 P2 is building the queue tiles and the filter behaviour on the same file. Run R8 after P2

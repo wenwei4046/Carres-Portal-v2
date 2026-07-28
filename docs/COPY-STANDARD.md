@@ -330,7 +330,13 @@ stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-Five verbs, five meanings. Every module uses these; no module invents a sixth.
+**SIX verbs, six meanings. Every module uses these; no module invents a seventh.**
+
+*(It was five until 2026-07-28. `Return` was added by Loo's ruling and it is the only
+addition since the table was locked — it exists because R6 needed a word for "this record
+goes back to whoever produced it" and reached for `Send back`, which reuses the one verb
+this table pins hardest. The bar for a seventh is the bar that was cleared here: no
+existing verb fits, and the alternative was a module inventing its own.)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
@@ -350,11 +356,32 @@ not WHAT — label it `Open WhatsApp group` / `Copy message`, never as a second 
 | **Issue** | the SYSTEM produces a formal document | the document exists |
 | **Upload** | evidence is attached | the file exists |
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
+| **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
 `Call {logistics} — arrange new delivery date` · `Issue invoice` · `Issue credit note` ·
-`Upload delivery photo` · `Upload payment proof`.
+`Upload delivery photo` · `Upload payment proof` · `Return count to Carres` ·
+`Return count to {warehouse}`.
+
+### The warehouse count words (Loo, 2026-07-28)
+
+**One verb, two directions, and the party is always named.** `Send back` is retired: `Send`
+is pinned to raising a purchase order to a factory and is never reused (rule 8).
+
+| Who does it | Queue tile | Row line | Button | Done message | Empty state |
+|---|---|---|---|---|---|
+| the warehouse files its count | `Return count` | `Return count to Carres` | `Return count to Carres` | `Count returned to Carres` | `Nothing counted and waiting.` |
+| Carres sends it back to be redone | `Return count` | `Return count to {warehouse}` | `Return count to {warehouse}` | `Count returned to {warehouse}` | `No count is waiting for a check.` |
+
+The queue word is the same for both because a queue holds many and names no party — which is
+the dictionary's own rule, and here it is load-bearing rather than incidental: the two rows
+are the same act seen from the two ends.
+
+**This replaces R6's `Save count` on the warehouse form, and that is deliberate.** The form
+law says a button that merely stores what you typed is `Save` — but this one does not merely
+store: it hands the count to Carres and the state becomes `Waiting Carres check`. A button
+that changes whose problem something is has never been a `Save`.
 
 **Consequence of the Issue rule:** the SYSTEM writes the document; the human only presses
 the button. **`Issue delivery order` IS an action** (Jess ruled 2026-07-27): once the
