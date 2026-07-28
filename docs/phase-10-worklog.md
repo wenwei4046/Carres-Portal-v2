@@ -3710,6 +3710,91 @@ been used for a day is how a wrong shell reaches five pages.*
 
 The Order Detail Information Architecture is complete and this workstream is closed.
 
+---
+
+**2026-07-28 · ⑧ D0.5a — the ten boxes exist, and `/ui` is real** (branch
+`claude/carres-portal-d0-5a-b2afe1`, **no migration**, **not deployed**) — the kit stops being a
+document and starts being components.
+
+**Why this card, in one line.** The kit was frozen once already (2026-07-16) with the same claim of
+being the only design document, and the codebase still reached **2,556 hard-coded font sizes across
+225 files**. The measurement explains it: what survived was everything expressible as a CSS class
+(`.btn-*` 343 uses), and what died was everything needing structure — **274 of 285 pages hand-roll a
+page shell, 26 a `<table>`, 63 a modal, 134 an `<input>`**. So the deliverable was never a better
+document.
+
+**What shipped.** `apps/web/src/components/kit/` — `Button` · `Input` · `Textarea` · `SearchInput` ·
+`Card` · `Panel` · `Badge` · `StatusPill` · `EmptyState` · `Loading`, plus `Icon` (§5) and the two
+internal extractions §6.6 demanded rather than allowed (`FieldFrame`, `field-recipe` — three
+controls needed one border, one radius, one focus ring). **`/ui`** (`pages/dev/UiShowcase.tsx`)
+renders every one of them in every §9 state, routed **public** (CI has no login) and **lazy** (it
+built as its own 23 kB chunk, so a kit reference never rides the operator's 4.48 MB bundle).
+
+**Zero existing pages touched, which is the lane rule for this card.** Outside `components/kit/**`
+and `pages/dev/**` the diff is `tailwind.config.ts` (additive keys only — no existing token
+changed), `App.tsx` (one route), and docs.
+
+**The decision the card was not allowed to make, and did not.** Q1 spacing · Q3 weight · Q4 icon
+stroke render side by side on `/ui` and **not one component depends on any of them**: the kit is
+built from the six spacing steps present in BOTH Q1 candidates (4·8·12·16·24·32), uses no
+`font-bold`, and takes Lucide's own default stroke. **Freezing any of the three costs zero component
+changes** — which is the whole reason components could ship while the register is non-empty, instead
+of the line stalling on three questions. A source scan (`kit-source.test.ts`) fails if anyone later
+edits a kit padding off that safe set, so the property survives the next hand rather than depending
+on this note being read.
+
+**The one thing that could not be built as the law words it.** §2.1's tokens are `t-page … t-label`;
+**`.t-body` is ALREADY the retired v17 ramp's 14px/400** in `index.css` and is live in 5 files, so
+taking the name would have re-sized pages this card may not touch. The classes are `text-page …
+text-label` — Tailwind `fontSize` entries carrying size + weight + line-height in ONE class, which is
+a **stronger** shape than a CSS class (a page cannot half-apply a token, and `text-[Npx]` never
+appears). UI-KIT §2.1 records the mapping and hands the rename to D2. *Discovered by counting, not
+assumed: `t-page`/`t-title`/`t-strong`/`t-meta`/`t-label` are all 0 uses — exactly one of the six
+collided.*
+
+**Enforcement, not documentation — every rule this card added is a type or an API.** No kit
+component accepts `className` or `style` (11 × `@ts-expect-error`, and `tsc` fails on an UNUSED
+directive, so the test cannot silently rot); `Icon`'s `name` is §5.3's 40 meanings and `size` is
+`14|16|18`; **`StatusPill`'s `tone` is `OrderActionTone`**, the union the action engine already
+computes, so §3.6's "tone comes from a CONDITION, never a verb" holds by construction — that file
+contains no verb and no verb→tone map; `Badge` has no `tone` at all (a coloured badge is a status in
+disguise, and §3.4 says a status is a pill); `Button` has no `danger` variant (§3.3 gives red one
+job — *late · act now* — and a red button paints intent onto a control instead of onto the state
+that earned it). **§16 moves 9.09% → 31.58% with the Human Review debt unchanged at 4**, and the
+arithmetic is printed in §16 rather than asserted. One rule was deliberately NOT written as a rule
+row — "partial data names its own gap" has no mechanism, and §16's second health rule forbids growing
+the debt, so it stays prose.
+
+**Measured in a real browser, not asserted.** `vite preview` → `/ui` → computed styles: canvas
+`rgb(240,240,243)` = slate-3 (Q2) · card border `rgb(224,225,230)` = slate-5, radius 10, padding 16 ·
+primary button `rgb(0,144,255)` = blue-9, radius 6, height 32, 13px · danger pill red-3 on red-11 at
+radius 4 · all six type tokens exactly 24/600/32 · 20/600/28 · 15/600/22 · 13/400/18 · 12/400/16 ·
+11/500/14. **A screenshot could not be taken** — the harness reported the Browser pane not displayed
+— so the evidence is the computed-style read, which is the stronger proof for tokens anyway.
+
+**Gates**: `tsc -p tsconfig.app.json` clean · `vite build` clean (v4-guard clean) ·
+`check-design-standard` "no new violations" · web suite **at baseline — 16 pre-existing failures in
+the 4 documented files, +34 new tests all green** (kit 21 · source scan 6 · showcase 7).
+
+**Five findings, reported not fixed.** (1) **§3.6 lists six tones; `OrderActionTone` has five** — no
+`money` member, so `tone="money"` does not compile; whether the money track gets its own colour
+changes what the ENGINE may return, which is Jess's. (2) **§5.2 picks `TriangleAlert` as the
+`warning` survivor and §5.3 has no row for it**, so the kit has no warning glyph. (3) **§3.6 names a
+held (🔒) condition and §5.3's STATUS group has no `lock`** — the pill's icon is narrowed to the four
+STATUS meanings until it does. (4) **§13.4's screenshot gate has no CI job** — the page exists, the
+image diff does not; parked on D1 and now said out loud in §13.4. (5) **`lib/status-pill.ts` maps a
+status WORD to a legacy pill class** and is still the live renderer for unmigrated pages — a second
+status renderer until D2–D7 move them; deleting it would restyle pages this card may not touch.
+
+**A law conflict, corrected rather than worked around.** `docs/execution-queues-index.md` said D0.6
+is *"the ONLY card that may edit `docs/UI-KIT.md`"* — but the kit itself assigns §6 to whichever card
+lands the component ("when it lands on `/ui`") and marks §9 *"Written by D0.5a"*. The kit outranks
+the index, so the index row was narrowed to what it means: **D0.6 owns the Reference-Review
+principles and the mirror's claims**, and a D-card still writes the chapter the law assigns it.
+`design-standard.ts` was **not touched** — it is D0.6's.
+
+---
+
 ## 2026-07-28 · Purchasing P2 (Claims half) — the Claims tab gets the portal's ONE list behaviour · PR #494 · no migration · DEPLOYED
 
 **Merge `a7df6291`** · web `index-bGVCSQpH.js` (carres-portal `d5b1f5f5` + carres-pos `95a00cdb`,

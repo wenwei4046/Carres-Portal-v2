@@ -173,6 +173,22 @@ for (const f of files) {
 // Kit-governed files — hard rules C/D/F apply here. ADD a file when you
 // migrate it to the kit; never remove one.
 const KIT_FILES = new Set([
+  // D0.5a — the Foundation Components. They are the kit by definition, so they
+  // are in scope from the day they land. (`pages/dev/UiShowcase.tsx` is
+  // deliberately NOT here: it renders BOTH pending spacing candidates on
+  // purpose, which is the one file that must be allowed to.)
+  "apps/web/src/components/kit/Badge.tsx",
+  "apps/web/src/components/kit/Button.tsx",
+  "apps/web/src/components/kit/Card.tsx",
+  "apps/web/src/components/kit/EmptyState.tsx",
+  "apps/web/src/components/kit/FieldFrame.tsx",
+  "apps/web/src/components/kit/Icon.tsx",
+  "apps/web/src/components/kit/Input.tsx",
+  "apps/web/src/components/kit/Loading.tsx",
+  "apps/web/src/components/kit/Panel.tsx",
+  "apps/web/src/components/kit/SearchInput.tsx",
+  "apps/web/src/components/kit/StatusPill.tsx",
+  "apps/web/src/components/kit/Textarea.tsx",
   "apps/web/src/components/SectionPanel.tsx",
   "apps/web/src/pages/operation/components/OrderDetailDrawer.tsx",
   "apps/web/src/pages/operation/components/StockPickerGrid.tsx",

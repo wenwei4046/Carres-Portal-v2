@@ -1,5 +1,9 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
+// UI-KIT §3.1 — "The law names the STEP, never the hex", so the hexes are read
+// out of @radix-ui/colors rather than typed here. Nobody maintains a hex table
+// and nobody can mistype a digit. Card D0.5a.
+import { amber, blue, green, red, slate } from "@radix-ui/colors";
 
 export default {
   darkMode: ["class"],
@@ -94,6 +98,48 @@ export default {
           // is the only piece proto adds on top.
           soft: "hsl(var(--error-soft))",
         },
+        /* ⭐ THE KIT PALETTE (UI-KIT §3.2 · §3.3, card D0.5a) — Radix steps,
+         * namespaced under `kit` so they ADD to the palette instead of
+         * overriding Tailwind's own blue/green/amber/red, which 76 live class
+         * uses still depend on. Only the steps the law names exist here: a
+         * chat reaching for `bg-kit-slate-4` gets nothing, which is the point.
+         * The legacy `base-*` / `success` / `warning` ramps stay untouched
+         * until the D2–D4 codemods move the pages over. */
+        kit: {
+          slate: {
+            3: slate.slate3, // page canvas (Q2, frozen)
+            5: slate.slate5, // hairline — table lines, card edge
+            6: slate.slate6, // stronger divider — section split
+            9: slate.slate9, // icon at rest · placeholder
+            11: slate.slate11, // secondary text
+            12: slate.slate12, // primary text
+          },
+          blue: {
+            3: blue.blue3, // selected row · hover tint · info fill
+            9: blue.blue9, // the one action fill · focus ring
+            11: blue.blue11, // action ink
+          },
+          green: { 3: green.green3, 11: green.green11 }, // done · received · in stock
+          amber: { 3: amber.amber3, 11: amber.amber11 }, // needs attention · waiting
+          red: { 3: red.red3, 9: red.red9, 11: red.red11 }, // late · act now
+        },
+      },
+      /* ⭐ THE KIT TYPE SCALE (UI-KIT §2.1, card D0.5a) — six tokens, each
+       * carrying size + weight + line-height in ONE class, so a page cannot
+       * half-apply a token. A seventh size means editing this file, which is
+       * exactly the friction the law wants. These ADD to Tailwind's defaults;
+       * `text-sm` etc. still resolve for the 225 unmigrated pages.
+       *
+       * The law's token names (`t-page` … `t-label`) could not be used as CSS
+       * class names — `.t-body` is already the retired v17 ramp's 14px/400 in
+       * index.css and is live in 5 files. UI-KIT §2.1 records the mapping. */
+      fontSize: {
+        page: ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        title: ["20px", { lineHeight: "28px", fontWeight: "600" }],
+        strong: ["15px", { lineHeight: "22px", fontWeight: "600" }],
+        body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
+        meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],
+        label: ["11px", { lineHeight: "14px", fontWeight: "500" }],
       },
       fontFamily: {
         // v17 (2026-06-09): Inter is the workhorse UI font for body + display.
@@ -125,6 +171,12 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        /* ⭐ THE KIT RADII (UI-KIT §4.2, card D0.5a) — four, frozen, named by
+         * USE so a chat picks the surface rather than a number. `rounded-full`
+         * (avatar · status dot) is Tailwind's own and needs no entry. */
+        pill: "4px", // pill · small tag · checkbox
+        control: "6px", // button · input · dropdown
+        card: "10px", // card · panel · modal · drawer
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
