@@ -209,6 +209,18 @@ the list back exactly as it was left.
 
 ### 🟡 PARTIALLY DONE — the To Order half shipped 2026-07-28 (PR #492)
 
+**DEPLOYED** — web `index-c7LT9aSQ.js` from main tip `10f49add` (carres-portal `4523c8cf` +
+carres-pos `f22c7dcc`, both `--branch=main`; `wrangler pages deployment list` names
+`10f49ad` the newest Production/main writer on BOTH projects). **No api deploy**:
+`git diff 9fe094bf..HEAD -- apps/api packages/shared supabase/migrations` is empty, so the
+Worker R6 deployed an hour earlier already matches this tip. **Proved BOTH directions on
+downloaded bundles** (4,486,379 bytes, `SERVICE_ROLE` 0): `facet-stage-place` ·
+`facet-stage-chase` · `facet-stage-receive` · `facet-supplier-` · `place-row-` each grep
+**0** in the previous live bundle (`index-DCTBedJr.js`, fetched from its OWN deployment URL
+— a superseded asset 404s at the apex) and **1** here. The canonicals flapped between the
+two hashes for several minutes, which is the documented edge-cache behaviour; the
+deployment list is what settles it.
+
 **Done: To Order.** No migration, no new word, no extracted component.
 
 - **Clicking the same PO again clears it.** It never did: the row already toggled
